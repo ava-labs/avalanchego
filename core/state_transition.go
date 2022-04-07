@@ -247,6 +247,15 @@ func (st *StateTransition) preCheck() error {
 		if vm.IsProhibited(st.msg.From()) {
 			return fmt.Errorf("%w: address %v", vmerrs.ErrAddrProhibited, st.msg.From())
 		}
+
+		// Check that the sender is on the tx allow list if enabled
+		isTxAllowList := st.evm.ChainConfig().IsTxAllowList(st.evm.Context.Time)
+		if isTxAllowList {
+			txAllowListRole := precompile.GetTxAllowListStatus(st.state, st.msg.From())
+			if !txAllowListRole.IsEnabled() {
+				return fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, st.msg.From())
+			}
+		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
 	if st.evm.ChainConfig().IsSubnetEVM(st.evm.Context.Time) {
@@ -295,11 +304,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// 1. the nonce of the message caller is correct
 	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
 	// 3. the amount of gas required is available in the block
-	// 4. the purchased gas is enough to cover intrinsic usage
-	// 5. there is no overflow when calculating intrinsic gas
-	// 6. caller has enough balance to cover asset transfer for **topmost** call
+	// 4. the message caller is on the tx allow list (if enabled)
+	// 5. the purchased gas is enough to cover intrinsic usage
+	// 6. there is no overflow when calculating intrinsic gas
+	// 7. caller has enough balance to cover asset transfer for **topmost** call
 
-	// Check clauses 1-3, buy gas if everything is correct
+	// Check clauses 1-4, buy gas if everything is correct
 	if err := st.preCheck(); err != nil {
 		return nil, err
 	}
@@ -308,16 +318,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.Context.BlockNumber)
 	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.BlockNumber)
 	subnetEVM := st.evm.ChainConfig().IsSubnetEVM(st.evm.Context.Time)
-	isTxAllowList := st.evm.ChainConfig().IsTxAllowList(st.evm.Context.Time)
 
 	contractCreation := msg.To() == nil
-
-	if isTxAllowList {
-		txAllowListRole := precompile.GetTxAllowListStatus(st.state, sender.Address())
-		if !txAllowListRole.IsEnabled() {
-			return nil, fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, sender.Address())
-		}
-	}
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)

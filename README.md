@@ -286,6 +286,97 @@ If you call `readAllowList(addr)` then you can read the current role of `addr`, 
 
 WARNING: if you remove all of the admins from the allow list, it will no longer be possible to update the allow list without modifying the subnet-evm to schedule a network upgrade.
 
+### Restricting Who Can Submit Transactions
+Similar to restricting contract deployers, this precompile restricts which addresses may submit transactions on chain. Like the previous section, you can activate the precompile by including an `AllowList` configuration in your genesis file:
+```json
+{
+  "config": {
+    "chainId": 99999,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip150Hash": "0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0",
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "subnetEVMTimestamp": 0,
+    "feeConfig": {
+      "gasLimit": 20000000,
+      "minBaseFee": 1000000000,
+      "targetGas": 100000000,
+      "baseFeeChangeDenominator": 48,
+      "minBlockGasCost": 0,
+      "maxBlockGasCost": 10000000,
+      "targetBlockRate": 2,
+      "blockGasCostStep": 500000
+    },
+    "txAllowListConfig": {
+      "blockTimestamp": 0,
+      "adminAddresses":["0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"]
+    }
+  },
+  "alloc": {
+    "8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC": {
+      "balance": "0x52B7D2DCC80CD2E4000000"
+    }
+  },
+  "nonce": "0x0",
+  "timestamp": "0x0",
+  "extraData": "0x00",
+  "gasLimit": "0x1312D00",
+  "difficulty": "0x0",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "number": "0x0",
+  "gasUsed": "0x0",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+}
+```
+
+In this example, `0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC` is named as the
+`Admin` of the `ContractDeployerAllowList`. This enables them to add other `Admins` or to add
+`Allowed`. Both `Admins` and `Allowed` can submit transactions to the chain.
+
+The `Stateful Precompile` powering the `TxAllowList` adheres to the following Solidity interface at `0x0200000000000000000000000000000000000002` (you can load this interface and interact directly in Remix):
+```solidity
+// (c) 2022-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity >=0.8.0;
+
+interface AllowListInterface {
+    // Set [addr] to have the admin role over the allow list
+    function setAdmin(address addr) external;
+
+    // Set [addr] to be enabled on the allow list
+    function setEnabled(address addr) external;
+
+    // Set [addr] to have no role over the allow list
+    function setNone(address addr) external;
+
+    // Read the status of [addr]
+    function readAllowList(address addr) external view returns (uint256);
+}
+```
+
+If you attempt to add an `Allowed` and you are not an `Admin`, you will see
+something like:
+![admin fail](./imgs/admin_fail.png)
+
+If you attempt to submit a transaction but you are not an `Admin` or not
+`Allowed`, you will see something like: `cannot issue transaction from non-allow listed address`
+
+The allow list has three roles: `None`, `Allowed`, and `Admin`.
+
+If you call `readAllowList(addr)` then you can read the current role of `addr`, which will return a `uint256` with a value of 0, 1, or 2, corresponding to the roles `None`, `Allowed`, and `Admin` respectively.
+
+WARNING: if you remove all of the admins from the allow list, it will no longer be possible to update the allow list without modifying the subnet-evm to schedule a network upgrade.
+
 ### Minting Native Coins
 
 You can mint native(gas) coins with a precompiled contract. In order to activate this feature, you can provide `nativeMinterConfig` in genesis:

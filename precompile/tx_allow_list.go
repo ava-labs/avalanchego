@@ -47,6 +47,6 @@ func GetTxAllowListStatus(stateDB StateDB, address common.Address) AllowListRole
 // SetTxAllowListStatus sets the permissions of [address] to [role] for the
 // tx allow list.
 // assumes [role] has already been verified as valid.
-func SetAllowListStatus(stateDB StateDB, address common.Address, role AllowListRole) {
+func SetTxAllowListStatus(stateDB StateDB, address common.Address, role AllowListRole) {
 	setAllowListRole(stateDB, TxAllowListAddress, address, role)
 }
