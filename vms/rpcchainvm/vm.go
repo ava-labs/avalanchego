@@ -14,10 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+// protocolVersion should be bumped anytime changes are made which require
+// the plugin vm to upgrade to latest avalanchego release to be compatible.
+const protocolVersion = 12
+
 var (
 	// Handshake is a common handshake that is shared by plugin and host.
 	Handshake = plugin.HandshakeConfig{
-		ProtocolVersion:  12,
+		ProtocolVersion:  protocolVersion,
 		MagicCookieKey:   "VM_PLUGIN",
 		MagicCookieValue: "dynamic",
 	}
