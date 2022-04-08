@@ -1,0 +1,42 @@
+{
+  "Version": {
+    "VersionTitle": "",
+    "ReleaseNotes": "Automated latest avalanchego release"
+  },
+  "DeliveryOptions": [
+    {
+      "Details": {
+        "AmiDeliveryOptionDetails": {
+          "AmiSource": {
+            "AmiId": "",
+            "AccessRoleArn": "",
+            "UserName": "ubuntu",
+            "OperatingSystemName": "UBUNTU",
+            "OperatingSystemVersion": "Ubuntu 20.04"
+          },
+          "UsageInstructions": "Connect via SSH and you can make local calls to port 9650",
+          "RecommendedInstanceType": "c5.2xlarge",
+          "SecurityGroups": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 9651,
+              "ToPort": 9651,
+              "IpRanges": [
+                "0.0.0.0/0"
+              ]
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                "0.0.0.0/0"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+

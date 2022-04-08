@@ -1,0 +1,9 @@
+#!/usr/bin/env ansible-playbook
+---
+- name: Create a public AMI image for AWS Marketplace
+  connection: ssh
+  gather_facts: false
+  become: yes
+  hosts: all
+  roles:
+    - name: public-ami
