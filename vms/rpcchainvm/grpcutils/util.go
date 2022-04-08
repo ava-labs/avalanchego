@@ -5,8 +5,12 @@ package grpcutils
 
 import (
 	"fmt"
+	"math"
+	"net"
 	"net/http"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -14,6 +18,17 @@ import (
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+)
+
+var (
+	DefaultDialOptions = []grpc.DialOption{
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
+	}
+	DefaultServerOptions = []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(math.MaxInt),
+		grpc.MaxSendMsgSize(math.MaxInt),
+	}
 )
 
 func Errorf(code int, tmpl string, args ...interface{}) error {
@@ -75,4 +90,24 @@ func MergeHTTPHeader(hs []*httppb.Element, header http.Header) {
 	for _, h := range hs {
 		header[h.Key] = h.Values
 	}
+}
+
+func Serve(listener net.Listener, grpcServerFunc func([]grpc.ServerOption) *grpc.Server) {
+	var opts []grpc.ServerOption
+	grpcServer := grpcServerFunc(opts)
+
+	// TODO: While errors will be reported later, it could be useful to somehow
+	//       log this if it is the primary error.
+	//
+	// There is nothing to with the error returned by serve here. Later requests
+	// will propegate their error if they occur.
+	_ = grpcServer.Serve(listener)
+
+	// Similarly, there is nothing to with an error when the listener is closed.
+	_ = listener.Close()
+}
+
+func createClientConn(addr string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpc.Dial(addr, opts...)
 }

@@ -9,13 +9,12 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/hashicorp/go-plugin"
-
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
 	readerpb "github.com/ava-labs/avalanchego/proto/pb/io/reader"
@@ -33,15 +32,13 @@ var (
 type Client struct {
 	client responsewriterpb.WriterClient
 	header http.Header
-	broker *plugin.GRPCBroker
 }
 
 // NewClient returns a response writer connected to a remote response writer
-func NewClient(header http.Header, client responsewriterpb.WriterClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(header http.Header, client responsewriterpb.WriterClient) *Client {
 	return &Client{
 		client: client,
 		header: header,
-		broker: broker,
 	}
 }
 
@@ -99,7 +96,7 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, err
 	}
 
-	clientConn, err := c.broker.Dial(resp.ConnReadWriterServer)
+	clientConn, err := grpcutils.Dial(resp.ServerAddr)
 	if err != nil {
 		return nil, nil, err
 	}

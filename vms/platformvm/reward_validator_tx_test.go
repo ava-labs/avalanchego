@@ -596,7 +596,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	appSender := &common.SenderTest{}
+	appSender := &common.SenderTest{T: t}
 	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
