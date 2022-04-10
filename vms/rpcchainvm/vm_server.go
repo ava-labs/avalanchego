@@ -6,9 +6,11 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
@@ -425,7 +427,13 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequ
 	return &emptypb.Empty{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmpb.HealthResponse, error) {
+func (vm *VMServer) Health(ctx context.Context, req *vmpb.HealthRequest) (*vmpb.HealthResponse, error) {
+	// Perform health checks for vm client gRPC servers
+	err := vm.grpcHealthChecks(ctx, req.GrpcChecks)
+	if err != nil {
+		return &vmpb.HealthResponse{}, err
+	}
+
 	details, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
@@ -450,6 +458,27 @@ func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmpb.HealthRespons
 	return &vmpb.HealthResponse{
 		Details: detailsStr,
 	}, nil
+}
+
+func (vm *VMServer) grpcHealthChecks(ctx context.Context, checks map[string]string) error {
+	var errs []error
+	for name, address := range checks {
+		clientConn, err := grpcutils.Dial(address)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("grpc health check failed to dial: %q address: %s: %w", name, address, err))
+			continue
+		}
+		client := grpc_health_v1.NewHealthClient(clientConn)
+		_, err = client.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("grpc health check failed for %q address: %s: %w", name, address, err))
+		}
+		err = clientConn.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return wrappers.NewAggregate(errs)
 }
 
 func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionResponse, error) {

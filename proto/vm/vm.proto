@@ -19,7 +19,7 @@ service VM {
   rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
   rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
   rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
-  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
   rpc Version(google.protobuf.Empty) returns (VersionResponse);
   rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
   rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
@@ -153,6 +153,12 @@ message BlockAcceptRequest {
 
 message BlockRejectRequest {
   bytes id = 1;
+}
+
+message HealthRequest {
+  // grpc_checks is a map [name]=address of the gRPC servers to perform the
+  // health check agaist.
+  map<string, string> grpc_checks = 1;
 }
 
 message HealthResponse {
