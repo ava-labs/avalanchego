@@ -67,6 +67,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -109,6 +110,8 @@ const (
 	decidedCacheSize    = 100
 	missingCacheSize    = 50
 	unverifiedCacheSize = 50
+
+	targetAtomicTxsSize = 40 * units.KiB
 )
 
 // Define the API endpoints for the VM
@@ -607,11 +610,19 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		batchContribution *big.Int = new(big.Int).Set(common.Big0)
 		batchGasUsed      *big.Int = new(big.Int).Set(common.Big0)
 		rules                      = vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+		size              int
 	)
 
 	for {
 		tx, exists := vm.mempool.NextTx()
 		if !exists {
+			break
+		}
+
+		// Ensure that adding [tx] to the block will not exceed the block size soft limit.
+		txSize := len(tx.Bytes())
+		if size+txSize > targetAtomicTxsSize {
+			vm.mempool.CancelCurrentTx(tx.ID())
 			break
 		}
 
@@ -661,6 +672,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		// Add the [txGasUsed] to the [batchGasUsed] when the [tx] has passed verification
 		batchGasUsed.Add(batchGasUsed, txGasUsed)
 		batchContribution.Add(batchContribution, txContribution)
+		size += txSize
 	}
 
 	// If there is a non-zero number of transactions, marshal them and return the byte slice
