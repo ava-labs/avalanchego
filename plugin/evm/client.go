@@ -35,6 +35,7 @@ type Client interface {
 	MemoryProfile(ctx context.Context) (bool, error)
 	LockProfile(ctx context.Context) (bool, error)
 	SetLogLevel(ctx context.Context, level log.Lvl) (bool, error)
+	GetVMConfig(ctx context.Context) (*Config, error)
 }
 
 // Client implementation for interacting with EVM [chain]
@@ -226,4 +227,11 @@ func (c *client) SetLogLevel(ctx context.Context, level log.Lvl) (bool, error) {
 		Level: level.String(),
 	}, res)
 	return res.Success, err
+}
+
+// GetVMConfig returns the current config of the VM
+func (c *client) GetVMConfig(ctx context.Context) (*Config, error) {
+	res := &ConfigReply{}
+	err := c.adminRequester.SendRequest(ctx, "getVMConfig", struct{}{}, res)
+	return res.Config, err
 }
