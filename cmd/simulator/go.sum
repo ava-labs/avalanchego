@@ -121,8 +121,8 @@ github.com/ava-labs/avalanchego v1.7.5-0.20220202014036-7c45dd1e2377/go.mod h1:s
 github.com/ava-labs/avalanchego v1.7.7-rc.1/go.mod h1:a5R0Zar2qRmaz2ukZs2zCocU/HvOIYrkKB506rsQTks=
 github.com/ava-labs/avalanchego v1.7.7-rc.4/go.mod h1:ZFuoVdAoCKS3Q4NFBKsR7TVCGyLvdbgwUkmkGE6jmi0=
 github.com/ava-labs/avalanchego v1.7.8/go.mod h1:1QNPNIFEYjNevyzaGx+RhdhWGG5LiA6Mn3iomnkf/h0=
-github.com/ava-labs/avalanchego v1.7.10-rc.0 h1:kb7lHch24cevxw2JEhcxups1e6ubWsiwXcyUiBx3EVE=
-github.com/ava-labs/avalanchego v1.7.10-rc.0/go.mod h1:2pR4qaFHtipNdydb8oCH07+Kbdn/WQNtkF6gMj4Hrdo=
+github.com/ava-labs/avalanchego v1.7.10-rc.2 h1:rSZVCNCJCwlBoqVu59CzGNg6V1JDqqVKsWd8lEITb+8=
+github.com/ava-labs/avalanchego v1.7.10-rc.2/go.mod h1:zrJ4OgbC38Xa7qkvC08EnSlywJdC4K3Hp5Nd1zhGt1U=
 github.com/ava-labs/avalanchego-operator v0.0.0-20211115144351-99f07d2570bf/go.mod h1:RTkVkouQ0HBSBVSFAQCUviXPU7Iuxoy+Fui3ykmD9HA=
 github.com/ava-labs/coreth v0.8.4-rc.1/go.mod h1:bP2Atm7pCJdx8fwzsPT3xU/kWOdHFklpja7aRNT++Qo=
 github.com/ava-labs/coreth v0.8.4-rc.3/go.mod h1:9TgpLJVY9ot6RV8Lh66F356S4MfalvaL3sAqw4+miTU=
