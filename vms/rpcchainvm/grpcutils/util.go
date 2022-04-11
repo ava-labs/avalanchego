@@ -8,9 +8,11 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -20,14 +22,62 @@ import (
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
+const (
+	// Server:
+
+	// MinTime is the minimum amount of time a client should wait before sending
+	// a keepalive ping. grpc-go default 5 mins
+	defaultServerKeepAliveMinTime = 5 * time.Second
+	// After a duration of this time if the server doesn't see any activity it
+	// pings the client to see if the transport is still alive.
+	// If set below 1s, a minimum value of 1s will be used instead.
+	// grpc-go default 2h
+	defaultServerKeepAliveInterval = 2 * time.Hour
+	// After having pinged for keepalive check, the server waits for a duration
+	// of Timeout and if no activity is seen even after that the connection is
+	// closed. grpc-go default 20s
+	defaultServerKeepAliveTimeout = 20 * time.Second
+
+	// Client:
+
+	// After a duration of this time if the client doesn't see any activity it
+	// pings the server to see if the transport is still alive.
+	// If set below 10s, a minimum value of 10s will be used instead.
+	// grpc-go default infinity
+	defaultClientKeepAliveTime = 30 * time.Second
+	// After having pinged for keepalive check, the client waits for a duration
+	// of Timeout and if no activity is seen even after that the connection is
+	// closed. grpc-go default 20s
+	defaultClientKeepAliveTimeOut = 10 * time.Second
+	// If true, client sends keepalive pings even with no active RPCs. If false,
+	// when there are no active RPCs, Time and Timeout will be ignored and no
+	// keepalive pings will be sent. grpc-go default false
+	defaultPermitWithoutStream = true
+)
+
 var (
 	DefaultDialOptions = []grpc.DialOption{
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                defaultClientKeepAliveTime,
+			Timeout:             defaultClientKeepAliveTimeOut,
+			PermitWithoutStream: defaultPermitWithoutStream,
+		}),
 	}
+
 	DefaultServerOptions = []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(math.MaxInt),
 		grpc.MaxSendMsgSize(math.MaxInt),
+		grpc.MaxConcurrentStreams(math.MaxUint32),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             defaultServerKeepAliveMinTime,
+			PermitWithoutStream: defaultPermitWithoutStream,
+		}),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time:    defaultServerKeepAliveInterval,
+			Timeout: defaultServerKeepAliveTimeout,
+		}),
 	}
 )
 

@@ -15,20 +15,27 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
 	// syncBound is the synchrony bound used for safe decision making
 	syncBound = 10 * time.Second
 
-	// BatchSize is the number of decision transactions to place into a block
-	BatchSize = 30
+	// TargetTxSize is the maximum number of bytes a transaction can use to be
+	// allowed into the mempool.
+	TargetTxSize = 64 * units.KiB
+
+	// TargetBlockSize is maximum number of transaction bytes to place into a
+	// StandardBlock
+	TargetBlockSize = 128 * units.KiB
 )
 
 var (
 	errEndOfTime         = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks   = errors.New("no pending blocks")
 	errMempoolReentrancy = errors.New("mempool reentrancy")
+	errTxTooBig          = errors.New("tx too big")
 )
 
 // blockBuilder implements a simple blockBuilder to convert txs into valid blocks
@@ -120,6 +127,11 @@ func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
 		return errMempoolReentrancy
 	}
 
+	txBytes := tx.Bytes()
+	if len(txBytes) > TargetTxSize {
+		return errTxTooBig
+	}
+
 	if err := m.Add(tx); err != nil {
 		return err
 	}
@@ -153,7 +165,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Try building a standard block.
 	if m.HasDecisionTxs() {
-		txs := m.PopDecisionTxs(BatchSize)
+		txs := m.PopDecisionTxs(TargetBlockSize)
 		return m.vm.newStandardBlock(preferredID, nextHeight, txs)
 	}
 

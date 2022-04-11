@@ -4,12 +4,12 @@
 package profiler
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/avalanchego/utils/filesystem"
 )
 
 // Config that is used to describe the options of the continuous profiler.
@@ -97,19 +97,12 @@ func (p *continuousProfiler) Shutdown() {
 func rotate(name string, maxNumFiles int) error {
 	for i := maxNumFiles - 1; i > 0; i-- {
 		sourceFilename := fmt.Sprintf("%s.%d", name, i)
-		_, err := os.Stat(sourceFilename)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
 		destFilename := fmt.Sprintf("%s.%d", name, i+1)
-		if err := os.Rename(sourceFilename, destFilename); err != nil {
+		if _, err := filesystem.RenameIfExists(sourceFilename, destFilename); err != nil {
 			return err
 		}
 	}
 	destFilename := fmt.Sprintf("%s.1", name)
-	return os.Rename(name, destFilename)
+	_, err := filesystem.RenameIfExists(name, destFilename)
+	return err
 }

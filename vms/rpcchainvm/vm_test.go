@@ -192,17 +192,15 @@ type TestVM interface {
 	CreateHandlers() (map[string]*common.HTTPHandler, error)
 }
 
-func NewTestServer(vm TestVM, broker *plugin.GRPCBroker) *TestVMServer {
+func NewTestServer(vm TestVM) *TestVMServer {
 	return &TestVMServer{
-		vm:     vm,
-		broker: broker,
+		vm: vm,
 	}
 }
 
 type TestVMServer struct {
 	vmpb.UnimplementedVMServer
-	vm     TestVM
-	broker *plugin.GRPCBroker
+	vm TestVM
 
 	serverCloser grpcutils.ServerCloser
 }
@@ -245,15 +243,12 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.C
 
 type TestVMClient struct {
 	client vmpb.VMClient
-	broker *plugin.GRPCBroker
-
-	conns []*grpc.ClientConn
+	conns  []*grpc.ClientConn
 }
 
-func NewTestClient(client vmpb.VMClient, broker *plugin.GRPCBroker) *TestVMClient {
+func NewTestClient(client vmpb.VMClient) *TestVMClient {
 	return &TestVMClient{
 		client: client,
-		broker: broker,
 	}
 }
 

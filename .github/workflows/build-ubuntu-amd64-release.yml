@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
           go-version: "1.17.1" # The Go version to download (if necessary) and use.
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
           go-version: "1.17.1" # The Go version to download (if necessary) and use.
@@ -92,12 +92,12 @@ jobs:
         shell: bash
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: master
 
       - name: Checkout devops repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ava-labs/devops
           token: ${{ secrets.AVALANCHE_PAT }}

@@ -5,11 +5,11 @@ package logging
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -90,15 +90,13 @@ func (fw *fileWriter) Rotate() error {
 	for i := fw.config.RotationSize - 1; i > 0; i-- {
 		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
 		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
-		if _, err := os.Stat(sourceFilename); !errors.Is(err, os.ErrNotExist) {
-			if err := os.Rename(sourceFilename, destFilename); err != nil {
-				return err
-			}
+		if _, err := filesystem.RenameIfExists(sourceFilename, destFilename); err != nil {
+			return err
 		}
 	}
 	sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
 	destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.1", fw.config.LoggerName))
-	if err := os.Rename(sourceFilename, destFilename); err != nil {
+	if _, err := filesystem.RenameIfExists(sourceFilename, destFilename); err != nil {
 		return err
 	}
 	writer, file, err := fw.create()
