@@ -264,10 +264,7 @@ func (vm *VM) setLogLevel(logLevel log.Lvl) {
 	prefix = fmt.Sprintf("<%s Chain>", prefix)
 	format := CorethFormat(prefix, vm.IsPlugin)
 	if vm.IsPlugin {
-		log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.MultiHandler(
-			log.StreamHandler(originalStderr, format),
-			log.StreamHandler(vm.ctx.Log, format),
-		)))
+		log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, format)))
 	} else {
 		log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(vm.ctx.Log, format)))
 	}
