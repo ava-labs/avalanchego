@@ -42,6 +42,7 @@ var (
 		PeerListNumValidatorIPs:        100,
 		PeerListValidatorGossipSize:    100,
 		PeerListNonValidatorGossipSize: 100,
+		PeerListPeersGossipSize:        100,
 		PeerListGossipFreq:             time.Second,
 	}
 	defaultTimeoutConfig = TimeoutConfig{

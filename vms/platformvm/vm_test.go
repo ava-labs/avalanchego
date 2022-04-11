@@ -2045,10 +2045,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		sender.GossipConfig{
-			AcceptedFrontierSize:      1,
-			OnAcceptSize:              1,
-			AppGossipNonValidatorSize: 1,
+			AcceptedFrontierPeerSize:  1,
+			OnAcceptPeerSize:          1,
 			AppGossipValidatorSize:    1,
+			AppGossipNonValidatorSize: 1,
 		},
 	)
 	assert.NoError(t, err)

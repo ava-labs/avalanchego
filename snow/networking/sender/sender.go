@@ -24,10 +24,15 @@ var (
 )
 
 type GossipConfig struct {
-	AcceptedFrontierSize      uint `json:"gossipAcceptedFrontierSize"`
-	OnAcceptSize              uint `json:"gossipOnAcceptSize"`
-	AppGossipNonValidatorSize uint `json:"appGossipNonValidatorSize"`
-	AppGossipValidatorSize    uint `json:"appGossipValidatorSize"`
+	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize"`
+	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize"`
+	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize"`
+	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize"`
+	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize"`
+	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize"`
+	AppGossipValidatorSize           uint `json:"appGossipValidatorSize"`
+	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize"`
+	AppGossipPeerSize                uint `json:"appGossipPeerSize"`
 }
 
 // sender is a wrapper around an ExternalSender.
@@ -780,8 +785,9 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 
 	validatorSize := int(s.gossipConfig.AppGossipValidatorSize)
 	nonValidatorSize := int(s.gossipConfig.AppGossipNonValidatorSize)
+	peerSize := int(s.gossipConfig.AppGossipPeerSize)
 
-	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), validatorSize, nonValidatorSize)
+	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), validatorSize, nonValidatorSize, peerSize)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip AppGossip(%s)", s.ctx.ChainID)
 		s.ctx.Log.Verbo("failed message: %s", formatting.DumpBytes(appGossipBytes))
@@ -803,7 +809,15 @@ func (s *sender) SendGossip(containerID ids.ID, container []byte) {
 		return
 	}
 
-	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), 0, int(s.gossipConfig.AcceptedFrontierSize))
+	sentTo := s.sender.Gossip(
+		outMsg,
+		s.ctx.SubnetID,
+		s.ctx.IsValidatorOnly(),
+		int(s.gossipConfig.AcceptedFrontierValidatorSize),
+		int(s.gossipConfig.AcceptedFrontierNonValidatorSize),
+		int(s.gossipConfig.AcceptedFrontierPeerSize),
+	)
+
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
@@ -828,7 +842,15 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containe
 		return nil
 	}
 
-	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), 0, int(s.gossipConfig.OnAcceptSize))
+	sentTo := s.sender.Gossip(
+		outMsg,
+		s.ctx.SubnetID,
+		s.ctx.IsValidatorOnly(),
+		int(s.gossipConfig.OnAcceptValidatorSize),
+		int(s.gossipConfig.OnAcceptNonValidatorSize),
+		int(s.gossipConfig.OnAcceptPeerSize),
+	)
+
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
