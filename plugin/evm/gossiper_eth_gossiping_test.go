@@ -88,10 +88,10 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	_, vm, _, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
@@ -174,10 +174,10 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	_, vm, _, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
@@ -234,10 +234,10 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	_, vm, _, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
@@ -289,10 +289,10 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	cfgJson, err := fundAddressByGenesis([]common.Address{addr})
+	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
+	_, vm, _, _, _ := GenesisVM(t, true, genesisJSON, `{"local-txs-enabled":true}`, "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
@@ -329,10 +329,10 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 		addrs[i] = crypto.PubkeyToAddress(key.PublicKey)
 	}
 
-	cfgJson, err := fundAddressByGenesis(addrs)
+	genesisJSON, err := fundAddressByGenesis(addrs)
 	assert.NoError(err)
 
-	_, vm, _, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
+	_, vm, _, _, _ := GenesisVM(t, true, genesisJSON, `{"local-txs-enabled":true}`, "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
