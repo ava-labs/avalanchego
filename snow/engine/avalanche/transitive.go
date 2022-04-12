@@ -95,6 +95,11 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) err
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return t.GetFailed(vdr, requestID)
 	}
+
+	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
+		t.metrics.numUselessPutBytes.Add(float64(len(vtxBytes)))
+	}
+
 	if _, err := t.issueFrom(vdr, vtx); err != nil {
 		return err
 	}
@@ -159,6 +164,10 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byt
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return nil
+	}
+
+	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
+		t.metrics.numUselessPushQueryBytes.Add(float64(len(vtxBytes)))
 	}
 
 	if _, err := t.issueFrom(vdr, vtx); err != nil {
