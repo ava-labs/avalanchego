@@ -66,8 +66,6 @@ type Logger interface {
 	GetDisplayLevel() Level
 	// Add a prefix to all logged messages
 	SetPrefix(string)
-	// Enable or disable the display of logged events
-	SetDisplayingEnabled(bool)
 	// Enable or disable the display of contextual information for logged events
 	SetContextualDisplayingEnabled(bool)
 

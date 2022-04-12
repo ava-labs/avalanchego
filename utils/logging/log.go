@@ -120,15 +120,13 @@ func (l *Log) Write(p []byte) (int, error) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
 
-	if !l.config.DisableLogging {
-		l.flushLock.Lock()
-		l.messages = append(l.messages, string(p))
-		l.size += len(p)
-		l.needsFlush.Signal()
-		l.flushLock.Unlock()
-	}
+	l.flushLock.Lock()
+	l.messages = append(l.messages, string(p))
+	l.size += len(p)
+	l.needsFlush.Signal()
+	l.flushLock.Unlock()
 
-	if !l.config.DisableDisplaying && !l.config.DisableWriterDisplaying {
+	if !l.config.DisableWriterDisplaying {
 		os.Stdout.Write(p)
 	}
 
@@ -153,8 +151,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
 
-	shouldLog := !l.config.DisableLogging && level <= l.config.LogLevel
-	shouldDisplay := (!l.config.DisableDisplaying && level <= l.config.DisplayLevel) || level == Fatal
+	shouldLog := level <= l.config.LogLevel
+	shouldDisplay := level <= l.config.DisplayLevel
 
 	if !shouldLog && !shouldDisplay {
 		return
@@ -314,13 +312,6 @@ func (l *Log) SetPrefix(prefix string) {
 	defer l.configLock.Unlock()
 
 	l.config.MsgPrefix = prefix
-}
-
-func (l *Log) SetDisplayingEnabled(enabled bool) {
-	l.configLock.Lock()
-	defer l.configLock.Unlock()
-
-	l.config.DisableDisplaying = !enabled
 }
 
 func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
