@@ -5,7 +5,6 @@ package indexer
 
 import (
 	"errors"
-	"io"
 	"sync"
 	"testing"
 	"time"
@@ -40,7 +39,7 @@ type apiServerMock struct {
 	endpoints   []string
 }
 
-func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, endpoint string, _ io.Writer) error {
+func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, endpoint string) error {
 	a.timesCalled++
 	a.bases = append(a.bases, base)
 	a.endpoints = append(a.endpoints, endpoint)

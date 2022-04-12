@@ -80,7 +80,6 @@ var (
 type Node struct {
 	Log        logging.Logger
 	LogFactory logging.Factory
-	HTTPLog    logging.Logger
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
@@ -526,7 +525,7 @@ func (n *Node) initAPIServer() error {
 		LockOptions: common.NoLock,
 		Handler:     authService,
 	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "")
 }
 
 // Add the default VM aliases
@@ -745,7 +744,7 @@ func (n *Node) initKeystoreAPI() error {
 		LockOptions: common.NoLock,
 		Handler:     keystoreHandler,
 	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -782,7 +781,6 @@ func (n *Node) initMetricsAPI() error {
 		&sync.RWMutex{},
 		"metrics",
 		"",
-		n.HTTPLog,
 	)
 }
 
@@ -815,7 +813,7 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "")
 }
 
 // initProfiler initializes the continuous profiling
@@ -872,7 +870,7 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "")
 }
 
 // initHealthAPI initializes the Health API service
@@ -913,7 +911,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -927,7 +924,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/readiness",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -941,7 +937,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/health",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -955,7 +950,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/liveness",
-		n.HTTPLog,
 	)
 }
 
@@ -971,7 +965,7 @@ func (n *Node) initIPCAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "")
 }
 
 // Give chains aliases as specified by the genesis information
@@ -1024,12 +1018,6 @@ func (n *Node) Initialize(
 	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
-
-	httpLog, err := logFactory.Make("http")
-	if err != nil {
-		return fmt.Errorf("problem initializing HTTP logger: %w", err)
-	}
-	n.HTTPLog = httpLog
 
 	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)
