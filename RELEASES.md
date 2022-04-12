@@ -1,6 +1,10 @@
 # Release Notes
 
 ## [v0.8.9](https://github.com/ava-labs/coreth/releases/tag/v0.8.9)
+- Fix deadlock bug on shutdown causing historical re-generation on restart
+- Add API endpoint to fetch running VM Config
+- Add AvalancheGo custom log formatting to C-Chain logs
+- Deprecate support for JS Tracer
 
 ## [v0.8.8](https://github.com/ava-labs/coreth/releases/tag/v0.8.8)
 
