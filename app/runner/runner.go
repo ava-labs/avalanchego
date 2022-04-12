@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 )
@@ -28,7 +29,7 @@ func Run(config Config, nodeConfig node.Config) {
 			Plugins: map[string]plugin.Plugin{
 				appplugin.Name: appplugin.New(nodeApp),
 			},
-			GRPCServer: plugin.DefaultGRPCServer, // A non-nil value here enables gRPC serving for this plugin
+			GRPCServer: grpcutils.NewDefaultServer, // A non-nil value here enables gRPC serving for this plugin
 			Logger: hclog.New(&hclog.LoggerOptions{
 				Level: hclog.Error,
 			}),
