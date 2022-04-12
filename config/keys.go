@@ -99,6 +99,7 @@ const (
 	LogLevelKey                                        = "log-level"
 	LogDisplayLevelKey                                 = "log-display-level"
 	LogDisplayHighlightKey                             = "log-display-highlight"
+	LogDisableDisplayPluginLogsKey                     = "log-disable-display-plugin-logs"
 	SnowSampleSizeKey                                  = "snow-sample-size"
 	SnowQuorumSizeKey                                  = "snow-quorum-size"
 	SnowVirtuousCommitThresholdKey                     = "snow-virtuous-commit-threshold"

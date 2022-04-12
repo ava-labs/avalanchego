@@ -150,6 +150,7 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 		return loggingConfig, err
 	}
 	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.DisableWriterDisplaying = v.GetBool(LogDisableDisplayPluginLogsKey)
 	return loggingConfig, err
 }
 

@@ -5,6 +5,7 @@ package logging
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -125,6 +126,10 @@ func (l *Log) Write(p []byte) (int, error) {
 		l.size += len(p)
 		l.needsFlush.Signal()
 		l.flushLock.Unlock()
+	}
+
+	if !l.config.DisableDisplaying && !l.config.DisableWriterDisplaying {
+		os.Stdout.Write(p)
 	}
 
 	return len(p), nil

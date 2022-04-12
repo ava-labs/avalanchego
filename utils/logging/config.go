@@ -42,6 +42,7 @@ type Config struct {
 	DisableDisplaying           bool          `json:"disableDisplaying"`
 	DisableContextualDisplaying bool          `json:"disableContextualDisplaying"`
 	DisableFlushOnWrite         bool          `json:"disableFlushOnWrite"`
+	DisableWriterDisplaying     bool          `json:"disableWriterDisplaying"`
 	Assertions                  bool          `json:"assertions"`
 	LogLevel                    Level         `json:"logLevel"`
 	DisplayLevel                Level         `json:"displayLevel"`
