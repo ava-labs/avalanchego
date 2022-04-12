@@ -72,12 +72,8 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey   = errors.New("invalid TLS key")
-	errPNotCreated     = errors.New("P-Chain not created")
-	errXNotCreated     = errors.New("X-Chain not created")
-	errCNotCreated     = errors.New("C-Chain not created")
-	errNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-	errShuttingDown    = errors.New("server shutting down")
+	errInvalidTLSKey = errors.New("invalid TLS key")
+	errShuttingDown  = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
@@ -894,54 +890,6 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
-		chains := make([]string, 0, 3)
-		if !n.chainManager.IsBootstrapped(pChainID) {
-			chains = append(chains, "'P'")
-		}
-		if !n.chainManager.IsBootstrapped(xChainID) {
-			chains = append(chains, "'X'")
-		}
-		if !n.chainManager.IsBootstrapped(cChainID) {
-			chains = append(chains, "'C'")
-		}
-		return chains
-	}
-
-	// Passes if the P, X and C chains are finished bootstrapping
-	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
-		pChainID, err := n.chainManager.Lookup("P")
-		if err != nil {
-			return nil, errPNotCreated
-		}
-
-		xChainID, err := n.chainManager.Lookup("X")
-		if err != nil {
-			return nil, errXNotCreated
-		}
-
-		cChainID, err := n.chainManager.Lookup("C")
-		if err != nil {
-			return nil, errCNotCreated
-		}
-
-		chains := chainsNotBootstrapped(pChainID, xChainID, cChainID)
-		if len(chains) != 0 {
-			return chains, errNotBootstrapped
-		}
-		return chains, nil
-	})
-
-	err = healthChecker.RegisterReadinessCheck("bootstrapped", bootstrappedCheck)
-	if err != nil {
-		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
-	}
-
-	err = healthChecker.RegisterHealthCheck("bootstrapped", bootstrappedCheck)
-	if err != nil {
-		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
-	}
-
 	err = healthChecker.RegisterHealthCheck("network", n.Net)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
