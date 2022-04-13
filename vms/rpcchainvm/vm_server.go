@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -13,35 +24,35 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
-	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/api/proto/appsenderproto"
-	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
-	"github.com/ava-labs/avalanchego/api/proto/gsharedmemoryproto"
-	"github.com/ava-labs/avalanchego/api/proto/gsubnetlookupproto"
-	"github.com/ava-labs/avalanchego/api/proto/messengerproto"
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
-	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
-	"github.com/ava-labs/avalanchego/database/corruptabledb"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/rpcdb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/ids/galiasreader"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
+	"github.com/chain4travel/caminogo/api/keystore/gkeystore"
+	"github.com/chain4travel/caminogo/api/metrics"
+	"github.com/chain4travel/caminogo/api/proto/appsenderproto"
+	"github.com/chain4travel/caminogo/api/proto/galiasreaderproto"
+	"github.com/chain4travel/caminogo/api/proto/ghttpproto"
+	"github.com/chain4travel/caminogo/api/proto/gkeystoreproto"
+	"github.com/chain4travel/caminogo/api/proto/gsharedmemoryproto"
+	"github.com/chain4travel/caminogo/api/proto/gsubnetlookupproto"
+	"github.com/chain4travel/caminogo/api/proto/messengerproto"
+	"github.com/chain4travel/caminogo/api/proto/rpcdbproto"
+	"github.com/chain4travel/caminogo/api/proto/vmproto"
+	"github.com/chain4travel/caminogo/chains/atomic/gsharedmemory"
+	"github.com/chain4travel/caminogo/database/corruptabledb"
+	"github.com/chain4travel/caminogo/database/manager"
+	"github.com/chain4travel/caminogo/database/rpcdb"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/ids/galiasreader"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/common/appsender"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/block"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/version"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/ghttp"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/gsubnetlookup"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/messenger"
 )
 
 var (

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -17,13 +28,13 @@ import (
 
 	runner_client "github.com/ava-labs/avalanche-network-runner/client"
 
-	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/chain4travel/caminogo/tests"
+	"github.com/chain4travel/caminogo/tests/e2e"
 
 	// ensure test packages are scanned by ginkgo
-	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/whitelist-vtx"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+	_ "github.com/chain4travel/caminogo/tests/e2e/ping"
+	_ "github.com/chain4travel/caminogo/tests/e2e/whitelist-vtx"
+	_ "github.com/chain4travel/caminogo/tests/e2e/x/transfer"
 )
 
 func TestE2E(t *testing.T) {
