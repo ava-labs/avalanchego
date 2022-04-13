@@ -155,14 +155,38 @@ type VM struct {
 	bootstrapped bool
 }
 
-// setLogLevel sets the log level with the original [os.StdErr] interface along
-// with the context logger.
+// setLogLevel initializes logger and sets the log level with the original [os.StdErr] interface
+// along with the context logger.
 func (vm *VM) setLogLevel(logLevel log.Lvl) {
-	format := log.TerminalFormat(false)
+	prefix, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
+	if err != nil {
+		prefix = vm.ctx.ChainID.String()
+	}
+	prefix = fmt.Sprintf("<%s Chain>", prefix)
+	format := SubnetEVMFormat(prefix)
 	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.MultiHandler(
 		log.StreamHandler(originalStderr, format),
 		log.StreamHandler(vm.ctx.Log, format),
 	)))
+}
+
+func SubnetEVMFormat(prefix string) log.Format {
+	return log.FormatFunc(func(r *log.Record) []byte {
+		location := fmt.Sprintf("%+v", r.Call)
+		newMsg := fmt.Sprintf("%s %s: %s", prefix, location, r.Msg)
+		// need to deep copy since we're using a multihandler
+		// as a result it will alter R.msg twice.
+		newRecord := log.Record{
+			Time:     r.Time,
+			Lvl:      r.Lvl,
+			Msg:      newMsg,
+			Ctx:      r.Ctx,
+			Call:     r.Call,
+			KeyNames: r.KeyNames,
+		}
+		b := log.TerminalFormat(false).Format(&newRecord)
+		return b
+	})
 }
 
 /*
@@ -193,6 +217,13 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
 	}
+	vm.ctx = ctx
+	// Set log level
+	logLevel, err := log.LvlFromString(vm.config.LogLevel)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger due to: %w ", err)
+	}
+	vm.setLogLevel(logLevel)
 	if b, err := json.Marshal(vm.config); err == nil {
 		log.Info("Initializing Subnet EVM VM", "Version", Version, "Config", string(b))
 	} else {
@@ -208,20 +239,12 @@ func (vm *VM) Initialize(
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
 	vm.shutdownChan = make(chan struct{}, 1)
-	vm.ctx = ctx
 	baseDB := dbManager.Current().Database
 	// Use NewNested rather than New so that the structure of the database
 	// remains the same regardless of the provided baseDB type.
 	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, baseDB)}
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-
-	// Set log level
-	logLevel, err := log.LvlFromString(vm.config.LogLevel)
-	if err != nil {
-		return fmt.Errorf("failed to initialize logger due to: %w ", err)
-	}
-	vm.setLogLevel(logLevel)
 
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {

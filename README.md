@@ -16,7 +16,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 ```
 [v0.1.0] AvalancheGo@v1.7.0-v1.7.4
 [v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
-[v0.2.0] AvalancheGo@v1.7.7-v1.7.8
+[v0.2.0] AvalancheGo@v1.7.7-v1.7.9
 ```
 
 ## API
@@ -143,12 +143,38 @@ genesis file (under the `"config"` key):
 Next, you'll need to update your [chain config](https://docs.avax.network/build/references/command-line-interface/#chain-configs) with the following:
 ```json
 {
-  "feeRecipient":"<YOU 0x-ADDRESS>"
+  "feeRecipient":"<YOUR 0x-ADDRESS>"
 }
 ```
 
 _Note: If you enable this feature but a validator doesn't specify
 a "feeRecipient", the fees will be burned in blocks they produce._
+
+## Priority Regossip
+
+A transaction is "regossiped" when the node does not find the transaction in
+a block after `tx-regossip-frequency` (defaults to `1m`). By default, up to 16 transactions
+(max 1 per address) are regossiped to validators per minute.
+
+Operators can use "priority regossip" to more aggressively "regossip" transactions for a set of
+important addresses (like bridge relayers). To do so, you'll need to update your
+[chain config](https://docs.avax.network/build/references/command-line-interface/#chain-configs) with the following:
+```json
+{
+  "tx-priority-regossip-addresses":["<YOUR 0x-ADDRESS>"]
+}
+```
+
+By default, up to 32 transactions from priority addresses (max 16 per address) are regossipped to validators per second.
+You can override these defaults with the following config:
+```json
+{
+  "tx-priority-regossip-frequency":"1s",
+  "tx-priority-regossip-max-size":32,
+  "tx-priority-regossip-addresses":["<YOUR 0x-ADDRESS>"],
+  "tx-priority-regossip-address-txs":16
+}
+```
 
 ## Precompiles
 
