@@ -324,7 +324,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	var stateSyncEnabled bool
 	stateSyncEnabled, err = stateSyncer.IsEnabled()
-	if err != nil {
+	if err != nil && err != common.ErrStateSyncableVMNotImplemented {
 		return
 	}
 
