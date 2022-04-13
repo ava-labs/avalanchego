@@ -745,7 +745,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 }
 
 func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
+	if !n.config.AllowPrivateIPs && ip.IPDesc.IP.IsPrivate() {
 		n.peerConfig.Log.Verbo(
 			"dropping suggested connected to %s%s because the ip (%s) is private",
 			constants.NodeIDPrefix, nodeID,

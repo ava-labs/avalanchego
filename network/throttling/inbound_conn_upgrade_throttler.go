@@ -98,8 +98,8 @@ type inboundConnUpgradeThrottler struct {
 
 // Returns whether we should upgrade an inbound connection from [ipStr].
 func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
-	if ip.IsPrivate() {
-		// Don't rate-limit private (local) IPs
+	if ip.IP.IsLoopback() {
+		// Don't rate-limit loopback IPs
 		return true
 	}
 	// Only use IP (not port). This mitigates DoS
