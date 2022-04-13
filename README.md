@@ -1035,5 +1035,3 @@ contract WWAGMI{
     }
 }
 ```
-
-[become a fuji validator]: https://docs.avax.network/build/tutorials/nodes-and-staking/staking-avax-by-validating-or-delegating-with-the-avalanche-wallet

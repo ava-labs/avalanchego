@@ -262,6 +262,7 @@ func (vm *VM) Initialize(
 	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
 	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
 
+	// Create directory for offline pruning
 	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
 		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
 			log.Error("failed to create offline pruning data directory", "error", err)
