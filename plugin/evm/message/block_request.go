@@ -1,0 +1,49 @@
+// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package message
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/ids"
+
+	"github.com/ethereum/go-ethereum/common"
+)
+
+var (
+	_ Request = BlockRequest{}
+)
+
+// BlockRequest is a request to retrieve Parents number of blocks starting from Hash from newest-oldest manner
+type BlockRequest struct {
+	Hash    common.Hash `serialize:"true"`
+	Height  uint64      `serialize:"true"`
+	Parents uint16      `serialize:"true"`
+}
+
+func (b BlockRequest) String() string {
+	return fmt.Sprintf(
+		"BlockRequest(Hash=%s, Height=%d, Parents=%d)",
+		b.Hash, b.Height, b.Parents,
+	)
+}
+
+func (b BlockRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler RequestHandler) ([]byte, error) {
+	return handler.HandleBlockRequest(ctx, nodeID, requestID, b)
+}
+
+// BlockResponse is a response to a BlockRequest
+// Blocks is slice of RLP encoded blocks starting with the block
+// requested in BlockRequest.Hash. The next block is the parent, etc.
+// handler: handlers.BlockRequestHandler
+type BlockResponse struct {
+	Blocks [][]byte `serialize:"true"`
+}
+
+// SerializedMap is map of Keys and Vals to track leaf sync progress
+type SerializedMap struct {
+	Keys []common.Hash `serialize:"true"`
+	Vals []common.Hash `serialize:"true"`
+}

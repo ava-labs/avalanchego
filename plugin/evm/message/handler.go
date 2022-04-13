@@ -4,6 +4,8 @@
 package message
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,12 +15,12 @@ var _ GossipHandler = NoopMempoolGossipHandler{}
 
 // GossipHandler handles incoming gossip messages
 type GossipHandler interface {
-	HandleTxs(nodeID ids.ShortID, msg *Txs) error
+	HandleTxs(nodeID ids.ShortID, msg TxsGossip) error
 }
 
 type NoopMempoolGossipHandler struct{}
 
-func (NoopMempoolGossipHandler) HandleTxs(nodeID ids.ShortID, _ *Txs) error {
+func (NoopMempoolGossipHandler) HandleTxs(nodeID ids.ShortID, _ TxsGossip) error {
 	log.Debug("dropping unexpected Txs message", "peerID", nodeID)
 	return nil
 }
@@ -28,7 +30,11 @@ func (NoopMempoolGossipHandler) HandleTxs(nodeID ids.ShortID, _ *Txs) error {
 // so that the Request object of relevant Type can invoke its respective handle method
 // on this struct.
 // Also see GossipHandler for implementation style.
-type RequestHandler interface{}
+type RequestHandler interface {
+	HandleTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
+	HandleBlockRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request BlockRequest) ([]byte, error)
+	HandleCodeRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, codeRequest CodeRequest) ([]byte, error)
+}
 
 // ResponseHandler handles response for a sent request
 // Only one of OnResponse or OnFailure is called for a given requestID, not both

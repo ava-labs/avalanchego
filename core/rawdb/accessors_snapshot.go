@@ -134,6 +134,11 @@ func IterateStorageSnapshots(db ethdb.Iteratee, accountHash common.Hash) ethdb.I
 	return db.NewIterator(storageSnapshotsKey(accountHash), nil)
 }
 
+// IterateAccountSnapshots returns an iterator for walking all of the accounts in the snapshot
+func IterateAccountSnapshots(db ethdb.Iteratee) ethdb.Iterator {
+	return db.NewIterator(SnapshotAccountPrefix, nil)
+}
+
 // ReadSnapshotGenerator retrieves the serialized snapshot generator saved at
 // the last shutdown.
 func ReadSnapshotGenerator(db ethdb.KeyValueReader) []byte {

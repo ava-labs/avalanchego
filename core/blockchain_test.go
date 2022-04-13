@@ -5,46 +5,68 @@ package core
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state/pruner"
+	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
+var (
+	archiveConfig = &CacheConfig{
+		TrieCleanLimit: 256,
+		TrieDirtyLimit: 256,
+		Pruning:        false, // Archive mode
+		SnapshotLimit:  256,
+	}
+
+	pruningConfig = &CacheConfig{
+		TrieCleanLimit: 256,
+		TrieDirtyLimit: 256,
+		Pruning:        true, // Enable pruning
+		SnapshotLimit:  256,
+	}
+)
+
+func createBlockChain(
+	db ethdb.Database,
+	cacheConfig *CacheConfig,
+	chainConfig *params.ChainConfig,
+	lastAcceptedHash common.Hash,
+) (*BlockChain, error) {
+	// Import the chain. This runs all block validation rules.
+	blockchain, err := NewBlockChain(
+		db,
+		cacheConfig,
+		chainConfig,
+		dummy.NewFaker(),
+		vm.Config{},
+		lastAcceptedHash,
+	)
+	return blockchain, err
+}
+
 func TestArchiveBlockChain(t *testing.T) {
-	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
-			db,
-			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        false, // Archive mode
-				SnapshotLimit:  256,
-			},
-			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
-			lastAcceptedHash,
-		)
-		return blockchain, err
+	createArchiveBlockChain := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
+		return createBlockChain(db, archiveConfig, chainConfig, lastAcceptedHash)
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			tt.testFunc(t, create)
+			tt.testFunc(t, createArchiveBlockChain)
 		})
 	}
 }
 
 func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
+		return createBlockChain(
 			db,
 			&CacheConfig{
 				TrieCleanLimit: 256,
@@ -53,11 +75,8 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 				SnapshotLimit:  0,     // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
 			lastAcceptedHash,
 		)
-		return blockchain, err
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
@@ -67,34 +86,19 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 }
 
 func TestPruningBlockChain(t *testing.T) {
-	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
-			db,
-			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				SnapshotLimit:  256,
-			},
-			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
-			lastAcceptedHash,
-		)
-		return blockchain, err
+	createPruningBlockChain := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
+		return createBlockChain(db, pruningConfig, chainConfig, lastAcceptedHash)
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
-			tt.testFunc(t, create)
+			tt.testFunc(t, createPruningBlockChain)
 		})
 	}
 }
 
 func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
+		return createBlockChain(
 			db,
 			&CacheConfig{
 				TrieCleanLimit: 256,
@@ -103,11 +107,8 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 				SnapshotLimit:  0,    // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
 			lastAcceptedHash,
 		)
-		return blockchain, err
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
@@ -124,20 +125,7 @@ func (w *wrappedStateManager) Shutdown() error { return nil }
 
 func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
-			db,
-			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				SnapshotLimit:  256,
-			},
-			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
-			lastAcceptedHash,
-		)
+		blockchain, err := createBlockChain(db, pruningConfig, chainConfig, lastAcceptedHash)
 		if err != nil {
 			return nil, err
 		}
@@ -156,8 +144,7 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 
 func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
+		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
 				TrieCleanLimit: 256,
@@ -166,8 +153,6 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 				SnapshotLimit:  0,    // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
 			lastAcceptedHash,
 		)
 		if err != nil {
@@ -191,7 +176,7 @@ func TestEnableSnapshots(t *testing.T) {
 	snapLimit := 0
 	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
+		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
 				TrieCleanLimit: 256,
@@ -200,8 +185,6 @@ func TestEnableSnapshots(t *testing.T) {
 				SnapshotLimit:  snapLimit, // Disable snapshots
 			},
 			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
 			lastAcceptedHash,
 		)
 		if err != nil {
@@ -224,25 +207,8 @@ func TestCorruptSnapshots(t *testing.T) {
 		// diff layer to disk at any point, we can still recover on restart.
 		rawdb.DeleteSnapshotBlockHash(db)
 		rawdb.DeleteSnapshotRoot(db)
-		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
-			db,
-			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				SnapshotLimit:  256,  // Disable snapshots
-			},
-			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
-			lastAcceptedHash,
-		)
-		if err != nil {
-			return nil, err
-		}
 
-		return blockchain, err
+		return createBlockChain(db, pruningConfig, chainConfig, lastAcceptedHash)
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
@@ -254,19 +220,7 @@ func TestCorruptSnapshots(t *testing.T) {
 func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 	create := func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
-		blockchain, err := NewBlockChain(
-			db,
-			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				SnapshotLimit:  256,
-			},
-			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
-			lastAcceptedHash,
-		)
+		blockchain, err := createBlockChain(db, pruningConfig, chainConfig, lastAcceptedHash)
 		if err != nil {
 			return nil, err
 		}
@@ -296,25 +250,110 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 		if err := pruner.Prune(targetRoot); err != nil {
 			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
 		}
-
 		// Re-initialize the blockchain after pruning
-		return NewBlockChain(
-			db,
-			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				SnapshotLimit:  256,
-			},
-			chainConfig,
-			dummy.NewFaker(),
-			vm.Config{},
-			lastAcceptedHash,
-		)
+		return createBlockChain(db, pruningConfig, chainConfig, lastAcceptedHash)
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			tt.testFunc(t, create)
 		})
+	}
+}
+
+func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		// We use two separate databases since GenerateChain commits the state roots to its underlying
+		// database.
+		genDB            = rawdb.NewMemoryDatabase()
+		chainDB          = rawdb.NewMemoryDatabase()
+		lastAcceptedHash common.Hash
+	)
+
+	// Ensure that key1 has some funds in the genesis block.
+	genesisBalance := big.NewInt(1000000)
+	gspec := &Genesis{
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+	}
+	genesis := gspec.MustCommit(genDB)
+	_ = gspec.MustCommit(chainDB)
+
+	blockchain, err := createBlockChain(chainDB, pruningConfig, gspec.Config, lastAcceptedHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
+	// This call generates a chain of 3 blocks.
+	signer := types.HomesteadSigner{}
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 10, 10, func(i int, gen *BlockGen) {
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := blockchain.InsertChain(chain); err != nil {
+		t.Fatal(err)
+	}
+	for _, block := range chain {
+		if err := blockchain.Accept(block); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	lastAcceptedHash = blockchain.LastAcceptedBlock().Hash()
+	blockchain.Stop()
+
+	blockchain, err = createBlockChain(chainDB, pruningConfig, gspec.Config, lastAcceptedHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Confirm that the node does not have the state for intermediate nodes (exclude the last accepted block)
+	for _, block := range chain[:len(chain)-1] {
+		if blockchain.HasState(block.Root()) {
+			t.Fatalf("Expected blockchain to be missing state for intermediate block %d with pruning enabled", block.NumberU64())
+		}
+	}
+	blockchain.Stop()
+
+	startHeight := uint64(1)
+	// Create a node in archival mode and re-populate the trie history.
+	blockchain, err = createBlockChain(
+		chainDB,
+		&CacheConfig{
+			TrieCleanLimit:                  256,
+			TrieDirtyLimit:                  256,
+			Pruning:                         false, // Archive mode
+			SnapshotLimit:                   256,
+			PopulateMissingTries:            &startHeight, // Starting point for re-populating.
+			PopulateMissingTriesParallelism: parallelism,
+		},
+		gspec.Config,
+		lastAcceptedHash,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, block := range chain {
+		if !blockchain.HasState(block.Root()) {
+			t.Fatalf("failed to re-generate state for block %d", block.NumberU64())
+		}
+	}
+}
+
+func TestRepopulateMissingTries(t *testing.T) {
+	// Test with different levels of parallelism as a regression test.
+	for _, parallelism := range []int{1, 2, 4, 1024} {
+		testRepopulateMissingTriesParallel(t, parallelism)
 	}
 }

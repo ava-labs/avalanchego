@@ -162,7 +162,7 @@ func setupGenesis(t *testing.T,
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
-// the channel use to send messages to the engine, the vm, and atomic memory
+// the channel use to send messages to the engine, the vm
 func GenesisVM(t *testing.T,
 	finishBootstrapping bool,
 	genesisJSON string,
@@ -1845,7 +1845,6 @@ func TestAcceptReorg(t *testing.T) {
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkCHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
 	}
-
 	if err := vm1BlkB.Reject(); err != nil {
 		t.Fatal(err)
 	}
@@ -1853,7 +1852,6 @@ func TestAcceptReorg(t *testing.T) {
 	if err := vm1BlkD.Accept(); err != nil {
 		t.Fatal(err)
 	}
-
 	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())

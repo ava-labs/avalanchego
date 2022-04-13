@@ -14,4 +14,3 @@ echo "Current test coverage : $totalCoverage %"
 echo "========================================"
 
 go tool cover -func=coverage.out
-

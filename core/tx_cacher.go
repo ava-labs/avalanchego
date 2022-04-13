@@ -27,6 +27,8 @@
 package core
 
 import (
+	"sync"
+
 	"github.com/ava-labs/subnet-evm/core/types"
 )
 
@@ -47,6 +49,10 @@ type txSenderCacherRequest struct {
 type TxSenderCacher struct {
 	threads int
 	tasks   chan *txSenderCacherRequest
+
+	// synchronization & cleanup
+	wg      sync.WaitGroup
+	tasksMu sync.RWMutex
 }
 
 // newTxSenderCacher creates a new transaction sender background cacher and starts
@@ -57,7 +63,11 @@ func newTxSenderCacher(threads int) *TxSenderCacher {
 		threads: threads,
 	}
 	for i := 0; i < threads; i++ {
-		go cacher.cache()
+		cacher.wg.Add(1)
+		go func() {
+			defer cacher.wg.Done()
+			cacher.cache()
+		}()
 	}
 	return cacher
 }
@@ -72,14 +82,24 @@ func (cacher *TxSenderCacher) cache() {
 	}
 }
 
-// recover recovers the senders from a batch of transactions and caches them
+// Recover recovers the senders from a batch of transactions and caches them
 // back into the same data structures. There is no validation being done, nor
 // any reaction to invalid signatures. That is up to calling code later.
 func (cacher *TxSenderCacher) Recover(signer types.Signer, txs []*types.Transaction) {
+	// Hold a read lock on tasksMu to make sure we don't close
+	// the channel in the middle of this call during Shutdown
+	cacher.tasksMu.RLock()
+	defer cacher.tasksMu.RUnlock()
+
 	// If there's nothing to recover, abort
 	if len(txs) == 0 {
 		return
 	}
+	// If we're shutting down, abort
+	if cacher.tasks == nil {
+		return
+	}
+
 	// Ensure we have meaningful task sizes and schedule the recoveries
 	tasks := cacher.threads
 	if len(txs) < tasks*4 {
@@ -94,17 +114,15 @@ func (cacher *TxSenderCacher) Recover(signer types.Signer, txs []*types.Transact
 	}
 }
 
-// recoverFromBlocks recovers the senders from a batch of blocks and caches them
-// back into the same data structures. There is no validation being done, nor
-// any reaction to invalid signatures. That is up to calling code later.
-func (cacher *TxSenderCacher) recoverFromBlocks(signer types.Signer, blocks []*types.Block) {
-	count := 0
-	for _, block := range blocks {
-		count += len(block.Transactions())
-	}
-	txs := make([]*types.Transaction, 0, count)
-	for _, block := range blocks {
-		txs = append(txs, block.Transactions()...)
-	}
-	cacher.Recover(signer, txs)
+// Shutdown stops the threads started by newTxSenderCacher
+func (cacher *TxSenderCacher) Shutdown() {
+	// Hold the lock on tasksMu to make sure we don't close
+	// the channel in the middle of Recover, which would
+	// cause it to write to a closed channel.
+	cacher.tasksMu.Lock()
+	defer cacher.tasksMu.Unlock()
+
+	close(cacher.tasks)
+	cacher.wg.Wait()
+	cacher.tasks = nil
 }

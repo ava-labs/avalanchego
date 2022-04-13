@@ -217,6 +217,10 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
 	}
+	if err := vm.config.Validate(); err != nil {
+		return err
+	}
+
 	vm.ctx = ctx
 	// Set log level
 	logLevel, err := log.LvlFromString(vm.config.LogLevel)
@@ -273,12 +277,16 @@ func (vm *VM) Initialize(
 	ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	ethConfig.Preimages = vm.config.Preimages
 	ethConfig.Pruning = vm.config.Pruning
+	ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
+	ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
+	ethConfig.AllowMissingTries = vm.config.AllowMissingTries
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 	ethConfig.OfflinePruning = vm.config.OfflinePruning
 	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
 	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
 
+	// Create directory for offline pruning
 	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
 		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
 			log.Error("failed to create offline pruning data directory", "error", err)
