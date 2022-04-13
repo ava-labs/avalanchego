@@ -44,7 +44,7 @@ var (
 		],
 		"initialStakers": [
 			{
-				"nodeID": "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
+				"nodeID": "NodeID-JPtMGLcaqXQuXZ5fqXFJvvX94d8BWy6zX",
 				"rewardAddress": "X-columbus1m4nr983lhd4p4nfsqk3a6a9mejugnn73ju0gav",
 				"delegationFee": 200000
 			}
