@@ -30,7 +30,7 @@ import (
 
 // Run an AvalancheGo node.
 // If specified in the config, serves a hashicorp plugin that can be consumed by
-// the daemon (see avalanchego/main).
+// the daemon (see caminogo/main).
 func Run(config Config, nodeConfig node.Config) {
 	nodeApp := process.NewApp(nodeConfig) // Create node wrapper
 	if config.PluginMode {                // Serve as a plugin

@@ -15,7 +15,7 @@ source "$CAMINO_PATH"/scripts/constants.sh
 echo "Downloading dependencies..."
 go mod download
 
-# Build avalanchego
+# Build caminogo
 "$CAMINO_PATH"/scripts/build_camino.sh
 
 # Build coreth

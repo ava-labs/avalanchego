@@ -1,5 +1,5 @@
 version: v1
-name: buf.build/ava-labs/avalanchego
+name: buf.build/chain4travel/caminogo
 breaking:
   use:
     - FILE

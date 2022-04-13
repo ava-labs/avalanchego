@@ -26,7 +26,7 @@ import (
 
 	"github.com/onsi/gomega"
 
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
+	runner_client "github.com/chain4travel/camino-network-runner/client"
 
 	"github.com/chain4travel/caminogo/tests"
 	"github.com/chain4travel/caminogo/tests/e2e"
@@ -43,8 +43,8 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	logLevel            string
-	avalanchegoLogLevel string
+	logLevel         string
+	caminogoLogLevel string
 
 	networkRunnerGRPCEp string
 	execPath            string
@@ -63,10 +63,10 @@ func init() {
 		"log level",
 	)
 	flag.StringVar(
-		&avalanchegoLogLevel,
-		"avalanchego-log-level",
+		&caminogoLogLevel,
+		"caminogo-log-level",
 		"INFO",
-		"avalanchegoLogLevel log level (optional, only required for local network-runner)",
+		"caminogoLogLevel log level (optional, only required for local network-runner)",
 	)
 
 	flag.StringVar(
@@ -77,9 +77,9 @@ func init() {
 	)
 	flag.StringVar(
 		&execPath,
-		"avalanchego-path",
+		"caminogo-path",
 		"",
-		"[optional] avalanchego executable path (only required for local network-runner tests)",
+		"[optional] caminogo executable path (only required for local network-runner tests)",
 	)
 
 	// TODO: set timestamp on the test network machines to be more realistic
@@ -121,7 +121,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", execPath)
 		ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
-		resp, err := runnerCli.Start(ctx, execPath, runner_client.WithLogLevel(avalanchegoLogLevel))
+		resp, err := runnerCli.Start(ctx, execPath, runner_client.WithLogLevel(caminogoLogLevel))
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
 		tests.Outf("{{green}}successfully started network-runner :{{/}} %+v\n", resp.ClusterInfo.NodeNames)

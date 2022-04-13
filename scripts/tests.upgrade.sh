@@ -59,7 +59,7 @@ NETWORK_RUNNER_VERSION=1.0.6
 DOWNLOAD_PATH=/tmp/camino-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/chain4travel/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
-  DOWNLOAD_URL=https://github.com/ava-labs/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_darwin_amd64.tar.gz
+  DOWNLOAD_URL=https://github.com/chain4travel/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_darwin_amd64.tar.gz
 fi
 
 rm -f ${DOWNLOAD_PATH}

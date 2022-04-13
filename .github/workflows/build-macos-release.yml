@@ -1,4 +1,4 @@
-# Build a macos release from the avalanchego repo 
+# Build a macos release from the caminogo repo 
 
 name: build-macos-release
 
@@ -25,7 +25,7 @@ jobs:
     - run: go version
 
     # Runs a single command using the runners shell
-    - name: Build the avalanchego binaries 
+    - name: Build the caminogo binaries 
       run: ./scripts/build.sh 
 
     - name: Get the version
@@ -39,7 +39,7 @@ jobs:
         sudo installer -pkg AWSCLIV2.pkg -target /
 
     - name: Create zip file
-      run: 7z a avalanchego-macos-${VERSION}.zip build/avalanchego build/plugins
+      run: 7z a caminogo-macos-${VERSION}.zip build/caminogo build/plugins
       env:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
 
@@ -51,7 +51,7 @@ jobs:
         aws-region: us-east-1
 
     - name: Upload file to S3 
-      run: aws s3 cp avalanchego-macos-${VERSION}.zip s3://${BUCKET}/macos/ 
+      run: aws s3 cp caminogo-macos-${VERSION}.zip s3://${BUCKET}/macos/ 
       env:
         BUCKET: ${{ secrets.BUCKET }}
         VERSION: ${{ steps.get_version.outputs.VERSION }}

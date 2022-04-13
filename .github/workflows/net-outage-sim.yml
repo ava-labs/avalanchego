@@ -19,8 +19,8 @@ jobs:
         shell: bash
         run: .github/workflows/cleanup-net-outage-sim.sh
 
-      - name: Download avalanchego:latest
-        run: docker pull avaplatform/avalanchego:latest
+      - name: Download caminogo:latest
+        run: docker pull avaplatform/caminogo:latest
 
       - name: Run the internet outage simulation 
         shell: bash

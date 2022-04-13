@@ -26,7 +26,7 @@ import (
 
 	"github.com/onsi/gomega"
 
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
+	runner_client "github.com/chain4travel/camino-network-runner/client"
 
 	"github.com/chain4travel/caminogo/tests"
 )
@@ -60,15 +60,15 @@ func init() {
 
 	flag.StringVar(
 		&execPath,
-		"avalanchego-path",
+		"caminogo-path",
 		"",
-		"avalanchego executable path",
+		"caminogo executable path",
 	)
 	flag.StringVar(
 		&execPathToUpgrade,
-		"avalanchego-path-to-upgrade",
+		"caminogo-path-to-upgrade",
 		"",
-		"avalanchego executable path (to upgrade to, only required for upgrade tests with local network-runner)",
+		"caminogo executable path (to upgrade to, only required for upgrade tests with local network-runner)",
 	)
 }
 

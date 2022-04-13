@@ -16,7 +16,7 @@ jobs:
          go-version: '1.17.1' # The Go version to download (if necessary) and use.
     - run: go version
 
-    - name: Build the avalanchego binaries 
+    - name: Build the caminogo binaries 
       run: ./scripts/build.sh 
 
     - name: Install aws cli
@@ -54,7 +54,7 @@ jobs:
          go-version: '1.17.1' # The Go version to download (if necessary) and use.
     - run: go version
 
-    - name: Build the avalanchego binaries
+    - name: Build the caminogo binaries
       run: ./scripts/build.sh
 
     - name: Install aws cli
@@ -99,8 +99,8 @@ jobs:
     - name: Checkout devops repo
       uses: actions/checkout@v2
       with: 
-        repository: ava-labs/devops
-        token: ${{ secrets.AVALANCHE_PAT }}
+        repository: chain4travel/devops
+        token: ${{ secrets.CAMINO_PAT }}
   
     - name: Run Ansible
       run: | 
@@ -108,9 +108,9 @@ jobs:
         if [[ ${{ secrets.DEPLOY }} == "true" ]]
         then 
           echo "The deployment is enabled.  Deploying $TAG to integration"
-          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/update-from-s3-and-restart.yml -e release_ver=$TAG
-          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
-          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
+          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u chain4travel scripts/ansible/testnet/update-from-s3-and-restart.yml -e release_ver=$TAG
+          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u chain4travel scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
+          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u chain4travel scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
         else
           echo 'The deployment is not set to "true".  Skipping deployment.'
         fi

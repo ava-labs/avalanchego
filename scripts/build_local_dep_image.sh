@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "Building docker image based off of most recent local commits of avalanchego and coreth"
+echo "Building docker image based off of most recent local commits of caminogo and coreth"
 
 CAMINO_REMOTE="git@github.com:chain4travel/caminogo.git"
 CORETH_REMOTE="git@github.com:chain4travel/coreth.git"
@@ -18,7 +18,7 @@ C4T_RELATIVE_PATH="src/github.com/chain4travel"
 EXISTING_GOPATH="$GOPATH"
 
 export GOPATH="$SCRIPT_DIRPATH/.build_image_gopath"
-WORKPREFIX="$GOPATH/src/github.com/ava-labs"
+WORKPREFIX="$GOPATH/src/github.com/chain4travel"
 
 # Clone the remotes and checkout the desired branch/commits
 CAMINO_CLONE="$WORKPREFIX/caminogo"

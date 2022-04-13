@@ -19,12 +19,12 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.17
-      - name: Build the avalanchego binaries
+      - name: Build the caminogo binaries
         shell: bash
         run: ./scripts/build.sh
       - name: Run e2e tests
         shell: bash
-        run: scripts/tests.e2e.sh ./build/avalanchego
+        run: scripts/tests.e2e.sh ./build/caminogo
       - name: Run e2e tests for whitelist vtx
         shell: bash
-        run: ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/avalanchego
+        run: ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/caminogo

@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 # Note: this script will build a docker image by cloning a remote version of
-# avalanchego into a temporary location and using that version's Dockerfile to
+# caminogo into a temporary location and using that version's Dockerfile to
 # build the image.
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -25,7 +25,7 @@ fi
 echo "Building docker image from branch: $BRANCH at remote: $REMOTE"
 
 export GOPATH="$SRC_DIR/.build_image_gopath"
-WORKPREFIX="$GOPATH/src/github.com/ava-labs"
+WORKPREFIX="$GOPATH/src/github.com/chain4travel"
 DOCKER="${DOCKER:-docker}"
 keep_existing=0
 while getopts 'k' opt

@@ -16,7 +16,7 @@ jobs:
          go-version: '1.17.1' # The Go version to download (if necessary) and use.
     - run: go version
 
-    - name: Build the avalanchego binaries 
+    - name: Build the caminogo binaries 
       run: ./scripts/build.sh 
 
     - name: Install aws cli
@@ -54,7 +54,7 @@ jobs:
          go-version: '1.17.1' # The Go version to download (if necessary) and use.
     - run: go version
 
-    - name: Build the avalanchego binaries
+    - name: Build the caminogo binaries
       run: ./scripts/build.sh
 
     - name: Install aws cli

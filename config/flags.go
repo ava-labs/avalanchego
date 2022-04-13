@@ -314,7 +314,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer")
 }
 
-// BuildFlagSet returns a complete set of flags for avalanchego
+// BuildFlagSet returns a complete set of flags for caminogo
 func BuildFlagSet() *flag.FlagSet {
 	// TODO parse directly into a *pflag.FlagSet instead of into a *flag.FlagSet
 	// and then putting those into a *plag.FlagSet

@@ -1,7 +1,7 @@
 # ref. https://goreleaser.com/customization/build/
 builds:
   - main: ./main
-    binary: avalanchego
+    binary: caminogo
     flags:
       - -v
     ignore:
@@ -24,5 +24,5 @@ release:
   # Repo in which the release will be created.
   # Default is extracted from the origin remote URL or empty if its private hosted.
   github:
-    owner: ava-labs
-    name: avalanchego
+    owner: chain4travel
+    name: caminogo

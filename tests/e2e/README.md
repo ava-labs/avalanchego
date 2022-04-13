@@ -1,4 +1,4 @@
-# Avalanche e2e test suites
+# Camino e2e test suites
 
 - Works for any environments (e.g., local, test network).
 - Compiles to a single binary with customizable configurations.
@@ -12,7 +12,7 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 
 ./tests/e2e/e2e.test \
 --network-runner-grpc-endpoint="0.0.0.0:12340" \
---avalanchego-path=./build/avalanchego
+--caminogo-path=./build/caminogo
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
