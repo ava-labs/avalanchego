@@ -1,0 +1,47 @@
+- name: Start node
+  # noqa 301
+  shell:
+    nohup {{ camino_binary }}
+      --network-id="{{ network_id }}"
+      --api-admin-enabled="{{ api_admin_enabled }}"
+      --api-keystore-enabled="{{ api_keystore_enabled }}"
+      --api-metrics-enabled="{{ api_metrics_enabled }}"
+      --tx-fee="{{ tx_fee }}"
+      --min-validator-stake="{{ min_validator_stake }}"
+      --min-delegator-stake="{{ min_delegator_stake }}"
+      --assertions-enabled="{{ assertions_enabled }}"
+      --signature-verification-enabled="{{ signature_verification_enabled }}"
+      --db-type="{{ db_type }}"
+      --db-dir="{{ db_dir }}"
+      --http-host="{{ http_host }}"
+      --http-port="{{ http_port }}"
+      --http-tls-enabled="{{ http_tls_enabled }}"
+      --http-tls-key-file="{{ http_tls_key_file }}"
+      --http-tls-cert-file="{{ http_tls_cert_file }}"
+      --bootstrap-ips="{{ bootstrap_ips }}"
+      --bootstrap-ids="{{ bootstrap_ids }}"
+      --staker-msg-reserved="{{ staker_msg_reserved }}"
+      --staker-cpu-reserved="{{ staker_cpu_reserved }}"
+      --public-ip="{{ ansible_host }}"
+      --staking-port="{{ staking_port }}"
+      --staking-enabled="{{ staking_enabled }}"
+      --staking-tls-key-file="{{ staking_tls_key_file }}"
+      --staking-tls-cert-file="{{ staking_tls_cert_file }}"
+      --plugin-dir="{{ plugin_dir }}"
+      --log-dir="{{ log_dir }}"
+      --log-level="{{ log_level }}"
+      --snow-sample-size="{{ snow_sample_size }}"
+      --snow-quorum-size="{{ snow_quorum_size }}"
+      --snow-virtuous-commit-threshold="{{ snow_virtuous_commit_threshold }}"
+      --snow-rogue-commit-threshold="{{ snow_rogue_commit_threshold }}"
+      --snow-camino-num-parents="{{ snow_camino_num_parents }}"
+      --snow-camino-batch-size="{{ snow_camino_batch_size }}"
+      --api-ipcs-enabled="{{ api_ipcs_enabled }}"
+      --max-non-staker-pending-msgs="{{ max_non_staker_pending_msgs }}"
+      --network-minimum-timeout={{ network_minimum_timeout }}
+      --network-initial-timeout={{ network_initial_timeout }}
+      --max-pending-msgs={{ max_pending_msgs }}
+      --send-queue-size={{ send_queue_size }}
+      >/dev/null 2>&1 &
+  environment:
+    PATH: /sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin

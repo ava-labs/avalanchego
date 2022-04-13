@@ -1,4 +1,4 @@
-avalanche_nodes:
+camino_nodes:
     hosts:
       raspberrypi.local:
     vars:

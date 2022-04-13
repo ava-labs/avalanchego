@@ -1,7 +1,7 @@
 ---
 # Changes to the minimum golang version must also be replicated in
 # scripts/ansible/roles/golang_base/defaults/main.yml (here)
-# scripts/build_avalanche.sh
+# scripts/build_camino.sh
 # scripts/local.Dockerfile
 # Dockerfile
 # README.md

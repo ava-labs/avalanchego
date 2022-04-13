@@ -4,8 +4,8 @@
   connection: ssh
   hosts: all
   roles:
-    - name: avalanche_stop
-    - name: avalanche_build
+    - name: camino_stop
+    - name: camino_build
     - name: coreth_build
-    - name: avalanche_reset
-    - name: avalanche_start
+    - name: camino_reset
+    - name: camino_start

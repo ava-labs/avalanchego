@@ -29,7 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	coreth "github.com/ava-labs/coreth/plugin/evm"
+	coreth "github.com/chain4travel/coreth/plugin/evm"
 
 	"github.com/chain4travel/caminogo/api/admin"
 	"github.com/chain4travel/caminogo/api/auth"
