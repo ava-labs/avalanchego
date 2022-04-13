@@ -301,6 +301,13 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// handler is started.
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
+	// Register bootstrapped health checks after P chain is started.
+	if chainParams.ID == constants.PlatformChainID {
+		if err := m.registerBootstrappedHealthChecks(); err != nil {
+			chain.Handler.StopWithError(err)
+		}
+	}
+
 	ctx := chain.Handler.Context()
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -341,22 +348,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	}
 
 	err = stateSyncer.Start(0)
-
-	// Tell the chain to start processing messages.
-	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
-
-	// If startup errored, then shutdown the chain with the fatal error.
-	if err != nil {
-		chain.Handler.StopWithError(err)
-	}
-
-	// Register bootstrapped health checks after P chain is started.
-	if chainParams.ID == constants.PlatformChainID {
-		if err := m.registerBootstrappedHealthChecks(); err != nil {
-			chain.Handler.StopWithError(err)
-		}
-	}
 }
 
 // Create a chain
