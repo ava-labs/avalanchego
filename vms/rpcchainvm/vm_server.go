@@ -6,24 +6,15 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/api/proto/appsenderproto"
-	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
-	"github.com/ava-labs/avalanchego/api/proto/gsharedmemoryproto"
-	"github.com/ava-labs/avalanchego/api/proto/gsubnetlookupproto"
-	"github.com/ava-labs/avalanchego/api/proto/messengerproto"
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
 	"github.com/ava-labs/avalanchego/database/corruptabledb"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -42,19 +33,28 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
+
+	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
+	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	keystorepb "github.com/ava-labs/avalanchego/proto/pb/keystore"
+	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
+	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
+	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
+	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
 	versionParser = version.NewDefaultApplicationParser()
 
-	_ vmproto.VMServer = &VMServer{}
+	_ vmpb.VMServer = &VMServer{}
 )
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vmproto.UnimplementedVMServer
-	vm     block.ChainVM
-	broker *plugin.GRPCBroker
+	vmpb.UnimplementedVMServer
+	vm block.ChainVM
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -64,14 +64,13 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm block.ChainVM, broker *plugin.GRPCBroker) *VMServer {
+func NewServer(vm block.ChainVM) *VMServer {
 	return &VMServer{
-		vm:     vm,
-		broker: broker,
+		vm: vm,
 	}
 }
 
-func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest) (*vmproto.InitializeResponse, error) {
+func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (*vmpb.InitializeResponse, error) {
 	subnetID, err := ids.ToID(req.SubnetId)
 	if err != nil {
 		return nil, err
@@ -104,14 +103,14 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 			return nil, err
 		}
 
-		dbConn, err := vm.broker.Dial(vDBReq.DbServer)
+		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
 			return nil, err
 		}
-		vm.connCloser.Add(dbConn)
-		db := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
+		vm.connCloser.Add(clientConn)
+		db := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(clientConn))
 		versionedDBs[i] = &manager.VersionedDatabase{
 			Database: corruptabledb.New(db),
 			Version:  version,
@@ -124,20 +123,21 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
-	clientConn, err := vm.broker.Dial(req.InitServer)
+	clientConn, err := grpcutils.Dial(req.ServerAddr)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
+
 	vm.connCloser.Add(clientConn)
 
-	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(clientConn))
-	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(clientConn), vm.broker)
-	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(clientConn))
-	bcLookupClient := galiasreader.NewClient(galiasreaderproto.NewAliasReaderClient(clientConn))
-	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(clientConn))
-	appSenderClient := appsender.NewClient(appsenderproto.NewAppSenderClient(clientConn))
+	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn))
+	keystoreClient := gkeystore.NewClient(keystorepb.NewKeystoreClient(clientConn))
+	sharedMemoryClient := gsharedmemory.NewClient(sharedmemorypb.NewSharedMemoryClient(clientConn))
+	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
+	snLookupClient := gsubnetlookup.NewClient(subnetlookuppb.NewSubnetLookupClient(clientConn))
+	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
 
 	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
@@ -201,7 +201,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}
 	parentID := blk.Parent()
 	timeBytes, err := blk.Timestamp().MarshalBinary()
-	return &vmproto.InitializeResponse{
+	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
 		Status:               uint32(choices.Accepted),
@@ -211,19 +211,19 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmproto.VerifyHeightIndexResponse, error) {
+func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
 	var err error
 	if hVM, ok := vm.vm.(block.HeightIndexedChainVM); ok {
 		err = hVM.VerifyHeightIndex()
 	} else {
 		err = block.ErrHeightIndexedVMNotImplemented
 	}
-	return &vmproto.VerifyHeightIndexResponse{
+	return &vmpb.VerifyHeightIndexResponse{
 		Err: errorToErrCode[err],
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmproto.GetBlockIDAtHeightRequest) (*vmproto.GetBlockIDAtHeightResponse, error) {
+func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmpb.GetBlockIDAtHeightRequest) (*vmpb.GetBlockIDAtHeightResponse, error) {
 	var (
 		blkID ids.ID
 		err   error
@@ -233,13 +233,13 @@ func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmproto.GetBloc
 	} else {
 		err = block.ErrHeightIndexedVMNotImplemented
 	}
-	return &vmproto.GetBlockIDAtHeightResponse{
+	return &vmpb.GetBlockIDAtHeightResponse{
 		BlkId: blkID[:],
 		Err:   errorToErrCode[err],
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) SetState(_ context.Context, stateReq *vmproto.SetStateRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) SetState(_ context.Context, stateReq *vmpb.SetStateRequest) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.SetState(snow.State(stateReq.State))
 }
 
@@ -255,63 +255,77 @@ func (vm *VMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, e
 	return &emptypb.Empty{}, errs.Err
 }
 
-func (vm *VMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*vmproto.CreateStaticHandlersResponse, error) {
+func (vm *VMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateStaticHandlersResponse, error) {
 	handlers, err := vm.vm.CreateStaticHandlers()
 	if err != nil {
 		return nil, err
 	}
-	resp := &vmproto.CreateStaticHandlersResponse{}
+	resp := &vmpb.CreateStaticHandlersResponse{}
 	for prefix, h := range handlers {
 		handler := h
 
-		// start the messenger server
-		serverID := vm.broker.NextId()
-		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			opts = append(opts, serverOptions...)
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		// Start the gRPC server which serves the HTTP service
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
 		})
 
-		resp.Handlers = append(resp.Handlers, &vmproto.Handler{
+		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			Server:      serverID,
+			ServerAddr:  serverAddr,
 		})
 	}
 	return resp, nil
 }
 
-func (vm *VMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmproto.CreateHandlersResponse, error) {
+func (vm *VMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateHandlersResponse, error) {
 	handlers, err := vm.vm.CreateHandlers()
 	if err != nil {
 		return nil, err
 	}
-	resp := &vmproto.CreateHandlersResponse{}
+	resp := &vmpb.CreateHandlersResponse{}
 	for prefix, h := range handlers {
 		handler := h
 
-		// start the messenger server
-		serverID := vm.broker.NextId()
-		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			opts = append(opts, serverOptions...)
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		// Start the gRPC server which serves the HTTP service
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
 		})
 
-		resp.Handlers = append(resp.Handlers, &vmproto.Handler{
+		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			Server:      serverID,
+			ServerAddr:  serverAddr,
 		})
 	}
 	return resp, nil
 }
 
-func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmproto.BuildBlockResponse, error) {
+func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmpb.BuildBlockResponse, error) {
 	blk, err := vm.vm.BuildBlock()
 	if err != nil {
 		return nil, err
@@ -319,7 +333,7 @@ func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmproto.BuildB
 	blkID := blk.ID()
 	parentID := blk.Parent()
 	timeBytes, err := blk.Timestamp().MarshalBinary()
-	return &vmproto.BuildBlockResponse{
+	return &vmpb.BuildBlockResponse{
 		Id:        blkID[:],
 		ParentId:  parentID[:],
 		Bytes:     blk.Bytes(),
@@ -328,7 +342,7 @@ func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmproto.BuildB
 	}, err
 }
 
-func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest) (*vmproto.ParseBlockResponse, error) {
+func (vm *VMServer) ParseBlock(_ context.Context, req *vmpb.ParseBlockRequest) (*vmpb.ParseBlockResponse, error) {
 	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
@@ -336,7 +350,7 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	blkID := blk.ID()
 	parentID := blk.Parent()
 	timeBytes, err := blk.Timestamp().MarshalBinary()
-	return &vmproto.ParseBlockResponse{
+	return &vmpb.ParseBlockResponse{
 		Id:        blkID[:],
 		ParentId:  parentID[:],
 		Status:    uint32(blk.Status()),
@@ -345,7 +359,7 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}, err
 }
 
-func (vm *VMServer) GetAncestors(_ context.Context, req *vmproto.GetAncestorsRequest) (*vmproto.GetAncestorsResponse, error) {
+func (vm *VMServer) GetAncestors(_ context.Context, req *vmpb.GetAncestorsRequest) (*vmpb.GetAncestorsResponse, error) {
 	blkID, err := ids.ToID(req.BlkId)
 	if err != nil {
 		return nil, err
@@ -361,18 +375,18 @@ func (vm *VMServer) GetAncestors(_ context.Context, req *vmproto.GetAncestorsReq
 		maxBlksSize,
 		maxBlocksRetrivalTime,
 	)
-	return &vmproto.GetAncestorsResponse{
+	return &vmpb.GetAncestorsResponse{
 		BlksBytes: blocks,
 	}, err
 }
 
 func (vm *VMServer) BatchedParseBlock(
 	ctx context.Context,
-	req *vmproto.BatchedParseBlockRequest,
-) (*vmproto.BatchedParseBlockResponse, error) {
-	blocks := make([]*vmproto.ParseBlockResponse, len(req.Request))
+	req *vmpb.BatchedParseBlockRequest,
+) (*vmpb.BatchedParseBlockResponse, error) {
+	blocks := make([]*vmpb.ParseBlockResponse, len(req.Request))
 	for i, blockBytes := range req.Request {
-		block, err := vm.ParseBlock(ctx, &vmproto.ParseBlockRequest{
+		block, err := vm.ParseBlock(ctx, &vmpb.ParseBlockRequest{
 			Bytes: blockBytes,
 		})
 		if err != nil {
@@ -380,12 +394,12 @@ func (vm *VMServer) BatchedParseBlock(
 		}
 		blocks[i] = block
 	}
-	return &vmproto.BatchedParseBlockResponse{
+	return &vmpb.BatchedParseBlockResponse{
 		Response: blocks,
 	}, nil
 }
 
-func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
+func (vm *VMServer) GetBlock(_ context.Context, req *vmpb.GetBlockRequest) (*vmpb.GetBlockResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err
@@ -396,7 +410,7 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 	}
 	parentID := blk.Parent()
 	timeBytes, err := blk.Timestamp().MarshalBinary()
-	return &vmproto.GetBlockResponse{
+	return &vmpb.GetBlockResponse{
 		ParentId:  parentID[:],
 		Bytes:     blk.Bytes(),
 		Status:    uint32(blk.Status()),
@@ -405,7 +419,7 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 	}, err
 }
 
-func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequest) (*emptypb.Empty, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err
@@ -413,10 +427,16 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 	return &emptypb.Empty{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmproto.HealthResponse, error) {
+func (vm *VMServer) Health(ctx context.Context, req *vmpb.HealthRequest) (*vmpb.HealthResponse, error) {
+	// Perform health checks for vm client gRPC servers
+	err := vm.grpcHealthChecks(ctx, req.GrpcChecks)
+	if err != nil {
+		return &vmpb.HealthResponse{}, err
+	}
+
 	details, err := vm.vm.HealthCheck()
 	if err != nil {
-		return &vmproto.HealthResponse{}, err
+		return &vmpb.HealthResponse{}, err
 	}
 
 	// Try to stringify the details
@@ -435,19 +455,40 @@ func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmproto.HealthResp
 		detailsStr = string(details)
 	}
 
-	return &vmproto.HealthResponse{
+	return &vmpb.HealthResponse{
 		Details: detailsStr,
 	}, nil
 }
 
-func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmproto.VersionResponse, error) {
+func (vm *VMServer) grpcHealthChecks(ctx context.Context, checks map[string]string) error {
+	var errs []error
+	for name, address := range checks {
+		clientConn, err := grpcutils.Dial(address)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("grpc health check failed to dial: %q address: %s: %w", name, address, err))
+			continue
+		}
+		client := grpc_health_v1.NewHealthClient(clientConn)
+		_, err = client.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("grpc health check failed for %q address: %s: %w", name, address, err))
+		}
+		err = clientConn.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return wrappers.NewAggregate(errs)
+}
+
+func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionResponse, error) {
 	version, err := vm.vm.Version()
-	return &vmproto.VersionResponse{
+	return &vmpb.VersionResponse{
 		Version: version,
 	}, err
 }
 
-func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -461,7 +502,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmproto.ConnectedRequest) 
 	return &emptypb.Empty{}, vm.vm.Connected(nodeID, peerVersion)
 }
 
-func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) Disconnected(_ context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -469,7 +510,7 @@ func (vm *VMServer) Disconnected(_ context.Context, req *vmproto.DisconnectedReq
 	return &emptypb.Empty{}, vm.vm.Disconnected(nodeID)
 }
 
-func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -481,7 +522,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*
 	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestId, deadline, req.Request)
 }
 
-func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -489,7 +530,7 @@ func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestF
 	return &emptypb.Empty{}, vm.vm.AppRequestFailed(nodeID, req.RequestId)
 }
 
-func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -497,7 +538,7 @@ func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) 
 	return &emptypb.Empty{}, vm.vm.AppResponse(nodeID, req.RequestId, req.Response)
 }
 
-func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*emptypb.Empty, error) {
+func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToShortID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -505,7 +546,7 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*em
 	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
-func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
+func (vm *VMServer) BlockVerify(_ context.Context, req *vmpb.BlockVerifyRequest) (*vmpb.BlockVerifyResponse, error) {
 	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
@@ -514,12 +555,12 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyReque
 		return nil, err
 	}
 	timeBytes, err := blk.Timestamp().MarshalBinary()
-	return &vmproto.BlockVerifyResponse{
+	return &vmpb.BlockVerifyResponse{
 		Timestamp: timeBytes,
 	}, err
 }
 
-func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) BlockAccept(_ context.Context, req *vmpb.BlockAcceptRequest) (*emptypb.Empty, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err
@@ -534,7 +575,7 @@ func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptReque
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) BlockReject(_ context.Context, req *vmproto.BlockRejectRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) BlockReject(_ context.Context, req *vmpb.BlockRejectRequest) (*emptypb.Empty, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err

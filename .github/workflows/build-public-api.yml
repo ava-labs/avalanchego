@@ -1,0 +1,45 @@
+name: build-public-ami
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build-public-ami-and-upload:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.17.9" # The Go version to download (if necessary) and use.
+      - run: go version
+
+      - name: Install aws cli
+        run: |
+          sudo apt update
+          sudo apt-get -y install awscli python3-pip packer
+
+      - name: Install python packer
+        run: |
+          pip install python-packer boto3
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        shell: bash
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MARKETPLACE_ID }}
+          aws-secret-access-key: ${{ secrets.MARKETPLACE_KEY }}
+          aws-region: us-east-1
+
+      - name: Create AMI and upload to marketplace
+        run: |
+          ./.github/workflows/update-ami.py
+        env:
+          TAG: ${{ steps.get_version.outputs.VERSION }}

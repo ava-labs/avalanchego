@@ -278,6 +278,7 @@ func (p *Packer) PackStr(str string) {
 	strSize := len(str)
 	if strSize > MaxStringLen {
 		p.Add(errInvalidInput)
+		return
 	}
 	p.PackShort(uint16(strSize))
 	p.PackFixedBytes([]byte(str))

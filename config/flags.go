@@ -103,8 +103,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
-	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
 	// Assertions
 	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
@@ -114,15 +115,17 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
-		"Gossip [%s] validator IPs to [%s] validators and [%s] non-validators every [%s]",
+		"Gossip [%s] validator IPs to [%s] validators, [%s] non-validators, and [%s] validating or non-validating peers every [%s]",
 		NetworkPeerListNumValidatorIPsKey,
 		NetworkPeerListValidatorGossipSizeKey,
 		NetworkPeerListNonValidatorGossipSizeKey,
+		NetworkPeerListPeersGossipSizeKey,
 		NetworkPeerListGossipFreqKey,
 	)
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListValidatorGossipSizeKey, 25, gossipHelpMsg)
 	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 25, gossipHelpMsg)
+	fs.Uint(NetworkPeerListPeersGossipSizeKey, 0, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 
 	// Public IP Resolution
@@ -162,10 +165,15 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Router
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers")
 	fs.Duration(ConsensusShutdownTimeoutKey, 30*time.Second, "Timeout before killing an unresponsive chain")
-	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipNonValidatorSizeKey, 0, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
+	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, 0, "Number of validators to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, 0, "Number of non-validators to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, 0, "Number of validators to gossip to each accepted container to")
+	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, 0, "Number of non-validators to gossip to each accepted container to")
+	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, 20, "Number of peers to gossip to each accepted container to")
 	fs.Uint(AppGossipValidatorSizeKey, 10, "Number of validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipNonValidatorSizeKey, 0, "Number of non-validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipPeerSizeKey, 0, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler")

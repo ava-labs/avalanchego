@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
-          go-version: "1.17.1" # The Go version to download (if necessary) and use.
+          go-version: "1.17.9" # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -48,10 +48,10 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
-          go-version: "1.17.1" # The Go version to download (if necessary) and use.
+          go-version: "1.17.9" # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -92,12 +92,12 @@ jobs:
         shell: bash
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: master
 
       - name: Checkout devops repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ava-labs/devops
           token: ${{ secrets.AVALANCHE_PAT }}
@@ -123,7 +123,7 @@ jobs:
     steps:
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: rubenesp87/semver-validation-action@0.0.6
         with:
           version: ${{ steps.get_version.outputs.VERSION }}

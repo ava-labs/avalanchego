@@ -10,29 +10,17 @@ import (
 	"log"
 	"path/filepath"
 
-	"google.golang.org/grpc"
-
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 var (
-	errWrongVM = errors.New("wrong vm type")
-
-	serverOptions = []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(math.MaxInt),
-		grpc.MaxSendMsgSize(math.MaxInt),
-	}
-	dialOptions = []grpc.DialOption{
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
-	}
-
-	_ Factory = &factory{}
+	errWrongVM         = errors.New("wrong vm type")
+	_          Factory = &factory{}
 )
 
 type Factory interface {
@@ -69,7 +57,7 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 		// We set managed to true so that we can call plugin.CleanupClients on
 		// node shutdown to ensure every plugin subprocess is killed.
 		Managed:         true,
-		GRPCDialOptions: dialOptions,
+		GRPCDialOptions: grpcutils.DefaultDialOptions,
 	}
 	if ctx != nil {
 		log.SetOutput(ctx.Log)

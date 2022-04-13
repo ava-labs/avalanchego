@@ -12,9 +12,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+
+	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 func setupDB(t testing.TB) (database.Database, func()) {
 	listener := bufconn.Listen(bufSize)
 	server := grpc.NewServer()
-	rpcdbproto.RegisterDatabaseServer(server, NewServer(memdb.New()))
+	rpcdbpb.RegisterDatabaseServer(server, NewServer(memdb.New()))
 	go func() {
 		if err := server.Serve(listener); err != nil {
 			t.Logf("Server exited with error: %v", err)
@@ -43,7 +44,7 @@ func setupDB(t testing.TB) (database.Database, func()) {
 		t.Fatalf("Failed to dial: %s", err)
 	}
 
-	db := NewClient(rpcdbproto.NewDatabaseClient(conn))
+	db := NewClient(rpcdbpb.NewDatabaseClient(conn))
 
 	close := func() {
 		server.Stop()

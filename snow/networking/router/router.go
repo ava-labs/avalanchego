@@ -27,7 +27,7 @@ type Router interface {
 		nodeID ids.ShortID,
 		log logging.Logger,
 		msgCreator message.Creator,
-		timeouts *timeout.Manager,
+		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
 		onFatal func(exitCode int),

@@ -25,15 +25,15 @@ var _ Client = &client{}
 type Client interface {
 	WalletClient
 	// GetTxStatus returns the status of [txID]
-	GetTxStatus(ctx context.Context, txID ids.ID) (choices.Status, error)
+	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
 	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
 	// Note: ConfirmTx will block until either the context is done or the client
 	//       returns a decided status.
-	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration) (choices.Status, error)
+	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
-	GetTx(ctx context.Context, txID ids.ID) ([]byte, error)
+	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
 	// IssueStopVertex issues a stop vertex.
-	IssueStopVertex(ctx context.Context) error
+	IssueStopVertex(ctx context.Context, options ...rpc.Option) error
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
@@ -41,6 +41,7 @@ type Client interface {
 		limit uint32,
 		startAddress,
 		startUTXOID string,
+		options ...rpc.Option,
 	) ([][]byte, api.Index, error)
 	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
 	// from [sourceChain]
@@ -51,15 +52,16 @@ type Client interface {
 		limit uint32,
 		startAddress,
 		startUTXOID string,
+		options ...rpc.Option,
 	) ([][]byte, api.Index, error)
 	// GetAssetDescription returns a description of [assetID]
-	GetAssetDescription(ctx context.Context, assetID string) (*GetAssetDescriptionReply, error)
+	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
-	GetBalance(ctx context.Context, addr string, assetID string, includePartial bool) (*GetBalanceReply, error)
+	GetBalance(ctx context.Context, addr string, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
 	// CreateAsset creates a new asset and returns its assetID
-	GetAllBalances(context.Context, string, bool) (*GetAllBalancesReply, error)
+	GetAllBalances(context.Context, string, bool, ...rpc.Option) (*GetAllBalancesReply, error)
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -70,6 +72,7 @@ type Client interface {
 		denomination byte,
 		holders []*Holder,
 		minters []Owners,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
 	CreateFixedCapAsset(
@@ -81,6 +84,7 @@ type Client interface {
 		symbol string,
 		denomination byte,
 		holders []*Holder,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
 	CreateVariableCapAsset(
@@ -92,6 +96,7 @@ type Client interface {
 		symbol string,
 		denomination byte,
 		minters []Owners,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateNFTAsset creates a new NFT asset and returns its assetID
 	CreateNFTAsset(
@@ -102,15 +107,16 @@ type Client interface {
 		name,
 		symbol string,
 		minters []Owners,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateAddress creates a new address controlled by [user]
-	CreateAddress(ctx context.Context, user api.UserPass) (string, error)
+	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error)
 	// ListAddresses returns all addresses on this chain controlled by [user]
-	ListAddresses(ctx context.Context, user api.UserPass) ([]string, error)
+	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
-	ExportKey(ctx context.Context, user api.UserPass, addr string) (string, error)
+	ExportKey(ctx context.Context, user api.UserPass, addr string, options ...rpc.Option) (string, error)
 	// ImportKey imports [privateKey] to [user]
-	ImportKey(ctx context.Context, user api.UserPass, privateKey string) (string, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error)
 	// Mint [amount] of [assetID] to be owned by [to]
 	Mint(
 		ctx context.Context,
@@ -120,6 +126,7 @@ type Client interface {
 		amount uint64,
 		assetID,
 		to string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendNFT sends an NFT and returns the ID of the newly created transaction
 	SendNFT(
@@ -130,6 +137,7 @@ type Client interface {
 		assetID string,
 		groupID uint32,
 		to string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 	MintNFT(
@@ -140,10 +148,11 @@ type Client interface {
 		assetID string,
 		payload []byte,
 		to string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// Import sends an import transaction to import funds from [sourceChain] and
 	// returns the ID of the newly created transaction
-	Import(ctx context.Context, user api.UserPass, to, sourceChain string) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
+	Import(ctx context.Context, user api.UserPass, to, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
 	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 	// Returns the ID of the newly created atomic transaction
 	Export(
@@ -154,6 +163,7 @@ type Client interface {
 		amount uint64,
 		to string,
 		assetID string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 }
 
@@ -169,7 +179,7 @@ func NewClient(uri, chain string) Client {
 	}
 }
 
-func (c *client) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
+func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
@@ -178,28 +188,28 @@ func (c *client) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
 	err = c.requester.SendRequest(ctx, "issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
-func (c *client) IssueStopVertex(ctx context.Context) error {
-	return c.requester.SendRequest(ctx, "issueStopVertex", &struct{}{}, &struct{}{})
+func (c *client) IssueStopVertex(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "issueStopVertex", &struct{}{}, &struct{}{}, options...)
 }
 
-func (c *client) GetTxStatus(ctx context.Context, txID ids.ID) (choices.Status, error) {
+func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error) {
 	res := &GetTxStatusReply{}
 	err := c.requester.SendRequest(ctx, "getTxStatus", &api.JSONTxID{
 		TxID: txID,
-	}, res)
+	}, res, options...)
 	return res.Status, err
 }
 
-func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration) (choices.Status, error) {
+func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error) {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 
 	for {
-		status, err := c.GetTxStatus(ctx, txID)
+		status, err := c.GetTxStatus(ctx, txID, options...)
 		if err == nil {
 			if status.Decided() {
 				return status, nil
@@ -214,12 +224,12 @@ func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration)
 	}
 }
 
-func (c *client) GetTx(ctx context.Context, txID ids.ID) ([]byte, error) {
+func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest(ctx, "getTx", &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
-	}, res)
+	}, res, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -231,11 +241,26 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID) ([]byte, error) {
 	return txBytes, nil
 }
 
-func (c *client) GetUTXOs(ctx context.Context, addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
-	return c.GetAtomicUTXOs(ctx, addrs, "", limit, startAddress, startUTXOID)
+func (c *client) GetUTXOs(
+	ctx context.Context,
+	addrs []string,
+	limit uint32,
+	startAddress string,
+	startUTXOID string,
+	options ...rpc.Option,
+) ([][]byte, api.Index, error) {
+	return c.GetAtomicUTXOs(ctx, addrs, "", limit, startAddress, startUTXOID, options...)
 }
 
-func (c *client) GetAtomicUTXOs(ctx context.Context, addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *client) GetAtomicUTXOs(
+	ctx context.Context,
+	addrs []string,
+	sourceChain string,
+	limit uint32,
+	startAddress string,
+	startUTXOID string,
+	options ...rpc.Option,
+) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrs,
@@ -246,7 +271,7 @@ func (c *client) GetAtomicUTXOs(ctx context.Context, addrs []string, sourceChain
 			UTXO:    startUTXOID,
 		},
 		Encoding: formatting.Hex,
-	}, res)
+	}, res, options...)
 	if err != nil {
 		return nil, api.Index{}, err
 	}
@@ -262,30 +287,41 @@ func (c *client) GetAtomicUTXOs(ctx context.Context, addrs []string, sourceChain
 	return utxos, res.EndIndex, nil
 }
 
-func (c *client) GetAssetDescription(ctx context.Context, assetID string) (*GetAssetDescriptionReply, error) {
+func (c *client) GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
 	err := c.requester.SendRequest(ctx, "getAssetDescription", &GetAssetDescriptionArgs{
 		AssetID: assetID,
-	}, res)
+	}, res, options...)
 	return res, err
 }
 
-func (c *client) GetBalance(ctx context.Context, addr string, assetID string, includePartial bool) (*GetBalanceReply, error) {
+func (c *client) GetBalance(
+	ctx context.Context,
+	addr string,
+	assetID string,
+	includePartial bool,
+	options ...rpc.Option,
+) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
 	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
 		Address:        addr,
 		AssetID:        assetID,
 		IncludePartial: includePartial,
-	}, res)
+	}, res, options...)
 	return res, err
 }
 
-func (c *client) GetAllBalances(ctx context.Context, addr string, includePartial bool) (*GetAllBalancesReply, error) {
+func (c *client) GetAllBalances(
+	ctx context.Context,
+	addr string,
+	includePartial bool,
+	options ...rpc.Option,
+) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
 	err := c.requester.SendRequest(ctx, "getAllBalances", &GetAllBalancesArgs{
 		JSONAddress:    api.JSONAddress{Address: addr},
 		IncludePartial: includePartial,
-	}, res)
+	}, res, options...)
 	return res, err
 }
 
@@ -299,6 +335,7 @@ func (c *client) CreateAsset(
 	denomination byte,
 	holders []*Holder,
 	minters []Owners,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
@@ -312,7 +349,7 @@ func (c *client) CreateAsset(
 		Denomination:   denomination,
 		InitialHolders: holders,
 		MinterSets:     minters,
-	}, res)
+	}, res, options...)
 	return res.AssetID, err
 }
 
@@ -325,6 +362,7 @@ func (c *client) CreateFixedCapAsset(
 	symbol string,
 	denomination byte,
 	holders []*Holder,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
@@ -337,7 +375,7 @@ func (c *client) CreateFixedCapAsset(
 		Symbol:         symbol,
 		Denomination:   denomination,
 		InitialHolders: holders,
-	}, res)
+	}, res, options...)
 	return res.AssetID, err
 }
 
@@ -350,6 +388,7 @@ func (c *client) CreateVariableCapAsset(
 	symbol string,
 	denomination byte,
 	minters []Owners,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
@@ -362,7 +401,7 @@ func (c *client) CreateVariableCapAsset(
 		Symbol:       symbol,
 		Denomination: denomination,
 		MinterSets:   minters,
-	}, res)
+	}, res, options...)
 	return res.AssetID, err
 }
 
@@ -374,6 +413,7 @@ func (c *client) CreateNFTAsset(
 	name,
 	symbol string,
 	minters []Owners,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest(ctx, "createNFTAsset", &CreateNFTAssetArgs{
@@ -385,37 +425,37 @@ func (c *client) CreateNFTAsset(
 		Name:       name,
 		Symbol:     symbol,
 		MinterSets: minters,
-	}, res)
+	}, res, options...)
 	return res.AssetID, err
 }
 
-func (c *client) CreateAddress(ctx context.Context, user api.UserPass) (string, error) {
+func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error) {
 	res := &api.JSONAddress{}
-	err := c.requester.SendRequest(ctx, "createAddress", &user, res)
+	err := c.requester.SendRequest(ctx, "createAddress", &user, res, options...)
 	return res.Address, err
 }
 
-func (c *client) ListAddresses(ctx context.Context, user api.UserPass) ([]string, error) {
+func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error) {
 	res := &api.JSONAddresses{}
-	err := c.requester.SendRequest(ctx, "listAddresses", &user, res)
+	err := c.requester.SendRequest(ctx, "listAddresses", &user, res, options...)
 	return res.Addresses, err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr string) (string, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr string, options ...rpc.Option) (string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
 		Address:  addr,
-	}, res)
+	}, res, options...)
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string) (string, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,
 		PrivateKey: privateKey,
-	}, res)
+	}, res, options...)
 	return res.Address, err
 }
 
@@ -428,6 +468,7 @@ func (c *client) Send(
 	assetID,
 	to,
 	memo string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "send", &SendArgs{
@@ -442,7 +483,7 @@ func (c *client) Send(
 			To:      to,
 		},
 		Memo: memo,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -453,6 +494,7 @@ func (c *client) SendMultiple(
 	changeAddr string,
 	outputs []SendOutput,
 	memo string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
@@ -463,7 +505,7 @@ func (c *client) SendMultiple(
 		},
 		Outputs: outputs,
 		Memo:    memo,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -475,6 +517,7 @@ func (c *client) Mint(
 	amount uint64,
 	assetID,
 	to string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "mint", &MintArgs{
@@ -486,7 +529,7 @@ func (c *client) Mint(
 		Amount:  cjson.Uint64(amount),
 		AssetID: assetID,
 		To:      to,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -498,6 +541,7 @@ func (c *client) SendNFT(
 	assetID string,
 	groupID uint32,
 	to string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "sendNFT", &SendNFTArgs{
@@ -509,7 +553,7 @@ func (c *client) SendNFT(
 		AssetID: assetID,
 		GroupID: cjson.Uint32(groupID),
 		To:      to,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -521,6 +565,7 @@ func (c *client) MintNFT(
 	assetID string,
 	payload []byte,
 	to string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	payloadStr, err := formatting.EncodeWithChecksum(formatting.Hex, payload)
 	if err != nil {
@@ -537,17 +582,17 @@ func (c *client) MintNFT(
 		Payload:  payloadStr,
 		To:       to,
 		Encoding: formatting.Hex,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
-func (c *client) Import(ctx context.Context, user api.UserPass, to, sourceChain string) (ids.ID, error) {
+func (c *client) Import(ctx context.Context, user api.UserPass, to, sourceChain string, options ...rpc.Option) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "import", &ImportArgs{
 		UserPass:    user,
 		To:          to,
 		SourceChain: sourceChain,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -559,6 +604,7 @@ func (c *client) Export(
 	amount uint64,
 	to string,
 	assetID string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "export", &ExportArgs{
@@ -570,6 +616,6 @@ func (c *client) Export(
 		Amount:  cjson.Uint64(amount),
 		To:      to,
 		AssetID: assetID,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }

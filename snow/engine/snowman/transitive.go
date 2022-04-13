@@ -95,6 +95,10 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) err
 		return t.GetFailed(vdr, requestID)
 	}
 
+	if t.wasIssued(blk) {
+		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+	}
+
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
 	// receive requests to fill the ancestry. dependencies that have already
@@ -155,6 +159,10 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byt
 		t.Ctx.Log.Debug("failed to parse block: %s", err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		return nil
+	}
+
+	if t.wasIssued(blk) {
+		t.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -434,10 +442,7 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) 
 func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
-	// If the block has been decided, we don't need to issue it.
-	// If the block is processing, we don't need to issue it.
-	// If the block is queued to be issued, we don't need to issue it.
-	for !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
+	for !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -477,7 +482,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
-	for status.Fetched() && !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
+	for status.Fetched() && !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -506,6 +511,14 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	t.blocked.Abandon(blkID)
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return false, t.errs.Err
+}
+
+// If the block has been decided, then it is marked as having been issued.
+// If the block is processing, then it was issued.
+// If the block is queued to be added to consensus, then it was issued.
+func (t *Transitive) wasIssued(blk snowman.Block) bool {
+	blkID := blk.ID()
+	return t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.

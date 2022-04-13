@@ -430,7 +430,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	appSender := &common.SenderTest{}
+	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
@@ -2009,9 +2009,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	beacons := vdrs
 
-	timeoutManager := timeout.Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err = timeoutManager.Initialize(
+	timeoutManager, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -2032,7 +2031,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
@@ -2044,12 +2043,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		mc,
 		externalSender,
 		chainRouter,
-		&timeoutManager,
+		timeoutManager,
 		sender.GossipConfig{
-			AcceptedFrontierSize:      1,
-			OnAcceptSize:              1,
-			AppGossipNonValidatorSize: 1,
+			AcceptedFrontierPeerSize:  1,
+			OnAcceptPeerSize:          1,
 			AppGossipValidatorSize:    1,
+			AppGossipNonValidatorSize: 1,
 		},
 	)
 	assert.NoError(t, err)

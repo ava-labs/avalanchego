@@ -107,6 +107,7 @@ func initTestProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
+	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
@@ -842,6 +843,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
+	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		return map[ids.ShortID]uint64{
@@ -1706,5 +1708,5 @@ func TestLaggedPChainHeight(t *testing.T) {
 	assert.True(ok, "expected post fork block")
 
 	pChainHeight := block.PChainHeight()
-	assert.Equal(pChainHeight, defaultPChainHeight-optimalHeightDelay)
+	assert.Equal(pChainHeight, coreGenBlk.Height())
 }

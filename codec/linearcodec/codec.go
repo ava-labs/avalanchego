@@ -42,19 +42,25 @@ type linearCodec struct {
 	typeToTypeID map[reflect.Type]uint32
 }
 
-// New returns a new, concurrency-safe codec
-func New(tagName string, maxSliceLen uint32) Codec {
+// New returns a new, concurrency-safe codec; it allow to specify
+// both tagNames and maxSlicelenght
+func New(tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &linearCodec{
 		nextTypeID:   0,
 		typeIDToType: map[uint32]reflect.Type{},
 		typeToTypeID: map[reflect.Type]uint32{},
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagName, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
 	return hCodec
 }
 
-// NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(reflectcodec.DefaultTagName, defaultMaxSliceLength) }
+// NewDefault is a convenience constructor; it returns a new codec with reasonable default values
+func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+
+// NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
+func NewCustomMaxLength(maxSliceLen uint32) Codec {
+	return New([]string{reflectcodec.DefaultTagName}, maxSliceLen)
+}
 
 // Skip some number of type IDs
 func (c *linearCodec) SkipRegistrations(num int) {

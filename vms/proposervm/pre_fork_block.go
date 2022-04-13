@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -18,10 +17,6 @@ var _ Block = &preForkBlock{}
 type preForkBlock struct {
 	snowman.Block
 	vm *VM
-}
-
-func (b *preForkBlock) Parent() ids.ID {
-	return b.Block.Parent()
 }
 
 func (b *preForkBlock) Verify() error {

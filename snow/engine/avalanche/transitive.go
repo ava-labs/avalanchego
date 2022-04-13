@@ -95,6 +95,11 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) err
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return t.GetFailed(vdr, requestID)
 	}
+
+	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
+		t.metrics.numUselessPutBytes.Add(float64(len(vtxBytes)))
+	}
+
 	if _, err := t.issueFrom(vdr, vtx); err != nil {
 		return err
 	}
@@ -159,6 +164,10 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byt
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
 		return nil
+	}
+
+	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
+		t.metrics.numUselessPushQueryBytes.Add(float64(len(vtxBytes)))
 	}
 
 	if _, err := t.issueFrom(vdr, vtx); err != nil {
@@ -482,20 +491,20 @@ type batchOption struct {
 	// if [force], allow for a conflict to be issued, and force each tx to be issued
 	// otherwise, some txs may not be put into vertices that are issued.
 	force bool
-	// if [empty], always result in a new poll
-	empty bool
 	// if [limit], stop when "Params.OptimalProcessing <= Consensus.NumProcessing"
 	limit bool
 }
 
 // Batchs [txs] into vertices and issue them.
 func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx, error) {
+	if len(txs) == 0 {
+		return nil, nil
+	}
 	if opt.limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
 		return txs, nil
 	}
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
-	issued := false
 	orphans := t.Consensus.Orphans()
 	start := 0
 	end := 0
@@ -513,7 +522,6 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 			}
 			start = end
 			consumed.Clear()
-			issued = true
 			overlaps = false
 		}
 
@@ -534,9 +542,6 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 
 	if end > start {
 		return txs[end:], t.issueBatch(txs[start:end])
-	}
-	if opt.empty && !issued {
-		t.issueRepoll()
 	}
 	return txs[end:], nil
 }

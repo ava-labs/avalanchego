@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -59,7 +58,7 @@ func newCustomCodecs(
 	log logging.Logger,
 	fxs []Fx,
 ) (codec.Manager, codec.Manager, error) {
-	gc := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	gc := linearcodec.NewCustomMaxLength(1 << 20)
 	c := linearcodec.NewDefault()
 
 	gcm := codec.NewManager(math.MaxInt32)

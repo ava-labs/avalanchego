@@ -47,7 +47,7 @@ type Mempool interface {
 	RemoveDecisionTxs(txs []*Tx)
 	RemoveProposalTx(tx *Tx)
 
-	PopDecisionTxs(numTxs int) []*Tx
+	PopDecisionTxs(maxTxsBytes int) []*Tx
 	PopProposalTx() *Tx
 
 	MarkDropped(txID ids.ID)
@@ -192,16 +192,19 @@ func (m *mempool) RemoveProposalTx(tx *Tx) {
 	}
 }
 
-func (m *mempool) PopDecisionTxs(numTxs int) []*Tx {
-	if maxLen := m.unissuedDecisionTxs.Len(); numTxs > maxLen {
-		numTxs = maxLen
-	}
+func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*Tx {
+	var txs []*Tx
+	for m.unissuedDecisionTxs.Len() > 0 {
+		tx := m.unissuedDecisionTxs.Peek()
+		txBytes := tx.Bytes()
+		if len(txBytes) > maxTxsBytes {
+			return txs
+		}
+		maxTxsBytes -= len(txBytes)
 
-	txs := make([]*Tx, numTxs)
-	for i := range txs {
-		tx := m.unissuedDecisionTxs.RemoveTop()
+		m.unissuedDecisionTxs.RemoveTop()
 		m.deregister(tx)
-		txs[i] = tx
+		txs = append(txs, tx)
 	}
 	return txs
 }

@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -40,6 +42,7 @@ var (
 		PeerListNumValidatorIPs:        100,
 		PeerListValidatorGossipSize:    100,
 		PeerListNonValidatorGossipSize: 100,
+		PeerListPeersGossipSize:        100,
 		PeerListGossipFreq:             time.Second,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
@@ -278,6 +281,36 @@ func TestSend(t *testing.T) {
 
 	inboundGetMsg := <-received
 	assert.Equal(message.Get, inboundGetMsg.Op())
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+func TestTrackVerifiesSignatures(t *testing.T) {
+	assert := assert.New(t)
+
+	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+
+	network := networks[0].(*network)
+	nodeID, tlsCert, _ := getTLS(t, 1)
+	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
+	assert.NoError(err)
+
+	network.Track(utils.IPCertDesc{
+		Cert: tlsCert.Leaf,
+		IPDesc: utils.IPDesc{
+			IP:   net.IPv4(123, 132, 123, 123),
+			Port: 10000,
+		},
+		Time:      1000,
+		Signature: nil,
+	})
+
+	network.peersLock.RLock()
+	assert.Empty(network.trackedIPs)
+	network.peersLock.RUnlock()
 
 	for _, net := range networks {
 		net.StartClose()

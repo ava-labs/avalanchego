@@ -208,7 +208,8 @@ func TestPackerUnpackInt(t *testing.T) {
 }
 
 func TestPackerPackLong(t *testing.T) {
-	p := Packer{MaxSize: 8}
+	maxSize := 8
+	p := Packer{MaxSize: maxSize}
 
 	p.PackLong(0x0102030405060708)
 
@@ -216,8 +217,8 @@ func TestPackerPackLong(t *testing.T) {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, 8)
+	if size := len(p.Bytes); size != maxSize {
+		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, maxSize)
 	}
 
 	expected := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
@@ -315,7 +316,7 @@ func TestPackerPackBytes(t *testing.T) {
 	}
 
 	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 7)
+		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 8)
 	}
 
 	expected := []byte("\x00\x00\x00\x04Avax")

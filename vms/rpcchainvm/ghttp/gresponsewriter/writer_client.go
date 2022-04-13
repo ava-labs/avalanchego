@@ -11,15 +11,15 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/hashicorp/go-plugin"
-
-	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
-	"github.com/ava-labs/avalanchego/api/proto/greaderproto"
-	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
-	"github.com/ava-labs/avalanchego/api/proto/gwriterproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
+	readerpb "github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	writerpb "github.com/ava-labs/avalanchego/proto/pb/io/writer"
+	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
 )
 
 var (
@@ -30,29 +30,27 @@ var (
 
 // Client is an http.ResponseWriter that talks over RPC.
 type Client struct {
-	client gresponsewriterproto.WriterClient
+	client responsewriterpb.WriterClient
 	header http.Header
-	broker *plugin.GRPCBroker
 }
 
 // NewClient returns a response writer connected to a remote response writer
-func NewClient(header http.Header, client gresponsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(header http.Header, client responsewriterpb.WriterClient) *Client {
 	return &Client{
 		client: client,
 		header: header,
-		broker: broker,
 	}
 }
 
 func (c *Client) Header() http.Header { return c.header }
 
 func (c *Client) Write(payload []byte) (int, error) {
-	req := &gresponsewriterproto.WriteRequest{
-		Headers: make([]*gresponsewriterproto.Header, 0, len(c.header)),
+	req := &responsewriterpb.WriteRequest{
+		Headers: make([]*responsewriterpb.Header, 0, len(c.header)),
 		Payload: payload,
 	}
 	for key, values := range c.header {
-		req.Headers = append(req.Headers, &gresponsewriterproto.Header{
+		req.Headers = append(req.Headers, &responsewriterpb.Header{
 			Key:    key,
 			Values: values,
 		})
@@ -65,12 +63,12 @@ func (c *Client) Write(payload []byte) (int, error) {
 }
 
 func (c *Client) WriteHeader(statusCode int) {
-	req := &gresponsewriterproto.WriteHeaderRequest{
-		Headers:    make([]*gresponsewriterproto.Header, 0, len(c.header)),
+	req := &responsewriterpb.WriteHeaderRequest{
+		Headers:    make([]*responsewriterpb.Header, 0, len(c.header)),
 		StatusCode: int32(statusCode),
 	}
 	for key, values := range c.header {
-		req.Headers = append(req.Headers, &gresponsewriterproto.Header{
+		req.Headers = append(req.Headers, &responsewriterpb.Header{
 			Key:    key,
 			Values: values,
 		})
@@ -98,13 +96,13 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, err
 	}
 
-	clientConn, err := c.broker.Dial(resp.ConnReadWriterServer)
+	clientConn, err := grpcutils.Dial(resp.ServerAddr)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	conn := gconn.NewClient(
-		gconnproto.NewConnClient(clientConn),
+		connpb.NewConnClient(clientConn),
 		&addr{
 			network: resp.LocalNetwork,
 			str:     resp.LocalString,
@@ -116,8 +114,8 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		clientConn,
 	)
 
-	reader := greader.NewClient(greaderproto.NewReaderClient(clientConn))
-	writer := gwriter.NewClient(gwriterproto.NewWriterClient(clientConn))
+	reader := greader.NewClient(readerpb.NewReaderClient(clientConn))
+	writer := gwriter.NewClient(writerpb.NewWriterClient(clientConn))
 
 	readWriter := bufio.NewReadWriter(
 		bufio.NewReader(reader),

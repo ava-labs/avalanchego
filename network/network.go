@@ -42,9 +42,9 @@ const (
 )
 
 var (
-	errNoPrimaryValidators = errors.New("no default subnet validators")
-
-	_ Network = &network{}
+	_                      sender.ExternalSender = &network{}
+	_                      Network               = &network{}
+	errNoPrimaryValidators                       = errors.New("no default subnet validators")
 )
 
 // Network defines the functionality of the networking library.
@@ -186,7 +186,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}
 
-	metrics, err := newMetrics(config.Namespace, metricsRegisterer)
+	metrics, err := newMetrics(config.Namespace, metricsRegisterer, config.WhitelistedSubnets)
 	if err != nil {
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
@@ -256,8 +256,9 @@ func (n *network) Gossip(
 	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
+	numPeersToSend int,
 ) ids.ShortSet {
-	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
+	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
 	return n.send(msg, peers)
 }
 
@@ -346,8 +347,7 @@ func (n *network) Connected(nodeID ids.ShortID) {
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
-	n.metrics.numPeers.Inc()
-	n.metrics.connected.Inc()
+	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion)
@@ -634,22 +634,29 @@ func (n *network) samplePeers(
 	validatorOnly bool,
 	numValidatorsToSample,
 	numNonValidatorsToSample int,
+	numPeersToSample int,
 ) []peer.Peer {
 	if validatorOnly {
-		numValidatorsToSample += numNonValidatorsToSample
+		numValidatorsToSample += numNonValidatorsToSample + numPeersToSample
 		numNonValidatorsToSample = 0
+		numPeersToSample = 0
 	}
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
 	return n.connectedPeers.Sample(
-		numValidatorsToSample+numNonValidatorsToSample,
+		numValidatorsToSample+numNonValidatorsToSample+numPeersToSample,
 		func(p peer.Peer) bool {
-			// Only return non-validators that are tracking [subnetID]
+			// Only return peers that are tracking [subnetID]
 			trackedSubnets := p.TrackedSubnets()
 			if !trackedSubnets.Contains(subnetID) {
 				return false
+			}
+
+			if numPeersToSample > 0 {
+				numPeersToSample--
+				return true
 			}
 
 			if n.config.Validators.Contains(subnetID, p.ID()) {
@@ -734,12 +741,11 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 		delete(n.trackedIPs, nodeID)
 	}
 
-	n.metrics.numPeers.Dec()
-	n.metrics.disconnected.Inc()
+	n.metrics.markDisconnected(peer)
 }
 
 func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
+	if !n.config.AllowPrivateIPs && ip.IPDesc.IP.IsPrivate() {
 		n.peerConfig.Log.Verbo(
 			"dropping suggested connected to %s%s because the ip (%s) is private",
 			constants.NodeIDPrefix, nodeID,
@@ -1079,6 +1085,7 @@ func (n *network) runTimers() {
 				false,
 				int(n.config.PeerListValidatorGossipSize),
 				int(n.config.PeerListNonValidatorGossipSize),
+				int(n.config.PeerListPeersGossipSize),
 			)
 
 		case <-updateUptimes.C:

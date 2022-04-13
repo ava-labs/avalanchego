@@ -814,7 +814,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -904,7 +904,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1009,7 +1009,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1116,7 +1116,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1223,7 +1223,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1331,7 +1331,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1436,7 +1436,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				Fx: &propertyfx.Fx{},
 			},
 		},
-		&common.SenderTest{},
+		&common.SenderTest{T: t},
 	)
 	if err != nil {
 		t.Fatal(err)
