@@ -5,21 +5,23 @@ package constants
 
 // Const variables to be exported
 const (
-	DefaultTokenSymbl   = "AVAX"
-	ColumbusTokenSymbol = "CAM"
+	DefaultTokenSymbl = "AVAX"
+	CaminoTokenSymbol = "CAM"
 
-	DefaultTokenName  = "Avalanche"
-	ColumbusTokenName = "Camino"
+	DefaultTokenName = "Avalanche"
+	CaminoTokenName  = "Camino"
 )
 
 // Variables to be exported
 var (
 	NetworkIDToTokenSymbol = map[uint32]string{
-		ColumbusID: ColumbusTokenSymbol,
+		CaminoID:   CaminoTokenSymbol,
+		ColumbusID: CaminoTokenSymbol,
 	}
 
 	NetworkIDToTokenName = map[uint32]string{
-		ColumbusID: ColumbusTokenName,
+		CaminoID:   CaminoTokenName,
+		ColumbusID: CaminoTokenName,
 	}
 )
 
