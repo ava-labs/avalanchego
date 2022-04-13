@@ -13,11 +13,12 @@ import (
 )
 
 type Config struct {
+	common.AllGetsServer
+
 	SampleK          int
 	Alpha            uint64
 	StateSyncBeacons validators.Set
 
-	common.AllGetsServer
 	Sender        common.Sender
 	Ctx           *snow.ConsensusContext
 	VM            block.ChainVM

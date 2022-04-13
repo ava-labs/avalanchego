@@ -19,8 +19,8 @@ var (
 // Summary must allow a VM to download, verify and rebuild its state,
 // no matter whether it is freshly created or it has previous state.
 // Both Key and ID uniquely identify a Summary. However:
-// Key should be as small as possible, and it is used to efficiently elicit network votes;
-// ID must allow Summary verification and it is returned into elicited votes
+// Key is used to efficiently elicit network votes;
+// ID must allow Summary verification and it is returned into elicited votes;
 // to allow state syncing nodes verify vote correctness.
 // Finally Byte represent the Summary content which is defined by the VM and opaque to the engine.
 type Summary interface {
@@ -58,7 +58,7 @@ type StateSyncableVM interface {
 	// These summaries were collected from peers and validated with validators.
 	// VM will use information inside the summary to choose one and sync
 	// its state to that summary.
-	// Will be called with [nil] if no valid state summaries could be found.
+	// Will be called with an empty list if no valid state summaries could be found.
 	// Normal bootstrapping resumes after VM signals the state sync process has completed.
 	StateSync([]Summary) error
 }

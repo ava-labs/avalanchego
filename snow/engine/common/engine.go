@@ -66,7 +66,7 @@ type GetStateSummaryHandler interface {
 	// requestID, and the engine's current state summary frontier.
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
 
-	// Notify this engine of a request to filter state summaries.
+	// Notify this engine of a request to return state summaries IDs referenced by the provided keys.
 	//
 	// This function can be called by any validator. It is not safe to assume
 	// this message is utilizing a unique requestID. However, the validatorID is
@@ -105,7 +105,7 @@ type StateSyncHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a GetAcceptedStateSummary message,
 	// is utilizing a unique requestID, or that the summaryIDs are a subset of the
-	// state summaries from a GetAcceptedStateSummary message.
+	// state summaries requested by key from a GetAcceptedStateSummary message.
 	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error
 
 	// Notify this engine that a get accepted state summary request it issued has

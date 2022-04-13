@@ -305,21 +305,42 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	// Start state-syncing if available; otherwise start bootstrapping.
-	stateSyncEnabled := false
-	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil {
-		stateSyncEnabled, err = stateSyncer.IsEnabled()
-		if err == nil && stateSyncEnabled {
-			// drop boostrap state from previous runs
-			if err = chain.Handler.Bootstrapper().Clear(); err == nil {
-				err = stateSyncer.Start(0)
-			}
+	defer func() {
+		// Tell the chain to start processing messages.
+		// If the X, P, or C Chain panics, do not attempt to recover
+		chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
+
+		// If startup errored, then shutdown the chain with the fatal error.
+		if err != nil {
+			chain.Handler.StopWithError(err)
 		}
+	}()
+
+	stateSyncer := chain.Handler.StateSyncer()
+	if stateSyncer == nil {
+		err = chain.Handler.Bootstrapper().Start(0)
+		return
 	}
 
-	if err != nil && !stateSyncEnabled {
-		err = chain.Handler.Bootstrapper().Start(0)
+	var stateSyncEnabled bool
+	stateSyncEnabled, err = stateSyncer.IsEnabled()
+	if err != nil {
+		return
 	}
+
+	if !stateSyncEnabled {
+		err = chain.Handler.Bootstrapper().Start(0)
+		return
+	}
+
+	// drop bootstrap state from previous runs
+	// before starting state sync
+	err = chain.Handler.Bootstrapper().Clear()
+	if err != nil {
+		return
+	}
+
+	err = stateSyncer.Start(0)
 
 	// Tell the chain to start processing messages.
 	// If the X, P, or C Chain panics, do not attempt to recover
@@ -867,8 +888,45 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	// Create state-syncer, bootstrapper and engine. Note that the Start callback
-	// for state-syncer and bootstrap must be wrapped to ensure proper initialization
+	// Create engine, bootstrapper and state-syncer in this order.
+	engineConfig := smeng.Config{
+		Ctx:           commonCfg.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            vm,
+		Sender:        commonCfg.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     &smcon.Topological{},
+	}
+	engine, err := smeng.New(engineConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
+	handler.SetConsensus(engine)
+
+	// create bootstrap gear
+	bootstrapCfg := smbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+		WeightTracker: weightTracker,
+		Bootstrapped:  m.unblockChains,
+	}
+
+	// Note: creating engine before bootstrapper ensures that
+	// handler.Consensus() does not return nil,
+	// because engine is already registered
+	bootstrapper, err := smbootstrap.New(
+		bootstrapCfg,
+		func(lastReqID uint32) error {
+			return handler.Consensus().Start(lastReqID + 1)
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
+	}
+	handler.SetBootstrapper(bootstrapper)
 
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
@@ -881,6 +939,10 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
+
+	// Note: creating bootstrapper before stateSyncer ensures that
+	// handler.Bootstrapper() does not return nil,
+	// because bootstrapper is already registered
 	stateSyncer := syncer.New(
 		stateSyncCfg,
 		func(lastReqID uint32) error {
@@ -888,42 +950,6 @@ func (m *manager) createSnowmanChain(
 		},
 	)
 	handler.SetStateSyncer(stateSyncer)
-
-	// create bootstrap gear
-	bootstrapCfg := smbootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-		WeightTracker: weightTracker,
-		Bootstrapped:  m.unblockChains,
-	}
-	bootstrapper, err := smbootstrap.New(
-		bootstrapCfg,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
-	}
-	handler.SetBootstrapper(bootstrapper)
-
-	// create engine gear
-	engineConfig := smeng.Config{
-		Ctx:           bootstrapCfg.Ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            bootstrapCfg.VM,
-		Sender:        bootstrapCfg.Sender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     &smcon.Topological{},
-	}
-	engine, err := smeng.New(engineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
-	}
-	handler.SetConsensus(engine)
 
 	// Register health checks
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
