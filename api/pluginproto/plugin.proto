@@ -1,6 +1,6 @@
 syntax = "proto3";
 package pluginproto;
-option go_package = "github.com/ava-labs/avalanchego/api/pluginproto";
+option go_package = "github.com/chain4travel/caminogo/api/pluginproto";
 import "google/protobuf/empty.proto";
 
 // To compile: protoc --go_out=plugins=grpc:. app.proto

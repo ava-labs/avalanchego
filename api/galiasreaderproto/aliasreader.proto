@@ -1,6 +1,6 @@
 syntax = "proto3";
 package galiasreaderproto;
-option go_package = "github.com/ava-labs/avalanchego/api/galiasreaderproto";
+option go_package = "github.com/chain4travel/caminogo/api/galiasreaderproto";
 
 message ID {
     bytes id = 1;

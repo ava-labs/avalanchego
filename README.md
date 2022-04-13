@@ -84,7 +84,7 @@ sudo apt install avalanchego
 
 ### Binary Install
 
-Download the [latest build](https://github.com/ava-labs/avalanchego/releases/latest) for your operating system and architecture.
+Download the [latest build](https://github.com/chain4travel/caminogo/releases/latest) for your operating system and architecture.
 
 The Avalanche binary to be executed is named `avalanchego`.
 
