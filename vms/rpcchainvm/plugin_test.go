@@ -15,6 +15,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
@@ -79,8 +81,7 @@ func TestHelperProcess(*testing.T) {
 			"vm": NewTestVM(&TestSubnetVM{logger: pluginLogger}),
 		},
 
-		// A non-nil value here enables gRPC serving for this plugin...
-		GRPCServer: plugin.DefaultGRPCServer,
+		GRPCServer: grpcutils.NewDefaultServer,
 	})
 	os.Exit(0)
 }

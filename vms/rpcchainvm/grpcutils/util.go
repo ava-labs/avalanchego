@@ -161,3 +161,13 @@ func createClientConn(addr string, opts ...grpc.DialOption) (*grpc.ClientConn, e
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	return grpc.Dial(addr, opts...)
 }
+
+// NewDefaultServer ensures the plugin service is served with proper
+// defaults. This should always be passed to GRPCServer field of
+// plugin.ServeConfig.
+func NewDefaultServer(opts []grpc.ServerOption) *grpc.Server {
+	if len(opts) == 0 {
+		opts = append(opts, DefaultServerOptions...)
+	}
+	return grpc.NewServer(opts...)
+}

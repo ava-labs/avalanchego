@@ -72,19 +72,14 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey   = errors.New("invalid TLS key")
-	errPNotCreated     = errors.New("P-Chain not created")
-	errXNotCreated     = errors.New("X-Chain not created")
-	errCNotCreated     = errors.New("C-Chain not created")
-	errNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-	errShuttingDown    = errors.New("server shutting down")
+	errInvalidTLSKey = errors.New("invalid TLS key")
+	errShuttingDown  = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
 type Node struct {
 	Log        logging.Logger
 	LogFactory logging.Factory
-	HTTPLog    logging.Logger
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
@@ -534,7 +529,7 @@ func (n *Node) initAPIServer() error {
 		LockOptions: common.NoLock,
 		Handler:     authService,
 	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "")
 }
 
 // Add the default VM aliases
@@ -756,7 +751,7 @@ func (n *Node) initKeystoreAPI() error {
 		LockOptions: common.NoLock,
 		Handler:     keystoreHandler,
 	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -793,7 +788,6 @@ func (n *Node) initMetricsAPI() error {
 		&sync.RWMutex{},
 		"metrics",
 		"",
-		n.HTTPLog,
 	)
 }
 
@@ -826,7 +820,7 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "")
 }
 
 // initProfiler initializes the continuous profiling
@@ -883,7 +877,7 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "")
 }
 
 // initHealthAPI initializes the Health API service
@@ -901,54 +895,6 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
-		chains := make([]string, 0, 3)
-		if !n.chainManager.IsBootstrapped(pChainID) {
-			chains = append(chains, "'P'")
-		}
-		if !n.chainManager.IsBootstrapped(xChainID) {
-			chains = append(chains, "'X'")
-		}
-		if !n.chainManager.IsBootstrapped(cChainID) {
-			chains = append(chains, "'C'")
-		}
-		return chains
-	}
-
-	// Passes if the P, X and C chains are finished bootstrapping
-	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
-		pChainID, err := n.chainManager.Lookup("P")
-		if err != nil {
-			return nil, errPNotCreated
-		}
-
-		xChainID, err := n.chainManager.Lookup("X")
-		if err != nil {
-			return nil, errXNotCreated
-		}
-
-		cChainID, err := n.chainManager.Lookup("C")
-		if err != nil {
-			return nil, errCNotCreated
-		}
-
-		chains := chainsNotBootstrapped(pChainID, xChainID, cChainID)
-		if len(chains) != 0 {
-			return chains, errNotBootstrapped
-		}
-		return chains, nil
-	})
-
-	err = healthChecker.RegisterReadinessCheck("bootstrapped", bootstrappedCheck)
-	if err != nil {
-		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
-	}
-
-	err = healthChecker.RegisterHealthCheck("bootstrapped", bootstrappedCheck)
-	if err != nil {
-		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
-	}
-
 	err = healthChecker.RegisterHealthCheck("network", n.Net)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
@@ -972,7 +918,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -986,7 +931,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/readiness",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -1000,7 +944,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/health",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -1014,7 +957,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/liveness",
-		n.HTTPLog,
 	)
 }
 
@@ -1030,7 +972,7 @@ func (n *Node) initIPCAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "")
 }
 
 // Give chains aliases as specified by the genesis information
@@ -1083,12 +1025,6 @@ func (n *Node) Initialize(
 	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
-
-	httpLog, err := logFactory.Make("http")
-	if err != nil {
-		return fmt.Errorf("problem initializing HTTP logger: %w", err)
-	}
-	n.HTTPLog = httpLog
 
 	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)

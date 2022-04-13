@@ -10,8 +10,10 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 // protocolVersion should be bumped anytime changes are made which require
@@ -57,4 +59,16 @@ func (p *vmPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
 // GRPCClient returns a new GRPC client
 func (p *vmPlugin) GRPCClient(ctx context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	return NewClient(vmpb.NewVMClient(c)), nil
+}
+
+// Serve serves a ChainVM plugin using sane gRPC server defaults.
+func Serve(vm block.ChainVM) {
+	plugin.Serve(&plugin.ServeConfig{
+		HandshakeConfig: Handshake,
+		Plugins: map[string]plugin.Plugin{
+			"vm": New(vm),
+		},
+		// ensure proper defaults
+		GRPCServer: grpcutils.NewDefaultServer,
+	})
 }

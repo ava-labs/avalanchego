@@ -194,45 +194,45 @@ func (mr *MockServerMockRecorder) AddAliasesWithReadLock(endpoint interface{}, a
 }
 
 // AddChainRoute mocks base method.
-func (m *MockServer) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string, loggingWriter io.Writer) error {
+func (m *MockServer) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddChainRoute", handler, ctx, base, endpoint, loggingWriter)
+	ret := m.ctrl.Call(m, "AddChainRoute", handler, ctx, base, endpoint)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddChainRoute indicates an expected call of AddChainRoute.
-func (mr *MockServerMockRecorder) AddChainRoute(handler, ctx, base, endpoint, loggingWriter interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddChainRoute(handler, ctx, base, endpoint interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddChainRoute", reflect.TypeOf((*MockServer)(nil).AddChainRoute), handler, ctx, base, endpoint, loggingWriter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddChainRoute", reflect.TypeOf((*MockServer)(nil).AddChainRoute), handler, ctx, base, endpoint)
 }
 
 // AddRoute mocks base method.
-func (m *MockServer) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error {
+func (m *MockServer) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRoute", handler, lock, base, endpoint, loggingWriter)
+	ret := m.ctrl.Call(m, "AddRoute", handler, lock, base, endpoint)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRoute indicates an expected call of AddRoute.
-func (mr *MockServerMockRecorder) AddRoute(handler, lock, base, endpoint, loggingWriter interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddRoute(handler, lock, base, endpoint interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoute", reflect.TypeOf((*MockServer)(nil).AddRoute), handler, lock, base, endpoint, loggingWriter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoute", reflect.TypeOf((*MockServer)(nil).AddRoute), handler, lock, base, endpoint)
 }
 
 // AddRouteWithReadLock mocks base method.
-func (m *MockServer) AddRouteWithReadLock(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error {
+func (m *MockServer) AddRouteWithReadLock(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRouteWithReadLock", handler, lock, base, endpoint, loggingWriter)
+	ret := m.ctrl.Call(m, "AddRouteWithReadLock", handler, lock, base, endpoint)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRouteWithReadLock indicates an expected call of AddRouteWithReadLock.
-func (mr *MockServerMockRecorder) AddRouteWithReadLock(handler, lock, base, endpoint, loggingWriter interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) AddRouteWithReadLock(handler, lock, base, endpoint interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), handler, lock, base, endpoint, loggingWriter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), handler, lock, base, endpoint)
 }
 
 // Dispatch mocks base method.
