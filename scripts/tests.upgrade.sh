@@ -24,12 +24,12 @@ if [[ -z "${NEW_BINARY}" ]]; then
 fi
 
 #################################
-# download avalanchego
+# download caminogo
 # https://github.com/chain4travel/caminogo/releases
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
 DOWNLOAD_URL=https://github.com/chain4travel/caminogo/releases/download/v${VERSION}/caminogo-linux-${GOARCH}-v${VERSION}.tar.gz
-DOWNLOAD_PATH=/tmp/avalanchego.tar.gz
+DOWNLOAD_PATH=/tmp/caminogo.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
   DOWNLOAD_URL=https://github.com/chain4travel/caminogo/releases/download/v${VERSION}/caminogo-macos-v${VERSION}.zip
   DOWNLOAD_PATH=/tmp/caminogo.zip
@@ -96,7 +96,7 @@ echo "running upgrade tests against the local cluster with ${NEW_BINARY}"
 --ginkgo.v \
 --log-level debug \
 --network-runner-grpc-endpoint="0.0.0.0:12340" \
---avalanchego-path=/tmp/caminogo-v${VERSION}/caminogo \
+--caminogo-path=/tmp/caminogo-v${VERSION}/caminogo \
 --caminogo-path-to-upgrade=${NEW_BINARY} || EXIT_CODE=$?
 
 kill ${PID}

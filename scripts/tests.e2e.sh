@@ -3,14 +3,14 @@ set -e
 
 # e.g.,
 # ./scripts/build.sh
-# ./scripts/tests.e2e.sh ./build/avalanchego
-# ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/avalanchego
+# ./scripts/tests.e2e.sh ./build/caminogo
+# ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/caminogo
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
 
-AVALANCHEGO_PATH=$1
+CAMINOGO_PATH=$1
 if [[ -z "${CAMINOGO_PATH}" ]]; then
   echo "Missing CAMINOGO_PATH argument!"
   echo "Usage: ${0} [CAMINOGO_PATH]" >> /dev/stderr
@@ -20,13 +20,13 @@ fi
 ENABLE_WHITELIST_VTX_TESTS=${ENABLE_WHITELIST_VTX_TESTS:-false}
 
 #################################
-# download avalanche-network-runner
-# https://github.com/ava-labs/avalanche-network-runner
-# TODO: migrate to upstream avalanche-network-runner
+# download camino-network-runner
+# https://github.com/chain4travel/camino-network-runner
+# TODO: migrate to upstream camino-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
 NETWORK_RUNNER_VERSION=1.0.6
-DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
+DOWNLOAD_PATH=/tmp/camino-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/chain4travel/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
   DOWNLOAD_URL=https://github.com/chain4travel/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_darwin_amd64.tar.gz

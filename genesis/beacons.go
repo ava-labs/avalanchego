@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,25 +18,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-// getIPs returns the beacon IPs for each network
-func getIPs(networkID uint32) []string {
-	switch networkID {
-	case constants.ColumbusID:
-		return []string{
-			"104.154.245.81:9651",
-		}
-	default:
-		return nil
-	}
+type node struct {
+	ip     string
+	nodeId string
 }
 
-// getNodeIDs returns the beacon node IDs for each network
-func getNodeIDs(networkID uint32) []string {
+// getIPs returns the beacon IPs for each network
+func getNodes(networkID uint32) []node {
 	switch networkID {
 	case constants.ColumbusID:
-		return []string{
-			"NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
-		}
+		return []node{{
+			ip:     "104.154.245.81:9651",
+			nodeId: "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
+		}}
 	default:
 		return nil
 	}
@@ -34,22 +38,21 @@ func getNodeIDs(networkID uint32) []string {
 
 // SampleBeacons returns the some beacons this node should connect to
 func SampleBeacons(networkID uint32, count int) ([]string, []string) {
-	ips := getIPs(networkID)
-	ids := getNodeIDs(networkID)
+	beacons := getNodes(networkID)
 
-	if numIPs := len(ips); numIPs < count {
-		count = numIPs
+	if numBeacons := len(beacons); numBeacons < count {
+		count = numBeacons
 	}
 
 	sampledIPs := make([]string, 0, count)
 	sampledIDs := make([]string, 0, count)
 
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(ips)))
+	_ = s.Initialize(uint64(len(beacons)))
 	indices, _ := s.Sample(count)
 	for _, index := range indices {
-		sampledIPs = append(sampledIPs, ips[int(index)])
-		sampledIDs = append(sampledIDs, ids[int(index)])
+		sampledIPs = append(sampledIPs, beacons[int(index)].ip)
+		sampledIDs = append(sampledIDs, beacons[int(index)].nodeId)
 	}
 
 	return sampledIPs, sampledIDs
