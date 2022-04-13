@@ -538,7 +538,7 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
-	log.Info("Shutting down state maanger")
+	log.Info("Shutting down state manager")
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
