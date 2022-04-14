@@ -72,6 +72,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
+		WeightTracker:                  tracker.NewWeightTracker(peers, peers.Weight()/2+1),
 		Sender:                         sender,
 		Subnet:                         subnet,
 		Timer:                          &common.TimerTest{},
@@ -92,7 +93,6 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		TxBlocked:     txBlocker,
 		Manager:       manager,
 		VM:            vm,
-		WeightTracker: tracker.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, manager, vm
 }
 

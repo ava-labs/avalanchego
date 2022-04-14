@@ -42,9 +42,8 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -429,9 +428,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -933,9 +931,8 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -1070,8 +1067,7 @@ func TestEngineNoQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1139,8 +1135,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	bootCfg, engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1824,9 +1819,8 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1959,9 +1953,8 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -2112,9 +2105,8 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()

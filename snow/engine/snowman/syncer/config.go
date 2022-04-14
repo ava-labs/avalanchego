@@ -33,7 +33,6 @@ func NewConfig(
 	stateSyncerIDs []ids.ShortID,
 	snowGetHandler common.AllGetsServer,
 	vm block.ChainVM,
-	weightTracker tracker.WeightTracker,
 ) (Config, error) {
 	var (
 		stateSyncBeacons = commonCfg.Beacons
@@ -63,7 +62,7 @@ func NewConfig(
 		AllGetsServer:             snowGetHandler,
 		Ctx:                       commonCfg.Ctx,
 		VM:                        vm,
-		WeightTracker:             weightTracker,
+		WeightTracker:             commonCfg.WeightTracker,
 		RetrySyncing:              commonCfg.RetryBootstrap,
 		RetrySyncingWarnFrequency: commonCfg.RetryBootstrapWarnFrequency,
 	}, nil

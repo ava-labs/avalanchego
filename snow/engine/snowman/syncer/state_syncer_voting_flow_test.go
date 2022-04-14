@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
@@ -23,11 +24,11 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 
 	noBeacons := validators.NewSet()
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      noBeacons,
-		SampleK:      int(noBeacons.Weight()),
-		Alpha:        (noBeacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       noBeacons,
+		SampleK:       int(noBeacons.Weight()),
+		Alpha:         (noBeacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(noBeacons, (3*noBeacons.Weight()+3)/4),
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
@@ -48,11 +49,11 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
@@ -81,11 +82,11 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -161,11 +162,11 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -222,11 +223,11 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -297,11 +298,11 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -360,11 +361,11 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -468,11 +469,11 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -562,11 +563,11 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	assert := assert.New(t)
 
 	commonCfg := common.Config{
-		Ctx:          snow.DefaultConsensusContextTest(),
-		Beacons:      beacons,
-		SampleK:      int(beacons.Weight()),
-		Alpha:        (beacons.Weight() + 1) / 2,
-		StartupAlpha: (3*beacons.Weight() + 3) / 4,
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       beacons,
+		SampleK:       int(beacons.Weight()),
+		Alpha:         (beacons.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -659,9 +660,9 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 		Beacons:                     beacons,
 		SampleK:                     int(beacons.Weight()),
 		Alpha:                       (beacons.Weight() + 1) / 2,
-		StartupAlpha:                (3*beacons.Weight() + 3) / 4,
-		RetryBootstrap:              true, // this enable RetryStateSync too
-		RetryBootstrapWarnFrequency: 1,    // this enable RetrySyncingWarnFrequency too
+		WeightTracker:               tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		RetryBootstrap:              true, // this sets RetryStateSyncing too
+		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 

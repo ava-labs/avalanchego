@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -68,14 +67,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
 	assert.NoError(t, err)
-	dummyWeightTracker := tracker.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha)
 
-	cfg, err := NewConfig(
-		*commonCfg,
-		nil,
-		dummyGetter,
-		fullVM,
-		dummyWeightTracker)
+	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
 	assert.NoError(t, err)
 	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
 	syncer, ok := commonSyncer.(*stateSyncer)
