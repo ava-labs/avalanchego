@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -2402,7 +2403,7 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	privKeyStr, err := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
+	privKeyStr, err := cb58.Encode(sk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2438,7 +2439,7 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
 	}
 
-	parsedKeyBytes, err := formatting.Decode(formatting.CB58, strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
+	parsedKeyBytes, err := cb58.Decode(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
 	if err != nil {
 		t.Fatal("Failed to parse exported private key")
 	}
@@ -2463,7 +2464,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-	privKeyStr, err := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
+	privKeyStr, err := cb58.Encode(sk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

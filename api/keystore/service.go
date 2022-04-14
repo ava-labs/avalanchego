@@ -50,7 +50,7 @@ type ImportUserArgs struct {
 	api.UserPass
 	// The string representation of the user
 	User string `json:"user"`
-	// The encoding of [User] ("hex" or "cb58")
+	// The encoding of [User] ("hex")
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
@@ -70,14 +70,14 @@ func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.S
 type ExportUserArgs struct {
 	// The username and password
 	api.UserPass
-	// The encoding for the exported user ("hex" or "cb58")
+	// The encoding for the exported user ("hex")
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
 type ExportUserReply struct {
 	// String representation of the user
 	User string `json:"user"`
-	// The encoding for the exported user ("hex" or "cb58")
+	// The encoding for the exported user ("hex")
 	Encoding formatting.Encoding `json:"encoding"`
 }
 

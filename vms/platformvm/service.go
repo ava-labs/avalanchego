@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -124,7 +125,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
+	privKeyStr, _ := cb58.Encode(sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return user.Close()
 }
@@ -144,7 +145,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
+	privKeyBytes, err := cb58.Decode(trimmedPrivateKey)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -354,7 +355,7 @@ type Index struct {
 // If [StartIndex] is omitted, gets all UTXOs.
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
-// [Encoding] defines the encoding format to use for the returned UTXOs. Can be either "cb58" or "hex"
+// [Encoding] defines the encoding format to use for the returned UTXOs. Should be "hex"
 type GetUTXOsArgs struct {
 	Addresses   []string            `json:"addresses"`
 	SourceChain string              `json:"sourceChain"`

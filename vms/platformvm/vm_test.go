@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -119,7 +120,7 @@ func init() {
 		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
+		privKeyBytes, err := cb58.Decode(key)
 		ctx.Log.AssertNoError(err)
 		pk, err := factory.ToPrivateKey(privKeyBytes)
 		ctx.Log.AssertNoError(err)
@@ -297,7 +298,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.CB58,
+		Encoding:      formatting.Hex,
 	}
 
 	if args != nil {

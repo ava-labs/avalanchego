@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -33,9 +34,9 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			"6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa",
 			"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
 		} {
-			b, err := formatting.Decode(formatting.CB58, addrStr)
+			addr, err := ids.ShortFromString(addrStr)
 			gomega.Expect(err).Should(gomega.BeNil())
-			addrMap[addrStr], err = formatting.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], b)
+			addrMap[addrStr], err = formatting.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], addr[:])
 			gomega.Expect(err).Should(gomega.BeNil())
 		}
 		avmArgs := avm.BuildGenesisArgs{
@@ -123,7 +124,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 			"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 		} {
-			privKeyBytes, err := formatting.Decode(formatting.CB58, key)
+			privKeyBytes, err := cb58.Decode(key)
 			gomega.Expect(err).Should(gomega.BeNil())
 			pk, err := factory.ToPrivateKey(privKeyBytes)
 			gomega.Expect(err).Should(gomega.BeNil())
@@ -173,7 +174,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			Chains:        nil,
 			Time:          json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 			InitialSupply: json.Uint64(360 * units.MegaAvax),
-			Encoding:      formatting.CB58,
+			Encoding:      formatting.Hex,
 		}
 
 		uris := e2e.GetURIs()
@@ -184,6 +185,6 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		resp, err := staticClient.BuildGenesis(ctx, &buildGenesisArgs)
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
-		gomega.Expect(resp.Bytes).Should(gomega.Equal("111111Dn1a3"))
+		gomega.Expect(resp.Bytes).Should(gomega.Equal("0x000000000000089e1d44"))
 	})
 })

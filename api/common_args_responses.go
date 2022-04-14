@@ -72,16 +72,15 @@ type GetBlockArgs struct {
 // GetBlockResponse is the response object for the GetBlock API.
 type GetBlockResponse struct {
 	Block interface{} `json:"block"`
-	// If GetBlockResponse.Encoding is formatting.Hex or formatting.CB58,
-	// GetBlockResponse.Block is the string representation of the block
-	// under the respective encoding.
+	// If GetBlockResponse.Encoding is formatting.Hex, GetBlockResponse.Block is
+	// the string representation of the block under hex encoding.
 	// If GetBlockResponse.Encoding is formatting.JSON, GetBlockResponse.Block
 	// is the actual block returned as a JSON.
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// FormattedBlock defines a JSON formatted struct containing a block in
-// CB58/Hex format
+// FormattedBlock defines a JSON formatted struct containing a block in Hex
+// format
 type FormattedBlock struct {
 	Block    string              `json:"block"`
 	Encoding formatting.Encoding `json:"encoding"`
@@ -94,15 +93,15 @@ type GetTxArgs struct {
 
 // GetTxReply defines an object containing a single [Tx] object along with Encoding
 type GetTxReply struct {
-	// If [GetTxArgs.Encoding] is [Hex] or [CB58], [Tx] is the string
-	// representation of the tx under that encoding.
+	// If [GetTxArgs.Encoding] is [Hex], [Tx] is the string representation of
+	// the tx under hex encoding.
 	// If [GetTxArgs.Encoding] is [JSON], [Tx] is the actual tx, which will be
 	// returned as JSON to the caller.
 	Tx       interface{}         `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
+// FormattedTx defines a JSON formatted struct containing a Tx as a string
 type FormattedTx struct {
 	Tx       string              `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
