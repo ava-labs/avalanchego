@@ -433,11 +433,11 @@ func TestVMGenesis(t *testing.T) {
 			vmTest: []vmTest{
 				{
 					vmID:       constants.AVMID,
-					expectedID: "ThJrkFv9THdCCePNkfwoFmgRw8uXekiAvWLXdNFoEb7CC1n29",
+					expectedID: "N5SYDM4Lyei9bhpNaCrr59P9u89Z77Hbe7AZ1NVZNGm9L5Tw4",
 				},
 				{
 					vmID:       constants.EVMID,
-					expectedID: "RinAZCjd5Dm4wk1FBWiXiiSW2VZkjzgNyR7nNBRkuCvG9zRkJ",
+					expectedID: "8FeUkRkbFTiF3yFQr1AyD7GFgexY6dYjhj8XcyQ7jXX1BC8s9",
 				},
 			},
 		},
@@ -450,7 +450,7 @@ func TestVMGenesis(t *testing.T) {
 				},
 				{
 					vmID:       constants.EVMID,
-					expectedID: "fnVV12Px5y6FGM5Ua8moqmTPCQT2im18SZEW2xgMDGurimFZg",
+					expectedID: "G52TJLLbDSxYXsijNMpKFB6kAyDVRd9DGWVWYBh86Z8sEXm1i",
 				},
 			},
 		},
@@ -504,7 +504,7 @@ func TestAVAXAssetID(t *testing.T) {
 	}{
 		{
 			networkID:  constants.CaminoID,
-			expectedID: "yZzd27CgLACi4ZNqjiHeLPF5CB98z1ytVr7wxCHfKBFqGPJE5",
+			expectedID: "23YabNt6vhLZYh3P4u8k97maNPx7JX44dE5ea9AHqVGCJhBf3P",
 		},
 		{
 			networkID:  constants.ColumbusID,
