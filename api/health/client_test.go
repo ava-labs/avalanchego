@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +18,7 @@ type mockClient struct {
 	onCall func()
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, replyIntf interface{}) error {
+func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, replyIntf interface{}, options ...rpc.Option) error {
 	reply := replyIntf.(*APIHealthReply)
 	*reply = mc.reply
 	mc.onCall()

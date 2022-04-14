@@ -8,21 +8,21 @@ import (
 	"errors"
 	"io"
 
-	"github.com/ava-labs/avalanchego/api/proto/gwriterproto"
+	writerpb "github.com/ava-labs/avalanchego/proto/pb/io/writer"
 )
 
 var _ io.Writer = &Client{}
 
 // Client is an io.Writer that talks over RPC.
-type Client struct{ client gwriterproto.WriterClient }
+type Client struct{ client writerpb.WriterClient }
 
 // NewClient returns a writer connected to a remote writer
-func NewClient(client gwriterproto.WriterClient) *Client {
+func NewClient(client writerpb.WriterClient) *Client {
 	return &Client{client: client}
 }
 
 func (c *Client) Write(p []byte) (int, error) {
-	resp, err := c.client.Write(context.Background(), &gwriterproto.WriteRequest{
+	resp, err := c.client.Write(context.Background(), &writerpb.WriteRequest{
 		Payload: p,
 	})
 	if err != nil {

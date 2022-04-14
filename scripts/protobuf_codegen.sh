@@ -27,7 +27,7 @@ if [[ $(protoc-gen-go-grpc --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_GRPC_V
   exit 255
 fi
 
-TARGET=$PWD/api
+TARGET=$PWD/proto
 if [ -n "$1" ]; then 
   TARGET="$1"
 fi

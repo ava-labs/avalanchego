@@ -355,14 +355,17 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		msgSummaryIDs := msg.Get(message.SummaryIDs).([][]byte)
-		summaryIDs := make([]ids.ID, len(msgSummaryIDs))
-		for i, summaryID := range msgSummaryIDs {
-			id, err := ids.ToID(summaryID)
-			if err != nil {
-				return err
-			}
-			summaryIDs[i] = id
+		summaryIDs, err := getIDs(message.SummaryIDs, msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s%s, %d): %s",
+				op,
+				constants.NodeIDPrefix,
+				nodeID,
+				reqID,
+				err,
+			)
+			return err
 		}
 		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
 
@@ -376,7 +379,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -396,7 +399,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -412,7 +415,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -473,7 +476,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
-		votes, err := getContainerIDs(msg)
+		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -667,9 +670,15 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	if err := h.engine.Shutdown(); err != nil {
+	currentEngine, err := h.getEngine()
+	if err == nil {
+		if err := currentEngine.Shutdown(); err != nil {
+			h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		}
+	} else {
 		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
+
 	if h.onStopped != nil {
 		go h.onStopped()
 	}

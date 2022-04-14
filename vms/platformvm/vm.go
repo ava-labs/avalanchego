@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -51,6 +52,9 @@ const (
 
 	// Maximum future start time for staking/delegating
 	maxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 var (
@@ -63,6 +67,7 @@ var (
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ validators.State     = &VM{}
 	_ Fx                   = &secp256k1fx.Fx{}
 )
 
@@ -119,6 +124,9 @@ type VM struct {
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
+
+	// sliding window of blocks that were recently accepted
+	recentlyAccepted *window.Window
 }
 
 // Initialize this blockchain.
@@ -199,8 +207,14 @@ func (vm *VM) Initialize(
 		)
 	}
 
+	vm.recentlyAccepted = window.New(
+		window.Config{
+			Clock:   &vm.clock,
+			MaxSize: maxRecentlyAcceptedWindowSize,
+			TTL:     recentlyAcceptedWindowTTL,
+		},
+	)
 	vm.lastAcceptedID = is.GetLastAccepted()
-
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
 
 	// Build off the most recently accepted block
@@ -541,6 +555,33 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	vm.metrics.validatorSetsDuration.Add(float64(endTime.Sub(startTime)))
 	vm.metrics.validatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
 	return vdrSet, nil
+}
+
+// GetMinimumHeight returns the height of the most recent block beyond the
+// horizon of our recentlyAccepted window.
+//
+// Because the time between blocks is arbitrary, we're only guaranteed that
+// the window's configured TTL amount of time has passed once an element
+// expires from the window.
+//
+// To try to always return a block older than the window's TTL, we return the
+// parent of the oldest element in the window (as an expired element is always
+// guaranteed to be sufficiently stale). If we haven't expired an element yet
+// in the case of a process restart, we default to the lastAccepted block's
+// height which is likely (but not guaranteed) to also be older than the
+// window's configured TTL.
+func (vm *VM) GetMinimumHeight() (uint64, error) {
+	oldest, ok := vm.recentlyAccepted.Oldest()
+	if !ok {
+		return vm.GetCurrentHeight()
+	}
+
+	blk, err := vm.GetBlock(oldest.(ids.ID))
+	if err != nil {
+		return 0, err
+	}
+
+	return blk.Height() - 1, nil
 }
 
 // GetCurrentHeight returns the height of the last accepted block

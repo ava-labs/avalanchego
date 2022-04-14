@@ -1,5 +1,58 @@
 # Release Notes
 
+## [v1.7.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.10)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### Networking
+
+- Improved vertex and block gossiping for validators with low stake weight.
+- Added peers metric by subnet.
+- Added percentage of stake connected metric by subnet.
+
+### APIs
+
+- Added support for specifying additional headers and query params in the RPC client implementations.
+- Added static API clients for the `platformvm` and the `avm`.
+
+### PlatformVM
+
+- Introduced time based windowing of accepted P-chain block heights to ensure that local networks update the proposer list timely in the `proposervm`.
+- Improved selection of decision transactions from the mempool.
+
+### RPCChainVM
+
+- Increased `buf` version to `v1.3.1`.
+- Migrated all proto definitions to a dedicated `/proto` folder.
+- Removed the dependency on the non-standard grpc broker to better support other language implementations.
+- Added grpc metrics.
+- Added grpc server health checks.
+
+### Coreth
+
+- Fixed a bug where a deadlock on shutdown caused historical re-generation on restart.
+- Added an API endpoint to fetch the current VM Config.
+- Added AvalancheGo custom log formatting to the logs.
+- Removed support for the JS Tracer.
+
+### Logging
+
+- Added piping of subnet logs to stdout.
+- Lazily initialized logs to avoid opening files that are never written to.
+- Added support for arbitrarily deleted log files while avalanchego is running.
+- Removed redundant logging configs.
+
+### Miscellaneous
+
+- Updated minimum go version to `v1.17.9`.
+- Added subnet bootstrapping health checks.
+- Supported multiple tags per codec instantiation.
+- Added minor fail-fast optimization to string packing.
+- Removed dead code.
+- Fixed typos.
+- Simplified consensus engine `Shutdown` notification dispatching.
+- Removed `Sleep` call in the inbound connection throttler.
+
 ## [v1.7.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.9)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.

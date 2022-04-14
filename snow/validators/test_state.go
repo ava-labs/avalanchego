@@ -11,18 +11,33 @@ import (
 )
 
 var (
+	errMinimumHeight   = errors.New("unexpectedly called GetMinimumHeight")
 	errCurrentHeight   = errors.New("unexpectedly called GetCurrentHeight")
 	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
 )
 
+var _ State = &TestState{}
+
 type TestState struct {
 	T *testing.T
 
+	CantGetMinimumHeight,
 	CantGetCurrentHeight,
 	CantGetValidatorSet bool
 
+	GetMinimumHeightF func() (uint64, error)
 	GetCurrentHeightF func() (uint64, error)
 	GetValidatorSetF  func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error)
+}
+
+func (vm *TestState) GetMinimumHeight() (uint64, error) {
+	if vm.GetMinimumHeightF != nil {
+		return vm.GetMinimumHeightF()
+	}
+	if vm.CantGetMinimumHeight && vm.T != nil {
+		vm.T.Fatal(errMinimumHeight)
+	}
+	return 0, errMinimumHeight
 }
 
 func (vm *TestState) GetCurrentHeight() (uint64, error) {

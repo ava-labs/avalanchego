@@ -63,6 +63,7 @@ var (
 	errUnknownChainID   = errors.New("unknown chain ID")
 	errUnknownVMType    = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped  = errors.New("chains not bootstrapped")
 
 	_ Manager = &manager{}
 )
@@ -100,6 +101,7 @@ type Manager interface {
 
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
+
 	Shutdown()
 }
 
@@ -299,34 +301,53 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// handler is started.
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
+	// Register bootstrapped health checks after P chain is started.
+	if chainParams.ID == constants.PlatformChainID {
+		if err := m.registerBootstrappedHealthChecks(); err != nil {
+			chain.Handler.StopWithError(err)
+		}
+	}
+
 	ctx := chain.Handler.Context()
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	// Start state-syncing if available; otherwise start bootstrapping.
-	stateSyncEnabled := false
-	if stateSyncer := chain.Handler.StateSyncer(); stateSyncer != nil {
-		stateSyncEnabled, err = stateSyncer.IsEnabled()
-		if err == nil && stateSyncEnabled {
-			// drop boostrap state from previous runs
-			if err = chain.Handler.Bootstrapper().Clear(); err == nil {
-				err = stateSyncer.Start(0)
-			}
+	defer func() {
+		// Tell the chain to start processing messages.
+		// If the X, P, or C Chain panics, do not attempt to recover
+		chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
+
+		// If startup errored, then shutdown the chain with the fatal error.
+		if err != nil {
+			chain.Handler.StopWithError(err)
 		}
-	}
+	}()
 
-	if err != nil && !stateSyncEnabled {
+	stateSyncer := chain.Handler.StateSyncer()
+	if stateSyncer == nil {
 		err = chain.Handler.Bootstrapper().Start(0)
+		return
 	}
 
-	// Tell the chain to start processing messages.
-	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
+	var stateSyncEnabled bool
+	stateSyncEnabled, err = stateSyncer.IsEnabled()
+	if err != nil && err != common.ErrStateSyncableVMNotImplemented {
+		return
+	}
 
-	// If startup errored, then shutdown the chain with the fatal error.
+	if !stateSyncEnabled {
+		err = chain.Handler.Bootstrapper().Start(0)
+		return
+	}
+
+	// drop bootstrap state from previous runs
+	// before starting state sync
+	err = chain.Handler.Bootstrapper().Clear()
 	if err != nil {
-		chain.Handler.StopWithError(err)
+		return
 	}
+
+	err = stateSyncer.Start(0)
 }
 
 // Create a chain
@@ -858,8 +879,45 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	// Create state-syncer, bootstrapper and engine. Note that the Start callback
-	// for state-syncer and bootstrap must be wrapped to ensure proper initialization
+	// Create engine, bootstrapper and state-syncer in this order.
+	engineConfig := smeng.Config{
+		Ctx:           commonCfg.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            vm,
+		Sender:        commonCfg.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     &smcon.Topological{},
+	}
+	engine, err := smeng.New(engineConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
+	handler.SetConsensus(engine)
+
+	// create bootstrap gear
+	bootstrapCfg := smbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+		WeightTracker: weightTracker,
+		Bootstrapped:  m.unblockChains,
+	}
+
+	// Note: creating engine before bootstrapper ensures that
+	// handler.Consensus() does not return nil,
+	// because engine is already registered
+	bootstrapper, err := smbootstrap.New(
+		bootstrapCfg,
+		func(lastReqID uint32) error {
+			return handler.Consensus().Start(lastReqID + 1)
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
+	}
+	handler.SetBootstrapper(bootstrapper)
 
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
@@ -872,6 +930,10 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
+
+	// Note: creating bootstrapper before stateSyncer ensures that
+	// handler.Bootstrapper() does not return nil,
+	// because bootstrapper is already registered
 	stateSyncer := syncer.New(
 		stateSyncCfg,
 		func(lastReqID uint32) error {
@@ -879,42 +941,6 @@ func (m *manager) createSnowmanChain(
 		},
 	)
 	handler.SetStateSyncer(stateSyncer)
-
-	// create bootstrap gear
-	bootstrapCfg := smbootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-		WeightTracker: weightTracker,
-		Bootstrapped:  m.unblockChains,
-	}
-	bootstrapper, err := smbootstrap.New(
-		bootstrapCfg,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
-	}
-	handler.SetBootstrapper(bootstrapper)
-
-	// create engine gear
-	engineConfig := smeng.Config{
-		Ctx:           bootstrapCfg.Ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            bootstrapCfg.VM,
-		Sender:        bootstrapCfg.Sender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     &smcon.Topological{},
-	}
-	engine, err := smeng.New(engineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
-	}
-	handler.SetConsensus(engine)
 
 	// Register health checks
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
@@ -964,6 +990,42 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 	}
 
 	return chain.Context().GetState() == snow.NormalOp
+}
+
+func (m *manager) chainsNotBootstrapped() []ids.ID {
+	m.chainsLock.Lock()
+	defer m.chainsLock.Unlock()
+
+	chainsBootstrapping := make([]ids.ID, 0, len(m.chains))
+	for chainID, chain := range m.chains {
+		if chain.Context().GetState() == snow.NormalOp {
+			continue
+		}
+		chainsBootstrapping = append(chainsBootstrapping, chainID)
+	}
+	return chainsBootstrapping
+}
+
+func (m *manager) registerBootstrappedHealthChecks() error {
+	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
+		chains := m.chainsNotBootstrapped()
+		aliases := make([]string, len(chains))
+		for i, chain := range chains {
+			aliases[i] = m.PrimaryAliasOrDefault(chain)
+		}
+
+		if len(aliases) != 0 {
+			return aliases, errNotBootstrapped
+		}
+		return aliases, nil
+	})
+	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
+		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
+	}
+	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck); err != nil {
+		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
+	}
+	return nil
 }
 
 // Shutdown stops all the chains

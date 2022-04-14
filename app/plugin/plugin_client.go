@@ -8,15 +8,15 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/api/proto/pluginproto"
+	pluginpb "github.com/ava-labs/avalanchego/proto/pb/plugin"
 )
 
 type Client struct {
-	client pluginproto.NodeClient
+	client pluginpb.NodeClient
 }
 
 // NewServer returns an app instance connected to a remote app instance
-func NewClient(node pluginproto.NodeClient) *Client {
+func NewClient(node pluginpb.NodeClient) *Client {
 	return &Client{
 		client: node,
 	}

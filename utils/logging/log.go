@@ -4,17 +4,12 @@
 package logging
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 var (
@@ -22,8 +17,7 @@ var (
 	filePrefix string
 	timeFormat = "01-02|15:04:05.000"
 
-	_ Logger         = &Log{}
-	_ RotatingWriter = &fileWriter{}
+	_ Logger = &Log{}
 )
 
 func init() {
@@ -53,10 +47,7 @@ type Log struct {
 }
 
 // New returns a new logger set up according to [config]
-func newLog(config Config) (*Log, error) {
-	if err := os.MkdirAll(config.Directory, perms.ReadWriteExecute); err != nil {
-		return nil, err
-	}
+func newLog(config Config) Logger {
 	l := &Log{
 		config: config,
 		writer: &fileWriter{},
@@ -67,7 +58,7 @@ func newLog(config Config) (*Log, error) {
 
 	go l.RecoverAndPanic(l.run)
 
-	return l, nil
+	return l
 }
 
 func (l *Log) run() {
@@ -76,10 +67,7 @@ func (l *Log) run() {
 	l.writeLock.Lock()
 	defer l.writeLock.Unlock()
 
-	currentSize, err := l.writer.Initialize(l.config)
-	if err != nil {
-		panic(err)
-	}
+	l.writer.Initialize(l.config)
 
 	closed := false
 	nextRotation := time.Now().Add(l.config.RotationInterval)
@@ -98,8 +86,7 @@ func (l *Log) run() {
 		l.writeLock.Lock()
 
 		for _, msg := range prevMessages {
-			n, _ := l.writer.WriteString(msg)
-			currentSize += n
+			_, _ = l.writer.WriteString(msg)
 		}
 
 		if !l.config.DisableFlushOnWrite {
@@ -107,9 +94,8 @@ func (l *Log) run() {
 			_ = l.writer.Flush()
 		}
 
-		if now := time.Now(); nextRotation.Before(now) || currentSize > l.config.FileSize {
+		if now := time.Now(); nextRotation.Before(now) || l.writer.GetCurrentSize() > l.config.FileSize {
 			nextRotation = now.Add(l.config.RotationInterval)
-			currentSize = 0
 			// attempt to flush before closing
 			_ = l.writer.Flush()
 			// attempt to close the file
@@ -134,12 +120,14 @@ func (l *Log) Write(p []byte) (int, error) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
 
-	if !l.config.DisableLogging {
-		l.flushLock.Lock()
-		l.messages = append(l.messages, string(p))
-		l.size += len(p)
-		l.needsFlush.Signal()
-		l.flushLock.Unlock()
+	l.flushLock.Lock()
+	l.messages = append(l.messages, string(p))
+	l.size += len(p)
+	l.needsFlush.Signal()
+	l.flushLock.Unlock()
+
+	if !l.config.DisableWriterDisplaying {
+		os.Stdout.Write(p)
 	}
 
 	return len(p), nil
@@ -163,8 +151,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
 
-	shouldLog := !l.config.DisableLogging && level <= l.config.LogLevel
-	shouldDisplay := (!l.config.DisableDisplaying && level <= l.config.DisplayLevel) || level == Fatal
+	shouldLog := level <= l.config.LogLevel
+	shouldDisplay := level <= l.config.DisplayLevel
 
 	if !shouldLog && !shouldDisplay {
 		return
@@ -326,97 +314,9 @@ func (l *Log) SetPrefix(prefix string) {
 	l.config.MsgPrefix = prefix
 }
 
-func (l *Log) SetLoggingEnabled(enabled bool) {
-	l.configLock.Lock()
-	defer l.configLock.Unlock()
-
-	l.config.DisableLogging = !enabled
-}
-
-func (l *Log) SetDisplayingEnabled(enabled bool) {
-	l.configLock.Lock()
-	defer l.configLock.Unlock()
-
-	l.config.DisableDisplaying = !enabled
-}
-
 func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
 
 	l.config.DisableContextualDisplaying = !enabled
-}
-
-type fileWriter struct {
-	writer *bufio.Writer
-	file   *os.File
-
-	config Config
-}
-
-func (fw *fileWriter) Flush() error {
-	return fw.writer.Flush()
-}
-
-func (fw *fileWriter) Write(b []byte) (int, error) {
-	return fw.writer.Write(b)
-}
-
-func (fw *fileWriter) WriteString(s string) (int, error) {
-	return fw.writer.WriteString(s)
-}
-
-func (fw *fileWriter) Close() error {
-	return fw.file.Close()
-}
-
-func (fw *fileWriter) Rotate() error {
-	for i := fw.config.RotationSize - 1; i > 0; i-- {
-		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
-		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
-		if _, err := os.Stat(sourceFilename); !errors.Is(err, os.ErrNotExist) {
-			if err := os.Rename(sourceFilename, destFilename); err != nil {
-				return err
-			}
-		}
-	}
-	sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
-	destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.1", fw.config.LoggerName))
-	if err := os.Rename(sourceFilename, destFilename); err != nil {
-		return err
-	}
-	writer, file, err := fw.create()
-	if err != nil {
-		return err
-	}
-	fw.file = file
-	fw.writer = writer
-	return nil
-}
-
-// Creates a file if it does not exist or opens it in append mode if it does
-func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
-	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, perms.ReadWrite)
-	if err != nil {
-		return nil, nil, err
-	}
-	writer := bufio.NewWriter(file)
-	return writer, file, nil
-}
-
-func (fw *fileWriter) Initialize(config Config) (int, error) {
-	fw.config = config
-	writer, file, err := fw.create()
-	if err != nil {
-		return 0, err
-	}
-	fw.writer = writer
-	fw.file = file
-	fileinfo, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-	fileSize := fileinfo.Size()
-	return int(fileSize), nil
 }

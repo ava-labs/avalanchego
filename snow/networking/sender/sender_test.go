@@ -29,10 +29,10 @@ import (
 )
 
 var defaultGossipConfig = GossipConfig{
-	AcceptedFrontierSize:      2,
-	OnAcceptSize:              2,
-	AppGossipNonValidatorSize: 2,
+	AcceptedFrontierPeerSize:  2,
+	OnAcceptPeerSize:          2,
 	AppGossipValidatorSize:    2,
+	AppGossipNonValidatorSize: 2,
 }
 
 func TestSenderContext(t *testing.T) {

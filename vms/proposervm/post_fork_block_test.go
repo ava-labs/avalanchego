@@ -126,7 +126,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	prntProBlk, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("Could not build proposer block")
+		t.Fatalf("Could not build proposer block: %s", err)
 	}
 
 	if err := prntProBlk.Verify(); err != nil {
@@ -863,8 +863,8 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	var pChainHeight uint64
-	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	var minimumHeight uint64
+	valState.GetMinimumHeightF = func() (uint64, error) { return minimumHeight, nil }
 
 	// generate two blocks with the same core block and store them
 	coreBlk := &snowman.TestBlock{
@@ -879,13 +879,14 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 
-	pChainHeight = optimalHeightDelay // proBlk1's pChainHeight
+	minimumHeight = coreGenBlk.Height()
+
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build proBlk1")
 	}
 
-	pChainHeight = optimalHeightDelay + 1 // proBlk2's pChainHeight
+	minimumHeight++
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build proBlk2")

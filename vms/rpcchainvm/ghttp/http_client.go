@@ -9,29 +9,25 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/hashicorp/go-plugin"
-
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
 )
 
 var _ http.Handler = &Client{}
 
 // Client is an http.Handler that talks over RPC.
 type Client struct {
-	client ghttpproto.HTTPClient
-	broker *plugin.GRPCBroker
+	client httppb.HTTPClient
 }
 
 // NewClient returns an HTTP handler database instance connected to a remote
 // HTTP handler instance
-func NewClient(client ghttpproto.HTTPClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(client httppb.HTTPClient) *Client {
 	return &Client{
 		client: client,
-		broker: broker,
 	}
 }
 
@@ -51,16 +47,21 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Wrap [w] with a lock to ensure that it is accessed in a thread-safe manner.
 	w = gresponsewriter.NewLockedWriter(w)
 
-	readerWriterID := c.broker.NextId()
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	serverAddr := serverListener.Addr().String()
+
 	// Start responsewriter gRPC service.
-	go c.broker.AcceptAndServe(readerWriterID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
+	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
-		gresponsewriterproto.RegisterWriterServer(server, gresponsewriter.NewServer(w, c.broker))
+		responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
 		return server
 	})
 
@@ -70,54 +71,54 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := &ghttpproto.HTTPRequest{
-		ResponseWriter: &ghttpproto.ResponseWriter{
-			Id:     readerWriterID,
-			Header: make([]*ghttpproto.Element, 0, len(r.Header)),
+	req := &httppb.HTTPRequest{
+		ResponseWriter: &httppb.ResponseWriter{
+			ServerAddr: serverAddr,
+			Header:     make([]*httppb.Element, 0, len(r.Header)),
 		},
-		Request: &ghttpproto.Request{
+		Request: &httppb.Request{
 			Method:           r.Method,
 			Proto:            r.Proto,
 			ProtoMajor:       int32(r.ProtoMajor),
 			ProtoMinor:       int32(r.ProtoMinor),
-			Header:           make([]*ghttpproto.Element, 0, len(r.Header)),
+			Header:           make([]*httppb.Element, 0, len(r.Header)),
 			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,
-			Form:             make([]*ghttpproto.Element, 0, len(r.Form)),
-			PostForm:         make([]*ghttpproto.Element, 0, len(r.PostForm)),
+			Form:             make([]*httppb.Element, 0, len(r.Form)),
+			PostForm:         make([]*httppb.Element, 0, len(r.PostForm)),
 			RemoteAddr:       r.RemoteAddr,
 			RequestUri:       r.RequestURI,
 		},
 	}
 	for key, values := range w.Header() {
-		req.ResponseWriter.Header = append(req.ResponseWriter.Header, &ghttpproto.Element{
+		req.ResponseWriter.Header = append(req.ResponseWriter.Header, &httppb.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 	for key, values := range r.Header {
-		req.Request.Header = append(req.Request.Header, &ghttpproto.Element{
+		req.Request.Header = append(req.Request.Header, &httppb.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 	for key, values := range r.Form {
-		req.Request.Form = append(req.Request.Form, &ghttpproto.Element{
+		req.Request.Form = append(req.Request.Form, &httppb.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 	for key, values := range r.PostForm {
-		req.Request.PostForm = append(req.Request.PostForm, &ghttpproto.Element{
+		req.Request.PostForm = append(req.Request.PostForm, &httppb.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 
 	if r.URL != nil {
-		req.Request.Url = &ghttpproto.URL{
+		req.Request.Url = &httppb.URL{
 			Scheme:     r.URL.Scheme,
 			Opaque:     r.URL.Opaque,
 			Host:       r.URL.Host,
@@ -130,7 +131,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if r.URL.User != nil {
 			pwd, set := r.URL.User.Password()
-			req.Request.Url.User = &ghttpproto.Userinfo{
+			req.Request.Url.User = &httppb.Userinfo{
 				Username:    r.URL.User.Username(),
 				Password:    pwd,
 				PasswordSet: set,
@@ -139,17 +140,17 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.TLS != nil {
-		req.Request.Tls = &ghttpproto.ConnectionState{
+		req.Request.Tls = &httppb.ConnectionState{
 			Version:            uint32(r.TLS.Version),
 			HandshakeComplete:  r.TLS.HandshakeComplete,
 			DidResume:          r.TLS.DidResume,
 			CipherSuite:        uint32(r.TLS.CipherSuite),
 			NegotiatedProtocol: r.TLS.NegotiatedProtocol,
 			ServerName:         r.TLS.ServerName,
-			PeerCertificates: &ghttpproto.Certificates{
+			PeerCertificates: &httppb.Certificates{
 				Cert: make([][]byte, len(r.TLS.PeerCertificates)),
 			},
-			VerifiedChains:              make([]*ghttpproto.Certificates, len(r.TLS.VerifiedChains)),
+			VerifiedChains:              make([]*httppb.Certificates, len(r.TLS.VerifiedChains)),
 			SignedCertificateTimestamps: r.TLS.SignedCertificateTimestamps,
 			OcspResponse:                r.TLS.OCSPResponse,
 		}
@@ -157,7 +158,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			req.Request.Tls.PeerCertificates.Cert[i] = cert.Raw
 		}
 		for i, chain := range r.TLS.VerifiedChains {
-			req.Request.Tls.VerifiedChains[i] = &ghttpproto.Certificates{
+			req.Request.Tls.VerifiedChains[i] = &httppb.Certificates{
 				Cert: make([][]byte, len(chain)),
 			}
 			for j, cert := range chain {
@@ -200,12 +201,12 @@ func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 }
 
 // getHTTPSimpleRequest takes an http request as input and returns a gRPC HandleSimpleHTTPRequest.
-func getHTTPSimpleRequest(r *http.Request) (*ghttpproto.HandleSimpleHTTPRequest, error) {
+func getHTTPSimpleRequest(r *http.Request) (*httppb.HandleSimpleHTTPRequest, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
-	return &ghttpproto.HandleSimpleHTTPRequest{
+	return &httppb.HandleSimpleHTTPRequest{
 		Method:  r.Method,
 		Url:     r.RequestURI,
 		Body:    body,
@@ -214,7 +215,7 @@ func getHTTPSimpleRequest(r *http.Request) (*ghttpproto.HandleSimpleHTTPRequest,
 }
 
 // convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
-func convertWriteResponse(w http.ResponseWriter, resp *ghttpproto.HandleSimpleHTTPResponse) error {
+func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPResponse) error {
 	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
 	w.WriteHeader(int(resp.Code))
 	_, err := w.Write(resp.Body)

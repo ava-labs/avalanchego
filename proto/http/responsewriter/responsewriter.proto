@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package http.responsewriter;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter";
+
+// Writer is an http.ResponseWriter see: https://pkg.go.dev/net/http#ResponseWriter
+service Writer {
+  // Write writes the data to the connection as part of an HTTP reply
+  rpc Write(WriteRequest) returns (WriteResponse);
+  // WriteHeader sends an HTTP response header with the provided
+  // status code
+  rpc WriteHeader(WriteHeaderRequest) returns (google.protobuf.Empty);
+  // Flush is a no-op
+  rpc Flush(google.protobuf.Empty) returns (google.protobuf.Empty);
+  // Hijack lets the caller take over the connection
+  rpc Hijack(google.protobuf.Empty) returns (HijackResponse);
+}
+
+message Header {
+  // key is a element key in a key value pair
+  string key = 1;
+  // values are a list of strings coresponding to the key
+  repeated string values = 2;
+}
+
+message WriteRequest {
+  // headers represents the key-value pairs in an HTTP header
+  repeated Header headers = 1;
+  // payload is the write request in bytes
+  bytes payload = 2;
+}
+
+message WriteResponse {
+  // written is the number of bytes written in body
+  int32 written = 1;
+}
+
+message WriteHeaderRequest {
+  // headers represents the key-value pairs in an HTTP header
+  repeated Header headers = 1;
+  // status_code must be a valid HTTP 1xx-5xx status code
+  int32 status_code = 2;
+}
+
+message HijackResponse {
+  // reserved for backward compatibility
+  // avalanchego <=v1.7.9 used the fields "1, 6, 7, 8" as an id to
+  // identify the gRPC server address which served the Conn, Reader
+  // and Writer services via the now removed service broker
+  reserved 1, 6 to 8;
+  string local_network = 2;
+  // local_string is string form of address
+  string local_string = 3;
+  // remote_network is the name of the network (for example, "tcp", "udp")
+  string remote_network = 4;
+  // remote_string is string form of address
+  string remote_string = 5;
+  // server_addr is the address of the gRPC server serving the Conn, Reader
+  // and Writer services which facilitate Hijacking
+  string server_addr = 9;
+}

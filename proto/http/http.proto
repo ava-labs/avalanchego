@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package http;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/http";
+
+service HTTP {
+  // Handle wraps http1 over http2 and provides support for websockets by implementing
+  // net conn and responsewriter in http2.
+  rpc Handle(HTTPRequest) returns (google.protobuf.Empty);
+  // HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
+  // and body bytes. Because the request and response are single protos with no inline
+  // gRPC servers the CPU cost as well as file descriptor overhead is less
+  // (no additional goroutines).
+  rpc HandleSimple(HandleSimpleHTTPRequest) returns (HandleSimpleHTTPResponse);
+}
+
+// URL is a net.URL see: https://pkg.go.dev/net/url#URL
+message URL {
+  // scheme is the url scheme name
+  string scheme = 1;
+  // opaque is encoded opaque data
+  string opaque = 2;
+  // user is username and password information
+  Userinfo user = 3;
+  // host can be in the format host or host:port
+  string host = 4;
+  // path (relative paths may omit leading slash)
+  string path = 5;
+  // raw_path is encoded path hint (see EscapedPath method)
+  string raw_path = 6;
+  // force is append a query ('?') even if RawQuery is empty
+  bool force_query = 7;
+  // raw_query is encoded query values, without '?'
+  string raw_query = 8;
+  // fragment is fragment for references, without '#'
+  string fragment = 9;
+}
+
+// UserInfo is net.Userinfo see: https://pkg.go.dev/net/url#Userinfo
+message Userinfo {
+  // username is the username for the user
+  string username = 1;
+  // password is the password for the user
+  string password = 2;
+  // password_set is a boolean which is true if the passord is set
+  bool password_set = 3;
+}
+
+message Element {
+  // key is a element key in a key value pair
+  string key = 1;
+  // values are a list of strings coresponding to the key
+  repeated string values = 2;
+}
+
+message Certificates {
+  // cert is the certificate body
+  repeated bytes cert = 1;
+}
+
+// ConnectionState is tls.ConnectionState see: https://pkg.go.dev/crypto/tls#ConnectionState
+message ConnectionState {
+  // reserved fields ids have been removed and should not be reused
+  reserved 6, 12;
+  // version is the TLS version used by the connection (e.g. VersionTLS12)
+  uint32 version = 1;
+  // handshake_complete is true if the handshake has concluded
+  bool handshake_complete = 2;
+  // did_resume is true if this connection was successfully resumed from a
+  // previous session with a session ticket or similar mechanism
+  bool did_resume = 3;
+  // cipher_suite is the cipher suite negotiated for the connection
+  uint32 cipher_suite = 4;
+  // negotiated_protocol is the application protocol negotiated with ALPN
+  string negotiated_protocol = 5;
+  // server_name is the value of the Server Name Indication extension sent by
+  // the client
+  string server_name = 7;
+  // peer_certificates are the parsed certificates sent by the peer, in the
+  // order in which they were sent
+  Certificates peer_certificates = 8;
+  // verified_chains is a list of one or more chains where the first element is
+  // PeerCertificates[0] and the last element is from Config.RootCAs (on the
+  // client side) or Config.ClientCAs (on the server side).
+  repeated Certificates verified_chains = 9;
+  // signed_certificate_timestamps is a list of SCTs provided by the peer
+  // through the TLS handshake for the leaf certificate, if any
+  repeated bytes signed_certificate_timestamps = 10;
+  // ocsp_response is a stapled Online Certificate Status Protocol (OCSP)
+  // response provided by the peer for the leaf certificate, if any.
+  bytes ocsp_response = 11;
+}
+
+// Request is an http.Request see: https://pkg.go.dev/net/http#Request
+message Request {
+  // method specifies the HTTP method (GET, POST, PUT, etc.)
+  string method = 1;
+  // url specifies either the URI being requested (for server requests)
+  // or the URL to access (for client requests)
+  URL url = 2;
+  // proto is the protocol version for incoming server requests
+  string proto = 3;
+  // proto_major is the major version
+  int32 proto_major = 4;
+  // proto_minor is the minor version
+  int32 proto_minor = 5;
+  // header contains the request header fields either received
+  // by the server or to be sent by the client
+  repeated Element header = 6;
+  // body is the request payload in bytes
+  bytes body = 7;
+  // content_length records the length of the associated content
+  int64 content_length = 8;
+  // transfer_encoding lists the transfer encodings from outermost to
+  // innermost
+  repeated string transfer_encoding = 9;
+  // host specifies the host on which the URL is sought
+  string host = 10;
+  // form contains the parsed form data, including both the URL
+  // field's query parameters and the PATCH, POST, or PUT form data
+  repeated Element form = 11;
+  // post_form contains the parsed form data from PATCH, POST
+  // or PUT body parameters
+  repeated Element post_form = 12;
+  // trailer_keys specifies additional headers that are sent after the request
+  repeated string trailer_keys = 13;
+  // remote_addr allows HTTP servers and other software to record
+  // the network address that sent the request
+  string remote_addr = 14;
+  // request_uri is the unmodified request-target
+  string request_uri = 15;
+  // tls connection state
+  ConnectionState tls = 16;
+}
+
+message ResponseWriter {
+  // reserved for backward compatibility
+  // avalanchego <=v1.7.9 used the field "1" as an id to identify the gRPC server
+  // address which served the Writer service via the now removed service broker
+  reserved 1;
+  // header returns the header map that will be sent by
+  // WriteHeader.
+  repeated Element header = 2;
+  // server_addr is the address of the gRPC server hosting the Writer service
+  string server_addr = 3;
+}
+
+message HTTPRequest {
+  // response_writer is used by an HTTP handler to construct an HTTP response
+  ResponseWriter response_writer = 1;
+  // request is an http request
+  Request request = 2;
+}
+
+message HandleSimpleHTTPRequest {
+  // method specifies the HTTP method (GET, POST, PUT, etc.)
+  string method = 1;
+  // url specifies either the URI being requested
+  string url = 2;
+  // headers contains the request header fields either received
+  // by the server or to be sent by the client
+  repeated Element headers = 3;
+  // body is the request payload in bytes
+  bytes body = 4;
+}
+
+message HandleSimpleHTTPResponse {
+  // code is the response code
+  int32 code = 1;
+  // headers contains the request header fields either received
+  // by the server or to be sent by the client
+  repeated Element headers = 2;
+  // body is the response payload in bytes
+  bytes body = 3;
+}
