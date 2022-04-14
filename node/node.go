@@ -29,7 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	coreth "github.com/chain4travel/coreth/plugin/evm"
+	caminoethvm "github.com/chain4travel/caminogovm/plugin/evm"
 
 	"github.com/chain4travel/caminogo/api/admin"
 	"github.com/chain4travel/caminogo/api/auth"
@@ -718,7 +718,7 @@ func (n *Node) initVMs() error {
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
-		n.Config.VMManager.RegisterFactory(constants.EVMID, &coreth.Factory{}),
+		n.Config.VMManager.RegisterFactory(constants.EVMID, &caminoethvm.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err

@@ -7,4 +7,4 @@
 
 # Set up the versions to be used
 # Don't export them as their used in the context of other calls
-coreth_version=${CORETH_VERSION:-'v0.8.8-rc.0'}
+caminoethvm_version=${CAMINOETHVM_VERSION:-'v0.0.0-0.8.9-sync'}

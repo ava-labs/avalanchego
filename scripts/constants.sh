@@ -9,7 +9,7 @@ CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory
 
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
-coreth_path="$GOPATH/pkg/mod/github.com/chain4travel/coreth@$coreth_version"
+caminoethvm_path="$GOPATH/pkg/mod/github.com/chain4travel/caminoethvm@$caminoethvm_version"
 
 # Where CaminoGo binary goes
 build_dir="$CAMINO_PATH/build"

@@ -18,8 +18,8 @@ go mod download
 # Build caminogo
 "$CAMINO_PATH"/scripts/build_camino.sh
 
-# Build coreth
-"$CAMINO_PATH"/scripts/build_coreth.sh
+# Build caminoethvm
+"$CAMINO_PATH"/scripts/build_caminoethvm.sh
 
 # Exit build successfully if the binaries are created
 if [[ -f "$caminogo_path" && -f "$evm_path" ]]; then
