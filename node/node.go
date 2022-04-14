@@ -29,7 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	caminoethvm "github.com/chain4travel/caminogovm/plugin/evm"
+	caminoethvm "github.com/chain4travel/caminoethvm/plugin/evm"
 
 	"github.com/chain4travel/caminogo/api/admin"
 	"github.com/chain4travel/caminogo/api/auth"
@@ -83,19 +83,14 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey   = errors.New("invalid TLS key")
-	errPNotCreated     = errors.New("P-Chain not created")
-	errXNotCreated     = errors.New("X-Chain not created")
-	errCNotCreated     = errors.New("C-Chain not created")
-	errNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
-	errShuttingDown    = errors.New("server shutting down")
+	errInvalidTLSKey = errors.New("invalid TLS key")
+	errShuttingDown  = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
 type Node struct {
 	Log        logging.Logger
 	LogFactory logging.Factory
-	HTTPLog    logging.Logger
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
@@ -541,7 +536,7 @@ func (n *Node) initAPIServer() error {
 		LockOptions: common.NoLock,
 		Handler:     authService,
 	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "")
 }
 
 // Add the default VM aliases
@@ -584,13 +579,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	)
 
 	// Manages network timeouts
-	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(
+	timeoutManager, err := timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		"requests",
 		n.MetricsRegisterer,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -663,20 +658,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 func (n *Node) initVMs() error {
 	n.Log.Info("initializing VMs")
 
-	// initialize the vm registry
-	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
-		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
-			FileReader:      filesystem.NewReader(),
-			Manager:         n.Config.VMManager,
-			PluginDirectory: n.Config.PluginDir,
-		}),
-		VMRegisterer: registry.NewVMRegisterer(registry.VMRegistererConfig{
-			APIServer: n.APIServer,
-			Log:       n.Log,
-			VMManager: n.Config.VMManager,
-		}),
-	})
-
 	vdrs := n.vdrs
 
 	// If staking is disabled, ignore updates to Subnets' validator sets
@@ -686,10 +667,16 @@ func (n *Node) initVMs() error {
 		vdrs = validators.NewManager()
 	}
 
+	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
+		APIServer: n.APIServer,
+		Log:       n.Log,
+		VMManager: n.Config.VMManager,
+	})
+
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.Config.VMManager.RegisterFactory(constants.PlatformVMID, &platformvm.Factory{
+		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
 			Chains:                 n.chainManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: n.uptimeCalculator,
@@ -711,18 +698,28 @@ func (n *Node) initVMs() error {
 			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
 		}),
-		n.Config.VMManager.RegisterFactory(constants.AVMID, &avm.Factory{
+		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
+		vmRegisterer.Register(constants.EVMID, &caminoethvm.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
-		n.Config.VMManager.RegisterFactory(constants.EVMID, &caminoethvm.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err
 	}
+
+	// initialize the vm registry
+	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
+		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
+			FileReader:      filesystem.NewReader(),
+			Manager:         n.Config.VMManager,
+			PluginDirectory: n.Config.PluginDir,
+		}),
+		VMRegisterer: vmRegisterer,
+	})
 
 	// register any vms that need to be installed as plugins from disk
 	_, failedVMs, err := n.VMRegistry.Reload()
@@ -758,7 +755,7 @@ func (n *Node) initKeystoreAPI() error {
 		LockOptions: common.NoLock,
 		Handler:     keystoreHandler,
 	}
-	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -795,7 +792,6 @@ func (n *Node) initMetricsAPI() error {
 		&sync.RWMutex{},
 		"metrics",
 		"",
-		n.HTTPLog,
 	)
 }
 
@@ -828,7 +824,7 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "")
 }
 
 // initProfiler initializes the continuous profiling
@@ -885,7 +881,7 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "")
 }
 
 // initHealthAPI initializes the Health API service
@@ -903,54 +899,6 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	chainsNotBootstrapped := func(pChainID ids.ID, xChainID ids.ID, cChainID ids.ID) []string {
-		chains := make([]string, 0, 3)
-		if !n.chainManager.IsBootstrapped(pChainID) {
-			chains = append(chains, "'P'")
-		}
-		if !n.chainManager.IsBootstrapped(xChainID) {
-			chains = append(chains, "'X'")
-		}
-		if !n.chainManager.IsBootstrapped(cChainID) {
-			chains = append(chains, "'C'")
-		}
-		return chains
-	}
-
-	// Passes if the P, X and C chains are finished bootstrapping
-	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
-		pChainID, err := n.chainManager.Lookup("P")
-		if err != nil {
-			return nil, errPNotCreated
-		}
-
-		xChainID, err := n.chainManager.Lookup("X")
-		if err != nil {
-			return nil, errXNotCreated
-		}
-
-		cChainID, err := n.chainManager.Lookup("C")
-		if err != nil {
-			return nil, errCNotCreated
-		}
-
-		chains := chainsNotBootstrapped(pChainID, xChainID, cChainID)
-		if len(chains) != 0 {
-			return chains, errNotBootstrapped
-		}
-		return chains, nil
-	})
-
-	err = healthChecker.RegisterReadinessCheck("bootstrapped", bootstrappedCheck)
-	if err != nil {
-		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
-	}
-
-	err = healthChecker.RegisterHealthCheck("bootstrapped", bootstrappedCheck)
-	if err != nil {
-		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
-	}
-
 	err = healthChecker.RegisterHealthCheck("network", n.Net)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
@@ -974,7 +922,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -988,7 +935,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/readiness",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -1002,7 +948,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/health",
-		n.HTTPLog,
 	)
 	if err != nil {
 		return err
@@ -1016,7 +961,6 @@ func (n *Node) initHealthAPI() error {
 		&sync.RWMutex{},
 		"health",
 		"/liveness",
-		n.HTTPLog,
 	)
 }
 
@@ -1032,7 +976,7 @@ func (n *Node) initIPCAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "")
 }
 
 // Give chains aliases as specified by the genesis information
@@ -1085,12 +1029,6 @@ func (n *Node) Initialize(
 	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
-
-	httpLog, err := logFactory.Make("http")
-	if err != nil {
-		return fmt.Errorf("problem initializing HTTP logger: %w", err)
-	}
-	n.HTTPLog = httpLog
 
 	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
 		return fmt.Errorf("problem initializing database: %w", err)

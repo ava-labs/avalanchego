@@ -19,7 +19,6 @@ import (
 
 	"github.com/chain4travel/caminogo/codec"
 	"github.com/chain4travel/caminogo/codec/linearcodec"
-	"github.com/chain4travel/caminogo/codec/reflectcodec"
 	"github.com/chain4travel/caminogo/utils/wrappers"
 	"github.com/chain4travel/caminogo/vms/secp256k1fx"
 )
@@ -38,7 +37,7 @@ var (
 func init() {
 	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
-	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxInt32)
+	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}

@@ -33,6 +33,7 @@ import (
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/chain4travel/caminogo/tests/e2e/ping"
+	_ "github.com/chain4travel/caminogo/tests/e2e/static-handlers"
 	_ "github.com/chain4travel/caminogo/tests/e2e/whitelist-vtx"
 	_ "github.com/chain4travel/caminogo/tests/e2e/x/transfer"
 )

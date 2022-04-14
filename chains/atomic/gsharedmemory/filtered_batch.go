@@ -15,7 +15,7 @@
 package gsharedmemory
 
 import (
-	"github.com/chain4travel/caminogo/api/proto/gsharedmemoryproto"
+	sharedmemorypb "github.com/chain4travel/caminogo/proto/pb/sharedmemory"
 )
 
 type filteredBatch struct {
@@ -37,11 +37,11 @@ func (b *filteredBatch) Delete(key []byte) error {
 	return nil
 }
 
-func (b *filteredBatch) PutRequests() []*gsharedmemoryproto.BatchPut {
-	reqs := make([]*gsharedmemoryproto.BatchPut, len(b.writes))
+func (b *filteredBatch) PutRequests() []*sharedmemorypb.BatchPut {
+	reqs := make([]*sharedmemorypb.BatchPut, len(b.writes))
 	i := 0
 	for keyStr, value := range b.writes {
-		reqs[i] = &gsharedmemoryproto.BatchPut{
+		reqs[i] = &sharedmemorypb.BatchPut{
 			Key:   []byte(keyStr),
 			Value: value,
 		}
@@ -50,11 +50,11 @@ func (b *filteredBatch) PutRequests() []*gsharedmemoryproto.BatchPut {
 	return reqs
 }
 
-func (b *filteredBatch) DeleteRequests() []*gsharedmemoryproto.BatchDelete {
-	reqs := make([]*gsharedmemoryproto.BatchDelete, len(b.deletes))
+func (b *filteredBatch) DeleteRequests() []*sharedmemorypb.BatchDelete {
+	reqs := make([]*sharedmemorypb.BatchDelete, len(b.deletes))
 	i := 0
 	for keyStr := range b.deletes {
-		reqs[i] = &gsharedmemoryproto.BatchDelete{
+		reqs[i] = &sharedmemorypb.BatchDelete{
 			Key: []byte(keyStr),
 		}
 		i++

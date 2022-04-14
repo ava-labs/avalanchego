@@ -17,16 +17,17 @@ package gsubnetlookup
 import (
 	"context"
 
-	"github.com/chain4travel/caminogo/api/proto/gsubnetlookupproto"
 	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/snow"
+
+	subnetlookuppb "github.com/chain4travel/caminogo/proto/pb/subnetlookup"
 )
 
-var _ gsubnetlookupproto.SubnetLookupServer = &Server{}
+var _ subnetlookuppb.SubnetLookupServer = &Server{}
 
 // Server is a subnet lookup that is managed over RPC.
 type Server struct {
-	gsubnetlookupproto.UnimplementedSubnetLookupServer
+	subnetlookuppb.UnimplementedSubnetLookupServer
 	aliaser snow.SubnetLookup
 }
 
@@ -37,8 +38,8 @@ func NewServer(aliaser snow.SubnetLookup) *Server {
 
 func (s *Server) SubnetID(
 	_ context.Context,
-	req *gsubnetlookupproto.SubnetIDRequest,
-) (*gsubnetlookupproto.SubnetIDResponse, error) {
+	req *subnetlookuppb.SubnetIDRequest,
+) (*subnetlookuppb.SubnetIDResponse, error) {
 	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return nil, err
@@ -47,7 +48,7 @@ func (s *Server) SubnetID(
 	if err != nil {
 		return nil, err
 	}
-	return &gsubnetlookupproto.SubnetIDResponse{
+	return &subnetlookuppb.SubnetIDResponse{
 		Id: id[:],
 	}, nil
 }

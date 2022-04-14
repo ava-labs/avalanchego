@@ -18,19 +18,20 @@ import (
 	"context"
 	"errors"
 
-	"github.com/chain4travel/caminogo/api/proto/messengerproto"
 	"github.com/chain4travel/caminogo/snow/engine/common"
+
+	messengerpb "github.com/chain4travel/caminogo/proto/pb/messenger"
 )
 
 var (
 	errFullQueue = errors.New("full message queue")
 
-	_ messengerproto.MessengerServer = &Server{}
+	_ messengerpb.MessengerServer = &Server{}
 )
 
 // Server is a messenger that is managed over RPC.
 type Server struct {
-	messengerproto.UnimplementedMessengerServer
+	messengerpb.UnimplementedMessengerServer
 	messenger chan<- common.Message
 }
 
@@ -39,11 +40,11 @@ func NewServer(messenger chan<- common.Message) *Server {
 	return &Server{messenger: messenger}
 }
 
-func (s *Server) Notify(_ context.Context, req *messengerproto.NotifyRequest) (*messengerproto.NotifyResponse, error) {
+func (s *Server) Notify(_ context.Context, req *messengerpb.NotifyRequest) (*messengerpb.NotifyResponse, error) {
 	msg := common.Message(req.Message)
 	select {
 	case s.messenger <- msg:
-		return &messengerproto.NotifyResponse{}, nil
+		return &messengerpb.NotifyResponse{}, nil
 	default:
 		return nil, errFullQueue
 	}

@@ -20,7 +20,6 @@ import (
 
 	"github.com/chain4travel/caminogo/codec"
 	"github.com/chain4travel/caminogo/codec/linearcodec"
-	"github.com/chain4travel/caminogo/codec/reflectcodec"
 	"github.com/chain4travel/caminogo/utils/logging"
 	"github.com/chain4travel/caminogo/utils/timer/mockable"
 	"github.com/chain4travel/caminogo/utils/wrappers"
@@ -70,7 +69,7 @@ func newCustomCodecs(
 	log logging.Logger,
 	fxs []Fx,
 ) (codec.Manager, codec.Manager, error) {
-	gc := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	gc := linearcodec.NewCustomMaxLength(1 << 20)
 	c := linearcodec.NewDefault()
 
 	gcm := codec.NewManager(math.MaxInt32)

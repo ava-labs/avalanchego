@@ -18,12 +18,12 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/chain4travel/caminogo/pubsub"
-	"github.com/chain4travel/caminogo/vms/components/avax"
-	"github.com/chain4travel/caminogo/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/pubsub"
+	"github.com/chain4travel/caminogo/vms/components/avax"
+	"github.com/chain4travel/caminogo/vms/secp256k1fx"
 )
 
 type mockFilter struct {

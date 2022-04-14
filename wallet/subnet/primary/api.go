@@ -23,6 +23,7 @@ import (
 	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/utils/constants"
 	"github.com/chain4travel/caminogo/utils/formatting"
+	"github.com/chain4travel/caminogo/utils/rpc"
 	"github.com/chain4travel/caminogo/vms/avm"
 	"github.com/chain4travel/caminogo/vms/components/avax"
 	"github.com/chain4travel/caminogo/vms/platformvm"
@@ -53,6 +54,7 @@ type UTXOClient interface {
 		limit uint32,
 		startAddress,
 		startUTXOID string,
+		options ...rpc.Option,
 	) ([][]byte, api.Index, error)
 }
 

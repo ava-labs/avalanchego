@@ -17,29 +17,27 @@ package gkeystore
 import (
 	"context"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/chain4travel/caminogo/api/keystore"
-	"github.com/chain4travel/caminogo/api/proto/gkeystoreproto"
-	"github.com/chain4travel/caminogo/api/proto/rpcdbproto"
 	"github.com/chain4travel/caminogo/database"
 	"github.com/chain4travel/caminogo/database/encdb"
 	"github.com/chain4travel/caminogo/database/rpcdb"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
+
+	keystorepb "github.com/chain4travel/caminogo/proto/pb/keystore"
+	rpcdbpb "github.com/chain4travel/caminogo/proto/pb/rpcdb"
 )
 
 var _ keystore.BlockchainKeystore = &Client{}
 
 // Client is a snow.Keystore that talks over RPC.
 type Client struct {
-	client gkeystoreproto.KeystoreClient
-	broker *plugin.GRPCBroker
+	client keystorepb.KeystoreClient
 }
 
 // NewClient returns a keystore instance connected to a remote keystore instance
-func NewClient(client gkeystoreproto.KeystoreClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(client keystorepb.KeystoreClient) *Client {
 	return &Client{
 		client: client,
-		broker: broker,
 	}
 }
 
@@ -52,7 +50,7 @@ func (c *Client) GetDatabase(username, password string) (*encdb.Database, error)
 }
 
 func (c *Client) GetRawDatabase(username, password string) (database.Database, error) {
-	resp, err := c.client.GetDatabase(context.Background(), &gkeystoreproto.GetDatabaseRequest{
+	resp, err := c.client.GetDatabase(context.Background(), &keystorepb.GetDatabaseRequest{
 		Username: username,
 		Password: password,
 	})
@@ -60,11 +58,11 @@ func (c *Client) GetRawDatabase(username, password string) (database.Database, e
 		return nil, err
 	}
 
-	dbConn, err := c.broker.Dial(resp.DbServer)
+	clientConn, err := grpcutils.Dial(resp.ServerAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
+	dbClient := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(clientConn))
 	return dbClient, err
 }

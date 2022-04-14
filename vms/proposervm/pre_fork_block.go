@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/chain4travel/caminogo/database"
-	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/snow/choices"
 	"github.com/chain4travel/caminogo/snow/consensus/snowman"
 	"github.com/chain4travel/caminogo/vms/proposervm/block"
@@ -29,10 +28,6 @@ var _ Block = &preForkBlock{}
 type preForkBlock struct {
 	snowman.Block
 	vm *VM
-}
-
-func (b *preForkBlock) Parent() ids.ID {
-	return b.Block.Parent()
 }
 
 func (b *preForkBlock) Verify() error {

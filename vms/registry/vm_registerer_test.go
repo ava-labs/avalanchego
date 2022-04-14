@@ -111,7 +111,7 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// We fail to create an endpoint for the handler
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(errOops)
 
@@ -135,7 +135,7 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// Registering the route fails
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errOops)
@@ -160,7 +160,7 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
@@ -189,7 +189,7 @@ func TestRegisterHappyCase(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
@@ -280,7 +280,7 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// We fail to create an endpoint for the handler
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(errOops)
 
@@ -304,7 +304,7 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// RegisterWithReadLocking the route fails
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errOops)
@@ -329,7 +329,7 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
@@ -358,7 +358,7 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)

@@ -19,7 +19,6 @@ import (
 
 	"github.com/chain4travel/caminogo/codec"
 	"github.com/chain4travel/caminogo/codec/linearcodec"
-	"github.com/chain4travel/caminogo/codec/reflectcodec"
 )
 
 const (
@@ -32,7 +31,7 @@ var (
 )
 
 func init() {
-	lc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
+	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
 	c = codec.NewManager(math.MaxInt32)
 
 	if err := c.RegisterCodec(codecVersion, lc); err != nil {

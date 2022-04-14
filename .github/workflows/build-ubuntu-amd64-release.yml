@@ -3,17 +3,17 @@ name: build-amd64-debian-packages
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 jobs:
   build-bionic-amd64-package:
-    runs-on: ubuntu-18.04 
+    runs-on: ubuntu-18.04
 
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
-         go-version: '1.17.1' # The Go version to download (if necessary) and use.
+         go-version: '1.17.9' # The Go version to download (if necessary) and use.
     - run: go version
 
     - name: Build the caminogo binaries 
@@ -51,7 +51,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
-         go-version: '1.17.1' # The Go version to download (if necessary) and use.
+         go-version: '1.17.9' # The Go version to download (if necessary) and use.
     - run: go version
 
     - name: Build the caminogo binaries
@@ -116,3 +116,22 @@ jobs:
         fi
       env:
         TAG: ${{ steps.get_version.outputs.VERSION }}
+
+  deploy-to-tmpnet:
+    needs: build-focal-amd64-package
+    runs-on: [ubuntu-20.04]
+    steps:
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+      - uses: rubenesp87/semver-validation-action@0.0.6
+        with:
+          version: ${{ steps.get_version.outputs.VERSION }}
+      - name: deploy tmpnet
+        uses: benc-uk/workflow-dispatch@v1.1
+        with:
+          workflow: Deployment tmpnet
+          repo: chain4travel/devops
+          token: ${{ secrets.DEVOPS_SNOWBOT_PAT }}
+          ref: main
+          inputs: '{ "version": "${{ steps.get_version.outputs.VERSION }}" }'

@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/chain4travel/caminogo/chains/atomic"
 	"github.com/chain4travel/caminogo/database/prefixdb"
 	"github.com/chain4travel/caminogo/ids"
@@ -26,7 +28,6 @@ import (
 	"github.com/chain4travel/caminogo/vms/components/avax"
 	"github.com/chain4travel/caminogo/vms/platformvm/status"
 	"github.com/chain4travel/caminogo/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAtomicTxImports(t *testing.T) {

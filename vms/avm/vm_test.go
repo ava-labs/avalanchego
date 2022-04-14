@@ -19,6 +19,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/chain4travel/caminogo/api/keystore"
 	"github.com/chain4travel/caminogo/chains/atomic"
 	"github.com/chain4travel/caminogo/database/manager"
@@ -39,7 +41,6 @@ import (
 	"github.com/chain4travel/caminogo/vms/nftfx"
 	"github.com/chain4travel/caminogo/vms/propertyfx"
 	"github.com/chain4travel/caminogo/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 var (

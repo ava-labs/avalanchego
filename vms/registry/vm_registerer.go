@@ -68,7 +68,10 @@ func (r *vmRegisterer) RegisterWithReadLock(vmID ids.ID, factory vms.Factory) er
 }
 
 func (r *vmRegisterer) register(pathAdder server.PathAdder, vmID ids.ID, factory vms.Factory) error {
-	handlers, err := r.createHandlers(vmID, factory)
+	if err := r.config.VMManager.RegisterFactory(vmID, factory); err != nil {
+		return err
+	}
+	handlers, err := r.createStaticHandlers(vmID, factory)
 	if err != nil {
 		return err
 	}
@@ -76,7 +79,7 @@ func (r *vmRegisterer) register(pathAdder server.PathAdder, vmID ids.ID, factory
 	// all static endpoints go to the vm endpoint, defaulting to the vm id
 	defaultEndpoint := constants.VMAliasPrefix + vmID.String()
 
-	if err := r.createEndpoints(pathAdder, handlers, defaultEndpoint); err != nil {
+	if err := r.createStaticEndpoints(pathAdder, handlers, defaultEndpoint); err != nil {
 		return err
 	}
 	urlAliases, err := r.getURLAliases(vmID, defaultEndpoint)
@@ -86,11 +89,7 @@ func (r *vmRegisterer) register(pathAdder server.PathAdder, vmID ids.ID, factory
 	return pathAdder.AddAliases(defaultEndpoint, urlAliases...)
 }
 
-func (r *vmRegisterer) createHandlers(vmID ids.ID, factory vms.Factory) (map[string]*common.HTTPHandler, error) {
-	if err := r.config.VMManager.RegisterFactory(vmID, factory); err != nil {
-		return nil, err
-	}
-
+func (r *vmRegisterer) createStaticHandlers(vmID ids.ID, factory vms.Factory) (map[string]*common.HTTPHandler, error) {
 	vm, err := factory.New(nil)
 	if err != nil {
 		return nil, err
@@ -113,13 +112,13 @@ func (r *vmRegisterer) createHandlers(vmID ids.ID, factory vms.Factory) (map[str
 	return handlers, nil
 }
 
-func (r *vmRegisterer) createEndpoints(pathAdder server.PathAdder, handlers map[string]*common.HTTPHandler, defaultEndpoint string) error {
+func (r *vmRegisterer) createStaticEndpoints(pathAdder server.PathAdder, handlers map[string]*common.HTTPHandler, defaultEndpoint string) error {
 	// use a single lock for this entire vm
 	lock := new(sync.RWMutex)
 	// register the static endpoints
 	for extension, service := range handlers {
 		r.config.Log.Verbo("adding static API endpoint: %s%s", defaultEndpoint, extension)
-		if err := pathAdder.AddRoute(service, lock, defaultEndpoint, extension, r.config.Log); err != nil {
+		if err := pathAdder.AddRoute(service, lock, defaultEndpoint, extension); err != nil {
 			return fmt.Errorf(
 				"failed to add static API endpoint %s%s: %s",
 				defaultEndpoint,

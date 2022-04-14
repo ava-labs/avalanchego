@@ -23,7 +23,6 @@ import (
 
 	"github.com/chain4travel/caminogo/codec"
 	"github.com/chain4travel/caminogo/codec/linearcodec"
-	"github.com/chain4travel/caminogo/codec/reflectcodec"
 	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/utils/formatting"
 	"github.com/chain4travel/caminogo/utils/wrappers"
@@ -202,7 +201,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 }
 
 func staticCodec() (codec.Manager, error) {
-	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewCustomMaxLength(1 << 20)
 	manager := codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}

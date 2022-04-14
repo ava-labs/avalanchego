@@ -27,9 +27,8 @@ import (
 )
 
 func TestManagerFire(t *testing.T) {
-	manager := Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err := manager.Initialize(
+	manager, err := NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -55,9 +54,8 @@ func TestManagerFire(t *testing.T) {
 }
 
 func TestManagerCancel(t *testing.T) {
-	manager := Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err := manager.Initialize(
+	manager, err := NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,

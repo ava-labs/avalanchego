@@ -30,7 +30,6 @@ import (
 
 	"github.com/chain4travel/caminogo/codec"
 	"github.com/chain4travel/caminogo/codec/linearcodec"
-	"github.com/chain4travel/caminogo/codec/reflectcodec"
 	"github.com/chain4travel/caminogo/database"
 	"github.com/chain4travel/caminogo/database/prefixdb"
 	"github.com/chain4travel/caminogo/ids"
@@ -102,9 +101,10 @@ func NewIndexer(config Config) (Indexer, error) {
 		pathAdder:            config.APIServer,
 		shutdownF:            config.ShutdownF,
 	}
+
 	if err := indexer.codec.RegisterCodec(
 		codecVersion,
-		linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32),
+		linearcodec.NewCustomMaxLength(math.MaxUint32),
 	); err != nil {
 		return nil, fmt.Errorf("couldn't register codec: %w", err)
 	}
@@ -305,7 +305,7 @@ func (i *indexer) registerChainHelper(
 		return nil, err
 	}
 	handler := &common.HTTPHandler{LockOptions: common.NoLock, Handler: apiServer}
-	if err := i.pathAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint, i.log); err != nil {
+	if err := i.pathAdder.AddRoute(handler, &sync.RWMutex{}, "index/"+name, "/"+endpoint); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

@@ -33,4 +33,4 @@ go build -ldflags "-X github.com/chain4travel/caminoethvm/plugin/evm.Version=$ca
 cd "$CAMINO_PATH"
 
 # Building caminoethvm + using go get can mess with the go.mod file.
-go mod tidy
+go mod tidy -compat=1.17

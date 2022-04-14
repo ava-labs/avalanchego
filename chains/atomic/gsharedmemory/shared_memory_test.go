@@ -21,10 +21,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/chain4travel/caminogo/api/proto/gsharedmemoryproto"
 	"github.com/chain4travel/caminogo/chains/atomic"
 	"github.com/chain4travel/caminogo/database"
 	"github.com/chain4travel/caminogo/database/memdb"
@@ -32,6 +32,8 @@ import (
 	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/utils/logging"
 	"github.com/chain4travel/caminogo/utils/units"
+
+	sharedmemorypb "github.com/chain4travel/caminogo/proto/pb/sharedmemory"
 )
 
 const (
@@ -69,7 +71,7 @@ func TestInterface(t *testing.T) {
 func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database) (atomic.SharedMemory, io.Closer) {
 	listener := bufconn.Listen(bufSize)
 	server := grpc.NewServer()
-	gsharedmemoryproto.RegisterSharedMemoryServer(server, NewServer(sm, db))
+	sharedmemorypb.RegisterSharedMemoryServer(server, NewServer(sm, db))
 	go func() {
 		if err := server.Serve(listener); err != nil {
 			t.Logf("Server exited with error: %v", err)
@@ -88,6 +90,6 @@ func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database
 		t.Fatalf("Failed to dial: %s", err)
 	}
 
-	rpcsm := NewClient(gsharedmemoryproto.NewSharedMemoryClient(conn))
+	rpcsm := NewClient(sharedmemorypb.NewSharedMemoryClient(conn))
 	return rpcsm, conn
 }

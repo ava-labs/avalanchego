@@ -20,6 +20,7 @@ import (
 
 	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/utils/formatting"
+	"github.com/chain4travel/caminogo/utils/rpc"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +30,7 @@ type mockClient struct {
 	onSendRequestF func(reply interface{}) error
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, _ interface{}, reply interface{}) error {
+func (mc *mockClient) SendRequest(ctx context.Context, method string, _ interface{}, reply interface{}, options ...rpc.Option) error {
 	mc.assert.Equal(mc.expectedMethod, method)
 	return mc.onSendRequestF(reply)
 }

@@ -19,10 +19,10 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/chain4travel/caminogo/api/proto/vmproto"
+	vmpb "github.com/chain4travel/caminogo/proto/pb/vm"
 )
 
-func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmproto.GatherResponse, error) {
+func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
 	mfs, err := vm.ctx.Metrics.Gather()
-	return &vmproto.GatherResponse{MetricFamilies: mfs}, err
+	return &vmpb.GatherResponse{MetricFamilies: mfs}, err
 }

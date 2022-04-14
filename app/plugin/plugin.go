@@ -21,8 +21,9 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/chain4travel/caminogo/api/proto/pluginproto"
 	"github.com/chain4travel/caminogo/app"
+
+	pluginpb "github.com/chain4travel/caminogo/proto/pb/plugin"
 )
 
 const Name = "nodeProcess"
@@ -56,11 +57,11 @@ func New(app app.App) plugin.Plugin {
 
 // GRPCServer registers a new GRPC server.
 func (p *appPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
-	pluginproto.RegisterNodeServer(s, NewServer(p.app))
+	pluginpb.RegisterNodeServer(s, NewServer(p.app))
 	return nil
 }
 
 // GRPCClient returns a new GRPC client
 func (p *appPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewClient(pluginproto.NewNodeClient(c)), nil
+	return NewClient(pluginpb.NewNodeClient(c)), nil
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/chain4travel/caminogo/app"
 	"github.com/chain4travel/caminogo/app/process"
 	"github.com/chain4travel/caminogo/node"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
 
 	appplugin "github.com/chain4travel/caminogo/app/plugin"
 )
@@ -39,7 +40,7 @@ func Run(config Config, nodeConfig node.Config) {
 			Plugins: map[string]plugin.Plugin{
 				appplugin.Name: appplugin.New(nodeApp),
 			},
-			GRPCServer: plugin.DefaultGRPCServer, // A non-nil value here enables gRPC serving for this plugin
+			GRPCServer: grpcutils.NewDefaultServer, // A non-nil value here enables gRPC serving for this plugin
 			Logger: hclog.New(&hclog.LoggerOptions{
 				Level: hclog.Error,
 			}),

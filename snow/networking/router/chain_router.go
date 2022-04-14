@@ -26,6 +26,7 @@ import (
 
 	"github.com/chain4travel/caminogo/ids"
 	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
 	"github.com/chain4travel/caminogo/snow/networking/handler"
 	"github.com/chain4travel/caminogo/snow/networking/timeout"
 	"github.com/chain4travel/caminogo/utils/constants"
@@ -40,7 +41,8 @@ import (
 var (
 	errUnknownChain = errors.New("received message for unknown chain")
 
-	_ Router = &ChainRouter{}
+	_ Router              = &ChainRouter{}
+	_ benchlist.Benchable = &ChainRouter{}
 )
 
 type requestEntry struct {
@@ -64,7 +66,7 @@ type ChainRouter struct {
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
 	// other calls to the timeout manager with the router lock held could cause
 	// a deadlock because the timeout manager will call Benched and Unbenched.
-	timeoutManager *timeout.Manager
+	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
 	peers        map[ids.ShortID]version.Application
@@ -92,7 +94,7 @@ func (cr *ChainRouter) Initialize(
 	nodeID ids.ShortID,
 	log logging.Logger,
 	msgCreator message.Creator,
-	timeoutManager *timeout.Manager,
+	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
 	onFatal func(exitCode int),

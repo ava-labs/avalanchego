@@ -19,13 +19,14 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/chain4travel/caminogo/api/proto/pluginproto"
 	"github.com/chain4travel/caminogo/app"
+
+	pluginpb "github.com/chain4travel/caminogo/proto/pb/plugin"
 )
 
 // Server wraps a node so it can be served with the hashicorp plugin harness
 type Server struct {
-	pluginproto.UnimplementedNodeServer
+	pluginpb.UnimplementedNodeServer
 	app app.App
 }
 
@@ -43,9 +44,9 @@ func (s *Server) Stop(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, s.app.Stop()
 }
 
-func (s *Server) ExitCode(context.Context, *emptypb.Empty) (*pluginproto.ExitCodeResponse, error) {
+func (s *Server) ExitCode(context.Context, *emptypb.Empty) (*pluginpb.ExitCodeResponse, error) {
 	exitCode, err := s.app.ExitCode()
-	return &pluginproto.ExitCodeResponse{
+	return &pluginpb.ExitCodeResponse{
 		ExitCode: int32(exitCode),
 	}, err
 }

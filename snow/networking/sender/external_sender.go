@@ -22,7 +22,6 @@ import (
 // ExternalSender sends consensus messages to other validators
 // Right now this is implemented in the networking package
 type ExternalSender interface {
-
 	// Send a message to a specific set of nodes
 	Send(
 		msg message.OutboundMessage,
@@ -39,5 +38,6 @@ type ExternalSender interface {
 		validatorOnly bool,
 		numValidatorsToSend int,
 		numNonValidatorsToSend int,
+		numPeersToSend int,
 	) ids.ShortSet
 }

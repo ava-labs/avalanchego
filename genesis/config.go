@@ -18,7 +18,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/chain4travel/caminogo/ids"
@@ -214,7 +214,7 @@ func GetConfig(networkID uint32) *Config {
 
 // GetConfigFile loads a *Config from a provided filepath.
 func GetConfigFile(fp string) (*Config, error) {
-	bytes, err := ioutil.ReadFile(filepath.Clean(fp))
+	bytes, err := os.ReadFile(filepath.Clean(fp))
 	if err != nil {
 		return nil, fmt.Errorf("unable to load file %s: %w", fp, err)
 	}

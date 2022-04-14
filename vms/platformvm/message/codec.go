@@ -17,7 +17,6 @@ package message
 import (
 	"github.com/chain4travel/caminogo/codec"
 	"github.com/chain4travel/caminogo/codec/linearcodec"
-	"github.com/chain4travel/caminogo/codec/reflectcodec"
 	"github.com/chain4travel/caminogo/utils/units"
 	"github.com/chain4travel/caminogo/utils/wrappers"
 )
@@ -33,7 +32,7 @@ var c codec.Manager
 
 func init() {
 	c = codec.NewManager(maxMessageSize)
-	lc := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
+	lc := linearcodec.NewCustomMaxLength(maxSliceLen)
 
 	errs := wrappers.Errs{}
 	errs.Add(

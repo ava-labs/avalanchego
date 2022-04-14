@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
 	"os"
@@ -162,6 +161,7 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 		return loggingConfig, err
 	}
 	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.DisableWriterDisplaying = v.GetBool(LogDisableDisplayPluginLogsKey)
 	return loggingConfig, err
 }
 
@@ -177,7 +177,7 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 		config.APIAuthPassword = v.GetString(APIAuthPasswordKey)
 	} else {
 		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
-		passwordBytes, err := ioutil.ReadFile(passwordFilePath)
+		passwordBytes, err := os.ReadFile(passwordFilePath)
 		if err != nil {
 			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
 		}
@@ -219,7 +219,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSKeyFileKey):
 		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
-		if httpsKey, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+		if httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -233,7 +233,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSCertFileKey):
 		httpsCertFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
-		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
+		if httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -314,10 +314,15 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 
 func getGossipConfig(v *viper.Viper) sender.GossipConfig {
 	return sender.GossipConfig{
-		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
+		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
+		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
+		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
+		OnAcceptValidatorSize:            uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
+		OnAcceptNonValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
+		OnAcceptPeerSize:                 uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
+		AppGossipValidatorSize:           uint(v.GetUint32(AppGossipValidatorSizeKey)),
+		AppGossipNonValidatorSize:        uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+		AppGossipPeerSize:                uint(v.GetUint32(AppGossipPeerSizeKey)),
 	}
 }
 
@@ -380,6 +385,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			PeerListNumValidatorIPs:        v.GetUint32(NetworkPeerListNumValidatorIPsKey),
 			PeerListValidatorGossipSize:    v.GetUint32(NetworkPeerListValidatorGossipSizeKey),
 			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
+			PeerListPeersGossipSize:        v.GetUint32(NetworkPeerListPeersGossipSizeKey),
 			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
 		},
 
@@ -749,7 +755,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		}
 	} else if v.IsSet(DBConfigFileKey) {
 		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
-		configBytes, err = ioutil.ReadFile(path)
+		configBytes, err = os.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
 		}
@@ -788,7 +794,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 			return nil, nil
 		}
 
-		fileBytes, err = ioutil.ReadFile(aliasFilePath)
+		fileBytes, err = os.ReadFile(aliasFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -984,7 +990,7 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 		}
 
 		// subnetConfigDir/subnetID.json
-		file, err := ioutil.ReadFile(filePath)
+		file, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, err
 		}

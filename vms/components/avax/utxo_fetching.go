@@ -17,6 +17,7 @@ package avax
 import (
 	"bytes"
 	"fmt"
+	"math"
 
 	"github.com/chain4travel/caminogo/ids"
 
@@ -46,7 +47,7 @@ func GetAllUTXOs(db UTXOReader, addrs ids.ShortSet) ([]*UTXO, error) {
 		addrs,
 		ids.ShortEmpty,
 		ids.Empty,
-		safemath.MaxInt,
+		math.MaxInt,
 	)
 	return utxos, err
 }

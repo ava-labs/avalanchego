@@ -17,33 +17,21 @@ package rpcchainvm
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"path/filepath"
-
-	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/chain4travel/caminogo/snow"
-	"github.com/chain4travel/caminogo/utils/math"
 	"github.com/chain4travel/caminogo/utils/subprocess"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
 )
 
 var (
-	errWrongVM = errors.New("wrong vm type")
-
-	serverOptions = []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(math.MaxInt),
-		grpc.MaxSendMsgSize(math.MaxInt),
-	}
-	dialOptions = []grpc.DialOption{
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
-	}
-
-	_ Factory = &factory{}
+	errWrongVM         = errors.New("wrong vm type")
+	_          Factory = &factory{}
 )
 
 type Factory interface {
@@ -80,7 +68,7 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 		// We set managed to true so that we can call plugin.CleanupClients on
 		// node shutdown to ensure every plugin subprocess is killed.
 		Managed:         true,
-		GRPCDialOptions: dialOptions,
+		GRPCDialOptions: grpcutils.DefaultDialOptions,
 	}
 	if ctx != nil {
 		log.SetOutput(ctx.Log)
@@ -90,10 +78,10 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 			Level:  hclog.Info,
 		})
 	} else {
-		log.SetOutput(ioutil.Discard)
-		config.Stderr = ioutil.Discard
+		log.SetOutput(io.Discard)
+		config.Stderr = io.Discard
 		config.Logger = hclog.New(&hclog.LoggerOptions{
-			Output: ioutil.Discard,
+			Output: io.Discard,
 		})
 	}
 	client := plugin.NewClient(config)
