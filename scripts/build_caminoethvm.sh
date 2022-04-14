@@ -31,6 +31,3 @@ echo "Building Coreth @ ${caminoethvm_version} ..."
 cd "$caminoethvm_path"
 go build -ldflags "-X github.com/chain4travel/caminoethvm/plugin/evm.Version=$caminoethvm_version $static_ld_flags" -o "$evm_path" "plugin/"*.go
 cd "$CAMINO_PATH"
-
-# Building caminoethvm + using go get can mess with the go.mod file.
-go mod tidy -compat=1.17

@@ -7,4 +7,4 @@
 
 # Set up the versions to be used
 # Don't export them as their used in the context of other calls
-caminoethvm_version=${CAMINOETHVM_VERSION:-'v0.0.0-alpha.1'}
+caminoethvm_version=${CAMINOETHVM_VERSION:-'v0.0.0-alpha.5'}
