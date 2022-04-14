@@ -1,7 +1,7 @@
 name: build-amd64-debian-packages
 
 on:
-  push:
+  pull-request:
     tags:
       - "*"
 

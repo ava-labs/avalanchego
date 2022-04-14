@@ -3,7 +3,7 @@
 name: Build on supported platforms
 
 on:
-  push:
+  pull-request:
 
 permissions:
   contents: write

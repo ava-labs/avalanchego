@@ -1,11 +1,10 @@
 name: Static analysis
 on:
-  push:
+  pull-request:
     tags-ignore:
       - "*" # Ignores all tags
     branches-ignore:
-      - master
-      - dev
+      - chain4travel
 
 jobs:
   run_static_analysis:

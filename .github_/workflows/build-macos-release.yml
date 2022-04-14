@@ -1,19 +1,20 @@
-# Build a windows release from the caminogo repo 
+# Build a macos release from the caminogo repo 
 
-name: build-win-release
+name: build-macos-release
 
 # Controls when the action will run.
 on:
-  push:
+  pull-request:
     tags:
       - "*" # Push events to every tag
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build-win:
+  build-mac:
     # The type of runner that the job will run on
-    runs-on: windows-2019
+    runs-on: macos-10.15
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -23,33 +24,34 @@ jobs:
          go-version: '1.17.9' # The Go version to download (if necessary) and use.
     - run: go version
 
+    # Runs a single command using the runners shell
+    - name: Build the caminogo binaries 
+      run: ./scripts/build.sh 
+
     - name: Get the version
       id: get_version
       run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
       shell: bash
-    
-    - name: Install awscli
+
+    - name: Install aws cli
       run: |
-        msiexec.exe /passive /i /n https://awscli.amazonaws.com/AWSCLIV2.msi 
-        aws --version
+        curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+        sudo installer -pkg AWSCLIV2.pkg -target /
 
-    # Runs a single command using the runners shell
-    - name: Build the caminogo binaries 
-      run: ./scripts/build.sh 
-      shell: bash
+    - name: Create zip file
+      run: 7z a caminogo-macos-${VERSION}.zip build/caminogo build/plugins
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
 
-    - name: Create zip
-      run: |
-        mv .\build\caminogo .\build\caminogo.exe
-        mv .\build\plugins\evm .\build\plugins\evm.exe
-        Compress-Archive -Path .\build\caminogo.exe,.\build\plugins -DestinationPath .\build\caminogo-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
-
-    - name: Configure AWS Credentials
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: Copy to s3
-      run: aws s3 cp .\build\caminogo-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/caminogo-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+    - name: Upload file to S3 
+      run: aws s3 cp caminogo-macos-${VERSION}.zip s3://${BUCKET}/macos/ 
+      env:
+        BUCKET: ${{ secrets.BUCKET }}
+        VERSION: ${{ steps.get_version.outputs.VERSION }}

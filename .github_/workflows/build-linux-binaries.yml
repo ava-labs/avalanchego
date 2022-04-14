@@ -1,7 +1,7 @@
 name: build-linux-release
 
 on:
-  push:
+  pull-request:
     tags:
       - "*"
 

@@ -1,16 +1,13 @@
-name: Test e2e
+name: Test upgrade
 
 on:
-  push:
-    branches:
-      - dev
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  test_e2e:
+  test_upgrade:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -22,9 +19,6 @@ jobs:
       - name: Build the caminogo binaries
         shell: bash
         run: ./scripts/build.sh
-      - name: Run e2e tests
+      - name: Run upgrade tests
         shell: bash
-        run: scripts/tests.e2e.sh ./build/caminogo
-      - name: Run e2e tests for whitelist vtx
-        shell: bash
-        run: ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/caminogo
+        run: scripts/tests.upgrade.sh 0.0.0 ./build/caminogo

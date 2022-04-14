@@ -1,7 +1,7 @@
 name: build-arm64-debian-packages
 
 on:
-  push:
+  pull-request:
     tags:
       - "*"
 
