@@ -44,8 +44,15 @@ type stateSyncer struct {
 	common.AppHandler
 
 	started bool
+
 	// Tracks the last requestID that was used in a request
 	requestID uint32
+
+	// once vm finishes processing rebuilding its state via state summaries
+	// the full block associated with state summary must be download.
+	// stateSummaryBlkIDRequested ensures that the full block will be downloaded
+	// only in that case.
+	stateSummaryBlkIDRequested bool
 
 	// State Sync specific fields
 	stateSyncVM        block.StateSyncableVM
@@ -438,6 +445,7 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 
 	// request the block
 	ss.Sender.SendGet(vdrID, ss.requestID, blkID)
+	ss.stateSummaryBlkIDRequested = true
 	return nil
 }
 
@@ -445,7 +453,7 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 // Pass it to VM, declare state sync done and move onto bootstrapping
 func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
 	// ignores any late responses
-	if requestID != ss.requestID {
+	if !ss.stateSummaryBlkIDRequested || requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
 		return nil

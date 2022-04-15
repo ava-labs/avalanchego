@@ -55,6 +55,10 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 		assert.True(reqBlkID == lastSummaryBlkID)
 	}
 
+	// Any Put response before StateSyncDone is received from VM is dropped
+	assert.NoError(syncer.Put(reachedNodeID, sentReqID, []byte{}))
+	assert.False(stateSyncFullyDone)
+
 	assert.NoError(syncer.Notify(common.StateSyncDone))
 	assert.True(blkRequested)
 	assert.False(stateSyncFullyDone)
