@@ -5,6 +5,7 @@ package p
 
 import (
 	"fmt"
+	"sync"
 
 	stdcontext "context"
 
@@ -38,6 +39,7 @@ type backend struct {
 	Context
 	ChainUTXOs
 
+	txsLock sync.RWMutex
 	// txID -> tx
 	txs map[ids.ID]*platformvm.Tx
 }
@@ -108,6 +110,9 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *platformvm.Tx) error {
 		return err
 	}
 
+	b.txsLock.Lock()
+	defer b.txsLock.Unlock()
+
 	b.txs[txID] = tx
 	return nil
 }
@@ -131,6 +136,9 @@ func (b *backend) removeUTXOs(ctx stdcontext.Context, sourceChain ids.ID, utxoID
 }
 
 func (b *backend) GetTx(_ stdcontext.Context, txID ids.ID) (*platformvm.Tx, error) {
+	b.txsLock.RLock()
+	defer b.txsLock.RUnlock()
+
 	tx, exists := b.txs[txID]
 	if !exists {
 		return nil, database.ErrNotFound
