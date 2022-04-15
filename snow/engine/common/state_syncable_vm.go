@@ -20,8 +20,8 @@ var (
 // no matter whether it is freshly created or it has previous state.
 // Both Key and ID uniquely identify a Summary. However:
 // Key is used to efficiently elicit network votes;
-// ID must allow Summary verification and it is returned into elicited votes;
-// to allow state syncing nodes verify vote correctness.
+// ID must allow summaries comparison and verification as an alternative to Bytes;
+// it is used to verify what summaries are votes casted for.
 // Finally Byte returns the Summary content which is defined by the VM and opaque to the engine.
 type Summary interface {
 	Bytes() []byte

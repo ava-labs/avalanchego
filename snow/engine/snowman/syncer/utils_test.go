@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -33,13 +32,14 @@ type fullVM struct {
 }
 
 func init() {
-	ctx := snow.DefaultContextTest()
 	beacons = validators.NewSet()
 
 	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
 		beaconID := ids.GenerateTestShortID()
 		err := beacons.AddWeight(beaconID, uint64(1))
-		ctx.Log.AssertNoError(err)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
