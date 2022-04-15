@@ -149,7 +149,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 
 	// fail the fast sync if the weight is not enough to fast sync
 	if float64(ss.frontierSeeders.Weight())-newAlpha < float64(failedBeaconWeight) {
-		if ss.Config.RetrySyncing {
+		if ss.Config.RetryBootstrap {
 			ss.Ctx.Log.Debug("Not enough frontiers received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedSeeders.Len(), ss.attempts)
 			return ss.restart()
@@ -242,7 +242,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		}
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
-		if ss.Config.RetrySyncing && ss.StateSyncBeacons.Weight()-ss.Alpha < failedBeaconWeight {
+		if ss.Config.RetryBootstrap && ss.StateSyncBeacons.Weight()-ss.Alpha < failedBeaconWeight {
 			ss.Ctx.Log.Debug("Not enough votes received, restarting state sync... - Beacons: %d - Failed syncer: %d "+
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedVoters.Len(), ss.attempts)
 			return ss.restart()
@@ -337,7 +337,7 @@ func (ss *stateSyncer) startup() error {
 }
 
 func (ss *stateSyncer) restart() error {
-	if ss.attempts > 0 && ss.attempts%ss.RetrySyncingWarnFrequency == 0 {
+	if ss.attempts > 0 && ss.attempts%ss.RetryBootstrapWarnFrequency == 0 {
 		ss.Ctx.Log.Debug("continuing to attempt to state sync after %d failed attempts. Is this node connected to the internet?",
 			ss.attempts)
 	}

@@ -14,11 +14,9 @@ type Config struct {
 	common.Config
 	common.AllGetsServer
 
-	SampleK                   int
-	Alpha                     uint64
-	StateSyncBeacons          validators.Set
-	RetrySyncing              bool
-	RetrySyncingWarnFrequency int
+	SampleK          int
+	Alpha            uint64
+	StateSyncBeacons validators.Set
 
 	VM block.ChainVM
 }
@@ -49,13 +47,11 @@ func NewConfig(
 		syncAlpha = stateSyncingWeight/2 + 1 // must be > 50%
 	}
 	return Config{
-		Config:                    commonCfg,
-		AllGetsServer:             snowGetHandler,
-		SampleK:                   syncSampleK,
-		Alpha:                     syncAlpha,
-		StateSyncBeacons:          stateSyncBeacons,
-		RetrySyncing:              commonCfg.RetryBootstrap,
-		RetrySyncingWarnFrequency: commonCfg.RetryBootstrapWarnFrequency,
-		VM:                        vm,
+		Config:           commonCfg,
+		AllGetsServer:    snowGetHandler,
+		SampleK:          syncSampleK,
+		Alpha:            syncAlpha,
+		StateSyncBeacons: stateSyncBeacons,
+		VM:               vm,
 	}, nil
 }
