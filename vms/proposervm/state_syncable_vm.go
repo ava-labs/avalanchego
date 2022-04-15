@@ -95,7 +95,6 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 
 	coreSummary, err := vm.coreStateSyncVM.StateSyncGetSummary(key)
 	if err != nil {
-		vm.ctx.Log.Info("could not retrieve core summary due to: %s", err)
 		return nil, err // including common.ErrUnknownStateSummary case
 	}
 
@@ -154,7 +153,6 @@ func (vm *VM) StateSyncGetResult() (ids.ID, uint64, error) {
 	if err != nil {
 		return ids.Empty, 0, errUnknownLastSummaryBlockID
 	}
-	vm.ctx.Log.Info("coreToProBlkID mapping found %v", proBlkID.String())
 	return proBlkID, height, nil
 }
 
@@ -177,9 +175,9 @@ func (vm *VM) StateSyncSetLastSummaryBlock(blkByte []byte) error {
 		return errBadLastSummaryBlock
 	}
 
-	if err := vm.coreStateSyncVM.StateSyncSetLastSummaryBlock(coreBlkBytes); err != nil {
+	if err := blk.acceptOuterBlk(); err != nil {
 		return err
 	}
 
-	return blk.acceptOuterBlk()
+	return vm.coreStateSyncVM.StateSyncSetLastSummaryBlock(coreBlkBytes)
 }

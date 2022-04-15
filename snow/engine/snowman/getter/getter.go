@@ -57,7 +57,7 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 
 	summary, err := gh.ssVM.StateSyncGetLastSummary()
 	if err != nil {
-		gh.log.Verbo("couldn't get state summary frontier with %s. Dropping GetStateSummaryFrontier(%s, %d)",
+		gh.log.Info("couldn't get state summary frontier with %s. Dropping GetStateSummaryFrontier(%s, %d)",
 			err, validatorID, requestID)
 		return nil
 	}
