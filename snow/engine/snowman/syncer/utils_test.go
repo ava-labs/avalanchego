@@ -49,7 +49,7 @@ func init() {
 }
 
 // helper to build
-func buildTestsObjects(commonCfg *common.Config, t *testing.T) (
+func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	*stateSyncer,
 	*fullVM,
 	*common.SenderTest,

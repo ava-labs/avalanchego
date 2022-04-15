@@ -22,7 +22,7 @@ var (
 // Key is used to efficiently elicit network votes;
 // ID must allow Summary verification and it is returned into elicited votes;
 // to allow state syncing nodes verify vote correctness.
-// Finally Byte represent the Summary content which is defined by the VM and opaque to the engine.
+// Finally Byte returns the Summary content which is defined by the VM and opaque to the engine.
 type Summary interface {
 	Bytes() []byte
 	Key() uint64

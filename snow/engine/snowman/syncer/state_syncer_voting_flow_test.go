@@ -29,23 +29,19 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 		Alpha:        (noBeacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, _ := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
 	// set VM to check for StateSync call
-	stateSyncEmpty := false
 	fullVM.CantStateSync = true
+
+	// check that StateSync is called immediately with no frontiers
 	fullVM.StateSyncF = func(s []common.Summary) error {
-		if len(s) == 0 {
-			stateSyncEmpty = true
-		}
+		assert.True(len(s) == 0)
 		return nil
 	}
 
 	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
-
-	// check that StateSync is called immediately with no frontiers
-	assert.True(stateSyncEmpty)
 }
 
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
@@ -58,7 +54,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, _, sender := buildTestsObjects(&commonCfg, t)
+	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := ids.NewShortSet(3)
@@ -91,7 +87,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -171,7 +167,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -232,7 +228,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -275,7 +271,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
 			len(contactedFrontiersProviders) == beacons.Len())
 
-	// mock VM to simulate an valid but late summary is returned
+	// mock VM to simulate a valid but late summary is returned
 
 	fullVM.CantStateSyncParseSummary = true
 	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
@@ -307,7 +303,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -370,7 +366,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -478,7 +474,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -572,7 +568,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		Alpha:        (beacons.Weight() + 1) / 2,
 		StartupAlpha: (3*beacons.Weight() + 3) / 4,
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -664,10 +660,10 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 		SampleK:                     int(beacons.Weight()),
 		Alpha:                       (beacons.Weight() + 1) / 2,
 		StartupAlpha:                (3*beacons.Weight() + 3) / 4,
-		RetryBootstrap:              true, // this enable RetryStateSyncinc too
+		RetryBootstrap:              true, // this enable RetryStateSync too
 		RetryBootstrapWarnFrequency: 1,    // this enable RetrySyncingWarnFrequency too
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.ShortID]uint32) // nodeID -> reqID map

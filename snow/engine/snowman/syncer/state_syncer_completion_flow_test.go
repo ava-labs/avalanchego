@@ -24,7 +24,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 		RetryBootstrap:              true, // this enable RetryStateSyncinc too
 		RetryBootstrapWarnFrequency: 1,    // this enable RetrySyncingWarnFrequency too
 	}
-	syncer, fullVM, sender := buildTestsObjects(&commonCfg, t)
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
 	stateSyncFullyDone := false
 	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
