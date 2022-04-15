@@ -4,7 +4,7 @@ name: Build on supported platforms
 
 on:
   push:
-    branches: [chain4travel]
+    branches-ignore: ['!chain4travel']
     tags:
       - "*"
 

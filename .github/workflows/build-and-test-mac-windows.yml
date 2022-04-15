@@ -2,7 +2,7 @@ name: Build + Test Mac-Windows
 
 on:
   push:
-    branches: [chain4travel]
+    branches-ignore: ['!chain4travel']
     tags:
       - "*" # Push events to every tag
 
