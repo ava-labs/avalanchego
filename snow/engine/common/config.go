@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -18,8 +19,8 @@ type Config struct {
 	Beacons    validators.Set
 
 	SampleK       int
-	StartupAlpha  uint64
 	Alpha         uint64
+	WeightTracker tracker.WeightTracker
 	Sender        Sender
 	Bootstrapable Bootstrapable
 	Subnet        Subnet
