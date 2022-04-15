@@ -1,9 +1,7 @@
 name: Ansible Lint
 on:
   push:
-    branches-ignore: ['!chain4travel']
-    tags:
-      - "*" # Push events to every tag
+    tags: ["*"] # Push events to every tag
 
 jobs:
   build-ansible:
