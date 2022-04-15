@@ -335,6 +335,7 @@ func (ss *stateSyncer) startup() error {
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
+		// we make sure that StateSync is called if state sync is enabled
 		return ss.stateSyncVM.StateSync(nil)
 	}
 

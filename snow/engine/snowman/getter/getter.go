@@ -74,7 +74,9 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	summaryIDs := make([]ids.ID, 0, len(keys))
 	for _, key := range keys {
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
-		if err != nil {
+		if err == common.ErrStateSyncableVMNotImplemented {
+			return nil
+		} else if err != nil {
 			continue
 		}
 		summaryIDs = append(summaryIDs, summary.ID())
