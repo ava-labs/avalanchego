@@ -301,7 +301,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// handler is started.
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
-	// Register bootstrapped health checks after P chain is started.
+	// Register bootstrapped health checks after P chain has been added to chains
+	// Note: this prevents a race condition between the health check and adding the first chain to the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
 			chain.Handler.StopWithError(err)
@@ -879,7 +880,8 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	// Create engine, bootstrapper and state-syncer in this order.
+	// Create engine, bootstrapper and state-syncer in this order,
+	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
 		Ctx:           commonCfg.Ctx,
 		AllGetsServer: snowGetHandler,
@@ -906,13 +908,10 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Note: creating engine before bootstrapper ensures that
-	// handler.Consensus() does not return nil,
-	// because engine is already registered
+	// engine.Start exists
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
+		engine.Start,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
@@ -932,13 +931,10 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Note: creating bootstrapper before stateSyncer ensures that
-	// handler.Bootstrapper() does not return nil,
-	// because bootstrapper is already registered
+	// bootstrapper.Start exists
 	stateSyncer := syncer.New(
 		stateSyncCfg,
-		func(lastReqID uint32) error {
-			return handler.Bootstrapper().Start(lastReqID + 1)
-		},
+		bootstrapper.Start,
 	)
 	handler.SetStateSyncer(stateSyncer)
 
