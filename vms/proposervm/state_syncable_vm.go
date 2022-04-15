@@ -19,7 +19,7 @@ var (
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	if vm.coreStateSyncVM == nil {
-		return false, common.ErrStateSyncableVMNotImplemented
+		return false, nil
 	}
 
 	return vm.coreStateSyncVM.StateSyncEnabled()

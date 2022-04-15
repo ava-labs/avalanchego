@@ -10,10 +10,10 @@ import (
 
 func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	if vm.ssVM == nil {
-		return false, common.ErrStateSyncableVMNotImplemented
+		return false, nil
 	}
-	// Note: we intentionally omit adding metrics for StateSyncEnabled
 
+	// Note: we intentionally omit adding metrics for StateSyncEnabled
 	return vm.ssVM.StateSyncEnabled()
 }
 

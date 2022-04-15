@@ -20,8 +20,6 @@ func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmpb.Sta
 
 	if vm.ssVM != nil {
 		enabled, err = vm.ssVM.StateSyncEnabled()
-	} else {
-		err = common.ErrStateSyncableVMNotImplemented
 	}
 
 	return &vmpb.StateSyncEnabledResponse{
