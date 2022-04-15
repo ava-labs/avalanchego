@@ -378,17 +378,14 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 }
 
 func (s *sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []ids.ID) {
-	summaryIDBytes := make([][]byte, len(summaryIDs))
-	encodeSummaryIDs(summaryIDs, summaryIDBytes)
-
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDBytes, nodeID)
+		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
 		go s.router.HandleInbound(inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDBytes)
+	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs)
 	if err != nil {
 		s.ctx.Log.Error(
 			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
@@ -1018,11 +1015,4 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containe
 		s.ctx.Log.Debug("failed to gossip GossipMsg(%s)", s.ctx.ChainID)
 	}
 	return nil
-}
-
-func encodeSummaryIDs(summaryIDs []ids.ID, result [][]byte) {
-	for i, summaryID := range summaryIDs {
-		copy := summaryID
-		result[i] = copy[:]
-	}
 }

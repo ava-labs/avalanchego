@@ -148,7 +148,7 @@ type OutboundMsgBuilder interface {
 	AcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		summaryIDs [][]byte,
+		summaryIDs []ids.ID,
 	) (OutboundMessage, error)
 }
 
@@ -249,10 +249,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		AcceptedFrontier,
 		map[Field]interface{}{
@@ -272,10 +269,7 @@ func (b *outMsgBuilder) GetAccepted(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		GetAccepted,
 		map[Field]interface{}{
@@ -295,10 +289,7 @@ func (b *outMsgBuilder) Accepted(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		Accepted,
 		map[Field]interface{}{
@@ -431,10 +422,7 @@ func (b *outMsgBuilder) Chits(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		Chits,
 		map[Field]interface{}{
@@ -550,8 +538,10 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 func (b *outMsgBuilder) AcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	summaryIDs [][]byte,
+	summaryIDs []ids.ID,
 ) (OutboundMessage, error) {
+	summaryIDBytes := make([][]byte, len(summaryIDs))
+	encodeIDs(summaryIDs, summaryIDBytes)
 	return b.c.Pack(
 		AcceptedStateSummary,
 		map[Field]interface{}{

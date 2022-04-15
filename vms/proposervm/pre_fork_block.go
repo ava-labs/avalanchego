@@ -21,8 +21,6 @@ type preForkBlock struct {
 }
 
 func (b *preForkBlock) Accept() error {
-	// Note: forkHeight is set to math.MaxUint64 until actual fork is reached.
-	// PreFork blocks do not need to update forkHeight
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
@@ -31,6 +29,7 @@ func (b *preForkBlock) Accept() error {
 }
 
 func (b *preForkBlock) acceptOuterBlk() error {
+	// PreFork blocks do not need to update proposerVM height index
 	return nil
 }
 

@@ -387,9 +387,9 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (
 				return nil, err
 			}
 			summaries[i] = &Summary{
-				SummaryKey:   sum.Key,
-				SummaryID:    summaryID,
-				ContentBytes: sum.Content,
+				key:   sum.Key,
+				id:    summaryID,
+				bytes: sum.Content,
 			}
 		}
 		err = ssVM.StateSync(summaries)

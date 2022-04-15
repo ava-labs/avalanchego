@@ -71,14 +71,14 @@ const (
 )
 
 type Summary struct {
-	SummaryKey   uint64
-	SummaryID    ids.ID
-	ContentBytes []byte
+	key   uint64
+	id    ids.ID
+	bytes []byte
 }
 
-func (s *Summary) Bytes() []byte { return s.ContentBytes }
-func (s *Summary) Key() uint64   { return s.SummaryKey }
-func (s *Summary) ID() ids.ID    { return s.SummaryID }
+func (s *Summary) Bytes() []byte { return s.bytes }
+func (s *Summary) Key() uint64   { return s.key }
+func (s *Summary) ID() ids.ID    { return s.id }
 
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
@@ -604,10 +604,7 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return false, errCodeToError[errCode]
-	}
-	return resp.Enabled, nil
+	return resp.Enabled, errCodeToError[resp.Err]
 }
 
 func (vm *VMClient) StateSyncGetOngoingSummary() (common.Summary, error) {
@@ -621,9 +618,9 @@ func (vm *VMClient) StateSyncGetOngoingSummary() (common.Summary, error) {
 
 	summaryID, err := ids.ToID(resp.SummaryId)
 	return &Summary{
-		SummaryKey:   resp.Key,
-		SummaryID:    summaryID,
-		ContentBytes: resp.Content,
+		key:   resp.Key,
+		id:    summaryID,
+		bytes: resp.Content,
 	}, err
 }
 
@@ -641,9 +638,9 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 
 	summaryID, err := ids.ToID(resp.SummaryId)
 	return &Summary{
-		SummaryKey:   resp.Key,
-		SummaryID:    summaryID,
-		ContentBytes: resp.Content,
+		key:   resp.Key,
+		id:    summaryID,
+		bytes: resp.Content,
 	}, err
 }
 
@@ -663,9 +660,9 @@ func (vm *VMClient) StateSyncParseSummary(summaryBytes []byte) (common.Summary, 
 
 	summaryID, err := ids.ToID(resp.SummaryId)
 	return &Summary{
-		SummaryKey:   resp.Key,
-		SummaryID:    summaryID,
-		ContentBytes: resp.Content,
+		key:   resp.Key,
+		id:    summaryID,
+		bytes: resp.Content,
 	}, err
 }
 
@@ -681,9 +678,9 @@ func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
 
 	summaryID, err := ids.ToID(resp.SummaryId)
 	return &Summary{
-		SummaryKey:   resp.Key,
-		SummaryID:    summaryID,
-		ContentBytes: resp.Content,
+		key:   resp.Key,
+		id:    summaryID,
+		bytes: resp.Content,
 	}, err
 }
 
@@ -706,10 +703,7 @@ func (vm *VMClient) StateSync(accepted []common.Summary) error {
 	if err != nil {
 		return err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return errCodeToError[errCode]
-	}
-	return nil
+	return errCodeToError[resp.Err]
 }
 
 func (vm *VMClient) StateSyncGetResult() (ids.ID, uint64, error) {
@@ -741,10 +735,7 @@ func (vm *VMClient) StateSyncSetLastSummaryBlock(blkByte []byte) error {
 	if err != nil {
 		return err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return errCodeToError[errCode]
-	}
-	return nil
+	return errCodeToError[resp.Err]
 }
 
 func (vm *VMClient) GetAncestors(

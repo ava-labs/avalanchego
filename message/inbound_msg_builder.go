@@ -131,7 +131,7 @@ type InboundMsgBuilder interface {
 	InboundAcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		summaryIDs [][]byte,
+		summaryIDs []ids.ID,
 		nodeID ids.ShortID,
 	) InboundMessage
 }
@@ -178,7 +178,7 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: AcceptedFrontier,
 		fields: map[Field]interface{}{
@@ -199,7 +199,7 @@ func (b *inMsgBuilder) InboundGetAccepted(
 ) InboundMessage {
 	received := b.clock.Time()
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: GetAccepted,
 		fields: map[Field]interface{}{
@@ -220,7 +220,7 @@ func (b *inMsgBuilder) InboundAccepted(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: Accepted,
 		fields: map[Field]interface{}{
@@ -283,7 +283,7 @@ func (b *inMsgBuilder) InboundChits(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: Chits,
 		fields: map[Field]interface{}{
@@ -450,22 +450,24 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	summaryIDs [][]byte,
+	summaryIDs []ids.ID,
 	nodeID ids.ShortID,
 ) InboundMessage {
+	summaryIDBytes := make([][]byte, len(summaryIDs))
+	encodeIDs(summaryIDs, summaryIDBytes)
 	return &inboundMessage{
 		op: AcceptedStateSummary,
 		fields: map[Field]interface{}{
 			ChainID:    chainID[:],
 			RequestID:  requestID,
-			SummaryIDs: summaryIDs,
+			SummaryIDs: summaryIDBytes,
 		},
 		nodeID: nodeID,
 	}
 }
 
-func encodeContainerIDs(containerIDs []ids.ID, result [][]byte) {
-	for i, containerID := range containerIDs {
+func encodeIDs(ids []ids.ID, result [][]byte) {
+	for i, containerID := range ids {
 		copy := containerID
 		result[i] = copy[:]
 	}

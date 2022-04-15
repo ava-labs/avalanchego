@@ -20,17 +20,14 @@ type stateSummaryMetrics struct {
 }
 
 func newStateSummaryMetrics(namespace string, reg prometheus.Registerer) (stateSummaryMetrics, error) {
-	var (
-		errs = wrappers.Errs{}
-		ssM  = stateSummaryMetrics{}
-	)
-
-	ssM.lastSummary = newAverager(namespace, "last_summary", reg, &errs)
-	ssM.lastSummaryBlockID = newAverager(namespace, "last_summary_block_id", reg, &errs)
-	ssM.setLastSummaryBlockID = newAverager(namespace, "set_last_summary_block_id", reg, &errs)
-	ssM.isSummaryAccepted = newAverager(namespace, "summary_accepted", reg, &errs)
-	ssM.parseSummary = newAverager(namespace, "parse_summary", reg, &errs)
-	ssM.getOngoingStateSyncSummary = newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs)
-	ssM.syncState = newAverager(namespace, "sync_state", reg, &errs)
-	return ssM, errs.Err
+	errs := wrappers.Errs{}
+	return stateSummaryMetrics{
+		lastSummary:                newAverager(namespace, "last_summary", reg, &errs),
+		lastSummaryBlockID:         newAverager(namespace, "last_summary_block_id", reg, &errs),
+		setLastSummaryBlockID:      newAverager(namespace, "set_last_summary_block_id", reg, &errs),
+		parseSummary:               newAverager(namespace, "parse_summary", reg, &errs),
+		getOngoingStateSyncSummary: newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs),
+		isSummaryAccepted:          newAverager(namespace, "summary_accepted", reg, &errs),
+		syncState:                  newAverager(namespace, "sync_state", reg, &errs),
+	}, errs.Err
 }

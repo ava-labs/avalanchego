@@ -37,12 +37,10 @@ type Block interface {
 
 	getInnerBlk() snowman.Block
 
-	// Following the introduction of state sync, we may need to
-	// update last accepted block data for proposervm, without
-	// propagating changes to innerVM. This is especially true for
-	// the block associated with last state summary.
-	// acceptOuterBlk and acceptInnerBlk allow controlling acceptance
-	// of outer and inner block
+	// After a state sync, we may need to update last accepted block data
+	// without propagating any changes to the innerVM.
+	// acceptOuterBlk and acceptInnerBlk allow controlling acceptance of outer
+	// and inner blocks.
 	acceptOuterBlk() error
 	acceptInnerBlk() error
 
