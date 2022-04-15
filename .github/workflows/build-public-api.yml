@@ -1,7 +1,8 @@
 name: build-public-ami
 
 on:
-  pull-request:
+  push:
+    branches: [chain4travel]
     tags:
       - "*"
 

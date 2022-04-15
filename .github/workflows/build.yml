@@ -3,7 +3,10 @@
 name: Build on supported platforms
 
 on:
+  push:
+    branches: [chain4travel]
   pull-request:
+    branches: [chain4travel]
 
 permissions:
   contents: write

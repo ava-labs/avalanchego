@@ -1,11 +1,10 @@
 name: Build + Test Mac-Windows
 
 on:
-  pull-request:
+  push:
+    branches: [chain4travel]
     tags:
       - "*" # Push events to every tag
-    branches:
-      - chain4travel
 
 jobs:
   run_build_tests:

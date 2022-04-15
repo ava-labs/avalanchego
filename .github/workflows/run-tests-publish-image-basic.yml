@@ -2,10 +2,9 @@ name: e2e Tests + Publish Docker Image
 
 on:
   pull-request:
+    branches: [chain4travel]
     tags-ignore:
       - "*" # Ignores all tags
-    branches-ignore:
-      - chain4travel
 
 jobs:
   run_e2e_tests_plus_publish_image:

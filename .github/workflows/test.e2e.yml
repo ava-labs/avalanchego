@@ -1,7 +1,10 @@
 name: Test e2e
 
 on:
+  push:
+    branches: [chain4travel]
   pull_request:
+    branches: [chain4travel]
 
 permissions:
   contents: read

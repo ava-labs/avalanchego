@@ -12,11 +12,11 @@
 name: "CodeQL"
 
 on:
+  push:
+    branches: [chain4travel]
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [chain4travel]
-  schedule:
-    - cron: "44 11 * * 4"
 
 jobs:
   analyze:

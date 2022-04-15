@@ -4,7 +4,8 @@ name: build-win-release
 
 # Controls when the action will run.
 on:
-  pull-request:
+  push:
+    branches: [chain4travel]
     tags:
       - "*" # Push events to every tag
 

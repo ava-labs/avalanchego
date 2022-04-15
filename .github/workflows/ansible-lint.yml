@@ -1,10 +1,9 @@
 name: Ansible Lint
 on:
-  pull-request:
+  push:
+    branches: [chain4travel]
     tags:
       - "*" # Push events to every tag
-    branches:
-      - chain4travel
 
 jobs:
   build-ansible:

@@ -3,8 +3,7 @@ on:
   pull-request:
     tags-ignore:
       - "*" # Ignores all tags
-    branches-ignore:
-      - chain4travel
+    branches: [chain4travel]
 
 jobs:
   run_static_analysis:

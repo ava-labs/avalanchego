@@ -1,6 +1,10 @@
 name: Test upgrade
 
 on:
+  push:
+    # As long we dont have compareable versions ...
+    branches-ignore:
+      - '**'
   pull_request:
     # As long we dont have compareable versions ...
     branches-ignore:

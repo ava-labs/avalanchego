@@ -1,7 +1,8 @@
 name: build-amd64-debian-packages
 
 on:
-  pull-request:
+  push:
+    branches: [chain4travel]
     tags:
       - "*"
 
