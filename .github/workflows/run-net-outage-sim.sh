@@ -3,8 +3,8 @@ set -e
 
 SUCCESS=1
 
-# Polls AvalancheGo until it's healthy. When it is,
-# sets SUCCESS to 0 and returns. If AvalancheGo
+# Polls CaminoGo until it's healthy. When it is,
+# sets SUCCESS to 0 and returns. If CaminoGo
 # doesn't become healthy within 3 hours, sets
 # SUCCESS to 1 and returns.
 wait_until_healthy () {
@@ -59,7 +59,7 @@ echo "Creating Docker network..."
 docker network create controlled-net 
 
 echo "Starting Docker container..."
-containerID=$(docker run --name="net_outage_simulation" --memory="12g" --memory-reservation="11g" --cpus="6.0" --net=controlled-net -p 9650:9650 -p 9651:9651 -v /var/lib/caminogo/db:/db -d avaplatform/caminogo:latest /caminogo/build/caminogo --db-dir /db --http-host=0.0.0.0)
+containerID=$(docker run --name="net_outage_simulation" --memory="12g" --memory-reservation="11g" --cpus="6.0" --net=controlled-net -p 9650:9650 -p 9651:9651 -v /var/lib/caminogo/db:/db -d caminoplatform/caminogo:latest /caminogo/build/caminogo --db-dir /db --http-host=0.0.0.0)
 
 echo "Waiting 30 seconds for node to start..."
 sleep 30

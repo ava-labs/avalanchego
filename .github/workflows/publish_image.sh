@@ -9,14 +9,14 @@ if [[ -z "$DOCKER_USERNAME"  ]]; then
   exit 0;
 fi
 
-# Avalanche root directory
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
+# Camino root directory
+CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 
 # Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
+source "$CAMINO_PATH"/scripts/versions.sh
 
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$CAMINO_PATH"/scripts/constants.sh
 
 if [[ $current_branch == "master" ]]; then
   echo "Tagging current caminogo image as $caminogo_dockerhub_repo:latest"

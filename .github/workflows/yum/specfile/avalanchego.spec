@@ -3,13 +3,13 @@
 Name:           caminogo
 Version:        %{version}
 Release:        %{release}
-Summary:        The Avalanche platform binaries
+Summary:        The Camino platform binaries
 URL:            https://github.com/chain4travel/%{name}
 License:        BSD-3
 AutoReqProv:    no
 
 %description
-Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
+Camino is a lightweight protocol which runs on minimum computer requirements.
 
 %files
 /usr/local/bin/caminogo
@@ -17,6 +17,5 @@ Avalanche is an incredibly lightweight protocol, so the minimum computer require
 /usr/local/lib/caminogo/evm
 
 %changelog
-* Mon Oct 26 2020 Charlie Wyse <charlie@avalabs.org>
-- First creation of package
-
+* Fri Apr 15 2022 devop <devop@chain4travel.com>
+- Initial version

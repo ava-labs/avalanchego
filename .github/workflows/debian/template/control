@@ -1,8 +1,8 @@
 Package: caminogo
 Version: 0.1.0
-Section: misc 
+Section: misc
 Priority: optional
-Architecture: arm64 
+Architecture: arm64
 Depends:
-Maintainer: Fabio Barone <fabio@avalabs.org>
-Description: The Avalanche platform binaries 
+Maintainer: devop <devop@chain4travel.com>
+Description: The Camino platform binaries

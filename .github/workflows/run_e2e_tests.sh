@@ -20,13 +20,13 @@ if [[ -z ${DOCKER_USERNAME} ]]; then
 fi
 
 # Camino root directory
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
+CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 
 # Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
+source "$CAMINO_PATH"/scripts/versions.sh
 
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$CAMINO_PATH"/scripts/constants.sh
 
 # Login to docker
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
@@ -45,7 +45,7 @@ docker pull $camino_byzantine_image
 git_commit_id=$( git rev-list -1 HEAD )
 
 # Build current caminogo
-source "$AVALANCHE_PATH"/scripts/build_image.sh
+source "$CAMINO_PATH"/scripts/build_image.sh
 
 # Target built version to use in camino-testing
 camino_image="$caminogo_dockerhub_repo:$current_branch"
