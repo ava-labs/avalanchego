@@ -2,9 +2,10 @@ name: build-public-ami
 
 on:
   push:
-    branches: [chain4travel]
-    tags:
-      - "*"
+    #branches: [chain4travel]
+    #tags:
+    #  - "*"
+    branches-ignore: ["*"]
 
 jobs:
   build-public-ami-and-upload:

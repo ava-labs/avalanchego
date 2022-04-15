@@ -2,9 +2,10 @@ name: build-linux-release
 
 on:
   push:
-    branches: [chain4travel]
-    tags:
-      - "*"
+    #branches: [chain4travel]
+    #tags:
+    #  - "*"
+    branches-ignore: ["*"]
 
 jobs:
   build-x86_64-binaries-tarball:

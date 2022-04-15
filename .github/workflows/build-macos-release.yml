@@ -5,9 +5,10 @@ name: build-macos-release
 # Controls when the action will run.
 on:
   push:
-    branches: [chain4travel]
-    tags:
-      - "*" # Push events to every tag
+    #branches: [chain4travel]
+    #tags:
+    #  - "*" # Push events to every tag
+    branches-ignore: ["*"]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:

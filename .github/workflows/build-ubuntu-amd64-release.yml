@@ -2,9 +2,10 @@ name: build-amd64-debian-packages
 
 on:
   push:
-    branches: [chain4travel]
-    tags:
-      - "*"
+    #branches: [chain4travel]
+    #tags:
+    #  - "*"
+    branches-ignore: ["*"]
 
 jobs:
   build-bionic-amd64-package:

@@ -5,6 +5,8 @@ name: Build on supported platforms
 on:
   push:
     branches: [chain4travel]
+    tags:
+      - "*"
   pull-request:
     branches: [chain4travel]
 
