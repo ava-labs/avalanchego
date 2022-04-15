@@ -6,7 +6,7 @@ package rpcchainvm
 import (
 	"context"
 
-	ids "github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ids"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"google.golang.org/protobuf/types/known/emptypb"
