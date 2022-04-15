@@ -316,7 +316,8 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.StateSyncParseSummaryF = func(b []byte) (common.Summary, error) {
+		assert.True(bytes.Equal(b, summaryBytes))
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
