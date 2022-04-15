@@ -5,4 +5,4 @@
   gather_facts: false
   hosts: all
   roles:
-    - name: avalanche_stop
+    - name: camino_stop

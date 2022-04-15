@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -13,18 +24,18 @@ import (
 
 	"github.com/kardianos/osext"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/rocksdb"
-	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ulimit"
-	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/chain4travel/caminogo/database/leveldb"
+	"github.com/chain4travel/caminogo/database/memdb"
+	"github.com/chain4travel/caminogo/database/rocksdb"
+	"github.com/chain4travel/caminogo/genesis"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/ulimit"
+	"github.com/chain4travel/caminogo/utils/units"
 )
 
 // Results of parsing the CLI
 var (
-	defaultNetworkName     = constants.MainnetName
+	defaultNetworkName     = constants.CaminoName
 	homeDir                = os.ExpandEnv("$HOME")
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
@@ -73,7 +84,7 @@ func addProcessFlags(fs *flag.FlagSet) {
 
 func addNodeFlags(fs *flag.FlagSet) {
 	// System
-	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value")
+	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max")
 
 	// Config File
 	fs.String(ConfigFileKey, "", fmt.Sprintf("Specifies a config file. Ignored if %s is specified", ConfigContentKey))
@@ -103,8 +114,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
-	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
 	// Assertions
 	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
@@ -114,15 +126,17 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
-		"Gossip [%s] validator IPs to [%s] validators and [%s] non-validators every [%s]",
+		"Gossip [%s] validator IPs to [%s] validators, [%s] non-validators, and [%s] validating or non-validating peers every [%s]",
 		NetworkPeerListNumValidatorIPsKey,
 		NetworkPeerListValidatorGossipSizeKey,
 		NetworkPeerListNonValidatorGossipSizeKey,
+		NetworkPeerListPeersGossipSizeKey,
 		NetworkPeerListGossipFreqKey,
 	)
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListValidatorGossipSizeKey, 25, gossipHelpMsg)
 	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 25, gossipHelpMsg)
+	fs.Uint(NetworkPeerListPeersGossipSizeKey, 0, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 
 	// Public IP Resolution
@@ -162,10 +176,15 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Router
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers")
 	fs.Duration(ConsensusShutdownTimeoutKey, 30*time.Second, "Timeout before killing an unresponsive chain")
-	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipNonValidatorSizeKey, 0, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
+	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, 0, "Number of validators to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, 0, "Number of non-validators to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, 0, "Number of validators to gossip to each accepted container to")
+	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, 0, "Number of non-validators to gossip to each accepted container to")
+	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, 20, "Number of peers to gossip to each accepted container to")
 	fs.Uint(AppGossipValidatorSizeKey, 10, "Number of validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipNonValidatorSizeKey, 0, "Number of non-validators to gossip an AppGossip message to")
+	fs.Uint(AppGossipPeerSizeKey, 0, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler")
@@ -303,7 +322,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer")
 }
 
-// BuildFlagSet returns a complete set of flags for avalanchego
+// BuildFlagSet returns a complete set of flags for caminogo
 func BuildFlagSet() *flag.FlagSet {
 	// TODO parse directly into a *pflag.FlagSet instead of into a *flag.FlagSet
 	// and then putting those into a *plag.FlagSet

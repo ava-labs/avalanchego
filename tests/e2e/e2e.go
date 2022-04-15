@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
+	runner_client "github.com/chain4travel/camino-network-runner/client"
 )
 
 const (

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -10,25 +21,32 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/utils/timer"
+	"github.com/chain4travel/caminogo/utils/timer/mockable"
+	"github.com/chain4travel/caminogo/utils/units"
 )
 
 const (
 	// syncBound is the synchrony bound used for safe decision making
 	syncBound = 10 * time.Second
 
-	// BatchSize is the number of decision transactions to place into a block
-	BatchSize = 30
+	// TargetTxSize is the maximum number of bytes a transaction can use to be
+	// allowed into the mempool.
+	TargetTxSize = 64 * units.KiB
+
+	// TargetBlockSize is maximum number of transaction bytes to place into a
+	// StandardBlock
+	TargetBlockSize = 128 * units.KiB
 )
 
 var (
 	errEndOfTime         = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks   = errors.New("no pending blocks")
 	errMempoolReentrancy = errors.New("mempool reentrancy")
+	errTxTooBig          = errors.New("tx too big")
 )
 
 // blockBuilder implements a simple blockBuilder to convert txs into valid blocks
@@ -120,6 +138,11 @@ func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
 		return errMempoolReentrancy
 	}
 
+	txBytes := tx.Bytes()
+	if len(txBytes) > TargetTxSize {
+		return errTxTooBig
+	}
+
 	if err := m.Add(tx); err != nil {
 		return err
 	}
@@ -153,7 +176,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Try building a standard block.
 	if m.HasDecisionTxs() {
-		txs := m.PopDecisionTxs(BatchSize)
+		txs := m.PopDecisionTxs(TargetBlockSize)
 		return m.vm.newStandardBlock(preferredID, nextHeight, txs)
 	}
 

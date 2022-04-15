@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -11,17 +22,17 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/chain4travel/caminogo/genesis"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/tests"
+	"github.com/chain4travel/caminogo/tests/e2e"
+	"github.com/chain4travel/caminogo/utils/crypto"
+	"github.com/chain4travel/caminogo/vms/avm"
+	"github.com/chain4travel/caminogo/vms/components/avax"
+	"github.com/chain4travel/caminogo/vms/secp256k1fx"
+	"github.com/chain4travel/caminogo/wallet/subnet/primary"
+	"github.com/chain4travel/caminogo/wallet/subnet/primary/common"
 )
 
 var keyFactory crypto.FactorySECP256K1R
@@ -60,9 +71,9 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 		})
 
 		allMetrics := []string{
-			"avalanche_X_vtx_processing",
-			"avalanche_X_vtx_accepted_count",
-			"avalanche_X_vtx_rejected_count",
+			"camino_X_vtx_processing",
+			"camino_X_vtx_accepted_count",
+			"camino_X_vtx_rejected_count",
 		}
 
 		// URI -> "metric name" -> "metric value"
@@ -75,7 +86,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 				gomega.Expect(err).Should(gomega.BeNil())
 				tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
 
-				if mm["avalanche_X_vtx_processing"] > 0 {
+				if mm["camino_X_vtx_processing"] > 0 {
 					tests.Outf("{{red}}{{bold}}%q already has processing vtx!!!{{/}}\n", u)
 					ginkgo.Skip("the cluster has already ongoing vtx txs thus skipping to prevent conflicts...")
 				}
@@ -170,13 +181,13 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 				prev := curMetrics[u]
 
 				// +0 since x-chain tx must have been processed and accepted by now
-				gomega.Expect(mm["avalanche_X_vtx_processing"]).Should(gomega.Equal(prev["avalanche_X_vtx_processing"]))
+				gomega.Expect(mm["camino_X_vtx_processing"]).Should(gomega.Equal(prev["camino_X_vtx_processing"]))
 
 				// +1 since x-chain tx must have been accepted by now
-				gomega.Expect(mm["avalanche_X_vtx_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_vtx_accepted_count"] + 1))
+				gomega.Expect(mm["camino_X_vtx_accepted_count"]).Should(gomega.Equal(prev["camino_X_vtx_accepted_count"] + 1))
 
 				// +0 since virtuous x-chain tx must not be rejected
-				gomega.Expect(mm["avalanche_X_vtx_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_vtx_rejected_count"]))
+				gomega.Expect(mm["camino_X_vtx_rejected_count"]).Should(gomega.Equal(prev["camino_X_vtx_rejected_count"]))
 
 				curMetrics[u] = mm
 			}

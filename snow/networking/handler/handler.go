@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,17 +19,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/networking/worker"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/uptime"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/networking/tracker"
+	"github.com/chain4travel/caminogo/snow/networking/worker"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/timer/mockable"
+	"github.com/chain4travel/caminogo/utils/uptime"
+	"github.com/chain4travel/caminogo/version"
 )
 
 const (
@@ -623,9 +634,15 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	if err := h.engine.Shutdown(); err != nil {
+	currentEngine, err := h.getEngine()
+	if err == nil {
+		if err := currentEngine.Shutdown(); err != nil {
+			h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		}
+	} else {
 		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
+
 	if h.onStopped != nil {
 		go h.onStopped()
 	}

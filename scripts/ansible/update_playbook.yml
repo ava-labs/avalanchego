@@ -5,6 +5,6 @@
   connection: ssh
   hosts: all
   roles:
-    - name: avalanche_stop
-    - name: avalanche_build
-    - name: avalanche_start
+    - name: camino_stop
+    - name: camino_build
+    - name: camino_start

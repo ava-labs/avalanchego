@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -7,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/timer/mockable"
 )
 
 var (
@@ -98,8 +109,8 @@ type inboundConnUpgradeThrottler struct {
 
 // Returns whether we should upgrade an inbound connection from [ipStr].
 func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
-	if ip.IsPrivate() {
-		// Don't rate-limit private (local) IPs
+	if ip.IP.IsLoopback() {
+		// Don't rate-limit loopback IPs
 		return true
 	}
 	// Only use IP (not port). This mitigates DoS
@@ -127,17 +138,29 @@ func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
 }
 
 func (n *inboundConnUpgradeThrottler) Dispatch() {
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+
+	defer timer.Stop()
 	for {
 		select {
-		case <-n.done:
-			return
 		case next := <-n.recentIPsAndTimes:
 			// Sleep until it's time to remove the next IP
-			time.Sleep(next.cooldownElapsedAt.Sub(n.clock.Time()))
-			// Remove the next IP (we'd upgrade another inbound connection from it)
-			n.lock.Lock()
-			delete(n.recentIPs, next.ip)
-			n.lock.Unlock()
+			timer.Reset(next.cooldownElapsedAt.Sub(n.clock.Time()))
+
+			select {
+			case <-timer.C:
+				// Remove the next IP (we'd upgrade another inbound connection from it)
+				n.lock.Lock()
+				delete(n.recentIPs, next.ip)
+				n.lock.Unlock()
+			case <-n.done:
+				return
+			}
+		case <-n.done:
+			return
 		}
 	}
 }

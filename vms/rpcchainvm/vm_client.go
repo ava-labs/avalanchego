@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -13,38 +24,44 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
-	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/api/proto/appsenderproto"
-	"github.com/ava-labs/avalanchego/api/proto/galiasreaderproto"
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/gkeystoreproto"
-	"github.com/ava-labs/avalanchego/api/proto/gsharedmemoryproto"
-	"github.com/ava-labs/avalanchego/api/proto/gsubnetlookupproto"
-	"github.com/ava-labs/avalanchego/api/proto/messengerproto"
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
-	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/rpcdb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/ids/galiasreader"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
+	"github.com/chain4travel/caminogo/api/keystore/gkeystore"
+	"github.com/chain4travel/caminogo/api/metrics"
+	"github.com/chain4travel/caminogo/chains/atomic/gsharedmemory"
+	"github.com/chain4travel/caminogo/database/manager"
+	"github.com/chain4travel/caminogo/database/rpcdb"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/ids/galiasreader"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/common/appsender"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/block"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/version"
+	"github.com/chain4travel/caminogo/vms/components/chain"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/ghttp"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/gsubnetlookup"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/messenger"
+
+	aliasreaderpb "github.com/chain4travel/caminogo/proto/pb/aliasreader"
+	appsenderpb "github.com/chain4travel/caminogo/proto/pb/appsender"
+	httppb "github.com/chain4travel/caminogo/proto/pb/http"
+	keystorepb "github.com/chain4travel/caminogo/proto/pb/keystore"
+	messengerpb "github.com/chain4travel/caminogo/proto/pb/messenger"
+	rpcdbpb "github.com/chain4travel/caminogo/proto/pb/rpcdb"
+	sharedmemorypb "github.com/chain4travel/caminogo/proto/pb/sharedmemory"
+	subnetlookuppb "github.com/chain4travel/caminogo/proto/pb/subnetlookup"
+	vmpb "github.com/chain4travel/caminogo/proto/pb/vm"
 )
 
 var (
@@ -65,8 +82,7 @@ const (
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {
 	*chain.State
-	client vmproto.VMClient
-	broker *plugin.GRPCBroker
+	client vmpb.VMClient
 	proc   *plugin.Client
 
 	messenger    *messenger.Server
@@ -79,14 +95,18 @@ type VMClient struct {
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
 
+	grpcHealthChecks map[string]string
+
+	grpcServerMetrics *grpc_prometheus.ServerMetrics
+
 	ctx *snow.Context
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
+func NewClient(client vmpb.VMClient) *VMClient {
 	return &VMClient{
-		client: client,
-		broker: broker,
+		client:           client,
+		grpcHealthChecks: make(map[string]string),
 	}
 }
 
@@ -111,32 +131,64 @@ func (vm *VMClient) Initialize(
 
 	vm.ctx = ctx
 
+	// Register metrics
+	registerer := prometheus.NewRegistry()
+	multiGatherer := metrics.NewMultiGatherer()
+	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
+	if err := registerer.Register(vm.grpcServerMetrics); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("", vm); err != nil {
+		return err
+	}
+
 	// Initialize and serve each database and construct the db manager
 	// initialize request parameters
 	versionedDBs := dbManager.GetDatabases()
-	versionedDBServers := make([]*vmproto.VersionedDBServer, len(versionedDBs))
+	versionedDBServers := make([]*vmpb.VersionedDBServer, len(versionedDBs))
 	for i, semDB := range versionedDBs {
-		dbBrokerID := vm.broker.NextId()
 		db := rpcdb.NewServer(semDB.Database)
-		go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServerFunc(db))
-		versionedDBServers[i] = &vmproto.VersionedDBServer{
-			DbServer: dbBrokerID,
-			Version:  semDB.Version.String(),
+		dbVersion := semDB.Version.String()
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return err
+		}
+		serverAddr := serverListener.Addr().String()
+		// Register gRPC server for health checks
+		vm.grpcHealthChecks[fmt.Sprintf("database-%s", dbVersion)] = serverAddr
+
+		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
+		vm.ctx.Log.Info("grpc: serving database version: %s on: %s", dbVersion, serverAddr)
+
+		versionedDBServers[i] = &vmpb.VersionedDBServer{
+			ServerAddr: serverAddr,
+			Version:    dbVersion,
 		}
 	}
 
 	vm.messenger = messenger.NewServer(toEngine)
-	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
+	vm.keystore = gkeystore.NewServer(ctx.Keystore)
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current().Database)
 	vm.bcLookup = galiasreader.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 
-	// start the gRPC init server
-	initServerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(initServerID, vm.startInitServer)
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return err
+	}
+	serverAddr := serverListener.Addr().String()
 
-	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
+	// Register gRPC server for health checks
+	vm.grpcHealthChecks["vm"] = serverAddr
+
+	go grpcutils.Serve(serverListener, vm.getInitServer)
+	vm.ctx.Log.Info("grpc: serving vm services on: %s", serverAddr)
+
+	resp, err := vm.client.Initialize(context.Background(), &vmpb.InitializeRequest{
 		NetworkId:    ctx.NetworkID,
 		SubnetId:     ctx.SubnetID[:],
 		ChainId:      ctx.ChainID[:],
@@ -147,7 +199,7 @@ func (vm *VMClient) Initialize(
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,
 		DbServers:    versionedDBServers,
-		InitServer:   initServerID,
+		ServerAddr:   serverAddr,
 	})
 	if err != nil {
 		return err
@@ -182,15 +234,6 @@ func (vm *VMClient) Initialize(
 		time:     timestamp,
 	}
 
-	registerer := prometheus.NewRegistry()
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
-		return err
-	}
-	if err := multiGatherer.Register("", vm); err != nil {
-		return err
-	}
-
 	chainState, err := chain.NewMeteredState(
 		registerer,
 		&chain.Config{
@@ -212,41 +255,80 @@ func (vm *VMClient) Initialize(
 	return vm.ctx.Metrics.Register(multiGatherer)
 }
 
-func (vm *VMClient) startDBServerFunc(db rpcdbproto.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
+func (vm *VMClient) getDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
 	return func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts, serverOptions...)
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
+
+		// Collect gRPC serving metrics
+		opts = append(opts, grpc.UnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()))
+		opts = append(opts, grpc.StreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()))
+
 		server := grpc.NewServer(opts...)
+
+		grpcHealth := health.NewServer()
+		// The server should use an empty string as the key for server's overall
+		// health status.
+		// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+		grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
 		vm.serverCloser.Add(server)
 
-		rpcdbproto.RegisterDatabaseServer(server, db)
+		// register database service
+		rpcdbpb.RegisterDatabaseServer(server, db)
+		// register health service
+		healthpb.RegisterHealthServer(server, grpcHealth)
+
+		// Ensure metric counters are zeroed on restart
+		grpc_prometheus.Register(server)
 
 		return server
 	}
 }
 
-func (vm *VMClient) startInitServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
+func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
+	if len(opts) == 0 {
+		opts = append(opts, grpcutils.DefaultServerOptions...)
+	}
+
+	// Collect gRPC serving metrics
+	opts = append(opts, grpc.UnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()))
+	opts = append(opts, grpc.StreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()))
+
 	server := grpc.NewServer(opts...)
+
+	grpcHealth := health.NewServer()
+	// The server should use an empty string as the key for server's overall
+	// health status.
+	// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+	grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
 	vm.serverCloser.Add(server)
 
 	// register the messenger service
-	messengerproto.RegisterMessengerServer(server, vm.messenger)
+	messengerpb.RegisterMessengerServer(server, vm.messenger)
 	// register the keystore service
-	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
+	keystorepb.RegisterKeystoreServer(server, vm.keystore)
 	// register the shared memory service
-	gsharedmemoryproto.RegisterSharedMemoryServer(server, vm.sharedMemory)
+	sharedmemorypb.RegisterSharedMemoryServer(server, vm.sharedMemory)
 	// register the blockchain alias service
-	galiasreaderproto.RegisterAliasReaderServer(server, vm.bcLookup)
+	aliasreaderpb.RegisterAliasReaderServer(server, vm.bcLookup)
 	// register the subnet alias service
-	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
-	// register the AppSender service
-	appsenderproto.RegisterAppSenderServer(server, vm.appSender)
+	subnetlookuppb.RegisterSubnetLookupServer(server, vm.snLookup)
+	// register the app sender service
+	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
+	// register the health service
+	healthpb.RegisterHealthServer(server, grpcHealth)
+
+	// Ensure metric counters are zeroed on restart
+	grpc_prometheus.Register(server)
 
 	return server
 }
 
 func (vm *VMClient) SetState(state snow.State) error {
-	_, err := vm.client.SetState(context.Background(), &vmproto.SetStateRequest{
+	_, err := vm.client.SetState(context.Background(), &vmpb.SetStateRequest{
 		State: uint32(state),
 	})
 
@@ -275,15 +357,15 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil
@@ -297,15 +379,15 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil
@@ -344,7 +426,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 }
 
 func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
-	resp, err := vm.client.ParseBlock(context.Background(), &vmproto.ParseBlockRequest{
+	resp, err := vm.client.ParseBlock(context.Background(), &vmpb.ParseBlockRequest{
 		Bytes: bytes,
 	})
 	if err != nil {
@@ -385,7 +467,7 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 }
 
 func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
-	resp, err := vm.client.GetBlock(context.Background(), &vmproto.GetBlockRequest{
+	resp, err := vm.client.GetBlock(context.Background(), &vmpb.GetBlockRequest{
 		Id: id[:],
 	})
 	if err != nil {
@@ -421,17 +503,20 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 }
 
 func (vm *VMClient) SetPreference(id ids.ID) error {
-	_, err := vm.client.SetPreference(context.Background(), &vmproto.SetPreferenceRequest{
+	_, err := vm.client.SetPreference(context.Background(), &vmpb.SetPreferenceRequest{
 		Id: id[:],
 	})
 	return err
 }
 
 func (vm *VMClient) HealthCheck() (interface{}, error) {
-	return vm.client.Health(
-		context.Background(),
-		&emptypb.Empty{},
-	)
+	resp, err := vm.client.Health(context.Background(), &vmpb.HealthRequest{
+		GrpcChecks: vm.grpcHealthChecks,
+	})
+	if err != nil {
+		vm.ctx.Log.Warn("health check failed: %v", err)
+	}
+	return resp, err
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
@@ -441,7 +526,7 @@ func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline ti
 	}
 	_, err = vm.client.AppRequest(
 		context.Background(),
-		&vmproto.AppRequestMsg{
+		&vmpb.AppRequestMsg{
 			NodeId:    nodeID[:],
 			RequestId: requestID,
 			Request:   request,
@@ -454,7 +539,7 @@ func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline ti
 func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	_, err := vm.client.AppResponse(
 		context.Background(),
-		&vmproto.AppResponseMsg{
+		&vmpb.AppResponseMsg{
 			NodeId:    nodeID[:],
 			RequestId: requestID,
 			Response:  response,
@@ -466,7 +551,7 @@ func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response [
 func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	_, err := vm.client.AppRequestFailed(
 		context.Background(),
-		&vmproto.AppRequestFailedMsg{
+		&vmpb.AppRequestFailedMsg{
 			NodeId:    nodeID[:],
 			RequestId: requestID,
 		},
@@ -477,7 +562,7 @@ func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
 func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		context.Background(),
-		&vmproto.AppGossipMsg{
+		&vmpb.AppGossipMsg{
 			NodeId: nodeID[:],
 			Msg:    msg,
 		},
@@ -499,7 +584,7 @@ func (vm *VMClient) VerifyHeightIndex() error {
 func (vm *VMClient) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	resp, err := vm.client.GetBlockIDAtHeight(
 		context.Background(),
-		&vmproto.GetBlockIDAtHeightRequest{Height: height},
+		&vmpb.GetBlockIDAtHeightRequest{Height: height},
 	)
 	if err != nil {
 		return ids.Empty, err
@@ -516,7 +601,7 @@ func (vm *VMClient) GetAncestors(
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	resp, err := vm.client.GetAncestors(context.Background(), &vmproto.GetAncestorsRequest{
+	resp, err := vm.client.GetAncestors(context.Background(), &vmpb.GetAncestorsRequest{
 		BlkId:                 blkID[:],
 		MaxBlocksNum:          int32(maxBlocksNum),
 		MaxBlocksSize:         int32(maxBlocksSize),
@@ -529,7 +614,7 @@ func (vm *VMClient) GetAncestors(
 }
 
 func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, error) {
-	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmproto.BatchedParseBlockRequest{
+	resp, err := vm.client.BatchedParseBlock(context.Background(), &vmpb.BatchedParseBlockRequest{
 		Request: blksBytes,
 	})
 	if err != nil {
@@ -589,7 +674,7 @@ func (vm *VMClient) Version() (string, error) {
 }
 
 func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
-	_, err := vm.client.Connected(context.Background(), &vmproto.ConnectedRequest{
+	_, err := vm.client.Connected(context.Background(), &vmpb.ConnectedRequest{
 		NodeId:  nodeID[:],
 		Version: nodeVersion.String(),
 	})
@@ -597,7 +682,7 @@ func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Applicatio
 }
 
 func (vm *VMClient) Disconnected(nodeID ids.ShortID) error {
-	_, err := vm.client.Disconnected(context.Background(), &vmproto.DisconnectedRequest{
+	_, err := vm.client.Disconnected(context.Background(), &vmpb.DisconnectedRequest{
 		NodeId: nodeID[:],
 	})
 	return err
@@ -619,7 +704,7 @@ func (b *BlockClient) ID() ids.ID { return b.id }
 
 func (b *BlockClient) Accept() error {
 	b.status = choices.Accepted
-	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
+	_, err := b.vm.client.BlockAccept(context.Background(), &vmpb.BlockAcceptRequest{
 		Id: b.id[:],
 	})
 	return err
@@ -627,7 +712,7 @@ func (b *BlockClient) Accept() error {
 
 func (b *BlockClient) Reject() error {
 	b.status = choices.Rejected
-	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
+	_, err := b.vm.client.BlockReject(context.Background(), &vmpb.BlockRejectRequest{
 		Id: b.id[:],
 	})
 	return err
@@ -640,7 +725,7 @@ func (b *BlockClient) Parent() ids.ID {
 }
 
 func (b *BlockClient) Verify() error {
-	resp, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
+	resp, err := b.vm.client.BlockVerify(context.Background(), &vmpb.BlockVerifyRequest{
 		Bytes: b.bytes,
 	})
 	if err != nil {

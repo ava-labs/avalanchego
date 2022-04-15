@@ -5,17 +5,16 @@ package hashing
 
 import (
 	"crypto/sha256"
-	"errors"
+	"fmt"
 	"io"
 
 	"golang.org/x/crypto/ripemd160"
 )
 
-var errBadLength = errors.New("input has insufficient length")
-
-const HashLen = sha256.Size
-
-const AddrLen = ripemd160.Size
+const (
+	HashLen = sha256.Size
+	AddrLen = ripemd160.Size
+)
 
 // Hash256 A 256 bit long hash value.
 type Hash256 = [HashLen]byte
@@ -83,8 +82,8 @@ func Checksum(bytes []byte, length int) []byte {
 
 func ToHash256(bytes []byte) (Hash256, error) {
 	hash := Hash256{}
-	if len(bytes) != HashLen {
-		return hash, errBadLength
+	if bytesLen := len(bytes); bytesLen != HashLen {
+		return hash, fmt.Errorf("expected 32 bytes but got %d", bytesLen)
 	}
 	copy(hash[:], bytes)
 	return hash, nil
@@ -92,8 +91,8 @@ func ToHash256(bytes []byte) (Hash256, error) {
 
 func ToHash160(bytes []byte) (Hash160, error) {
 	hash := Hash160{}
-	if len(bytes) != ripemd160.Size {
-		return hash, errBadLength
+	if bytesLen := len(bytes); bytesLen != ripemd160.Size {
+		return hash, fmt.Errorf("expected 20 bytes but got %d", bytesLen)
 	}
 	copy(hash[:], bytes)
 	return hash, nil

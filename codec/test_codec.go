@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -9,7 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/chain4travel/caminogo/utils/wrappers"
 )
 
 var Tests = []func(c GeneralCodec, t testing.TB){
@@ -37,6 +50,10 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestRestrictedSlice,
 	TestExtraSpace,
 	TestSliceLengthOverflow,
+}
+
+var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
+	TestMultipleTags,
 }
 
 // The below structs and interfaces exist
@@ -994,5 +1011,52 @@ func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 	s := inner{}
 	if _, err := manager.Unmarshal(bytes, &s); err == nil {
 		t.Fatalf("Should have errored due to large of a slice")
+	}
+}
+
+type MultipleVersionsStruct struct {
+	BothTags    string `tag1:"true" tag2:"true"`
+	SingleTag1  string `tag1:"true"`
+	SingleTag2  string `tag2:"true"`
+	EitherTags1 string `tag1:"false" tag2:"true"`
+	EitherTags2 string `tag1:"true" tag2:"false"`
+	NoTags      string `tag1:"false" tag2:"false"`
+}
+
+func TestMultipleTags(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
+	// received codec is expected to have both v1 and v2 registered as tags
+	inputs := MultipleVersionsStruct{
+		BothTags:    "both Tags",
+		SingleTag1:  "Only Tag1",
+		SingleTag2:  "Only Tag2",
+		EitherTags1: "Tag2 is false",
+		EitherTags2: "Tag1 is false",
+		NoTags:      "Neither Tag",
+	}
+
+	manager := NewDefaultManager()
+	for _, codecVersion := range []uint16{0, 1, 2022} {
+		if err := manager.RegisterCodec(codecVersion, codec); err != nil {
+			t.Fatal(err)
+		}
+
+		bytes, err := manager.Marshal(codecVersion, inputs)
+		if err != nil {
+			t.Fatalf("Could not marshal struct")
+		}
+
+		output := MultipleVersionsStruct{}
+		if _, err := manager.Unmarshal(bytes, &output); err != nil {
+			t.Fatalf("Could not unmarshal struct")
+		}
+
+		assert.True(t, inputs.BothTags == output.BothTags)
+		assert.True(t, inputs.SingleTag1 == output.SingleTag1)
+		assert.True(t, inputs.SingleTag2 == output.SingleTag2)
+		assert.True(t, inputs.EitherTags1 == output.EitherTags1)
+		assert.True(t, inputs.EitherTags2 == output.EitherTags2)
+		assert.True(t, len(output.NoTags) == 0)
 	}
 }

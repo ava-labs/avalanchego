@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -6,12 +17,12 @@ package platformvm
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/chain4travel/caminogo/chains"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/uptime"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/vms/platformvm/reward"
 )
 
 // Factory can create new instances of the Platform Chain

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,9 +19,9 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/chain4travel/caminogo/codec"
+	"github.com/chain4travel/caminogo/codec/reflectcodec"
+	"github.com/chain4travel/caminogo/utils/wrappers"
 )
 
 const (
@@ -50,19 +61,19 @@ type hierarchyCodec struct {
 }
 
 // New returns a new, concurrency-safe codec
-func New(tagName string, maxSliceLen uint32) Codec {
+func New(tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &hierarchyCodec{
 		currentGroupID: 0,
 		nextTypeID:     0,
 		typeIDToType:   map[typeID]reflect.Type{},
 		typeToTypeID:   map[reflect.Type]typeID{},
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagName, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
 	return hCodec
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(reflectcodec.DefaultTagName, defaultMaxSliceLength) }
+func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
 
 // SkipRegistrations some number of type IDs
 func (c *hierarchyCodec) SkipRegistrations(num int) {

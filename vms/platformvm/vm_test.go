@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -14,44 +25,44 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/handler"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/chain4travel/caminogo/chains"
+	"github.com/chain4travel/caminogo/chains/atomic"
+	"github.com/chain4travel/caminogo/database"
+	"github.com/chain4travel/caminogo/database/manager"
+	"github.com/chain4travel/caminogo/database/prefixdb"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowball"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/common/queue"
+	"github.com/chain4travel/caminogo/snow/engine/common/tracker"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/bootstrap"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
+	"github.com/chain4travel/caminogo/snow/networking/handler"
+	"github.com/chain4travel/caminogo/snow/networking/router"
+	"github.com/chain4travel/caminogo/snow/networking/sender"
+	"github.com/chain4travel/caminogo/snow/networking/timeout"
+	"github.com/chain4travel/caminogo/snow/uptime"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/crypto"
+	"github.com/chain4travel/caminogo/utils/formatting"
+	"github.com/chain4travel/caminogo/utils/json"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/timer"
+	"github.com/chain4travel/caminogo/utils/units"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/version"
+	"github.com/chain4travel/caminogo/vms/components/avax"
+	"github.com/chain4travel/caminogo/vms/platformvm/reward"
+	"github.com/chain4travel/caminogo/vms/platformvm/status"
+	"github.com/chain4travel/caminogo/vms/secp256k1fx"
 
-	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
-	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	smcon "github.com/chain4travel/caminogo/snow/consensus/snowman"
+	smeng "github.com/chain4travel/caminogo/snow/engine/snowman"
+	snowgetter "github.com/chain4travel/caminogo/snow/engine/snowman/getter"
 )
 
 var (
@@ -430,7 +441,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	appSender := &common.SenderTest{}
+	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
@@ -2009,9 +2020,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	beacons := vdrs
 
-	timeoutManager := timeout.Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err = timeoutManager.Initialize(
+	timeoutManager, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -2032,7 +2042,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
@@ -2044,12 +2054,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		mc,
 		externalSender,
 		chainRouter,
-		&timeoutManager,
+		timeoutManager,
 		sender.GossipConfig{
-			AcceptedFrontierSize:      1,
-			OnAcceptSize:              1,
-			AppGossipNonValidatorSize: 1,
+			AcceptedFrontierPeerSize:  1,
+			OnAcceptPeerSize:          1,
 			AppGossipValidatorSize:    1,
+			AppGossipNonValidatorSize: 1,
 		},
 	)
 	assert.NoError(t, err)

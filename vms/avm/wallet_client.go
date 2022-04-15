@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -7,12 +18,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/chain4travel/caminogo/api"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/formatting"
+	cjson "github.com/chain4travel/caminogo/utils/json"
+	"github.com/chain4travel/caminogo/utils/rpc"
 )
 
 // Interface compliance
@@ -21,7 +32,7 @@ var _ WalletClient = &client{}
 // interface of an AVM wallet client for interacting with avm managed wallet on [chain]
 type WalletClient interface {
 	// IssueTx issues a transaction to a node and returns the TxID
-	IssueTx(ctx context.Context, tx []byte) (ids.ID, error)
+	IssueTx(ctx context.Context, tx []byte, options ...rpc.Option) (ids.ID, error)
 	// Send [amount] of [assetID] to address [to]
 	Send(
 		ctx context.Context,
@@ -32,6 +43,7 @@ type WalletClient interface {
 		assetID,
 		to,
 		memo string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendMultiple sends a transaction from [user] funding all [outputs]
 	SendMultiple(
@@ -41,6 +53,7 @@ type WalletClient interface {
 		changeAddr string,
 		outputs []SendOutput,
 		memo string,
+		options ...rpc.Option,
 	) (ids.ID, error)
 }
 
@@ -56,7 +69,7 @@ func NewWalletClient(uri, chain string) WalletClient {
 	}
 }
 
-func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
+func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
@@ -65,7 +78,7 @@ func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, err
 	err = c.requester.SendRequest(ctx, "issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -78,6 +91,7 @@ func (c *walletClient) Send(
 	assetID,
 	to,
 	memo string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "send", &SendArgs{
@@ -92,7 +106,7 @@ func (c *walletClient) Send(
 			To:      to,
 		},
 		Memo: memo,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }
 
@@ -103,6 +117,7 @@ func (c *walletClient) SendMultiple(
 	changeAddr string,
 	outputs []SendOutput,
 	memo string,
+	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
@@ -113,6 +128,6 @@ func (c *walletClient) SendMultiple(
 		},
 		Outputs: outputs,
 		Memo:    memo,
-	}, res)
+	}, res, options...)
 	return res.TxID, err
 }

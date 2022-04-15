@@ -1,11 +1,9 @@
 name: Static analysis
 on:
-  push:
+  pull-request:
     tags-ignore:
       - "*" # Ignores all tags
-    branches-ignore:
-      - master
-      - dev
+    branches: [chain4travel]
 
 jobs:
   run_static_analysis:
@@ -13,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Go
         uses: actions/setup-go@v2
         with:

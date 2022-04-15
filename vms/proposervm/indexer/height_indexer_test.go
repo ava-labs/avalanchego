@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -9,15 +20,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/state"
+	"github.com/chain4travel/caminogo/database"
+	"github.com/chain4travel/caminogo/database/memdb"
+	"github.com/chain4travel/caminogo/database/versiondb"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/vms/proposervm/block"
+	"github.com/chain4travel/caminogo/vms/proposervm/state"
 	"github.com/stretchr/testify/assert"
 )
 

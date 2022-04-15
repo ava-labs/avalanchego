@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -9,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
 	"os"
@@ -19,31 +29,31 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/runner"
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/ipcs"
-	"github.com/ava-labs/avalanchego/nat"
-	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/dynamicip"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/password"
-	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/utils/storage"
-	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms"
+	"github.com/chain4travel/caminogo/app/runner"
+	"github.com/chain4travel/caminogo/chains"
+	"github.com/chain4travel/caminogo/genesis"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/ipcs"
+	"github.com/chain4travel/caminogo/nat"
+	"github.com/chain4travel/caminogo/network"
+	"github.com/chain4travel/caminogo/network/dialer"
+	"github.com/chain4travel/caminogo/network/throttling"
+	"github.com/chain4travel/caminogo/node"
+	"github.com/chain4travel/caminogo/snow/consensus/avalanche"
+	"github.com/chain4travel/caminogo/snow/consensus/snowball"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
+	"github.com/chain4travel/caminogo/snow/networking/router"
+	"github.com/chain4travel/caminogo/snow/networking/sender"
+	"github.com/chain4travel/caminogo/staking"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/dynamicip"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/password"
+	"github.com/chain4travel/caminogo/utils/profiler"
+	"github.com/chain4travel/caminogo/utils/storage"
+	"github.com/chain4travel/caminogo/utils/timer"
+	"github.com/chain4travel/caminogo/vms"
 )
 
 const (
@@ -81,7 +91,7 @@ func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
 	// Build directory should have this structure:
 	//
 	// build
-	// ├── avalanchego (the binary from compiling the app directory)
+	// ├── caminogo (the binary from compiling the app directory)
 	// └── plugins
 	//     └── evm
 	validBuildDir := func(dir string) bool {
@@ -151,6 +161,7 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 		return loggingConfig, err
 	}
 	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.DisableWriterDisplaying = v.GetBool(LogDisableDisplayPluginLogsKey)
 	return loggingConfig, err
 }
 
@@ -166,7 +177,7 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 		config.APIAuthPassword = v.GetString(APIAuthPasswordKey)
 	} else {
 		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
-		passwordBytes, err := ioutil.ReadFile(passwordFilePath)
+		passwordBytes, err := os.ReadFile(passwordFilePath)
 		if err != nil {
 			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
 		}
@@ -208,7 +219,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSKeyFileKey):
 		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
-		if httpsKey, err = ioutil.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+		if httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -222,7 +233,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSCertFileKey):
 		httpsCertFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
-		if httpsCert, err = ioutil.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
+		if httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -303,10 +314,15 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 
 func getGossipConfig(v *viper.Viper) sender.GossipConfig {
 	return sender.GossipConfig{
-		AcceptedFrontierSize:      uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-		OnAcceptSize:              uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		AppGossipNonValidatorSize: uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
-		AppGossipValidatorSize:    uint(v.GetUint32(AppGossipValidatorSizeKey)),
+		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
+		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
+		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
+		OnAcceptValidatorSize:            uint(v.GetUint32(ConsensusGossipOnAcceptValidatorSizeKey)),
+		OnAcceptNonValidatorSize:         uint(v.GetUint32(ConsensusGossipOnAcceptNonValidatorSizeKey)),
+		OnAcceptPeerSize:                 uint(v.GetUint32(ConsensusGossipOnAcceptPeerSizeKey)),
+		AppGossipValidatorSize:           uint(v.GetUint32(AppGossipValidatorSizeKey)),
+		AppGossipNonValidatorSize:        uint(v.GetUint32(AppGossipNonValidatorSizeKey)),
+		AppGossipPeerSize:                uint(v.GetUint32(AppGossipPeerSizeKey)),
 	}
 }
 
@@ -369,6 +385,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			PeerListNumValidatorIPs:        v.GetUint32(NetworkPeerListNumValidatorIPsKey),
 			PeerListValidatorGossipSize:    v.GetUint32(NetworkPeerListValidatorGossipSizeKey),
 			PeerListNonValidatorGossipSize: v.GetUint32(NetworkPeerListNonValidatorGossipSizeKey),
+			PeerListPeersGossipSize:        v.GetUint32(NetworkPeerListPeersGossipSizeKey),
 			PeerListGossipFreq:             v.GetDuration(NetworkPeerListGossipFreqKey),
 		},
 
@@ -634,7 +651,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		return node.StakingConfig{}, errInvalidStakerWeights
 	}
 
-	if !config.EnableStaking && (networkID == constants.MainnetID || networkID == constants.FujiID) {
+	if !config.EnableStaking && constants.IsActiveNetwork(networkID) {
 		return node.StakingConfig{}, errStakingDisableOnPublicNetwork
 	}
 
@@ -643,7 +660,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	if err != nil {
 		return node.StakingConfig{}, err
 	}
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
+	if !constants.IsActiveNetwork(networkID) {
 		config.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
 		config.MaxValidatorStake = v.GetUint64(MaxValidatorStakeKey)
@@ -678,7 +695,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 }
 
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
+	if !constants.IsActiveNetwork(networkID) {
 		return genesis.TxFeeConfig{
 			TxFee:                 v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:      v.GetUint64(CreateAssetTxFeeKey),
@@ -738,7 +755,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		}
 	} else if v.IsSet(DBConfigFileKey) {
 		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
-		configBytes, err = ioutil.ReadFile(path)
+		configBytes, err = os.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
 		}
@@ -777,7 +794,7 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 			return nil, nil
 		}
 
-		fileBytes, err = ioutil.ReadFile(aliasFilePath)
+		fileBytes, err = os.ReadFile(aliasFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -973,7 +990,7 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 		}
 
 		// subnetConfigDir/subnetID.json
-		file, err := ioutil.ReadFile(filePath)
+		file, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, err
 		}

@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,15 +18,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/formatting"
+	"github.com/chain4travel/caminogo/utils/wrappers"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/chain4travel/caminogo/utils/math"
 )
 
 type LockedAmount struct {
@@ -142,13 +152,13 @@ func (c *Config) InitialSupply() (uint64, error) {
 }
 
 var (
-	// MainnetConfig is the config that should be used to generate the mainnet
-	// genesis.
-	MainnetConfig Config
+	// CaminoConfig is the config that should be used to generate the camino
+	// mainnet genesis.
+	CaminoConfig Config
 
-	// FujiConfig is the config that should be used to generate the fuji
+	// ColumbusConfig is the config that should be used to generate the columbus
 	// genesis.
-	FujiConfig Config
+	ColumbusConfig Config
 
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
@@ -156,27 +166,27 @@ var (
 )
 
 func init() {
-	unparsedMainnetConfig := UnparsedConfig{}
-	unparsedFujiConfig := UnparsedConfig{}
+	unparsedCaminoConfig := UnparsedConfig{}
+	unparsedColumbusConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		json.Unmarshal([]byte(mainnetGenesisConfigJSON), &unparsedMainnetConfig),
-		json.Unmarshal([]byte(fujiGenesisConfigJSON), &unparsedFujiConfig),
+		json.Unmarshal([]byte(caminoGenesisConfigJSON), &unparsedCaminoConfig),
+		json.Unmarshal([]byte(columbusGenesisConfigJSON), &unparsedColumbusConfig),
 		json.Unmarshal([]byte(localGenesisConfigJSON), &unparsedLocalConfig),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
 
-	mainnetConfig, err := unparsedMainnetConfig.Parse()
+	caminoConfig, err := unparsedCaminoConfig.Parse()
 	errs.Add(err)
-	MainnetConfig = mainnetConfig
+	CaminoConfig = caminoConfig
 
-	fujiConfig, err := unparsedFujiConfig.Parse()
+	columbusConfig, err := unparsedColumbusConfig.Parse()
 	errs.Add(err)
-	FujiConfig = fujiConfig
+	ColumbusConfig = columbusConfig
 
 	localConfig, err := unparsedLocalConfig.Parse()
 	errs.Add(err)
@@ -189,10 +199,10 @@ func init() {
 
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
-	case constants.MainnetID:
-		return &MainnetConfig
-	case constants.FujiID:
-		return &FujiConfig
+	case constants.CaminoID:
+		return &CaminoConfig
+	case constants.ColumbusID:
+		return &ColumbusConfig
 	case constants.LocalID:
 		return &LocalConfig
 	default:
@@ -204,7 +214,7 @@ func GetConfig(networkID uint32) *Config {
 
 // GetConfigFile loads a *Config from a provided filepath.
 func GetConfigFile(fp string) (*Config, error) {
-	bytes, err := ioutil.ReadFile(filepath.Clean(fp))
+	bytes, err := os.ReadFile(filepath.Clean(fp))
 	if err != nil {
 		return nil, fmt.Errorf("unable to load file %s: %w", fp, err)
 	}

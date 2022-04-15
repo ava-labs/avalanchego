@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -6,12 +17,12 @@ package version
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/chain4travel/caminogo/utils/constants"
 )
 
 // These are globals that describe network upgrades and node versions
 var (
-	Current                      = NewDefaultVersion(1, 7, 8)
+	Current                      = NewDefaultVersion(1, 7, 10)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 7, 0)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 6, 0)

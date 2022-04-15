@@ -1,0 +1,10 @@
+- name: Reload systemd
+  become: true
+  systemd:
+    daemon_reload: true
+
+- name: Restart Camino service
+  become: true
+  service:
+    name: "{{ camino_daemon_service_name }}"
+    state: restarted

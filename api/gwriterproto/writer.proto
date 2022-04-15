@@ -1,6 +1,6 @@
 syntax = "proto3";
 package gwriterproto;
-option go_package = "github.com/ava-labs/avalanchego/api/gwriterproto";
+option go_package = "github.com/chain4travel/caminogo/api/gwriterproto";
 
 // Writer see: io.Writer https://pkg.go.dev/io#Writer
 service Writer {

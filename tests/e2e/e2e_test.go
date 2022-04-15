@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -15,15 +26,16 @@ import (
 
 	"github.com/onsi/gomega"
 
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
+	runner_client "github.com/chain4travel/camino-network-runner/client"
 
-	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/chain4travel/caminogo/tests"
+	"github.com/chain4travel/caminogo/tests/e2e"
 
 	// ensure test packages are scanned by ginkgo
-	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/whitelist-vtx"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+	_ "github.com/chain4travel/caminogo/tests/e2e/ping"
+	_ "github.com/chain4travel/caminogo/tests/e2e/static-handlers"
+	_ "github.com/chain4travel/caminogo/tests/e2e/whitelist-vtx"
+	_ "github.com/chain4travel/caminogo/tests/e2e/x/transfer"
 )
 
 func TestE2E(t *testing.T) {
@@ -32,8 +44,8 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	logLevel            string
-	avalanchegoLogLevel string
+	logLevel         string
+	caminogoLogLevel string
 
 	networkRunnerGRPCEp string
 	execPath            string
@@ -52,10 +64,10 @@ func init() {
 		"log level",
 	)
 	flag.StringVar(
-		&avalanchegoLogLevel,
-		"avalanchego-log-level",
+		&caminogoLogLevel,
+		"caminogo-log-level",
 		"INFO",
-		"avalanchegoLogLevel log level (optional, only required for local network-runner)",
+		"caminogoLogLevel log level (optional, only required for local network-runner)",
 	)
 
 	flag.StringVar(
@@ -66,9 +78,9 @@ func init() {
 	)
 	flag.StringVar(
 		&execPath,
-		"avalanchego-path",
+		"caminogo-path",
 		"",
-		"[optional] avalanchego executable path (only required for local network-runner tests)",
+		"[optional] caminogo executable path (only required for local network-runner tests)",
 	)
 
 	// TODO: set timestamp on the test network machines to be more realistic
@@ -110,7 +122,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", execPath)
 		ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
-		resp, err := runnerCli.Start(ctx, execPath, runner_client.WithLogLevel(avalanchegoLogLevel))
+		resp, err := runnerCli.Start(ctx, execPath, runner_client.WithLogLevel(caminogoLogLevel))
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
 		tests.Outf("{{green}}successfully started network-runner :{{/}} %+v\n", resp.ClusterInfo.NodeNames)

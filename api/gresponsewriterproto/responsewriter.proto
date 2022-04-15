@@ -1,6 +1,6 @@
 syntax = "proto3";
 package gresponsewriterproto;
-option go_package = "github.com/ava-labs/avalanchego/api/gresponsewriterproto";
+option go_package = "github.com/chain4travel/caminogo/api/gresponsewriterproto";
 import "google/protobuf/empty.proto";
 
 // Writer is an http.ResponseWriter see: https://pkg.go.dev/net/http#ResponseWriter

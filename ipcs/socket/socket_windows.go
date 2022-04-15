@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 //go:build windows
 // +build windows
 
@@ -10,7 +21,7 @@ import (
 	"net"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/chain4travel/caminogo/utils/constants"
 )
 
 // listen creates a net.Listen backed by a Windows named pipe

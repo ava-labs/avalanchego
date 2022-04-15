@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -17,21 +28,21 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/health"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/chain4travel/caminogo/api/health"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/network/dialer"
+	"github.com/chain4travel/caminogo/network/peer"
+	"github.com/chain4travel/caminogo/network/throttling"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
+	"github.com/chain4travel/caminogo/snow/networking/router"
+	"github.com/chain4travel/caminogo/snow/networking/sender"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/math"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/version"
 )
 
 const (
@@ -42,9 +53,9 @@ const (
 )
 
 var (
-	errNoPrimaryValidators = errors.New("no default subnet validators")
-
-	_ Network = &network{}
+	_                      sender.ExternalSender = &network{}
+	_                      Network               = &network{}
+	errNoPrimaryValidators                       = errors.New("no default subnet validators")
 )
 
 // Network defines the functionality of the networking library.
@@ -186,7 +197,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}
 
-	metrics, err := newMetrics(config.Namespace, metricsRegisterer)
+	metrics, err := newMetrics(config.Namespace, metricsRegisterer, config.WhitelistedSubnets)
 	if err != nil {
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
@@ -256,8 +267,9 @@ func (n *network) Gossip(
 	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
+	numPeersToSend int,
 ) ids.ShortSet {
-	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
+	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
 	return n.send(msg, peers)
 }
 
@@ -346,8 +358,7 @@ func (n *network) Connected(nodeID ids.ShortID) {
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
 
-	n.metrics.numPeers.Inc()
-	n.metrics.connected.Inc()
+	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
 	n.router.Connected(nodeID, peerVersion)
@@ -634,18 +645,31 @@ func (n *network) samplePeers(
 	validatorOnly bool,
 	numValidatorsToSample,
 	numNonValidatorsToSample int,
+	numPeersToSample int,
 ) []peer.Peer {
 	if validatorOnly {
-		numValidatorsToSample += numNonValidatorsToSample
+		numValidatorsToSample += numNonValidatorsToSample + numPeersToSample
 		numNonValidatorsToSample = 0
+		numPeersToSample = 0
 	}
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
 	return n.connectedPeers.Sample(
-		numValidatorsToSample+numNonValidatorsToSample,
+		numValidatorsToSample+numNonValidatorsToSample+numPeersToSample,
 		func(p peer.Peer) bool {
+			// Only return peers that are tracking [subnetID]
+			trackedSubnets := p.TrackedSubnets()
+			if !trackedSubnets.Contains(subnetID) {
+				return false
+			}
+
+			if numPeersToSample > 0 {
+				numPeersToSample--
+				return true
+			}
+
 			if n.config.Validators.Contains(subnetID, p.ID()) {
 				numValidatorsToSample--
 				return numValidatorsToSample >= 0
@@ -728,12 +752,11 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 		delete(n.trackedIPs, nodeID)
 	}
 
-	n.metrics.numPeers.Dec()
-	n.metrics.disconnected.Inc()
+	n.metrics.markDisconnected(peer)
 }
 
 func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
+	if !n.config.AllowPrivateIPs && ip.IPDesc.IP.IsPrivate() {
 		n.peerConfig.Log.Verbo(
 			"dropping suggested connected to %s%s because the ip (%s) is private",
 			constants.NodeIDPrefix, nodeID,
@@ -1073,6 +1096,7 @@ func (n *network) runTimers() {
 				false,
 				int(n.config.PeerListValidatorGossipSize),
 				int(n.config.PeerListNonValidatorGossipSize),
+				int(n.config.PeerListPeersGossipSize),
 			)
 
 		case <-updateUptimes.C:

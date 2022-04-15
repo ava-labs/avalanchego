@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -6,13 +17,13 @@ package snowman
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/metric"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/chain4travel/caminogo/utils/metric"
+	"github.com/chain4travel/caminogo/utils/wrappers"
 )
 
 type metrics struct {
 	bootstrapFinished, numRequests, numBlocked, numBlockers, numNonVerifieds prometheus.Gauge
-	numBuilt, numBuildsFailed                                                prometheus.Counter
+	numBuilt, numBuildsFailed, numUselessPutBytes, numUselessPushQueryBytes  prometheus.Counter
 	getAncestorsBlks                                                         metric.Averager
 }
 
@@ -49,6 +60,16 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blk_builds_failed",
 		Help:      "Number of BuildBlock calls that have failed",
 	})
+	m.numUselessPutBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_useless_put_bytes",
+		Help:      "Amount of useless bytes received in Put messages",
+	})
+	m.numUselessPushQueryBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_useless_push_query_bytes",
+		Help:      "Amount of useless bytes received in PushQuery messages",
+	})
 	m.getAncestorsBlks = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_blks",
@@ -67,9 +88,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.numRequests),
 		reg.Register(m.numBlocked),
 		reg.Register(m.numBlockers),
+		reg.Register(m.numNonVerifieds),
 		reg.Register(m.numBuilt),
 		reg.Register(m.numBuildsFailed),
-		reg.Register(m.numNonVerifieds),
+		reg.Register(m.numUselessPutBytes),
+		reg.Register(m.numUselessPushQueryBytes),
 	)
 	return errs.Err
 }

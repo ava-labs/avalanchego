@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -10,13 +21,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms"
+	"github.com/chain4travel/caminogo/api/server"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/block/mocks"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/vms"
 )
 
 var id = ids.GenerateTestID()
@@ -100,7 +111,7 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// We fail to create an endpoint for the handler
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(errOops)
 
@@ -124,7 +135,7 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// Registering the route fails
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errOops)
@@ -149,7 +160,7 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
@@ -178,7 +189,7 @@ func TestRegisterHappyCase(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
@@ -269,7 +280,7 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// We fail to create an endpoint for the handler
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(errOops)
 
@@ -293,7 +304,7 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	// RegisterWithReadLocking the route fails
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errOops)
@@ -318,7 +329,7 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)
@@ -347,7 +358,7 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
 	resources.mockServer.EXPECT().
-		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo", resources.mockLogger).
+		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
 		Return(nil)
 	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(aliases, nil)

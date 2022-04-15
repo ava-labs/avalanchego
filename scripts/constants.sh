@@ -5,28 +5,27 @@
 # Use the versions.sh to specify versions
 #
 
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
+CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
-coreth_path="$GOPATH/pkg/mod/github.com/chain4travel/coreth@$coreth_version"
+caminoethvm_path="$GOPATH/pkg/mod/github.com/chain4travel/caminoethvm@$caminoethvm_version"
 
-# Where AvalancheGo binary goes
-build_dir="$AVALANCHE_PATH/build"
-avalanchego_path="$build_dir/avalanchego"
+# Where CaminoGo binary goes
+build_dir="$CAMINO_PATH/build"
+caminogo_path="$build_dir/caminogo"
 plugin_dir="$build_dir/plugins"
 evm_path="$plugin_dir/evm"
 
-# Avalabs docker hub
-# avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
-# You should probably set it - export DOCKER_REPO='avaplatform/avalanchego'
-avalanchego_dockerhub_repo=${DOCKER_REPO:-"avalanchego"}
+# Camino docker hub
+# c4tplatform/caminogo - defaults to local as to avoid unintentional pushes
+# You should probably set it - export DOCKER_REPO='c4tplatform/caminogo'
+caminogo_dockerhub_repo=${DOCKER_REPO:-"caminogo"}
 
 # Current branch
-# TODO: fix "fatal: No names found, cannot describe anything" in github CI
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true)
 
-git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
+git_commit=${CAMINOGO_COMMIT:-$( git rev-list -1 HEAD )}
 
 # Static compilation
 static_ld_flags=''

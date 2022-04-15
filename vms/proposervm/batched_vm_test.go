@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -12,18 +23,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/chain4travel/caminogo/database/manager"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/block"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils/hashing"
+	"github.com/chain4travel/caminogo/utils/timer/mockable"
+	"github.com/chain4travel/caminogo/version"
+	"github.com/chain4travel/caminogo/vms/proposervm/proposer"
 )
 
 func TestCoreVMNotRemote(t *testing.T) {
@@ -881,6 +892,7 @@ func initTestRemoteProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
+	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
 	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)

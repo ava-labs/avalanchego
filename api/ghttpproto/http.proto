@@ -1,6 +1,6 @@
 syntax = "proto3";
 package ghttpproto;
-option go_package = "github.com/ava-labs/avalanchego/api/ghttpproto";
+option go_package = "github.com/chain4travel/caminogo/api/ghttpproto";
 import "google/protobuf/empty.proto";
 
 service HTTP {

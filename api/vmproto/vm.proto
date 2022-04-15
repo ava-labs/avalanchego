@@ -1,6 +1,6 @@
 syntax = "proto3";
 package vmproto;
-option go_package = "github.com/ava-labs/avalanchego/api/vmproto";
+option go_package = "github.com/chain4travel/caminogo/api/vmproto";
 import "google/protobuf/empty.proto";
 
 import "io/prometheus/client/metrics.proto";

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,10 +19,9 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/chain4travel/caminogo/utils"
 )
 
 var _ Compressor = &gzipCompressor{}
@@ -66,7 +76,7 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	// will return the appropriate error instead of an incomplete byte slice.
 	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
 
-	decompressed, err := ioutil.ReadAll(limitedReader)
+	decompressed, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}

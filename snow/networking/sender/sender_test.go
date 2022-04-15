@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -14,25 +25,25 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/handler"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
+	"github.com/chain4travel/caminogo/snow/networking/handler"
+	"github.com/chain4travel/caminogo/snow/networking/router"
+	"github.com/chain4travel/caminogo/snow/networking/timeout"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/timer"
+	"github.com/chain4travel/caminogo/version"
 )
 
 var defaultGossipConfig = GossipConfig{
-	AcceptedFrontierSize:      2,
-	OnAcceptSize:              2,
-	AppGossipNonValidatorSize: 2,
+	AcceptedFrontierPeerSize:  2,
+	OnAcceptPeerSize:          2,
 	AppGossipValidatorSize:    2,
+	AppGossipNonValidatorSize: 2,
 }
 
 func TestSenderContext(t *testing.T) {
@@ -42,15 +53,17 @@ func TestSenderContext(t *testing.T) {
 	assert.NoError(t, err)
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(true)
-	sender, err := New(
+	senderIntf, err := New(
 		context,
 		msgCreator,
 		externalSender,
 		&router.ChainRouter{},
-		&timeout.Manager{},
+		nil,
 		defaultGossipConfig,
 	)
 	assert.NoError(t, err)
+	sender := senderIntf.(*sender)
+
 	if res := sender.Context(); !reflect.DeepEqual(res, context) {
 		t.Fatalf("Got %#v, expected %#v", res, context)
 	}
@@ -61,8 +74,7 @@ func TestTimeout(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
-	tm := timeout.Manager{}
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -83,14 +95,14 @@ func TestTimeout(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, &tm, defaultGossipConfig)
+	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	assert.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -148,8 +160,7 @@ func TestReliableMessages(t *testing.T) {
 	err := vdrs.AddWeight(ids.ShortID{1}, 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
-	tm := timeout.Manager{}
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -170,7 +181,7 @@ func TestReliableMessages(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -178,7 +189,7 @@ func TestReliableMessages(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, &tm, defaultGossipConfig)
+	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -241,8 +252,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
-	tm := timeout.Manager{}
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
 			MinimumTimeout:     10 * time.Millisecond,
@@ -263,7 +273,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -271,7 +281,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, &tm, defaultGossipConfig)
+	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()

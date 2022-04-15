@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -5,6 +16,7 @@ package network
 
 import (
 	"crypto"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -13,18 +25,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/network/dialer"
+	"github.com/chain4travel/caminogo/network/throttling"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
+	"github.com/chain4travel/caminogo/snow/networking/router"
+	"github.com/chain4travel/caminogo/snow/uptime"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/units"
+	"github.com/chain4travel/caminogo/version"
 )
 
 var (
@@ -40,6 +53,7 @@ var (
 		PeerListNumValidatorIPs:        100,
 		PeerListValidatorGossipSize:    100,
 		PeerListNonValidatorGossipSize: 100,
+		PeerListPeersGossipSize:        100,
 		PeerListGossipFreq:             time.Second,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
@@ -278,6 +292,36 @@ func TestSend(t *testing.T) {
 
 	inboundGetMsg := <-received
 	assert.Equal(message.Get, inboundGetMsg.Op())
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+func TestTrackVerifiesSignatures(t *testing.T) {
+	assert := assert.New(t)
+
+	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+
+	network := networks[0].(*network)
+	nodeID, tlsCert, _ := getTLS(t, 1)
+	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
+	assert.NoError(err)
+
+	network.Track(utils.IPCertDesc{
+		Cert: tlsCert.Leaf,
+		IPDesc: utils.IPDesc{
+			IP:   net.IPv4(123, 132, 123, 123),
+			Port: 10000,
+		},
+		Time:      1000,
+		Signature: nil,
+	})
+
+	network.peersLock.RLock()
+	assert.Empty(network.trackedIPs)
+	network.peersLock.RUnlock()
 
 	for _, net := range networks {
 		net.StartClose()

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -15,9 +26,9 @@ import (
 
 	"github.com/onsi/gomega"
 
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
+	runner_client "github.com/chain4travel/camino-network-runner/client"
 
-	"github.com/ava-labs/avalanchego/tests"
+	"github.com/chain4travel/caminogo/tests"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -49,15 +60,15 @@ func init() {
 
 	flag.StringVar(
 		&execPath,
-		"avalanchego-path",
+		"caminogo-path",
 		"",
-		"avalanchego executable path",
+		"caminogo executable path",
 	)
 	flag.StringVar(
 		&execPathToUpgrade,
-		"avalanchego-path-to-upgrade",
+		"caminogo-path-to-upgrade",
 		"",
-		"avalanchego executable path (to upgrade to, only required for upgrade tests with local network-runner)",
+		"caminogo executable path (to upgrade to, only required for upgrade tests with local network-runner)",
 	)
 }
 

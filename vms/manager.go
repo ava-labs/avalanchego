@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -7,9 +18,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/engine/common"
 )
 
 var (
@@ -44,8 +55,8 @@ type Manager interface {
 	// ID is [vmID]
 	RegisterFactory(vmID ids.ID, factory Factory) error
 
-	// ListVMs returns all the IDs that have had factories registered.
-	ListVMs() ([]ids.ID, error)
+	// ListFactories returns all the IDs that have had factories registered.
+	ListFactories() ([]ids.ID, error)
 
 	// Versions returns the primary alias of the VM mapped to the reported
 	// version of the VM for all the registered VMs that reported versions.
@@ -113,7 +124,7 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 	return commonVM.Shutdown()
 }
 
-func (m *manager) ListVMs() ([]ids.ID, error) {
+func (m *manager) ListFactories() ([]ids.ID, error) {
 	vmIDs := make([]ids.ID, 0, len(m.factories))
 	for vmID := range m.factories {
 		vmIDs = append(vmIDs, vmID)

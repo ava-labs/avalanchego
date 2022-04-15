@@ -2,11 +2,9 @@ name: Build + Test Mac-Windows
 
 on:
   push:
+    branches: [chain4travel]
     tags:
-      - '*' # Push events to every tag
-    branches:
-      - dev
-      - master
+      - "*" # Push events to every tag
 
 jobs:
   run_build_tests:
@@ -14,12 +12,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ windows-latest, macos-latest ]
+        os: [windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.1' # The Go version to download (if necessary) and use.
+          go-version: "1.17.9" # The Go version to download (if necessary) and use.
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh

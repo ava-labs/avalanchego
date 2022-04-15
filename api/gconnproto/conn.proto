@@ -1,6 +1,6 @@
 syntax = "proto3";
 package gconnproto;
-option go_package = "github.com/ava-labs/avalanchego/api/gconnproto";
+option go_package = "github.com/chain4travel/caminogo/api/gconnproto";
 import "google/protobuf/empty.proto";
 
 // Conn is a net.Conn see: https://pkg.go.dev/net#Conn

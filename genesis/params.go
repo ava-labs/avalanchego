@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -6,8 +17,8 @@ package genesis
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/vms/platformvm/reward"
 )
 
 type StakingConfig struct {
@@ -51,12 +62,10 @@ type Params struct {
 
 func GetTxFeeConfig(networkID uint32) TxFeeConfig {
 	switch networkID {
-	case constants.MainnetID:
-		return MainnetParams.TxFeeConfig
-	case constants.FujiID:
-		return FujiParams.TxFeeConfig
-	case constants.LocalID:
-		return LocalParams.TxFeeConfig
+	case constants.CaminoID:
+		return CaminoParams.TxFeeConfig
+	case constants.ColumbusID:
+		return ColumbusParams.TxFeeConfig
 	default:
 		return LocalParams.TxFeeConfig
 	}
@@ -64,12 +73,10 @@ func GetTxFeeConfig(networkID uint32) TxFeeConfig {
 
 func GetStakingConfig(networkID uint32) StakingConfig {
 	switch networkID {
-	case constants.MainnetID:
-		return MainnetParams.StakingConfig
-	case constants.FujiID:
-		return FujiParams.StakingConfig
-	case constants.LocalID:
-		return LocalParams.StakingConfig
+	case constants.CaminoID:
+		return CaminoParams.StakingConfig
+	case constants.ColumbusID:
+		return ColumbusParams.StakingConfig
 	default:
 		return LocalParams.StakingConfig
 	}

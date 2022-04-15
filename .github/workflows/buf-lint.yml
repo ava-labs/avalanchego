@@ -2,6 +2,9 @@ name: Lint proto files
 
 on:
   push:
+    branches: [chain4travel]
+  pull-request:
+    branches: [chain4travel]
 
 permissions:
   contents: read
@@ -10,8 +13,8 @@ jobs:
   buf-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: bufbuild/buf-setup-action@v0.5.0
+      - uses: actions/checkout@v3
+      - uses: bufbuild/buf-setup-action@v1.3.1
       - uses: bufbuild/buf-lint-action@v1
         with:
-          input: 'api'
+          input: "proto"

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,17 +19,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/logging"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	host1     = utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 9651}
-	host2     = utils.IPDesc{IP: net.IPv4(1, 2, 3, 5), Port: 9653}
-	host3     = utils.IPDesc{IP: net.IPv4(1, 2, 3, 6), Port: 9655}
-	host4     = utils.IPDesc{IP: net.IPv4(1, 2, 3, 7), Port: 9657}
-	localhost = utils.IPDesc{IP: net.IPv4(127, 0, 0, 1), Port: 9657}
+	host1      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 9651}
+	host2      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 5), Port: 9653}
+	host3      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 6), Port: 9655}
+	host4      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 7), Port: 9657}
+	loopbackIP = utils.IPDesc{IP: net.IPv4(127, 0, 0, 1), Port: 9657}
 )
 
 func TestNoInboundConnUpgradeThrottler(t *testing.T) {
@@ -80,11 +91,11 @@ func TestInboundConnUpgradeThrottler(t *testing.T) {
 	assert.False(throttlerIntf.ShouldUpgrade(host3))
 
 	// Local host should never be rate-limited
-	assert.True(throttlerIntf.ShouldUpgrade(localhost))
-	assert.True(throttlerIntf.ShouldUpgrade(localhost))
-	assert.True(throttlerIntf.ShouldUpgrade(localhost))
-	assert.True(throttlerIntf.ShouldUpgrade(localhost))
-	assert.True(throttlerIntf.ShouldUpgrade(localhost))
+	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
 
 	// Make sure [throttler.done] isn't closed
 	throttler := throttlerIntf.(*inboundConnUpgradeThrottler)

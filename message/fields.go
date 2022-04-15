@@ -1,10 +1,21 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
 
 import (
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/chain4travel/caminogo/utils/wrappers"
 )
 
 // Field that may be packed into a message
@@ -17,7 +28,6 @@ const (
 	NodeID                           // TODO: remove NodeID. Used in handshake
 	MyTime                           // Used in handshake
 	IP                               // Used in handshake
-	Peers                            // Used in handshake
 	ChainID                          // Used for dispatching
 	RequestID                        // Used for all messages
 	Deadline                         // Used for request messages
@@ -27,7 +37,7 @@ const (
 	MultiContainerBytes              // Used in Ancestors
 	SigBytes                         // Used in handshake / peer gossiping
 	VersionTime                      // Used in handshake / peer gossiping
-	SignedPeers                      // Used in peer gossiping
+	Peers                            // Used in peer gossiping
 	TrackedSubnets                   // Used in handshake / peer gossiping
 	AppBytes                         // Used at application level
 	VMMessage                        // Used internally
@@ -48,8 +58,6 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackLong
 	case IP:
 		return wrappers.TryPackIP
-	case Peers:
-		return wrappers.TryPackIPList
 	case ChainID: // TODO: This will be shortened to use a modified varint spec
 		return wrappers.TryPackHash
 	case RequestID:
@@ -70,7 +78,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackBytes
 	case VersionTime:
 		return wrappers.TryPackLong
-	case SignedPeers:
+	case Peers:
 		return wrappers.TryPackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryPackHashes
@@ -94,8 +102,6 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackLong
 	case IP:
 		return wrappers.TryUnpackIP
-	case Peers:
-		return wrappers.TryUnpackIPList
 	case ChainID: // TODO: This will be shortened to use a modified varint spec
 		return wrappers.TryUnpackHash
 	case RequestID:
@@ -116,7 +122,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackBytes
 	case VersionTime:
 		return wrappers.TryUnpackLong
-	case SignedPeers:
+	case Peers:
 		return wrappers.TryUnpackIPCertList
 	case TrackedSubnets:
 		return wrappers.TryUnpackHashes
@@ -139,8 +145,6 @@ func (f Field) String() string {
 		return "MyTime"
 	case IP:
 		return "IP"
-	case Peers:
-		return "Peers"
 	case ChainID:
 		return "ChainID"
 	case RequestID:
@@ -161,8 +165,8 @@ func (f Field) String() string {
 		return "SigBytes"
 	case VersionTime:
 		return "VersionTime"
-	case SignedPeers:
-		return "SignedPeers"
+	case Peers:
+		return "Peers"
 	case TrackedSubnets:
 		return "TrackedSubnets"
 	case VMMessage:

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -5,31 +16,30 @@ package indexer
 
 import (
 	"errors"
-	"io"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/mocks"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/triggers"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/chain4travel/caminogo/api/server"
+	"github.com/chain4travel/caminogo/database/memdb"
+	"github.com/chain4travel/caminogo/database/versiondb"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/avalanche"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/snow/consensus/snowstorm"
+	"github.com/chain4travel/caminogo/snow/engine/avalanche/mocks"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/triggers"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/logging"
 
-	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
-	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
+	avvtxmocks "github.com/chain4travel/caminogo/snow/engine/avalanche/vertex/mocks"
+	smblockmocks "github.com/chain4travel/caminogo/snow/engine/snowman/block/mocks"
+	smengmocks "github.com/chain4travel/caminogo/snow/engine/snowman/mocks"
 )
 
 var _ server.PathAdder = &apiServerMock{}
@@ -40,7 +50,7 @@ type apiServerMock struct {
 	endpoints   []string
 }
 
-func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, endpoint string, _ io.Writer) error {
+func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, endpoint string) error {
 	a.timesCalled++
 	a.bases = append(a.bases, base)
 	a.endpoints = append(a.endpoints, endpoint)

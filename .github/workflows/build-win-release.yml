@@ -1,12 +1,14 @@
-# Build a windows release from the avalanchego repo 
+# Build a windows release from the caminogo repo 
 
-name: build-win-release 
+name: build-win-release
 
 # Controls when the action will run.
 on:
   push:
-    tags:
-      - '*' # Push events to every tag
+    #branches: [chain4travel]
+    #tags:
+    #  - "*" # Push events to every tag
+    branches-ignore: ["*"]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -20,7 +22,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
-         go-version: '1.17.1' # The Go version to download (if necessary) and use.
+         go-version: '1.17.9' # The Go version to download (if necessary) and use.
     - run: go version
 
     - name: Get the version
@@ -34,15 +36,15 @@ jobs:
         aws --version
 
     # Runs a single command using the runners shell
-    - name: Build the avalanchego binaries 
+    - name: Build the caminogo binaries 
       run: ./scripts/build.sh 
       shell: bash
 
     - name: Create zip
       run: |
-        mv .\build\avalanchego .\build\avalanchego.exe
+        mv .\build\caminogo .\build\caminogo.exe
         mv .\build\plugins\evm .\build\plugins\evm.exe
-        Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+        Compress-Archive -Path .\build\caminogo.exe,.\build\plugins -DestinationPath .\build\caminogo-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -52,4 +54,4 @@ jobs:
         aws-region: us-east-1
 
     - name: Copy to s3
-      run: aws s3 cp .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+      run: aws s3 cp .\build\caminogo-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/caminogo-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip

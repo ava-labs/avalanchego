@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -9,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/chain4travel/caminogo/database"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/vms/proposervm/block"
+	"github.com/chain4travel/caminogo/vms/proposervm/proposer"
 )
 
 // ProposerBlock Option interface tests section
@@ -126,7 +137,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	prntProBlk, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("Could not build proposer block")
+		t.Fatalf("Could not build proposer block: %s", err)
 	}
 
 	if err := prntProBlk.Verify(); err != nil {
@@ -863,8 +874,8 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	var pChainHeight uint64
-	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	var minimumHeight uint64
+	valState.GetMinimumHeightF = func() (uint64, error) { return minimumHeight, nil }
 
 	// generate two blocks with the same core block and store them
 	coreBlk := &snowman.TestBlock{
@@ -879,13 +890,14 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 
-	pChainHeight = optimalHeightDelay // proBlk1's pChainHeight
+	minimumHeight = coreGenBlk.Height()
+
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build proBlk1")
 	}
 
-	pChainHeight = optimalHeightDelay + 1 // proBlk2's pChainHeight
+	minimumHeight++
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build proBlk2")

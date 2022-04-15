@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -11,17 +22,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
-	"github.com/ava-labs/avalanchego/snow/networking/handler"
-	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/networking/benchlist"
+	"github.com/chain4travel/caminogo/snow/networking/handler"
+	"github.com/chain4travel/caminogo/snow/networking/timeout"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/timer"
+	"github.com/chain4travel/caminogo/version"
 )
 
 func TestShutdown(t *testing.T) {
@@ -29,8 +40,7 @@ func TestShutdown(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
-	tm := timeout.Manager{}
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
 			MinimumTimeout:     time.Millisecond,
@@ -52,7 +62,7 @@ func TestShutdown(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	shutdownCalled := make(chan struct{}, 1)
@@ -118,10 +128,9 @@ func TestShutdownTimesOut(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
-	tm := timeout.Manager{}
 	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
-	err = tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Second,
 			MinimumTimeout:     500 * time.Millisecond,
@@ -146,7 +155,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	err = chainRouter.Initialize(ids.ShortEmpty,
 		logging.NoLog{},
 		mc,
-		&tm,
+		tm,
 		time.Millisecond,
 		ids.Set{},
 		nil,
@@ -224,8 +233,7 @@ func TestShutdownTimesOut(t *testing.T) {
 func TestRouterTimeout(t *testing.T) {
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
-	tm := timeout.Manager{}
-	err := tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
 			MinimumTimeout:     10 * time.Millisecond,
@@ -248,7 +256,7 @@ func TestRouterTimeout(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -344,8 +352,7 @@ func TestRouterTimeout(t *testing.T) {
 
 func TestRouterClearTimeouts(t *testing.T) {
 	// Create a timeout manager
-	tm := timeout.Manager{}
-	err := tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     3 * time.Second,
 			MinimumTimeout:     3 * time.Second,
@@ -369,7 +376,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -453,8 +460,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
-	tm := timeout.Manager{}
-	err := tm.Initialize(
+	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
 			MinimumTimeout:     10 * time.Millisecond,
@@ -477,7 +483,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, &tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler

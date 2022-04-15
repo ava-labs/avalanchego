@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -15,12 +26,14 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
+
+	vmpb "github.com/chain4travel/caminogo/proto/pb/vm"
 )
 
 var (
 	TestHandshake = plugin.HandshakeConfig{
-		ProtocolVersion:  1,
+		ProtocolVersion:  protocolVersion,
 		MagicCookieKey:   "VM_PLUGIN",
 		MagicCookieValue: "dynamic",
 	}
@@ -79,8 +92,7 @@ func TestHelperProcess(*testing.T) {
 			"vm": NewTestVM(&TestSubnetVM{logger: pluginLogger}),
 		},
 
-		// A non-nil value here enables gRPC serving for this plugin...
-		GRPCServer: plugin.DefaultGRPCServer,
+		GRPCServer: grpcutils.NewDefaultServer,
 	})
 	os.Exit(0)
 }
@@ -94,11 +106,11 @@ func NewTestVM(vm *TestSubnetVM) plugin.Plugin {
 	return &testVMPlugin{vm: vm}
 }
 
-func (p *testVMPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	vmproto.RegisterVMServer(s, NewTestServer(p.vm, broker))
+func (p *testVMPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+	vmpb.RegisterVMServer(s, NewTestServer(p.vm))
 	return nil
 }
 
-func (p *testVMPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewTestClient(vmproto.NewVMClient(c), broker), nil
+func (p *testVMPlugin) GRPCClient(ctx context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+	return NewTestClient(vmpb.NewVMClient(c)), nil
 }

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -12,33 +23,34 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/chain4travel/caminogo/cache"
+	"github.com/chain4travel/caminogo/chains"
+	"github.com/chain4travel/caminogo/codec"
+	"github.com/chain4travel/caminogo/codec/linearcodec"
+	"github.com/chain4travel/caminogo/database"
+	"github.com/chain4travel/caminogo/database/manager"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/block"
+	"github.com/chain4travel/caminogo/snow/uptime"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/crypto"
+	"github.com/chain4travel/caminogo/utils/json"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/utils/timer/mockable"
+	"github.com/chain4travel/caminogo/utils/window"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/version"
+	"github.com/chain4travel/caminogo/vms/components/avax"
+	"github.com/chain4travel/caminogo/vms/platformvm/reward"
+	"github.com/chain4travel/caminogo/vms/secp256k1fx"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/chain4travel/caminogo/utils/math"
 )
 
 const (
@@ -51,6 +63,9 @@ const (
 
 	// Maximum future start time for staking/delegating
 	maxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 var (
@@ -63,6 +78,7 @@ var (
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ validators.State     = &VM{}
 	_ Fx                   = &secp256k1fx.Fx{}
 )
 
@@ -119,6 +135,9 @@ type VM struct {
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
+
+	// sliding window of blocks that were recently accepted
+	recentlyAccepted *window.Window
 }
 
 // Initialize this blockchain.
@@ -141,7 +160,7 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize metrics as soon as possible
-	if err := vm.metrics.Initialize("", registerer); err != nil {
+	if err := vm.metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
 		return err
 	}
 
@@ -199,8 +218,14 @@ func (vm *VM) Initialize(
 		)
 	}
 
+	vm.recentlyAccepted = window.New(
+		window.Config{
+			Clock:   &vm.clock,
+			MaxSize: maxRecentlyAcceptedWindowSize,
+			TTL:     recentlyAcceptedWindowTTL,
+		},
+	)
 	vm.lastAcceptedID = is.GetLastAccepted()
-
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
 
 	// Build off the most recently accepted block
@@ -376,6 +401,10 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return blk, nil
 }
 
+func (vm *VM) GetFeeAssetID() ids.ID {
+	return vm.ctx.AVAXAssetID
+}
+
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) { return vm.getBlock(blkID) }
 
 func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
@@ -543,6 +572,33 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	return vdrSet, nil
 }
 
+// GetMinimumHeight returns the height of the most recent block beyond the
+// horizon of our recentlyAccepted window.
+//
+// Because the time between blocks is arbitrary, we're only guaranteed that
+// the window's configured TTL amount of time has passed once an element
+// expires from the window.
+//
+// To try to always return a block older than the window's TTL, we return the
+// parent of the oldest element in the window (as an expired element is always
+// guaranteed to be sufficiently stale). If we haven't expired an element yet
+// in the case of a process restart, we default to the lastAccepted block's
+// height which is likely (but not guaranteed) to also be older than the
+// window's configured TTL.
+func (vm *VM) GetMinimumHeight() (uint64, error) {
+	oldest, ok := vm.recentlyAccepted.Oldest()
+	if !ok {
+		return vm.GetCurrentHeight()
+	}
+
+	blk, err := vm.GetBlock(oldest.(ids.ID))
+	if err != nil {
+		return 0, err
+	}
+
+	return blk.Height() - 1, nil
+}
+
 // GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
 	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
@@ -584,21 +640,24 @@ func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
-// Returns the percentage of the total stake on the Primary Network of nodes
-// connected to this node.
-func (vm *VM) getPercentConnected() (float64, error) {
-	vdrSet, exists := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+// Returns the percentage of the total stake of the subnet connected to this
+// node.
+func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
+	vdrSet, exists := vm.Validators.GetValidators(subnetID)
 	if !exists {
-		return 0, errNoPrimaryValidators
+		return 0, errNoValidators
 	}
 
-	vdrs := vdrSet.List()
+	vdrSetWeight := vdrSet.Weight()
+	if vdrSetWeight == 0 {
+		return 1, nil
+	}
 
 	var (
 		connectedStake uint64
 		err            error
 	)
-	for _, vdr := range vdrs {
+	for _, vdr := range vdrSet.List() {
 		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
@@ -607,5 +666,5 @@ func (vm *VM) getPercentConnected() (float64, error) {
 			return 0, err
 		}
 	}
-	return float64(connectedStake) / float64(vdrSet.Weight()), nil
+	return float64(connectedStake) / float64(vdrSetWeight), nil
 }

@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -13,47 +24,47 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/health"
-	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/networking/handler"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/triggers"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/metervm"
-	"github.com/ava-labs/avalanchego/vms/proposervm"
+	"github.com/chain4travel/caminogo/api/health"
+	"github.com/chain4travel/caminogo/api/keystore"
+	"github.com/chain4travel/caminogo/api/metrics"
+	"github.com/chain4travel/caminogo/api/server"
+	"github.com/chain4travel/caminogo/chains/atomic"
+	"github.com/chain4travel/caminogo/database/prefixdb"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/message"
+	"github.com/chain4travel/caminogo/network"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/consensus/snowball"
+	"github.com/chain4travel/caminogo/snow/engine/avalanche/state"
+	"github.com/chain4travel/caminogo/snow/engine/avalanche/vertex"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/engine/common/queue"
+	"github.com/chain4travel/caminogo/snow/engine/common/tracker"
+	"github.com/chain4travel/caminogo/snow/engine/snowman/block"
+	"github.com/chain4travel/caminogo/snow/networking/handler"
+	"github.com/chain4travel/caminogo/snow/networking/router"
+	"github.com/chain4travel/caminogo/snow/networking/sender"
+	"github.com/chain4travel/caminogo/snow/networking/timeout"
+	"github.com/chain4travel/caminogo/snow/triggers"
+	"github.com/chain4travel/caminogo/snow/validators"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/version"
+	"github.com/chain4travel/caminogo/vms"
+	"github.com/chain4travel/caminogo/vms/metervm"
+	"github.com/chain4travel/caminogo/vms/proposervm"
 
-	dbManager "github.com/ava-labs/avalanchego/database/manager"
+	dbManager "github.com/chain4travel/caminogo/database/manager"
 
-	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
-	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
-	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
+	avcon "github.com/chain4travel/caminogo/snow/consensus/avalanche"
+	aveng "github.com/chain4travel/caminogo/snow/engine/avalanche"
+	avbootstrap "github.com/chain4travel/caminogo/snow/engine/avalanche/bootstrap"
+	avagetter "github.com/chain4travel/caminogo/snow/engine/avalanche/getter"
 
-	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
-	smbootstrap "github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
-	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	smcon "github.com/chain4travel/caminogo/snow/consensus/snowman"
+	smeng "github.com/chain4travel/caminogo/snow/engine/snowman"
+	smbootstrap "github.com/chain4travel/caminogo/snow/engine/snowman/bootstrap"
+	snowgetter "github.com/chain4travel/caminogo/snow/engine/snowman/getter"
 )
 
 const defaultChannelSize = 1
@@ -62,6 +73,7 @@ var (
 	errUnknownChainID   = errors.New("unknown chain ID")
 	errUnknownVMType    = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped  = errors.New("chains not bootstrapped")
 
 	_ Manager = &manager{}
 )
@@ -99,6 +111,7 @@ type Manager interface {
 
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
+
 	Shutdown()
 }
 
@@ -149,9 +162,9 @@ type ManagerConfig struct {
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
 	XChainID                    ids.ID
-	CriticalChains              ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets          ids.Set          // Subnets to validate
-	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
+	CriticalChains              ids.Set         // Chains that can't exit gracefully
+	WhitelistedSubnets          ids.Set         // Subnets to validate
+	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
 	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
@@ -310,6 +323,13 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// If startup errored, then shutdown the chain with the fatal error.
 	if err != nil {
 		chain.Handler.StopWithError(err)
+	}
+
+	// Register bootstrapped health checks after P chain is started.
+	if chainParams.ID == constants.PlatformChainID {
+		if err := m.registerBootstrappedHealthChecks(); err != nil {
+			chain.Handler.StopWithError(err)
+		}
 	}
 }
 
@@ -924,6 +944,42 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 	}
 
 	return chain.Context().GetState() == snow.NormalOp
+}
+
+func (m *manager) chainsNotBootstrapped() []ids.ID {
+	m.chainsLock.Lock()
+	defer m.chainsLock.Unlock()
+
+	chainsBootstrapping := make([]ids.ID, 0, len(m.chains))
+	for chainID, chain := range m.chains {
+		if chain.Context().GetState() == snow.NormalOp {
+			continue
+		}
+		chainsBootstrapping = append(chainsBootstrapping, chainID)
+	}
+	return chainsBootstrapping
+}
+
+func (m *manager) registerBootstrappedHealthChecks() error {
+	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
+		chains := m.chainsNotBootstrapped()
+		aliases := make([]string, len(chains))
+		for i, chain := range chains {
+			aliases[i] = m.PrimaryAliasOrDefault(chain)
+		}
+
+		if len(aliases) != 0 {
+			return aliases, errNotBootstrapped
+		}
+		return aliases, nil
+	})
+	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
+		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
+	}
+	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck); err != nil {
+		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
+	}
+	return nil
 }
 
 // Shutdown stops all the chains

@@ -1,6 +1,6 @@
 syntax = "proto3";
 package greaderproto;
-option go_package = "github.com/ava-labs/avalanchego/api/greaderproto";
+option go_package = "github.com/chain4travel/caminogo/api/greaderproto";
 
 // Reader is an io.Reader see: https://pkg.go.dev/io#Reader
 service Reader {

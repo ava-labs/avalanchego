@@ -1,7 +1,7 @@
-# Ansible for AvalancheGo
+# Ansible for CaminoGo
 
 [Ansible](https://ansible.com) playbooks, roles, & inventories to install
-[AvalancheGo](https://github.com/ava-labs/avalanchego) as a systemd service.
+[CaminoGo](https://github.com/chain4travel/caminogo) as a systemd service.
 Target(s) can be
 
 - localhost
@@ -13,17 +13,17 @@ Target(s) can be
 
 ## Using
 
-To create an AvalancheGo service on localhost
+To create a CaminoGo service on localhost
 
 1. Check you have Ansible 2.9+ (see [Installing](#installing))
-2. Clone the AvalancheGo git repository
+2. Clone the CaminoGo git repository
     ```
-    $ git clone https://github.com/ava-labs/avalanchego
+    $ git clone https://github.com/chain4travel/caminogo
     ```
 
 3. Change to this directory
     ```
-    $ cd avalanchego/scripts/ansible
+    $ cd caminogo/scripts/ansible
     ```
 
 4. Run the service playbook
@@ -42,13 +42,13 @@ To create an AvalancheGo service on localhost
 
 5. Check the service is running
     ```
-    $ systemctl status avalanchego
+    $ systemctl status caminogo
     ```
 
     The output should look similar to
     ```
-    ● avalanchego.service - AvalancheGo node for Avalanche consensus network
-    Loaded: loaded (/etc/systemd/system/avalanchego.service; enabled; vendor preset: enabled)
+    ● caminogo.service - CaminoGo node for Camino consensus network
+    Loaded: loaded (/etc/systemd/system/caminogo.service; enabled; vendor preset: enabled)
     Active: active (running) since Wed 2020-10-21 10:00:00 UTC; 32s ago
     ...
     ```
@@ -93,7 +93,7 @@ Here are some examples to use as a starting point.
 ### Amazon
 
 ```yaml
-avalanche_nodes:
+camino_nodes:
   hosts:
     ec2-203-0-113-42.us-east-1.compute.amazonaws.com:
     ec2-203-0-113-9.ap-southeast-1.compute.amazonaws.com:
@@ -105,7 +105,7 @@ avalanche_nodes:
 ### Raspberry Pi
 
 ```yaml
-avalanche_nodes:
+camino_nodes:
   hosts:
     raspberrypi.local:
   vars:
@@ -127,78 +127,78 @@ Target operating systems supported by these roles & playbooks are
 ## Example run
 
 ```
-PLAY [Configure Avalanche service] *********************************************
+PLAY [Configure Camino service] *********************************************
 
 TASK [Gathering Facts] *********************************************************
 ok: [localhost]
 
-TASK [avalanche_download : Query releases] *************************************
+TASK [camino_download : Query releases] *************************************
 ok: [localhost]
 
-TASK [avalanche_download : Fetch release] **************************************
-changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz)
-changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz.sig)
+TASK [camino_download : Fetch release] **************************************
+changed: [localhost] => (item=caminogo-linux-arm64-v1.5.0.tar.gz)
+changed: [localhost] => (item=caminogo-linux-arm64-v1.5.0.tar.gz.sig)
 
-TASK [avalanche_download : Create temp gnupghome] ******************************
+TASK [camino_download : Create temp gnupghome] ******************************
 changed: [localhost]
 
-TASK [avalanche_download : Import keys] ****************************************
+TASK [camino_download : Import keys] ****************************************
 changed: [localhost]
 
-TASK [avalanche_download : Verify signature] ***********************************
+TASK [camino_download : Verify signature] ***********************************
 ok: [localhost]
 
-TASK [avalanche_download : Cleanup temp gnupghome] *****************************
+TASK [camino_download : Cleanup temp gnupghome] *****************************
 changed: [localhost]
 
-TASK [avalanche_download : Unpack release] *************************************
-changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz)
+TASK [camino_download : Unpack release] *************************************
+changed: [localhost] => (item=caminogo-linux-arm64-v1.5.0.tar.gz)
 
-TASK [avalanche_user : Create Avalanche daemon group] **************************
+TASK [camino_user : Create Camino daemon group] **************************
 changed: [localhost]
 
-TASK [avalanche_user : Create Avalanche daemon user] ***************************
+TASK [camino_user : Create Camino daemon user] ***************************
 changed: [localhost]
 
-TASK [avalanche_install : Create shared directories] ***************************
+TASK [camino_install : Create shared directories] ***************************
 changed: [localhost] => (item={'path': '/usr/local/bin'})
 changed: [localhost] => (item={'path': '/var/local/lib'})
 changed: [localhost] => (item={'path': '/var/local/log'})
 
-TASK [avalanche_install : Create Avalanche directories] ************************
-changed: [localhost] => (item=/var/local/lib/avalanchego)
-changed: [localhost] => (item=/var/local/lib/avalanchego/db)
-changed: [localhost] => (item=/var/local/lib/avalanchego/staking)
-changed: [localhost] => (item=/var/local/log/avalanchego)
-changed: [localhost] => (item=/usr/local/lib/avalanchego)
+TASK [camino_install : Create Camino directories] ************************
+changed: [localhost] => (item=/var/local/lib/caminogo)
+changed: [localhost] => (item=/var/local/lib/caminogo/db)
+changed: [localhost] => (item=/var/local/lib/caminogo/staking)
+changed: [localhost] => (item=/var/local/log/caminogo)
+changed: [localhost] => (item=/usr/local/lib/caminogo)
 
-TASK [avalanche_install : Install Avalanche binary] ****************************
+TASK [camino_install : Install Camino binary] ****************************
 changed: [localhost]
 
-TASK [avalanche_install : Remove outdated support files] **********************
-ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/evm'})
-ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-preupgrade'})
-ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-latest'})
+TASK [camino_install : Remove outdated support files] **********************
+ok: [localhost] => (item={'path': '/usr/local/lib/caminogo/evm'})
+ok: [localhost] => (item={'path': '/usr/local/lib/caminogo/caminogo-preupgrade'})
+ok: [localhost] => (item={'path': '/usr/local/lib/caminogo/caminogo-latest'})
 
-TASK [avalanche_install : Install support files] *******************************
-changed: [localhost] => (item=/usr/local/lib/avalanchego/plugins)
+TASK [camino_install : Install support files] *******************************
+changed: [localhost] => (item=/usr/local/lib/caminogo/plugins)
 
-TASK [avalanche_staker : Create staking key] ***********************************
+TASK [camino_staker : Create staking key] ***********************************
 changed: [localhost]
 
-TASK [avalanche_staker : Create staking certificate signing request] ***********
+TASK [camino_staker : Create staking certificate signing request] ***********
 changed: [localhost]
 
-TASK [avalanche_staker : Create staking certificate] ***************************
+TASK [camino_staker : Create staking certificate] ***************************
 changed: [localhost]
 
-TASK [avalanche_service : Configure Avalanche service] *************************
+TASK [camino_service : Configure Camino service] *************************
 changed: [localhost]
 
-TASK [avalanche_service : Enable Avalanche service] ****************************
+TASK [camino_service : Enable Camino service] ****************************
 changed: [localhost]
 
-RUNNING HANDLER [avalanche_service : Restart Avalanche service] ****************
+RUNNING HANDLER [camino_service : Restart Camino service] ****************
 changed: [localhost]
 
 PLAY RECAP *********************************************************************

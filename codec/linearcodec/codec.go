@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,9 +19,9 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/chain4travel/caminogo/codec"
+	"github.com/chain4travel/caminogo/codec/reflectcodec"
+	"github.com/chain4travel/caminogo/utils/wrappers"
 )
 
 const (
@@ -42,19 +53,25 @@ type linearCodec struct {
 	typeToTypeID map[reflect.Type]uint32
 }
 
-// New returns a new, concurrency-safe codec
-func New(tagName string, maxSliceLen uint32) Codec {
+// New returns a new, concurrency-safe codec; it allow to specify
+// both tagNames and maxSlicelenght
+func New(tagNames []string, maxSliceLen uint32) Codec {
 	hCodec := &linearCodec{
 		nextTypeID:   0,
 		typeIDToType: map[uint32]reflect.Type{},
 		typeToTypeID: map[reflect.Type]uint32{},
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagName, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
 	return hCodec
 }
 
-// NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New(reflectcodec.DefaultTagName, defaultMaxSliceLength) }
+// NewDefault is a convenience constructor; it returns a new codec with reasonable default values
+func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+
+// NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
+func NewCustomMaxLength(maxSliceLen uint32) Codec {
+	return New([]string{reflectcodec.DefaultTagName}, maxSliceLen)
+}
 
 // Skip some number of type IDs
 func (c *linearCodec) SkipRegistrations(num int) {

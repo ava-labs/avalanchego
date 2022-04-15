@@ -1,10 +1,20 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
 
 import (
-	"crypto/x509"
 	"math"
 	"net"
 	"testing"
@@ -14,9 +24,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/staking"
+	"github.com/chain4travel/caminogo/utils"
+	"github.com/chain4travel/caminogo/utils/units"
 )
 
 func TestCodecPackInvalidOp(t *testing.T) {
@@ -93,7 +104,10 @@ func TestCodecPackParseGzip(t *testing.T) {
 	c, err := NewCodecWithMemoryPool("", prometheus.DefaultRegisterer, 2*units.MiB, 10*time.Second)
 	assert.NoError(t, err)
 	id := ids.GenerateTestID()
-	cert := &x509.Certificate{}
+
+	tlsCert, err := staking.NewTLSCert()
+	assert.NoError(t, err)
+	cert := tlsCert.Leaf
 
 	msgs := []inboundMessage{
 		{
@@ -112,7 +126,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		{
 			op: PeerList,
 			fields: map[Field]interface{}{
-				SignedPeers: []utils.IPCertDesc{
+				Peers: []utils.IPCertDesc{
 					{
 						Cert:      cert,
 						IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4)},

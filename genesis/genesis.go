@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -11,19 +21,18 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/propertyfx"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/chain4travel/caminogo/codec"
+	"github.com/chain4travel/caminogo/codec/linearcodec"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/utils/constants"
+	"github.com/chain4travel/caminogo/utils/formatting"
+	"github.com/chain4travel/caminogo/utils/json"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/vms/avm"
+	"github.com/chain4travel/caminogo/vms/nftfx"
+	"github.com/chain4travel/caminogo/vms/platformvm"
+	"github.com/chain4travel/caminogo/vms/propertyfx"
+	"github.com/chain4travel/caminogo/vms/secp256k1fx"
 )
 
 const (
@@ -175,17 +184,17 @@ func validateConfig(networkID uint32, config *Config) error {
 // 1) The ID of the new network. [networkID]
 // 2) The location of a custom genesis config to load. [filepath]
 //
-// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
+// If [filepath] is empty or the given network ID is Camino, Testnet, or Local, returns error.
 // If [filepath] is non-empty and networkID isn't Mainnet, Testnet, or Local,
 // loads the network genesis data from the config at [filepath].
 //
 // FromFile returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
-// 2) The asset ID of AVAX
+// 2) The asset ID of native token
 func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constants.MainnetID, constants.CaminoID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"cannot override genesis config for standard network %s (%d)",
 			constants.NetworkName(networkID),
@@ -223,10 +232,10 @@ func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 // FromFlag returns:
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
-// 2) The asset ID of AVAX
+// 2) The asset ID of native token
 func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constants.MainnetID, constants.CaminoID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"cannot override genesis config for standard network %s (%d)",
 			constants.NetworkName(networkID),
@@ -262,8 +271,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 	{
 		avax := avm.AssetDefinition{
-			Name:         "Avalanche",
-			Symbol:       "AVAX",
+			Name:         constants.TokenName(config.NetworkID),
+			Symbol:       constants.TokenSymbol(config.NetworkID),
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
@@ -296,7 +305,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			"AVAX": avax, // The AVM starts out with one asset: AVAX
+			avax.Symbol: avax, // The AVM starts out with one asset
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
@@ -536,7 +545,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 }
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewCustomMaxLength(1 << 20)
 	m := codec.NewManager(math.MaxInt32)
 	errs := wrappers.Errs{}
 	errs.Add(

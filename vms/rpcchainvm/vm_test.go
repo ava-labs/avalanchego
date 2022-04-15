@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -6,12 +17,13 @@ package rpcchainvm
 import (
 	"bytes"
 	"context"
-	j "encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"testing"
+
+	j "encoding/json"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -26,13 +38,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/api/proto/ghttpproto"
-	"github.com/ava-labs/avalanchego/api/proto/vmproto"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/ghttp"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
 
-	cjson "github.com/ava-labs/avalanchego/utils/json"
+	httppb "github.com/chain4travel/caminogo/proto/pb/http"
+	vmpb "github.com/chain4travel/caminogo/proto/pb/vm"
+	cjson "github.com/chain4travel/caminogo/utils/json"
 )
 
 // Test_VMCreateHandlers tests the Handle and HandleSimple RPCs by creating a plugin and
@@ -191,60 +203,63 @@ type TestVM interface {
 	CreateHandlers() (map[string]*common.HTTPHandler, error)
 }
 
-func NewTestServer(vm TestVM, broker *plugin.GRPCBroker) *TestVMServer {
+func NewTestServer(vm TestVM) *TestVMServer {
 	return &TestVMServer{
-		vm:     vm,
-		broker: broker,
+		vm: vm,
 	}
 }
 
 type TestVMServer struct {
-	vmproto.UnimplementedVMServer
-	vm     TestVM
-	broker *plugin.GRPCBroker
+	vmpb.UnimplementedVMServer
+	vm TestVM
 
 	serverCloser grpcutils.ServerCloser
 }
 
-func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmproto.CreateHandlersResponse, error) {
+func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateHandlersResponse, error) {
 	handlers, err := vm.vm.CreateHandlers()
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &vmproto.CreateHandlersResponse{}
+	resp := &vmpb.CreateHandlersResponse{}
 	for prefix, h := range handlers {
 		handler := h
 
-		serverID := vm.broker.NextId()
-		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			opts = append(opts, serverOptions...)
+		// start the http server
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
 		})
 
-		resp.Handlers = append(resp.Handlers, &vmproto.Handler{
+		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			Server:      serverID,
+			ServerAddr:  serverAddr,
 		})
 	}
 	return resp, nil
 }
 
 type TestVMClient struct {
-	client vmproto.VMClient
-	broker *plugin.GRPCBroker
-
-	conns []*grpc.ClientConn
+	client vmpb.VMClient
+	conns  []*grpc.ClientConn
 }
 
-func NewTestClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *TestVMClient {
+func NewTestClient(client vmpb.VMClient) *TestVMClient {
 	return &TestVMClient{
 		client: client,
-		broker: broker,
 	}
 }
 
@@ -256,15 +271,15 @@ func (vm *TestVMClient) CreateHandlers() (map[string]*common.HTTPHandler, error)
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil

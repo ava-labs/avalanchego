@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -11,42 +22,38 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/hashicorp/go-plugin"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/ghttp/gconn"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/ghttp/greader"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/chain4travel/caminogo/vms/rpcchainvm/grpcutils"
 
-	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
-	"github.com/ava-labs/avalanchego/api/proto/greaderproto"
-	"github.com/ava-labs/avalanchego/api/proto/gresponsewriterproto"
-	"github.com/ava-labs/avalanchego/api/proto/gwriterproto"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+	responsewriterpb "github.com/chain4travel/caminogo/proto/pb/http/responsewriter"
+	readerpb "github.com/chain4travel/caminogo/proto/pb/io/reader"
+	writerpb "github.com/chain4travel/caminogo/proto/pb/io/writer"
+	connpb "github.com/chain4travel/caminogo/proto/pb/net/conn"
 )
 
 var (
 	errUnsupportedFlushing  = errors.New("response writer doesn't support flushing")
 	errUnsupportedHijacking = errors.New("response writer doesn't support hijacking")
 
-	_ gresponsewriterproto.WriterServer = &Server{}
+	_ responsewriterpb.WriterServer = &Server{}
 )
 
 // Server is an http.ResponseWriter that is managed over RPC.
 type Server struct {
-	gresponsewriterproto.UnimplementedWriterServer
+	responsewriterpb.UnimplementedWriterServer
 	writer http.ResponseWriter
-	broker *plugin.GRPCBroker
 }
 
 // NewServer returns an http.ResponseWriter instance managed remotely
-func NewServer(writer http.ResponseWriter, broker *plugin.GRPCBroker) *Server {
+func NewServer(writer http.ResponseWriter) *Server {
 	return &Server{
 		writer: writer,
-		broker: broker,
 	}
 }
 
-func (s *Server) Write(ctx context.Context, req *gresponsewriterproto.WriteRequest) (*gresponsewriterproto.WriteResponse, error) {
+func (s *Server) Write(ctx context.Context, req *responsewriterpb.WriteRequest) (*responsewriterpb.WriteResponse, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -59,12 +66,12 @@ func (s *Server) Write(ctx context.Context, req *gresponsewriterproto.WriteReque
 	if err != nil {
 		return nil, err
 	}
-	return &gresponsewriterproto.WriteResponse{
+	return &responsewriterpb.WriteResponse{
 		Written: int32(n),
 	}, nil
 }
 
-func (s *Server) WriteHeader(ctx context.Context, req *gresponsewriterproto.WriteHeaderRequest) (*emptypb.Empty, error) {
+func (s *Server) WriteHeader(ctx context.Context, req *responsewriterpb.WriteHeaderRequest) (*emptypb.Empty, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -85,7 +92,7 @@ func (s *Server) Flush(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*gresponsewriterproto.HijackResponse, error) {
+func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*responsewriterpb.HijackResponse, error) {
 	hijacker, ok := s.writer.(http.Hijacker)
 	if !ok {
 		return nil, errUnsupportedHijacking
@@ -95,30 +102,33 @@ func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*gresponsewrit
 		return nil, err
 	}
 
-	connReadWriterID := s.broker.NextId()
-	closer := grpcutils.ServerCloser{}
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return nil, err
+	}
+	serverAddr := serverListener.Addr().String()
 
-	go s.broker.AcceptAndServe(connReadWriterID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
+	closer := grpcutils.ServerCloser{}
+	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
-		gconnproto.RegisterConnServer(server, gconn.NewServer(conn, &closer))
-		greaderproto.RegisterReaderServer(server, greader.NewServer(readWriter))
-		gwriterproto.RegisterWriterServer(server, gwriter.NewServer(readWriter))
+		connpb.RegisterConnServer(server, gconn.NewServer(conn, &closer))
+		readerpb.RegisterReaderServer(server, greader.NewServer(readWriter))
+		writerpb.RegisterWriterServer(server, gwriter.NewServer(readWriter))
 		return server
 	})
 
 	local := conn.LocalAddr()
 	remote := conn.RemoteAddr()
 
-	return &gresponsewriterproto.HijackResponse{
-		LocalNetwork:         local.Network(),
-		LocalString:          local.String(),
-		RemoteNetwork:        remote.Network(),
-		RemoteString:         remote.String(),
-		ConnReadWriterServer: connReadWriterID,
+	return &responsewriterpb.HijackResponse{
+		LocalNetwork:  local.Network(),
+		LocalString:   local.String(),
+		RemoteNetwork: remote.Network(),
+		RemoteString:  remote.String(),
+		ServerAddr:    serverAddr,
 	}, nil
 }

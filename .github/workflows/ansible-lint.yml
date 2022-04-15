@@ -1,21 +1,20 @@
 name: Ansible Lint
 on:
   push:
+    branches: [chain4travel]
     tags:
-      - '*' # Push events to every tag
-    branches:
-      - master
+      - "*" # Push events to every tag
 
 jobs:
   build-ansible:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Lint Ansible playbooks
         # Lastest commit, as of February 22, 2021
-        uses: ansible/ansible-lint-action@c37fb7b4bda2c8cb18f4942716bae9f11b0dc9bc
+        uses: ansible/ansible-lint-action@main
         with:
           targets: |
             scripts/ansible/kill_playbook.yml
@@ -24,5 +23,4 @@ jobs:
             scripts/ansible/service_playbook.yml
             scripts/ansible/update_playbook.yml
 
-          args:
-            -c scripts/ansible/.ansible-lint
+          args: -c scripts/ansible/.ansible-lint

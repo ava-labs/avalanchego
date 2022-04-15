@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -14,16 +25,16 @@ import (
 
 	"github.com/onsi/gomega"
 
-	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/chain4travel/caminogo/genesis"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/tests"
+	"github.com/chain4travel/caminogo/tests/e2e"
+	"github.com/chain4travel/caminogo/utils/crypto"
+	"github.com/chain4travel/caminogo/vms/avm"
+	"github.com/chain4travel/caminogo/vms/components/avax"
+	"github.com/chain4travel/caminogo/vms/secp256k1fx"
+	"github.com/chain4travel/caminogo/wallet/subnet/primary"
+	"github.com/chain4travel/caminogo/wallet/subnet/primary/common"
 )
 
 var keyFactory crypto.FactorySECP256K1R
@@ -59,13 +70,13 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 		})
 
 		allMetrics := []string{
-			"avalanche_X_whitelist_vtx_issue_success",
-			"avalanche_X_whitelist_vtx_issue_failure",
-			"avalanche_X_whitelist_tx_processing",
-			"avalanche_X_whitelist_tx_accepted_count",
-			"avalanche_X_whitelist_tx_polls_accepted_count",
-			"avalanche_X_whitelist_tx_rejected_count",
-			"avalanche_X_whitelist_tx_polls_rejected_count",
+			"camino_X_whitelist_vtx_issue_success",
+			"camino_X_whitelist_vtx_issue_failure",
+			"camino_X_whitelist_tx_processing",
+			"camino_X_whitelist_tx_accepted_count",
+			"camino_X_whitelist_tx_polls_accepted_count",
+			"camino_X_whitelist_tx_rejected_count",
+			"camino_X_whitelist_tx_polls_rejected_count",
 		}
 
 		// URI -> "metric name" -> "metric value"
@@ -78,7 +89,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				gomega.Expect(err).Should(gomega.BeNil())
 				tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
 
-				if mm["avalanche_X_whitelist_tx_accepted_count"] > 0 {
+				if mm["camino_X_whitelist_tx_accepted_count"] > 0 {
 					tests.Outf("{{red}}{{bold}}%q already has whitelist vtx!!!{{/}}\n", u)
 					ginkgo.Skip("the cluster has already accepted whitelist vtx thus skipping")
 				}
@@ -178,21 +189,21 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				prev := curMetrics[u]
 
 				// +1 since the local node engine issues a new whitelist vtx
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_success"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_success"] + 1))
+				gomega.Expect(mm["camino_X_whitelist_vtx_issue_success"]).Should(gomega.Equal(prev["camino_X_whitelist_vtx_issue_success"] + 1))
 
 				// +0 since no node ever failed to issue a whitelist vtx
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_failure"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_failure"]))
+				gomega.Expect(mm["camino_X_whitelist_vtx_issue_failure"]).Should(gomega.Equal(prev["camino_X_whitelist_vtx_issue_failure"]))
 
 				// +0 since the local node snowstorm successfully issued the whitelist tx or received from the first node, and accepted
-				gomega.Expect(mm["avalanche_X_whitelist_tx_processing"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_processing"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_processing"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_processing"]))
 
 				// +1 since the local node snowstorm successfully accepted the whitelist tx or received from the first node
-				gomega.Expect(mm["avalanche_X_whitelist_tx_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_accepted_count"] + 1))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_accepted_count"] + 1))
+				gomega.Expect(mm["camino_X_whitelist_tx_accepted_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_accepted_count"] + 1))
+				gomega.Expect(mm["camino_X_whitelist_tx_polls_accepted_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_polls_accepted_count"] + 1))
 
 				// +0 since no node ever rejected a whitelist tx
-				gomega.Expect(mm["avalanche_X_whitelist_tx_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_rejected_count"]))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_rejected_count"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_rejected_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_rejected_count"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_polls_rejected_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_polls_rejected_count"]))
 
 				curMetrics[u] = mm
 			}
@@ -220,21 +231,21 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				prev := curMetrics[u]
 
 				// +0 since no node should ever successfully issue another whitelist vtx
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_success"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_success"]))
+				gomega.Expect(mm["camino_X_whitelist_vtx_issue_success"]).Should(gomega.Equal(prev["camino_X_whitelist_vtx_issue_success"]))
 
 				// +1 since the local node engine failed the conflicting whitelist vtx issue request
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_failure"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_failure"] + 1))
+				gomega.Expect(mm["camino_X_whitelist_vtx_issue_failure"]).Should(gomega.Equal(prev["camino_X_whitelist_vtx_issue_failure"] + 1))
 
 				// +0 since the local node snowstorm successfully issued the whitelist tx "before", and no whitelist tx is being processed
-				gomega.Expect(mm["avalanche_X_whitelist_tx_processing"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_processing"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_processing"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_processing"]))
 
 				// +0 since the local node snowstorm successfully accepted the whitelist tx "before"
-				gomega.Expect(mm["avalanche_X_whitelist_tx_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_accepted_count"]))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_accepted_count"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_accepted_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_accepted_count"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_polls_accepted_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_polls_accepted_count"]))
 
 				// +0 since the local node snowstorm never rejected a whitelist tx
-				gomega.Expect(mm["avalanche_X_whitelist_tx_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_rejected_count"]))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_rejected_count"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_rejected_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_rejected_count"]))
+				gomega.Expect(mm["camino_X_whitelist_tx_polls_rejected_count"]).Should(gomega.Equal(prev["camino_X_whitelist_tx_polls_rejected_count"]))
 
 				curMetrics[u] = mm
 			}

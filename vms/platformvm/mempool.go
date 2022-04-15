@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -9,9 +20,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/chain4travel/caminogo/cache"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/utils/units"
 )
 
 const (
@@ -47,7 +58,7 @@ type Mempool interface {
 	RemoveDecisionTxs(txs []*Tx)
 	RemoveProposalTx(tx *Tx)
 
-	PopDecisionTxs(numTxs int) []*Tx
+	PopDecisionTxs(maxTxsBytes int) []*Tx
 	PopProposalTx() *Tx
 
 	MarkDropped(txID ids.ID)
@@ -192,16 +203,19 @@ func (m *mempool) RemoveProposalTx(tx *Tx) {
 	}
 }
 
-func (m *mempool) PopDecisionTxs(numTxs int) []*Tx {
-	if maxLen := m.unissuedDecisionTxs.Len(); numTxs > maxLen {
-		numTxs = maxLen
-	}
+func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*Tx {
+	var txs []*Tx
+	for m.unissuedDecisionTxs.Len() > 0 {
+		tx := m.unissuedDecisionTxs.Peek()
+		txBytes := tx.Bytes()
+		if len(txBytes) > maxTxsBytes {
+			return txs
+		}
+		maxTxsBytes -= len(txBytes)
 
-	txs := make([]*Tx, numTxs)
-	for i := range txs {
-		tx := m.unissuedDecisionTxs.RemoveTop()
+		m.unissuedDecisionTxs.RemoveTop()
 		m.deregister(tx)
-		txs[i] = tx
+		txs = append(txs, tx)
 	}
 	return txs
 }

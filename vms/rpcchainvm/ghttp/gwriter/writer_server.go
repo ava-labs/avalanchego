@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -7,14 +18,14 @@ import (
 	"context"
 	"io"
 
-	"github.com/ava-labs/avalanchego/api/proto/gwriterproto"
+	writerpb "github.com/chain4travel/caminogo/proto/pb/io/writer"
 )
 
-var _ gwriterproto.WriterServer = &Server{}
+var _ writerpb.WriterServer = &Server{}
 
 // Server is an http.Handler that is managed over RPC.
 type Server struct {
-	gwriterproto.UnimplementedWriterServer
+	writerpb.UnimplementedWriterServer
 	writer io.Writer
 }
 
@@ -23,9 +34,9 @@ func NewServer(writer io.Writer) *Server {
 	return &Server{writer: writer}
 }
 
-func (s *Server) Write(ctx context.Context, req *gwriterproto.WriteRequest) (*gwriterproto.WriteResponse, error) {
+func (s *Server) Write(ctx context.Context, req *writerpb.WriteRequest) (*writerpb.WriteResponse, error) {
 	n, err := s.writer.Write(req.Payload)
-	resp := &gwriterproto.WriteResponse{
+	resp := &writerpb.WriteResponse{
 		Written: int32(n),
 	}
 	if err != nil {

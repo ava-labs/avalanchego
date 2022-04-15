@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -7,16 +18,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+	"github.com/chain4travel/caminogo/snow/choices"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman"
+	"github.com/chain4travel/caminogo/snow/consensus/snowman/poll"
+	"github.com/chain4travel/caminogo/snow/engine/common"
+	"github.com/chain4travel/caminogo/snow/events"
+	"github.com/chain4travel/caminogo/utils/formatting"
+	"github.com/chain4travel/caminogo/utils/wrappers"
+	"github.com/chain4travel/caminogo/version"
 )
 
 var _ Engine = &Transitive{}
@@ -95,6 +106,10 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) err
 		return t.GetFailed(vdr, requestID)
 	}
 
+	if t.wasIssued(blk) {
+		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+	}
+
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
 	// receive requests to fill the ancestry. dependencies that have already
@@ -155,6 +170,10 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byt
 		t.Ctx.Log.Debug("failed to parse block: %s", err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
 		return nil
+	}
+
+	if t.wasIssued(blk) {
+		t.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -434,10 +453,7 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) 
 func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
-	// If the block has been decided, we don't need to issue it.
-	// If the block is processing, we don't need to issue it.
-	// If the block is queued to be issued, we don't need to issue it.
-	for !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
+	for !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -477,7 +493,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
-	for status.Fetched() && !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
+	for status.Fetched() && !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -506,6 +522,14 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	t.blocked.Abandon(blkID)
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return false, t.errs.Err
+}
+
+// If the block has been decided, then it is marked as having been issued.
+// If the block is processing, then it was issued.
+// If the block is queued to be added to consensus, then it was issued.
+func (t *Transitive) wasIssued(blk snowman.Block) bool {
+	blkID := blk.ID()
+	return t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.

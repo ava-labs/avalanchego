@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -6,16 +17,17 @@ package gsubnetlookup
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/api/proto/gsubnetlookupproto"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/chain4travel/caminogo/ids"
+	"github.com/chain4travel/caminogo/snow"
+
+	subnetlookuppb "github.com/chain4travel/caminogo/proto/pb/subnetlookup"
 )
 
-var _ gsubnetlookupproto.SubnetLookupServer = &Server{}
+var _ subnetlookuppb.SubnetLookupServer = &Server{}
 
 // Server is a subnet lookup that is managed over RPC.
 type Server struct {
-	gsubnetlookupproto.UnimplementedSubnetLookupServer
+	subnetlookuppb.UnimplementedSubnetLookupServer
 	aliaser snow.SubnetLookup
 }
 
@@ -26,8 +38,8 @@ func NewServer(aliaser snow.SubnetLookup) *Server {
 
 func (s *Server) SubnetID(
 	_ context.Context,
-	req *gsubnetlookupproto.SubnetIDRequest,
-) (*gsubnetlookupproto.SubnetIDResponse, error) {
+	req *subnetlookuppb.SubnetIDRequest,
+) (*subnetlookuppb.SubnetIDResponse, error) {
 	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return nil, err
@@ -36,7 +48,7 @@ func (s *Server) SubnetID(
 	if err != nil {
 		return nil, err
 	}
-	return &gsubnetlookupproto.SubnetIDResponse{
+	return &subnetlookuppb.SubnetIDResponse{
 		Id: id[:],
 	}, nil
 }

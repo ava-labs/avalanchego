@@ -1,3 +1,14 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -5,14 +16,13 @@ package wrappers
 
 import (
 	"bytes"
-	"crypto/x509"
 	"net"
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/staking"
+	"github.com/chain4travel/caminogo/staking"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/chain4travel/caminogo/utils"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -209,7 +219,8 @@ func TestPackerUnpackInt(t *testing.T) {
 }
 
 func TestPackerPackLong(t *testing.T) {
-	p := Packer{MaxSize: 8}
+	maxSize := 8
+	p := Packer{MaxSize: maxSize}
 
 	p.PackLong(0x0102030405060708)
 
@@ -217,8 +228,8 @@ func TestPackerPackLong(t *testing.T) {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, 8)
+	if size := len(p.Bytes); size != maxSize {
+		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, maxSize)
 	}
 
 	expected := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
@@ -316,7 +327,7 @@ func TestPackerPackBytes(t *testing.T) {
 	}
 
 	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 7)
+		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 8)
 	}
 
 	expected := []byte("\x00\x00\x00\x04Avax")
@@ -595,15 +606,13 @@ func TestPackX509Certificate(t *testing.T) {
 	assert.NoError(t, err)
 
 	p := Packer{MaxSize: 10000}
-	TryPackX509Certificate(&p, cert.Leaf)
+	p.PackX509Certificate(cert.Leaf)
 	assert.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedCert := TryUnpackX509Certificate(&p)
+	unpackedCert := p.UnpackX509Certificate()
 
-	x509unpackedCert := unpackedCert.(*x509.Certificate)
-
-	assert.Equal(t, cert.Leaf.Raw, x509unpackedCert.Raw)
+	assert.Equal(t, cert.Leaf.Raw, unpackedCert.Raw)
 }
 
 func TestPackIPCert(t *testing.T) {
@@ -617,16 +626,15 @@ func TestPackIPCert(t *testing.T) {
 	}
 
 	p := Packer{MaxSize: 10000}
-	TryPackIPCert(&p, ipCert)
+	p.PackIPCert(ipCert)
 	assert.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedIPCert := TryUnpackIPCert(&p)
-	resolvedUnpackedIPCert := unpackedIPCert.(utils.IPCertDesc)
+	unpackedIPCert := p.UnpackIPCert()
 
-	assert.Equal(t, ipCert.IPDesc, resolvedUnpackedIPCert.IPDesc)
-	assert.Equal(t, ipCert.Cert.Raw, resolvedUnpackedIPCert.Cert.Raw)
-	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCert.Signature)
+	assert.Equal(t, ipCert.IPDesc, unpackedIPCert.IPDesc)
+	assert.Equal(t, ipCert.Cert.Raw, unpackedIPCert.Cert.Raw)
+	assert.Equal(t, ipCert.Signature, unpackedIPCert.Signature)
 }
 
 func TestPackIPCertList(t *testing.T) {

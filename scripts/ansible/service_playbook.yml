@@ -1,10 +1,10 @@
 #!/usr/bin/env ansible-playbook
 ---
-- name: Configure Avalanche service
-  hosts: avalanche_nodes
+- name: Configure Camino service
+  hosts: camino_nodes
   roles:
-    - name: avalanche_download
-    - name: avalanche_user
-    - name: avalanche_install
-    - name: avalanche_staker
-    - name: avalanche_service
+    - name: camino_download
+    - name: camino_user
+    - name: camino_install
+    - name: camino_staker
+    - name: camino_service
