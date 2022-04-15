@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -23,6 +24,12 @@ const (
 )
 
 var _ common.StateSyncer = &stateSyncer{}
+
+// summary content as received from network, along with accumulated weight.
+type weightedSummary struct {
+	common.Summary
+	weight uint64
+}
 
 type stateSyncer struct {
 	Config
@@ -45,8 +52,23 @@ type stateSyncer struct {
 	onDoneStateSyncing func(lastReqID uint32) error
 	lastSummaryBlkID   ids.ID
 
-	frontierTracker
-	voteTracker
+	// Holds the beacons that were sampled for the accepted frontier
+	frontierSeeders validators.Set
+	// IDs of validators we should request state summary frontier from
+	targetSeeders ids.ShortSet
+	// IDs of validators we requested a state summary frontier from
+	// but haven't received a reply yet. ID is cleared if/when reply arrives.
+	contactedSeeders ids.ShortSet
+	// IDs of validators that failed to respond with their state summary frontier
+	failedSeeders ids.ShortSet
+
+	// IDs of validators we should request filtering the accepted state summaries from
+	targetVoters ids.ShortSet
+	// IDs of validators we requested filtering the accepted state summaries from
+	// but haven't received a reply yet. ID is cleared if/when reply arrives.
+	contactedVoters ids.ShortSet
+	// IDs of validators that failed to respond with their filtered accepted state summaries
+	failedVoters ids.ShortSet
 
 	// summaryID --> (summary, weight)
 	weightedSummaries map[ids.ID]weightedSummary
@@ -82,13 +104,13 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 		return nil
 	}
 
-	if !ss.hasSeederBeenContacted(validatorID) {
+	if !ss.contactedSeeders.Contains(validatorID) {
 		ss.Ctx.Log.Debug("Received a StateSummaryFrontier message from %s unexpectedly", validatorID)
 		return nil
 	}
 
 	// Mark that we received a response from [validatorID]
-	ss.markSeederResponded(validatorID)
+	ss.contactedSeeders.Remove(validatorID)
 
 	// retrieve key for summary and register frontier;
 	// make sure next beacons are reached out
@@ -106,7 +128,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	ss.sendGetStateSummaryFrontiers()
 
 	// still waiting on requests
-	if ss.anyPendingSeederResponse() {
+	if ss.contactedSeeders.Len() != 0 {
 		return nil
 	}
 
@@ -118,7 +140,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// Create a newAlpha taking using the sampled beacon
 	// Keep the proportion of b.Alpha in the newAlpha
 	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
-	newAlpha := float64(ss.sampledSeedersWeight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
+	newAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
 
 	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
 	if err != nil {
@@ -126,7 +148,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	}
 
 	// fail the fast sync if the weight is not enough to fast sync
-	if float64(ss.sampledSeedersWeight())-newAlpha < float64(failedBeaconWeight) {
+	if float64(ss.frontierSeeders.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if ss.Config.RetrySyncing {
 			ss.Ctx.Log.Debug("Not enough frontiers received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedSeeders.Len(), ss.attempts)
@@ -151,7 +173,7 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.ShortID, re
 
 	// If we can't get a response from [validatorID], act as though they said their state summary frontier is empty
 	// and we add the validator to the failed list
-	ss.markSeederFailed(validatorID)
+	ss.failedSeeders.Add(validatorID)
 	return ss.StateSummaryFrontier(validatorID, requestID, []byte{})
 }
 
@@ -163,12 +185,12 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		return nil
 	}
 
-	if !ss.hasVoterBeenContacted(validatorID) {
+	if !ss.contactedVoters.Contains(validatorID) {
 		ss.Ctx.Log.Debug("Received an AcceptedStateSummary message from %s unexpectedly", validatorID)
 		return nil
 	}
 	// Mark that we received a response from [validatorID]
-	ss.markVoterResponded(validatorID)
+	ss.contactedVoters.Remove(validatorID)
 
 	weight := uint64(0)
 	if w, ok := ss.StateSyncBeacons.GetWeight(validatorID); ok {
@@ -196,7 +218,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	// wait on pending responses
-	if ss.anyPendingVoterResponse() {
+	if ss.contactedVoters.Len() != 0 {
 		return nil
 	}
 
@@ -241,7 +263,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 
 	// If we can't get a response from [validatorID], act as though they said
 	// that they think none of the containers we sent them in GetAccepted are accepted
-	ss.markVoterFailed(validatorID)
+	ss.failedVoters.Add(validatorID)
 
 	return ss.AcceptedStateSummary(validatorID, requestID, []ids.ID{})
 }
@@ -258,15 +280,35 @@ func (ss *stateSyncer) startup() error {
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]weightedSummary)
-	ss.frontierTracker.clear()
-	ss.voteTracker.clear()
 
-	// set beacons
-	if err := ss.sampleSeeders(ss.StateSyncBeacons, ss.Config.SampleK); err != nil {
+	ss.targetSeeders.Clear()
+	ss.contactedSeeders.Clear()
+	ss.failedSeeders.Clear()
+	ss.targetVoters.Clear()
+	ss.contactedVoters.Clear()
+	ss.failedVoters.Clear()
+
+	// sample K beacons to retrieve frontier from
+	beacons, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
+	if err != nil {
 		return err
 	}
 
-	ss.storeVoters(ss.StateSyncBeacons)
+	ss.frontierSeeders = validators.NewSet()
+	if err = ss.frontierSeeders.Set(beacons); err != nil {
+		return err
+	}
+
+	for _, vdr := range beacons {
+		vdrID := vdr.ID()
+		ss.targetSeeders.Add(vdrID)
+	}
+
+	// list all beacons, to reach them for voting on frontier
+	for _, vdr := range ss.StateSyncBeacons.List() {
+		vdrID := vdr.ID()
+		ss.targetVoters.Add(vdrID)
+	}
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
@@ -284,7 +326,7 @@ func (ss *stateSyncer) startup() error {
 
 	// initiate messages exchange
 	ss.attempts++
-	if !ss.hasSeedersToContact() {
+	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 		return ss.stateSyncVM.StateSync(nil)
 	}
@@ -306,27 +348,40 @@ func (ss *stateSyncer) restart() error {
 // Ask up to [maxOutstandingStateSyncRequests] state sync validators to send
 // their accepted state summary
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
-	if vdrs := ss.pickSeedersToContact(); vdrs.Len() > 0 {
+	vdrs := ids.NewShortSet(1)
+	for ss.targetSeeders.Len() > 0 && vdrs.Len() < maxOutstandingStateSyncRequests {
+		vdr, _ := ss.targetSeeders.Pop()
+		vdrs.Add(vdr)
+	}
+
+	if vdrs.Len() > 0 {
 		ss.Sender.SendGetStateSummaryFrontier(vdrs, ss.requestID)
-		ss.markSeederContacted(vdrs)
+		ss.contactedSeeders.Add(vdrs.List()...)
 	}
 }
 
 // Ask up to [maxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier
 func (ss *stateSyncer) sendGetAccepted() error {
-	if vdrs := ss.pickVotersToContact(); len(vdrs) > 0 {
-		ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
-			vdrs.Len(), ss.targetVoters.Len())
-
-		acceptedKeys := make([]uint64, 0, len(ss.weightedSummaries))
-		for _, summary := range ss.weightedSummaries {
-			acceptedKeys = append(acceptedKeys, summary.Key())
-		}
-		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
-		ss.markVoterContacted(vdrs)
+	// pick voters to contact
+	vdrs := ids.NewShortSet(1)
+	for ss.targetVoters.Len() > 0 && vdrs.Len() < maxOutstandingStateSyncRequests {
+		vdr, _ := ss.targetVoters.Pop()
+		vdrs.Add(vdr)
 	}
 
+	if len(vdrs) == 0 {
+		return nil
+	}
+
+	acceptedKeys := make([]uint64, 0, len(ss.weightedSummaries))
+	for _, summary := range ss.weightedSummaries {
+		acceptedKeys = append(acceptedKeys, summary.Key())
+	}
+	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
+	ss.contactedVoters.Add(vdrs.List()...)
+	ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
+		vdrs.Len(), ss.targetVoters.Len())
 	return nil
 }
 

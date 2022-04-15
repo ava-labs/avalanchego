@@ -8,7 +8,6 @@ import (
 	"crypto"
 	"crypto/tls"
 	"errors"
-	"math"
 	"testing"
 	"time"
 
@@ -151,18 +150,6 @@ func initTestProposerVM(
 
 	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
 		t.Fatal(err)
-	}
-
-	// Store ForkHeight
-	if proBlkStartTime.Before(genesisTimestamp) {
-		if err := proVM.State.SetForkHeight(0); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if proBlkStartTime.Equal(mockable.MaxTime) {
-		if err := proVM.State.SetForkHeight(math.MaxUint64); err != nil {
-			t.Fatal(err)
-		}
 	}
 
 	return coreVM, valState, proVM, coreGenBlk, dummyDBManager

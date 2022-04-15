@@ -74,7 +74,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert.True(len(contactedFrontiersProviders) == safeMath.Min(beacons.Len(), maxOutstandingStateSyncRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
-		assert.True(syncer.hasSeederBeenContacted(beaconID))
+		assert.True(syncer.contactedSeeders.Contains(beaconID))
 	}
 
 	// check that, obviously, no summary is yet registered
@@ -128,7 +128,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		math.MaxInt32,
 		summaryBytes,
 	))
-	assert.True(syncer.hasSeederBeenContacted(responsiveBeaconID)) // responsiveBeacon still pending
+	assert.True(syncer.contactedSeeders.Contains(responsiveBeaconID)) // responsiveBeacon still pending
 	assert.True(len(syncer.weightedSummaries) == 0)
 
 	// check a response from unsolicited node is dropped
@@ -148,7 +148,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.hasSeederBeenContacted(responsiveBeaconID))
+	assert.False(syncer.contactedSeeders.Contains(responsiveBeaconID))
 
 	// valid summary is recorded
 	ws, ok := syncer.weightedSummaries[summaryID]
@@ -209,7 +209,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.hasSeederBeenContacted(responsiveBeaconID))
+	assert.False(syncer.contactedSeeders.Contains(responsiveBeaconID))
 
 	// invalid summary is not recorded
 	assert.True(isSummaryDecoded)
@@ -266,7 +266,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	))
 
 	// unresponsiveBeacon not pending anymore
-	assert.False(syncer.hasSeederBeenContacted(unresponsiveBeaconID))
+	assert.False(syncer.contactedSeeders.Contains(unresponsiveBeaconID))
 	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
 
 	// even in case of timeouts, other listed beacons
@@ -352,7 +352,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.anyPendingSeederResponse())
+	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -415,7 +415,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.anyPendingSeederResponse())
+	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -437,7 +437,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveVoter still pending
-	assert.True(syncer.hasVoterBeenContacted(responsiveVoterID))
+	assert.True(syncer.contactedVoters.Contains(responsiveVoterID))
 	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
 	// check a response from unsolicited node is dropped
@@ -457,7 +457,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.hasSeederBeenContacted(responsiveVoterID))
+	assert.False(syncer.contactedSeeders.Contains(responsiveVoterID))
 	voterWeight, found := beacons.GetWeight(responsiveVoterID)
 	assert.True(found)
 	assert.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
@@ -523,7 +523,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.anyPendingSeederResponse())
+	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -547,7 +547,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.False(found)
 
 	// check that responsiveVoter cannot cast another vote
-	assert.False(syncer.hasSeederBeenContacted(responsiveVoterID))
+	assert.False(syncer.contactedSeeders.Contains(responsiveVoterID))
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
@@ -617,7 +617,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.anyPendingSeederResponse())
+	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	isVMStateSyncCalled := false
 	fullVM.CantStateSync = true
@@ -712,7 +712,8 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.anyPendingSeederResponse())
+
+	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	isVMStateSyncCalled := false
 	fullVM.CantStateSync = true
@@ -750,6 +751,6 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	assert.False(isVMStateSyncCalled)
 
 	// instead the whole process is restared
-	assert.False(syncer.anyPendingVoterResponse()) // no voters reached
-	assert.True(syncer.anyPendingSeederResponse()) // frontiers providers reached again
+	assert.False(syncer.contactedVoters.Len() != 0) // no voters reached
+	assert.True(syncer.contactedSeeders.Len() != 0) // frontiers providers reached again
 }
