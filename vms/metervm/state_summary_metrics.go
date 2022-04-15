@@ -14,6 +14,8 @@ type stateSummaryMetrics struct {
 	lastSummaryBlockID,
 	setLastSummaryBlockID,
 	isSummaryAccepted,
+	parseSummary,
+	getOngoingStateSyncSummary,
 	syncState metric.Averager
 }
 
@@ -27,6 +29,8 @@ func newStateSummaryMetrics(namespace string, reg prometheus.Registerer) (stateS
 	ssM.lastSummaryBlockID = newAverager(namespace, "last_summary_block_id", reg, &errs)
 	ssM.setLastSummaryBlockID = newAverager(namespace, "set_last_summary_block_id", reg, &errs)
 	ssM.isSummaryAccepted = newAverager(namespace, "summary_accepted", reg, &errs)
+	ssM.parseSummary = newAverager(namespace, "parse_summary", reg, &errs)
+	ssM.getOngoingStateSyncSummary = newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs)
 	ssM.syncState = newAverager(namespace, "sync_state", reg, &errs)
 	return ssM, errs.Err
 }

@@ -12,6 +12,7 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	if vm.ssVM == nil {
 		return false, common.ErrStateSyncableVMNotImplemented
 	}
+	// Note: we intentionally omit adding metrics for StateSyncEnabled
 
 	return vm.ssVM.StateSyncEnabled()
 }
@@ -33,8 +34,12 @@ func (vm *blockVM) StateSyncParseSummary(summaryBytes []byte) (common.Summary, e
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
+	start := vm.clock.Time()
+	summary, err := vm.ssVM.StateSyncParseSummary(summaryBytes)
+	end := vm.clock.Time()
+	vm.stateSummaryMetrics.parseSummary.Observe(float64(end.Sub(start)))
 
-	return vm.ssVM.StateSyncParseSummary(summaryBytes)
+	return summary, err
 }
 
 func (vm *blockVM) StateSyncGetSummary(key uint64) (common.Summary, error) {
@@ -67,8 +72,12 @@ func (vm *blockVM) StateSyncGetOngoingSummary() (common.Summary, error) {
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
+	start := vm.clock.Time()
+	summary, err := vm.ssVM.StateSyncGetOngoingSummary()
+	end := vm.clock.Time()
+	vm.stateSummaryMetrics.getOngoingStateSyncSummary.Observe(float64(end.Sub(start)))
 
-	return vm.ssVM.StateSyncGetOngoingSummary()
+	return summary, err
 }
 
 func (vm *blockVM) StateSyncGetResult() (ids.ID, uint64, error) {
