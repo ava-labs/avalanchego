@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,10 +20,16 @@ var (
 	_ block.ChainVM         = fullVM{}
 	_ block.StateSyncableVM = fullVM{}
 
-	beacons          validators.Set
-	summaryBytes     []byte
-	key              uint64
-	summaryID        ids.ID
+	beacons validators.Set
+
+	key          uint64
+	summaryID    ids.ID
+	summaryBytes []byte
+
+	minorityKey          uint64
+	minoritySummaryID    ids.ID
+	minoritySummaryBytes []byte
+
 	unknownSummaryID ids.ID
 )
 
@@ -32,6 +39,7 @@ type fullVM struct {
 }
 
 func init() {
+	var err error
 	beacons = validators.NewSet()
 
 	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
@@ -42,9 +50,20 @@ func init() {
 		}
 	}
 
-	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	key = uint64(2022)
-	summaryID = ids.ID{'h', 'a', 's', 'h'}
+	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
+	summaryID, err = ids.ToID(hashing.ComputeHash256(summaryBytes))
+	if err != nil {
+		panic(err)
+	}
+
+	minorityKey = uint64(2000)
+	minoritySummaryBytes = []byte{'m', 'i', 'n', 'o', 'r', 'i', 't', 'y'}
+	minoritySummaryID, err = ids.ToID(hashing.ComputeHash256(minoritySummaryBytes))
+	if err != nil {
+		panic(err)
+	}
+
 	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
 }
 
