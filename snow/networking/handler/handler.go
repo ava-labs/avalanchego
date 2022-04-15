@@ -41,7 +41,10 @@ type Handler interface {
 	SetConsensus(engine common.Engine)
 	Consensus() common.Engine
 	SetOnStopped(onStopped func())
+
+	SelectStartingGear() (common.Engine, error)
 	Start(recoverPanic bool)
+
 	Push(msg message.InboundMessage)
 	Stop()
 	StopWithError(err error)
@@ -151,6 +154,26 @@ func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
 func (h *handler) Consensus() common.Engine          { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
+
+func (h *handler) SelectStartingGear() (common.Engine, error) {
+	if h.stateSyncer == nil {
+		return h.bootstrapper, nil
+	}
+
+	var stateSyncEnabled bool
+	stateSyncEnabled, err := h.stateSyncer.IsEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	if !stateSyncEnabled {
+		return h.bootstrapper, nil
+	}
+
+	// drop bootstrap state from previous runs
+	// before starting state sync
+	return h.stateSyncer, h.bootstrapper.Clear()
+}
 
 func (h *handler) Start(recoverPanic bool) {
 	if recoverPanic {

@@ -324,31 +324,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		}
 	}()
 
-	stateSyncer := chain.Handler.StateSyncer()
-	if stateSyncer == nil {
-		err = chain.Handler.Bootstrapper().Start(0)
-		return
-	}
-
-	var stateSyncEnabled bool
-	stateSyncEnabled, err = stateSyncer.IsEnabled()
+	gear, err := chain.Handler.SelectStartingGear()
 	if err != nil {
 		return
 	}
-
-	if !stateSyncEnabled {
-		err = chain.Handler.Bootstrapper().Start(0)
-		return
-	}
-
-	// drop bootstrap state from previous runs
-	// before starting state sync
-	err = chain.Handler.Bootstrapper().Clear()
-	if err != nil {
-		return
-	}
-
-	err = stateSyncer.Start(0)
+	err = gear.Start(0)
 }
 
 // Create a chain
