@@ -130,8 +130,13 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 
 		// Following state sync introduction, we update height -> blockID index
 		// with summaries content in order to support resuming state sync in case
-		// of shutdown. Note that we won't download all the blocks associated with
-		// state summaries.
+		// of shutdown. The height index allows to retrieve the proposerBlkID
+		// of any state sync passed down to coreVM, so that the proposerVM state summary
+		// information of any coreVM summary can be rebuilt and pass to the engine, even
+		// following a shutdown.
+		// Note that we won't download all the blocks associated with state summaries,
+		// so proposerVM may not not all the full blocks indexed into height index. Same
+		// is true for coreVM.
 		if err := vm.updateHeightIndex(s.Key(), proContent.ProposerBlockID()); err != nil {
 			return err
 		}

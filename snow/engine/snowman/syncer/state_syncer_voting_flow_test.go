@@ -708,7 +708,6 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 			summaryBytes,
 		))
 	}
-
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	isVMStateSyncCalled := false
