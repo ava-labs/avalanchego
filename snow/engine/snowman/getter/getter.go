@@ -56,7 +56,11 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	}
 
 	summary, err := gh.ssVM.StateSyncGetLastSummary()
-	if err != nil {
+	if err == common.ErrStateSyncableVMNotImplemented {
+		// this may happen with rpcchainVMs
+		gh.log.Debug("State sync not supported. GetStateSummaryFrontier(%s, %d) dropped.", validatorID, requestID)
+		return nil
+	} else if err != nil {
 		gh.log.Info("couldn't get state summary frontier with %s. Dropping GetStateSummaryFrontier(%s, %d)",
 			err, validatorID, requestID)
 		return nil
@@ -75,6 +79,7 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	for _, key := range keys {
 		summary, err := gh.ssVM.StateSyncGetSummary(key)
 		if err == common.ErrStateSyncableVMNotImplemented {
+			// this may happen with rpcchainVMs
 			return nil
 		} else if err != nil {
 			continue
