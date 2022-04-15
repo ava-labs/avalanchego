@@ -2,6 +2,9 @@ name: Test upgrade
 
 on:
   pull_request:
+    # As long we dont have compareable versions ...
+    branches-ignore:
+      - '**'
 
 permissions:
   contents: read
