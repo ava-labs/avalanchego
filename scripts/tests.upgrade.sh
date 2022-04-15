@@ -54,8 +54,7 @@ find /tmp/caminogo-v${VERSION}
 #################################
 # download camino-network-runner
 # https://github.com/chain4travel/camino-network-runner
-# TODO: migrate to upstream camino-network-runner
-NETWORK_RUNNER_VERSION=1.0.6
+NETWORK_RUNNER_VERSION=0.0.1
 DOWNLOAD_PATH=/tmp/camino-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/chain4travel/camino-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/camino-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
