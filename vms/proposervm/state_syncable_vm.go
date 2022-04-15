@@ -6,81 +6,16 @@ package proposervm
 import (
 	"errors"
 	"fmt"
-	"math"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
 var (
-	_ common.Summary = &ProposerSummaryContent{}
-
-	stateSyncCodec               codec.Manager
-	errWrongStateSyncVersion     = errors.New("wrong state sync key version")
 	errUnknownLastSummaryBlockID = errors.New("could not retrieve blockID associated with last summary")
 	errBadLastSummaryBlock       = errors.New("could not parse last summary block")
 )
-
-const StateSummaryVersion = 0
-
-func init() {
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	stateSyncCodec = codec.NewManager(math.MaxInt32)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		lc.RegisterType(&ProposerSummaryContent{}),
-		stateSyncCodec.RegisterCodec(StateSummaryVersion, lc),
-	)
-	if err := errs.Err; err != nil {
-		panic(err)
-	}
-}
-
-// ProposerSummaryContent adds to its Core Summary the proposer block ID
-// associated with the summary. This allows retrieving the full block associated
-// with state summary once state syncing is done.
-// ProposerSummaryContent Key is summary block height and matches CoreSummaryContent key;
-// However ProposerSummaryContent ID is different from CoreSummaryContent ID
-// since it hashes ProBlkID along with Core Summary Bytes for full verification.
-type ProposerSummaryContent struct {
-	ProBlkID    ids.ID `serialize:"true"`
-	CoreContent []byte `serialize:"true"`
-
-	proSummaryID ids.ID
-	proContent   []byte
-	key          uint64
-}
-
-func (ps *ProposerSummaryContent) Bytes() []byte { return ps.proContent }
-func (ps *ProposerSummaryContent) Key() uint64   { return ps.key }
-func (ps *ProposerSummaryContent) ID() ids.ID    { return ps.proSummaryID }
-
-func newSummary(proBlkID ids.ID, coreSummary common.Summary) (common.Summary, error) {
-	res := &ProposerSummaryContent{
-		ProBlkID:    proBlkID,
-		CoreContent: coreSummary.Bytes(),
-
-		key: coreSummary.Key(), // note: this is not serialized
-	}
-
-	proContent, err := stateSyncCodec.Marshal(StateSummaryVersion, res)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
-	}
-	res.proContent = proContent
-
-	proSummaryID, err := ids.ToID(hashing.ComputeHash256(proContent))
-	if err != nil {
-		return nil, fmt.Errorf("cannot compute summary ID: %w", err)
-	}
-	res.proSummaryID = proSummaryID
-	return res, nil
-}
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	if vm.coreStateSyncVM == nil {
@@ -108,7 +43,7 @@ func (vm *VM) StateSyncGetOngoingSummary() (common.Summary, error) {
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return newSummary(proBlkID, coreSummary)
+	return summary.New(proBlkID, coreSummary)
 }
 
 func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
@@ -130,7 +65,7 @@ func (vm *VM) StateSyncGetLastSummary() (common.Summary, error) {
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return newSummary(proBlkID, coreSummary)
+	return summary.New(proBlkID, coreSummary)
 }
 
 // Note: it's important that StateSyncParseSummary do not use any index or state
@@ -140,21 +75,17 @@ func (vm *VM) StateSyncParseSummary(summaryBytes []byte) (common.Summary, error)
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	proContent := ProposerSummaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(summaryBytes, &proContent)
+	proContent, err := summary.Parse(summaryBytes)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
-	}
-	if ver != StateSummaryVersion {
-		return nil, errWrongStateSyncVersion
+		return nil, err
 	}
 
-	coreSummary, err := vm.coreStateSyncVM.StateSyncParseSummary(proContent.CoreContent)
+	coreSummary, err := vm.coreStateSyncVM.StateSyncParseSummary(proContent.CoreSummaryBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal coreSummaryContent due to: %w", err)
 	}
 
-	return newSummary(proContent.ProBlkID, coreSummary)
+	return summary.New(proContent.ProposerBlockID(), coreSummary)
 }
 
 func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
@@ -176,7 +107,7 @@ func (vm *VM) StateSyncGetSummary(key uint64) (common.Summary, error) {
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return newSummary(proBlkID, coreSummary)
+	return summary.New(proBlkID, coreSummary)
 }
 
 func (vm *VM) StateSync(accepted []common.Summary) error {
@@ -185,17 +116,13 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 	}
 
 	coreSummaries := make([]common.Summary, 0, len(accepted))
-	for _, summary := range accepted {
-		proContent := ProposerSummaryContent{}
-		ver, err := stateSyncCodec.Unmarshal(summary.Bytes(), &proContent)
+	for _, s := range accepted {
+		proContent, err := summary.Parse(s.Bytes())
 		if err != nil {
 			return err
 		}
-		if ver != StateSummaryVersion {
-			return errWrongStateSyncVersion
-		}
 
-		coreSummary, err := vm.coreStateSyncVM.StateSyncParseSummary(proContent.CoreContent)
+		coreSummary, err := vm.coreStateSyncVM.StateSyncParseSummary(proContent.CoreSummaryBytes())
 		if err != nil {
 			return fmt.Errorf("could not parse coreSummaryContent due to: %w", err)
 		}
@@ -206,7 +133,7 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		// with summaries content in order to support resuming state sync in case
 		// of shutdown. Note that we won't download all the blocks associated with
 		// state summaries.
-		if err := vm.updateHeightIndex(summary.Key(), proContent.ProBlkID); err != nil {
+		if err := vm.updateHeightIndex(s.Key(), proContent.ProposerBlockID()); err != nil {
 			return err
 		}
 	}
