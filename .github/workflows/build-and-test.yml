@@ -3,7 +3,7 @@ name: Build + Unit Tests
 on:
   push:
     branches: [chain4travel]
-  pull-request:
+  pull_request:
     branches: [chain4travel]
 
 jobs:

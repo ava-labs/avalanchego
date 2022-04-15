@@ -7,8 +7,6 @@ on:
     branches: [chain4travel]
     tags:
       - "*"
-  pull-request:
-    branches: [chain4travel]
 
 permissions:
   contents: write

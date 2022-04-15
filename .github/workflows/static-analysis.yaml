@@ -1,6 +1,6 @@
 name: Static analysis
 on:
-  pull-request:
+  pull_request:
     tags-ignore:
       - "*" # Ignores all tags
     branches: [chain4travel]

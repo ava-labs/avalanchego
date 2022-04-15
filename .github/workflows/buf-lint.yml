@@ -3,7 +3,7 @@ name: Lint proto files
 on:
   push:
     branches: [chain4travel]
-  pull-request:
+  pull_request:
     branches: [chain4travel]
 
 permissions:
