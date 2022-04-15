@@ -142,6 +142,10 @@ func (vm *VM) StateSync(accepted []common.Summary) error {
 		}
 	}
 
+	if err := vm.db.Commit(); err != nil {
+		return nil
+	}
+
 	return vm.coreStateSyncVM.StateSync(coreSummaries)
 }
 

@@ -39,6 +39,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -112,6 +113,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -178,6 +180,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		nil,
 		nil,
 		1,
+		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -236,6 +239,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		msgFromVMChan,
 		nil,
 		time.Second,
+		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
