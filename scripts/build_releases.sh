@@ -8,7 +8,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-RELEASE_ID="$(git describe --tag)"
+RELEASE_TAG="$(git describe --tag)"
+RELEASE_ID=0
+
 # caminogo root folder
 CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Authentication
@@ -25,6 +27,7 @@ publish () {
 	fi
 	FILENAME=$(basename "$1")
 	UPLOAD_URL="https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=${FILENAME}"
+	echo "upload url: ${UPLOAD_URL}"
 
 	# create a temp file for upload output
 	logOut=$(mktemp)
@@ -39,19 +42,33 @@ publish () {
 		--output $logOut \
 		"${UPLOAD_URL}")
 
-	cat $logOut
-	rm $logOut
+        if [ "$?" -ne 0 ]; then
+                echo "err: curl command failed!!!"
+		rm $logOut
+                return 1
+        fi
 
-	if [ "$?" -ne 0 ]; then
-		echo "err: curl command failed!!!"
-		return 1
-	fi
+	cat $logOut && echo ""
+	rm $logOut
 
 	if [ $response -ge 400 ]; then
 		echo "err: upload not successful ($response)!!!"
  		return 1
 	fi
 }
+
+if [ -n "$AUTH_HEADER" ]; then
+	GH_API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+	GH_TAGS="${GH_API}/releases/tags/$RELEASE_TAG"
+
+	# release the version
+	response=$(curl  -sH "${AUTH_HEADER}" --data "{\"tag_name\":\"$RELEASE_TAG\", \"draft\":true, \"generate_release_notes\":true}" "$GH_API/releases")
+
+	# extract id out of response
+	eval $(echo "$response" | grep -m 1 "id.:" | grep -w id | tr : = | tr -cd '[[:alnum:]]=')
+	[ "$id" ] || { echo "Error: Failed to get release id for tag: $tag"; echo "$response\n" >&2; exit 1; }
+	RELEASE_ID=$id
+fi
 
 echo "Building release OS=linux and ARCH=amd64 using GOAMD64 V2 for caminogo version $RELEASE_ID"
 rm -rf $CAMINO_PATH/build/*
@@ -64,7 +81,7 @@ cp $CAMINO_PATH/LICENSE $CAMINO_PATH/build
 rm -rf $CAMINO_PATH/dist && mkdir $CAMINO_PATH/dist
 # create the package
 echo "building artifact"
-ARTIFACT=$CAMINO_PATH/dist/caminogo-linux-amd64-$RELEASE_ID.tar.gz
+ARTIFACT=$CAMINO_PATH/dist/caminogo-linux-amd64-$RELEASE_TAG.tar.gz
 tar -czf $ARTIFACT -C $CAMINO_PATH/build/ .
 # publish the newly generated file
 publish $ARTIFACT
