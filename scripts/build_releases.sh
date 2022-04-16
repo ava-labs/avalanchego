@@ -73,15 +73,19 @@ fi
 echo "Building release OS=linux and ARCH=amd64 using GOAMD64 V2 for caminogo version $RELEASE_ID"
 rm -rf $CAMINO_PATH/build/*
 
+DEST_PATH=$CAMINO_PATH/dist/
+ARCHIVE_PATH=caminogo-$RELEASE_TAG
+# prepare a fresh dist folder
+rm -rf $DEST_PATH && mkdir -p $DEST_PATH
+
 # build executables into build dir
 GOOS=linux GOARCH=amd64 GOAMD64=v2 $CAMINO_PATH/scripts/build.sh
 # copy the license file
 cp $CAMINO_PATH/LICENSE $CAMINO_PATH/build
-# prepare a fresh dist folder
-rm -rf $CAMINO_PATH/dist && mkdir $CAMINO_PATH/dist
+
 # create the package
 echo "building artifact"
-ARTIFACT=$CAMINO_PATH/dist/caminogo-linux-amd64-$RELEASE_TAG.tar.gz
-tar -czf $ARTIFACT -C $CAMINO_PATH/build/ .
+ARTIFACT=$DEST_PATH/caminogo-linux-amd64-$RELEASE_TAG.tar.gz
+tar -czf $ARTIFACT -C $CAMINO_PATH build --transform "s,build,$ARCHIVE_PATH,"
 # publish the newly generated file
 publish $ARTIFACT
