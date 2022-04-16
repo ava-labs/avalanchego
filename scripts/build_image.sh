@@ -4,8 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Avalanchego root folder
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Caminogo root folder
+CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the versions
 source "$CAMINO_PATH"/scripts/versions.sh
 # Load the constants

@@ -49,6 +49,6 @@ if [[ ! -d "$WORKPREFIX" ]]; then
 fi
 
 FULL_COMMIT_HASH="$(git --git-dir="$CAMINO_CLONE/.git" rev-parse HEAD)"
-AVALANCHE_COMMIT="${FULL_COMMIT_HASH::8}"
+CAMINO_COMMIT="${FULL_COMMIT_HASH::8}"
 
 "${DOCKER}" build -t "$DOCKERHUB_REPO:$CAMINO_COMMIT" "$CAMINO_CLONE" -f "$CAMINO_CLONE/Dockerfile"

@@ -4,7 +4,8 @@ name: Build on supported platforms
 
 on:
   push:
-    tags: ["*"]
+    #tags: ["*"]
+    branches-ignore: ["*"]
 
 permissions:
   contents: write
