@@ -1,5 +1,7 @@
 # Release Notes
 
+## [v0.8.10](https://github.com/ava-labs/coreth/releases/tag/v0.8.10)
+
 ## [v0.8.9](https://github.com/ava-labs/coreth/releases/tag/v0.8.9)
 - Fix deadlock bug on shutdown causing historical re-generation on restart
 - Add API endpoint to fetch running VM Config
