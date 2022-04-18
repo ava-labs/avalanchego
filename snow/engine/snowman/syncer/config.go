@@ -5,27 +5,20 @@ package syncer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 type Config struct {
+	common.Config
 	common.AllGetsServer
 
 	SampleK          int
 	Alpha            uint64
 	StateSyncBeacons validators.Set
 
-	Sender        common.Sender
-	Ctx           *snow.ConsensusContext
-	VM            block.ChainVM
-	WeightTracker tracker.WeightTracker
-
-	RetrySyncing              bool
-	RetrySyncingWarnFrequency int
+	VM block.ChainVM
 }
 
 func NewConfig(
@@ -33,7 +26,6 @@ func NewConfig(
 	stateSyncerIDs []ids.ShortID,
 	snowGetHandler common.AllGetsServer,
 	vm block.ChainVM,
-	weightTracker tracker.WeightTracker,
 ) (Config, error) {
 	var (
 		stateSyncBeacons = commonCfg.Beacons
@@ -54,17 +46,12 @@ func NewConfig(
 		}
 		syncAlpha = stateSyncingWeight/2 + 1 // must be > 50%
 	}
-
 	return Config{
-		SampleK:                   syncSampleK,
-		Alpha:                     syncAlpha,
-		StateSyncBeacons:          stateSyncBeacons,
-		Sender:                    commonCfg.Sender,
-		AllGetsServer:             snowGetHandler,
-		Ctx:                       commonCfg.Ctx,
-		VM:                        vm,
-		WeightTracker:             weightTracker,
-		RetrySyncing:              commonCfg.RetryBootstrap,
-		RetrySyncingWarnFrequency: commonCfg.RetryBootstrapWarnFrequency,
+		Config:           commonCfg,
+		AllGetsServer:    snowGetHandler,
+		SampleK:          syncSampleK,
+		Alpha:            syncAlpha,
+		StateSyncBeacons: stateSyncBeacons,
+		VM:               vm,
 	}, nil
 }

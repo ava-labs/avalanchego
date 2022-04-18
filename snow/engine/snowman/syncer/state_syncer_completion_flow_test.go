@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,9 +25,9 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 		Beacons:                     beacons,
 		SampleK:                     int(beacons.Weight()),
 		Alpha:                       (beacons.Weight() + 1) / 2,
-		StartupAlpha:                (3*beacons.Weight() + 3) / 4,
-		RetryBootstrap:              true, // this enable RetryStateSyncinc too
-		RetryBootstrapWarnFrequency: 1,    // this enable RetrySyncingWarnFrequency too
+		WeightTracker:               tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		RetryBootstrap:              true, // this sets RetryStateSyncing too
+		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 

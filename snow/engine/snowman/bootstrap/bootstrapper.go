@@ -225,10 +225,11 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.SetState(snow.Bootstrapping)
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if b.WeightTracker.EnoughConnectedWeight() {
+	if !b.WeightTracker.EnoughConnectedWeight() {
 		return nil
 	}
 
+	b.started = true
 	return b.Startup()
 }
 

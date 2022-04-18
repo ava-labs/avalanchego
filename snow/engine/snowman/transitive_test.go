@@ -13,9 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -29,22 +27,11 @@ var (
 	Genesis         = ids.GenerateTestID()
 )
 
-type dummyHandler struct {
-	startEngineF func(startReqID uint32) error
-}
-
-func (dh *dummyHandler) onDoneBootstrapping(lastReqID uint32) error {
-	lastReqID++
-	return dh.startEngineF(lastReqID)
-}
-
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	bootCfg, engCfg := DefaultConfigs()
+	commonCfg := common.DefaultConfigTest()
+	engCfg := DefaultConfigs()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -52,19 +39,16 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
+	commonCfg.Sender = sender
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
-	snowGetHandler, err := snowgetter.New(vm, bootCfg.Config)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +63,6 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	}}
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	sender.CantSendGetAcceptedFrontier = false
 
 	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -91,31 +74,18 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 		}
 	}
 
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.CantSetState = false
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
-	sender.CantSendGetAcceptedFrontier = true
-
 	return vdr, vals, sender, vm, te, gBlk
 }
 
@@ -228,7 +198,6 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	blocked := new(bool)
-
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		*blocked = true
 		switch blkID {
@@ -415,8 +384,7 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
-
+	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		Alpha:                 2,
@@ -429,9 +397,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -448,16 +413,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	vm.Default(true)
@@ -469,9 +430,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}}
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	sender.CantSendGetAcceptedFrontier = false
-
-	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
@@ -479,30 +437,18 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk, nil
 	}
 
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.CantSetState = false
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
-	sender.CantSendGetAcceptedFrontier = true
 
 	blk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -919,8 +865,7 @@ func TestEngineRepoll(t *testing.T) {
 }
 
 func TestVoteCanceling(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
-
+	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     3,
 		Alpha:                 2,
@@ -933,9 +878,6 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -952,16 +894,12 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	vm.Default(true)
@@ -982,32 +920,18 @@ func TestVoteCanceling(t *testing.T) {
 			panic("Should have failed")
 		}
 	}
-	sender.CantSendGetAcceptedFrontier = false
-
-	vm.CantSetState = false
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.CantSetState = false
 	vm.LastAcceptedF = nil
-	sender.CantSendGetAcceptedFrontier = true
 
 	blk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1067,19 +991,11 @@ func TestVoteCanceling(t *testing.T) {
 }
 
 func TestEngineNoQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs()
 
-	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.WeightTracker = wt
-
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
 	sender.Default(true)
-	sender.CantSendGetAcceptedFrontier = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1097,26 +1013,15 @@ func TestEngineNoQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bootCfg.VM = vm
 	engCfg.VM = vm
-
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1136,19 +1041,11 @@ func TestEngineNoQuery(t *testing.T) {
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs()
 
-	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.WeightTracker = wt
-
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
 	sender.Default(true)
-	sender.CantSendGetAcceptedFrontier = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1166,26 +1063,15 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	bootCfg.VM = vm
 	engCfg.VM = vm
-
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1819,14 +1705,10 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
-
+	engCfg := DefaultConfigs()
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -1834,16 +1716,12 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	vm.Default(true)
@@ -1855,9 +1733,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}}
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	sender.CantSendGetAcceptedFrontier = false
-
-	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
@@ -1865,32 +1740,18 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk, nil
 	}
 
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.CantSetState = true
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
-	sender.CantSendGetAcceptedFrontier = true
-
-	sender.Default(true)
 
 	pendingBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1945,8 +1806,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
-
+	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
 		K:                     2,
 		Alpha:                 2,
@@ -1959,9 +1819,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestShortID()
@@ -1974,16 +1831,13 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	vm.Default(true)
@@ -1995,8 +1849,6 @@ func TestEngineDoubleChit(t *testing.T) {
 	}}
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	sender.CantSendGetAcceptedFrontier = false
-
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		if id == gBlk.ID() {
 			return gBlk, nil
@@ -2005,30 +1857,17 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	vm.CantSetState = false
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.CantSetState = true
 	vm.LastAcceptedF = nil
-	sender.CantSendGetAcceptedFrontier = true
 
 	blk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -2105,16 +1944,12 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
-	bootCfg, engCfg := DefaultConfigs()
-
+	engCfg := DefaultConfigs()
 	engCfg.Params.K = 1
 	engCfg.Params.Alpha = 1
 	engCfg.Params.OptimalProcessing = 1
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestShortID()
@@ -2122,16 +1957,12 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender := &common.SenderTest{}
-	sender.T = t
-	bootCfg.Sender = sender
+	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
-
 	sender.Default(true)
 
 	vm := &block.TestVM{}
 	vm.T = t
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	vm.Default(true)
@@ -2143,9 +1974,6 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	}}
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	sender.CantSendGetAcceptedFrontier = false
-
-	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
@@ -2153,32 +1981,18 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk, nil
 	}
 
-	dh := &dummyHandler{}
-	bootstrapper, err := bootstrap.New(
-		bootCfg,
-		dh.onDoneBootstrapping,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	te, err := newTransitive(engCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dh.startEngineF = te.Start
 
 	startReqID := uint32(0)
-	if err := bootstrapper.Start(startReqID); err != nil {
+	if err := te.Start(startReqID); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.CantSetState = true
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
-	sender.CantSendGetAcceptedFrontier = true
-
-	sender.Default(true)
 
 	blk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
