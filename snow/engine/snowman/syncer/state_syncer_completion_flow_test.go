@@ -89,19 +89,19 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	assert.True(reqBlkID == lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
-	// if Put message is received from wrong validator, block is requested again (to a random beacon)
+	// if Put message is received from wrong validator, node waits to for the right node to respond
 	blkRequested = false
 	wrongNodeID := ids.ShortID{'w', 'r', 'o', 'n', 'g'}
 	assert.NoError(syncer.Put(wrongNodeID, sentReqID, []byte{}))
-	assert.True(blkRequested)
+	assert.False(blkRequested)
 	assert.True(reqBlkID == lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
-	// if Put message is received with wrong reqID, block is requested again (to a random beacon)
+	// if Put message is received with wrong reqID, node waits to for the right node to respond
 	blkRequested = false
 	wrongSentReqID := uint32(math.MaxUint32)
 	assert.NoError(syncer.Put(reachedNodeID, wrongSentReqID, []byte{}))
-	assert.True(blkRequested)
+	assert.False(blkRequested)
 	assert.True(reqBlkID == lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 

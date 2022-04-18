@@ -360,8 +360,8 @@ func (n *network) Connected(nodeID ids.ShortID) {
 // peer is a validator/beacon.
 // WantsConnection requires n.peersLock already locked
 func (n *network) AllowConnection(nodeID ids.ShortID) bool {
-	n.peersLock.Lock()
-	defer n.peersLock.Unlock()
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
 
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||

@@ -52,10 +52,10 @@ type stateSyncer struct {
 	onDoneStateSyncing func(lastReqID uint32) error
 	// once vm finishes processing rebuilding its state via state summaries
 	// the full block associated with state summary must be download.
-	// stateSummaryBlkIDValidator tracks validator reached out for the full block
-	// and ensures that the full block will be downloaded only in that case.
-	stateSummaryBlkIDValidator ids.ShortID
-	lastSummaryBlkID           ids.ID
+	// lastSummaryBlkRequestedFrom tracks the validator reached out to for the full block
+	// and ensures that the full block will be downloaded only from that validator.
+	lastSummaryBlkRequestedFrom ids.ShortID
+	lastSummaryBlkID            ids.ID
 
 	// Holds the beacons that were sampled for the accepted frontier
 	frontierSeeders validators.Set
@@ -413,10 +413,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
 
 	case common.StateSyncSkipped:
-		// State sync completed
-		if err := ss.onDoneStateSyncing(ss.requestID); err != nil {
-			ss.Ctx.Log.Warn("Could not complete state sync: %w", err)
-		}
+		return ss.onDoneStateSyncing(ss.requestID)
 
 	case common.StateSyncDone:
 		// retrieve the blkID to request
@@ -445,8 +442,9 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 	vdrID := vdrsList[0].ID()
 
 	// request the block
+	ss.requestID++
 	ss.Sender.SendGet(vdrID, ss.requestID, blkID)
-	ss.stateSummaryBlkIDValidator = vdrID
+	ss.lastSummaryBlkRequestedFrom = vdrID
 	return nil
 }
 
@@ -457,17 +455,20 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
-		return ss.requestBlk(ss.lastSummaryBlkID)
+		return nil
 	}
 
-	if validatorID != ss.stateSummaryBlkIDValidator {
+	if validatorID != ss.lastSummaryBlkRequestedFrom {
 		ss.Ctx.Log.Debug("Received a Put message from %s unexpectedly", validatorID)
-		return ss.requestBlk(ss.lastSummaryBlkID)
+		return nil
 	}
 
 	blk, err := ss.VM.ParseBlock(container)
 	if err != nil {
-		ss.Ctx.Log.Debug("Received unparsable block. Requesting it again.")
+		ss.Ctx.Log.Debug("Received unparsable block from vdr %s, err %v. Requesting it again.",
+			validatorID,
+			err,
+		)
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
@@ -480,15 +481,11 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	}
 
 	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlockID(rcvdBlkID); err != nil {
-		ss.Ctx.Log.Warn("Could not accept last summary block, err :%v. Retrying block download.", err)
+		ss.Ctx.Log.Warn("Could not accept last summary block, err: %v. Retrying block download.", err)
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	if err := ss.onDoneStateSyncing(ss.requestID); err != nil {
-		ss.Ctx.Log.Warn("Could not complete state sync: %w", err)
-	}
-
-	return nil
+	return ss.onDoneStateSyncing(ss.requestID)
 }
 
 // following completion of state sync on VM side, block associated with state summary is requested.

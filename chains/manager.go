@@ -181,9 +181,9 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	// State sync
-	StateSyncBeacons           []ids.ShortID
 	ResetProposerVMHeightIndex bool
+
+	StateSyncBeacons []ids.ShortID
 }
 
 type manager struct {
