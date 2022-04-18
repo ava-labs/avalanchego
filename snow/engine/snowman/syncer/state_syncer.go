@@ -481,8 +481,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	}
 
 	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlockID(rcvdBlkID); err != nil {
-		ss.Ctx.Log.Warn("Could not accept last summary block, err: %v. Retrying block download.", err)
-		return ss.requestBlk(ss.lastSummaryBlkID)
+		return err
 	}
 
 	return ss.onDoneStateSyncing(ss.requestID)
