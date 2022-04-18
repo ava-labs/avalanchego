@@ -346,7 +346,7 @@ func (ss *stateSyncer) startup() error {
 
 func (ss *stateSyncer) restart() error {
 	if ss.attempts > 0 && ss.attempts%ss.RetrySyncingWarnFrequency == 0 {
-		ss.Ctx.Log.Debug("continuing to attempt to state sync after %d failed attempts. Is this node connected to the internet?",
+		ss.Ctx.Log.Info("continuing to attempt to state sync after %d failed attempts. Is this node connected to the internet?",
 			ss.attempts)
 	}
 
@@ -459,12 +459,26 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
-		return nil
+		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
 	if validatorID != ss.stateSummaryBlkIDValidator {
 		ss.Ctx.Log.Debug("Received a Put message from %s unexpectedly", validatorID)
-		return nil
+		return ss.requestBlk(ss.lastSummaryBlkID)
+	}
+
+	blk, err := ss.VM.ParseBlock(container)
+	if err != nil {
+		ss.Ctx.Log.Debug("Received unparsable block. Requesting it again.")
+		return ss.requestBlk(ss.lastSummaryBlkID)
+	}
+
+	rcvdBlkID := blk.ID()
+	if rcvdBlkID != ss.lastSummaryBlkID {
+		ss.Ctx.Log.Debug("Received wrong block; expected ID %s, received ID %s, Requesting it again.",
+			rcvdBlkID,
+			ss.lastSummaryBlkID)
+		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
 	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlock(container); err != nil {
@@ -486,7 +500,7 @@ func (ss *stateSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) erro
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync GetFailed - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
-		return nil
+		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
 	ss.Ctx.Log.Warn("Failed downloading Last Summary block. Retrying block download.")
