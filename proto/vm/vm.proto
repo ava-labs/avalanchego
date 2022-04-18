@@ -312,7 +312,7 @@ message StateSyncGetResultResponse {
 }
 
 message StateSyncSetLastSummaryBlockRequest {
-  bytes bytes = 1;
+  bytes id = 1;
 }
 
 message StateSyncSetLastSummaryBlockResponse {

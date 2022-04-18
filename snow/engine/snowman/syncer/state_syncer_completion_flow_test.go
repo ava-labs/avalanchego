@@ -43,7 +43,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 		return lastSummaryBlkID, 2022, nil
 	}
 	fullVM.CantStateSyncSetLastSummaryBlock = true
-	fullVM.StateSyncSetLastSummaryBlockF = func(b []byte) error { return nil }
+	fullVM.StateSyncSetLastSummaryBlockIDF = func(ids.ID) error { return nil }
 
 	fullVM.CantParseBlock = true
 	successfulParseBlkMock := func(b []byte) (snowman.Block, error) {

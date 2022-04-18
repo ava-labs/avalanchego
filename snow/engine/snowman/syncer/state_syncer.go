@@ -48,16 +48,14 @@ type stateSyncer struct {
 	// Tracks the last requestID that was used in a request
 	requestID uint32
 
+	stateSyncVM        block.StateSyncableVM
+	onDoneStateSyncing func(lastReqID uint32) error
 	// once vm finishes processing rebuilding its state via state summaries
 	// the full block associated with state summary must be download.
 	// stateSummaryBlkIDValidator tracks validator reached out for the full block
 	// and ensures that the full block will be downloaded only in that case.
 	stateSummaryBlkIDValidator ids.ShortID
-
-	// State Sync specific fields
-	stateSyncVM        block.StateSyncableVM
-	onDoneStateSyncing func(lastReqID uint32) error
-	lastSummaryBlkID   ids.ID
+	lastSummaryBlkID           ids.ID
 
 	// Holds the beacons that were sampled for the accepted frontier
 	frontierSeeders validators.Set
@@ -481,7 +479,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlock(container); err != nil {
+	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlockID(rcvdBlkID); err != nil {
 		ss.Ctx.Log.Warn("Could not accept last summary block, err :%v. Retrying block download.", err)
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
