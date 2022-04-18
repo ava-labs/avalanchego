@@ -116,3 +116,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
+
+//replace github.com/ava-labs/coreth => /srv/avalanche/coreth
+
+replace github.com/ava-labs/coreth v0.8.9-rc.1 => github.com/ConsiderItDone/coreth v0.8.9-cidt-v0.0.1

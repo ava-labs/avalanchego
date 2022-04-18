@@ -95,7 +95,7 @@ func (c *connection) readPump() {
 		err := c.readMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.s.log.Debug("Unexpected close in websockets: %s", err)
+				c.s.log.Warn("Unexpected close in websockets: %s", err)
 			}
 			break
 		}
@@ -122,7 +122,7 @@ func (c *connection) writePump() {
 		select {
 		case message, ok := <-c.send:
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				c.s.log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				c.s.log.Warn("failed to set the write deadline, closing the connection due to %s", err)
 				return
 			}
 			if !ok {
@@ -137,7 +137,7 @@ func (c *connection) writePump() {
 			}
 		case <-ticker.C:
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				c.s.log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				c.s.log.Warn("failed to set the write deadline, closing the connection due to %s", err)
 				return
 			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -201,5 +201,7 @@ func (c *connection) handleAddAddresses(cmd *AddAddresses) error {
 		return fmt.Errorf("address append failed %w", err)
 	}
 	c.s.subscribedConnections.Add(c)
+	c.s.log.Info("handled new AddAddresses from %s (%s)", c.conn.RemoteAddr().String(), cmd.Addresses)
+
 	return nil
 }

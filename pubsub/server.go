@@ -74,7 +74,7 @@ func New(networkID uint32, log logging.Logger) *Server {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.log.Debug("Failed to upgrade %s", err)
+		s.log.Warn("Failed to upgrade %s", err)
 		return
 	}
 	conn := &connection{
@@ -96,7 +96,9 @@ func (s *Server) Publish(parser Filterer) {
 		}
 		conn := conns[i].(*connection)
 		if !conn.Send(msg) {
-			s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
+			s.log.Warn("dropping message to subscribed connection due to too many pending messages")
+		} else {
+			s.log.Info("sending to %s (%v, %v)", conn.conn.RemoteAddr().String(), conn.fp.set, conn.fp.filter)
 		}
 	}
 }
@@ -106,6 +108,8 @@ func (s *Server) addConnection(conn *connection) {
 	defer s.lock.Unlock()
 
 	s.conns[conn] = struct{}{}
+
+	s.log.Info("new incoming connection to pubsub from %s", conn.conn.RemoteAddr().String())
 
 	go conn.writePump()
 	go conn.readPump()
@@ -118,4 +122,6 @@ func (s *Server) removeConnection(conn *connection) {
 	defer s.lock.Unlock()
 
 	delete(s.conns, conn)
+
+	s.log.Info("remove pubsub connection from %s", conn.conn.RemoteAddr().String())
 }
