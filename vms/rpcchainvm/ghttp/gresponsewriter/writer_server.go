@@ -8,12 +8,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/hashicorp/go-plugin"
-
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter"
@@ -36,14 +33,12 @@ var (
 type Server struct {
 	responsewriterpb.UnimplementedWriterServer
 	writer http.ResponseWriter
-	broker *plugin.GRPCBroker
 }
 
 // NewServer returns an http.ResponseWriter instance managed remotely
-func NewServer(writer http.ResponseWriter, broker *plugin.GRPCBroker) *Server {
+func NewServer(writer http.ResponseWriter) *Server {
 	return &Server{
 		writer: writer,
-		broker: broker,
 	}
 }
 
@@ -96,14 +91,17 @@ func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*responsewrite
 		return nil, err
 	}
 
-	connReadWriterID := s.broker.NextId()
-	closer := grpcutils.ServerCloser{}
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return nil, err
+	}
+	serverAddr := serverListener.Addr().String()
 
-	go s.broker.AcceptAndServe(connReadWriterID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
+	closer := grpcutils.ServerCloser{}
+	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
 		connpb.RegisterConnServer(server, gconn.NewServer(conn, &closer))
@@ -116,10 +114,10 @@ func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*responsewrite
 	remote := conn.RemoteAddr()
 
 	return &responsewriterpb.HijackResponse{
-		LocalNetwork:         local.Network(),
-		LocalString:          local.String(),
-		RemoteNetwork:        remote.Network(),
-		RemoteString:         remote.String(),
-		ConnReadWriterServer: connReadWriterID,
+		LocalNetwork:  local.Network(),
+		LocalString:   local.String(),
+		RemoteNetwork: remote.Network(),
+		RemoteString:  remote.String(),
+		ServerAddr:    serverAddr,
 	}, nil
 }

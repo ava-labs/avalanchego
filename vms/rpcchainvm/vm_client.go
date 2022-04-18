@@ -13,8 +13,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -67,7 +72,6 @@ const (
 type VMClient struct {
 	*chain.State
 	client vmpb.VMClient
-	broker *plugin.GRPCBroker
 	proc   *plugin.Client
 
 	messenger    *messenger.Server
@@ -80,14 +84,18 @@ type VMClient struct {
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
 
+	grpcHealthChecks map[string]string
+
+	grpcServerMetrics *grpc_prometheus.ServerMetrics
+
 	ctx *snow.Context
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(client vmpb.VMClient, broker *plugin.GRPCBroker) *VMClient {
+func NewClient(client vmpb.VMClient) *VMClient {
 	return &VMClient{
-		client: client,
-		broker: broker,
+		client:           client,
+		grpcHealthChecks: make(map[string]string),
 	}
 }
 
@@ -112,30 +120,62 @@ func (vm *VMClient) Initialize(
 
 	vm.ctx = ctx
 
+	// Register metrics
+	registerer := prometheus.NewRegistry()
+	multiGatherer := metrics.NewMultiGatherer()
+	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
+	if err := registerer.Register(vm.grpcServerMetrics); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
+		return err
+	}
+	if err := multiGatherer.Register("", vm); err != nil {
+		return err
+	}
+
 	// Initialize and serve each database and construct the db manager
 	// initialize request parameters
 	versionedDBs := dbManager.GetDatabases()
 	versionedDBServers := make([]*vmpb.VersionedDBServer, len(versionedDBs))
 	for i, semDB := range versionedDBs {
-		dbBrokerID := vm.broker.NextId()
 		db := rpcdb.NewServer(semDB.Database)
-		go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServerFunc(db))
+		dbVersion := semDB.Version.String()
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return err
+		}
+		serverAddr := serverListener.Addr().String()
+		// Register gRPC server for health checks
+		vm.grpcHealthChecks[fmt.Sprintf("database-%s", dbVersion)] = serverAddr
+
+		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
+		vm.ctx.Log.Info("grpc: serving database version: %s on: %s", dbVersion, serverAddr)
+
 		versionedDBServers[i] = &vmpb.VersionedDBServer{
-			DbServer: dbBrokerID,
-			Version:  semDB.Version.String(),
+			ServerAddr: serverAddr,
+			Version:    dbVersion,
 		}
 	}
 
 	vm.messenger = messenger.NewServer(toEngine)
-	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
+	vm.keystore = gkeystore.NewServer(ctx.Keystore)
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current().Database)
 	vm.bcLookup = galiasreader.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 
-	// start the gRPC init server
-	initServerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(initServerID, vm.startInitServer)
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return err
+	}
+	serverAddr := serverListener.Addr().String()
+
+	// Register gRPC server for health checks
+	vm.grpcHealthChecks["vm"] = serverAddr
+
+	go grpcutils.Serve(serverListener, vm.getInitServer)
+	vm.ctx.Log.Info("grpc: serving vm services on: %s", serverAddr)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmpb.InitializeRequest{
 		NetworkId:    ctx.NetworkID,
@@ -148,7 +188,7 @@ func (vm *VMClient) Initialize(
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,
 		DbServers:    versionedDBServers,
-		InitServer:   initServerID,
+		ServerAddr:   serverAddr,
 	})
 	if err != nil {
 		return err
@@ -183,15 +223,6 @@ func (vm *VMClient) Initialize(
 		time:     timestamp,
 	}
 
-	registerer := prometheus.NewRegistry()
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := multiGatherer.Register("rpcchainvm", registerer); err != nil {
-		return err
-	}
-	if err := multiGatherer.Register("", vm); err != nil {
-		return err
-	}
-
 	chainState, err := chain.NewMeteredState(
 		registerer,
 		&chain.Config{
@@ -213,21 +244,55 @@ func (vm *VMClient) Initialize(
 	return vm.ctx.Metrics.Register(multiGatherer)
 }
 
-func (vm *VMClient) startDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
+func (vm *VMClient) getDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
 	return func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts, serverOptions...)
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
+
+		// Collect gRPC serving metrics
+		opts = append(opts, grpc.UnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()))
+		opts = append(opts, grpc.StreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()))
+
 		server := grpc.NewServer(opts...)
+
+		grpcHealth := health.NewServer()
+		// The server should use an empty string as the key for server's overall
+		// health status.
+		// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+		grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
 		vm.serverCloser.Add(server)
 
+		// register database service
 		rpcdbpb.RegisterDatabaseServer(server, db)
+		// register health service
+		healthpb.RegisterHealthServer(server, grpcHealth)
+
+		// Ensure metric counters are zeroed on restart
+		grpc_prometheus.Register(server)
 
 		return server
 	}
 }
 
-func (vm *VMClient) startInitServer(opts []grpc.ServerOption) *grpc.Server {
-	opts = append(opts, serverOptions...)
+func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
+	if len(opts) == 0 {
+		opts = append(opts, grpcutils.DefaultServerOptions...)
+	}
+
+	// Collect gRPC serving metrics
+	opts = append(opts, grpc.UnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()))
+	opts = append(opts, grpc.StreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()))
+
 	server := grpc.NewServer(opts...)
+
+	grpcHealth := health.NewServer()
+	// The server should use an empty string as the key for server's overall
+	// health status.
+	// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+	grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
 	vm.serverCloser.Add(server)
 
 	// register the messenger service
@@ -240,8 +305,13 @@ func (vm *VMClient) startInitServer(opts []grpc.ServerOption) *grpc.Server {
 	aliasreaderpb.RegisterAliasReaderServer(server, vm.bcLookup)
 	// register the subnet alias service
 	subnetlookuppb.RegisterSubnetLookupServer(server, vm.snLookup)
-	// register the AppSender service
+	// register the app sender service
 	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
+	// register the health service
+	healthpb.RegisterHealthServer(server, grpcHealth)
+
+	// Ensure metric counters are zeroed on restart
+	grpc_prometheus.Register(server)
 
 	return server
 }
@@ -276,15 +346,15 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil
@@ -298,15 +368,15 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 
 	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
 	for _, handler := range resp.Handlers {
-		conn, err := vm.broker.Dial(handler.Server)
+		clientConn, err := grpcutils.Dial(handler.ServerAddr)
 		if err != nil {
 			return nil, err
 		}
 
-		vm.conns = append(vm.conns, conn)
+		vm.conns = append(vm.conns, clientConn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httppb.NewHTTPClient(conn), vm.broker),
+			Handler:     ghttp.NewClient(httppb.NewHTTPClient(clientConn)),
 		}
 	}
 	return handlers, nil
@@ -429,10 +499,13 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 }
 
 func (vm *VMClient) HealthCheck() (interface{}, error) {
-	return vm.client.Health(
-		context.Background(),
-		&emptypb.Empty{},
-	)
+	resp, err := vm.client.Health(context.Background(), &vmpb.HealthRequest{
+		GrpcChecks: vm.grpcHealthChecks,
+	})
+	if err != nil {
+		vm.ctx.Log.Warn("health check failed: %v", err)
+	}
+	return resp, err
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {

@@ -14,7 +14,9 @@ type metrics struct {
 	numVtxRequests, numPendingVts,
 	numMissingTxs, pendingTxs,
 	blockerVtxs, blockerTxs prometheus.Gauge
-	whitelistVtxIssueSuccess, whitelistVtxIssueFailure prometheus.Counter
+
+	whitelistVtxIssueSuccess, whitelistVtxIssueFailure,
+	numUselessPutBytes, numUselessPushQueryBytes prometheus.Counter
 }
 
 func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
@@ -64,6 +66,16 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "whitelist_vtx_issue_failure",
 		Help:      "Number of DAG linearization request issue failed (verification failure)",
 	})
+	m.numUselessPutBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_useless_put_bytes",
+		Help:      "Amount of useless bytes received in Put messages",
+	})
+	m.numUselessPushQueryBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_useless_push_query_bytes",
+		Help:      "Amount of useless bytes received in PushQuery messages",
+	})
 
 	errs.Add(
 		reg.Register(m.bootstrapFinished),
@@ -75,6 +87,8 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.blockerTxs),
 		reg.Register(m.whitelistVtxIssueSuccess),
 		reg.Register(m.whitelistVtxIssueFailure),
+		reg.Register(m.numUselessPutBytes),
+		reg.Register(m.numUselessPushQueryBytes),
 	)
 	return errs.Err
 }

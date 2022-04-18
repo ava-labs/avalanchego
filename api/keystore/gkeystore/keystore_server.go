@@ -8,12 +8,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	keystorepb "github.com/ava-labs/avalanchego/proto/pb/keystore"
@@ -25,15 +22,13 @@ var _ keystorepb.KeystoreServer = &Server{}
 // Server is a snow.Keystore that is managed over RPC.
 type Server struct {
 	keystorepb.UnimplementedKeystoreServer
-	ks     keystore.BlockchainKeystore
-	broker *plugin.GRPCBroker
+	ks keystore.BlockchainKeystore
 }
 
 // NewServer returns a keystore connected to a remote keystore
-func NewServer(ks keystore.BlockchainKeystore, broker *plugin.GRPCBroker) *Server {
+func NewServer(ks keystore.BlockchainKeystore) *Server {
 	return &Server{
-		ks:     ks,
-		broker: broker,
+		ks: ks,
 	}
 }
 
@@ -49,19 +44,23 @@ func (s *Server) GetDatabase(
 	closer := dbCloser{Database: db}
 
 	// start the db server
-	dbBrokerID := s.broker.NextId()
-	go s.broker.AcceptAndServe(dbBrokerID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return nil, err
+	}
+	serverAddr := serverListener.Addr().String()
+
+	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
 		server := grpc.NewServer(opts...)
 		closer.closer.Add(server)
 		db := rpcdb.NewServer(&closer)
 		rpcdbpb.RegisterDatabaseServer(server, db)
 		return server
 	})
-	return &keystorepb.GetDatabaseResponse{DbServer: dbBrokerID}, nil
+	return &keystorepb.GetDatabaseResponse{ServerAddr: serverAddr}, nil
 }
 
 type dbCloser struct {

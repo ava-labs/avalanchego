@@ -6,11 +6,11 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-plugin"
-
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
@@ -54,8 +54,7 @@ var (
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
 	vmpb.UnimplementedVMServer
-	vm     block.ChainVM
-	broker *plugin.GRPCBroker
+	vm block.ChainVM
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -65,10 +64,9 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm block.ChainVM, broker *plugin.GRPCBroker) *VMServer {
+func NewServer(vm block.ChainVM) *VMServer {
 	return &VMServer{
-		vm:     vm,
-		broker: broker,
+		vm: vm,
 	}
 }
 
@@ -105,14 +103,14 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 			return nil, err
 		}
 
-		dbConn, err := vm.broker.Dial(vDBReq.DbServer)
+		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
 			return nil, err
 		}
-		vm.connCloser.Add(dbConn)
-		db := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbConn))
+		vm.connCloser.Add(clientConn)
+		db := rpcdb.NewClient(rpcdbpb.NewDatabaseClient(clientConn))
 		versionedDBs[i] = &manager.VersionedDatabase{
 			Database: corruptabledb.New(db),
 			Version:  version,
@@ -125,16 +123,17 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		return nil, err
 	}
 
-	clientConn, err := vm.broker.Dial(req.InitServer)
+	clientConn, err := grpcutils.Dial(req.ServerAddr)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
+
 	vm.connCloser.Add(clientConn)
 
 	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn))
-	keystoreClient := gkeystore.NewClient(keystorepb.NewKeystoreClient(clientConn), vm.broker)
+	keystoreClient := gkeystore.NewClient(keystorepb.NewKeystoreClient(clientConn))
 	sharedMemoryClient := gsharedmemory.NewClient(sharedmemorypb.NewSharedMemoryClient(clientConn))
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
 	snLookupClient := gsubnetlookup.NewClient(subnetlookuppb.NewSubnetLookupClient(clientConn))
@@ -265,20 +264,27 @@ func (vm *VMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*vmpb
 	for prefix, h := range handlers {
 		handler := h
 
-		// start the messenger server
-		serverID := vm.broker.NextId()
-		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			opts = append(opts, serverOptions...)
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		// Start the gRPC server which serves the HTTP service
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
 		})
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			Server:      serverID,
+			ServerAddr:  serverAddr,
 		})
 	}
 	return resp, nil
@@ -293,20 +299,27 @@ func (vm *VMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.Creat
 	for prefix, h := range handlers {
 		handler := h
 
-		// start the messenger server
-		serverID := vm.broker.NextId()
-		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			opts = append(opts, serverOptions...)
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		// Start the gRPC server which serves the HTTP service
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
 			server := grpc.NewServer(opts...)
 			vm.serverCloser.Add(server)
-			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
 		})
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			Server:      serverID,
+			ServerAddr:  serverAddr,
 		})
 	}
 	return resp, nil
@@ -414,7 +427,13 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequ
 	return &emptypb.Empty{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmpb.HealthResponse, error) {
+func (vm *VMServer) Health(ctx context.Context, req *vmpb.HealthRequest) (*vmpb.HealthResponse, error) {
+	// Perform health checks for vm client gRPC servers
+	err := vm.grpcHealthChecks(ctx, req.GrpcChecks)
+	if err != nil {
+		return &vmpb.HealthResponse{}, err
+	}
+
 	details, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
@@ -439,6 +458,27 @@ func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmpb.HealthRespons
 	return &vmpb.HealthResponse{
 		Details: detailsStr,
 	}, nil
+}
+
+func (vm *VMServer) grpcHealthChecks(ctx context.Context, checks map[string]string) error {
+	var errs []error
+	for name, address := range checks {
+		clientConn, err := grpcutils.Dial(address)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("grpc health check failed to dial: %q address: %s: %w", name, address, err))
+			continue
+		}
+		client := grpc_health_v1.NewHealthClient(clientConn)
+		_, err = client.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("grpc health check failed for %q address: %s: %w", name, address, err))
+		}
+		err = clientConn.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return wrappers.NewAggregate(errs)
 }
 
 func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionResponse, error) {

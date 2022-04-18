@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
-	"unicode"
 )
 
 const (
@@ -91,8 +90,7 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 		if !captureField {
 			continue
 		}
-
-		if unicode.IsLower(rune(field.Name[0])) { // Can only marshal exported fields
+		if !field.IsExported() { // Can only marshal exported fields
 			return nil, fmt.Errorf("can't marshal un-exported field %s", field.Name)
 		}
 		sliceLenField := field.Tag.Get(SliceLenTagName)

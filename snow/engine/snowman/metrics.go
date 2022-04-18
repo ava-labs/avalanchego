@@ -12,7 +12,7 @@ import (
 
 type metrics struct {
 	bootstrapFinished, numRequests, numBlocked, numBlockers, numNonVerifieds prometheus.Gauge
-	numBuilt, numBuildsFailed                                                prometheus.Counter
+	numBuilt, numBuildsFailed, numUselessPutBytes, numUselessPushQueryBytes  prometheus.Counter
 	getAncestorsBlks                                                         metric.Averager
 }
 
@@ -49,6 +49,16 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blk_builds_failed",
 		Help:      "Number of BuildBlock calls that have failed",
 	})
+	m.numUselessPutBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_useless_put_bytes",
+		Help:      "Amount of useless bytes received in Put messages",
+	})
+	m.numUselessPushQueryBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "num_useless_push_query_bytes",
+		Help:      "Amount of useless bytes received in PushQuery messages",
+	})
 	m.getAncestorsBlks = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_blks",
@@ -67,9 +77,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		reg.Register(m.numRequests),
 		reg.Register(m.numBlocked),
 		reg.Register(m.numBlockers),
+		reg.Register(m.numNonVerifieds),
 		reg.Register(m.numBuilt),
 		reg.Register(m.numBuildsFailed),
-		reg.Register(m.numNonVerifieds),
+		reg.Register(m.numUselessPutBytes),
+		reg.Register(m.numUselessPushQueryBytes),
 	)
 	return errs.Err
 }

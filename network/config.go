@@ -59,6 +59,10 @@ type PeerListGossipConfig struct {
 	// the IPs to in every IP gossip event.
 	PeerListNonValidatorGossipSize uint32 `json:"peerListNonValidatorGossipSize"`
 
+	// PeerListPeersGossipSize is the number of peers to gossip
+	// the IPs to in every IP gossip event.
+	PeerListPeersGossipSize uint32 `json:"peerListPeersGossipSize"`
+
 	// PeerListGossipFreq is the frequency that this node will attempt to gossip
 	// signed IPs to its peers.
 	PeerListGossipFreq time.Duration `json:"peerListGossipFreq"`

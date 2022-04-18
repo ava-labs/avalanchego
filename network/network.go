@@ -256,8 +256,9 @@ func (n *network) Gossip(
 	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
+	numPeersToSend int,
 ) ids.NodeIDSet {
-	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
+	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
 	return n.send(msg, peers)
 }
 
@@ -630,22 +631,29 @@ func (n *network) samplePeers(
 	validatorOnly bool,
 	numValidatorsToSample,
 	numNonValidatorsToSample int,
+	numPeersToSample int,
 ) []peer.Peer {
 	if validatorOnly {
-		numValidatorsToSample += numNonValidatorsToSample
+		numValidatorsToSample += numNonValidatorsToSample + numPeersToSample
 		numNonValidatorsToSample = 0
+		numPeersToSample = 0
 	}
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
 	return n.connectedPeers.Sample(
-		numValidatorsToSample+numNonValidatorsToSample,
+		numValidatorsToSample+numNonValidatorsToSample+numPeersToSample,
 		func(p peer.Peer) bool {
-			// Only return non-validators that are tracking [subnetID]
+			// Only return peers that are tracking [subnetID]
 			trackedSubnets := p.TrackedSubnets()
 			if !trackedSubnets.Contains(subnetID) {
 				return false
+			}
+
+			if numPeersToSample > 0 {
+				numPeersToSample--
+				return true
 			}
 
 			if n.config.Validators.Contains(subnetID, p.ID()) {
@@ -734,7 +742,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 }
 
 func (n *network) shouldTrack(nodeID ids.NodeID, ip utils.IPCertDesc) bool {
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IsPrivate() {
+	if !n.config.AllowPrivateIPs && ip.IPDesc.IP.IsPrivate() {
 		n.peerConfig.Log.Verbo(
 			"dropping suggested connected to %s because the ip (%s) is private",
 			nodeID, ip.IPDesc,
@@ -1068,6 +1076,7 @@ func (n *network) runTimers() {
 				false,
 				int(n.config.PeerListValidatorGossipSize),
 				int(n.config.PeerListNonValidatorGossipSize),
+				int(n.config.PeerListPeersGossipSize),
 			)
 
 		case <-updateUptimes.C:

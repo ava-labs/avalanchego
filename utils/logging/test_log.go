@@ -59,8 +59,6 @@ func (NoLog) GetDisplayLevel() Level { return Off }
 
 func (NoLog) SetPrefix(string) {}
 
-func (NoLog) SetDisplayingEnabled(bool) {}
-
 func (NoLog) SetContextualDisplayingEnabled(bool) {}
 
 // NoIOWriter is a mock Writer that does not write to any underlying source

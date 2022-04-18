@@ -7,11 +7,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/hashicorp/go-plugin"
-
 	"google.golang.org/grpc"
 
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -24,15 +21,13 @@ var _ http.Handler = &Client{}
 // Client is an http.Handler that talks over RPC.
 type Client struct {
 	client httppb.HTTPClient
-	broker *plugin.GRPCBroker
 }
 
 // NewClient returns an HTTP handler database instance connected to a remote
 // HTTP handler instance
-func NewClient(client httppb.HTTPClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(client httppb.HTTPClient) *Client {
 	return &Client{
 		client: client,
-		broker: broker,
 	}
 }
 
@@ -52,16 +47,21 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Wrap [w] with a lock to ensure that it is accessed in a thread-safe manner.
 	w = gresponsewriter.NewLockedWriter(w)
 
-	readerWriterID := c.broker.NextId()
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	serverAddr := serverListener.Addr().String()
+
 	// Start responsewriter gRPC service.
-	go c.broker.AcceptAndServe(readerWriterID, func(opts []grpc.ServerOption) *grpc.Server {
-		opts = append(opts,
-			grpc.MaxRecvMsgSize(math.MaxInt),
-			grpc.MaxSendMsgSize(math.MaxInt),
-		)
+	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+		if len(opts) == 0 {
+			opts = append(opts, grpcutils.DefaultServerOptions...)
+		}
 		server := grpc.NewServer(opts...)
 		closer.Add(server)
-		responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w, c.broker))
+		responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
 		return server
 	})
 
@@ -73,8 +73,8 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	req := &httppb.HTTPRequest{
 		ResponseWriter: &httppb.ResponseWriter{
-			Id:     readerWriterID,
-			Header: make([]*httppb.Element, 0, len(r.Header)),
+			ServerAddr: serverAddr,
+			Header:     make([]*httppb.Element, 0, len(r.Header)),
 		},
 		Request: &httppb.Request{
 			Method:           r.Method,

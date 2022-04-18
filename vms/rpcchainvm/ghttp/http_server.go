@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/hashicorp/go-plugin"
-
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
@@ -31,19 +29,17 @@ var (
 type Server struct {
 	httppb.UnimplementedHTTPServer
 	handler http.Handler
-	broker  *plugin.GRPCBroker
 }
 
 // NewServer returns an http.Handler instance managed remotely
-func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
+func NewServer(handler http.Handler) *Server {
 	return &Server{
 		handler: handler,
-		broker:  broker,
 	}
 }
 
 func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.Empty, error) {
-	readWriteConn, err := s.broker.Dial(req.ResponseWriter.Id)
+	clientConn, err := grpcutils.Dial(req.ResponseWriter.ServerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +49,7 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.
 		writerHeaders[elem.Key] = elem.Values
 	}
 
-	writer := gresponsewriter.NewClient(writerHeaders, responsewriterpb.NewWriterClient(readWriteConn), s.broker)
+	writer := gresponsewriter.NewClient(writerHeaders, responsewriterpb.NewWriterClient(clientConn))
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
@@ -143,7 +139,7 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.
 
 	s.handler.ServeHTTP(writer, request)
 
-	return &emptypb.Empty{}, readWriteConn.Close()
+	return &emptypb.Empty{}, clientConn.Close()
 }
 
 // HandleSimple handles http requests over http2 using a simple request response model.

@@ -430,7 +430,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	appSender := &common.SenderTest{}
+	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
@@ -2045,10 +2045,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		sender.GossipConfig{
-			AcceptedFrontierSize:      1,
-			OnAcceptSize:              1,
-			AppGossipNonValidatorSize: 1,
+			AcceptedFrontierPeerSize:  1,
+			OnAcceptPeerSize:          1,
 			AppGossipValidatorSize:    1,
+			AppGossipNonValidatorSize: 1,
 		},
 	)
 	assert.NoError(t, err)

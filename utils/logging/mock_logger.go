@@ -235,18 +235,6 @@ func (mr *MockLoggerMockRecorder) SetDisplayLevel(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDisplayLevel", reflect.TypeOf((*MockLogger)(nil).SetDisplayLevel), arg0)
 }
 
-// SetDisplayingEnabled mocks base method.
-func (m *MockLogger) SetDisplayingEnabled(arg0 bool) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetDisplayingEnabled", arg0)
-}
-
-// SetDisplayingEnabled indicates an expected call of SetDisplayingEnabled.
-func (mr *MockLoggerMockRecorder) SetDisplayingEnabled(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDisplayingEnabled", reflect.TypeOf((*MockLogger)(nil).SetDisplayingEnabled), arg0)
-}
-
 // SetLogLevel mocks base method.
 func (m *MockLogger) SetLogLevel(arg0 Level) {
 	m.ctrl.T.Helper()
