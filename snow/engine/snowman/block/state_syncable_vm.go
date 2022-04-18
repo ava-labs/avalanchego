@@ -11,7 +11,7 @@ import (
 type StateSyncableVM interface {
 	common.StateSyncableVM
 
-	// VM State Sync process must run asynchronously; morever, once it is done,
+	// VM State Sync process must run asynchronously; moreover, once it is done,
 	// the full block associated with synced summary must be downloaded from
 	// the network. StateSyncGetResult returns:
 	// 1- height and ID of this block to allow its retrival from network
