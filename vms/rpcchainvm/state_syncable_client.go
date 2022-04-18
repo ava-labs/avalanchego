@@ -33,11 +33,11 @@ func (vm *VMClient) StateSyncGetOngoingSummary() (common.Summary, error) {
 		return nil, errCodeToError[errCode]
 	}
 
-	summaryID, err := ids.ToID(resp.SummaryId)
+	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &Summary{
-		key:   resp.Key,
+		key:   resp.Summary.Key,
 		id:    summaryID,
-		bytes: resp.Content,
+		bytes: resp.Summary.Content,
 	}, err
 }
 
@@ -53,11 +53,11 @@ func (vm *VMClient) StateSyncGetLastSummary() (common.Summary, error) {
 		return nil, errCodeToError[errCode]
 	}
 
-	summaryID, err := ids.ToID(resp.SummaryId)
+	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &Summary{
-		key:   resp.Key,
+		key:   resp.Summary.Key,
 		id:    summaryID,
-		bytes: resp.Content,
+		bytes: resp.Summary.Content,
 	}, err
 }
 
@@ -75,11 +75,11 @@ func (vm *VMClient) StateSyncParseSummary(summaryBytes []byte) (common.Summary, 
 		return nil, errCodeToError[errCode]
 	}
 
-	summaryID, err := ids.ToID(resp.SummaryId)
+	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &Summary{
-		key:   resp.Key,
+		key:   resp.Summary.Key,
 		id:    summaryID,
-		bytes: resp.Content,
+		bytes: resp.Summary.Content,
 	}, err
 }
 
@@ -93,22 +93,22 @@ func (vm *VMClient) StateSyncGetSummary(key uint64) (common.Summary, error) {
 		return nil, errCodeToError[errCode]
 	}
 
-	summaryID, err := ids.ToID(resp.SummaryId)
+	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &Summary{
-		key:   resp.Key,
+		key:   resp.Summary.Key,
 		id:    summaryID,
-		bytes: resp.Content,
+		bytes: resp.Summary.Content,
 	}, err
 }
 
 func (vm *VMClient) StateSync(accepted []common.Summary) error {
-	requestedSummaries := make([]*vmpb.StateSyncGetLastSummaryResponse, len(accepted))
+	requestedSummaries := make([]*vmpb.StateSyncSummary, len(accepted))
 	for i, sum := range accepted {
 		summaryID := sum.ID()
-		requestedSummaries[i] = &vmpb.StateSyncGetLastSummaryResponse{
-			Key:       sum.Key(),
-			SummaryId: summaryID[:],
-			Content:   sum.Bytes(),
+		requestedSummaries[i] = &vmpb.StateSyncSummary{
+			Key:     sum.Key(),
+			Id:      summaryID[:],
+			Content: sum.Bytes(),
 		}
 	}
 	resp, err := vm.client.StateSync(

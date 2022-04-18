@@ -46,9 +46,11 @@ func (vm *VMServer) StateSyncGetOngoingSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncGetOngoingSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -75,9 +77,11 @@ func (vm *VMServer) StateSyncGetLastSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncGetLastSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -104,9 +108,11 @@ func (vm *VMServer) StateSyncParseSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncParseSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -133,9 +139,11 @@ func (vm *VMServer) StateSyncGetSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncGetSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -153,7 +161,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (
 	if vm.ssVM != nil {
 		for i, sum := range req.Summaries {
 			var summaryID ids.ID
-			summaryID, err = ids.ToID(sum.SummaryId)
+			summaryID, err = ids.ToID(sum.Id)
 			if err != nil {
 				return nil, err
 			}
