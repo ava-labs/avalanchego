@@ -23,9 +23,9 @@ At a high level, Avalanche engine takes care of the following three state syncin
 - Frontier validation: Avalanche engine validates these summaries by requesting all connected node whether they support these state summaries.
 - State sync completion: Following state sync completion on VM side, Avalanche engine downloads data to ensure normal operations can be smoothly resumed.  
 
-These phases are devised to stop a malicious actor from poisoning a VM with a crafted state summary or DoSsing it with an unavailable one. Similarly to Avalanche bootstrapping process, security is achieved by feeding state summaries to the VM only if a sufficiently high fraction of network stake has validated them.
+These phases are devised to stop a malicious actor from poisoning a VM with a crafted state summary or DoSing it with an unavailable one. Similar to Avalanche's bootstrapping process, security is achieved by feeding state summaries to the VM only if a sufficiently high fraction of network stake has validated them.
 
-In the following we details these phases.
+In the following we detail these phases.
 
 ### Frontier retrieval
 
@@ -70,6 +70,6 @@ Specifically, once VM signal that state sync is done on its side, Avalanche engi
 1- an error of VM state sync processing has failed. This is considered a fatal error.
 2- the blockID and height of the block corresponding to state summary, which needs to be downloaded. Note that while height is not strictly needed, it helps coordinating Snowman++ operations.
 
-If `StateSyncGetResult()` returns no errors, Avalanche engine download the block from the network via a `Get` message. Once it receives it, it pass the full block down to the VM via `StateSyncSetLastSummaryBlock` method.
+If `StateSyncGetResult()` returns no errors, Avalanche engine downloads the block from the network via a `Get` message. Once it receives it, it passes the full block down to the VM by calling `StateSyncSetLastSummaryBlock`.
 
-Once `StateSyncSetLastSummaryBlock` state sync is complete and Avalanche engine moves ahead to bootstrapping.
+After `StateSyncSetLastSummaryBlock`, state sync is complete and Avalanche engine moves ahead to bootstrapping.
