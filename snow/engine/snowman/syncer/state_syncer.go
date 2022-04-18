@@ -44,13 +44,18 @@ type stateSyncer struct {
 	common.AppHandler
 
 	started bool
+
 	// Tracks the last requestID that was used in a request
 	requestID uint32
 
-	// State Sync specific fields
 	stateSyncVM        block.StateSyncableVM
 	onDoneStateSyncing func(lastReqID uint32) error
-	lastSummaryBlkID   ids.ID
+	// once vm finishes processing rebuilding its state via state summaries
+	// the full block associated with state summary must be download.
+	// stateSummaryBlkIDValidator tracks validator reached out for the full block
+	// and ensures that the full block will be downloaded only in that case.
+	stateSummaryBlkIDValidator ids.ShortID
+	lastSummaryBlkID           ids.ID
 
 	// Holds the beacons that were sampled for the accepted frontier
 	frontierSeeders validators.Set
@@ -328,6 +333,7 @@ func (ss *stateSyncer) startup() error {
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
+		// we make sure that StateSync is called if state sync is enabled
 		return ss.stateSyncVM.StateSync(nil)
 	}
 
@@ -338,15 +344,16 @@ func (ss *stateSyncer) startup() error {
 
 func (ss *stateSyncer) restart() error {
 	if ss.attempts > 0 && ss.attempts%ss.RetryBootstrapWarnFrequency == 0 {
-		ss.Ctx.Log.Debug("continuing to attempt to state sync after %d failed attempts. Is this node connected to the internet?",
+		ss.Ctx.Log.Info("continuing to attempt to state sync after %d failed attempts. Is this node connected to the internet?",
 			ss.attempts)
 	}
 
 	return ss.startup()
 }
 
-// Ask up to [maxOutstandingStateSyncRequests] state sync validators to send
-// their accepted state summary
+// Ask up to [maxOutstandingStateSyncRequests] state sync validators at times
+// to send their accepted state summary. It is called again until there are
+// no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	vdrs := ids.NewShortSet(1)
 	for ss.targetSeeders.Len() > 0 && vdrs.Len() < maxOutstandingStateSyncRequests {
@@ -361,7 +368,8 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 }
 
 // Ask up to [maxOutstandingStateSyncRequests] syncers validators to send
-// their filtered accepted frontier
+// their filtered accepted frontier. It is called again until there are
+// no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAccepted() error {
 	// pick voters to contact
 	vdrs := ids.NewShortSet(1)
@@ -438,6 +446,7 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 
 	// request the block
 	ss.Sender.SendGet(vdrID, ss.requestID, blkID)
+	ss.stateSummaryBlkIDValidator = vdrID
 	return nil
 }
 
@@ -448,10 +457,29 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
-		return nil
+		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlock(container); err != nil {
+	if validatorID != ss.stateSummaryBlkIDValidator {
+		ss.Ctx.Log.Debug("Received a Put message from %s unexpectedly", validatorID)
+		return ss.requestBlk(ss.lastSummaryBlkID)
+	}
+
+	blk, err := ss.VM.ParseBlock(container)
+	if err != nil {
+		ss.Ctx.Log.Debug("Received unparsable block. Requesting it again.")
+		return ss.requestBlk(ss.lastSummaryBlkID)
+	}
+
+	rcvdBlkID := blk.ID()
+	if rcvdBlkID != ss.lastSummaryBlkID {
+		ss.Ctx.Log.Debug("Received wrong block; expected ID %s, received ID %s, Requesting it again.",
+			rcvdBlkID,
+			ss.lastSummaryBlkID)
+		return ss.requestBlk(ss.lastSummaryBlkID)
+	}
+
+	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlockID(rcvdBlkID); err != nil {
 		ss.Ctx.Log.Warn("Could not accept last summary block, err :%v. Retrying block download.", err)
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
@@ -470,7 +498,7 @@ func (ss *stateSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) erro
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync GetFailed - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
-		return nil
+		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
 	ss.Ctx.Log.Warn("Failed downloading Last Summary block. Retrying block download.")

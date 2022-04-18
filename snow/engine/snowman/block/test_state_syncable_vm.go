@@ -33,8 +33,8 @@ type TestStateSyncableVM struct {
 
 	CantStateSyncGetResult, CantStateSyncSetLastSummaryBlock bool
 
-	StateSyncGetResultF           func() (ids.ID, uint64, error)
-	StateSyncSetLastSummaryBlockF func([]byte) error
+	StateSyncGetResultF             func() (ids.ID, uint64, error)
+	StateSyncSetLastSummaryBlockIDF func(blkID ids.ID) error
 }
 
 func (tss *TestStateSyncableVM) StateSyncGetResult() (ids.ID, uint64, error) {
@@ -47,9 +47,9 @@ func (tss *TestStateSyncableVM) StateSyncGetResult() (ids.ID, uint64, error) {
 	return ids.Empty, 0, errStateSyncGetResult
 }
 
-func (tss *TestStateSyncableVM) StateSyncSetLastSummaryBlock(blkBytes []byte) error {
-	if tss.StateSyncSetLastSummaryBlockF != nil {
-		return tss.StateSyncSetLastSummaryBlockF(blkBytes)
+func (tss *TestStateSyncableVM) StateSyncSetLastSummaryBlockID(blkID ids.ID) error {
+	if tss.StateSyncSetLastSummaryBlockIDF != nil {
+		return tss.StateSyncSetLastSummaryBlockIDF(blkID)
 	}
 	if tss.CantStateSyncSetLastSummaryBlock && tss.T != nil {
 		tss.T.Fatalf("Unexpectedly called StateSyncSetLastSummaryBlock")

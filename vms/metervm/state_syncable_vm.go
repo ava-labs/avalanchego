@@ -93,13 +93,13 @@ func (vm *blockVM) StateSyncGetResult() (ids.ID, uint64, error) {
 	return blkID, height, err
 }
 
-func (vm *blockVM) StateSyncSetLastSummaryBlock(blkBytes []byte) error {
+func (vm *blockVM) StateSyncSetLastSummaryBlockID(blkID ids.ID) error {
 	if vm.ssVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	err := vm.ssVM.StateSyncSetLastSummaryBlock(blkBytes)
+	err := vm.ssVM.StateSyncSetLastSummaryBlockID(blkID)
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.setLastSummaryBlockID.Observe(float64(end.Sub(start)))
 

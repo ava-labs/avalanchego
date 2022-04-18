@@ -358,7 +358,11 @@ func (n *network) Connected(nodeID ids.ShortID) {
 // provided nodeID. If the node is attempting to connect to the minimum number
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator/beacon.
+// WantsConnection requires n.peersLock already locked
 func (n *network) AllowConnection(nodeID ids.ShortID) bool {
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
 		n.WantsConnection(nodeID)
@@ -539,6 +543,7 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
+// WantsConnection must be called with n.peersLock already locked
 func (n *network) WantsConnection(nodeID ids.ShortID) bool {
 	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)

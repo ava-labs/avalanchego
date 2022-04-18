@@ -317,7 +317,8 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.StateSyncParseSummaryF = func(b []byte) (common.Summary, error) {
+		assert.True(bytes.Equal(b, summaryBytes))
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
@@ -582,12 +583,23 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
-		}, nil
+	fullVM.StateSyncParseSummaryF = func(b []byte) (common.Summary, error) {
+		switch {
+		case bytes.Equal(b, summaryBytes):
+			return &block.TestSummary{
+				SummaryKey:   key,
+				SummaryID:    summaryID,
+				ContentBytes: summaryBytes,
+			}, nil
+		case bytes.Equal(b, minoritySummaryBytes):
+			return &block.TestSummary{
+				SummaryKey:   minorityKey,
+				SummaryID:    minoritySummaryID,
+				ContentBytes: minoritySummaryBytes,
+			}, nil
+		default:
+			return nil, fmt.Errorf("unknown state summary")
+		}
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -602,17 +614,29 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// let all contacted beacons respond
-	for syncer.contactedSeeders.Len() != 0 {
+	// let all contacted beacons respond with majority or minority summaries
+	for {
+		reachedSeeders := syncer.contactedSeeders.Len()
+		if reachedSeeders == 0 {
+			break
+		}
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
-		assert.NoError(syncer.StateSummaryFrontier(
-			beaconID,
-			reqID,
-			summaryBytes,
-		))
+		if reachedSeeders%2 == 0 {
+			assert.NoError(syncer.StateSummaryFrontier(
+				beaconID,
+				reqID,
+				summaryBytes,
+			))
+		} else {
+			assert.NoError(syncer.StateSummaryFrontier(
+				beaconID,
+				reqID,
+				minoritySummaryBytes,
+			))
+		}
 	}
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
@@ -625,14 +649,24 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		return nil
 	}
 
-	// let just a majority of voters return the summary. The rest timeout.
+	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
 	cumulatedWeight := uint64(0)
 	for syncer.contactedVoters.Len() != 0 {
 		voterID, found := syncer.contactedVoters.Peek()
 		assert.True(found)
 		reqID := contactedVoters[voterID]
 
-		if cumulatedWeight < commonCfg.Alpha {
+		switch {
+		case cumulatedWeight < commonCfg.Alpha/2:
+			assert.NoError(syncer.AcceptedStateSummary(
+				voterID,
+				reqID,
+				[]ids.ID{summaryID, minoritySummaryID},
+			))
+			bw, _ := beacons.GetWeight(voterID)
+			cumulatedWeight += bw
+
+		case cumulatedWeight < commonCfg.Alpha:
 			assert.NoError(syncer.AcceptedStateSummary(
 				voterID,
 				reqID,
@@ -640,7 +674,8 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			))
 			bw, _ := beacons.GetWeight(voterID)
 			cumulatedWeight += bw
-		} else {
+
+		default:
 			assert.NoError(syncer.GetAcceptedStateSummaryFailed(
 				voterID,
 				reqID,

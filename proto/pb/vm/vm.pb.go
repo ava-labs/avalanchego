@@ -1986,21 +1986,82 @@ func (x *StateSyncEnabledResponse) GetErr() uint32 {
 	return 0
 }
 
+type StateSyncSummary struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Key     uint64 `protobuf:"varint,1,opt,name=key,proto3" json:"key,omitempty"`
+	Id      []byte `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Content []byte `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+}
+
+func (x *StateSyncSummary) Reset() {
+	*x = StateSyncSummary{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_vm_vm_proto_msgTypes[34]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StateSyncSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StateSyncSummary) ProtoMessage() {}
+
+func (x *StateSyncSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_vm_vm_proto_msgTypes[34]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StateSyncSummary.ProtoReflect.Descriptor instead.
+func (*StateSyncSummary) Descriptor() ([]byte, []int) {
+	return file_vm_vm_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *StateSyncSummary) GetKey() uint64 {
+	if x != nil {
+		return x.Key
+	}
+	return 0
+}
+
+func (x *StateSyncSummary) GetId() []byte {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *StateSyncSummary) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 type StateSyncGetOngoingSummaryResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key       uint64 `protobuf:"varint,1,opt,name=key,proto3" json:"key,omitempty"`
-	SummaryId []byte `protobuf:"bytes,2,opt,name=summary_id,json=summaryId,proto3" json:"summary_id,omitempty"`
-	Content   []byte `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	Err       uint32 `protobuf:"varint,4,opt,name=err,proto3" json:"err,omitempty"`
+	Summary *StateSyncSummary `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	Err     uint32            `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
 func (x *StateSyncGetOngoingSummaryResponse) Reset() {
 	*x = StateSyncGetOngoingSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[34]
+		mi := &file_vm_vm_proto_msgTypes[35]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2013,7 +2074,7 @@ func (x *StateSyncGetOngoingSummaryResponse) String() string {
 func (*StateSyncGetOngoingSummaryResponse) ProtoMessage() {}
 
 func (x *StateSyncGetOngoingSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[34]
+	mi := &file_vm_vm_proto_msgTypes[35]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2026,26 +2087,12 @@ func (x *StateSyncGetOngoingSummaryResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use StateSyncGetOngoingSummaryResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncGetOngoingSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{34}
+	return file_vm_vm_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *StateSyncGetOngoingSummaryResponse) GetKey() uint64 {
+func (x *StateSyncGetOngoingSummaryResponse) GetSummary() *StateSyncSummary {
 	if x != nil {
-		return x.Key
-	}
-	return 0
-}
-
-func (x *StateSyncGetOngoingSummaryResponse) GetSummaryId() []byte {
-	if x != nil {
-		return x.SummaryId
-	}
-	return nil
-}
-
-func (x *StateSyncGetOngoingSummaryResponse) GetContent() []byte {
-	if x != nil {
-		return x.Content
+		return x.Summary
 	}
 	return nil
 }
@@ -2062,16 +2109,14 @@ type StateSyncGetLastSummaryResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key       uint64 `protobuf:"varint,1,opt,name=key,proto3" json:"key,omitempty"`
-	SummaryId []byte `protobuf:"bytes,2,opt,name=summary_id,json=summaryId,proto3" json:"summary_id,omitempty"`
-	Content   []byte `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	Err       uint32 `protobuf:"varint,4,opt,name=err,proto3" json:"err,omitempty"`
+	Summary *StateSyncSummary `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	Err     uint32            `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
 func (x *StateSyncGetLastSummaryResponse) Reset() {
 	*x = StateSyncGetLastSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[35]
+		mi := &file_vm_vm_proto_msgTypes[36]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2084,7 +2129,7 @@ func (x *StateSyncGetLastSummaryResponse) String() string {
 func (*StateSyncGetLastSummaryResponse) ProtoMessage() {}
 
 func (x *StateSyncGetLastSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[35]
+	mi := &file_vm_vm_proto_msgTypes[36]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2097,26 +2142,12 @@ func (x *StateSyncGetLastSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncGetLastSummaryResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncGetLastSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{35}
+	return file_vm_vm_proto_rawDescGZIP(), []int{36}
 }
 
-func (x *StateSyncGetLastSummaryResponse) GetKey() uint64 {
+func (x *StateSyncGetLastSummaryResponse) GetSummary() *StateSyncSummary {
 	if x != nil {
-		return x.Key
-	}
-	return 0
-}
-
-func (x *StateSyncGetLastSummaryResponse) GetSummaryId() []byte {
-	if x != nil {
-		return x.SummaryId
-	}
-	return nil
-}
-
-func (x *StateSyncGetLastSummaryResponse) GetContent() []byte {
-	if x != nil {
-		return x.Content
+		return x.Summary
 	}
 	return nil
 }
@@ -2139,7 +2170,7 @@ type StateSyncParseSummaryRequest struct {
 func (x *StateSyncParseSummaryRequest) Reset() {
 	*x = StateSyncParseSummaryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[36]
+		mi := &file_vm_vm_proto_msgTypes[37]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2152,7 +2183,7 @@ func (x *StateSyncParseSummaryRequest) String() string {
 func (*StateSyncParseSummaryRequest) ProtoMessage() {}
 
 func (x *StateSyncParseSummaryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[36]
+	mi := &file_vm_vm_proto_msgTypes[37]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2165,7 +2196,7 @@ func (x *StateSyncParseSummaryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncParseSummaryRequest.ProtoReflect.Descriptor instead.
 func (*StateSyncParseSummaryRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{36}
+	return file_vm_vm_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *StateSyncParseSummaryRequest) GetSummary() []byte {
@@ -2180,16 +2211,14 @@ type StateSyncParseSummaryResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key       uint64 `protobuf:"varint,1,opt,name=key,proto3" json:"key,omitempty"`
-	SummaryId []byte `protobuf:"bytes,2,opt,name=summary_id,json=summaryId,proto3" json:"summary_id,omitempty"`
-	Content   []byte `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	Err       uint32 `protobuf:"varint,4,opt,name=err,proto3" json:"err,omitempty"`
+	Summary *StateSyncSummary `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	Err     uint32            `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
 func (x *StateSyncParseSummaryResponse) Reset() {
 	*x = StateSyncParseSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[37]
+		mi := &file_vm_vm_proto_msgTypes[38]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2202,7 +2231,7 @@ func (x *StateSyncParseSummaryResponse) String() string {
 func (*StateSyncParseSummaryResponse) ProtoMessage() {}
 
 func (x *StateSyncParseSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[37]
+	mi := &file_vm_vm_proto_msgTypes[38]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2215,26 +2244,12 @@ func (x *StateSyncParseSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncParseSummaryResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncParseSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{37}
+	return file_vm_vm_proto_rawDescGZIP(), []int{38}
 }
 
-func (x *StateSyncParseSummaryResponse) GetKey() uint64 {
+func (x *StateSyncParseSummaryResponse) GetSummary() *StateSyncSummary {
 	if x != nil {
-		return x.Key
-	}
-	return 0
-}
-
-func (x *StateSyncParseSummaryResponse) GetSummaryId() []byte {
-	if x != nil {
-		return x.SummaryId
-	}
-	return nil
-}
-
-func (x *StateSyncParseSummaryResponse) GetContent() []byte {
-	if x != nil {
-		return x.Content
+		return x.Summary
 	}
 	return nil
 }
@@ -2257,7 +2272,7 @@ type StateSyncGetSummaryRequest struct {
 func (x *StateSyncGetSummaryRequest) Reset() {
 	*x = StateSyncGetSummaryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[38]
+		mi := &file_vm_vm_proto_msgTypes[39]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2270,7 +2285,7 @@ func (x *StateSyncGetSummaryRequest) String() string {
 func (*StateSyncGetSummaryRequest) ProtoMessage() {}
 
 func (x *StateSyncGetSummaryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[38]
+	mi := &file_vm_vm_proto_msgTypes[39]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2283,7 +2298,7 @@ func (x *StateSyncGetSummaryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncGetSummaryRequest.ProtoReflect.Descriptor instead.
 func (*StateSyncGetSummaryRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{38}
+	return file_vm_vm_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *StateSyncGetSummaryRequest) GetKey() uint64 {
@@ -2298,16 +2313,14 @@ type StateSyncGetSummaryResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key       uint64 `protobuf:"varint,1,opt,name=key,proto3" json:"key,omitempty"`
-	SummaryId []byte `protobuf:"bytes,2,opt,name=summary_id,json=summaryId,proto3" json:"summary_id,omitempty"`
-	Content   []byte `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	Err       uint32 `protobuf:"varint,4,opt,name=err,proto3" json:"err,omitempty"`
+	Summary *StateSyncSummary `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	Err     uint32            `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
 func (x *StateSyncGetSummaryResponse) Reset() {
 	*x = StateSyncGetSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[39]
+		mi := &file_vm_vm_proto_msgTypes[40]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2320,7 +2333,7 @@ func (x *StateSyncGetSummaryResponse) String() string {
 func (*StateSyncGetSummaryResponse) ProtoMessage() {}
 
 func (x *StateSyncGetSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[39]
+	mi := &file_vm_vm_proto_msgTypes[40]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2333,26 +2346,12 @@ func (x *StateSyncGetSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncGetSummaryResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncGetSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{39}
+	return file_vm_vm_proto_rawDescGZIP(), []int{40}
 }
 
-func (x *StateSyncGetSummaryResponse) GetKey() uint64 {
+func (x *StateSyncGetSummaryResponse) GetSummary() *StateSyncSummary {
 	if x != nil {
-		return x.Key
-	}
-	return 0
-}
-
-func (x *StateSyncGetSummaryResponse) GetSummaryId() []byte {
-	if x != nil {
-		return x.SummaryId
-	}
-	return nil
-}
-
-func (x *StateSyncGetSummaryResponse) GetContent() []byte {
-	if x != nil {
-		return x.Content
+		return x.Summary
 	}
 	return nil
 }
@@ -2369,13 +2368,14 @@ type StateSyncRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Summaries []*StateSyncGetLastSummaryResponse `protobuf:"bytes,1,rep,name=summaries,proto3" json:"summaries,omitempty"`
+	Summaries []*StateSyncSummary `protobuf:"bytes,1,rep,name=summaries,proto3" json:"summaries,omitempty"`
+	Err       uint32              `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
 func (x *StateSyncRequest) Reset() {
 	*x = StateSyncRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[40]
+		mi := &file_vm_vm_proto_msgTypes[41]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2388,7 +2388,7 @@ func (x *StateSyncRequest) String() string {
 func (*StateSyncRequest) ProtoMessage() {}
 
 func (x *StateSyncRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[40]
+	mi := &file_vm_vm_proto_msgTypes[41]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2401,14 +2401,21 @@ func (x *StateSyncRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncRequest.ProtoReflect.Descriptor instead.
 func (*StateSyncRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{40}
+	return file_vm_vm_proto_rawDescGZIP(), []int{41}
 }
 
-func (x *StateSyncRequest) GetSummaries() []*StateSyncGetLastSummaryResponse {
+func (x *StateSyncRequest) GetSummaries() []*StateSyncSummary {
 	if x != nil {
 		return x.Summaries
 	}
 	return nil
+}
+
+func (x *StateSyncRequest) GetErr() uint32 {
+	if x != nil {
+		return x.Err
+	}
+	return 0
 }
 
 type StateSyncResponse struct {
@@ -2422,7 +2429,7 @@ type StateSyncResponse struct {
 func (x *StateSyncResponse) Reset() {
 	*x = StateSyncResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[41]
+		mi := &file_vm_vm_proto_msgTypes[42]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2435,7 +2442,7 @@ func (x *StateSyncResponse) String() string {
 func (*StateSyncResponse) ProtoMessage() {}
 
 func (x *StateSyncResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[41]
+	mi := &file_vm_vm_proto_msgTypes[42]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2448,7 +2455,7 @@ func (x *StateSyncResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{41}
+	return file_vm_vm_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *StateSyncResponse) GetErr() uint32 {
@@ -2472,7 +2479,7 @@ type StateSyncGetResultResponse struct {
 func (x *StateSyncGetResultResponse) Reset() {
 	*x = StateSyncGetResultResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[42]
+		mi := &file_vm_vm_proto_msgTypes[43]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2485,7 +2492,7 @@ func (x *StateSyncGetResultResponse) String() string {
 func (*StateSyncGetResultResponse) ProtoMessage() {}
 
 func (x *StateSyncGetResultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[42]
+	mi := &file_vm_vm_proto_msgTypes[43]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2498,7 +2505,7 @@ func (x *StateSyncGetResultResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateSyncGetResultResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncGetResultResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{42}
+	return file_vm_vm_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *StateSyncGetResultResponse) GetBytes() []byte {
@@ -2534,13 +2541,13 @@ type StateSyncSetLastSummaryBlockRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Bytes []byte `protobuf:"bytes,1,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	Id []byte `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 }
 
 func (x *StateSyncSetLastSummaryBlockRequest) Reset() {
 	*x = StateSyncSetLastSummaryBlockRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[43]
+		mi := &file_vm_vm_proto_msgTypes[44]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2553,7 +2560,7 @@ func (x *StateSyncSetLastSummaryBlockRequest) String() string {
 func (*StateSyncSetLastSummaryBlockRequest) ProtoMessage() {}
 
 func (x *StateSyncSetLastSummaryBlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[43]
+	mi := &file_vm_vm_proto_msgTypes[44]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2566,12 +2573,12 @@ func (x *StateSyncSetLastSummaryBlockRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use StateSyncSetLastSummaryBlockRequest.ProtoReflect.Descriptor instead.
 func (*StateSyncSetLastSummaryBlockRequest) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{43}
+	return file_vm_vm_proto_rawDescGZIP(), []int{44}
 }
 
-func (x *StateSyncSetLastSummaryBlockRequest) GetBytes() []byte {
+func (x *StateSyncSetLastSummaryBlockRequest) GetId() []byte {
 	if x != nil {
-		return x.Bytes
+		return x.Id
 	}
 	return nil
 }
@@ -2587,7 +2594,7 @@ type StateSyncSetLastSummaryBlockResponse struct {
 func (x *StateSyncSetLastSummaryBlockResponse) Reset() {
 	*x = StateSyncSetLastSummaryBlockResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[44]
+		mi := &file_vm_vm_proto_msgTypes[45]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2600,7 +2607,7 @@ func (x *StateSyncSetLastSummaryBlockResponse) String() string {
 func (*StateSyncSetLastSummaryBlockResponse) ProtoMessage() {}
 
 func (x *StateSyncSetLastSummaryBlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[44]
+	mi := &file_vm_vm_proto_msgTypes[45]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2613,7 +2620,7 @@ func (x *StateSyncSetLastSummaryBlockResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use StateSyncSetLastSummaryBlockResponse.ProtoReflect.Descriptor instead.
 func (*StateSyncSetLastSummaryBlockResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{44}
+	return file_vm_vm_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *StateSyncSetLastSummaryBlockResponse) GetErr() uint32 {
@@ -2634,7 +2641,7 @@ type GatherResponse struct {
 func (x *GatherResponse) Reset() {
 	*x = GatherResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_vm_vm_proto_msgTypes[45]
+		mi := &file_vm_vm_proto_msgTypes[46]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2647,7 +2654,7 @@ func (x *GatherResponse) String() string {
 func (*GatherResponse) ProtoMessage() {}
 
 func (x *GatherResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vm_vm_proto_msgTypes[45]
+	mi := &file_vm_vm_proto_msgTypes[46]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2660,7 +2667,7 @@ func (x *GatherResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GatherResponse.ProtoReflect.Descriptor instead.
 func (*GatherResponse) Descriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{45}
+	return file_vm_vm_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *GatherResponse) GetMetricFamilies() []*_go.MetricFamily {
@@ -2869,65 +2876,63 @@ var file_vm_vm_proto_rawDesc = []byte{
 	0x79, 0x6e, 0x63, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
 	0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x08, 0x52, 0x07, 0x65, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x12, 0x10, 0x0a, 0x03,
-	0x65, 0x72, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x81,
-	0x01, 0x0a, 0x22, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x4f,
-	0x6e, 0x67, 0x6f, 0x69, 0x6e, 0x67, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x75, 0x6d, 0x6d, 0x61,
-	0x72, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x73, 0x75, 0x6d,
-	0x6d, 0x61, 0x72, 0x79, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e,
-	0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74,
-	0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65,
-	0x72, 0x72, 0x22, 0x7e, 0x0a, 0x1f, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47,
-	0x65, 0x74, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x75, 0x6d, 0x6d, 0x61,
-	0x72, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x73, 0x75, 0x6d,
-	0x6d, 0x61, 0x72, 0x79, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e,
-	0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74,
-	0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65,
-	0x72, 0x72, 0x22, 0x38, 0x0a, 0x1c, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x50,
-	0x61, 0x72, 0x73, 0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x07, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x22, 0x7c, 0x0a, 0x1d,
-	0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x50, 0x61, 0x72, 0x73, 0x65, 0x53, 0x75,
-	0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a,
-	0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12,
-	0x1d, 0x0a, 0x0a, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x09, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x49, 0x64, 0x12, 0x18,
-	0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52,
-	0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18,
-	0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x2e, 0x0a, 0x1a, 0x53, 0x74,
-	0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72,
-	0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x22, 0x7a, 0x0a, 0x1b, 0x53, 0x74,
-	0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72,
-	0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x73,
-	0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52,
-	0x09, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f,
-	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e,
-	0x74, 0x65, 0x6e, 0x74, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28,
-	0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x55, 0x0a, 0x10, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53,
-	0x79, 0x6e, 0x63, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x41, 0x0a, 0x09, 0x73, 0x75,
-	0x6d, 0x6d, 0x61, 0x72, 0x69, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x23, 0x2e,
-	0x76, 0x6d, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x4c,
-	0x61, 0x73, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x52, 0x09, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x69, 0x65, 0x73, 0x22, 0x25, 0x0a,
-	0x11, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52,
-	0x03, 0x65, 0x72, 0x72, 0x22, 0x79, 0x0a, 0x1a, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e,
-	0x63, 0x47, 0x65, 0x74, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x0c, 0x52, 0x05, 0x62, 0x79, 0x74, 0x65, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67,
-	0x68, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74,
-	0x12, 0x1b, 0x0a, 0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x5f, 0x6d, 0x73, 0x67, 0x18, 0x03, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x08, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x4d, 0x73, 0x67, 0x12, 0x10, 0x0a,
-	0x03, 0x65, 0x72, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22,
-	0x3b, 0x0a, 0x23, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x65, 0x74, 0x4c,
-	0x61, 0x73, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x79, 0x74, 0x65, 0x73, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x62, 0x79, 0x74, 0x65, 0x73, 0x22, 0x38, 0x0a, 0x24,
+	0x65, 0x72, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x4e,
+	0x0a, 0x10, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61,
+	0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52,
+	0x03, 0x6b, 0x65, 0x79, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x02, 0x69, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x66,
+	0x0a, 0x22, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x4f, 0x6e,
+	0x67, 0x6f, 0x69, 0x6e, 0x67, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x76, 0x6d, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x65,
+	0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x07, 0x73, 0x75, 0x6d,
+	0x6d, 0x61, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x63, 0x0a, 0x1f, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53,
+	0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72,
+	0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x75, 0x6d,
+	0x6d, 0x61, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x76, 0x6d, 0x2e,
+	0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79,
+	0x52, 0x07, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x38, 0x0a, 0x1c, 0x53,
+	0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x50, 0x61, 0x72, 0x73, 0x65, 0x53, 0x75, 0x6d,
+	0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x73,
+	0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x73, 0x75,
+	0x6d, 0x6d, 0x61, 0x72, 0x79, 0x22, 0x61, 0x0a, 0x1d, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79,
+	0x6e, 0x63, 0x50, 0x61, 0x72, 0x73, 0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72,
+	0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x76, 0x6d, 0x2e, 0x53, 0x74, 0x61,
+	0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x07, 0x73,
+	0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x2e, 0x0a, 0x1a, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x22, 0x5f, 0x0a, 0x1b, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x75, 0x6d, 0x6d, 0x61,
+	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x76, 0x6d, 0x2e, 0x53, 0x74,
+	0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x07,
+	0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x58, 0x0a, 0x10, 0x53, 0x74, 0x61,
+	0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x32, 0x0a,
+	0x09, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x69, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x14, 0x2e, 0x76, 0x6d, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53,
+	0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x09, 0x73, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x69, 0x65,
+	0x73, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03,
+	0x65, 0x72, 0x72, 0x22, 0x25, 0x0a, 0x11, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x79, 0x0a, 0x1a, 0x53, 0x74,
+	0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x47, 0x65, 0x74, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x79, 0x74, 0x65,
+	0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x62, 0x79, 0x74, 0x65, 0x73, 0x12, 0x16,
+	0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06,
+	0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x5f,
+	0x6d, 0x73, 0x67, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x65, 0x72, 0x72, 0x6f, 0x72,
+	0x4d, 0x73, 0x67, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d,
+	0x52, 0x03, 0x65, 0x72, 0x72, 0x22, 0x35, 0x0a, 0x23, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79,
+	0x6e, 0x63, 0x53, 0x65, 0x74, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79,
+	0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x0e, 0x0a, 0x02,
+	0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x02, 0x69, 0x64, 0x22, 0x38, 0x0a, 0x24,
 	0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x65, 0x74, 0x4c, 0x61, 0x73, 0x74,
 	0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x52, 0x65, 0x73, 0x70,
 	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x72, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28,
@@ -3099,7 +3104,7 @@ func file_vm_vm_proto_rawDescGZIP() []byte {
 	return file_vm_vm_proto_rawDescData
 }
 
-var file_vm_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
+var file_vm_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
 var file_vm_vm_proto_goTypes = []interface{}{
 	(*InitializeRequest)(nil),                    // 0: vm.InitializeRequest
 	(*SetStateRequest)(nil),                      // 1: vm.SetStateRequest
@@ -3135,101 +3140,106 @@ var file_vm_vm_proto_goTypes = []interface{}{
 	(*GetBlockIDAtHeightRequest)(nil),            // 31: vm.GetBlockIDAtHeightRequest
 	(*GetBlockIDAtHeightResponse)(nil),           // 32: vm.GetBlockIDAtHeightResponse
 	(*StateSyncEnabledResponse)(nil),             // 33: vm.StateSyncEnabledResponse
-	(*StateSyncGetOngoingSummaryResponse)(nil),   // 34: vm.StateSyncGetOngoingSummaryResponse
-	(*StateSyncGetLastSummaryResponse)(nil),      // 35: vm.StateSyncGetLastSummaryResponse
-	(*StateSyncParseSummaryRequest)(nil),         // 36: vm.StateSyncParseSummaryRequest
-	(*StateSyncParseSummaryResponse)(nil),        // 37: vm.StateSyncParseSummaryResponse
-	(*StateSyncGetSummaryRequest)(nil),           // 38: vm.StateSyncGetSummaryRequest
-	(*StateSyncGetSummaryResponse)(nil),          // 39: vm.StateSyncGetSummaryResponse
-	(*StateSyncRequest)(nil),                     // 40: vm.StateSyncRequest
-	(*StateSyncResponse)(nil),                    // 41: vm.StateSyncResponse
-	(*StateSyncGetResultResponse)(nil),           // 42: vm.StateSyncGetResultResponse
-	(*StateSyncSetLastSummaryBlockRequest)(nil),  // 43: vm.StateSyncSetLastSummaryBlockRequest
-	(*StateSyncSetLastSummaryBlockResponse)(nil), // 44: vm.StateSyncSetLastSummaryBlockResponse
-	(*GatherResponse)(nil),                       // 45: vm.GatherResponse
-	nil,                                          // 46: vm.HealthRequest.GrpcChecksEntry
-	(*_go.MetricFamily)(nil),                     // 47: io.prometheus.client.MetricFamily
-	(*emptypb.Empty)(nil),                        // 48: google.protobuf.Empty
+	(*StateSyncSummary)(nil),                     // 34: vm.StateSyncSummary
+	(*StateSyncGetOngoingSummaryResponse)(nil),   // 35: vm.StateSyncGetOngoingSummaryResponse
+	(*StateSyncGetLastSummaryResponse)(nil),      // 36: vm.StateSyncGetLastSummaryResponse
+	(*StateSyncParseSummaryRequest)(nil),         // 37: vm.StateSyncParseSummaryRequest
+	(*StateSyncParseSummaryResponse)(nil),        // 38: vm.StateSyncParseSummaryResponse
+	(*StateSyncGetSummaryRequest)(nil),           // 39: vm.StateSyncGetSummaryRequest
+	(*StateSyncGetSummaryResponse)(nil),          // 40: vm.StateSyncGetSummaryResponse
+	(*StateSyncRequest)(nil),                     // 41: vm.StateSyncRequest
+	(*StateSyncResponse)(nil),                    // 42: vm.StateSyncResponse
+	(*StateSyncGetResultResponse)(nil),           // 43: vm.StateSyncGetResultResponse
+	(*StateSyncSetLastSummaryBlockRequest)(nil),  // 44: vm.StateSyncSetLastSummaryBlockRequest
+	(*StateSyncSetLastSummaryBlockResponse)(nil), // 45: vm.StateSyncSetLastSummaryBlockResponse
+	(*GatherResponse)(nil),                       // 46: vm.GatherResponse
+	nil,                                          // 47: vm.HealthRequest.GrpcChecksEntry
+	(*_go.MetricFamily)(nil),                     // 48: io.prometheus.client.MetricFamily
+	(*emptypb.Empty)(nil),                        // 49: google.protobuf.Empty
 }
 var file_vm_vm_proto_depIdxs = []int32{
 	3,  // 0: vm.InitializeRequest.db_servers:type_name -> vm.VersionedDBServer
 	6,  // 1: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
 	6,  // 2: vm.CreateStaticHandlersResponse.handlers:type_name -> vm.Handler
-	46, // 3: vm.HealthRequest.grpc_checks:type_name -> vm.HealthRequest.GrpcChecksEntry
+	47, // 3: vm.HealthRequest.grpc_checks:type_name -> vm.HealthRequest.GrpcChecksEntry
 	9,  // 4: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
-	35, // 5: vm.StateSyncRequest.summaries:type_name -> vm.StateSyncGetLastSummaryResponse
-	47, // 6: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
-	0,  // 7: vm.VM.Initialize:input_type -> vm.InitializeRequest
-	1,  // 8: vm.VM.SetState:input_type -> vm.SetStateRequest
-	48, // 9: vm.VM.Shutdown:input_type -> google.protobuf.Empty
-	48, // 10: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
-	48, // 11: vm.VM.CreateStaticHandlers:input_type -> google.protobuf.Empty
-	24, // 12: vm.VM.Connected:input_type -> vm.ConnectedRequest
-	25, // 13: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
-	48, // 14: vm.VM.BuildBlock:input_type -> google.protobuf.Empty
-	8,  // 15: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
-	10, // 16: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
-	12, // 17: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
-	17, // 18: vm.VM.Health:input_type -> vm.HealthRequest
-	48, // 19: vm.VM.Version:input_type -> google.protobuf.Empty
-	20, // 20: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
-	21, // 21: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
-	22, // 22: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
-	23, // 23: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
-	48, // 24: vm.VM.Gather:input_type -> google.protobuf.Empty
-	13, // 25: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
-	15, // 26: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
-	16, // 27: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
-	26, // 28: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
-	28, // 29: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
-	48, // 30: vm.VM.VerifyHeightIndex:input_type -> google.protobuf.Empty
-	31, // 31: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
-	48, // 32: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
-	48, // 33: vm.VM.StateSyncGetOngoingSummary:input_type -> google.protobuf.Empty
-	48, // 34: vm.VM.StateSyncGetLastSummary:input_type -> google.protobuf.Empty
-	36, // 35: vm.VM.StateSyncParseSummary:input_type -> vm.StateSyncParseSummaryRequest
-	38, // 36: vm.VM.StateSyncGetSummary:input_type -> vm.StateSyncGetSummaryRequest
-	40, // 37: vm.VM.StateSync:input_type -> vm.StateSyncRequest
-	48, // 38: vm.VM.StateSyncGetResult:input_type -> google.protobuf.Empty
-	43, // 39: vm.VM.StateSyncSetLastSummaryBlock:input_type -> vm.StateSyncSetLastSummaryBlockRequest
-	2,  // 40: vm.VM.Initialize:output_type -> vm.InitializeResponse
-	48, // 41: vm.VM.SetState:output_type -> google.protobuf.Empty
-	48, // 42: vm.VM.Shutdown:output_type -> google.protobuf.Empty
-	4,  // 43: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
-	5,  // 44: vm.VM.CreateStaticHandlers:output_type -> vm.CreateStaticHandlersResponse
-	48, // 45: vm.VM.Connected:output_type -> google.protobuf.Empty
-	48, // 46: vm.VM.Disconnected:output_type -> google.protobuf.Empty
-	7,  // 47: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
-	9,  // 48: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
-	11, // 49: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
-	48, // 50: vm.VM.SetPreference:output_type -> google.protobuf.Empty
-	18, // 51: vm.VM.Health:output_type -> vm.HealthResponse
-	19, // 52: vm.VM.Version:output_type -> vm.VersionResponse
-	48, // 53: vm.VM.AppRequest:output_type -> google.protobuf.Empty
-	48, // 54: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
-	48, // 55: vm.VM.AppResponse:output_type -> google.protobuf.Empty
-	48, // 56: vm.VM.AppGossip:output_type -> google.protobuf.Empty
-	45, // 57: vm.VM.Gather:output_type -> vm.GatherResponse
-	14, // 58: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
-	48, // 59: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
-	48, // 60: vm.VM.BlockReject:output_type -> google.protobuf.Empty
-	27, // 61: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
-	29, // 62: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
-	30, // 63: vm.VM.VerifyHeightIndex:output_type -> vm.VerifyHeightIndexResponse
-	32, // 64: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
-	33, // 65: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
-	34, // 66: vm.VM.StateSyncGetOngoingSummary:output_type -> vm.StateSyncGetOngoingSummaryResponse
-	35, // 67: vm.VM.StateSyncGetLastSummary:output_type -> vm.StateSyncGetLastSummaryResponse
-	37, // 68: vm.VM.StateSyncParseSummary:output_type -> vm.StateSyncParseSummaryResponse
-	39, // 69: vm.VM.StateSyncGetSummary:output_type -> vm.StateSyncGetSummaryResponse
-	41, // 70: vm.VM.StateSync:output_type -> vm.StateSyncResponse
-	42, // 71: vm.VM.StateSyncGetResult:output_type -> vm.StateSyncGetResultResponse
-	44, // 72: vm.VM.StateSyncSetLastSummaryBlock:output_type -> vm.StateSyncSetLastSummaryBlockResponse
-	40, // [40:73] is the sub-list for method output_type
-	7,  // [7:40] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	34, // 5: vm.StateSyncGetOngoingSummaryResponse.summary:type_name -> vm.StateSyncSummary
+	34, // 6: vm.StateSyncGetLastSummaryResponse.summary:type_name -> vm.StateSyncSummary
+	34, // 7: vm.StateSyncParseSummaryResponse.summary:type_name -> vm.StateSyncSummary
+	34, // 8: vm.StateSyncGetSummaryResponse.summary:type_name -> vm.StateSyncSummary
+	34, // 9: vm.StateSyncRequest.summaries:type_name -> vm.StateSyncSummary
+	48, // 10: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
+	0,  // 11: vm.VM.Initialize:input_type -> vm.InitializeRequest
+	1,  // 12: vm.VM.SetState:input_type -> vm.SetStateRequest
+	49, // 13: vm.VM.Shutdown:input_type -> google.protobuf.Empty
+	49, // 14: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
+	49, // 15: vm.VM.CreateStaticHandlers:input_type -> google.protobuf.Empty
+	24, // 16: vm.VM.Connected:input_type -> vm.ConnectedRequest
+	25, // 17: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
+	49, // 18: vm.VM.BuildBlock:input_type -> google.protobuf.Empty
+	8,  // 19: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
+	10, // 20: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
+	12, // 21: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
+	17, // 22: vm.VM.Health:input_type -> vm.HealthRequest
+	49, // 23: vm.VM.Version:input_type -> google.protobuf.Empty
+	20, // 24: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
+	21, // 25: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
+	22, // 26: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
+	23, // 27: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
+	49, // 28: vm.VM.Gather:input_type -> google.protobuf.Empty
+	13, // 29: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
+	15, // 30: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
+	16, // 31: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
+	26, // 32: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
+	28, // 33: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
+	49, // 34: vm.VM.VerifyHeightIndex:input_type -> google.protobuf.Empty
+	31, // 35: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
+	49, // 36: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
+	49, // 37: vm.VM.StateSyncGetOngoingSummary:input_type -> google.protobuf.Empty
+	49, // 38: vm.VM.StateSyncGetLastSummary:input_type -> google.protobuf.Empty
+	37, // 39: vm.VM.StateSyncParseSummary:input_type -> vm.StateSyncParseSummaryRequest
+	39, // 40: vm.VM.StateSyncGetSummary:input_type -> vm.StateSyncGetSummaryRequest
+	41, // 41: vm.VM.StateSync:input_type -> vm.StateSyncRequest
+	49, // 42: vm.VM.StateSyncGetResult:input_type -> google.protobuf.Empty
+	44, // 43: vm.VM.StateSyncSetLastSummaryBlock:input_type -> vm.StateSyncSetLastSummaryBlockRequest
+	2,  // 44: vm.VM.Initialize:output_type -> vm.InitializeResponse
+	49, // 45: vm.VM.SetState:output_type -> google.protobuf.Empty
+	49, // 46: vm.VM.Shutdown:output_type -> google.protobuf.Empty
+	4,  // 47: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
+	5,  // 48: vm.VM.CreateStaticHandlers:output_type -> vm.CreateStaticHandlersResponse
+	49, // 49: vm.VM.Connected:output_type -> google.protobuf.Empty
+	49, // 50: vm.VM.Disconnected:output_type -> google.protobuf.Empty
+	7,  // 51: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
+	9,  // 52: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
+	11, // 53: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
+	49, // 54: vm.VM.SetPreference:output_type -> google.protobuf.Empty
+	18, // 55: vm.VM.Health:output_type -> vm.HealthResponse
+	19, // 56: vm.VM.Version:output_type -> vm.VersionResponse
+	49, // 57: vm.VM.AppRequest:output_type -> google.protobuf.Empty
+	49, // 58: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
+	49, // 59: vm.VM.AppResponse:output_type -> google.protobuf.Empty
+	49, // 60: vm.VM.AppGossip:output_type -> google.protobuf.Empty
+	46, // 61: vm.VM.Gather:output_type -> vm.GatherResponse
+	14, // 62: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
+	49, // 63: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
+	49, // 64: vm.VM.BlockReject:output_type -> google.protobuf.Empty
+	27, // 65: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
+	29, // 66: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
+	30, // 67: vm.VM.VerifyHeightIndex:output_type -> vm.VerifyHeightIndexResponse
+	32, // 68: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
+	33, // 69: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
+	35, // 70: vm.VM.StateSyncGetOngoingSummary:output_type -> vm.StateSyncGetOngoingSummaryResponse
+	36, // 71: vm.VM.StateSyncGetLastSummary:output_type -> vm.StateSyncGetLastSummaryResponse
+	38, // 72: vm.VM.StateSyncParseSummary:output_type -> vm.StateSyncParseSummaryResponse
+	40, // 73: vm.VM.StateSyncGetSummary:output_type -> vm.StateSyncGetSummaryResponse
+	42, // 74: vm.VM.StateSync:output_type -> vm.StateSyncResponse
+	43, // 75: vm.VM.StateSyncGetResult:output_type -> vm.StateSyncGetResultResponse
+	45, // 76: vm.VM.StateSyncSetLastSummaryBlock:output_type -> vm.StateSyncSetLastSummaryBlockResponse
+	44, // [44:77] is the sub-list for method output_type
+	11, // [11:44] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_vm_vm_proto_init() }
@@ -3647,7 +3657,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncGetOngoingSummaryResponse); i {
+			switch v := v.(*StateSyncSummary); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3659,7 +3669,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncGetLastSummaryResponse); i {
+			switch v := v.(*StateSyncGetOngoingSummaryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3671,7 +3681,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[36].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncParseSummaryRequest); i {
+			switch v := v.(*StateSyncGetLastSummaryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3683,7 +3693,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[37].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncParseSummaryResponse); i {
+			switch v := v.(*StateSyncParseSummaryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3695,7 +3705,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[38].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncGetSummaryRequest); i {
+			switch v := v.(*StateSyncParseSummaryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3707,7 +3717,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[39].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncGetSummaryResponse); i {
+			switch v := v.(*StateSyncGetSummaryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3719,7 +3729,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[40].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncRequest); i {
+			switch v := v.(*StateSyncGetSummaryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3731,7 +3741,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[41].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncResponse); i {
+			switch v := v.(*StateSyncRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3743,7 +3753,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[42].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncGetResultResponse); i {
+			switch v := v.(*StateSyncResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3755,7 +3765,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[43].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncSetLastSummaryBlockRequest); i {
+			switch v := v.(*StateSyncGetResultResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3767,7 +3777,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[44].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StateSyncSetLastSummaryBlockResponse); i {
+			switch v := v.(*StateSyncSetLastSummaryBlockRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3779,6 +3789,18 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[45].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StateSyncSetLastSummaryBlockResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_vm_vm_proto_msgTypes[46].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GatherResponse); i {
 			case 0:
 				return &v.state
@@ -3797,7 +3819,7 @@ func file_vm_vm_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_vm_vm_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   47,
+			NumMessages:   48,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

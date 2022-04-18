@@ -6,7 +6,7 @@ package rpcchainvm
 import (
 	"context"
 
-	ids "github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ids"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -46,9 +46,11 @@ func (vm *VMServer) StateSyncGetOngoingSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncGetOngoingSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -75,9 +77,11 @@ func (vm *VMServer) StateSyncGetLastSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncGetLastSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -104,9 +108,11 @@ func (vm *VMServer) StateSyncParseSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncParseSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -133,9 +139,11 @@ func (vm *VMServer) StateSyncGetSummary(
 	if err == nil {
 		summaryID := summary.ID()
 		return &vmpb.StateSyncGetSummaryResponse{
-			Key:       summary.Key(),
-			SummaryId: summaryID[:],
-			Content:   summary.Bytes(),
+			Summary: &vmpb.StateSyncSummary{
+				Key:     summary.Key(),
+				Id:      summaryID[:],
+				Content: summary.Bytes(),
+			},
 		}, nil
 	}
 
@@ -153,7 +161,7 @@ func (vm *VMServer) StateSync(ctx context.Context, req *vmpb.StateSyncRequest) (
 	if vm.ssVM != nil {
 		for i, sum := range req.Summaries {
 			var summaryID ids.ID
-			summaryID, err = ids.ToID(sum.SummaryId)
+			summaryID, err = ids.ToID(sum.Id)
 			if err != nil {
 				return nil, err
 			}
@@ -198,15 +206,21 @@ func (vm *VMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*vmpb.S
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) StateSyncSetLastSummaryBlock(
+func (vm *VMServer) StateSyncSetLastSummaryBlockID(
 	ctx context.Context,
 	req *vmpb.StateSyncSetLastSummaryBlockRequest,
 ) (*vmpb.StateSyncSetLastSummaryBlockResponse, error) {
-	var err error
-	if vm.ssVM != nil {
-		err = vm.ssVM.StateSyncSetLastSummaryBlock(req.Bytes)
-	} else {
-		err = common.ErrStateSyncableVMNotImplemented
+	var (
+		blkID ids.ID
+		err   error
+	)
+	blkID, err = ids.ToID(req.Id)
+	if err == nil {
+		if vm.ssVM != nil {
+			err = vm.ssVM.StateSyncSetLastSummaryBlockID(blkID)
+		} else {
+			err = common.ErrStateSyncableVMNotImplemented
+		}
 	}
 
 	return &vmpb.StateSyncSetLastSummaryBlockResponse{

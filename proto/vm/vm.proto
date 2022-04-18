@@ -261,18 +261,20 @@ message StateSyncEnabledResponse {
   uint32 err = 2;
 }
 
-message StateSyncGetOngoingSummaryResponse {
+message StateSyncSummary {
   uint64 key = 1;
-  bytes summary_id = 2;
+  bytes id = 2;
   bytes content = 3;
-  uint32 err = 4;
+}
+
+message StateSyncGetOngoingSummaryResponse {
+  StateSyncSummary summary = 1;
+  uint32 err = 2;
 }
 
 message StateSyncGetLastSummaryResponse {
-  uint64 key = 1;
-  bytes summary_id = 2;
-  bytes content = 3;
-  uint32 err = 4;
+  StateSyncSummary summary = 1;
+  uint32 err = 2;
 }
 
 message StateSyncParseSummaryRequest {
@@ -280,10 +282,8 @@ message StateSyncParseSummaryRequest {
 }
 
 message StateSyncParseSummaryResponse {
-  uint64 key = 1;
-  bytes summary_id = 2;
-  bytes content = 3;
-  uint32 err = 4;
+  StateSyncSummary summary = 1;
+  uint32 err = 2;
 }
 
 message StateSyncGetSummaryRequest {
@@ -291,14 +291,13 @@ message StateSyncGetSummaryRequest {
 }
 
 message StateSyncGetSummaryResponse {
-  uint64 key = 1;
-  bytes summary_id = 2;
-  bytes content = 3;
-  uint32 err = 4;
+  StateSyncSummary summary = 1;
+  uint32 err = 2;
 }
 
 message StateSyncRequest {
-  repeated StateSyncGetLastSummaryResponse summaries = 1;
+  repeated StateSyncSummary summaries = 1;
+  uint32 err = 2;
 }
 
 message StateSyncResponse {
@@ -313,7 +312,7 @@ message StateSyncGetResultResponse {
 }
 
 message StateSyncSetLastSummaryBlockRequest {
-  bytes bytes = 1;
+  bytes id = 1;
 }
 
 message StateSyncSetLastSummaryBlockResponse {
