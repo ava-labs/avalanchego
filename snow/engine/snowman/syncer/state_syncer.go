@@ -50,9 +50,9 @@ type stateSyncer struct {
 
 	// once vm finishes processing rebuilding its state via state summaries
 	// the full block associated with state summary must be download.
-	// stateSummaryBlkIDRequested ensures that the full block will be downloaded
-	// only in that case.
-	stateSummaryBlkIDRequested bool
+	// stateSummaryBlkIDValidator tracks validator reached out for the full block
+	// and ensures that the full block will be downloaded only in that case.
+	stateSummaryBlkIDValidator ids.ShortID
 
 	// State Sync specific fields
 	stateSyncVM        block.StateSyncableVM
@@ -446,7 +446,7 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 
 	// request the block
 	ss.Sender.SendGet(vdrID, ss.requestID, blkID)
-	ss.stateSummaryBlkIDRequested = true
+	ss.stateSummaryBlkIDValidator = vdrID
 	return nil
 }
 
@@ -454,9 +454,14 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 // Pass it to VM, declare state sync done and move onto bootstrapping
 func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
 	// ignores any late responses
-	if !ss.stateSummaryBlkIDRequested || requestID != ss.requestID {
+	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
 			validatorID, ss.requestID, requestID)
+		return nil
+	}
+
+	if validatorID != ss.stateSummaryBlkIDValidator {
+		ss.Ctx.Log.Debug("Received a Put message from %s unexpectedly", validatorID)
 		return nil
 	}
 

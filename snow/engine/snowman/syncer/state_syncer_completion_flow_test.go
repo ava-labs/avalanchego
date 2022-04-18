@@ -44,7 +44,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	// mock sender to record requested blkID
 	var (
 		blkRequested  bool
-		reachedNodeID ids.ShortID
+		reachedNodeID = ids.ShortID{'n', 'o', 'd', 'e', 'I', 'D'}
 		sentReqID     uint32
 	)
 	sender.CantSendGet = true
