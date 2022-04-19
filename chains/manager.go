@@ -870,8 +870,6 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped:  m.unblockChains,
 	}
 
-	// Note: creating engine before bootstrapper ensures that
-	// engine.Start exists
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
 		engine.Start,
@@ -892,8 +890,6 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
 
-	// Note: creating bootstrapper before stateSyncer ensures that
-	// bootstrapper.Start exists
 	stateSyncer := syncer.New(
 		stateSyncCfg,
 		bootstrapper.Start,

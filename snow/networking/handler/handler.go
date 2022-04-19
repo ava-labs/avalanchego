@@ -175,10 +175,9 @@ func (h *handler) selectStartingGear() (common.Engine, error) {
 
 func (h *handler) Start(recoverPanic bool) {
 	gear, err := h.selectStartingGear()
-	if err != nil {
-		return
+	if err == nil {
+		err = gear.Start(0)
 	}
-	err = gear.Start(0)
 
 	h.dispatch(recoverPanic)
 
@@ -402,7 +401,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				reqID,
 				err,
 			)
-			return err
+			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
 		}
 		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
 
