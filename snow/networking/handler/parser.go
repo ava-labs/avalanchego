@@ -29,3 +29,16 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 	}
 	return res, nil
 }
+
+func getKeys(msg message.InboundMessage) ([]uint64, error) {
+	keys := msg.Get(message.SummaryKeys).([]uint64)
+	keysSet := make(map[uint64]struct{})
+
+	for _, key := range keys {
+		if _, found := keysSet[key]; found {
+			return nil, errDuplicatedID
+		}
+		keysSet[key] = struct{}{}
+	}
+	return keys, nil
+}

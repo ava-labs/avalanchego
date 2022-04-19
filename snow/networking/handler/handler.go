@@ -386,7 +386,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		msgKeys := msg.Get(message.SummaryKeys).([]uint64)
+		msgKeys, err := getKeys(msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s%s, %d): %s",
+				op,
+				constants.NodeIDPrefix,
+				nodeID,
+				reqID,
+				err,
+			)
+			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+		}
 		return engine.GetAcceptedStateSummary(nodeID, reqID, msgKeys)
 
 	case message.AcceptedStateSummary:
