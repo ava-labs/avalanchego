@@ -105,7 +105,6 @@ func TestTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Hour,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
@@ -191,7 +190,6 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		nil,
 		1,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
@@ -283,7 +281,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 

@@ -22,6 +22,12 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 		return false, nil
 	}
 
+	// 	if vm implements Snowman++, a block height index must be available
+	// to support state sync
+	if vm.VerifyHeightIndex() != nil {
+		return false, nil
+	}
+
 	return vm.coreStateSyncVM.StateSyncEnabled()
 }
 

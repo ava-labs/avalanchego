@@ -92,8 +92,6 @@ type handler struct {
 	numDispatchersClosed int
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
-
-	requestedResetHeightIndex bool
 }
 
 // Initialize this consensus handler
@@ -105,7 +103,6 @@ func New(
 	msgFromVMChan <-chan common.Message,
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
-	requestedResetHeightIndex bool,
 ) (Handler, error) {
 	h := &handler{
 		ctx:             ctx,
@@ -121,8 +118,6 @@ func New(
 
 		closingChan: make(chan struct{}),
 		closed:      make(chan struct{}),
-
-		requestedResetHeightIndex: requestedResetHeightIndex,
 	}
 
 	var err error
@@ -161,11 +156,6 @@ func (h *handler) Consensus() common.Engine          { return h.engine }
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
 func (h *handler) SelectStartingGear() (common.Engine, error) {
-	if h.requestedResetHeightIndex {
-		h.ctx.Log.Info("Could not start state syncing if height index reset is requested.")
-		return h.bootstrapper, nil
-	}
-
 	if h.stateSyncer == nil {
 		return h.bootstrapper, nil
 	}

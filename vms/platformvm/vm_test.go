@@ -2108,7 +2108,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		time.Hour,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 

@@ -64,7 +64,6 @@ func TestShutdown(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
@@ -163,7 +162,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
@@ -271,7 +269,6 @@ func TestRouterTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
@@ -384,7 +381,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
@@ -497,7 +493,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		false, // requestedResetHeightIndex
 	)
 	assert.NoError(t, err)
 
