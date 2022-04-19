@@ -66,8 +66,7 @@ type VMServer struct {
 
 // NewServer returns a vm instance connected to a remote vm instance
 func NewServer(vm block.ChainVM) *VMServer {
-	ssVM, _ := vm.(block.StateSyncableVM)
-
+	ssVM := vm.(block.StateSyncableVM)
 	return &VMServer{
 		vm:   vm,
 		ssVM: ssVM,

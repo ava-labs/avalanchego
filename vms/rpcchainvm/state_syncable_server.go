@@ -6,10 +6,12 @@ package rpcchainvm
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/ids"
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmpb.StateSyncEnabledResponse, error) {
@@ -74,20 +76,20 @@ func (vm *VMServer) GetLastStateSummary(
 		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	if err == nil {
-		summaryID := summary.ID()
+	if err != nil {
 		return &vmpb.GetLastStateSummaryResponse{
-			Summary: &vmpb.StateSyncSummary{
-				Key:     summary.Key(),
-				Id:      summaryID[:],
-				Content: summary.Bytes(),
-			},
-		}, nil
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
 	}
 
+	summaryID := summary.ID()
 	return &vmpb.GetLastStateSummaryResponse{
-		Err: errorToErrCode[err],
-	}, errorToRPCError(err)
+		Summary: &vmpb.StateSyncSummary{
+			Key:     summary.Key(),
+			Id:      summaryID[:],
+			Content: summary.Bytes(),
+		},
+	}, nil
 }
 
 func (vm *VMServer) ParseStateSummary(
@@ -105,20 +107,20 @@ func (vm *VMServer) ParseStateSummary(
 		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	if err == nil {
-		summaryID := summary.ID()
+	if err != nil {
 		return &vmpb.ParseStateSummaryResponse{
-			Summary: &vmpb.StateSyncSummary{
-				Key:     summary.Key(),
-				Id:      summaryID[:],
-				Content: summary.Bytes(),
-			},
-		}, nil
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
 	}
 
+	summaryID := summary.ID()
 	return &vmpb.ParseStateSummaryResponse{
-		Err: errorToErrCode[err],
-	}, errorToRPCError(err)
+		Summary: &vmpb.StateSyncSummary{
+			Key:     summary.Key(),
+			Id:      summaryID[:],
+			Content: summary.Bytes(),
+		},
+	}, nil
 }
 
 func (vm *VMServer) GetStateSummary(
@@ -136,36 +138,32 @@ func (vm *VMServer) GetStateSummary(
 		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	if err == nil {
-		summaryID := summary.ID()
+	if err != nil {
 		return &vmpb.GetStateSummaryResponse{
-			Summary: &vmpb.StateSyncSummary{
-				Key:     summary.Key(),
-				Id:      summaryID[:],
-				Content: summary.Bytes(),
-			},
-		}, nil
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
 	}
 
+	summaryID := summary.ID()
 	return &vmpb.GetStateSummaryResponse{
-		Err: errorToErrCode[err],
-	}, errorToRPCError(err)
+		Summary: &vmpb.StateSyncSummary{
+			Key:     summary.Key(),
+			Id:      summaryID[:],
+			Content: summary.Bytes(),
+		},
+	}, nil
 }
 
 func (vm *VMServer) SetSyncableStateSummaries(ctx context.Context, req *vmpb.SetSyncableStateSummariesRequest) (*vmpb.SetSyncableStateSummariesResponse, error) {
-	var (
-		summaries = make([]common.Summary, len(req.Summaries))
-		err       error
-	)
-
+	var err error
 	if vm.ssVM != nil {
+		summaries := make([]common.Summary, len(req.Summaries))
 		for i, sum := range req.Summaries {
-			var summaryID ids.ID
-			summaryID, err = ids.ToID(sum.Id)
+			summaryID, err := ids.ToID(sum.Id)
 			if err != nil {
 				return nil, err
 			}
-			summaries[i] = &Summary{
+			summaries[i] = &summary{
 				key:   sum.Key,
 				id:    summaryID,
 				bytes: sum.Content,

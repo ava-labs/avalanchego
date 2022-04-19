@@ -54,13 +54,12 @@ import (
 )
 
 var (
-	errUnsupportedFXs = errors.New("unsupported feature extensions")
-
-	_ common.Summary             = &Summary{}
 	_ block.ChainVM              = &VMClient{}
 	_ block.BatchedChainVM       = &VMClient{}
 	_ block.HeightIndexedChainVM = &VMClient{}
 	_ block.StateSyncableVM      = &VMClient{}
+
+	errUnsupportedFXs = errors.New("unsupported feature extensions")
 )
 
 const (
@@ -69,16 +68,6 @@ const (
 	unverifiedCacheSize = 2048
 	bytesToIDCacheSize  = 2048
 )
-
-type Summary struct {
-	key   uint64
-	id    ids.ID
-	bytes []byte
-}
-
-func (s *Summary) Bytes() []byte { return s.bytes }
-func (s *Summary) Key() uint64   { return s.key }
-func (s *Summary) ID() ids.ID    { return s.id }
 
 // VMClient is an implementation of VM that talks over RPC.
 type VMClient struct {

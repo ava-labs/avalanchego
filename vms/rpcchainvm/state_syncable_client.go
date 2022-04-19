@@ -7,11 +7,25 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
+
+var _ common.Summary = &summary{}
+
+type summary struct {
+	key   uint64
+	id    ids.ID
+	bytes []byte
+}
+
+func (s *summary) Bytes() []byte { return s.bytes }
+func (s *summary) Key() uint64   { return s.key }
+func (s *summary) ID() ids.ID    { return s.id }
 
 func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	resp, err := vm.client.StateSyncEnabled(
@@ -34,7 +48,7 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &Summary{
+	return &summary{
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
@@ -54,7 +68,7 @@ func (vm *VMClient) GetLastStateSummary() (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &Summary{
+	return &summary{
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
@@ -76,7 +90,7 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (common.Summary, erro
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &Summary{
+	return &summary{
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
@@ -84,8 +98,12 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (common.Summary, erro
 }
 
 func (vm *VMClient) GetStateSummary(key uint64) (common.Summary, error) {
-	req := &vmpb.GetStateSummaryRequest{Key: key}
-	resp, err := vm.client.GetStateSummary(context.Background(), req)
+	resp, err := vm.client.GetStateSummary(
+		context.Background(),
+		&vmpb.GetStateSummaryRequest{
+			Key: key,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +112,7 @@ func (vm *VMClient) GetStateSummary(key uint64) (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &Summary{
+	return &summary{
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
