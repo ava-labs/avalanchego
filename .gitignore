@@ -58,3 +58,5 @@ scripts/.build_image_gopath/
 
 tests/e2e/e2e.test
 tests/upgrade/upgrade.test
+
+vendor

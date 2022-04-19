@@ -81,7 +81,8 @@ func initTestProposerVM(
 
 	coreVM.InitializeF = func(*snow.Context, manager.Manager,
 		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
+		[]*common.Fx, common.AppSender,
+	) error {
 		return nil
 	}
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
@@ -1413,7 +1414,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		t.Fatalf("could not verify valid block due to %s", err)
 	}
 
-	// use a different way to constrcut pre-fork block Y and post-fork block B
+	// use a different way to construct pre-fork block Y and post-fork block B
 	yBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -1709,4 +1710,371 @@ func TestLaggedPChainHeight(t *testing.T) {
 
 	pChainHeight := block.PChainHeight()
 	assert.Equal(pChainHeight, coreGenBlk.Height())
+}
+
+// Ensure that rejecting a block does not modify the accepted block ID for the
+// rejected height.
+func TestRejectedHeightNotIndexed(t *testing.T) {
+	assert := assert.New(t)
+
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	coreHeights := []ids.ID{coreGenBlk.ID()}
+
+	initialState := []byte("genesis state")
+	coreVM := &struct {
+		block.TestVM
+		block.TestHeightIndexedVM
+	}{
+		TestVM: block.TestVM{
+			TestVM: common.TestVM{
+				T: t,
+			},
+		},
+		TestHeightIndexedVM: block.TestHeightIndexedVM{
+			T:                  t,
+			VerifyHeightIndexF: func() error { return nil },
+			GetBlockIDAtHeightF: func(height uint64) (ids.ID, error) {
+				if height >= uint64(len(coreHeights)) {
+					return ids.ID{}, errors.New("too high")
+				}
+				return coreHeights[height], nil
+			},
+		},
+	}
+
+	coreVM.InitializeF = func(*snow.Context, manager.Manager,
+		[]byte, []byte, []byte, chan<- common.Message,
+		[]*common.Fx, common.AppSender,
+	) error {
+		return nil
+	}
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM := New(coreVM, time.Time{}, 0, false)
+
+	valState := &validators.TestState{
+		T: t,
+	}
+	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[proVM.ctx.NodeID] = uint64(10)
+		res[ids.ShortID{1}] = uint64(5)
+		res[ids.ShortID{2}] = uint64(6)
+		res[ids.ShortID{3}] = uint64(7)
+		return res, nil
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
+
+	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	// make sure that DBs are compressed correctly
+	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil)
+	assert.NoError(err)
+
+	// Initialize shouldn't be called again
+	coreVM.InitializeF = nil
+
+	err = proVM.SetState(snow.NormalOp)
+	assert.NoError(err)
+
+	err = proVM.SetPreference(coreGenBlk.IDV)
+	assert.NoError(err)
+
+	ctx.Lock.Lock()
+	for proVM.VerifyHeightIndex() != nil {
+		ctx.Lock.Unlock()
+		time.Sleep(time.Millisecond)
+		ctx.Lock.Lock()
+	}
+	ctx.Lock.Unlock()
+
+	// create inner block X and outer block A
+	xBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	aBlock, err := proVM.BuildBlock()
+	assert.NoError(err)
+
+	coreVM.BuildBlockF = nil
+	err = aBlock.Verify()
+	assert.NoError(err)
+
+	// use a different way to construct inner block Y and outer block B
+	yBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    coreGenBlk.ID(),
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+
+	ySlb, err := statelessblock.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreGenBlk.Timestamp(),
+		defaultPChainHeight,
+		yBlock.Bytes(),
+	)
+	assert.NoError(err)
+
+	bBlock := postForkBlock{
+		SignedBlock: ySlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: yBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	err = bBlock.Verify()
+	assert.NoError(err)
+
+	// accept A
+	err = aBlock.Accept()
+	assert.NoError(err)
+	coreHeights = append(coreHeights, xBlock.ID())
+
+	blkID, err := proVM.GetBlockIDAtHeight(aBlock.Height())
+	assert.NoError(err)
+	assert.Equal(aBlock.ID(), blkID)
+
+	// reject B
+	err = bBlock.Reject()
+	assert.NoError(err)
+
+	blkID, err = proVM.GetBlockIDAtHeight(aBlock.Height())
+	assert.NoError(err)
+	assert.Equal(aBlock.ID(), blkID)
+}
+
+// Ensure that rejecting an option block does not modify the accepted block ID
+// for the rejected height.
+func TestRejectedOptionHeightNotIndexed(t *testing.T) {
+	assert := assert.New(t)
+
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
+	}
+
+	coreHeights := []ids.ID{coreGenBlk.ID()}
+
+	initialState := []byte("genesis state")
+	coreVM := &struct {
+		block.TestVM
+		block.TestHeightIndexedVM
+	}{
+		TestVM: block.TestVM{
+			TestVM: common.TestVM{
+				T: t,
+			},
+		},
+		TestHeightIndexedVM: block.TestHeightIndexedVM{
+			T:                  t,
+			VerifyHeightIndexF: func() error { return nil },
+			GetBlockIDAtHeightF: func(height uint64) (ids.ID, error) {
+				if height >= uint64(len(coreHeights)) {
+					return ids.ID{}, errors.New("too high")
+				}
+				return coreHeights[height], nil
+			},
+		},
+	}
+
+	coreVM.InitializeF = func(*snow.Context, manager.Manager,
+		[]byte, []byte, []byte, chan<- common.Message,
+		[]*common.Fx, common.AppSender,
+	) error {
+		return nil
+	}
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == coreGenBlk.ID():
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM := New(coreVM, time.Time{}, 0, false)
+
+	valState := &validators.TestState{
+		T: t,
+	}
+	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
+	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[proVM.ctx.NodeID] = uint64(10)
+		res[ids.ShortID{1}] = uint64(5)
+		res[ids.ShortID{2}] = uint64(6)
+		res[ids.ShortID{3}] = uint64(7)
+		return res, nil
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.ValidatorState = valState
+
+	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	// make sure that DBs are compressed correctly
+	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil)
+	assert.NoError(err)
+
+	// Initialize shouldn't be called again
+	coreVM.InitializeF = nil
+
+	err = proVM.SetState(snow.NormalOp)
+	assert.NoError(err)
+
+	err = proVM.SetPreference(coreGenBlk.IDV)
+	assert.NoError(err)
+
+	ctx.Lock.Lock()
+	for proVM.VerifyHeightIndex() != nil {
+		ctx.Lock.Unlock()
+		time.Sleep(time.Millisecond)
+		ctx.Lock.Lock()
+	}
+	ctx.Lock.Unlock()
+
+	xBlockID := ids.GenerateTestID()
+	xBlock := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     xBlockID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    xBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    xBlockID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+		},
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	aBlockIntf, err := proVM.BuildBlock()
+	assert.NoError(err)
+
+	aBlock, ok := aBlockIntf.(*postForkBlock)
+	assert.True(ok)
+
+	opts, err := aBlock.Options()
+	assert.NoError(err)
+
+	err = aBlock.Verify()
+	assert.NoError(err)
+
+	bBlock := opts[0]
+	err = bBlock.Verify()
+	assert.NoError(err)
+
+	cBlock := opts[1]
+	err = cBlock.Verify()
+	assert.NoError(err)
+
+	// accept A
+	err = aBlock.Accept()
+	assert.NoError(err)
+	coreHeights = append(coreHeights, xBlock.ID())
+
+	blkID, err := proVM.GetBlockIDAtHeight(aBlock.Height())
+	assert.NoError(err)
+	assert.Equal(aBlock.ID(), blkID)
+
+	// accept B
+	err = bBlock.Accept()
+	assert.NoError(err)
+	coreHeights = append(coreHeights, xBlock.opts[0].ID())
+
+	blkID, err = proVM.GetBlockIDAtHeight(bBlock.Height())
+	assert.NoError(err)
+	assert.Equal(bBlock.ID(), blkID)
+
+	// reject C
+	err = cBlock.Reject()
+	assert.NoError(err)
+
+	blkID, err = proVM.GetBlockIDAtHeight(cBlock.Height())
+	assert.NoError(err)
+	assert.Equal(bBlock.ID(), blkID)
 }

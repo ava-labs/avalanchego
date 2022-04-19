@@ -44,10 +44,8 @@ func (b *postForkBlock) Accept() error {
 func (b *postForkBlock) Reject() error {
 	// We do not reject the inner block here because it may be accepted later
 	delete(b.vm.verifiedBlocks, b.ID())
-
-	// Persist this block with its status
 	b.status = choices.Rejected
-	return b.vm.storePostForkBlock(b)
+	return nil
 }
 
 func (b *postForkBlock) Status() choices.Status { return b.status }

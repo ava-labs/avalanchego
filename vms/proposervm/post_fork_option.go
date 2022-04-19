@@ -52,10 +52,8 @@ func (b *postForkOption) Reject() error {
 	// in the proposer block that causing this block to be rejected.
 
 	delete(b.vm.verifiedBlocks, b.ID())
-
-	// Persist this block and its status
 	b.status = choices.Rejected
-	return b.vm.storePostForkBlock(b)
+	return nil
 }
 
 func (b *postForkOption) Status() choices.Status { return b.status }
