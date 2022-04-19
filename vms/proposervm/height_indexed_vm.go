@@ -57,11 +57,6 @@ func (vm *VM) VerifyHeightIndex() error {
 		return block.ErrHeightIndexedVMNotImplemented
 	}
 
-	if vm.resetHeightIndexOngoing.GetValue() {
-		// index currently being wiped out
-		return block.ErrIndexIncomplete
-	}
-
 	if !vm.hIndexer.IsRepaired() {
 		return block.ErrIndexIncomplete
 	}

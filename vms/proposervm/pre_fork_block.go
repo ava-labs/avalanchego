@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -35,10 +34,6 @@ func (b *preForkBlock) acceptOuterBlk() error {
 
 func (b *preForkBlock) acceptInnerBlk() error {
 	return b.Block.Accept()
-}
-
-func (b *preForkBlock) Parent() ids.ID {
-	return b.Block.Parent()
 }
 
 func (b *preForkBlock) Verify() error {

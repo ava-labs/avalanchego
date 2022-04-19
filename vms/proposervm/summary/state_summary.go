@@ -13,29 +13,22 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
 	_ ProposerContent = &summaryContent{}
 
-	stateSyncCodec codec.Manager
+	cdc codec.Manager
 
 	errWrongStateSyncVersion = errors.New("wrong state sync key version")
 )
 
-const StateSummaryVersion = 0
+const codecVersion = 0
 
 func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	stateSyncCodec = codec.NewManager(math.MaxInt32)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		lc.RegisterType(&summaryContent{}),
-		stateSyncCodec.RegisterCodec(StateSummaryVersion, lc),
-	)
-	if err := errs.Err; err != nil {
+	cdc = codec.NewManager(math.MaxInt32)
+	if err := cdc.RegisterCodec(codecVersion, lc); err != nil {
 		panic(err)
 	}
 }
@@ -77,7 +70,7 @@ func New(proBlkID ids.ID, coreSummary common.Summary) (ProposerContent, error) {
 		key: coreSummary.Key(), // note: this is not serialized
 	}
 
-	proContent, err := stateSyncCodec.Marshal(StateSummaryVersion, res)
+	proContent, err := cdc.Marshal(codecVersion, res)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
 	}
@@ -93,11 +86,11 @@ func New(proBlkID ids.ID, coreSummary common.Summary) (ProposerContent, error) {
 
 func Parse(summaryBytes []byte) (ProposerContent, error) {
 	proContent := summaryContent{}
-	ver, err := stateSyncCodec.Unmarshal(summaryBytes, &proContent)
+	ver, err := cdc.Unmarshal(summaryBytes, &proContent)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal ProposerSummaryContent due to: %w", err)
 	}
-	if ver != StateSummaryVersion {
+	if ver != codecVersion {
 		return nil, errWrongStateSyncVersion
 	}
 
