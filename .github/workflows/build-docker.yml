@@ -4,8 +4,7 @@ on:
   push:
     tags:
       - "*" # Push events to every tag
-    branches: [ docker-release ]
-    #branches-ignore: ["*"]
+    branches-ignore: ["*"]
 
 jobs:
   build_publish_image:
