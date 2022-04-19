@@ -83,6 +83,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
 	handler.Push(msg)
 
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -145,6 +146,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	nodeID := ids.ShortEmpty
@@ -201,6 +203,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	nodeID := ids.ShortEmpty
@@ -239,6 +242,17 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	handler.SetBootstrapper(bootstrapper)
+
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
@@ -249,6 +263,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 	msgFromVMChan <- 0
 

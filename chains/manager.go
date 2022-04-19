@@ -313,22 +313,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	defer func() {
-		// Tell the chain to start processing messages.
-		// If the X, P, or C Chain panics, do not attempt to recover
-		chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
-
-		// If startup errored, then shutdown the chain with the fatal error.
-		if err != nil {
-			chain.Handler.StopWithError(err)
-		}
-	}()
-
-	gear, err := chain.Handler.SelectStartingGear()
-	if err != nil {
-		return
-	}
-	err = gear.Start(0)
+	// Tell the chain to start processing messages.
+	// If the X, P, or C Chain panics, do not attempt to recover
+	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
 }
 
 // Create a chain

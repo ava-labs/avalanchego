@@ -42,9 +42,7 @@ type Handler interface {
 	Consensus() common.Engine
 	SetOnStopped(onStopped func())
 
-	SelectStartingGear() (common.Engine, error)
 	Start(recoverPanic bool)
-
 	Push(msg message.InboundMessage)
 	Stop()
 	StopWithError(err error)
@@ -155,7 +153,7 @@ func (h *handler) Consensus() common.Engine          { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
-func (h *handler) SelectStartingGear() (common.Engine, error) {
+func (h *handler) selectStartingGear() (common.Engine, error) {
 	if h.stateSyncer == nil {
 		return h.bootstrapper, nil
 	}
@@ -176,6 +174,21 @@ func (h *handler) SelectStartingGear() (common.Engine, error) {
 }
 
 func (h *handler) Start(recoverPanic bool) {
+	gear, err := h.selectStartingGear()
+	if err != nil {
+		return
+	}
+	err = gear.Start(0)
+
+	h.dispatch(recoverPanic)
+
+	// If startup errored, then shutdown the chain with the fatal error.
+	if err != nil {
+		h.StopWithError(err)
+	}
+}
+
+func (h *handler) dispatch(recoverPanic bool) {
 	if recoverPanic {
 		go h.ctx.Log.RecoverAndExit(h.dispatchSync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the sync dispatcher")
@@ -186,11 +199,12 @@ func (h *handler) Start(recoverPanic bool) {
 		go h.ctx.Log.RecoverAndExit(h.dispatchChans, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the chan dispatcher")
 		})
-	} else {
-		go h.ctx.Log.RecoverAndPanic(h.dispatchSync)
-		go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
-		go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
+		return
 	}
+
+	go h.ctx.Log.RecoverAndPanic(h.dispatchSync)
+	go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
+	go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
 }
 
 // Push the message onto the handler's queue

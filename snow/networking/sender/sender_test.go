@@ -129,6 +129,7 @@ func TestTimeout(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	vdrIDs := ids.ShortSet{}
@@ -219,6 +220,7 @@ func TestReliableMessages(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	go func() {
@@ -309,6 +311,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	go func() {
