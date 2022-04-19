@@ -208,8 +208,8 @@ func (vm *VMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*vmpb.S
 
 func (vm *VMServer) StateSyncSetLastSummaryBlockID(
 	ctx context.Context,
-	req *vmpb.StateSyncSetLastSummaryBlockRequest,
-) (*vmpb.StateSyncSetLastSummaryBlockResponse, error) {
+	req *vmpb.StateSyncSetLastSummaryBlockIDRequest,
+) (*vmpb.StateSyncSetLastSummaryBlockIDResponse, error) {
 	var (
 		blkID ids.ID
 		err   error
@@ -223,7 +223,7 @@ func (vm *VMServer) StateSyncSetLastSummaryBlockID(
 		}
 	}
 
-	return &vmpb.StateSyncSetLastSummaryBlockResponse{
+	return &vmpb.StateSyncSetLastSummaryBlockIDResponse{
 		Err: errorToErrCode[err],
 	}, errorToRPCError(err)
 }

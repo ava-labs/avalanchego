@@ -145,8 +145,8 @@ func (vm *VMClient) StateSyncGetResult() (ids.ID, uint64, error) {
 }
 
 func (vm *VMClient) StateSyncSetLastSummaryBlockID(blkID ids.ID) error {
-	resp, err := vm.client.StateSyncSetLastSummaryBlock(context.Background(),
-		&vmpb.StateSyncSetLastSummaryBlockRequest{
+	resp, err := vm.client.StateSyncSetLastSummaryBlockID(context.Background(),
+		&vmpb.StateSyncSetLastSummaryBlockIDRequest{
 			Id: blkID[:],
 		})
 	if err != nil {
