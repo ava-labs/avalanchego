@@ -21,11 +21,6 @@ if [[ -z "$DOCKER_USERNAME"  ]]; then
   exit 0;
 fi
 
-if [[ $current_branch == "chain4travel" ]]; then
-  echo "Tagging current caminogo image as $caminogo_dockerhub_repo:latest"
-  docker tag $caminogo_dockerhub_repo:$current_branch $caminogo_dockerhub_repo:latest
-fi
-
 echo "Pushing: $caminogo_dockerhub_repo:$current_branch"
 
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
