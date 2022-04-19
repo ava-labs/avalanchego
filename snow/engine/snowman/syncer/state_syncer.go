@@ -455,7 +455,7 @@ func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
 
 // following completion of state sync on VM side, block associated with state summary is requested.
 // Pass it to VM, declare state sync done and move onto bootstrapping
-func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container []byte) error {
+func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
@@ -468,7 +468,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 		return nil
 	}
 
-	blk, err := ss.VM.ParseBlock(container)
+	blk, err := ss.VM.ParseBlock(blkBytes)
 	if err != nil {
 		ss.Ctx.Log.Debug("Received unparsable block from vdr %s, err %v. Requesting it again.",
 			validatorID,
@@ -485,7 +485,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, container 
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlockID(rcvdBlkID); err != nil {
+	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlock(blkBytes); err != nil {
 		return err
 	}
 

@@ -206,24 +206,18 @@ func (vm *VMServer) StateSyncGetResult(context.Context, *emptypb.Empty) (*vmpb.S
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) StateSyncSetLastSummaryBlockID(
+func (vm *VMServer) StateSyncSetLastSummaryBlock(
 	ctx context.Context,
-	req *vmpb.StateSyncSetLastSummaryBlockIDRequest,
-) (*vmpb.StateSyncSetLastSummaryBlockIDResponse, error) {
-	var (
-		blkID ids.ID
-		err   error
-	)
-	blkID, err = ids.ToID(req.Id)
-	if err == nil {
-		if vm.ssVM != nil {
-			err = vm.ssVM.StateSyncSetLastSummaryBlockID(blkID)
-		} else {
-			err = common.ErrStateSyncableVMNotImplemented
-		}
+	req *vmpb.StateSyncSetLastSummaryBlockRequest,
+) (*vmpb.StateSyncSetLastSummaryBlockResponse, error) {
+	var err error
+	if vm.ssVM != nil {
+		err = vm.ssVM.StateSyncSetLastSummaryBlock(req.Bytes)
+	} else {
+		err = common.ErrStateSyncableVMNotImplemented
 	}
 
-	return &vmpb.StateSyncSetLastSummaryBlockIDResponse{
+	return &vmpb.StateSyncSetLastSummaryBlockResponse{
 		Err: errorToErrCode[err],
 	}, errorToRPCError(err)
 }

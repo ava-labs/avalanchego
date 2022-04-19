@@ -144,10 +144,10 @@ func (vm *VMClient) StateSyncGetResult() (ids.ID, uint64, error) {
 	return blkID, height, err
 }
 
-func (vm *VMClient) StateSyncSetLastSummaryBlockID(blkID ids.ID) error {
-	resp, err := vm.client.StateSyncSetLastSummaryBlockID(context.Background(),
-		&vmpb.StateSyncSetLastSummaryBlockIDRequest{
-			Id: blkID[:],
+func (vm *VMClient) StateSyncSetLastSummaryBlock(blkBytes []byte) error {
+	resp, err := vm.client.StateSyncSetLastSummaryBlock(context.Background(),
+		&vmpb.StateSyncSetLastSummaryBlockRequest{
+			Bytes: blkBytes,
 		})
 	if err != nil {
 		return err

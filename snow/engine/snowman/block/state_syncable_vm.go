@@ -19,9 +19,7 @@ type StateSyncableVM interface {
 	StateSyncGetResult() (ids.ID, uint64, error)
 
 	// Once last summary block pulled from VM via StateSyncGetResult has been
-	// retrieved from network and validated, StateSyncSetLastSummaryBlockID
+	// retrieved from network and validated, StateSyncSetLastSummaryBlock
 	// confirms it to the VM.
-	// StateSyncSetLastSummaryBlockID is preceded by a ParseBlock call which
-	// is assumed to store the parse block upon success
-	StateSyncSetLastSummaryBlockID(blkID ids.ID) error
+	StateSyncSetLastSummaryBlock(blkBytes []byte) error
 }

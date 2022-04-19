@@ -171,27 +171,28 @@ func (vm *VM) StateSyncGetResult() (ids.ID, uint64, error) {
 	return proBlkID, height, nil
 }
 
-func (vm *VM) StateSyncSetLastSummaryBlockID(blkID ids.ID) error {
+func (vm *VM) StateSyncSetLastSummaryBlock(blkBytes []byte) error {
 	if vm.coreStateSyncVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
+	// retrieve core block
 	var (
-		blk Block
-		err error
+		coreBlkBytes []byte
+		blk          Block
+		err          error
 	)
-
-	blk, err = vm.getPostForkBlock(blkID)
-	if err != nil {
-		blk, err = vm.getPreForkBlock(blkID)
-		if err != nil {
-			return errBadLastSummaryBlock
-		}
+	if blk, err = vm.parsePostForkBlock(blkBytes); err == nil {
+		coreBlkBytes = blk.getInnerBlk().Bytes()
+	} else if blk, err = vm.parsePreForkBlock(blkBytes); err == nil {
+		coreBlkBytes = blk.Bytes()
+	} else {
+		return errBadLastSummaryBlock
 	}
 
 	if err := blk.acceptOuterBlk(); err != nil {
 		return err
 	}
 
-	return vm.coreStateSyncVM.StateSyncSetLastSummaryBlockID(blk.getInnerBlk().ID())
+	return vm.coreStateSyncVM.StateSyncSetLastSummaryBlock(coreBlkBytes)
 }
