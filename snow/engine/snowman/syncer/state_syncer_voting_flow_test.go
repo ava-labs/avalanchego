@@ -14,21 +14,64 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
+	assert := assert.New(t)
+
+	vdrs := buildTestPeers(t)
+	alpha := vdrs.Weight()
+	startupAlpha := alpha
+
+	commonCfg := common.Config{
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Validators:    vdrs,
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         alpha,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+	}
+	syncer, _, sender := buildTestsObjects(t, &commonCfg)
+
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.ShortSet, u uint32) {}
+
+	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
+	startReqID := uint32(0)
+	assert.NoError(syncer.Start(startReqID))
+	assert.False(syncer.started)
+
+	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
+	vdr0 := ids.GenerateTestShortID()
+	assert.NoError(vdrs.AddWeight(vdr0, startupAlpha/2))
+	assert.NoError(syncer.Connected(vdr0, version.CurrentApp))
+
+	assert.NoError(syncer.Start(startReqID))
+	assert.False(syncer.started)
+
+	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
+	vdr := ids.GenerateTestShortID()
+	assert.NoError(vdrs.AddWeight(vdr, startupAlpha))
+	assert.NoError(syncer.Connected(vdr, version.CurrentApp))
+
+	assert.NoError(syncer.Start(startReqID))
+	assert.True(syncer.started)
+}
 
 func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	assert := assert.New(t)
 
-	noBeacons := validators.NewSet()
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       noBeacons,
-		SampleK:       int(noBeacons.Weight()),
-		Alpha:         (noBeacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(noBeacons, (3*noBeacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
@@ -48,12 +91,14 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
@@ -64,11 +109,13 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 		contactedFrontiersProviders.Union(ss)
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
 
-	// check that beacons are reached out for frontiers
-	assert.True(len(contactedFrontiersProviders) == safeMath.Min(beacons.Len(), maxOutstandingStateSyncRequests))
+	// check that vdrs are reached out for frontiers
+	assert.True(len(contactedFrontiersProviders) == safeMath.Min(vdrs.Len(), maxOutstandingStateSyncRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		assert.True(syncer.contactedSeeders.Contains(beaconID))
@@ -81,12 +128,14 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -99,8 +148,11 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
@@ -115,7 +167,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		}, nil
 	}
 
-	// pick one of the beacons that have been reached out
+	// pick one of the vdrs that have been reached out
 	responsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
 	responsiveBeaconReqID := contactedFrontiersProviders[responsiveBeaconID]
 
@@ -152,21 +204,23 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.True(ok)
 	assert.True(bytes.Equal(ws.Summary.Bytes(), summaryBytes))
 
-	// other listed beacons are reached for data
+	// other listed vdrs are reached for data
 	assert.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == beacons.Len())
+			len(contactedFrontiersProviders) == vdrs.Len())
 }
 
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -179,8 +233,11 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
@@ -194,7 +251,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 		return nil, fmt.Errorf("invalid state summary")
 	}
 
-	// pick one of the beacons that have been reached out
+	// pick one of the vdrs that have been reached out
 	responsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
 	responsiveBeaconReqID := contactedFrontiersProviders[responsiveBeaconID]
 
@@ -212,22 +269,24 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.True(isSummaryDecoded)
 	assert.True(len(syncer.weightedSummaries) == 0)
 
-	// even in case of invalid summaries, other listed beacons
+	// even in case of invalid summaries, other listed vdrs
 	// are reached for data
 	assert.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == beacons.Len())
+			len(contactedFrontiersProviders) == vdrs.Len())
 }
 
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -240,13 +299,16 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
-	// pick one of the beacons that have been reached out
+	// pick one of the vdrs that have been reached out
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
 	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
@@ -256,7 +318,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 		return nil, fmt.Errorf("empty summary")
 	}
 
-	// assume timeout is reached and beacons is marked as unresponsive
+	// assume timeout is reached and vdrs is marked as unresponsive
 	assert.NoError(syncer.GetStateSummaryFrontierFailed(
 		unresponsiveBeaconID,
 		unresponsiveBeaconReqID,
@@ -266,11 +328,11 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert.False(syncer.contactedSeeders.Contains(unresponsiveBeaconID))
 	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
 
-	// even in case of timeouts, other listed beacons
+	// even in case of timeouts, other listed vdrs
 	// are reached for data
 	assert.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == beacons.Len())
+			len(contactedFrontiersProviders) == vdrs.Len())
 
 	// mock VM to simulate a valid but late summary is returned
 
@@ -297,12 +359,14 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -334,11 +398,13 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// let all contacted beacons respond
+	// let all contacted vdrs respond
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
@@ -361,12 +427,14 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -397,11 +465,13 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// let all contacted beacons respond
+	// let all contacted vdrs respond
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
@@ -456,25 +526,27 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// responsiveBeacon not pending anymore
 	assert.False(syncer.contactedSeeders.Contains(responsiveVoterID))
-	voterWeight, found := beacons.GetWeight(responsiveVoterID)
+	voterWeight, found := vdrs.GetWeight(responsiveVoterID)
 	assert.True(found)
 	assert.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
 
 	// other listed voters are reached out
 	assert.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
-			len(contactedVoters) == beacons.Len())
+			len(contactedVoters) == vdrs.Len())
 }
 
 func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -505,11 +577,13 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// let all contacted beacons respond
+	// let all contacted vdrs respond
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
@@ -557,18 +631,20 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// on unknown summary
 	assert.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
-			len(contactedVoters) == beacons.Len())
+			len(contactedVoters) == vdrs.Len())
 }
 
 func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       beacons,
-		SampleK:       int(beacons.Weight()),
-		Alpha:         (beacons.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -610,11 +686,13 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// let all contacted beacons respond with majority or minority summaries
+	// let all contacted vdrs respond with majority or minority summaries
 	for {
 		reachedSeeders := syncer.contactedSeeders.Len()
 		if reachedSeeders == 0 {
@@ -663,7 +741,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				reqID,
 				[]ids.ID{summaryID, minoritySummaryID},
 			))
-			bw, _ := beacons.GetWeight(voterID)
+			bw, _ := vdrs.GetWeight(voterID)
 			cumulatedWeight += bw
 
 		case cumulatedWeight < commonCfg.Alpha:
@@ -672,7 +750,7 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				reqID,
 				[]ids.ID{summaryID},
 			))
-			bw, _ := beacons.GetWeight(voterID)
+			bw, _ := vdrs.GetWeight(voterID)
 			cumulatedWeight += bw
 
 		default:
@@ -690,12 +768,14 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     beacons,
-		SampleK:                     int(beacons.Weight()),
-		Alpha:                       (beacons.Weight() + 1) / 2,
-		WeightTracker:               tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:                     vdrs,
+		SampleK:                     vdrs.Len(),
+		Alpha:                       (vdrs.Weight() + 1) / 2,
+		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
 		RetryBootstrap:              true, // this sets RetryStateSyncing too
 		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
 	}
@@ -728,11 +808,13 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 		}
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
 	assert.True(syncer.contactedSeeders.Len() != 0)
 
-	// let all contacted beacons respond
+	// let all contacted vdrs respond
 	for syncer.contactedSeeders.Len() != 0 {
 		beaconID, found := syncer.contactedSeeders.Peek()
 		assert.True(found)
@@ -762,12 +844,13 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 		assert.True(found)
 		reqID := contactedVoters[voterID]
 
+		// vdr carries the largest weight by far. Make sure it fails
 		if timedOutWeight <= commonCfg.Alpha {
 			assert.NoError(syncer.GetAcceptedStateSummaryFailed(
 				voterID,
 				reqID,
 			))
-			bw, _ := beacons.GetWeight(voterID)
+			bw, _ := vdrs.GetWeight(voterID)
 			timedOutWeight += bw
 		} else {
 			assert.NoError(syncer.AcceptedStateSummary(

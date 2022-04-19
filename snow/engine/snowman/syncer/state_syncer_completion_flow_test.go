@@ -20,12 +20,14 @@ import (
 func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	assert := assert.New(t)
 
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
-		Beacons:                     beacons,
-		SampleK:                     int(beacons.Weight()),
-		Alpha:                       (beacons.Weight() + 1) / 2,
-		WeightTracker:               tracker.NewWeightTracker(beacons, (3*beacons.Weight()+3)/4),
+		Beacons:                     vdrs,
+		SampleK:                     vdrs.Len(),
+		Alpha:                       (vdrs.Weight() + 1) / 2,
+		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
 		RetryBootstrap:              true, // this sets RetryStateSyncing too
 		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
 	}

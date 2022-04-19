@@ -276,12 +276,17 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, re
 func (ss *stateSyncer) Start(startReqID uint32) error {
 	ss.requestID = startReqID
 	ss.Ctx.SetState(snow.StateSyncing)
+
+	if !ss.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	ss.started = true
 	return ss.startup()
 }
 
 func (ss *stateSyncer) startup() error {
 	ss.Config.Ctx.Log.Info("starting state sync")
-	ss.started = true
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]weightedSummary)

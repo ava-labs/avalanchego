@@ -19,8 +19,6 @@ var (
 	_ block.ChainVM         = fullVM{}
 	_ block.StateSyncableVM = fullVM{}
 
-	beacons validators.Set
-
 	key          uint64
 	summaryID    ids.ID
 	summaryBytes []byte
@@ -39,15 +37,6 @@ type fullVM struct {
 
 func init() {
 	var err error
-	beacons = validators.NewSet()
-
-	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
-		beaconID := ids.GenerateTestShortID()
-		err := beacons.AddWeight(beaconID, uint64(1))
-		if err != nil {
-			panic(err)
-		}
-	}
 
 	key = uint64(2022)
 	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
@@ -67,6 +56,15 @@ func init() {
 }
 
 // helper to build
+func buildTestPeers(t *testing.T) validators.Set {
+	vdrs := validators.NewSet()
+	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
+		beaconID := ids.GenerateTestShortID()
+		assert.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
+	}
+	return vdrs
+}
+
 func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	*stateSyncer,
 	*fullVM,
