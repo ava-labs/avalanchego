@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -30,7 +31,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
-	db := memdb.New()
+
 	sender := &common.SenderTest{}
 	vm := &block.TestVM{}
 
@@ -54,14 +55,13 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		t.Fatal(err)
 	}
 
-	blocker, _ := queue.NewWithMissing(db, "", prometheus.NewRegistry())
-
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
+		WeightTracker:                  tracker.NewWeightTracker(peers, peers.Weight()/2+1),
 		Sender:                         sender,
 		Subnet:                         subnet,
 		Timer:                          &common.TimerTest{},
@@ -75,13 +75,105 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		t.Fatal(err)
 	}
 
+	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	return Config{
 		Config:        commonConfig,
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocker,
 		VM:            vm,
-		WeightTracker: tracker.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, vm
+}
+
+func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
+	assert := assert.New(t)
+
+	sender := &common.SenderTest{T: t}
+	vm := &block.TestVM{
+		TestVM: common.TestVM{T: t},
+	}
+
+	sender.Default(true)
+	vm.Default(true)
+
+	// create boostrapper configuration
+	peers := validators.NewSet()
+	sampleK := 2
+	alpha := uint64(10)
+	startupAlpha := alpha
+	commonCfg := common.Config{
+		Ctx:                            snow.DefaultConsensusContextTest(),
+		Validators:                     peers,
+		Beacons:                        peers,
+		SampleK:                        sampleK,
+		Alpha:                          alpha,
+		WeightTracker:                  tracker.NewWeightTracker(peers, startupAlpha),
+		Sender:                         sender,
+		Subnet:                         &common.SubnetTest{},
+		Timer:                          &common.TimerTest{},
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
+	}
+
+	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	assert.NoError(err)
+	cfg := Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocker,
+		VM:            vm,
+	}
+
+	blkID0 := ids.Empty.Prefix(0)
+	blkBytes0 := []byte{0}
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
+	}
+	vm.CantLastAccepted = false
+	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		assert.Equal(blk0.ID(), blkID)
+		return blk0, nil
+	}
+
+	// create bootstrapper
+	dummyCallback := func(lastReqID uint32) error { cfg.Ctx.SetState(snow.NormalOp); return nil }
+	bs, err := New(cfg, dummyCallback)
+	assert.NoError(err)
+
+	vm.CantConnected = true
+	vm.ConnectedF = func(ids.ShortID, version.Application) error { return nil }
+
+	frontierRequested := false
+	sender.CantSendGetAcceptedFrontier = false
+	sender.SendGetAcceptedFrontierF = func(ss ids.ShortSet, u uint32) {
+		frontierRequested = true
+	}
+
+	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
+	startReqID := uint32(0)
+	assert.NoError(bs.Start(startReqID))
+	assert.False(frontierRequested)
+
+	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
+	vdr0 := ids.GenerateTestShortID()
+	assert.NoError(peers.AddWeight(vdr0, startupAlpha/2))
+	assert.NoError(bs.Connected(vdr0, version.CurrentApp))
+
+	assert.NoError(bs.Start(startReqID))
+	assert.False(frontierRequested)
+
+	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
+	vdr := ids.GenerateTestShortID()
+	assert.NoError(peers.AddWeight(vdr, startupAlpha))
+	assert.NoError(bs.Connected(vdr, version.CurrentApp))
+	assert.True(frontierRequested)
 }
 
 // Single node in the accepted frontier; no need to fetch parent

@@ -623,7 +623,7 @@ func (m *manager) createAvalancheChain(
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -636,7 +636,6 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -650,7 +649,6 @@ func (m *manager) createAvalancheChain(
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
 		VM:            vm,
-		WeightTracker: weightTracker,
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -832,7 +830,7 @@ func (m *manager) createSnowmanChain(
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -845,7 +843,6 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
@@ -857,7 +854,6 @@ func (m *manager) createSnowmanChain(
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: weightTracker,
 		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(
