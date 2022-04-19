@@ -125,11 +125,6 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		VM:            vm,
 	}
 
-	// create bootstrapper
-	dummyCallback := func(lastReqID uint32) error { cfg.Ctx.SetState(snow.NormalOp); return nil }
-	bs, err := New(cfg, dummyCallback)
-	assert.NoError(err)
-
 	blkID0 := ids.Empty.Prefix(0)
 	blkBytes0 := []byte{0}
 	blk0 := &snowman.TestBlock{
@@ -140,13 +135,18 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		HeightV: 0,
 		BytesV:  blkBytes0,
 	}
-
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		assert.Equal(blk0.ID(), blkID)
 		return blk0, nil
 	}
+
+	// create bootstrapper
+	dummyCallback := func(lastReqID uint32) error { cfg.Ctx.SetState(snow.NormalOp); return nil }
+	bs, err := New(cfg, dummyCallback)
+	assert.NoError(err)
+
 	vm.CantConnected = true
 	vm.ConnectedF = func(ids.ShortID, version.Application) error { return nil }
 
