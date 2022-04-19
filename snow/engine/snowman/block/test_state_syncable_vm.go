@@ -14,8 +14,8 @@ var (
 	_ common.Summary  = &TestSummary{}
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
-	errStateSyncGetResult           = errors.New("unexpectedly called StateSyncGetResult")
-	errStateSyncSetLastSummaryBlock = errors.New("unexpectedly called StateSyncSetLastSummaryBlock")
+	errGetStateSyncResult       = errors.New("unexpectedly called GetStateSyncResult")
+	errSetLastStateSummaryBlock = errors.New("unexpectedly called SetLastStateSummaryBlock")
 )
 
 type TestSummary struct {
@@ -31,28 +31,28 @@ func (s *TestSummary) ID() ids.ID    { return s.SummaryID }
 type TestStateSyncableVM struct {
 	common.TestStateSyncableVM
 
-	CantStateSyncGetResult, CantStateSyncSetLastSummaryBlock bool
+	CantGetStateSyncResult, CantSetLastStateSummaryBlock bool
 
-	StateSyncGetResultF           func() (ids.ID, uint64, error)
-	StateSyncSetLastSummaryBlockF func(blkBytes []byte) error
+	GetStateSyncResultF       func() (ids.ID, uint64, error)
+	SetLastStateSummaryBlockF func(blkBytes []byte) error
 }
 
-func (tss *TestStateSyncableVM) StateSyncGetResult() (ids.ID, uint64, error) {
-	if tss.StateSyncGetResultF != nil {
-		return tss.StateSyncGetResultF()
+func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
+	if tss.GetStateSyncResultF != nil {
+		return tss.GetStateSyncResultF()
 	}
-	if tss.CantStateSyncGetResult && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called StateSyncGetResult")
+	if tss.CantGetStateSyncResult && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called GetStateSyncResult")
 	}
-	return ids.Empty, 0, errStateSyncGetResult
+	return ids.Empty, 0, errGetStateSyncResult
 }
 
-func (tss *TestStateSyncableVM) StateSyncSetLastSummaryBlock(blkBytes []byte) error {
-	if tss.StateSyncSetLastSummaryBlockF != nil {
-		return tss.StateSyncSetLastSummaryBlockF(blkBytes)
+func (tss *TestStateSyncableVM) SetLastStateSummaryBlock(blkBytes []byte) error {
+	if tss.SetLastStateSummaryBlockF != nil {
+		return tss.SetLastStateSummaryBlockF(blkBytes)
 	}
-	if tss.CantStateSyncSetLastSummaryBlock && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called StateSyncSetLastSummaryBlock")
+	if tss.CantSetLastStateSummaryBlock && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called SetLastStateSummaryBlock")
 	}
-	return errStateSyncSetLastSummaryBlock
+	return errSetLastStateSummaryBlock
 }

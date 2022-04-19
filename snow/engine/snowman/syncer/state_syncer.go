@@ -120,7 +120,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// retrieve key for summary and register frontier;
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
-	if summary, err := ss.stateSyncVM.StateSyncParseSummary(summaryBytes); err == nil {
+	if summary, err := ss.stateSyncVM.ParseStateSummary(summaryBytes); err == nil {
 		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
 			ss.weightedSummaries[summary.ID()] = weightedSummary{
 				Summary: summary,
@@ -255,7 +255,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	ss.Ctx.Log.Info("State sync started syncing with %d vertices in the accepted frontier", size)
-	return ss.stateSyncVM.StateSync(accepted)
+	return ss.stateSyncVM.SetSyncableStateSummaries(accepted)
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
@@ -322,7 +322,7 @@ func (ss *stateSyncer) startup() error {
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
-	summary, err := ss.stateSyncVM.StateSyncGetOngoingSummary()
+	summary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
 	switch err {
 	case nil:
 		ss.weightedSummaries[summary.ID()] = weightedSummary{
@@ -339,7 +339,7 @@ func (ss *stateSyncer) startup() error {
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 		// we make sure that StateSync is called if state sync is enabled
-		return ss.stateSyncVM.StateSync(nil)
+		return ss.stateSyncVM.SetSyncableStateSummaries(nil)
 	}
 
 	ss.requestID++
@@ -423,7 +423,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	case common.StateSyncDone:
 		// retrieve the blkID to request
 		var err error
-		ss.lastSummaryBlkID, _, err = ss.stateSyncVM.StateSyncGetResult()
+		ss.lastSummaryBlkID, _, err = ss.stateSyncVM.GetStateSyncResult()
 		if err != nil {
 			ss.Ctx.Log.Warn("Could not retrieve last summary block ID to complete state sync. Err: %v", err)
 			return err
@@ -485,7 +485,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes [
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	if err := ss.stateSyncVM.StateSyncSetLastSummaryBlock(blkBytes); err != nil {
+	if err := ss.stateSyncVM.SetLastStateSummaryBlock(blkBytes); err != nil {
 		return err
 	}
 

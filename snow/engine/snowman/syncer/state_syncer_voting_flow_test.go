@@ -76,10 +76,10 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
 	// set VM to check for StateSync call
-	fullVM.CantStateSync = true
+	fullVM.CantSetSyncableStateSummaries = true
 
 	// check that StateSync is called immediately with no frontiers
-	fullVM.StateSyncF = func(s []common.Summary) error {
+	fullVM.SetSyncableStateSummariesF = func(s []common.Summary) error {
 		assert.True(len(s) == 0)
 		return nil
 	}
@@ -158,8 +158,8 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
 
 	// mock VM to simulate a valid summary is returned
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
@@ -245,8 +245,8 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// mock VM to simulate an invalid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	isSummaryDecoded := false
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		isSummaryDecoded = true
 		return nil, fmt.Errorf("invalid state summary")
 	}
@@ -312,8 +312,8 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
 	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		assert.True(len(summaryBytes) == 0)
 		return nil, fmt.Errorf("empty summary")
 	}
@@ -336,8 +336,8 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// mock VM to simulate a valid but late summary is returned
 
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
@@ -380,8 +380,8 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(b []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(b []byte) (common.Summary, error) {
 		assert.True(bytes.Equal(b, summaryBytes))
 		return &block.TestSummary{
 			SummaryKey:   key,
@@ -448,8 +448,8 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
@@ -560,8 +560,8 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
@@ -658,8 +658,8 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(b []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(b []byte) (common.Summary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return &block.TestSummary{
@@ -719,8 +719,8 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	isVMStateSyncCalled := false
-	fullVM.CantStateSync = true
-	fullVM.StateSyncF = func(summaries []common.Summary) error {
+	fullVM.CantSetSyncableStateSummaries = true
+	fullVM.SetSyncableStateSummariesF = func(summaries []common.Summary) error {
 		isVMStateSyncCalled = true
 		assert.True(len(summaries) == 1)
 		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
@@ -791,8 +791,8 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	fullVM.CantStateSyncParseSummary = true
-	fullVM.StateSyncParseSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
 			SummaryKey:   key,
 			SummaryID:    summaryID,
@@ -829,8 +829,8 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	isVMStateSyncCalled := false
-	fullVM.CantStateSync = true
-	fullVM.StateSyncF = func(summaries []common.Summary) error {
+	fullVM.CantSetSyncableStateSummaries = true
+	fullVM.SetSyncableStateSummariesF = func(summaries []common.Summary) error {
 		isVMStateSyncCalled = true
 		assert.True(len(summaries) == 1)
 		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))

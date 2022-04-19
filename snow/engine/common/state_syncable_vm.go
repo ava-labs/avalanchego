@@ -38,29 +38,29 @@ type StateSyncableVM interface {
 	// StateSyncEnabled should return false, nil
 	StateSyncEnabled() (bool, error)
 
-	// StateSyncGetOngoingSummary returns an in-progress state summary if it exists. This
+	// GetOngoingStateSyncSummary returns an in-progress state summary if it exists. This
 	// allows the engine to ask the network if the ongoing summary is still supported by the
 	// network. This simplifies the task of the StateSyncableVM to decide whether to
 	// continue an in-progress sync or start over.
 	// Returns ErrNoStateSyncOngoing if no local state summary exists.
-	StateSyncGetOngoingSummary() (Summary, error)
+	GetOngoingStateSyncSummary() (Summary, error)
 
-	// StateSyncGetLastSummary returns latest Summary with an optional error
+	// GetLastStateSummary returns latest Summary with an optional error
 	// Returns ErrUnknownStateSummary if summary is not available
-	StateSyncGetLastSummary() (Summary, error)
+	GetLastStateSummary() (Summary, error)
 
-	// StateSyncParseSummary builds a Summary out of summaryBytes
-	StateSyncParseSummary(summaryBytes []byte) (Summary, error)
+	// ParseStateSummary builds a Summary out of summaryBytes
+	ParseStateSummary(summaryBytes []byte) (Summary, error)
 
-	// StateSyncGetSummary retrieves the summary related to key, if available.
+	// GetStateSummary retrieves the summary related to key, if available.
 	// Returns ErrUnknownStateSummary if summary is not available
-	StateSyncGetSummary(summaryKey uint64) (Summary, error)
+	GetStateSummary(summaryKey uint64) (Summary, error)
 
-	// StateSync is called with a list of valid summaries to sync from.
+	// SetSyncableStateSummaries is called with a list of valid summaries to sync from.
 	// These summaries were collected from peers and validated with validators.
 	// VM will use information inside the summary to choose one and sync
 	// its state to that summary.
 	// Will be called with an empty list if no valid state summaries could be found.
 	// Normal bootstrapping resumes after VM signals the state sync process has completed.
-	StateSync([]Summary) error
+	SetSyncableStateSummaries([]Summary) error
 }
