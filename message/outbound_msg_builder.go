@@ -547,7 +547,7 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 		map[Field]interface{}{
 			ChainID:    chainID[:],
 			RequestID:  requestID,
-			SummaryIDs: summaryIDs,
+			SummaryIDs: summaryIDBytes,
 		},
 		b.compress && AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages may be compressed
 		false,
