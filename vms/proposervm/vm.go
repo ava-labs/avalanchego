@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -92,7 +93,6 @@ func New(
 		minimumPChainHeight: minimumPChainHeight,
 		coreStateSyncVM:     ssVM,
 	}
-
 	proVM.resetHeightIndexOngoing.SetValue(resetHeightIndex)
 	return proVM
 }
@@ -158,6 +158,15 @@ func (vm *VM) Initialize(
 	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
 	if !ok {
 		return nil // nothing else to do
+	}
+
+	indexResetRequired, err := vm.State.GetIndexResetRequired()
+	if err != nil {
+		return fmt.Errorf("retrieving value of required index reset failed with: %w", err)
+	}
+
+	if indexResetRequired {
+		vm.resetHeightIndexOngoing.SetValue(true)
 	}
 
 	// asynchronously rebuild height index, if needed
@@ -532,7 +541,6 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.Status()); err != nil {
 		return err
 	}
-
 	height := blk.Height()
 	blkID := blk.ID()
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
