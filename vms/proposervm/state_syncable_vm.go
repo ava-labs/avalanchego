@@ -49,7 +49,7 @@ func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return summary.New(proBlkID, coreSummary)
+	return summary.BuildProposerSummary(proBlkID, coreSummary)
 }
 
 func (vm *VM) GetLastStateSummary() (common.Summary, error) {
@@ -71,7 +71,7 @@ func (vm *VM) GetLastStateSummary() (common.Summary, error) {
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return summary.New(proBlkID, coreSummary)
+	return summary.BuildProposerSummary(proBlkID, coreSummary)
 }
 
 // Note: it's important that ParseStateSummary do not use any index or state
@@ -81,17 +81,17 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	proContent, err := summary.Parse(summaryBytes)
+	statelessSummary, err := summary.Parse(summaryBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(proContent.CoreSummaryBytes())
+	coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(statelessSummary.InnerSummaryBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal coreSummaryContent due to: %w", err)
 	}
 
-	return summary.New(proContent.ProposerBlockID(), coreSummary)
+	return summary.BuildProposerSummary(statelessSummary.ProposerBlockID(), coreSummary)
 }
 
 func (vm *VM) GetStateSummary(key uint64) (common.Summary, error) {
@@ -112,7 +112,7 @@ func (vm *VM) GetStateSummary(key uint64) (common.Summary, error) {
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return summary.New(proBlkID, coreSummary)
+	return summary.BuildProposerSummary(proBlkID, coreSummary)
 }
 
 func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
@@ -127,7 +127,7 @@ func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
 			return err
 		}
 
-		coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(proContent.CoreSummaryBytes())
+		coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(proContent.InnerSummaryBytes())
 		if err != nil {
 			return fmt.Errorf("could not parse coreSummaryContent due to: %w", err)
 		}
