@@ -360,12 +360,9 @@ func (n *network) Connected(nodeID ids.ShortID) {
 // peer is a validator/beacon.
 // WantsConnection requires n.peersLock already locked
 func (n *network) AllowConnection(nodeID ids.ShortID) bool {
-	n.peersLock.RLock()
-	defer n.peersLock.RUnlock()
-
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
-		n.WantsConnection(nodeID)
+		n.wantsConnection(nodeID)
 }
 
 func (n *network) Track(ip utils.IPCertDesc) {
@@ -418,7 +415,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
 		}
-	} else if n.WantsConnection(nodeID) {
+	} else if n.wantsConnection(nodeID) {
 		tracked := newTrackedIP(&peer.UnsignedIP{
 			IP:        ip.IPDesc,
 			Timestamp: ip.Time,
@@ -543,8 +540,14 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
-// WantsConnection must be called with n.peersLock already locked
 func (n *network) WantsConnection(nodeID ids.ShortID) bool {
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
+	return n.wantsConnection(nodeID)
+}
+
+// wantsConnection is unexported and must be called with n.peersLock already locked
+func (n *network) wantsConnection(nodeID ids.ShortID) bool {
 	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
@@ -719,7 +722,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.ShortID) {
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
 	if ok {
-		if n.WantsConnection(nodeID) {
+		if n.wantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
@@ -741,7 +744,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.ShortID) 
 	n.connectedPeers.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
-	if n.WantsConnection(nodeID) {
+	if n.wantsConnection(nodeID) {
 		tracked := newTrackedIP(&peer.IP().IP)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
@@ -777,7 +780,7 @@ func (n *network) shouldTrack(nodeID ids.ShortID, ip utils.IPCertDesc) bool {
 	if isTracked {
 		return tracked.ip.Timestamp < ip.Time
 	}
-	return n.WantsConnection(nodeID)
+	return n.wantsConnection(nodeID)
 }
 
 // dial will spin up a new goroutine and attempt to establish a connection with
@@ -815,7 +818,7 @@ func (n *network) dial(ctx context.Context, nodeID ids.ShortID, ip *trackedIP) {
 			}
 
 			n.peersLock.Lock()
-			if !n.WantsConnection(nodeID) {
+			if !n.wantsConnection(nodeID) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
 				// race conditions before removing the entry.
