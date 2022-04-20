@@ -20,7 +20,7 @@ import (
 
 type node struct {
 	ip     string
-	nodeId string
+	nodeID string
 }
 
 // getIPs returns the beacon IPs for each network
@@ -29,7 +29,7 @@ func getNodes(networkID uint32) []node {
 	case constants.ColumbusID:
 		return []node{{
 			ip:     "104.154.245.81:9651",
-			nodeId: "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
+			nodeID: "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
 		}}
 	default:
 		return nil
@@ -52,7 +52,7 @@ func SampleBeacons(networkID uint32, count int) ([]string, []string) {
 	indices, _ := s.Sample(count)
 	for _, index := range indices {
 		sampledIPs = append(sampledIPs, beacons[int(index)].ip)
-		sampledIDs = append(sampledIDs, beacons[int(index)].nodeId)
+		sampledIDs = append(sampledIDs, beacons[int(index)].nodeID)
 	}
 
 	return sampledIPs, sampledIDs
