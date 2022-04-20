@@ -307,8 +307,7 @@ message SetSyncableStateSummariesResponse {
 message GetStateSyncResultResponse {
   bytes bytes = 1;
   uint64 height = 2;
-  string error_msg = 3;
-  uint32 err = 4;
+  uint32 err = 3;
 }
 
 message SetLastStateSummaryBlockRequest {

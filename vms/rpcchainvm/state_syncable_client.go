@@ -5,7 +5,6 @@ package rpcchainvm
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -156,9 +155,6 @@ func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
 	}
 
 	height := resp.Height
-	if len(resp.ErrorMsg) != 0 {
-		err = fmt.Errorf(resp.ErrorMsg)
-	}
 	return blkID, height, err
 }
 

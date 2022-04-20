@@ -181,26 +181,19 @@ func (vm *VMServer) SetSyncableStateSummaries(ctx context.Context, req *vmpb.Set
 
 func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.GetStateSyncResultResponse, error) {
 	var (
-		blkID  ids.ID
-		height uint64
-		err    error
+		blkID  = ids.Empty
+		height = uint64(0)
+		err    = common.ErrStateSyncableVMNotImplemented
 	)
 
 	if vm.ssVM != nil {
 		blkID, height, err = vm.ssVM.GetStateSyncResult()
-	} else {
-		blkID, height, err = ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
-	var errMsg string
-	if err != nil {
-		errMsg = err.Error()
-	}
 	return &vmpb.GetStateSyncResultResponse{
-		Bytes:    blkID[:],
-		Height:   height,
-		ErrorMsg: errMsg,
-		Err:      errorToErrCode[err],
+		Bytes:  blkID[:],
+		Height: height,
+		Err:    errorToErrCode[err],
 	}, errorToRPCError(err)
 }
 
