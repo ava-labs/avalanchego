@@ -40,7 +40,10 @@ service VM {
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
+
+  rpc SummaryAccept(SummaryAcceptRequest) returns (google.protobuf.Empty);
   rpc SetSyncableStateSummaries(SetSyncableStateSummariesRequest) returns (SetSyncableStateSummariesResponse);
+
   rpc GetStateSyncResult(google.protobuf.Empty) returns (GetStateSyncResultResponse);
   rpc SetLastStateSummaryBlock(SetLastStateSummaryBlockRequest) returns (SetLastStateSummaryBlockResponse);
 }
@@ -293,6 +296,10 @@ message GetStateSummaryRequest {
 message GetStateSummaryResponse {
   StateSyncSummary summary = 1;
   uint32 err = 2;
+}
+
+message SummaryAcceptRequest {
+  uint64 key = 1;
 }
 
 message SetSyncableStateSummariesRequest {

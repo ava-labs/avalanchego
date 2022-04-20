@@ -14,18 +14,6 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var _ common.Summary = &summary{}
-
-type summary struct {
-	key   uint64
-	id    ids.ID
-	bytes []byte
-}
-
-func (s *summary) Bytes() []byte { return s.bytes }
-func (s *summary) Key() uint64   { return s.key }
-func (s *summary) ID() ids.ID    { return s.id }
-
 func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	resp, err := vm.client.StateSyncEnabled(
 		context.Background(),
@@ -47,7 +35,8 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &summary{
+	return &SummaryClient{
+		vm:    vm,
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
@@ -67,7 +56,8 @@ func (vm *VMClient) GetLastStateSummary() (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &summary{
+	return &SummaryClient{
+		vm:    vm,
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
@@ -89,7 +79,8 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (common.Summary, erro
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &summary{
+	return &SummaryClient{
+		vm:    vm,
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,
@@ -111,7 +102,8 @@ func (vm *VMClient) GetStateSummary(key uint64) (common.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &summary{
+	return &SummaryClient{
+		vm:    vm,
 		key:   resp.Summary.Key,
 		id:    summaryID,
 		bytes: resp.Summary.Content,

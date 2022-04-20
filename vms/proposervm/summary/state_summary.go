@@ -9,12 +9,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
-	_ common.Summary      = ProposerSummaryIntf(nil)
 	_ ProposerSummaryIntf = &ProposerSummary{}
 
 	cdc codec.Manager

@@ -18,7 +18,7 @@ var (
 )
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return false, nil
 	}
 
@@ -28,56 +28,66 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 		return false, nil
 	}
 
-	return vm.coreStateSyncVM.StateSyncEnabled()
+	return vm.innerStateSyncVM.StateSyncEnabled()
 }
 
 func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreSummary, err := vm.coreStateSyncVM.GetOngoingStateSyncSummary()
+	innerSummary, err := vm.innerStateSyncVM.GetOngoingStateSyncSummary()
 	if err != nil {
 		return nil, err // including common.ErrNoStateSyncOngoing case
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Key())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return summary.BuildProposerSummary(proBlkID, coreSummary)
+	proSummary, err := summary.BuildProposerSummary(proBlkID, innerSummary)
+	return &statefulSummary{
+		ProposerSummaryIntf: proSummary,
+		innerSummary:        innerSummary,
+		vm:                  vm,
+	}, err
 }
 
 func (vm *VM) GetLastStateSummary() (common.Summary, error) {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
 	// Extract core last state summary
-	coreSummary, err := vm.coreStateSyncVM.GetLastStateSummary()
+	innerSummary, err := vm.innerStateSyncVM.GetLastStateSummary()
 	if err != nil {
 		return nil, err // including common.ErrUnknownStateSummary case
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Key())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return summary.BuildProposerSummary(proBlkID, coreSummary)
+	proSummary, err := summary.BuildProposerSummary(proBlkID, innerSummary)
+	return &statefulSummary{
+		ProposerSummaryIntf: proSummary,
+		innerSummary:        innerSummary,
+		vm:                  vm,
+	}, err
 }
 
 // Note: it's important that ParseStateSummary do not use any index or state
 // to allow summaries being parsed also by freshly started node with no previous state.
 func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
@@ -86,40 +96,49 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, err
 	}
 
-	innerSummary, err := vm.coreStateSyncVM.ParseStateSummary(statelessSummary.InnerBytes())
+	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal coreSummaryContent due to: %w", err)
 	}
 
-	return &summary.ProposerSummary{
-		StatelessSummary: *statelessSummary.(*summary.StatelessSummary),
-		SummaryKey:       innerSummary.Key(),
+	return &statefulSummary{
+		ProposerSummaryIntf: &summary.ProposerSummary{
+			StatelessSummary: *statelessSummary.(*summary.StatelessSummary),
+			SummaryKey:       innerSummary.Key(),
+		},
+		innerSummary: innerSummary,
+		vm:           vm,
 	}, nil
 }
 
 func (vm *VM) GetStateSummary(key uint64) (common.Summary, error) {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	coreSummary, err := vm.coreStateSyncVM.GetStateSummary(key)
+	innerSummary, err := vm.innerStateSyncVM.GetStateSummary(key)
 	if err != nil {
 		return nil, err // including common.ErrUnknownStateSummary case
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(coreSummary.Key())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Key())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
 
-	return summary.BuildProposerSummary(proBlkID, coreSummary)
+	proSummary, err := summary.BuildProposerSummary(proBlkID, innerSummary)
+	return &statefulSummary{
+		ProposerSummaryIntf: proSummary,
+		innerSummary:        innerSummary,
+		vm:                  vm,
+	}, err
 }
 
 func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
@@ -130,7 +149,7 @@ func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
 			return err
 		}
 
-		coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(proContent.InnerBytes())
+		coreSummary, err := vm.innerStateSyncVM.ParseStateSummary(proContent.InnerBytes())
 		if err != nil {
 			return fmt.Errorf("could not parse coreSummaryContent due to: %w", err)
 		}
@@ -155,15 +174,15 @@ func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
 		return nil
 	}
 
-	return vm.coreStateSyncVM.SetSyncableStateSummaries(coreSummaries)
+	return vm.innerStateSyncVM.SetSyncableStateSummaries(coreSummaries)
 }
 
 func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
 	}
 
-	_, height, err := vm.coreStateSyncVM.GetStateSyncResult()
+	_, height, err := vm.innerStateSyncVM.GetStateSyncResult()
 	if err != nil {
 		return ids.Empty, 0, err
 	}
@@ -175,7 +194,7 @@ func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
 }
 
 func (vm *VM) SetLastStateSummaryBlock(blkBytes []byte) error {
-	if vm.coreStateSyncVM == nil {
+	if vm.innerStateSyncVM == nil {
 		return common.ErrStateSyncableVMNotImplemented
 	}
 
@@ -197,5 +216,5 @@ func (vm *VM) SetLastStateSummaryBlock(blkBytes []byte) error {
 		return err
 	}
 
-	return vm.coreStateSyncVM.SetLastStateSummaryBlock(coreBlkBytes)
+	return vm.innerStateSyncVM.SetLastStateSummaryBlock(coreBlkBytes)
 }

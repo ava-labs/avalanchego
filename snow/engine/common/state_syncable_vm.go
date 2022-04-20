@@ -27,6 +27,8 @@ type Summary interface {
 	Bytes() []byte
 	Key() uint64
 	ID() ids.ID
+
+	Accept() error
 }
 
 // StateSyncableVM represents functionalities to allow VMs to sync to a given state,

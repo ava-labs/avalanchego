@@ -22,11 +22,14 @@ type TestSummary struct {
 	SummaryKey   uint64
 	SummaryID    ids.ID
 	ContentBytes []byte
+
+	AcceptErr error
 }
 
 func (s *TestSummary) Bytes() []byte { return s.ContentBytes }
 func (s *TestSummary) Key() uint64   { return s.SummaryKey }
 func (s *TestSummary) ID() ids.ID    { return s.SummaryID }
+func (s *TestSummary) Accept() error { return s.AcceptErr }
 
 type TestStateSyncableVM struct {
 	common.TestStateSyncableVM

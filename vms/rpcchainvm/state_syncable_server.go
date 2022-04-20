@@ -154,6 +154,20 @@ func (vm *VMServer) GetStateSummary(
 	}, nil
 }
 
+func (vm *VMServer) SummaryAccept(_ context.Context, req *vmpb.SummaryAcceptRequest) (*emptypb.Empty, error) {
+	if vm.ssVM == nil {
+		return &emptypb.Empty{}, nil
+	}
+	summary, err := vm.ssVM.GetStateSummary(req.Key)
+	if err != nil {
+		return nil, err
+	}
+	if err := summary.Accept(); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func (vm *VMServer) SetSyncableStateSummaries(ctx context.Context, req *vmpb.SetSyncableStateSummariesRequest) (*vmpb.SetSyncableStateSummariesResponse, error) {
 	var err error
 	if vm.ssVM != nil {
@@ -163,7 +177,7 @@ func (vm *VMServer) SetSyncableStateSummaries(ctx context.Context, req *vmpb.Set
 			if err != nil {
 				return nil, err
 			}
-			summaries[i] = &summary{
+			summaries[i] = &deprecatedSummaryToBeRemoved{
 				key:   sum.Key,
 				id:    summaryID,
 				bytes: sum.Content,

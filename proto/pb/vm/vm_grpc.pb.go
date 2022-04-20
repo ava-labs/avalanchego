@@ -54,6 +54,7 @@ type VMClient interface {
 	GetLastStateSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetLastStateSummaryResponse, error)
 	ParseStateSummary(ctx context.Context, in *ParseStateSummaryRequest, opts ...grpc.CallOption) (*ParseStateSummaryResponse, error)
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
+	SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SetSyncableStateSummaries(ctx context.Context, in *SetSyncableStateSummariesRequest, opts ...grpc.CallOption) (*SetSyncableStateSummariesResponse, error)
 	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error)
 	SetLastStateSummaryBlock(ctx context.Context, in *SetLastStateSummaryBlockRequest, opts ...grpc.CallOption) (*SetLastStateSummaryBlockResponse, error)
@@ -337,6 +338,15 @@ func (c *vMClient) GetStateSummary(ctx context.Context, in *GetStateSummaryReque
 	return out, nil
 }
 
+func (c *vMClient) SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/SummaryAccept", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) SetSyncableStateSummaries(ctx context.Context, in *SetSyncableStateSummariesRequest, opts ...grpc.CallOption) (*SetSyncableStateSummariesResponse, error) {
 	out := new(SetSyncableStateSummariesResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/SetSyncableStateSummaries", in, out, opts...)
@@ -399,6 +409,7 @@ type VMServer interface {
 	GetLastStateSummary(context.Context, *emptypb.Empty) (*GetLastStateSummaryResponse, error)
 	ParseStateSummary(context.Context, *ParseStateSummaryRequest) (*ParseStateSummaryResponse, error)
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
+	SummaryAccept(context.Context, *SummaryAcceptRequest) (*emptypb.Empty, error)
 	SetSyncableStateSummaries(context.Context, *SetSyncableStateSummariesRequest) (*SetSyncableStateSummariesResponse, error)
 	GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error)
 	SetLastStateSummaryBlock(context.Context, *SetLastStateSummaryBlockRequest) (*SetLastStateSummaryBlockResponse, error)
@@ -498,6 +509,9 @@ func (UnimplementedVMServer) ParseStateSummary(context.Context, *ParseStateSumma
 }
 func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSummary not implemented")
+}
+func (UnimplementedVMServer) SummaryAccept(context.Context, *SummaryAcceptRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SummaryAccept not implemented")
 }
 func (UnimplementedVMServer) SetSyncableStateSummaries(context.Context, *SetSyncableStateSummariesRequest) (*SetSyncableStateSummariesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetSyncableStateSummaries not implemented")
@@ -1061,6 +1075,24 @@ func _VM_GetStateSummary_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_SummaryAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SummaryAcceptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).SummaryAccept(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/SummaryAccept",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).SummaryAccept(ctx, req.(*SummaryAcceptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_SetSyncableStateSummaries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SetSyncableStateSummariesRequest)
 	if err := dec(in); err != nil {
@@ -1241,6 +1273,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStateSummary",
 			Handler:    _VM_GetStateSummary_Handler,
+		},
+		{
+			MethodName: "SummaryAccept",
+			Handler:    _VM_SummaryAccept_Handler,
 		},
 		{
 			MethodName: "SetSyncableStateSummaries",
