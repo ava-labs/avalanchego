@@ -6,7 +6,7 @@ package summary
 import "fmt"
 
 func Parse(summaryBytes []byte) (StatelessSummaryIntf, error) {
-	var summary StatelessSummaryIntf
+	var summary StatelessSummary
 	ver, err := cdc.Unmarshal(summaryBytes, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal summary due to: %w", err)
@@ -15,5 +15,5 @@ func Parse(summaryBytes []byte) (StatelessSummaryIntf, error) {
 		return nil, errWrongStateSyncVersion
 	}
 
-	return summary, summary.initialize(summaryBytes)
+	return &summary, summary.initialize(summaryBytes)
 }

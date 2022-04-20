@@ -10,22 +10,22 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (common.Summary, error) {
-	res := &ProposerSummary{
-		StatelessSummary: StatelessSummary{
-			ProBlkID:     proBlkID,
-			InnerSummary: coreSummary.Bytes(),
-		},
-		SummaryKey: coreSummary.Key(), // note: this is not serialized
+func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (ProposerSummaryIntf, error) {
+	statelessSummary := StatelessSummary{
+		ProBlkID:     proBlkID,
+		InnerSummary: coreSummary.Bytes(),
 	}
 
-	proSummaryBytes, err := cdc.Marshal(codecVersion, res)
+	proSummaryBytes, err := cdc.Marshal(codecVersion, &statelessSummary)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposer summary due to: %w", err)
 	}
-	if err := res.StatelessSummary.initialize(proSummaryBytes); err != nil {
+	if err := statelessSummary.initialize(proSummaryBytes); err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return &ProposerSummary{
+		StatelessSummary: statelessSummary,
+		SummaryKey:       coreSummary.Key(),
+	}, nil
 }

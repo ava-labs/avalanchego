@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	_ common.Summary = &ProposerSummary{}
+	_ common.Summary      = ProposerSummaryIntf(nil)
+	_ ProposerSummaryIntf = &ProposerSummary{}
 
 	cdc codec.Manager
 
@@ -30,6 +31,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		lc.RegisterType(&StatelessSummary{}),
+
 		cdc.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {
@@ -37,9 +39,11 @@ func init() {
 	}
 }
 
-// ProposerSummary key is summary block height and matches CoreSummaryContent key;
-// However ProposerSummary ID is different from CoreSummaryContent ID
-// since it hashes ProBlkID along with Core Summary Bytes for full verification.
+type ProposerSummaryIntf interface {
+	StatelessSummaryIntf
+	Key() uint64
+}
+
 type ProposerSummary struct {
 	StatelessSummary `serialize:"true"`
 
