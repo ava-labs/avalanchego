@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (common.Summary, error) {
@@ -17,19 +16,16 @@ func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (common.S
 			ProBlkID:     proBlkID,
 			InnerSummary: coreSummary.Bytes(),
 		},
-		key: coreSummary.Key(), // note: this is not serialized
+		SummaryKey: coreSummary.Key(), // note: this is not serialized
 	}
 
-	proContent, err := cdc.Marshal(codecVersion, res)
+	proSummaryBytes, err := cdc.Marshal(codecVersion, res)
 	if err != nil {
-		return nil, fmt.Errorf("cannot marshal proposerVMKey due to: %w", err)
+		return nil, fmt.Errorf("cannot marshal proposer summary due to: %w", err)
 	}
-	res.proContent = proContent
+	if err := res.StatelessSummary.initialize(proSummaryBytes); err != nil {
+		return nil, err
+	}
 
-	proSummaryID, err := ids.ToID(hashing.ComputeHash256(proContent))
-	if err != nil {
-		return nil, fmt.Errorf("cannot compute summary ID: %w", err)
-	}
-	res.proSummaryID = proSummaryID
 	return res, nil
 }

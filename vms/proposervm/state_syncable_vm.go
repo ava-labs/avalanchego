@@ -86,12 +86,15 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
 		return nil, err
 	}
 
-	coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(statelessSummary.InnerSummaryBytes())
+	innerSummary, err := vm.coreStateSyncVM.ParseStateSummary(statelessSummary.InnerBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal coreSummaryContent due to: %w", err)
 	}
 
-	return summary.BuildProposerSummary(statelessSummary.ProposerBlockID(), coreSummary)
+	return &summary.ProposerSummary{
+		StatelessSummary: *statelessSummary.(*summary.StatelessSummary),
+		SummaryKey:       innerSummary.Key(),
+	}, nil
 }
 
 func (vm *VM) GetStateSummary(key uint64) (common.Summary, error) {
@@ -127,7 +130,7 @@ func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
 			return err
 		}
 
-		coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(proContent.InnerSummaryBytes())
+		coreSummary, err := vm.coreStateSyncVM.ParseStateSummary(proContent.InnerBytes())
 		if err != nil {
 			return fmt.Errorf("could not parse coreSummaryContent due to: %w", err)
 		}

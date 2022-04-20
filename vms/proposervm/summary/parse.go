@@ -9,11 +9,11 @@ func Parse(summaryBytes []byte) (StatelessSummaryIntf, error) {
 	var summary StatelessSummaryIntf
 	ver, err := cdc.Unmarshal(summaryBytes, &summary)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal Summary due to: %w", err)
+		return nil, fmt.Errorf("could not unmarshal summary due to: %w", err)
 	}
 	if ver != codecVersion {
 		return nil, errWrongStateSyncVersion
 	}
 
-	return summary, nil
+	return summary, summary.initialize(summaryBytes)
 }

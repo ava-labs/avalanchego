@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -44,11 +43,7 @@ func init() {
 type ProposerSummary struct {
 	StatelessSummary `serialize:"true"`
 
-	proSummaryID ids.ID
-	proContent   []byte
-	key          uint64
+	SummaryKey uint64
 }
 
-func (ps *ProposerSummary) Bytes() []byte { return ps.proContent }
-func (ps *ProposerSummary) Key() uint64   { return ps.key }
-func (ps *ProposerSummary) ID() ids.ID    { return ps.proSummaryID }
+func (ps *ProposerSummary) Key() uint64 { return ps.SummaryKey }
