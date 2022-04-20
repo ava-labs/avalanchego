@@ -19,6 +19,12 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
+**Logs**
+If applicable, please include the relevant logs that indicate a problem and/or the log directory of your node. By default, this can be found at `~/.avalanchego/logs/`.
+
+**Metrics**
+If applicable, please include any metrics gathered from your node to assist us in diagnosing the problem.
+
 **Operating System**
 Which OS you used to reveal the bug.
 

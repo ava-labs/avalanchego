@@ -2082,7 +2082,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Len(),
-		StartupAlpha:                   (beacons.Weight() + 1) / 2,
+		WeightTracker:                  tracker.NewWeightTracker(beacons, (beacons.Weight()+1)/2),
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
 		Subnet:                         subnet,
@@ -2099,7 +2099,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: tracker.NewWeightTracker(commonCfg.Beacons, commonCfg.StartupAlpha),
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
