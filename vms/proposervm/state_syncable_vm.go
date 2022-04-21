@@ -8,14 +8,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
-var (
-	errUnknownLastSummaryBlockID = errors.New("could not retrieve blockID associated with last summary")
-	errBadLastSummaryBlock       = errors.New("could not parse last summary block")
-)
+var errStateSyncResults = errors.New("could not retrieve state sync results")
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	if vm.innerStateSyncVM == nil {
@@ -49,8 +47,8 @@ func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 		var proBlkID ids.ID
 		proBlkID, err = vm.GetBlockIDAtHeight(innerSummary.Height())
 		if err != nil {
-			// this should never happen, it's proVM being out of sync with coreVM
-			vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
+			// this should never happen, it's proVM being out of sync with innerVM
+			vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 			return nil, common.ErrUnknownStateSummary
 		}
 		proSummary, err = summary.BuildProposerSummary(proBlkID, innerSummary)
@@ -68,7 +66,7 @@ func (vm *VM) GetLastStateSummary() (common.Summary, error) {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	// Extract core last state summary
+	// Extract inner last state summary
 	innerSummary, err := vm.innerStateSyncVM.GetLastStateSummary()
 	if err != nil {
 		return nil, err // including common.ErrUnknownStateSummary case
@@ -77,8 +75,8 @@ func (vm *VM) GetLastStateSummary() (common.Summary, error) {
 	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with coreVM
-		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
+		// this should never happen, it's proVM being out of sync with innerVM
+		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
 
@@ -104,7 +102,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
 
 	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerBytes())
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal coreSummaryContent due to: %w", err)
+		return nil, fmt.Errorf("could not unmarshal innerSummaryContent due to: %w", err)
 	}
 
 	return &statefulSummary{
@@ -130,8 +128,8 @@ func (vm *VM) GetStateSummary(height uint64) (common.Summary, error) {
 	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with coreVM
-		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
+		// this should never happen, it's proVM being out of sync with innerVM
+		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
 
@@ -154,33 +152,28 @@ func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
 	}
 	proBlkID, err := vm.GetBlockIDAtHeight(height)
 	if err != nil {
-		return ids.Empty, 0, errUnknownLastSummaryBlockID
+		return ids.Empty, 0, errStateSyncResults
 	}
 	return proBlkID, height, nil
 }
 
-func (vm *VM) SetLastStateSummaryBlock(blkBytes []byte) error {
+func (vm *VM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {
 	if vm.innerStateSyncVM == nil {
-		return common.ErrStateSyncableVMNotImplemented
+		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	// retrieve core block
-	var (
-		coreBlkBytes []byte
-		blk          Block
-		err          error
-	)
-	if blk, err = vm.parsePostForkBlock(blkBytes); err == nil {
-		coreBlkBytes = blk.getInnerBlk().Bytes()
-	} else if blk, err = vm.parsePreForkBlock(blkBytes); err == nil {
-		coreBlkBytes = blk.Bytes()
-	} else {
-		return errBadLastSummaryBlock
+	proposerBlk, err := vm.parseBlock(blkBytes)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := blk.acceptOuterBlk(); err != nil {
-		return err
+	innerStateSyncableBlk, err := vm.innerStateSyncVM.ParseStateSyncableBlock(proposerBlk.getInnerBlk().Bytes())
+	if err != nil {
+		return nil, err
 	}
 
-	return vm.innerStateSyncVM.SetLastStateSummaryBlock(coreBlkBytes)
+	return &stateSyncableBlock{
+		Block:                 proposerBlk,
+		innerStateSyncableBlk: innerStateSyncableBlk,
+	}, nil
 }

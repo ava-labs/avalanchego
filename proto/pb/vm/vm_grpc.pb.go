@@ -56,7 +56,7 @@ type VMClient interface {
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
 	SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error)
-	SetLastStateSummaryBlock(ctx context.Context, in *SetLastStateSummaryBlockRequest, opts ...grpc.CallOption) (*SetLastStateSummaryBlockResponse, error)
+	StateSyncableBlockRegister(ctx context.Context, in *StateSyncableBlockRegisterRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type vMClient struct {
@@ -355,9 +355,9 @@ func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, op
 	return out, nil
 }
 
-func (c *vMClient) SetLastStateSummaryBlock(ctx context.Context, in *SetLastStateSummaryBlockRequest, opts ...grpc.CallOption) (*SetLastStateSummaryBlockResponse, error) {
-	out := new(SetLastStateSummaryBlockResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/SetLastStateSummaryBlock", in, out, opts...)
+func (c *vMClient) StateSyncableBlockRegister(ctx context.Context, in *StateSyncableBlockRegisterRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/StateSyncableBlockRegister", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +401,7 @@ type VMServer interface {
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
 	SummaryAccept(context.Context, *SummaryAcceptRequest) (*emptypb.Empty, error)
 	GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error)
-	SetLastStateSummaryBlock(context.Context, *SetLastStateSummaryBlockRequest) (*SetLastStateSummaryBlockResponse, error)
+	StateSyncableBlockRegister(context.Context, *StateSyncableBlockRegisterRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -505,8 +505,8 @@ func (UnimplementedVMServer) SummaryAccept(context.Context, *SummaryAcceptReques
 func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSyncResult not implemented")
 }
-func (UnimplementedVMServer) SetLastStateSummaryBlock(context.Context, *SetLastStateSummaryBlockRequest) (*SetLastStateSummaryBlockResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetLastStateSummaryBlock not implemented")
+func (UnimplementedVMServer) StateSyncableBlockRegister(context.Context, *StateSyncableBlockRegisterRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSyncableBlockRegister not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -1097,20 +1097,20 @@ func _VM_GetStateSyncResult_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_SetLastStateSummaryBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetLastStateSummaryBlockRequest)
+func _VM_StateSyncableBlockRegister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSyncableBlockRegisterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).SetLastStateSummaryBlock(ctx, in)
+		return srv.(VMServer).StateSyncableBlockRegister(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vm.VM/SetLastStateSummaryBlock",
+		FullMethod: "/vm.VM/StateSyncableBlockRegister",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).SetLastStateSummaryBlock(ctx, req.(*SetLastStateSummaryBlockRequest))
+		return srv.(VMServer).StateSyncableBlockRegister(ctx, req.(*StateSyncableBlockRegisterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1251,8 +1251,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_GetStateSyncResult_Handler,
 		},
 		{
-			MethodName: "SetLastStateSummaryBlock",
-			Handler:    _VM_SetLastStateSummaryBlock_Handler,
+			MethodName: "StateSyncableBlockRegister",
+			Handler:    _VM_StateSyncableBlockRegister_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
@@ -128,13 +129,13 @@ func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
 	return blkID, height, err
 }
 
-func (vm *VMClient) SetLastStateSummaryBlock(blkBytes []byte) error {
-	resp, err := vm.client.SetLastStateSummaryBlock(context.Background(),
-		&vmpb.SetLastStateSummaryBlockRequest{
-			Bytes: blkBytes,
-		})
+func (vm *VMClient) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {
+	blkClient, err := vm.parseBlockClient(blkBytes)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return errCodeToError[resp.Err]
+
+	return &StateSyncableBlockClient{
+		BlockClient: *blkClient,
+	}, err
 }

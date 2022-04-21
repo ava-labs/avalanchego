@@ -5,28 +5,14 @@ package rpcchainvm
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var (
-	_ common.Summary = &SummaryClient{}
-	_ common.Summary = &deprecatedSummaryToBeRemoved{}
-)
-
-type deprecatedSummaryToBeRemoved struct {
-	height uint64
-	id     ids.ID
-	bytes  []byte
-}
-
-func (s *deprecatedSummaryToBeRemoved) Bytes() []byte  { return s.bytes }
-func (s *deprecatedSummaryToBeRemoved) Height() uint64 { return s.height }
-func (s *deprecatedSummaryToBeRemoved) ID() ids.ID     { return s.id }
-func (s *deprecatedSummaryToBeRemoved) Accept() error  { return fmt.Errorf("TO BE IMPLEMENTED") }
+var _ common.Summary = &SummaryClient{}
 
 // SummaryClient is an implementation of Summary that talks over RPC.
 type SummaryClient struct {

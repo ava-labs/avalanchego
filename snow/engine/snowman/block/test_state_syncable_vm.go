@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -15,9 +16,9 @@ var (
 	_ common.Summary  = &TestSummary{}
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
-	errAccept                   = errors.New("unexpectedly called Accept")
-	errGetStateSyncResult       = errors.New("unexpectedly called GetStateSyncResult")
-	errSetLastStateSummaryBlock = errors.New("unexpectedly called SetLastStateSummaryBlock")
+	errAccept                  = errors.New("unexpectedly called Accept")
+	errGetStateSyncResult      = errors.New("unexpectedly called GetStateSyncResult")
+	errParseStateSyncableBlock = errors.New("unexpectedly called ParseStateSyncableBlock")
 )
 
 type TestSummary struct {
@@ -46,10 +47,11 @@ func (s *TestSummary) Accept() error {
 type TestStateSyncableVM struct {
 	common.TestStateSyncableVM
 
-	CantGetStateSyncResult, CantSetLastStateSummaryBlock bool
+	CantGetStateSyncResult,
+	CantParseStateSyncableBlock bool
 
-	GetStateSyncResultF       func() (ids.ID, uint64, error)
-	SetLastStateSummaryBlockF func(blkBytes []byte) error
+	GetStateSyncResultF      func() (ids.ID, uint64, error)
+	ParseStateSyncableBlockF func(blkBytes []byte) (snowman.StateSyncableBlock, error)
 }
 
 func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
@@ -62,12 +64,12 @@ func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
 	return ids.Empty, 0, errGetStateSyncResult
 }
 
-func (tss *TestStateSyncableVM) SetLastStateSummaryBlock(blkBytes []byte) error {
-	if tss.SetLastStateSummaryBlockF != nil {
-		return tss.SetLastStateSummaryBlockF(blkBytes)
+func (tss *TestStateSyncableVM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {
+	if tss.ParseStateSyncableBlockF != nil {
+		return tss.ParseStateSyncableBlockF(blkBytes)
 	}
-	if tss.CantSetLastStateSummaryBlock && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called SetLastStateSummaryBlock")
+	if tss.CantParseStateSyncableBlock && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called ParseStateSyncableBlock")
 	}
-	return errSetLastStateSummaryBlock
+	return nil, errParseStateSyncableBlock
 }

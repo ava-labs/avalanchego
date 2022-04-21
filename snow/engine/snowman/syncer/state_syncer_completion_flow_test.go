@@ -45,20 +45,25 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	fullVM.GetStateSyncResultF = func() (ids.ID, uint64, error) {
 		return lastSummaryBlkID, 2022, nil
 	}
-	fullVM.CantSetLastStateSummaryBlock = true
-	fullVM.SetLastStateSummaryBlockF = func([]byte) error { return nil }
 
-	fullVM.CantParseBlock = true
-	successfulParseBlkMock := func(b []byte) (snowman.Block, error) {
-		return &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     lastSummaryBlkID,
-				StatusV: choices.Processing,
+	successfulParseSyncableBlockBlkMock := func(
+		b []byte,
+	) (snowman.StateSyncableBlock, error) {
+		return &snowman.TestStateSyncableBlock{
+			TestBlock: snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     lastSummaryBlkID,
+					StatusV: choices.Processing,
+				},
+				BytesV: b,
 			},
-			BytesV: b,
+			T:         t,
+			RegisterF: func() error { return nil },
 		}, nil
 	}
-	fullVM.ParseBlockF = successfulParseBlkMock
+
+	fullVM.CantParseStateSyncableBlock = true
+	fullVM.ParseStateSyncableBlockF = successfulParseSyncableBlockBlkMock
 
 	// mock sender to record requested blkID
 	var (
@@ -109,10 +114,10 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 
 	// if Put message carries unparsable blk, block is requested again (to a random beacon)
 	blkRequested = false
-	failedParseBlkMock := func(b []byte) (snowman.Block, error) {
+	failedParseStateSyncableBlkMock := func(b []byte) (snowman.StateSyncableBlock, error) {
 		return nil, fmt.Errorf("parse failed")
 	}
-	fullVM.ParseBlockF = failedParseBlkMock
+	fullVM.ParseStateSyncableBlockF = failedParseStateSyncableBlkMock
 
 	assert.NoError(syncer.Put(reachedNodeID, sentReqID, []byte{}))
 	assert.True(blkRequested)
@@ -121,16 +126,19 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 
 	// if Put message carries the wrong blk, block is requested again (to a random beacon)
 	blkRequested = false
-	wrongParseBlkMock := func(b []byte) (snowman.Block, error) {
-		return &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.ID{'w', 'r', 'o', 'n', 'g', 'I', 'D'},
-				StatusV: choices.Processing,
+	wrongParseStateSyncableBlkMock := func(b []byte) (snowman.StateSyncableBlock, error) {
+		return &snowman.TestStateSyncableBlock{
+			TestBlock: snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.ID{'w', 'r', 'o', 'n', 'g', 'I', 'D'},
+					StatusV: choices.Processing,
+				},
+				BytesV: b,
 			},
-			BytesV: b,
+			T: t,
 		}, nil
 	}
-	fullVM.ParseBlockF = wrongParseBlkMock
+	fullVM.ParseStateSyncableBlockF = wrongParseStateSyncableBlkMock
 
 	assert.NoError(syncer.Put(reachedNodeID, sentReqID, []byte{}))
 	assert.True(blkRequested)
@@ -138,7 +146,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	assert.False(stateSyncFullyDone)
 
 	// if Put message is received, state sync is declared done
-	fullVM.ParseBlockF = successfulParseBlkMock
+	fullVM.ParseStateSyncableBlockF = successfulParseSyncableBlockBlkMock
 	assert.NoError(syncer.Put(reachedNodeID, sentReqID, []byte{}))
 	assert.True(stateSyncFullyDone)
 }

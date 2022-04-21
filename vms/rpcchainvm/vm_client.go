@@ -416,6 +416,10 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 }
 
 func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
+	return vm.parseBlockClient(bytes)
+}
+
+func (vm *VMClient) parseBlockClient(bytes []byte) (*BlockClient, error) {
 	resp, err := vm.client.ParseBlock(context.Background(), &vmpb.ParseBlockRequest{
 		Bytes: bytes,
 	})

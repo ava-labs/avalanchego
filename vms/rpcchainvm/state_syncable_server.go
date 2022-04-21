@@ -154,7 +154,10 @@ func (vm *VMServer) GetStateSummary(
 	}, nil
 }
 
-func (vm *VMServer) SummaryAccept(_ context.Context, req *vmpb.SummaryAcceptRequest) (*emptypb.Empty, error) {
+func (vm *VMServer) SummaryAccept(
+	_ context.Context,
+	req *vmpb.SummaryAcceptRequest,
+) (*emptypb.Empty, error) {
 	if vm.ssVM == nil {
 		return &emptypb.Empty{}, nil
 	}
@@ -183,21 +186,5 @@ func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.G
 		Bytes:  blkID[:],
 		Height: height,
 		Err:    errorToErrCode[err],
-	}, errorToRPCError(err)
-}
-
-func (vm *VMServer) SetLastStateSummaryBlock(
-	ctx context.Context,
-	req *vmpb.SetLastStateSummaryBlockRequest,
-) (*vmpb.SetLastStateSummaryBlockResponse, error) {
-	var err error
-	if vm.ssVM != nil {
-		err = vm.ssVM.SetLastStateSummaryBlock(req.Bytes)
-	} else {
-		err = common.ErrStateSyncableVMNotImplemented
-	}
-
-	return &vmpb.SetLastStateSummaryBlockResponse{
-		Err: errorToErrCode[err],
 	}, errorToRPCError(err)
 }

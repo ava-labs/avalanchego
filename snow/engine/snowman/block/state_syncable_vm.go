@@ -5,6 +5,7 @@ package block
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -18,8 +19,7 @@ type StateSyncableVM interface {
 	// 2- error state of the whole StateSync process so far
 	GetStateSyncResult() (ids.ID, uint64, error)
 
-	// Once last summary block pulled from VM via StateSyncGetResult has been
-	// retrieved from network and validated, SetLastStateSummaryBlock
-	// confirms it to the VM.
-	SetLastStateSummaryBlock(blkBytes []byte) error
+	// Once block associated with state summary has been downloaded from the network
+	// ParseStateSyncableBlock helps parsing it
+	ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error)
 }

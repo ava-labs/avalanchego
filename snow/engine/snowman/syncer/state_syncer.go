@@ -497,7 +497,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes [
 		return nil
 	}
 
-	blk, err := ss.VM.ParseBlock(blkBytes)
+	stateSyncableBlk, err := ss.stateSyncVM.ParseStateSyncableBlock(blkBytes)
 	if err != nil {
 		ss.Ctx.Log.Debug("Received unparsable block from vdr %s, err %v. Requesting it again.",
 			validatorID,
@@ -506,7 +506,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes [
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	rcvdBlkID := blk.ID()
+	rcvdBlkID := stateSyncableBlk.ID()
 	if rcvdBlkID != ss.lastSummaryBlkID {
 		ss.Ctx.Log.Debug("Received wrong block; expected ID %s, received ID %s, Requesting it again.",
 			rcvdBlkID,
@@ -514,7 +514,7 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes [
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	if err := ss.stateSyncVM.SetLastStateSummaryBlock(blkBytes); err != nil {
+	if err := stateSyncableBlk.Register(); err != nil {
 		return err
 	}
 
