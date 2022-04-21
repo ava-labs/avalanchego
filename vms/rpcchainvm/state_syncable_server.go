@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
@@ -35,14 +35,14 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 	*emptypb.Empty,
 ) (*vmpb.GetOngoingSyncStateSummaryResponse, error) {
 	var (
-		summary common.Summary
+		summary block.Summary
 		err     error
 	)
 
 	if vm.ssVM != nil {
 		summary, err = vm.ssVM.GetOngoingSyncStateSummary()
 	} else {
-		err = common.ErrStateSyncableVMNotImplemented
+		err = block.ErrStateSyncableVMNotImplemented
 	}
 
 	if err == nil {
@@ -66,14 +66,14 @@ func (vm *VMServer) GetLastStateSummary(
 	empty *emptypb.Empty,
 ) (*vmpb.GetLastStateSummaryResponse, error) {
 	var (
-		summary common.Summary
+		summary block.Summary
 		err     error
 	)
 
 	if vm.ssVM != nil {
 		summary, err = vm.ssVM.GetLastStateSummary()
 	} else {
-		err = common.ErrStateSyncableVMNotImplemented
+		err = block.ErrStateSyncableVMNotImplemented
 	}
 
 	if err != nil {
@@ -97,14 +97,14 @@ func (vm *VMServer) ParseStateSummary(
 	req *vmpb.ParseStateSummaryRequest,
 ) (*vmpb.ParseStateSummaryResponse, error) {
 	var (
-		summary common.Summary
+		summary block.Summary
 		err     error
 	)
 
 	if vm.ssVM != nil {
 		summary, err = vm.ssVM.ParseStateSummary(req.Summary)
 	} else {
-		err = common.ErrStateSyncableVMNotImplemented
+		err = block.ErrStateSyncableVMNotImplemented
 	}
 
 	if err != nil {
@@ -128,14 +128,14 @@ func (vm *VMServer) GetStateSummary(
 	req *vmpb.GetStateSummaryRequest,
 ) (*vmpb.GetStateSummaryResponse, error) {
 	var (
-		summary common.Summary
+		summary block.Summary
 		err     error
 	)
 
 	if vm.ssVM != nil {
 		summary, err = vm.ssVM.GetStateSummary(req.Height)
 	} else {
-		err = common.ErrStateSyncableVMNotImplemented
+		err = block.ErrStateSyncableVMNotImplemented
 	}
 
 	if err != nil {
@@ -175,7 +175,7 @@ func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.G
 	var (
 		blkID  = ids.Empty
 		height = uint64(0)
-		err    = common.ErrStateSyncableVMNotImplemented
+		err    = block.ErrStateSyncableVMNotImplemented
 	)
 
 	if vm.ssVM != nil {

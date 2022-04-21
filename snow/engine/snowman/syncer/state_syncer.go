@@ -27,7 +27,7 @@ var _ common.StateSyncer = &stateSyncer{}
 
 // summary content as received from network, along with accumulated weight.
 type weightedSummary struct {
-	common.Summary
+	block.Summary
 	weight uint64
 }
 
@@ -53,7 +53,7 @@ type stateSyncer struct {
 
 	// we track the (possibly empty) local summary to help engine
 	// choosing among multiple validated summaries
-	locallyAvailableSummary common.Summary
+	locallyAvailableSummary block.Summary
 	// once vm finishes processing rebuilding its state via state summaries
 	// the full block associated with state summary must be download.
 	// lastSummaryBlkRequestedFrom tracks the validator reached out to for the full block
@@ -265,7 +265,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 
 // selectSyncableStateSummary chooses a state summary from all
 // the network validated summaries.
-func (ss *stateSyncer) selectSyncableStateSummary() common.Summary {
+func (ss *stateSyncer) selectSyncableStateSummary() block.Summary {
 	highestSummary := uint64(0)
 	preferredStateSummaryID := ids.Empty
 

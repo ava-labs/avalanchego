@@ -5,7 +5,6 @@ package rpcchainvm
 
 import (
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -17,8 +16,8 @@ var (
 		3: block.ErrHeightIndexedVMNotImplemented,
 		4: block.ErrIndexIncomplete,
 
-		5: common.ErrStateSyncableVMNotImplemented,
-		6: common.ErrUnknownStateSummary,
+		5: block.ErrStateSyncableVMNotImplemented,
+		6: block.ErrUnknownStateSummary,
 	}
 	errorToErrCode = map[error]uint32{
 		database.ErrClosed:   1,
@@ -27,8 +26,8 @@ var (
 		block.ErrHeightIndexedVMNotImplemented: 3,
 		block.ErrIndexIncomplete:               4,
 
-		common.ErrStateSyncableVMNotImplemented: 5,
-		common.ErrUnknownStateSummary:           6,
+		block.ErrStateSyncableVMNotImplemented: 5,
+		block.ErrUnknownStateSummary:           6,
 	}
 )
 

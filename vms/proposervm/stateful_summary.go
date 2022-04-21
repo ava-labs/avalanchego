@@ -5,17 +5,17 @@ package proposervm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
-var _ common.Summary = &statefulSummary{}
+var _ block.Summary = &statefulSummary{}
 
 type statefulSummary struct {
 	summary.ProposerSummaryIntf
 
 	// stateful inner summary, retrieved via Parse
-	innerSummary common.Summary
+	innerSummary block.Summary
 
 	vm *VM
 }

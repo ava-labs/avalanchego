@@ -7,12 +7,12 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var _ common.Summary = &SummaryClient{}
+var _ block.Summary = &SummaryClient{}
 
 // SummaryClient is an implementation of Summary that talks over RPC.
 type SummaryClient struct {

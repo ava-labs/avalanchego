@@ -6,7 +6,7 @@ package metervm
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func (vm *blockVM) StateSyncEnabled() (bool, error) {
@@ -21,9 +21,9 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	return enabled, err
 }
 
-func (vm *blockVM) GetOngoingSyncStateSummary() (common.Summary, error) {
+func (vm *blockVM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	if vm.ssVM == nil {
-		return nil, common.ErrStateSyncableVMNotImplemented
+		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetOngoingSyncStateSummary()
@@ -33,9 +33,9 @@ func (vm *blockVM) GetOngoingSyncStateSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) GetLastStateSummary() (common.Summary, error) {
+func (vm *blockVM) GetLastStateSummary() (block.Summary, error) {
 	if vm.ssVM == nil {
-		return nil, common.ErrStateSyncableVMNotImplemented
+		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -46,9 +46,9 @@ func (vm *blockVM) GetLastStateSummary() (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
+func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 	if vm.ssVM == nil {
-		return nil, common.ErrStateSyncableVMNotImplemented
+		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 	start := vm.clock.Time()
 	summary, err := vm.ssVM.ParseStateSummary(summaryBytes)
@@ -58,9 +58,9 @@ func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (common.Summary, error
 	return summary, err
 }
 
-func (vm *blockVM) GetStateSummary(height uint64) (common.Summary, error) {
+func (vm *blockVM) GetStateSummary(height uint64) (block.Summary, error) {
 	if vm.ssVM == nil {
-		return nil, common.ErrStateSyncableVMNotImplemented
+		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -73,7 +73,7 @@ func (vm *blockVM) GetStateSummary(height uint64) (common.Summary, error) {
 
 func (vm *blockVM) GetStateSyncResult() (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
-		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented
+		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
@@ -86,7 +86,7 @@ func (vm *blockVM) GetStateSyncResult() (ids.ID, uint64, error) {
 
 func (vm *blockVM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {
 	if vm.ssVM == nil {
-		return nil, common.ErrStateSyncableVMNotImplemented
+		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()

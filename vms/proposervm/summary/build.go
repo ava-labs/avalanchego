@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 // emptySummary has an ad-hoc construction in that it must have an empty summary ID
-func BuildEmptyProposerSummary(coreSummary common.Summary) (ProposerSummaryIntf, error) {
+func BuildEmptyProposerSummary(coreSummary block.Summary) (ProposerSummaryIntf, error) {
 	return &ProposerSummary{
 		StatelessSummaryIntf: &StatelessSummary{
 			ProBlkID:          ids.Empty,
@@ -20,7 +20,7 @@ func BuildEmptyProposerSummary(coreSummary common.Summary) (ProposerSummaryIntf,
 	}, nil
 }
 
-func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (ProposerSummaryIntf, error) {
+func BuildProposerSummary(proBlkID ids.ID, coreSummary block.Summary) (ProposerSummaryIntf, error) {
 	statelessSummary := StatelessSummary{
 		ProBlkID:     proBlkID,
 		InnerSummary: coreSummary.Bytes(),

@@ -86,7 +86,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 			TestVM: common.TestVM{T: t},
 		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+			T: t,
 		},
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
@@ -99,7 +99,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	assert.True(t, ok)
 	assert.True(t, syncer.stateSyncVM != nil)
 
-	fullVM.GetOngoingSyncStateSummaryF = func() (common.Summary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
 		emptySummary.T = t
 		return emptySummary, nil
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
@@ -26,7 +26,7 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	return resp.Enabled, errCodeToError[resp.Err]
 }
 
-func (vm *VMClient) GetOngoingSyncStateSummary() (common.Summary, error) {
+func (vm *VMClient) GetOngoingSyncStateSummary() (block.Summary, error) {
 	resp, err := vm.client.GetOngoingSyncStateSummary(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func (vm *VMClient) GetOngoingSyncStateSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) GetLastStateSummary() (common.Summary, error) {
+func (vm *VMClient) GetLastStateSummary() (block.Summary, error) {
 	resp, err := vm.client.GetLastStateSummary(
 		context.Background(),
 		&emptypb.Empty{},
@@ -65,7 +65,7 @@ func (vm *VMClient) GetLastStateSummary() (common.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
+func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 	resp, err := vm.client.ParseStateSummary(
 		context.Background(),
 		&vmpb.ParseStateSummaryRequest{
@@ -88,7 +88,7 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (common.Summary, erro
 	}, err
 }
 
-func (vm *VMClient) GetStateSummary(height uint64) (common.Summary, error) {
+func (vm *VMClient) GetStateSummary(height uint64) (block.Summary, error) {
 	resp, err := vm.client.GetStateSummary(
 		context.Background(),
 		&vmpb.GetStateSummaryRequest{
