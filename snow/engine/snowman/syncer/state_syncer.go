@@ -51,7 +51,7 @@ type stateSyncer struct {
 	stateSyncVM        block.StateSyncableVM
 	onDoneStateSyncing func(lastReqID uint32) error
 
-	// we track the (possibly nil) local summary to help engine
+	// we track the (possibly empty) local summary to help engine
 	// choosing among multiple validated summaries
 	locallyAvailableSummary common.Summary
 	// once vm finishes processing rebuilding its state via state summaries
@@ -345,16 +345,16 @@ func (ss *stateSyncer) startup() error {
 		ss.targetVoters.Add(vdrID)
 	}
 
-	// check if there is an ongoing state sync; if so add its state localSummary
+	// check if there is an ongoing state sync; if so add it
 	// to the frontier to request votes on
+	// Note that summary with emptyID represents no ongoing summary
+	// empty summaries are not validated over network
 	localSummary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
 	if err != nil {
 		return err
 	}
 	ss.locallyAvailableSummary = localSummary
 
-	// register localSummary among those to validate over netwok,
-	// unless its the emptySummary
 	if localSummary.ID() != ids.Empty {
 		ss.weightedSummaries[localSummary.ID()] = weightedSummary{
 			Summary: localSummary,
