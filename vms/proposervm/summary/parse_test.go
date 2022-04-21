@@ -16,9 +16,9 @@ func TestParse(t *testing.T) {
 
 	proBlkID := ids.ID{'p', 'r', 'o', 'I', 'D'}
 	coreSummary := &block.TestSummary{
-		SummaryHeight: 2022,
-		SummaryID:     ids.ID{'I', 'D'},
-		ContentBytes:  []byte{'b', 'y', 't', 'e', 's'},
+		HeightV: 2022,
+		IDV:     ids.ID{'I', 'D'},
+		BytesV:  []byte{'b', 'y', 't', 'e', 's'},
 	}
 	builtSummary, err := BuildProposerSummary(proBlkID, coreSummary)
 	assert.NoError(err)

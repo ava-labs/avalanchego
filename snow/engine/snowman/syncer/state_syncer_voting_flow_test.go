@@ -162,9 +162,9 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
-			SummaryHeight: key,
-			SummaryID:     summaryID,
-			ContentBytes:  summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -340,9 +340,9 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
-			SummaryHeight: key,
-			SummaryID:     summaryID,
-			ContentBytes:  summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -385,9 +385,9 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	fullVM.ParseStateSummaryF = func(b []byte) (common.Summary, error) {
 		assert.True(bytes.Equal(b, summaryBytes))
 		return &block.TestSummary{
-			SummaryHeight: key,
-			SummaryID:     summaryID,
-			ContentBytes:  summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -452,9 +452,9 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
-			SummaryHeight: key,
-			SummaryID:     summaryID,
-			ContentBytes:  summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -564,9 +564,9 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
 		return &block.TestSummary{
-			SummaryHeight: key,
-			SummaryID:     summaryID,
-			ContentBytes:  summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -660,16 +660,16 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	summary := &block.TestSummary{
-		SummaryHeight: key,
-		SummaryID:     summaryID,
-		ContentBytes:  summaryBytes,
-		T:             t,
+		HeightV: key,
+		IDV:     summaryID,
+		BytesV:  summaryBytes,
+		T:       t,
 	}
 	minoritySummary := &block.TestSummary{
-		SummaryHeight: minorityKey,
-		SummaryID:     minoritySummaryID,
-		ContentBytes:  minoritySummaryBytes,
-		T:             t,
+		HeightV: minorityKey,
+		IDV:     minoritySummaryID,
+		BytesV:  minoritySummaryBytes,
+		T:       t,
 	}
 
 	fullVM.CantParseStateSummary = true
@@ -801,10 +801,10 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	minoritySummary := &block.TestSummary{
-		SummaryHeight: minorityKey,
-		SummaryID:     minoritySummaryID,
-		ContentBytes:  minoritySummaryBytes,
-		T:             t,
+		HeightV: minorityKey,
+		IDV:     minoritySummaryID,
+		BytesV:  minoritySummaryBytes,
+		T:       t,
 	}
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {

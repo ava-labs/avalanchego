@@ -19,7 +19,8 @@ type StateSyncableVM interface {
 	// 2- error state of the whole StateSync process so far
 	GetStateSyncResult() (ids.ID, uint64, error)
 
-	// Once block associated with state summary has been downloaded from the network
-	// ParseStateSyncableBlock helps parsing it
+	// ParseStateSyncableBlock parses [blkBytes] into a state syncable block.
+	// This is called after the block associated with a state summary
+	// has been downloaded from the network.
 	ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error)
 }

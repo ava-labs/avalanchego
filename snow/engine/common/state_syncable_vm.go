@@ -20,7 +20,7 @@ var (
 // Both Height and ID uniquely identify a Summary. However:
 // Height is used to efficiently elicit network votes;
 // ID must allow summaries comparison and verification as an alternative to Bytes;
-// it is used to verify what summaries are votes casted for.
+// it is used to verify what summaries votes are casted for.
 // Finally Byte returns the Summary content which is defined by the VM and opaque to the engine.
 type Summary interface {
 	Bytes() []byte

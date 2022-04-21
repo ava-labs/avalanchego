@@ -16,9 +16,9 @@ func TestBuild(t *testing.T) {
 
 	proBlkID := ids.ID{'p', 'r', 'o', 'I', 'D'}
 	coreSummary := &block.TestSummary{
-		SummaryHeight: 2022,
-		SummaryID:     ids.ID{'I', 'D'},
-		ContentBytes:  []byte{'b', 'y', 't', 'e', 's'},
+		HeightV: 2022,
+		IDV:     ids.ID{'I', 'D'},
+		BytesV:  []byte{'b', 'y', 't', 'e', 's'},
 	}
 	builtSummary, err := BuildProposerSummary(proBlkID, coreSummary)
 	assert.NoError(err)
@@ -33,9 +33,9 @@ func TestBuildEmptySummary(t *testing.T) {
 	assert := assert.New(t)
 
 	coreSummary := &block.TestSummary{
-		SummaryHeight: 0,
-		SummaryID:     ids.Empty,
-		ContentBytes:  nil,
+		HeightV: 0,
+		IDV:     ids.Empty,
+		BytesV:  nil,
 	}
 	builtSummary, err := BuildEmptyProposerSummary(coreSummary)
 	assert.NoError(err)

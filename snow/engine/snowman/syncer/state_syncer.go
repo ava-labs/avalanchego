@@ -256,31 +256,32 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		}
 	}
 
-	ss.Ctx.Log.Info("State sync started syncing with %d vertices in the accepted frontier", size)
-	bestStateSummary := ss.selectSyncableStateSummary()
-	return bestStateSummary.Accept()
+	ss.Ctx.Log.Info("State sync found %d state summaries in the accepted frontier", size)
+	preferredStateSummary := ss.selectSyncableStateSummary()
+	ss.Ctx.Log.Info("Selected summary %d to start state sync", preferredStateSummary.ID())
+	return preferredStateSummary.Accept()
 }
 
-// selectSyncableStateSummary encapsules the logic to choose a state summary
-// out of all the network validated one
+// selectSyncableStateSummary chooses a state summary from all
+// the network validated summaries.
 func (ss *stateSyncer) selectSyncableStateSummary() common.Summary {
 	highestSummary := uint64(0)
-	bestID := ids.Empty
+	preferredStateSummaryID := ids.Empty
 
 	// by default pick highest summary, unless locallyAvailableSummary is still valid.
 	// In such case we pick locallyAvailableSummary to allow VM resuming state syncing.
 	for id, ws := range ss.weightedSummaries {
 		if id == ss.locallyAvailableSummary.ID() {
-			bestID = id
+			preferredStateSummaryID = id
 			break
 		}
 
 		if highestSummary < ws.Summary.Height() {
 			highestSummary = ws.Summary.Height()
-			bestID = id
+			preferredStateSummaryID = id
 		}
 	}
-	return ss.weightedSummaries[bestID].Summary
+	return ss.weightedSummaries[preferredStateSummaryID].Summary
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
@@ -345,7 +346,7 @@ func (ss *stateSyncer) startup() error {
 		ss.targetVoters.Add(vdrID)
 	}
 
-	// check if there is an ongoing state sync; if so add it
+	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
 	// Note that summary with emptyID represents no ongoing summary
 	// empty summaries are not validated over network
@@ -364,7 +365,7 @@ func (ss *stateSyncer) startup() error {
 	// initiate messages exchange
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
-		// we make sure that a state summary is always eventually called if state sync is enabled
+		// Accept must always be called on exactly one state summary if state sync is enabled
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
 		if err := ss.locallyAvailableSummary.Accept(); err != nil {
 			return err
@@ -416,11 +417,11 @@ func (ss *stateSyncer) sendGetAccepted() error {
 		return nil
 	}
 
-	acceptedKeys := make([]uint64, 0, len(ss.weightedSummaries))
+	acceptedSummaryHeights := make([]uint64, 0, len(ss.weightedSummaries))
 	for _, summary := range ss.weightedSummaries {
-		acceptedKeys = append(acceptedKeys, summary.Height())
+		acceptedSummaryHeights = append(acceptedSummaryHeights, summary.Height())
 	}
-	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
+	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
 	ss.contactedVoters.Add(vdrs.List()...)
 	ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 		vdrs.Len(), ss.targetVoters.Len())
@@ -506,10 +507,10 @@ func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes [
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
 
-	rcvdBlkID := stateSyncableBlk.ID()
-	if rcvdBlkID != ss.lastSummaryBlkID {
+	receivedBlockID := stateSyncableBlk.ID()
+	if receivedBlockID != ss.lastSummaryBlkID {
 		ss.Ctx.Log.Debug("Received wrong block; expected ID %s, received ID %s, Requesting it again.",
-			rcvdBlkID,
+			receivedBlockID,
 			ss.lastSummaryBlkID)
 		return ss.requestBlk(ss.lastSummaryBlkID)
 	}
