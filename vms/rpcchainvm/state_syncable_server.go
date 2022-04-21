@@ -8,7 +8,6 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
@@ -172,19 +171,13 @@ func (vm *VMServer) SummaryAccept(
 }
 
 func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.GetStateSyncResultResponse, error) {
-	var (
-		blkID  = ids.Empty
-		height = uint64(0)
-		err    = block.ErrStateSyncableVMNotImplemented
-	)
+	err := block.ErrStateSyncableVMNotImplemented
 
 	if vm.ssVM != nil {
-		blkID, height, err = vm.ssVM.GetStateSyncResult()
+		err = vm.ssVM.GetStateSyncResult()
 	}
 
 	return &vmpb.GetStateSyncResultResponse{
-		Bytes:  blkID[:],
-		Height: height,
-		Err:    errorToErrCode[err],
+		Err: errorToErrCode[err],
 	}, errorToRPCError(err)
 }

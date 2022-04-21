@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
@@ -36,7 +35,7 @@ type TestStateSyncableVM struct {
 	GetLastStateSummaryF        func() (Summary, error)
 	ParseStateSummaryF          func(summaryBytes []byte) (Summary, error)
 	GetStateSummaryF            func(uint64) (Summary, error)
-	GetStateSyncResultF         func() (ids.ID, uint64, error)
+	GetStateSyncResultF         func() error
 	ParseStateSyncableBlockF    func(blkBytes []byte) (snowman.StateSyncableBlock, error)
 }
 
@@ -90,14 +89,14 @@ func (tss *TestStateSyncableVM) GetStateSummary(key uint64) (Summary, error) {
 	return nil, errGetStateSummary
 }
 
-func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
+func (tss *TestStateSyncableVM) GetStateSyncResult() error {
 	if tss.GetStateSyncResultF != nil {
 		return tss.GetStateSyncResultF()
 	}
 	if tss.CantGetStateSyncResult && tss.T != nil {
 		tss.T.Fatalf("Unexpectedly called GetStateSyncResult")
 	}
-	return ids.Empty, 0, errGetStateSyncResult
+	return errGetStateSyncResult
 }
 
 func (tss *TestStateSyncableVM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {

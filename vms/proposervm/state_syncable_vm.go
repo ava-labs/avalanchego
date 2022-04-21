@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,8 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
-
-var errStateSyncResults = errors.New("could not retrieve state sync results")
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
 	if vm.innerStateSyncVM == nil {
@@ -143,20 +140,12 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	}, err
 }
 
-func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {
+func (vm *VM) GetStateSyncResult() error {
 	if vm.innerStateSyncVM == nil {
-		return ids.Empty, 0, block.ErrStateSyncableVMNotImplemented
+		return block.ErrStateSyncableVMNotImplemented
 	}
 
-	_, height, err := vm.innerStateSyncVM.GetStateSyncResult()
-	if err != nil {
-		return ids.Empty, 0, err
-	}
-	proBlkID, err := vm.GetBlockIDAtHeight(height)
-	if err != nil {
-		return ids.Empty, 0, errStateSyncResults
-	}
-	return proBlkID, height, nil
+	return vm.innerStateSyncVM.GetStateSyncResult()
 }
 
 func (vm *VM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {

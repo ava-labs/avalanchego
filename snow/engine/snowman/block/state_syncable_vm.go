@@ -6,7 +6,6 @@ package block
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
@@ -43,11 +42,9 @@ type StateSyncableVM interface {
 	GetStateSummary(summaryHeight uint64) (Summary, error)
 
 	// VM State Sync process must run asynchronously; moreover, once it is done,
-	// the full block associated with synced summary must be downloaded from
-	// the network. GetStateSyncResult returns:
-	// 1- height and ID of this block to allow its retrival from network
-	// 2- error state of the whole StateSync process so far
-	GetStateSyncResult() (ids.ID, uint64, error)
+	// VM will notify engine which in turn will issue a GetStateSyncResult call.
+	// GetStateSyncResult returns the result of state sync
+	GetStateSyncResult() error
 
 	// ParseStateSyncableBlock parses [blkBytes] into a state syncable block.
 	// This is called after the block associated with a state summary

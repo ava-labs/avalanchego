@@ -40,11 +40,9 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	}
 
 	// mock VM to return lastSummaryBlkID and be able to receive full block
-	lastSummaryBlkID := ids.ID{'b', 'l', 'k', 'I', 'D'}
+	syncer.lastSummaryBlkID = ids.ID{'b', 'l', 'k', 'I', 'D'}
 	fullVM.CantGetStateSyncResult = true
-	fullVM.GetStateSyncResultF = func() (ids.ID, uint64, error) {
-		return lastSummaryBlkID, 2022, nil
-	}
+	fullVM.GetStateSyncResultF = func() error { return nil }
 
 	successfulParseSyncableBlockBlkMock := func(
 		b []byte,
@@ -52,7 +50,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 		return &snowman.TestStateSyncableBlock{
 			TestBlock: snowman.TestBlock{
 				TestDecidable: choices.TestDecidable{
-					IDV:     lastSummaryBlkID,
+					IDV:     syncer.lastSummaryBlkID,
 					StatusV: choices.Processing,
 				},
 				BytesV: b,
@@ -86,14 +84,14 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 
 	assert.NoError(syncer.Notify(common.StateSyncDone))
 	assert.True(blkRequested)
-	assert.True(reqBlkID == lastSummaryBlkID)
+	assert.True(reqBlkID == syncer.lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
 	// if Put message is not received, block is requested again (to a random beacon)
 	blkRequested = false
 	assert.NoError(syncer.GetFailed(reachedNodeID, sentReqID))
 	assert.True(blkRequested)
-	assert.True(reqBlkID == lastSummaryBlkID)
+	assert.True(reqBlkID == syncer.lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
 	// if Put message is received from wrong validator, node waits to for the right node to respond
@@ -101,7 +99,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	wrongNodeID := ids.ShortID{'w', 'r', 'o', 'n', 'g'}
 	assert.NoError(syncer.Put(wrongNodeID, sentReqID, []byte{}))
 	assert.False(blkRequested)
-	assert.True(reqBlkID == lastSummaryBlkID)
+	assert.True(reqBlkID == syncer.lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
 	// if Put message is received with wrong reqID, node waits to for the right node to respond
@@ -109,7 +107,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	wrongSentReqID := uint32(math.MaxUint32)
 	assert.NoError(syncer.Put(reachedNodeID, wrongSentReqID, []byte{}))
 	assert.False(blkRequested)
-	assert.True(reqBlkID == lastSummaryBlkID)
+	assert.True(reqBlkID == syncer.lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
 	// if Put message carries unparsable blk, block is requested again (to a random beacon)
@@ -121,7 +119,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 
 	assert.NoError(syncer.Put(reachedNodeID, sentReqID, []byte{}))
 	assert.True(blkRequested)
-	assert.True(reqBlkID == lastSummaryBlkID)
+	assert.True(reqBlkID == syncer.lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
 	// if Put message carries the wrong blk, block is requested again (to a random beacon)
@@ -142,7 +140,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 
 	assert.NoError(syncer.Put(reachedNodeID, sentReqID, []byte{}))
 	assert.True(blkRequested)
-	assert.True(reqBlkID == lastSummaryBlkID)
+	assert.True(reqBlkID == syncer.lastSummaryBlkID)
 	assert.False(stateSyncFullyDone)
 
 	// if Put message is received, state sync is declared done

@@ -135,22 +135,12 @@ func (vm *VMClient) GetStateSummary(height uint64) (block.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
+func (vm *VMClient) GetStateSyncResult() error {
 	resp, err := vm.client.GetStateSyncResult(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		return ids.Empty, 0, err
+		return err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return ids.Empty, 0, errCodeToError[errCode]
-	}
-
-	blkID, err := ids.ToID(resp.Bytes)
-	if err != nil {
-		return ids.Empty, 0, err
-	}
-
-	height := resp.Height
-	return blkID, height, err
+	return errCodeToError[resp.Err]
 }
 
 func (vm *VMClient) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {

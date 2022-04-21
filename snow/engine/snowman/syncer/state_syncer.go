@@ -260,6 +260,8 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	ss.Ctx.Log.Info("Selected summary %s out of %d to start state sync",
 		preferredStateSummary.ID(), size,
 	)
+
+	ss.lastSummaryBlkID = preferredStateSummary.BlockID()
 	return preferredStateSummary.Accept()
 }
 
@@ -453,9 +455,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 
 	case common.StateSyncDone:
 		// retrieve the blkID to request
-		var err error
-		ss.lastSummaryBlkID, _, err = ss.stateSyncVM.GetStateSyncResult()
-		if err != nil {
+		if err := ss.stateSyncVM.GetStateSyncResult(); err != nil {
 			ss.Ctx.Log.Warn("Could not retrieve last summary block ID to complete state sync. Err: %v", err)
 			return err
 		}

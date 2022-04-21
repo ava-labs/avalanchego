@@ -301,8 +301,6 @@ message SummaryAcceptRequest {
 }
 
 message GetStateSyncResultResponse {
-  bytes bytes = 1;
-  uint64 height = 2;
   uint32 err = 3;
 }
 
