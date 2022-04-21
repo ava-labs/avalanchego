@@ -42,8 +42,12 @@ type ProposerSummaryIntf interface {
 	Height() uint64
 }
 
+func NewProposerSummary() ProposerSummaryIntf {
+	return &ProposerSummary{}
+}
+
 type ProposerSummary struct {
-	StatelessSummary
+	StatelessSummaryIntf
 	SummaryHeight uint64
 }
 

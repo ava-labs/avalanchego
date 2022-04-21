@@ -104,13 +104,13 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
 
 	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerBytes())
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal innerSummaryContent due to: %w", err)
+		return nil, fmt.Errorf("could not parse inner summary due to: %w", err)
 	}
 
 	return &statefulSummary{
 		ProposerSummaryIntf: &summary.ProposerSummary{
-			StatelessSummary: *statelessSummary.(*summary.StatelessSummary),
-			SummaryHeight:    innerSummary.Height(),
+			StatelessSummaryIntf: statelessSummary,
+			SummaryHeight:        innerSummary.Height(),
 		},
 		innerSummary: innerSummary,
 		vm:           vm,

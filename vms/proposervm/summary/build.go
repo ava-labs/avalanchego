@@ -13,7 +13,7 @@ import (
 // emptySummary has an ad-hoc construction in that it must have an empty summary ID
 func BuildEmptyProposerSummary(coreSummary common.Summary) (ProposerSummaryIntf, error) {
 	return &ProposerSummary{
-		StatelessSummary: StatelessSummary{
+		StatelessSummaryIntf: &StatelessSummary{
 			ProBlkID:             ids.Empty,
 			InnerSummary:         coreSummary.Bytes(),
 			ProposerSummaryBytes: nil,
@@ -38,7 +38,7 @@ func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (Proposer
 	}
 
 	return &ProposerSummary{
-		StatelessSummary: statelessSummary,
-		SummaryHeight:    coreSummary.Height(),
+		StatelessSummaryIntf: &statelessSummary,
+		SummaryHeight:        coreSummary.Height(),
 	}, nil
 }
