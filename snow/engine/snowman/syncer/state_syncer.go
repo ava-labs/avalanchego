@@ -366,7 +366,9 @@ func (ss *stateSyncer) startup() error {
 	if ss.targetSeeders.Len() == 0 {
 		// we make sure that a state summary is always eventually called if state sync is enabled
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
-		ss.locallyAvailableSummary.Accept()
+		if err := ss.locallyAvailableSummary.Accept(); err != nil {
+			return err
+		}
 	}
 
 	ss.requestID++

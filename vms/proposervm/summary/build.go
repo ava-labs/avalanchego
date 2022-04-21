@@ -21,7 +21,6 @@ func BuildEmptyProposerSummary(coreSummary common.Summary) (ProposerSummaryIntf,
 		},
 		SummaryHeight: coreSummary.Height(),
 	}, nil
-
 }
 
 func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (ProposerSummaryIntf, error) {
