@@ -26,8 +26,8 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	return resp.Enabled, errCodeToError[resp.Err]
 }
 
-func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
-	resp, err := vm.client.GetOngoingStateSyncSummary(context.Background(), &emptypb.Empty{})
+func (vm *VMClient) GetOngoingSyncStateSummary() (common.Summary, error) {
+	resp, err := vm.client.GetOngoingSyncStateSummary(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}

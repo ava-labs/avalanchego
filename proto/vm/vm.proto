@@ -36,7 +36,7 @@ service VM {
 
   // State sync
   rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
-  rpc GetOngoingStateSyncSummary(google.protobuf.Empty) returns (GetOngoingStateSyncSummaryResponse);
+  rpc GetOngoingSyncStateSummary(google.protobuf.Empty) returns (GetOngoingSyncStateSummaryResponse);
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
@@ -267,7 +267,7 @@ message StateSyncSummary {
   bytes content = 3;
 }
 
-message GetOngoingStateSyncSummaryResponse {
+message GetOngoingSyncStateSummaryResponse {
   StateSyncSummary summary = 1;
   uint32 err = 2;
 }

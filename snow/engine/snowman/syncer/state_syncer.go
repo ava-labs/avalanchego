@@ -351,7 +351,7 @@ func (ss *stateSyncer) startup() error {
 	// to the frontier to request votes on
 	// Note that summary with emptyID represents no ongoing summary
 	// empty summaries are not validated over network
-	localSummary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
+	localSummary, err := ss.stateSyncVM.GetOngoingSyncStateSummary()
 	if err != nil {
 		return err
 	}

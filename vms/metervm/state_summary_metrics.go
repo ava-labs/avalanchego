@@ -11,7 +11,7 @@ import (
 
 type stateSummaryMetrics struct {
 	stateSyncEnabled,
-	getOngoingStateSyncSummary,
+	GetOngoingSyncStateSummary,
 	getLastStateSummary,
 	parseStateSummary,
 	getStateSummary,
@@ -23,7 +23,7 @@ func newStateSummaryMetrics(namespace string, reg prometheus.Registerer) (stateS
 	errs := wrappers.Errs{}
 	return stateSummaryMetrics{
 		stateSyncEnabled:           newAverager(namespace, "state_sync_enabled", reg, &errs),
-		getOngoingStateSyncSummary: newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs),
+		GetOngoingSyncStateSummary: newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs),
 		getLastStateSummary:        newAverager(namespace, "get_last_state_summary", reg, &errs),
 		parseStateSummary:          newAverager(namespace, "parse_state_summary", reg, &errs),
 		getStateSummary:            newAverager(namespace, "get_state_summary", reg, &errs),

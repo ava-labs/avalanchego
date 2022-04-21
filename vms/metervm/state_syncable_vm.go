@@ -21,14 +21,14 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	return enabled, err
 }
 
-func (vm *blockVM) GetOngoingStateSyncSummary() (common.Summary, error) {
+func (vm *blockVM) GetOngoingSyncStateSummary() (common.Summary, error) {
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 	start := vm.clock.Time()
-	summary, err := vm.ssVM.GetOngoingStateSyncSummary()
+	summary, err := vm.ssVM.GetOngoingSyncStateSummary()
 	end := vm.clock.Time()
-	vm.stateSummaryMetrics.getOngoingStateSyncSummary.Observe(float64(end.Sub(start)))
+	vm.stateSummaryMetrics.GetOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
 
 	return summary, err
 }

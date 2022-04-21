@@ -29,12 +29,12 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return vm.innerStateSyncVM.StateSyncEnabled()
 }
 
-func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
+func (vm *VM) GetOngoingSyncStateSummary() (common.Summary, error) {
 	if vm.innerStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	innerSummary, err := vm.innerStateSyncVM.GetOngoingStateSyncSummary()
+	innerSummary, err := vm.innerStateSyncVM.GetOngoingSyncStateSummary()
 	if err != nil {
 		return nil, err
 	}

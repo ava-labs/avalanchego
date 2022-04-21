@@ -26,7 +26,7 @@ type TestStateSyncableVM struct {
 	CantGetStateSummary bool
 
 	StateSyncEnabledF           func() (bool, error)
-	GetOngoingStateSyncSummaryF func() (Summary, error)
+	GetOngoingSyncStateSummaryF func() (Summary, error)
 	GetLastStateSummaryF        func() (Summary, error)
 	ParseStateSummaryF          func(summaryBytes []byte) (Summary, error)
 	GetStateSummaryF            func(uint64) (Summary, error)
@@ -42,9 +42,9 @@ func (tss *TestStateSyncableVM) StateSyncEnabled() (bool, error) {
 	return false, errStateSyncEnabled
 }
 
-func (tss *TestStateSyncableVM) GetOngoingStateSyncSummary() (Summary, error) {
-	if tss.GetOngoingStateSyncSummaryF != nil {
-		return tss.GetOngoingStateSyncSummaryF()
+func (tss *TestStateSyncableVM) GetOngoingSyncStateSummary() (Summary, error) {
+	if tss.GetOngoingSyncStateSummaryF != nil {
+		return tss.GetOngoingSyncStateSummaryF()
 	}
 	if tss.CantStateSyncGetOngoingSummary && tss.T != nil {
 		tss.T.Fatalf("Unexpectedly called StateSyncGetOngoingSummary")

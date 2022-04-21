@@ -2049,7 +2049,7 @@ func (x *StateSyncSummary) GetContent() []byte {
 	return nil
 }
 
-type GetOngoingStateSyncSummaryResponse struct {
+type GetOngoingSyncStateSummaryResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -2058,8 +2058,8 @@ type GetOngoingStateSyncSummaryResponse struct {
 	Err     uint32            `protobuf:"varint,2,opt,name=err,proto3" json:"err,omitempty"`
 }
 
-func (x *GetOngoingStateSyncSummaryResponse) Reset() {
-	*x = GetOngoingStateSyncSummaryResponse{}
+func (x *GetOngoingSyncStateSummaryResponse) Reset() {
+	*x = GetOngoingSyncStateSummaryResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_vm_vm_proto_msgTypes[35]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2067,13 +2067,13 @@ func (x *GetOngoingStateSyncSummaryResponse) Reset() {
 	}
 }
 
-func (x *GetOngoingStateSyncSummaryResponse) String() string {
+func (x *GetOngoingSyncStateSummaryResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetOngoingStateSyncSummaryResponse) ProtoMessage() {}
+func (*GetOngoingSyncStateSummaryResponse) ProtoMessage() {}
 
-func (x *GetOngoingStateSyncSummaryResponse) ProtoReflect() protoreflect.Message {
+func (x *GetOngoingSyncStateSummaryResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_vm_vm_proto_msgTypes[35]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2085,19 +2085,19 @@ func (x *GetOngoingStateSyncSummaryResponse) ProtoReflect() protoreflect.Message
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetOngoingStateSyncSummaryResponse.ProtoReflect.Descriptor instead.
-func (*GetOngoingStateSyncSummaryResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetOngoingSyncStateSummaryResponse.ProtoReflect.Descriptor instead.
+func (*GetOngoingSyncStateSummaryResponse) Descriptor() ([]byte, []int) {
 	return file_vm_vm_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *GetOngoingStateSyncSummaryResponse) GetSummary() *StateSyncSummary {
+func (x *GetOngoingSyncStateSummaryResponse) GetSummary() *StateSyncSummary {
 	if x != nil {
 		return x.Summary
 	}
 	return nil
 }
 
-func (x *GetOngoingStateSyncSummaryResponse) GetErr() uint32 {
+func (x *GetOngoingSyncStateSummaryResponse) GetErr() uint32 {
 	if x != nil {
 		return x.Err
 	}
@@ -2773,7 +2773,7 @@ var file_vm_vm_proto_rawDesc = []byte{
 	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x02, 0x69, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f,
 	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e,
 	0x74, 0x65, 0x6e, 0x74, 0x22, 0x66, 0x0a, 0x22, 0x47, 0x65, 0x74, 0x4f, 0x6e, 0x67, 0x6f, 0x69,
-	0x6e, 0x67, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61,
+	0x6e, 0x67, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61,
 	0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2e, 0x0a, 0x07, 0x73, 0x75,
 	0x6d, 0x6d, 0x61, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x76, 0x6d,
 	0x2e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72,
@@ -2927,11 +2927,11 @@ var file_vm_vm_proto_rawDesc = []byte{
 	0x6d, 0x70, 0x74, 0x79, 0x1a, 0x1c, 0x2e, 0x76, 0x6d, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53,
 	0x79, 0x6e, 0x63, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
 	0x73, 0x65, 0x12, 0x5c, 0x0a, 0x1a, 0x47, 0x65, 0x74, 0x4f, 0x6e, 0x67, 0x6f, 0x69, 0x6e, 0x67,
-	0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79,
+	0x53, 0x79, 0x6e, 0x63, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79,
 	0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
 	0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x26, 0x2e, 0x76, 0x6d, 0x2e, 0x47, 0x65,
-	0x74, 0x4f, 0x6e, 0x67, 0x6f, 0x69, 0x6e, 0x67, 0x53, 0x74, 0x61, 0x74, 0x65, 0x53, 0x79, 0x6e,
-	0x63, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x74, 0x4f, 0x6e, 0x67, 0x6f, 0x69, 0x6e, 0x67, 0x53, 0x79, 0x6e, 0x63, 0x53, 0x74, 0x61, 0x74,
+	0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
 	0x12, 0x4e, 0x0a, 0x13, 0x47, 0x65, 0x74, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65,
 	0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
 	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a,
@@ -3017,7 +3017,7 @@ var file_vm_vm_proto_goTypes = []interface{}{
 	(*GetBlockIDAtHeightResponse)(nil),         // 32: vm.GetBlockIDAtHeightResponse
 	(*StateSyncEnabledResponse)(nil),           // 33: vm.StateSyncEnabledResponse
 	(*StateSyncSummary)(nil),                   // 34: vm.StateSyncSummary
-	(*GetOngoingStateSyncSummaryResponse)(nil), // 35: vm.GetOngoingStateSyncSummaryResponse
+	(*GetOngoingSyncStateSummaryResponse)(nil), // 35: vm.GetOngoingSyncStateSummaryResponse
 	(*GetLastStateSummaryResponse)(nil),        // 36: vm.GetLastStateSummaryResponse
 	(*ParseStateSummaryRequest)(nil),           // 37: vm.ParseStateSummaryRequest
 	(*ParseStateSummaryResponse)(nil),          // 38: vm.ParseStateSummaryResponse
@@ -3037,7 +3037,7 @@ var file_vm_vm_proto_depIdxs = []int32{
 	6,  // 2: vm.CreateStaticHandlersResponse.handlers:type_name -> vm.Handler
 	45, // 3: vm.HealthRequest.grpc_checks:type_name -> vm.HealthRequest.GrpcChecksEntry
 	9,  // 4: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
-	34, // 5: vm.GetOngoingStateSyncSummaryResponse.summary:type_name -> vm.StateSyncSummary
+	34, // 5: vm.GetOngoingSyncStateSummaryResponse.summary:type_name -> vm.StateSyncSummary
 	34, // 6: vm.GetLastStateSummaryResponse.summary:type_name -> vm.StateSyncSummary
 	34, // 7: vm.ParseStateSummaryResponse.summary:type_name -> vm.StateSyncSummary
 	34, // 8: vm.GetStateSummaryResponse.summary:type_name -> vm.StateSyncSummary
@@ -3068,7 +3068,7 @@ var file_vm_vm_proto_depIdxs = []int32{
 	47, // 33: vm.VM.VerifyHeightIndex:input_type -> google.protobuf.Empty
 	31, // 34: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
 	47, // 35: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
-	47, // 36: vm.VM.GetOngoingStateSyncSummary:input_type -> google.protobuf.Empty
+	47, // 36: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
 	47, // 37: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
 	37, // 38: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
 	39, // 39: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
@@ -3101,7 +3101,7 @@ var file_vm_vm_proto_depIdxs = []int32{
 	30, // 66: vm.VM.VerifyHeightIndex:output_type -> vm.VerifyHeightIndexResponse
 	32, // 67: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
 	33, // 68: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
-	35, // 69: vm.VM.GetOngoingStateSyncSummary:output_type -> vm.GetOngoingStateSyncSummaryResponse
+	35, // 69: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
 	36, // 70: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
 	38, // 71: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
 	40, // 72: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
@@ -3542,7 +3542,7 @@ func file_vm_vm_proto_init() {
 			}
 		}
 		file_vm_vm_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetOngoingStateSyncSummaryResponse); i {
+			switch v := v.(*GetOngoingSyncStateSummaryResponse); i {
 			case 0:
 				return &v.state
 			case 1:

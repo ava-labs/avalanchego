@@ -30,24 +30,24 @@ func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmpb.Sta
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) GetOngoingStateSyncSummary(
+func (vm *VMServer) GetOngoingSyncStateSummary(
 	context.Context,
 	*emptypb.Empty,
-) (*vmpb.GetOngoingStateSyncSummaryResponse, error) {
+) (*vmpb.GetOngoingSyncStateSummaryResponse, error) {
 	var (
 		summary common.Summary
 		err     error
 	)
 
 	if vm.ssVM != nil {
-		summary, err = vm.ssVM.GetOngoingStateSyncSummary()
+		summary, err = vm.ssVM.GetOngoingSyncStateSummary()
 	} else {
 		err = common.ErrStateSyncableVMNotImplemented
 	}
 
 	if err == nil {
 		summaryID := summary.ID()
-		return &vmpb.GetOngoingStateSyncSummaryResponse{
+		return &vmpb.GetOngoingSyncStateSummaryResponse{
 			Summary: &vmpb.StateSyncSummary{
 				Height:  summary.Height(),
 				Id:      summaryID[:],
@@ -56,7 +56,7 @@ func (vm *VMServer) GetOngoingStateSyncSummary(
 		}, nil
 	}
 
-	return &vmpb.GetOngoingStateSyncSummaryResponse{
+	return &vmpb.GetOngoingSyncStateSummaryResponse{
 		Err: errorToErrCode[err],
 	}, errorToRPCError(err)
 }
