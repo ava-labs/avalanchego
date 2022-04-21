@@ -33,7 +33,7 @@ func (ss *statefulSummary) Accept() error {
 	// Finally note that an empty summary may be accepted, which has empty ID.
 	// Such summary must not be added to height index.
 	if ss.ID() != ids.Empty {
-		if err := ss.vm.updateHeightIndex(ss.Height(), ss.ProposerBlockID()); err != nil {
+		if err := ss.vm.updateHeightIndex(ss.Height(), ss.BlockID()); err != nil {
 			return err
 		}
 

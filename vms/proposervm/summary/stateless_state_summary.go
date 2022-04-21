@@ -11,10 +11,10 @@ import (
 var _ StatelessSummaryIntf = &StatelessSummary{}
 
 type StatelessSummaryIntf interface {
-	Bytes() []byte // part of common.Summary interface
-	ID() ids.ID    // part of common.Summary interface
+	Bytes() []byte   // part of block.Summary interface
+	ID() ids.ID      // part of block.Summary interface
+	BlockID() ids.ID // part of block.Summary interface
 
-	ProposerBlockID() ids.ID
 	InnerBytes() []byte
 
 	initialize(bytes []byte) error
@@ -28,11 +28,11 @@ type StatelessSummary struct {
 	ProposerSummaryID    ids.ID
 }
 
-func (ss *StatelessSummary) Bytes() []byte { return ss.ProposerSummaryBytes }
-func (ss *StatelessSummary) ID() ids.ID    { return ss.ProposerSummaryID }
+func (ss *StatelessSummary) Bytes() []byte   { return ss.ProposerSummaryBytes }
+func (ss *StatelessSummary) ID() ids.ID      { return ss.ProposerSummaryID }
+func (ss *StatelessSummary) BlockID() ids.ID { return ss.ProBlkID }
 
-func (ss *StatelessSummary) ProposerBlockID() ids.ID { return ss.ProBlkID }
-func (ss *StatelessSummary) InnerBytes() []byte      { return ss.InnerSummary }
+func (ss *StatelessSummary) InnerBytes() []byte { return ss.InnerSummary }
 
 func (ss *StatelessSummary) initialize(bytes []byte) error {
 	ss.ProposerSummaryBytes = bytes

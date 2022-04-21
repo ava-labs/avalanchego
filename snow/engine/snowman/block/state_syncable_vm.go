@@ -15,23 +15,6 @@ var (
 	ErrUnknownStateSummary           = errors.New("state summary not found")
 )
 
-// Summary represents all the information needed for state sync processing.
-// Summary must allow a VM to download, verify and rebuild its state,
-// no matter whether it is freshly created or it has previous state.
-// Both Height and ID uniquely identify a Summary. However:
-// Height is used to efficiently elicit network votes;
-// ID must allow summaries comparison and verification as an alternative to Bytes;
-// it is used to verify what summaries votes are casted for.
-// Finally Byte returns the Summary content which is defined by the VM and opaque to the engine.
-type Summary interface {
-	Bytes() []byte
-	Height() uint64
-	ID() ids.ID
-	// BlockID() ids.ID
-
-	Accept() error
-}
-
 // StateSyncableVM represents functionalities to allow Snowman VMs to sync to a given state,
 // rather then boostrapping from genesis.
 type StateSyncableVM interface {

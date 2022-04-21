@@ -36,11 +36,17 @@ func (vm *VMClient) GetOngoingSyncStateSummary() (block.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	blockID, err := ids.ToID(resp.Summary.BlockId)
 	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
+		vm:      vm,
+		height:  resp.Summary.Height,
+		id:      summaryID,
+		bytes:   resp.Summary.Content,
+		blockID: blockID,
 	}, err
 }
 
@@ -57,11 +63,17 @@ func (vm *VMClient) GetLastStateSummary() (block.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	blockID, err := ids.ToID(resp.Summary.BlockId)
 	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
+		vm:      vm,
+		height:  resp.Summary.Height,
+		id:      summaryID,
+		bytes:   resp.Summary.Content,
+		blockID: blockID,
 	}, err
 }
 
@@ -80,11 +92,17 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.Summary, error
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	blockID, err := ids.ToID(resp.Summary.BlockId)
 	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
+		vm:      vm,
+		height:  resp.Summary.Height,
+		id:      summaryID,
+		bytes:   resp.Summary.Content,
+		blockID: blockID,
 	}, err
 }
 
@@ -103,11 +121,17 @@ func (vm *VMClient) GetStateSummary(height uint64) (block.Summary, error) {
 	}
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	blockID, err := ids.ToID(resp.Summary.BlockId)
 	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
+		vm:      vm,
+		height:  resp.Summary.Height,
+		id:      summaryID,
+		bytes:   resp.Summary.Content,
+		blockID: blockID,
 	}, err
 }
 

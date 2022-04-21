@@ -25,7 +25,7 @@ func TestBuild(t *testing.T) {
 
 	assert.Equal(builtSummary.Height(), coreSummary.Height())
 
-	assert.Equal(builtSummary.ProposerBlockID(), proBlkID)
+	assert.Equal(builtSummary.BlockID(), proBlkID)
 	assert.Equal(builtSummary.InnerBytes(), coreSummary.Bytes())
 }
 
@@ -43,6 +43,6 @@ func TestBuildEmptySummary(t *testing.T) {
 	assert.Equal(builtSummary.ID(), ids.Empty)
 	assert.Equal(builtSummary.Height(), uint64(0))
 	assert.Equal(builtSummary.Bytes(), []byte(nil))
-	assert.Equal(builtSummary.ProposerBlockID(), ids.Empty)
+	assert.Equal(builtSummary.BlockID(), ids.Empty)
 	assert.Equal(builtSummary.InnerBytes(), coreSummary.Bytes())
 }

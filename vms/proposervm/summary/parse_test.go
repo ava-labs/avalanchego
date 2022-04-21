@@ -33,7 +33,7 @@ func TestParse(t *testing.T) {
 
 	assert.Equal(builtSummary.Bytes(), parsedBlock.Bytes())
 	assert.Equal(builtSummary.ID(), parsedBlock.ID())
-	assert.Equal(builtSummary.ProposerBlockID(), parsedBlock.ProposerBlockID())
+	assert.Equal(builtSummary.BlockID(), parsedBlock.BlockID())
 	assert.Equal(builtSummary.InnerBytes(), parsedBlock.InnerBytes())
 }
 

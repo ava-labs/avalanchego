@@ -265,6 +265,7 @@ message StateSyncSummary {
   uint64 height = 1;
   bytes id = 2;
   bytes content = 3;
+  bytes block_id = 4;
 }
 
 message GetOngoingSyncStateSummaryResponse {
