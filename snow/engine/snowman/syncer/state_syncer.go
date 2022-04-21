@@ -256,9 +256,10 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		}
 	}
 
-	ss.Ctx.Log.Info("State sync found %d state summaries in the accepted frontier", size)
 	preferredStateSummary := ss.selectSyncableStateSummary()
-	ss.Ctx.Log.Info("Selected summary %d to start state sync", preferredStateSummary.ID())
+	ss.Ctx.Log.Info("Selected summary %s out of %d to start state sync",
+		preferredStateSummary.ID(), size,
+	)
 	return preferredStateSummary.Accept()
 }
 

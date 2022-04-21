@@ -43,8 +43,7 @@ type ProposerSummaryIntf interface {
 }
 
 type ProposerSummary struct {
-	StatelessSummary `serialize:"true"`
-
+	StatelessSummary
 	SummaryHeight uint64
 }
 

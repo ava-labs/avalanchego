@@ -44,14 +44,16 @@ func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 		// summary with emptyID signals no local summary is available in InnerVM
 		proSummary, err = summary.BuildEmptyProposerSummary(innerSummary)
 	} else {
-		var proBlkID ids.ID
-		proBlkID, err = vm.GetBlockIDAtHeight(innerSummary.Height())
+		proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 		if err != nil {
 			// this should never happen, it's proVM being out of sync with innerVM
 			vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 			return nil, common.ErrUnknownStateSummary
 		}
 		proSummary, err = summary.BuildProposerSummary(proBlkID, innerSummary)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &statefulSummary{
@@ -66,7 +68,7 @@ func (vm *VM) GetLastStateSummary() (common.Summary, error) {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	// Extract inner last state summary
+	// Extract inner vm's last state summary
 	innerSummary, err := vm.innerStateSyncVM.GetLastStateSummary()
 	if err != nil {
 		return nil, err // including common.ErrUnknownStateSummary case
@@ -75,7 +77,7 @@ func (vm *VM) GetLastStateSummary() (common.Summary, error) {
 	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with innerVM
+		// this should never happen, since that would mean proVM has become out of sync with innerVM
 		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
@@ -128,7 +130,7 @@ func (vm *VM) GetStateSummary(height uint64) (common.Summary, error) {
 	// retrieve ProBlkID
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with innerVM
+		// this should never happen, since that would mean proVM has become out of sync with innerVM
 		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, common.ErrUnknownStateSummary
 	}
