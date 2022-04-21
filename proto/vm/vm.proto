@@ -265,7 +265,7 @@ message StateSyncEnabledResponse {
 }
 
 message StateSyncSummary {
-  uint64 key = 1;
+  uint64 height = 1;
   bytes id = 2;
   bytes content = 3;
 }
@@ -290,7 +290,7 @@ message ParseStateSummaryResponse {
 }
 
 message GetStateSummaryRequest {
-  uint64 key = 1;
+  uint64 height = 1;
 }
 
 message GetStateSummaryResponse {
@@ -299,7 +299,7 @@ message GetStateSummaryResponse {
 }
 
 message SummaryAcceptRequest {
-  uint64 key = 1;
+  uint64 height = 1;
 }
 
 message SetSyncableStateSummariesRequest {

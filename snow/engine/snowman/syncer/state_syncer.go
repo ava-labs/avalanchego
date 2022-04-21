@@ -389,7 +389,7 @@ func (ss *stateSyncer) sendGetAccepted() error {
 
 	acceptedKeys := make([]uint64, 0, len(ss.weightedSummaries))
 	for _, summary := range ss.weightedSummaries {
-		acceptedKeys = append(acceptedKeys, summary.Key())
+		acceptedKeys = append(acceptedKeys, summary.Height())
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedKeys)
 	ss.contactedVoters.Add(vdrs.List()...)

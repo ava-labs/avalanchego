@@ -49,7 +49,7 @@ func (vm *VMServer) GetOngoingStateSyncSummary(
 		summaryID := summary.ID()
 		return &vmpb.GetOngoingStateSyncSummaryResponse{
 			Summary: &vmpb.StateSyncSummary{
-				Key:     summary.Key(),
+				Height:  summary.Height(),
 				Id:      summaryID[:],
 				Content: summary.Bytes(),
 			},
@@ -85,7 +85,7 @@ func (vm *VMServer) GetLastStateSummary(
 	summaryID := summary.ID()
 	return &vmpb.GetLastStateSummaryResponse{
 		Summary: &vmpb.StateSyncSummary{
-			Key:     summary.Key(),
+			Height:  summary.Height(),
 			Id:      summaryID[:],
 			Content: summary.Bytes(),
 		},
@@ -116,7 +116,7 @@ func (vm *VMServer) ParseStateSummary(
 	summaryID := summary.ID()
 	return &vmpb.ParseStateSummaryResponse{
 		Summary: &vmpb.StateSyncSummary{
-			Key:     summary.Key(),
+			Height:  summary.Height(),
 			Id:      summaryID[:],
 			Content: summary.Bytes(),
 		},
@@ -133,7 +133,7 @@ func (vm *VMServer) GetStateSummary(
 	)
 
 	if vm.ssVM != nil {
-		summary, err = vm.ssVM.GetStateSummary(req.Key)
+		summary, err = vm.ssVM.GetStateSummary(req.Height)
 	} else {
 		err = common.ErrStateSyncableVMNotImplemented
 	}
@@ -147,7 +147,7 @@ func (vm *VMServer) GetStateSummary(
 	summaryID := summary.ID()
 	return &vmpb.GetStateSummaryResponse{
 		Summary: &vmpb.StateSyncSummary{
-			Key:     summary.Key(),
+			Height:  summary.Height(),
 			Id:      summaryID[:],
 			Content: summary.Bytes(),
 		},
@@ -158,7 +158,7 @@ func (vm *VMServer) SummaryAccept(_ context.Context, req *vmpb.SummaryAcceptRequ
 	if vm.ssVM == nil {
 		return &emptypb.Empty{}, nil
 	}
-	summary, err := vm.ssVM.GetStateSummary(req.Key)
+	summary, err := vm.ssVM.GetStateSummary(req.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -178,9 +178,9 @@ func (vm *VMServer) SetSyncableStateSummaries(ctx context.Context, req *vmpb.Set
 				return nil, err
 			}
 			summaries[i] = &deprecatedSummaryToBeRemoved{
-				key:   sum.Key,
-				id:    summaryID,
-				bytes: sum.Content,
+				height: sum.Height,
+				id:     summaryID,
+				bytes:  sum.Content,
 			}
 		}
 		err = vm.ssVM.SetSyncableStateSummaries(summaries)

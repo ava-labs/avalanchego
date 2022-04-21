@@ -26,6 +26,6 @@ func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (Proposer
 
 	return &ProposerSummary{
 		StatelessSummary: statelessSummary,
-		SummaryKey:       coreSummary.Key(),
+		SummaryHeight:    coreSummary.Height(),
 	}, nil
 }

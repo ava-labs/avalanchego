@@ -16,14 +16,14 @@ func TestBuild(t *testing.T) {
 
 	proBlkID := ids.ID{'p', 'r', 'o', 'I', 'D'}
 	coreSummary := &block.TestSummary{
-		SummaryKey:   2022,
-		SummaryID:    ids.ID{'I', 'D'},
-		ContentBytes: []byte{'b', 'y', 't', 'e', 's'},
+		SummaryHeight: 2022,
+		SummaryID:     ids.ID{'I', 'D'},
+		ContentBytes:  []byte{'b', 'y', 't', 'e', 's'},
 	}
 	builtSummary, err := BuildProposerSummary(proBlkID, coreSummary)
 	assert.NoError(err)
 
-	assert.Equal(builtSummary.Key(), coreSummary.Key())
+	assert.Equal(builtSummary.Height(), coreSummary.Height())
 
 	assert.Equal(builtSummary.ProposerBlockID(), proBlkID)
 	assert.Equal(builtSummary.InnerBytes(), coreSummary.Bytes())

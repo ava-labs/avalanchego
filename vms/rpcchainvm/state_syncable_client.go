@@ -36,10 +36,10 @@ func (vm *VMClient) GetOngoingStateSyncSummary() (common.Summary, error) {
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &SummaryClient{
-		vm:    vm,
-		key:   resp.Summary.Key,
-		id:    summaryID,
-		bytes: resp.Summary.Content,
+		vm:     vm,
+		height: resp.Summary.Height,
+		id:     summaryID,
+		bytes:  resp.Summary.Content,
 	}, err
 }
 
@@ -57,10 +57,10 @@ func (vm *VMClient) GetLastStateSummary() (common.Summary, error) {
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &SummaryClient{
-		vm:    vm,
-		key:   resp.Summary.Key,
-		id:    summaryID,
-		bytes: resp.Summary.Content,
+		vm:     vm,
+		height: resp.Summary.Height,
+		id:     summaryID,
+		bytes:  resp.Summary.Content,
 	}, err
 }
 
@@ -80,18 +80,18 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (common.Summary, erro
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &SummaryClient{
-		vm:    vm,
-		key:   resp.Summary.Key,
-		id:    summaryID,
-		bytes: resp.Summary.Content,
+		vm:     vm,
+		height: resp.Summary.Height,
+		id:     summaryID,
+		bytes:  resp.Summary.Content,
 	}, err
 }
 
-func (vm *VMClient) GetStateSummary(key uint64) (common.Summary, error) {
+func (vm *VMClient) GetStateSummary(height uint64) (common.Summary, error) {
 	resp, err := vm.client.GetStateSummary(
 		context.Background(),
 		&vmpb.GetStateSummaryRequest{
-			Key: key,
+			Height: height,
 		},
 	)
 	if err != nil {
@@ -103,10 +103,10 @@ func (vm *VMClient) GetStateSummary(key uint64) (common.Summary, error) {
 
 	summaryID, err := ids.ToID(resp.Summary.Id)
 	return &SummaryClient{
-		vm:    vm,
-		key:   resp.Summary.Key,
-		id:    summaryID,
-		bytes: resp.Summary.Content,
+		vm:     vm,
+		height: resp.Summary.Height,
+		id:     summaryID,
+		bytes:  resp.Summary.Content,
 	}, err
 }
 
@@ -115,7 +115,7 @@ func (vm *VMClient) SetSyncableStateSummaries(accepted []common.Summary) error {
 	for i, sum := range accepted {
 		summaryID := sum.ID()
 		requestedSummaries[i] = &vmpb.StateSyncSummary{
-			Key:     sum.Key(),
+			Height:  sum.Height(),
 			Id:      summaryID[:],
 			Content: sum.Bytes(),
 		}

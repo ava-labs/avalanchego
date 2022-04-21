@@ -41,17 +41,17 @@ State summary frontier is collected as follows:
 2. Each target validator pulls its latest state sync from VM via `StateSyncGetLastSummary` method and respond with a `StateSummaryFrontier` message.
 3. `StateSummaryFrontier` responses are parsed via `StateSyncParseSummary` method and added to the state summary frontier to be then validated.
 
-Avalanche engine does not pose major constraints on the state summary structure as its parsing is left to the VM to implement. However Avalanche engine does require each state summary to be uniquely described by two identifiers, a `Key` and a `ID`. The reason for this double identification will be clearer as we describe the state summary validation phase.
+Avalanche engine does not pose major constraints on the state summary structure as its parsing is left to the VM to implement. However Avalanche engine does require each state summary to be uniquely described by two identifiers, a `Height` and a `ID`. The reason for this double identification will be clearer as we describe the state summary validation phase.
 
-`Key` is a `uint64` type and in our intention is the succinct way to address a state summary. In our C-chain implementation, a state summary `Key` it's the block height state summaries refers to.
+`Height` is a `uint64` type and represents the block height state summaries refers to. `Height` offers the succinct way to address a state summary.
 
 `ID` is a `ids.ID` type and in our intention is the verifiable way to address a state summary. In our C-chain implementation, a state summary `ID` it's the hash of state summary bytes.
 
 ### Frontier validation
 
-Once frontier has been retrieved, a network wide voting round is initiated to validate it. Avalanche engine addresses each connected validator with a `GetAcceptedStateSummary` message, listing state summary frontier `Key`s. `Key`s provide a uniquely yet succinct way to identify state summaries and they help reducing `GetAcceptedStateSummary` size.
+Once frontier has been retrieved, a network wide voting round is initiated to validate it. Avalanche engine addresses each connected validator with a `GetAcceptedStateSummary` message, listing state summary frontier `Height`s. `Height`s provide a uniquely yet succinct way to identify state summaries and they help reducing `GetAcceptedStateSummary` size.
 
-Target validators reached by `GetAcceptedStateSummary` message try pulling from VM all the listed state summaries via `StateSyncGetSummary(summaryKey uint64)` method. Validators prepare a `AcceptedStateSummary` message response by appending those state summaries `ID`s in the same order as  `GetAcceptedStateSummary`; unknown or unsupported state summaries are simply skipped. We chose to respond with state summary `ID`s to hinder potential DoSser and ease up votes verification.
+Target validators reached by `GetAcceptedStateSummary` message try pulling from VM all the listed state summaries via `StateSyncGetSummary(summaryHeight uint64)` method. Validators prepare a `AcceptedStateSummary` message response by appending those state summaries `ID`s in the same order as  `GetAcceptedStateSummary`; unknown or unsupported state summaries are simply skipped. We chose to respond with state summary `ID`s to hinder potential DoSser and ease up votes verification.
 
 `AcceptedStateSummary` messages returned to state syncing node are validated by comparing responded state summaries `ID`s with the `ID`s calculated from state summary frontier previously retrieved. Valid responses are stored along with validator stake.
 

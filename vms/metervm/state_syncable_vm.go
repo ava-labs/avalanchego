@@ -57,13 +57,13 @@ func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (common.Summary, error
 	return summary, err
 }
 
-func (vm *blockVM) GetStateSummary(key uint64) (common.Summary, error) {
+func (vm *blockVM) GetStateSummary(height uint64) (common.Summary, error) {
 	if vm.ssVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	summary, err := vm.ssVM.GetStateSummary(key)
+	summary, err := vm.ssVM.GetStateSummary(height)
 	end := vm.clock.Time()
 	vm.stateSummaryMetrics.getStateSummary.Observe(float64(end.Sub(start)))
 

@@ -39,13 +39,13 @@ func init() {
 
 type ProposerSummaryIntf interface {
 	StatelessSummaryIntf
-	Key() uint64
+	Height() uint64
 }
 
 type ProposerSummary struct {
 	StatelessSummary `serialize:"true"`
 
-	SummaryKey uint64
+	SummaryHeight uint64
 }
 
-func (ps *ProposerSummary) Key() uint64 { return ps.SummaryKey }
+func (ps *ProposerSummary) Height() uint64 { return ps.SummaryHeight }

@@ -29,7 +29,7 @@ func (ss *statefulSummary) Accept() error {
 	// Note that we won't download all the blocks associated with state summaries,
 	// so proposerVM may not not all the full blocks indexed into height index. Same
 	// is true for coreVM.
-	if err := ss.vm.updateHeightIndex(ss.Key(), ss.ProposerBlockID()); err != nil {
+	if err := ss.vm.updateHeightIndex(ss.Height(), ss.ProposerBlockID()); err != nil {
 		return err
 	}
 

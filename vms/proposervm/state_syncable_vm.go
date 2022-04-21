@@ -42,7 +42,7 @@ func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Key())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
@@ -69,7 +69,7 @@ func (vm *VM) GetLastStateSummary() (common.Summary, error) {
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Key())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
@@ -104,25 +104,25 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (common.Summary, error) {
 	return &statefulSummary{
 		ProposerSummaryIntf: &summary.ProposerSummary{
 			StatelessSummary: *statelessSummary.(*summary.StatelessSummary),
-			SummaryKey:       innerSummary.Key(),
+			SummaryHeight:    innerSummary.Height(),
 		},
 		innerSummary: innerSummary,
 		vm:           vm,
 	}, nil
 }
 
-func (vm *VM) GetStateSummary(key uint64) (common.Summary, error) {
+func (vm *VM) GetStateSummary(height uint64) (common.Summary, error) {
 	if vm.innerStateSyncVM == nil {
 		return nil, common.ErrStateSyncableVMNotImplemented
 	}
 
-	innerSummary, err := vm.innerStateSyncVM.GetStateSummary(key)
+	innerSummary, err := vm.innerStateSyncVM.GetStateSummary(height)
 	if err != nil {
 		return nil, err // including common.ErrUnknownStateSummary case
 	}
 
 	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Key())
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with coreVM
 		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
@@ -165,7 +165,7 @@ func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
 		// Note that we won't download all the blocks associated with state summaries,
 		// so proposerVM may not not all the full blocks indexed into height index. Same
 		// is true for coreVM.
-		if err := vm.updateHeightIndex(s.Key(), proContent.ProposerBlockID()); err != nil {
+		if err := vm.updateHeightIndex(s.Height(), proContent.ProposerBlockID()); err != nil {
 			return err
 		}
 	}

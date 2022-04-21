@@ -18,14 +18,14 @@ var (
 // Summary represents all the information needed for state sync processing.
 // Summary must allow a VM to download, verify and rebuild its state,
 // no matter whether it is freshly created or it has previous state.
-// Both Key and ID uniquely identify a Summary. However:
-// Key is used to efficiently elicit network votes;
+// Both Height and ID uniquely identify a Summary. However:
+// Height is used to efficiently elicit network votes;
 // ID must allow summaries comparison and verification as an alternative to Bytes;
 // it is used to verify what summaries are votes casted for.
 // Finally Byte returns the Summary content which is defined by the VM and opaque to the engine.
 type Summary interface {
 	Bytes() []byte
-	Key() uint64
+	Height() uint64
 	ID() ids.ID
 
 	Accept() error
@@ -54,9 +54,9 @@ type StateSyncableVM interface {
 	// ParseStateSummary builds a Summary out of summaryBytes
 	ParseStateSummary(summaryBytes []byte) (Summary, error)
 
-	// GetStateSummary retrieves the summary related to key, if available.
+	// GetStateSummary retrieves the summary related to height, if available.
 	// Returns ErrUnknownStateSummary if summary is not available
-	GetStateSummary(summaryKey uint64) (Summary, error)
+	GetStateSummary(summaryHeight uint64) (Summary, error)
 
 	// SetSyncableStateSummaries is called with a list of valid summaries to sync from.
 	// These summaries were collected from peers and validated with validators.
