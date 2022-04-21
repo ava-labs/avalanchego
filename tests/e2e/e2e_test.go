@@ -106,7 +106,7 @@ var (
 )
 
 var _ = ginkgo.BeforeSuite(func() {
-	gomega.Ω(mode).Should(gomega.Or(gomega.Equal("test"), gomega.Equal("run")))
+	gomega.Expect(mode).Should(gomega.Or(gomega.Equal("test"), gomega.Equal("run")))
 
 	var err error
 	cli, err = client.New(client.Config{
@@ -114,7 +114,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		Endpoint:    gRPCEp,
 		DialTimeout: 10 * time.Second,
 	})
-	gomega.Ω(err).Should(gomega.BeNil())
+	gomega.Expect(err).Should(gomega.BeNil())
 
 	ginkgo.By("calling start API via network runner", func() {
 		outf("{{green}}sending 'start' with binary path:{{/}} %q\n", execPath)
@@ -127,7 +127,7 @@ var _ = ginkgo.BeforeSuite(func() {
 				"subnetevm": vmGenesisPath,
 			}))
 		cancel()
-		gomega.Ω(err).Should(gomega.BeNil())
+		gomega.Expect(err).Should(gomega.BeNil())
 		outf("{{green}}successfully started:{{/}} %+v\n", resp.ClusterInfo.NodeNames)
 	})
 
@@ -139,12 +139,12 @@ var _ = ginkgo.BeforeSuite(func() {
 	ctx, cancel := createDefaultCtx()
 	_, err = cli.Health(ctx)
 	cancel()
-	gomega.Ω(err).Should(gomega.BeNil())
+	gomega.Expect(err).Should(gomega.BeNil())
 
 	subnetEVMRPCEps = make([]string, 0)
 	blockchainID, logsDir := "", ""
 	k, err := getVMID("subnetevm")
-	gomega.Ω(err).Should(gomega.BeNil())
+	gomega.Expect(err).Should(gomega.BeNil())
 
 	// wait up to 5-minute for custom VM installation
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
@@ -160,7 +160,7 @@ done:
 		cctx, ccancel := createDefaultCtx()
 		resp, err := cli.Status(cctx)
 		ccancel()
-		gomega.Ω(err).Should(gomega.BeNil())
+		gomega.Expect(err).Should(gomega.BeNil())
 
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
@@ -171,16 +171,16 @@ done:
 			break done
 		}
 	}
-	gomega.Ω(ctx.Err()).Should(gomega.BeNil())
+	gomega.Expect(ctx.Err()).Should(gomega.BeNil())
 	cancel()
 
-	gomega.Ω(blockchainID).Should(gomega.Not(gomega.BeEmpty()))
-	gomega.Ω(logsDir).Should(gomega.Not(gomega.BeEmpty()))
+	gomega.Expect(blockchainID).Should(gomega.Not(gomega.BeEmpty()))
+	gomega.Expect(logsDir).Should(gomega.Not(gomega.BeEmpty()))
 
 	cctx, ccancel := createDefaultCtx()
 	uris, err := cli.URIs(cctx)
 	ccancel()
-	gomega.Ω(err).Should(gomega.BeNil())
+	gomega.Expect(err).Should(gomega.BeNil())
 	outf("{{blue}}avalanche HTTP RPCs URIs:{{/}} %q\n", uris)
 
 	for _, u := range uris {
@@ -197,10 +197,10 @@ done:
 		PID:      pid,
 		LogsDir:  logsDir,
 	}
-	gomega.Ω(ci.Save(outputPath)).Should(gomega.BeNil())
+	gomega.Expect(ci.Save(outputPath)).Should(gomega.BeNil())
 
 	b, err := ioutil.ReadFile(outputPath)
-	gomega.Ω(err).Should(gomega.BeNil())
+	gomega.Expect(err).Should(gomega.BeNil())
 	outf("\n{{blue}}$ cat %s:{{/}}\n%s\n", outputPath, string(b))
 })
 
@@ -211,14 +211,14 @@ var _ = ginkgo.AfterSuite(func() {
 		ctx, cancel := createDefaultCtx()
 		_, err := cli.Stop(ctx)
 		cancel()
-		gomega.Ω(err).Should(gomega.BeNil())
+		gomega.Expect(err).Should(gomega.BeNil())
 
 	case "run":
 		outf("{{red}}skipping shutting down cluster{{/}}\n")
 	}
 
 	outf("{{red}}shutting down client{{/}}\n")
-	gomega.Ω(cli.Close()).Should(gomega.BeNil())
+	gomega.Expect(cli.Close()).Should(gomega.BeNil())
 })
 
 var _ = ginkgo.Describe("[basic]", func() {
