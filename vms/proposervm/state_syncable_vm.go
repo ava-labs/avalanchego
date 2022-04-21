@@ -131,7 +131,7 @@ func (vm *VM) GetStateSummary(height uint64) (common.Summary, error) {
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this should never happen, since that would mean proVM has become out of sync with innerVM
-		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
+		vm.ctx.Log.Warn("Block height index missing at height %d: %s", innerSummary.Height(), err)
 		return nil, common.ErrUnknownStateSummary
 	}
 

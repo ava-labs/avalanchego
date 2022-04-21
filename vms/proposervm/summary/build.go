@@ -14,12 +14,9 @@ import (
 func BuildEmptyProposerSummary(coreSummary common.Summary) (ProposerSummaryIntf, error) {
 	return &ProposerSummary{
 		StatelessSummaryIntf: &StatelessSummary{
-			ProBlkID:             ids.Empty,
-			InnerSummary:         coreSummary.Bytes(),
-			ProposerSummaryBytes: nil,
-			ProposerSummaryID:    ids.Empty,
+			ProBlkID:          ids.Empty,
+			ProposerSummaryID: ids.Empty,
 		},
-		SummaryHeight: coreSummary.Height(),
 	}, nil
 }
 
