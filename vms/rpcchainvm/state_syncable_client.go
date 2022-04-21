@@ -110,28 +110,6 @@ func (vm *VMClient) GetStateSummary(height uint64) (common.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) SetSyncableStateSummaries(accepted []common.Summary) error {
-	requestedSummaries := make([]*vmpb.StateSyncSummary, len(accepted))
-	for i, sum := range accepted {
-		summaryID := sum.ID()
-		requestedSummaries[i] = &vmpb.StateSyncSummary{
-			Height:  sum.Height(),
-			Id:      summaryID[:],
-			Content: sum.Bytes(),
-		}
-	}
-	resp, err := vm.client.SetSyncableStateSummaries(
-		context.Background(),
-		&vmpb.SetSyncableStateSummariesRequest{
-			Summaries: requestedSummaries,
-		},
-	)
-	if err != nil {
-		return err
-	}
-	return errCodeToError[resp.Err]
-}
-
 func (vm *VMClient) GetStateSyncResult() (ids.ID, uint64, error) {
 	resp, err := vm.client.GetStateSyncResult(context.Background(), &emptypb.Empty{})
 	if err != nil {

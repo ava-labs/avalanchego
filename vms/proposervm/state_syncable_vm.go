@@ -38,18 +38,24 @@ func (vm *VM) GetOngoingStateSyncSummary() (common.Summary, error) {
 
 	innerSummary, err := vm.innerStateSyncVM.GetOngoingStateSyncSummary()
 	if err != nil {
-		return nil, err // including common.ErrNoStateSyncOngoing case
+		return nil, err
 	}
 
-	// retrieve ProBlkID
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
-	if err != nil {
-		// this should never happen, it's proVM being out of sync with coreVM
-		vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
-		return nil, common.ErrUnknownStateSummary
+	var proSummary summary.ProposerSummaryIntf
+	if innerSummary.ID() == ids.Empty {
+		// summary with emptyID signals no local summary is available in InnerVM
+		proSummary, err = summary.BuildEmptyProposerSummary(innerSummary)
+	} else {
+		var proBlkID ids.ID
+		proBlkID, err = vm.GetBlockIDAtHeight(innerSummary.Height())
+		if err != nil {
+			// this should never happen, it's proVM being out of sync with coreVM
+			vm.ctx.Log.Warn("core summary unknown to proposer VM. Block height index missing: %s", err)
+			return nil, common.ErrUnknownStateSummary
+		}
+		proSummary, err = summary.BuildProposerSummary(proBlkID, innerSummary)
 	}
 
-	proSummary, err := summary.BuildProposerSummary(proBlkID, innerSummary)
 	return &statefulSummary{
 		ProposerSummaryIntf: proSummary,
 		innerSummary:        innerSummary,
@@ -135,46 +141,6 @@ func (vm *VM) GetStateSummary(height uint64) (common.Summary, error) {
 		innerSummary:        innerSummary,
 		vm:                  vm,
 	}, err
-}
-
-func (vm *VM) SetSyncableStateSummaries(accepted []common.Summary) error {
-	if vm.innerStateSyncVM == nil {
-		return common.ErrStateSyncableVMNotImplemented
-	}
-
-	coreSummaries := make([]common.Summary, 0, len(accepted))
-	for _, s := range accepted {
-		proContent, err := summary.Parse(s.Bytes())
-		if err != nil {
-			return err
-		}
-
-		coreSummary, err := vm.innerStateSyncVM.ParseStateSummary(proContent.InnerBytes())
-		if err != nil {
-			return fmt.Errorf("could not parse coreSummaryContent due to: %w", err)
-		}
-
-		coreSummaries = append(coreSummaries, coreSummary)
-
-		// Following state sync introduction, we update height -> blockID index
-		// with summaries content in order to support resuming state sync in case
-		// of shutdown. The height index allows to retrieve the proposerBlkID
-		// of any state sync passed down to coreVM, so that the proposerVM state summary
-		// information of any coreVM summary can be rebuilt and pass to the engine, even
-		// following a shutdown.
-		// Note that we won't download all the blocks associated with state summaries,
-		// so proposerVM may not not all the full blocks indexed into height index. Same
-		// is true for coreVM.
-		if err := vm.updateHeightIndex(s.Height(), proContent.ProposerBlockID()); err != nil {
-			return err
-		}
-	}
-
-	if err := vm.db.Commit(); err != nil {
-		return nil
-	}
-
-	return vm.innerStateSyncVM.SetSyncableStateSummaries(coreSummaries)
 }
 
 func (vm *VM) GetStateSyncResult() (ids.ID, uint64, error) {

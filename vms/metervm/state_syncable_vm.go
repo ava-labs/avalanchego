@@ -70,19 +70,6 @@ func (vm *blockVM) GetStateSummary(height uint64) (common.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) SetSyncableStateSummaries(accepted []common.Summary) error {
-	if vm.ssVM == nil {
-		return common.ErrStateSyncableVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	err := vm.ssVM.SetSyncableStateSummaries(accepted)
-	end := vm.clock.Time()
-	vm.stateSummaryMetrics.setSyncableStateSummaries.Observe(float64(end.Sub(start)))
-
-	return err
-}
-
 func (vm *blockVM) GetStateSyncResult() (ids.ID, uint64, error) {
 	if vm.ssVM == nil {
 		return ids.Empty, 0, common.ErrStateSyncableVMNotImplemented

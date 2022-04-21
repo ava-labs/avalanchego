@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -29,12 +30,16 @@ func (ss *statefulSummary) Accept() error {
 	// Note that we won't download all the blocks associated with state summaries,
 	// so proposerVM may not not all the full blocks indexed into height index. Same
 	// is true for coreVM.
-	if err := ss.vm.updateHeightIndex(ss.Height(), ss.ProposerBlockID()); err != nil {
-		return err
-	}
+	// Finally note that an empty summary may be accepted, which has empty ID.
+	// Such summary must not be added to height index.
+	if ss.ID() != ids.Empty {
+		if err := ss.vm.updateHeightIndex(ss.Height(), ss.ProposerBlockID()); err != nil {
+			return err
+		}
 
-	if err := ss.vm.db.Commit(); err != nil {
-		return nil
+		if err := ss.vm.db.Commit(); err != nil {
+			return nil
+		}
 	}
 
 	return ss.innerSummary.Accept()

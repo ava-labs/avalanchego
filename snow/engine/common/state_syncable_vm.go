@@ -12,7 +12,6 @@ import (
 var (
 	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 	ErrUnknownStateSummary           = errors.New("state summary not found")
-	ErrNoStateSyncOngoing            = errors.New("no state sync ongoing")
 )
 
 // Summary represents all the information needed for state sync processing.
@@ -44,7 +43,8 @@ type StateSyncableVM interface {
 	// allows the engine to ask the network if the ongoing summary is still supported by the
 	// network. This simplifies the task of the StateSyncableVM to decide whether to
 	// continue an in-progress sync or start over.
-	// Returns ErrNoStateSyncOngoing if no local state summary exists.
+	// If no local state summary exists, GetOngoingStateSyncSummary returns an
+	// Empty Summary with empty ID, zero height, and nil bytes.
 	GetOngoingStateSyncSummary() (Summary, error)
 
 	// GetLastStateSummary returns latest Summary with an optional error
@@ -57,12 +57,4 @@ type StateSyncableVM interface {
 	// GetStateSummary retrieves the summary related to height, if available.
 	// Returns ErrUnknownStateSummary if summary is not available
 	GetStateSummary(summaryHeight uint64) (Summary, error)
-
-	// SetSyncableStateSummaries is called with a list of valid summaries to sync from.
-	// These summaries were collected from peers and validated with validators.
-	// VM will use information inside the summary to choose one and sync
-	// its state to that summary.
-	// Will be called with an empty list if no valid state summaries could be found.
-	// Normal bootstrapping resumes after VM signals the state sync process has completed.
-	SetSyncableStateSummaries([]Summary) error
 }

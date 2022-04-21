@@ -28,6 +28,7 @@ var (
 	minoritySummaryBytes []byte
 
 	unknownSummaryID ids.ID
+	emptySummary     *block.TestSummary
 )
 
 type fullVM struct {
@@ -53,6 +54,12 @@ func init() {
 	}
 
 	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+
+	emptySummary = &block.TestSummary{
+		SummaryHeight: 0,
+		SummaryID:     ids.Empty,
+		ContentBytes:  nil,
+	}
 }
 
 // helper to build
@@ -93,7 +100,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	assert.True(t, syncer.stateSyncVM != nil)
 
 	fullVM.GetOngoingStateSyncSummaryF = func() (common.Summary, error) {
-		return nil, common.ErrNoStateSyncOngoing
+		emptySummary.T = t
+		return emptySummary, nil
 	}
 
 	return syncer, fullVM, sender

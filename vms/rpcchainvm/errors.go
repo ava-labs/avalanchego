@@ -19,7 +19,6 @@ var (
 
 		5: common.ErrStateSyncableVMNotImplemented,
 		6: common.ErrUnknownStateSummary,
-		7: common.ErrNoStateSyncOngoing,
 	}
 	errorToErrCode = map[error]uint32{
 		database.ErrClosed:   1,
@@ -30,7 +29,6 @@ var (
 
 		common.ErrStateSyncableVMNotImplemented: 5,
 		common.ErrUnknownStateSummary:           6,
-		common.ErrNoStateSyncOngoing:            7,
 	}
 )
 

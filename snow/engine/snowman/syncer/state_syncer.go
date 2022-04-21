@@ -50,6 +50,10 @@ type stateSyncer struct {
 
 	stateSyncVM        block.StateSyncableVM
 	onDoneStateSyncing func(lastReqID uint32) error
+
+	// we track the (possibly nil) local summary to help engine
+	// choosing among multiple validated summaries
+	locallyAvailableSummary common.Summary
 	// once vm finishes processing rebuilding its state via state summaries
 	// the full block associated with state summary must be download.
 	// lastSummaryBlkRequestedFrom tracks the validator reached out to for the full block
@@ -117,7 +121,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	// Mark that we received a response from [validatorID]
 	ss.contactedSeeders.Remove(validatorID)
 
-	// retrieve key for summary and register frontier;
+	// retrieve summary ID and register frontier;
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
 	if summary, err := ss.stateSyncVM.ParseStateSummary(summaryBytes); err == nil {
@@ -228,17 +232,15 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	// We've received the filtered accepted frontier from every state sync validator
-	// Accept all containers that have a sufficient weight behind them
-	accepted := make([]common.Summary, 0, len(ss.weightedSummaries))
-	for _, ws := range ss.weightedSummaries {
+	// Drop all summaries without a sufficient weight behind them
+	for key, ws := range ss.weightedSummaries {
 		if ws.weight < ss.Alpha {
-			continue
+			delete(ss.weightedSummaries, key)
 		}
-		accepted = append(accepted, ws.Summary)
 	}
 
 	// if we don't have enough weight for the state summary to be accepted then retry or fail the state sync
-	size := len(accepted)
+	size := len(ss.weightedSummaries)
 	if size == 0 && ss.StateSyncBeacons.Len() > 0 {
 		// retry the fast sync if the weight is not enough to fast sync
 		failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedVoters)
@@ -255,7 +257,30 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	}
 
 	ss.Ctx.Log.Info("State sync started syncing with %d vertices in the accepted frontier", size)
-	return ss.stateSyncVM.SetSyncableStateSummaries(accepted)
+	bestStateSummary := ss.selectSyncableStateSummary()
+	return bestStateSummary.Accept()
+}
+
+// selectSyncableStateSummary encapsules the logic to choose a state summary
+// out of all the network validated one
+func (ss *stateSyncer) selectSyncableStateSummary() common.Summary {
+	highestSummary := uint64(0)
+	bestID := ids.Empty
+
+	// by default pick highest summary, unless locallyAvailableSummary is still valid.
+	// In such case we pick locallyAvailableSummary to allow VM resuming state syncing.
+	for id, ws := range ss.weightedSummaries {
+		if id == ss.locallyAvailableSummary.ID() {
+			bestID = id
+			break
+		}
+
+		if highestSummary < ws.Summary.Height() {
+			highestSummary = ws.Summary.Height()
+			bestID = id
+		}
+	}
+	return ss.weightedSummaries[bestID].Summary
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
@@ -320,26 +345,28 @@ func (ss *stateSyncer) startup() error {
 		ss.targetVoters.Add(vdrID)
 	}
 
-	// check if there is an ongoing state sync; if so add its state summary
+	// check if there is an ongoing state sync; if so add its state localSummary
 	// to the frontier to request votes on
-	summary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
-	switch err {
-	case nil:
-		ss.weightedSummaries[summary.ID()] = weightedSummary{
-			Summary: summary,
-		}
-	case common.ErrNoStateSyncOngoing:
-		// nothing to add to frontiers
-	default:
+	localSummary, err := ss.stateSyncVM.GetOngoingStateSyncSummary()
+	if err != nil {
 		return err
+	}
+	ss.locallyAvailableSummary = localSummary
+
+	// register localSummary among those to validate over netwok,
+	// unless its the emptySummary
+	if localSummary.ID() != ids.Empty {
+		ss.weightedSummaries[localSummary.ID()] = weightedSummary{
+			Summary: localSummary,
+		}
 	}
 
 	// initiate messages exchange
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
+		// we make sure that a state summary is always eventually called if state sync is enabled
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
-		// we make sure that StateSync is called if state sync is enabled
-		return ss.stateSyncVM.SetSyncableStateSummaries(nil)
+		ss.locallyAvailableSummary.Accept()
 	}
 
 	ss.requestID++

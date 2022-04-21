@@ -61,7 +61,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.True(syncer.started)
 }
 
-func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
+func TestStateSyncIsSkippedIfNotEnoughBeaconsAreConnected(t *testing.T) {
 	assert := assert.New(t)
 
 	vdrs := buildTestPeers(t)
@@ -73,19 +73,20 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 		Alpha:         (vdrs.Weight() + 1) / 2,
 		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
 	}
-	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
+	syncer, _, _ := buildTestsObjects(t, &commonCfg)
 
-	// set VM to check for StateSync call
-	fullVM.CantSetSyncableStateSummaries = true
-
-	// check that StateSync is called immediately with no frontiers
-	fullVM.SetSyncableStateSummariesF = func(s []common.Summary) error {
-		assert.True(len(s) == 0)
+	emptySummaryAccepted := false
+	emptySummary.CantAccept = true
+	emptySummary.AcceptF = func() error {
+		emptySummaryAccepted = true
 		return nil
 	}
 
 	// Start syncer without errors
 	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+
+	// no summary is accepted if not enough beacons are available
+	assert.False(emptySummaryAccepted)
 }
 
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
@@ -658,21 +659,26 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
+	summary := &block.TestSummary{
+		SummaryHeight: key,
+		SummaryID:     summaryID,
+		ContentBytes:  summaryBytes,
+		T:             t,
+	}
+	minoritySummary := &block.TestSummary{
+		SummaryHeight: minorityKey,
+		SummaryID:     minoritySummaryID,
+		ContentBytes:  minoritySummaryBytes,
+		T:             t,
+	}
+
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(b []byte) (common.Summary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
-			return &block.TestSummary{
-				SummaryHeight: key,
-				SummaryID:     summaryID,
-				ContentBytes:  summaryBytes,
-			}, nil
+			return summary, nil
 		case bytes.Equal(b, minoritySummaryBytes):
-			return &block.TestSummary{
-				SummaryHeight: minorityKey,
-				SummaryID:     minoritySummaryID,
-				ContentBytes:  minoritySummaryBytes,
-			}, nil
+			return minoritySummary, nil
 		default:
 			return nil, fmt.Errorf("unknown state summary")
 		}
@@ -718,12 +724,14 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
-	isVMStateSyncCalled := false
-	fullVM.CantSetSyncableStateSummaries = true
-	fullVM.SetSyncableStateSummariesF = func(summaries []common.Summary) error {
-		isVMStateSyncCalled = true
-		assert.True(len(summaries) == 1)
-		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
+	majoritySummaryCalled := false
+	minoritySummaryCalled := false
+	summary.AcceptF = func() error {
+		majoritySummaryCalled = true
+		return nil
+	}
+	minoritySummary.AcceptF = func() error {
+		minoritySummaryCalled = true
 		return nil
 	}
 
@@ -762,7 +770,8 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// check that finally summary is passed to VM
-	assert.True(isVMStateSyncCalled)
+	assert.True(majoritySummaryCalled)
+	assert.False(minoritySummaryCalled)
 }
 
 func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
@@ -791,13 +800,15 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
+	minoritySummary := &block.TestSummary{
+		SummaryHeight: minorityKey,
+		SummaryID:     minoritySummaryID,
+		ContentBytes:  minoritySummaryBytes,
+		T:             t,
+	}
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.TestSummary{
-			SummaryHeight: key,
-			SummaryID:     summaryID,
-			ContentBytes:  summaryBytes,
-		}, nil
+		return minoritySummary, nil
 	}
 
 	contactedVoters := make(map[ids.ShortID]uint32) // nodeID -> reqID map
@@ -828,12 +839,9 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
-	isVMStateSyncCalled := false
-	fullVM.CantSetSyncableStateSummaries = true
-	fullVM.SetSyncableStateSummariesF = func(summaries []common.Summary) error {
-		isVMStateSyncCalled = true
-		assert.True(len(summaries) == 1)
-		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
+	minoritySummaryCalled := false
+	minoritySummary.AcceptF = func() error {
+		minoritySummaryCalled = true
 		return nil
 	}
 
@@ -862,7 +870,7 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 
 	// No state summary is passed to VM
-	assert.False(isVMStateSyncCalled)
+	assert.False(minoritySummaryCalled)
 
 	// instead the whole process is restared
 	assert.False(syncer.contactedVoters.Len() != 0) // no voters reached

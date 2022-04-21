@@ -5,6 +5,7 @@ package block
 
 import (
 	"errors"
+	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -14,6 +15,7 @@ var (
 	_ common.Summary  = &TestSummary{}
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
+	errAccept                   = errors.New("unexpectedly called Accept")
 	errGetStateSyncResult       = errors.New("unexpectedly called GetStateSyncResult")
 	errSetLastStateSummaryBlock = errors.New("unexpectedly called SetLastStateSummaryBlock")
 )
@@ -23,13 +25,23 @@ type TestSummary struct {
 	SummaryID     ids.ID
 	ContentBytes  []byte
 
-	AcceptErr error
+	T          *testing.T
+	CantAccept bool
+	AcceptF    func() error
 }
 
 func (s *TestSummary) Bytes() []byte  { return s.ContentBytes }
 func (s *TestSummary) Height() uint64 { return s.SummaryHeight }
 func (s *TestSummary) ID() ids.ID     { return s.SummaryID }
-func (s *TestSummary) Accept() error  { return s.AcceptErr }
+func (s *TestSummary) Accept() error {
+	if s.AcceptF != nil {
+		return s.AcceptF()
+	}
+	if s.CantAccept && s.T != nil {
+		s.T.Fatalf("Unexpectedly called Accept")
+	}
+	return errAccept
+}
 
 type TestStateSyncableVM struct {
 	common.TestStateSyncableVM

@@ -55,7 +55,6 @@ type VMClient interface {
 	ParseStateSummary(ctx context.Context, in *ParseStateSummaryRequest, opts ...grpc.CallOption) (*ParseStateSummaryResponse, error)
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
 	SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	SetSyncableStateSummaries(ctx context.Context, in *SetSyncableStateSummariesRequest, opts ...grpc.CallOption) (*SetSyncableStateSummariesResponse, error)
 	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error)
 	SetLastStateSummaryBlock(ctx context.Context, in *SetLastStateSummaryBlockRequest, opts ...grpc.CallOption) (*SetLastStateSummaryBlockResponse, error)
 }
@@ -347,15 +346,6 @@ func (c *vMClient) SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, 
 	return out, nil
 }
 
-func (c *vMClient) SetSyncableStateSummaries(ctx context.Context, in *SetSyncableStateSummariesRequest, opts ...grpc.CallOption) (*SetSyncableStateSummariesResponse, error) {
-	out := new(SetSyncableStateSummariesResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/SetSyncableStateSummaries", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error) {
 	out := new(GetStateSyncResultResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/GetStateSyncResult", in, out, opts...)
@@ -410,7 +400,6 @@ type VMServer interface {
 	ParseStateSummary(context.Context, *ParseStateSummaryRequest) (*ParseStateSummaryResponse, error)
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
 	SummaryAccept(context.Context, *SummaryAcceptRequest) (*emptypb.Empty, error)
-	SetSyncableStateSummaries(context.Context, *SetSyncableStateSummariesRequest) (*SetSyncableStateSummariesResponse, error)
 	GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error)
 	SetLastStateSummaryBlock(context.Context, *SetLastStateSummaryBlockRequest) (*SetLastStateSummaryBlockResponse, error)
 	mustEmbedUnimplementedVMServer()
@@ -512,9 +501,6 @@ func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRe
 }
 func (UnimplementedVMServer) SummaryAccept(context.Context, *SummaryAcceptRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SummaryAccept not implemented")
-}
-func (UnimplementedVMServer) SetSyncableStateSummaries(context.Context, *SetSyncableStateSummariesRequest) (*SetSyncableStateSummariesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetSyncableStateSummaries not implemented")
 }
 func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSyncResult not implemented")
@@ -1093,24 +1079,6 @@ func _VM_SummaryAccept_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_SetSyncableStateSummaries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetSyncableStateSummariesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).SetSyncableStateSummaries(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vm.VM/SetSyncableStateSummaries",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).SetSyncableStateSummaries(ctx, req.(*SetSyncableStateSummariesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _VM_GetStateSyncResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -1277,10 +1245,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SummaryAccept",
 			Handler:    _VM_SummaryAccept_Handler,
-		},
-		{
-			MethodName: "SetSyncableStateSummaries",
-			Handler:    _VM_SetSyncableStateSummaries_Handler,
 		},
 		{
 			MethodName: "GetStateSyncResult",

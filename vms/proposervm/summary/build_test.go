@@ -28,3 +28,21 @@ func TestBuild(t *testing.T) {
 	assert.Equal(builtSummary.ProposerBlockID(), proBlkID)
 	assert.Equal(builtSummary.InnerBytes(), coreSummary.Bytes())
 }
+
+func TestBuildEmptySummary(t *testing.T) {
+	assert := assert.New(t)
+
+	coreSummary := &block.TestSummary{
+		SummaryHeight: 0,
+		SummaryID:     ids.Empty,
+		ContentBytes:  nil,
+	}
+	builtSummary, err := BuildEmptyProposerSummary(coreSummary)
+	assert.NoError(err)
+
+	assert.Equal(builtSummary.ID(), ids.Empty)
+	assert.Equal(builtSummary.Height(), uint64(0))
+	assert.Equal(builtSummary.Bytes(), []byte(nil))
+	assert.Equal(builtSummary.ProposerBlockID(), ids.Empty)
+	assert.Equal(builtSummary.InnerBytes(), coreSummary.Bytes())
+}

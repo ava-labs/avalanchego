@@ -10,6 +10,20 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+// emptySummary has an ad-hoc construction in that it must have an empty summary ID
+func BuildEmptyProposerSummary(coreSummary common.Summary) (ProposerSummaryIntf, error) {
+	return &ProposerSummary{
+		StatelessSummary: StatelessSummary{
+			ProBlkID:             ids.Empty,
+			InnerSummary:         coreSummary.Bytes(),
+			ProposerSummaryBytes: nil,
+			ProposerSummaryID:    ids.Empty,
+		},
+		SummaryHeight: coreSummary.Height(),
+	}, nil
+
+}
+
 func BuildProposerSummary(proBlkID ids.ID, coreSummary common.Summary) (ProposerSummaryIntf, error) {
 	statelessSummary := StatelessSummary{
 		ProBlkID:     proBlkID,

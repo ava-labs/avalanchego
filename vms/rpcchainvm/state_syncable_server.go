@@ -168,31 +168,6 @@ func (vm *VMServer) SummaryAccept(_ context.Context, req *vmpb.SummaryAcceptRequ
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) SetSyncableStateSummaries(ctx context.Context, req *vmpb.SetSyncableStateSummariesRequest) (*vmpb.SetSyncableStateSummariesResponse, error) {
-	var err error
-	if vm.ssVM != nil {
-		summaries := make([]common.Summary, len(req.Summaries))
-		for i, sum := range req.Summaries {
-			summaryID, err := ids.ToID(sum.Id)
-			if err != nil {
-				return nil, err
-			}
-			summaries[i] = &deprecatedSummaryToBeRemoved{
-				height: sum.Height,
-				id:     summaryID,
-				bytes:  sum.Content,
-			}
-		}
-		err = vm.ssVM.SetSyncableStateSummaries(summaries)
-	} else {
-		err = common.ErrStateSyncableVMNotImplemented
-	}
-
-	return &vmpb.SetSyncableStateSummariesResponse{
-		Err: errorToErrCode[err],
-	}, errorToRPCError(err)
-}
-
 func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.GetStateSyncResultResponse, error) {
 	var (
 		blkID  = ids.Empty
