@@ -156,18 +156,25 @@ func (vm *VMServer) GetStateSummary(
 func (vm *VMServer) SummaryAccept(
 	_ context.Context,
 	req *vmpb.SummaryAcceptRequest,
-) (*emptypb.Empty, error) {
+) (*vmpb.SummaryAcceptResponse, error) {
+	var (
+		accepted bool
+		err      error
+	)
 	if vm.ssVM == nil {
-		return &emptypb.Empty{}, nil
+		accepted, err = false, block.ErrStateSyncableVMNotImplemented
+	} else {
+		var summary block.Summary
+		summary, err = vm.ssVM.GetStateSummary(req.Height)
+		if err == nil {
+			accepted, err = summary.Accept()
+		}
 	}
-	summary, err := vm.ssVM.GetStateSummary(req.Height)
-	if err != nil {
-		return nil, err
-	}
-	if err := summary.Accept(); err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
+
+	return &vmpb.SummaryAcceptResponse{
+		Accepted: accepted,
+		Err:      errorToErrCode[err],
+	}, errorToRPCError(err)
 }
 
 func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.GetStateSyncResultResponse, error) {

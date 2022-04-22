@@ -262,7 +262,18 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	)
 
 	ss.lastSummaryBlkID = preferredStateSummary.BlockID()
-	return preferredStateSummary.Accept()
+	accepted, err := preferredStateSummary.Accept()
+	if err != nil {
+		return err
+	}
+	if accepted {
+		// summary was accepted and VM is state syncing.
+		// Engine will wait for notification of state sync done.
+		return nil
+	}
+
+	// VM did not accept the summary. Just move on with bootstrapping
+	return ss.onDoneStateSyncing(ss.requestID)
 }
 
 // selectSyncableStateSummary chooses a state summary from all
@@ -370,7 +381,7 @@ func (ss *stateSyncer) startup() error {
 	if ss.targetSeeders.Len() == 0 {
 		// Accept must always be called on exactly one state summary if state sync is enabled
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
-		if err := ss.locallyAvailableSummary.Accept(); err != nil {
+		if _, err := ss.locallyAvailableSummary.Accept(); err != nil {
 			return err
 		}
 	}
@@ -449,9 +460,6 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
-
-	case common.StateSyncSkipped:
-		return ss.onDoneStateSyncing(ss.requestID)
 
 	case common.StateSyncDone:
 		// retrieve the blkID to request

@@ -20,7 +20,7 @@ type statefulSummary struct {
 	vm *VM
 }
 
-func (ss *statefulSummary) Accept() error {
+func (ss *statefulSummary) Accept() (bool, error) {
 	// A non-empty summary must update the block height index with its blockID
 	// ( i.e. the ID of the block summary refers to). This helps resuming
 	// state sync after a shutdown since height index allows retrieving
@@ -30,11 +30,11 @@ func (ss *statefulSummary) Accept() error {
 	// is true for coreVM.
 	if ss.ID() != ids.Empty {
 		if err := ss.vm.updateHeightIndex(ss.Height(), ss.BlockID()); err != nil {
-			return err
+			return false, err
 		}
 
 		if err := ss.vm.db.Commit(); err != nil {
-			return nil
+			return false, err
 		}
 	}
 

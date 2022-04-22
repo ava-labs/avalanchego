@@ -29,12 +29,15 @@ func (s *SummaryClient) Height() uint64  { return s.height }
 func (s *SummaryClient) ID() ids.ID      { return s.id }
 func (s *SummaryClient) BlockID() ids.ID { return s.blockID }
 
-func (s *SummaryClient) Accept() error {
-	_, err := s.vm.client.SummaryAccept(
+func (s *SummaryClient) Accept() (bool, error) {
+	resp, err := s.vm.client.SummaryAccept(
 		context.Background(),
 		&vmpb.SummaryAcceptRequest{
 			Height: s.height,
 		},
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return resp.Accepted, errCodeToError[resp.Err]
 }

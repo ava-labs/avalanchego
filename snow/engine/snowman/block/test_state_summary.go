@@ -24,19 +24,19 @@ type TestSummary struct {
 
 	T          *testing.T
 	CantAccept bool
-	AcceptF    func() error
+	AcceptF    func() (bool, error)
 }
 
 func (s *TestSummary) Bytes() []byte   { return s.BytesV }
 func (s *TestSummary) Height() uint64  { return s.HeightV }
 func (s *TestSummary) ID() ids.ID      { return s.IDV }
 func (s *TestSummary) BlockID() ids.ID { return s.IDV }
-func (s *TestSummary) Accept() error {
+func (s *TestSummary) Accept() (bool, error) {
 	if s.AcceptF != nil {
 		return s.AcceptF()
 	}
 	if s.CantAccept && s.T != nil {
 		s.T.Fatalf("Unexpectedly called Accept")
 	}
-	return errAccept
+	return false, errAccept
 }

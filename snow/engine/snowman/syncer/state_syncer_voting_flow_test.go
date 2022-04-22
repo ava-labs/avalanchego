@@ -77,9 +77,9 @@ func TestStateSyncIsSkippedIfNotEnoughBeaconsAreConnected(t *testing.T) {
 
 	emptySummaryAccepted := false
 	emptySummary.CantAccept = true
-	emptySummary.AcceptF = func() error {
+	emptySummary.AcceptF = func() (bool, error) {
 		emptySummaryAccepted = true
-		return nil
+		return true, nil
 	}
 
 	// Start syncer without errors
@@ -726,13 +726,13 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	summary.AcceptF = func() error {
+	summary.AcceptF = func() (bool, error) {
 		majoritySummaryCalled = true
-		return nil
+		return true, nil
 	}
-	minoritySummary.AcceptF = func() error {
+	minoritySummary.AcceptF = func() (bool, error) {
 		minoritySummaryCalled = true
-		return nil
+		return true, nil
 	}
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
@@ -840,9 +840,9 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
 	minoritySummaryCalled := false
-	minoritySummary.AcceptF = func() error {
+	minoritySummary.AcceptF = func() (bool, error) {
 		minoritySummaryCalled = true
-		return nil
+		return true, nil
 	}
 
 	// Let a majority of voters timeout.

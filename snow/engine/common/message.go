@@ -19,8 +19,8 @@ const (
 	PendingTxs Message = iota
 
 	// snowman-VM related messages for state sync capable VMs
-	StateSyncSkipped
 	StateSyncDone
+
 	// StopVertex notifies a consensus that it has a pending stop vertex
 	StopVertex
 )
@@ -29,8 +29,6 @@ func (msg Message) String() string {
 	switch msg {
 	case PendingTxs:
 		return "Pending Transactions"
-	case StateSyncSkipped:
-		return "State Sync Skipped"
 	case StateSyncDone:
 		return "State Sync Done"
 	case StopVertex:

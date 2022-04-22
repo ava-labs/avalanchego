@@ -40,7 +40,7 @@ service VM {
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
-  rpc SummaryAccept(SummaryAcceptRequest) returns (google.protobuf.Empty);
+  rpc SummaryAccept(SummaryAcceptRequest) returns (SummaryAcceptResponse);
   rpc GetStateSyncResult(google.protobuf.Empty) returns (GetStateSyncResultResponse);
   rpc StateSyncableBlockRegister(StateSyncableBlockRegisterRequest) returns (google.protobuf.Empty);
 }
@@ -300,12 +300,18 @@ message SummaryAcceptRequest {
   uint64 height = 1;
 }
 
+message SummaryAcceptResponse {
+  bool accepted = 1;
+  uint32 err = 2;
+}
+
 message GetStateSyncResultResponse {
   uint32 err = 3;
 }
 
 message StateSyncableBlockRegisterRequest {
   bytes id = 1;
+  uint32 err = 2;
 }
 // end of StateSyncableVM related messages
 
