@@ -39,7 +39,7 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	var proSummary summary.ProposerSummaryIntf
 	if innerSummary.ID() == ids.Empty {
 		// summary with emptyID signals no local summary is available in InnerVM
-		proSummary, err = summary.BuildEmptyProposerSummary(innerSummary)
+		proSummary, err = summary.BuildEmptyProposerSummary()
 	} else {
 		proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 		if err != nil {

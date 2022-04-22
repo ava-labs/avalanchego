@@ -22,12 +22,9 @@ type statefulSummary struct {
 
 func (ss *statefulSummary) Accept() (bool, error) {
 	// A non-empty summary must update the block height index with its blockID
-	// ( i.e. the ID of the block summary refers to). This helps resuming
+	// (i.e. the ID of the block summary refers to). This helps resuming
 	// state sync after a shutdown since height index allows retrieving
 	// proposerBlkID from innerSummary.Height.
-	// Note that we won't download all the blocks associated with state summaries,
-	// so proposerVM may not not all the full blocks indexed into height index. Same
-	// is true for coreVM.
 	if ss.ID() != ids.Empty {
 		if err := ss.vm.updateHeightIndex(ss.Height(), ss.BlockID()); err != nil {
 			return false, err

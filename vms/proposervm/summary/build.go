@@ -11,7 +11,7 @@ import (
 )
 
 // emptySummary has an ad-hoc construction in that it must have an empty summary ID
-func BuildEmptyProposerSummary(coreSummary block.Summary) (ProposerSummaryIntf, error) {
+func BuildEmptyProposerSummary() (ProposerSummaryIntf, error) {
 	return &ProposerSummary{
 		StatelessSummaryIntf: &StatelessSummary{},
 	}, nil
