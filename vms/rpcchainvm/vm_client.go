@@ -209,8 +209,8 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	if err != nil {
 		return err
 	}
 
@@ -221,7 +221,7 @@ func (vm *VMClient) Initialize(
 		status:   status,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
-		time:     timestamp,
+		time:     time,
 	}
 
 	chainState, err := chain.NewMeteredState(
@@ -399,8 +399,8 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	if err != nil {
 		return nil, err
 	}
 
@@ -411,7 +411,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 		status:   choices.Processing,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
-		time:     timestamp,
+		time:     time,
 	}, nil
 }
 
@@ -442,8 +442,8 @@ func (vm *VMClient) parseBlockClient(bytes []byte) (*BlockClient, error) {
 		return nil, err
 	}
 
-	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	if err != nil {
 		return nil, err
 	}
 
@@ -454,7 +454,7 @@ func (vm *VMClient) parseBlockClient(bytes []byte) (*BlockClient, error) {
 		status:   status,
 		bytes:    bytes,
 		height:   resp.Height,
-		time:     timestamp,
+		time:     time,
 	}
 
 	return blk, nil
@@ -467,6 +467,9 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
 
 	parentID, err := ids.ToID(resp.ParentId)
 	if err != nil {
@@ -478,8 +481,8 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 		return nil, err
 	}
 
-	timestamp := time.Time{}
-	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	if err != nil {
 		return nil, err
 	}
 
@@ -490,7 +493,7 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 		status:   status,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
-		time:     timestamp,
+		time:     time,
 	}
 
 	return blk, nil
@@ -514,17 +517,13 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
-	deadlineBytes, err := deadline.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	_, err = vm.client.AppRequest(
+	_, err := vm.client.AppRequest(
 		context.Background(),
 		&vmpb.AppRequestMsg{
 			NodeId:    nodeID[:],
 			RequestId: requestID,
 			Request:   request,
-			Deadline:  deadlineBytes,
+			Deadline:  grpcutils.TimestampFromTime(deadline),
 		},
 	)
 	return err
@@ -635,8 +634,8 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 			return nil, err
 		}
 
-		timestamp := time.Time{}
-		if err := timestamp.UnmarshalBinary(blkResp.Timestamp); err != nil {
+		time, err := grpcutils.TimestampAsTime(blkResp.Timestamp)
+		if err != nil {
 			return nil, err
 		}
 
@@ -647,7 +646,7 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 			status:   status,
 			bytes:    blksBytes[idx],
 			height:   blkResp.Height,
-			time:     timestamp,
+			time:     time,
 		}
 
 		res = append(res, blk)
@@ -725,7 +724,9 @@ func (b *BlockClient) Verify() error {
 	if err != nil {
 		return err
 	}
-	return b.time.UnmarshalBinary(resp.Timestamp)
+
+	b.time, err = grpcutils.TimestampAsTime(resp.Timestamp)
+	return err
 }
 
 func (b *BlockClient) Bytes() []byte        { return b.bytes }

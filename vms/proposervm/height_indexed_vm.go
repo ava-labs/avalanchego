@@ -14,11 +14,8 @@ import (
 // shouldHeightIndexBeRepaired checks if index needs repairing and stores a
 // checkpoint if repairing is needed.
 //
-// vm.ctx.Lock is acquired to avoid interleaving with block acceptance.
+// vm.ctx.Lock should be held
 func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
 	_, err := vm.State.GetCheckpoint()
 	if err != database.ErrNotFound {
 		return true, err

@@ -566,6 +566,180 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 }
 
+// There are multiple needed blocks and some validators do not have all the blocks
+// This test was modeled after TestBootstrapperPartialFetch.
+func TestBootstrapperEmptyResponse(t *testing.T) {
+	config, peerID, sender, vm := newConfig(t)
+
+	blkID0 := ids.Empty.Prefix(0)
+	blkID1 := ids.Empty.Prefix(1)
+	blkID2 := ids.Empty.Prefix(2)
+	blkID3 := ids.Empty.Prefix(3)
+
+	blkBytes0 := []byte{0}
+	blkBytes1 := []byte{1}
+	blkBytes2 := []byte{2}
+	blkBytes3 := []byte{3}
+
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
+	}
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID1,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk0.IDV,
+		HeightV: 1,
+		BytesV:  blkBytes1,
+	}
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID2,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk1.IDV,
+		HeightV: 2,
+		BytesV:  blkBytes2,
+	}
+	blk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID3,
+			StatusV: choices.Processing,
+		},
+		ParentV: blk2.IDV,
+		HeightV: 3,
+		BytesV:  blkBytes3,
+	}
+
+	vm.CantLastAccepted = false
+	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		assert.Equal(t, blk0.ID(), blkID)
+		return blk0, nil
+	}
+
+	bs, err := New(
+		config,
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	startReqID := uint32(0)
+	if err := bs.Start(startReqID); err != nil {
+		t.Fatal(err)
+	}
+
+	acceptedIDs := []ids.ID{blkID3}
+
+	parsedBlk1 := false
+	parsedBlk2 := false
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case blkID0:
+			return blk0, nil
+		case blkID1:
+			if parsedBlk1 {
+				return blk1, nil
+			}
+			return nil, errUnknownBlock
+		case blkID2:
+			if parsedBlk2 {
+				return blk2, nil
+			}
+			return nil, errUnknownBlock
+		case blkID3:
+			return blk3, nil
+		default:
+			t.Fatal(errUnknownBlock)
+			panic(errUnknownBlock)
+		}
+	}
+	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blkBytes, blkBytes0):
+			return blk0, nil
+		case bytes.Equal(blkBytes, blkBytes1):
+			blk1.StatusV = choices.Processing
+			parsedBlk1 = true
+			return blk1, nil
+		case bytes.Equal(blkBytes, blkBytes2):
+			blk2.StatusV = choices.Processing
+			parsedBlk2 = true
+			return blk2, nil
+		case bytes.Equal(blkBytes, blkBytes3):
+			return blk3, nil
+		}
+		t.Fatal(errUnknownBlock)
+		return nil, errUnknownBlock
+	}
+
+	requestID := new(uint32)
+	requested := ids.Empty
+	expectedPeerID := peerID
+	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if vdr != expectedPeerID {
+			t.Fatalf("Should have requested block from %s, requested from %s", expectedPeerID, vdr)
+		}
+		switch vtxID {
+		case blkID1, blkID2:
+		default:
+			t.Fatalf("should have requested blk1 or blk2")
+		}
+		*requestID = reqID
+		requested = vtxID
+	}
+
+	vm.CantSetState = false
+	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
+		t.Fatal(err)
+	}
+
+	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
+		t.Fatal(err)
+	} else if requested != blkID1 {
+		t.Fatal("should have requested blk1")
+	}
+
+	// add another vdr to the fetch set to test behavior on empty response
+	newPeerID := ids.GenerateTestShortID()
+	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
+	expectedPeerID = newPeerID
+
+	if err := bs.Ancestors(peerID, *requestID, [][]byte{}); err != nil { // respond with empty
+		t.Fatal(err)
+	} else if requested != blkID1 {
+		t.Fatal("should have requested blk1")
+	}
+
+	if err := bs.Ancestors(newPeerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
+		t.Fatal(err)
+	} else if requested != blkID1 {
+		t.Fatal("should not have requested another block")
+	}
+
+	switch {
+	case config.Ctx.GetState() != snow.NormalOp:
+		t.Fatalf("Bootstrapping should have finished")
+	case blk0.Status() != choices.Accepted:
+		t.Fatalf("Block should be accepted")
+	case blk1.Status() != choices.Accepted:
+		t.Fatalf("Block should be accepted")
+	case blk2.Status() != choices.Accepted:
+		t.Fatalf("Block should be accepted")
+	}
+
+	// check peerID was removed from the fetch set
+	assert.False(t, bs.(*bootstrapper).fetchFrom.Contains(peerID))
+}
+
 // There are multiple needed blocks and Ancestors returns all at once
 func TestBootstrapperAncestors(t *testing.T) {
 	config, peerID, sender, vm := newConfig(t)
