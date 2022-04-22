@@ -22,6 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+const (
+	DefaultHTTPPort    = 9650
+	DefaultStakingPort = 9651
+)
+
 // Results of parsing the CLI
 var (
 	defaultNetworkName     = constants.MainnetName
@@ -190,7 +195,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
-	fs.Uint(HTTPPortKey, 9650, "Port of the HTTP server")
+	fs.Uint(HTTPPortKey, DefaultHTTPPort, "Port of the HTTP server")
 	fs.Bool(HTTPSEnabledKey, false, "Upgrade the HTTP server to HTTPs")
 	fs.String(HTTPSKeyFileKey, "", fmt.Sprintf("TLS private key file for the HTTPs server. Ignored if %s is specified", HTTPSKeyContentKey))
 	fs.String(HTTPSKeyContentKey, "", "Specifies base64 encoded TLS private key for the HTTPs server")
@@ -228,7 +233,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
-	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
+	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required")
 	fs.Bool(StakingEphemeralCertEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID")
 	fs.String(StakingKeyPathKey, defaultStakingKeyPath, fmt.Sprintf("Path to the TLS private key for staking. Ignored if %s is specified", StakingKeyContentKey))

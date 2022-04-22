@@ -3,6 +3,7 @@ syntax = "proto3";
 package vm;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "io/prometheus/client/metrics.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/vm";
@@ -78,7 +79,7 @@ message InitializeResponse {
   uint32 status = 3;
   uint64 height = 4;
   bytes bytes = 5;
-  bytes timestamp = 6;
+  google.protobuf.Timestamp timestamp = 6;
 }
 
 message VersionedDBServer {
@@ -117,7 +118,7 @@ message BuildBlockResponse {
   bytes parent_id = 2;
   bytes bytes = 3;
   uint64 height = 4;
-  bytes timestamp = 5;
+  google.protobuf.Timestamp timestamp = 5;
   // status is always processing
 }
 
@@ -130,7 +131,7 @@ message ParseBlockResponse {
   bytes parent_id = 2;
   uint32 status = 3;
   uint64 height = 4;
-  bytes timestamp = 5;
+  google.protobuf.Timestamp timestamp = 5;
 }
 
 message GetBlockRequest {
@@ -142,7 +143,9 @@ message GetBlockResponse {
   bytes bytes = 2;
   uint32 status = 3;
   uint64 height = 4;
-  bytes timestamp = 5;
+  google.protobuf.Timestamp timestamp = 5;
+  // used to propagate database.ErrNotFound through RPC
+  uint32 err = 6;
 }
 
 message SetPreferenceRequest {
@@ -154,7 +157,7 @@ message BlockVerifyRequest {
 }
 
 message BlockVerifyResponse {
-  bytes timestamp = 1;
+  google.protobuf.Timestamp timestamp = 1;
 }
 
 message BlockAcceptRequest {
@@ -185,7 +188,7 @@ message AppRequestMsg {
   // The ID of this request
   uint32 request_id = 2;
   // deadline for this request
-  bytes deadline = 3;
+  google.protobuf.Timestamp deadline = 3;
   // The request body
   bytes request = 4;
 }

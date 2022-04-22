@@ -177,7 +177,7 @@ type Client interface {
 	) (*GetTxStatusResponse, error)
 	// GetStake returns the amount of nAVAX that [addresses] have cumulatively
 	// staked on the Primary Network.
-	GetStake(ctx context.Context, addrs []string, options ...rpc.Option) (*GetStakeReply, error)
+	GetStake(ctx context.Context, addrs []string, options ...rpc.Option) (uint64, [][]byte, error)
 	// GetMinStake returns the minimum staking amount in nAVAX for validators
 	// and delegators respectively
 	GetMinStake(ctx context.Context, options ...rpc.Option) (uint64, uint64, error)
@@ -654,12 +654,27 @@ func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason 
 	}
 }
 
-func (c *client) GetStake(ctx context.Context, addrs []string, options ...rpc.Option) (*GetStakeReply, error) {
+func (c *client) GetStake(ctx context.Context, addrs []string, options ...rpc.Option) (uint64, [][]byte, error) {
 	res := new(GetStakeReply)
-	err := c.requester.SendRequest(ctx, "getStake", &api.JSONAddresses{
-		Addresses: addrs,
+	err := c.requester.SendRequest(ctx, "getStake", &GetStakeArgs{
+		JSONAddresses: api.JSONAddresses{
+			Addresses: addrs,
+		},
+		Encoding: formatting.Hex,
 	}, res, options...)
-	return res, err
+	if err != nil {
+		return 0, nil, err
+	}
+
+	outputs := make([][]byte, len(res.Outputs))
+	for i, outputStr := range res.Outputs {
+		output, err := formatting.Decode(res.Encoding, outputStr)
+		if err != nil {
+			return 0, nil, err
+		}
+		outputs[i] = output
+	}
+	return uint64(res.Staked), outputs, err
 }
 
 func (c *client) GetMinStake(ctx context.Context, options ...rpc.Option) (uint64, uint64, error) {

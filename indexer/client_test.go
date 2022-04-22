@@ -7,10 +7,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 type mockClient struct {
@@ -37,7 +37,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		index, err := client.GetIndex(context.Background(), &GetIndexArgs{ContainerID: ids.Empty, Encoding: formatting.Hex})
+		index, err := client.GetIndex(context.Background(), ids.Empty)
 		assert.NoError(err)
 		assert.EqualValues(5, index)
 	}
@@ -52,7 +52,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		container, err := client.GetLastAccepted(context.Background(), &GetLastAcceptedArgs{Encoding: formatting.Hex})
+		container, err := client.GetLastAccepted(context.Background())
 		assert.NoError(err)
 		assert.EqualValues(id, container.ID)
 	}
@@ -67,7 +67,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		containers, err := client.GetContainerRange(context.Background(), &GetContainerRangeArgs{StartIndex: 1, NumToFetch: 10, Encoding: formatting.Hex})
+		containers, err := client.GetContainerRange(context.Background(), 1, 10)
 		assert.NoError(err)
 		assert.Len(containers, 1)
 		assert.EqualValues(id, containers[0].ID)
@@ -78,11 +78,11 @@ func TestIndexClient(t *testing.T) {
 			assert:         assert,
 			expectedMethod: "isAccepted",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*bool)) = true
+				*(reply.(*IsAcceptedResponse)) = IsAcceptedResponse{IsAccepted: true}
 				return nil
 			},
 		}
-		isAccepted, err := client.IsAccepted(context.Background(), &GetIndexArgs{ContainerID: ids.Empty, Encoding: formatting.Hex})
+		isAccepted, err := client.IsAccepted(context.Background(), ids.Empty)
 		assert.NoError(err)
 		assert.True(isAccepted)
 	}
@@ -97,7 +97,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		container, err := client.GetContainerByID(context.Background(), &GetIndexArgs{ContainerID: id, Encoding: formatting.Hex})
+		container, err := client.GetContainerByID(context.Background(), id)
 		assert.NoError(err)
 		assert.EqualValues(id, container.ID)
 	}
