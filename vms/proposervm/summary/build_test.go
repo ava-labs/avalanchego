@@ -32,11 +32,7 @@ func TestBuild(t *testing.T) {
 func TestBuildEmptySummary(t *testing.T) {
 	assert := assert.New(t)
 
-	EmptySummary := &block.TestSummary{
-		HeightV: 0,
-		IDV:     ids.Empty,
-		BytesV:  nil,
-	}
+	emptySummary := &block.TestSummary{}
 	builtSummary, err := BuildEmptyProposerSummary()
 	assert.NoError(err)
 
@@ -44,5 +40,5 @@ func TestBuildEmptySummary(t *testing.T) {
 	assert.Equal(builtSummary.Height(), uint64(0))
 	assert.Equal(builtSummary.Bytes(), []byte(nil))
 	assert.Equal(builtSummary.BlockID(), ids.Empty)
-	assert.Equal(builtSummary.InnerBytes(), EmptySummary.Bytes())
+	assert.Equal(builtSummary.InnerBytes(), emptySummary.Bytes())
 }
