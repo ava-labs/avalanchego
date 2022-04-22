@@ -55,11 +55,7 @@ func init() {
 
 	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
 
-	emptySummary = &block.TestSummary{
-		HeightV: 0,
-		IDV:     ids.Empty,
-		BytesV:  nil,
-	}
+	emptySummary = &block.TestSummary{}
 }
 
 // helper to build
