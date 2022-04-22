@@ -12,18 +12,18 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 )
 
-func TestHeightIndexRequiredResets(t *testing.T) {
+func TestHasIndexReset(t *testing.T) {
 	a := assert.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	s := New(vdb)
-	required, err := s.GetIndexResetRequired()
+	wasReset, err := s.HasIndexReset()
 	a.NoError(err)
-	a.True(required)
+	a.False(wasReset)
 	err = s.ResetHeightIndex()
 	a.NoError(err)
-	required, err = s.GetIndexResetRequired()
+	wasReset, err = s.HasIndexReset()
 	a.NoError(err)
-	a.False(required)
+	a.True(wasReset)
 }
