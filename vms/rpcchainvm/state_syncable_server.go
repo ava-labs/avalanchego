@@ -165,7 +165,7 @@ func (vm *VMServer) SummaryAccept(
 		accepted, err = false, block.ErrStateSyncableVMNotImplemented
 	} else {
 		var summary block.Summary
-		summary, err = vm.ssVM.GetStateSummary(req.Height)
+		summary, err = vm.ssVM.ParseStateSummary(req.Bytes)
 		if err == nil {
 			accepted, err = summary.Accept()
 		}

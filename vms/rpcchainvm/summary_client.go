@@ -33,7 +33,7 @@ func (s *SummaryClient) Accept() (bool, error) {
 	resp, err := s.vm.client.SummaryAccept(
 		context.Background(),
 		&vmpb.SummaryAcceptRequest{
-			Height: s.height,
+			Bytes: s.bytes,
 		},
 	)
 	if err != nil {

@@ -297,7 +297,7 @@ message GetStateSummaryResponse {
 }
 
 message SummaryAcceptRequest {
-  uint64 height = 1;
+  bytes bytes = 1;
 }
 
 message SummaryAcceptResponse {
