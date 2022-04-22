@@ -21,17 +21,13 @@ type statefulSummary struct {
 }
 
 func (ss *statefulSummary) Accept() error {
-	// Following state sync introduction, we update height -> blockID index
-	// with summary content in order to support resuming state sync in case
-	// of shutdown. The height index allows to retrieve the proposerBlkID
-	// of any state sync passed down to coreVM, so that the proposerVM state summary
-	// information of any coreVM summary can be rebuilt and pass to the engine, even
-	// following a shutdown.
+	// A non-empty summary must update the block height index with its blockID
+	// ( i.e. the ID of the block summary refers to). This helps resuming
+	// state sync after a shutdown since height index allows retrieving
+	// proposerBlkID from innerSummary.Height.
 	// Note that we won't download all the blocks associated with state summaries,
 	// so proposerVM may not not all the full blocks indexed into height index. Same
 	// is true for coreVM.
-	// Finally note that an empty summary may be accepted, which has empty ID.
-	// Such summary must not be added to height index.
 	if ss.ID() != ids.Empty {
 		if err := ss.vm.updateHeightIndex(ss.Height(), ss.BlockID()); err != nil {
 			return err
