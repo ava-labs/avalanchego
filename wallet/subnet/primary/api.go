@@ -38,7 +38,7 @@ var (
 type UTXOClient interface {
 	GetAtomicUTXOs(
 		ctx context.Context,
-		addrs []string,
+		addrs []ids.ShortID,
 		sourceChain string,
 		limit uint32,
 		startAddress,
@@ -49,22 +49,18 @@ type UTXOClient interface {
 
 func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context, x.Context, UTXOs, error) {
 	infoClient := info.NewClient(uri)
-	xClient := avm.NewClient(uri, "X")
+	networkID, err := infoClient.GetNetworkID(ctx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	xClient := avm.NewClient(uri, "X", networkID)
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	pAddrs, err := FormatAddresses("P", pCTX.HRP(), addrs)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 
 	xCTX, err := x.NewContextFromClients(ctx, infoClient, xClient)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	xAddrs, err := FormatAddresses("X", xCTX.HRP(), addrs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -74,19 +70,16 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 		id     ids.ID
 		client UTXOClient
 		codec  codec.Manager
-		addrs  []string
 	}{
 		{
 			id:     constants.PlatformChainID,
-			client: platformvm.NewClient(uri),
+			client: platformvm.NewClient(uri, networkID),
 			codec:  platformvm.Codec,
-			addrs:  pAddrs,
 		},
 		{
 			id:     xCTX.BlockchainID(),
 			client: xClient,
 			codec:  x.Codec,
-			addrs:  xAddrs,
 		},
 	}
 	for _, destinationChain := range chains {
@@ -98,7 +91,7 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 				destinationChain.codec,
 				sourceChain.id,
 				destinationChain.id,
-				destinationChain.addrs,
+				addrs.List(),
 			)
 			if err != nil {
 				return nil, nil, nil, err
@@ -134,7 +127,7 @@ func AddAllUTXOs(
 	codec codec.Manager,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
-	addrs []string,
+	addrs []ids.ShortID,
 ) error {
 	var (
 		sourceChainIDStr = sourceChainID.String()

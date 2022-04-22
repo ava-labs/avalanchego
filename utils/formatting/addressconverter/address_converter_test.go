@@ -1,11 +1,12 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package formatting
+package addressconverter
 
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -55,7 +56,7 @@ func TestAddressConversion(t *testing.T) {
 			srcAddrs: []string{
 				"not a valid address",
 			},
-			expectedErr: errNoSeparator,
+			expectedErr: formatting.ErrNoSeparator,
 		},
 	}
 	for _, test := range tests {

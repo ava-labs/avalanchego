@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -156,7 +157,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 			tests.Outf("{{blue}}waiting before querying metrics{{/}}\n")
 
 			for _, u := range uris {
-				xc := avm.NewClient(u, "X")
+				xc := avm.NewClient(u, "X", constants.MainnetID)
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
 				cancel()

@@ -13,10 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
+
+const chainIDAlias = "X"
 
 // Interface compliance
 var _ Client = &client{}
@@ -37,17 +40,17 @@ type Client interface {
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
-		addrs []string,
+		addrs []ids.ShortID,
 		limit uint32,
 		startAddress,
 		startUTXOID string,
 		options ...rpc.Option,
 	) ([][]byte, api.Index, error)
-	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addrs]
 	// from [sourceChain]
 	GetAtomicUTXOs(
 		ctx context.Context,
-		addrs []string,
+		addrs []ids.ShortID,
 		sourceChain string,
 		limit uint32,
 		startAddress,
@@ -58,10 +61,10 @@ type Client interface {
 	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
-	GetBalance(ctx context.Context, addr string, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
+	GetBalance(ctx context.Context, addr ids.ShortID, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
 	// CreateAsset creates a new asset and returns its assetID
-	GetAllBalances(context.Context, string, bool, ...rpc.Option) (*GetAllBalancesReply, error)
+	GetAllBalances(context.Context, ids.ShortID, bool, ...rpc.Option) (*GetAllBalancesReply, error)
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -114,7 +117,7 @@ type Client interface {
 	// ListAddresses returns all addresses on this chain controlled by [user]
 	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
-	ExportKey(ctx context.Context, user api.UserPass, addr string, options ...rpc.Option) (string, error)
+	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (string, error)
 	// ImportKey imports [privateKey] to [user]
 	ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error)
 	// Mint [amount] of [assetID] to be owned by [to]
@@ -170,12 +173,15 @@ type Client interface {
 // implementation for an AVM client for interacting with avm [chain]
 type client struct {
 	requester rpc.EndpointRequester
+	// used for address ID -> string conversion
+	hrp string
 }
 
 // NewClient returns an AVM client for interacting with avm [chain]
-func NewClient(uri, chain string) Client {
+func NewClient(uri string, chain string, networkID uint32) Client {
 	return &client{
 		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s", constants.ChainAliasPrefix+chain), "avm"),
+		hrp:       constants.GetHRP(networkID),
 	}
 }
 
@@ -243,7 +249,7 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 
 func (c *client) GetUTXOs(
 	ctx context.Context,
-	addrs []string,
+	addrs []ids.ShortID,
 	limit uint32,
 	startAddress string,
 	startUTXOID string,
@@ -254,7 +260,7 @@ func (c *client) GetUTXOs(
 
 func (c *client) GetAtomicUTXOs(
 	ctx context.Context,
-	addrs []string,
+	addrs []ids.ShortID,
 	sourceChain string,
 	limit uint32,
 	startAddress string,
@@ -262,8 +268,12 @@ func (c *client) GetAtomicUTXOs(
 	options ...rpc.Option,
 ) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
-	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
-		Addresses:   addrs,
+	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
+	if err != nil {
+		return nil, api.Index{}, err
+	}
+	err = c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
+		Addresses:   addrsStr,
 		SourceChain: sourceChain,
 		Limit:       cjson.Uint32(limit),
 		StartIndex: api.Index{
@@ -297,14 +307,18 @@ func (c *client) GetAssetDescription(ctx context.Context, assetID string, option
 
 func (c *client) GetBalance(
 	ctx context.Context,
-	addr string,
+	addr ids.ShortID,
 	assetID string,
 	includePartial bool,
 	options ...rpc.Option,
 ) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
-	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
-		Address:        addr,
+	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
+	if err != nil {
+		return nil, err
+	}
+	err = c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
+		Address:        addrStr,
 		AssetID:        assetID,
 		IncludePartial: includePartial,
 	}, res, options...)
@@ -313,13 +327,17 @@ func (c *client) GetBalance(
 
 func (c *client) GetAllBalances(
 	ctx context.Context,
-	addr string,
+	addr ids.ShortID,
 	includePartial bool,
 	options ...rpc.Option,
 ) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
-	err := c.requester.SendRequest(ctx, "getAllBalances", &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addr},
+	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
+	if err != nil {
+		return nil, err
+	}
+	err = c.requester.SendRequest(ctx, "getAllBalances", &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
 		IncludePartial: includePartial,
 	}, res, options...)
 	return res, err
@@ -441,11 +459,15 @@ func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options .
 	return res.Addresses, err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr string, options ...rpc.Option) (string, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (string, error) {
 	res := &ExportKeyReply{}
-	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
+	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
+	if err != nil {
+		return "", err
+	}
+	err = c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
-		Address:  addr,
+		Address:  addrStr,
 	}, res, options...)
 	return res.PrivateKey, err
 }
