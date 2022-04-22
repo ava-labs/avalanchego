@@ -200,15 +200,14 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		return nil, err
 	}
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
 		Status:               uint32(choices.Accepted),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
-		Timestamp:            timeBytes,
-	}, err
+		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
@@ -332,14 +331,13 @@ func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmpb.BuildBloc
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.BuildBlockResponse{
 		Id:        blkID[:],
 		ParentId:  parentID[:],
 		Bytes:     blk.Bytes(),
 		Height:    blk.Height(),
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) ParseBlock(_ context.Context, req *vmpb.ParseBlockRequest) (*vmpb.ParseBlockResponse, error) {
@@ -349,14 +347,13 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmpb.ParseBlockRequest) (
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.ParseBlockResponse{
 		Id:        blkID[:],
 		ParentId:  parentID[:],
 		Status:    uint32(blk.Status()),
 		Height:    blk.Height(),
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) GetAncestors(_ context.Context, req *vmpb.GetAncestorsRequest) (*vmpb.GetAncestorsResponse, error) {
@@ -409,14 +406,13 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmpb.GetBlockRequest) (*vmp
 		return nil, err
 	}
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.GetBlockResponse{
 		ParentId:  parentID[:],
 		Bytes:     blk.Bytes(),
 		Status:    uint32(blk.Status()),
 		Height:    blk.Height(),
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequest) (*emptypb.Empty, error) {
@@ -515,8 +511,8 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emp
 	if err != nil {
 		return nil, err
 	}
-	var deadline time.Time
-	if err := deadline.UnmarshalBinary(req.Deadline); err != nil {
+	deadline, err := grpcutils.TimestampAsTime(req.Deadline)
+	if err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestId, deadline, req.Request)
@@ -554,10 +550,9 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmpb.BlockVerifyRequest)
 	if err := blk.Verify(); err != nil {
 		return nil, err
 	}
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.BlockVerifyResponse{
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) BlockAccept(_ context.Context, req *vmpb.BlockAcceptRequest) (*emptypb.Empty, error) {
