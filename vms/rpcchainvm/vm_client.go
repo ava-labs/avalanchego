@@ -462,6 +462,9 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
 
 	parentID, err := ids.ToID(resp.ParentId)
 	if err != nil {

@@ -403,8 +403,11 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmpb.GetBlockRequest) (*vmp
 	}
 	blk, err := vm.vm.GetBlock(id)
 	if err != nil {
-		return nil, err
+		return &vmpb.GetBlockResponse{
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
 	}
+
 	parentID := blk.Parent()
 	return &vmpb.GetBlockResponse{
 		ParentId:  parentID[:],

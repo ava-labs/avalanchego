@@ -134,6 +134,8 @@ message GetBlockResponse {
   uint32 status = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
+  // used to propagate database.ErrNotFound through RPC
+  uint32 err = 6;
 }
 
 message SetPreferenceRequest {

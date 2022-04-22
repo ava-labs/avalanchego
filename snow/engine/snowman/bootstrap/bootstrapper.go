@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -70,6 +71,10 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 
 	config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
+
+	// initialize set of validators to fetch containers from using [Config.Beacons]
+	b.setFetchFrom(b.Config.Beacons)
+
 	return b, nil
 }
 
@@ -105,6 +110,12 @@ type bootstrapper struct {
 	parser *parser
 
 	awaitingTimeout bool
+
+	// set of validators to fetch containers from
+	// initialized to config.Beacons, vdrs responding
+	// with empty GetAncestors messages are removed
+	// from this set so we avoid contacting them again
+	fetchFrom ids.ShortSet
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
@@ -113,6 +124,10 @@ func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byt
 	lenBlks := len(blks)
 	if lenBlks == 0 {
 		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
+		// avoid contacting [vdr] about ancestors again
+		if err := b.markUnavailable(vdr); err != nil {
+			return err
+		}
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
 	if lenBlks > b.Config.AncestorsMaxContainersReceived {
@@ -294,15 +309,26 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 		return b.checkFinish()
 	}
 
-	validators, err := b.Config.Beacons.Sample(1) // validator to send request to
-	if err != nil {
+	validatorID, ok := b.fetchFrom.Peek()
+	if !ok {
 		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
 	}
-	validatorID := validators[0].ID()
 	b.Config.SharedCfg.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
 	b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
+	return nil
+}
+
+// markUnavailable removes [vdr] from the set of validators used to fetch ancestors.
+// if the set becomes empty, it is reset to [b.Config.Beacons] so bootstrapping can continue.
+func (b *bootstrapper) markUnavailable(vdr ids.ShortID) error {
+	b.fetchFrom.Remove(vdr)
+
+	// if [fetchFrom] has become empty, reset it to [b.Config.Beacons]
+	if b.fetchFrom.Len() == 0 {
+		b.setFetchFrom(b.Config.Beacons)
+	}
 	return nil
 }
 
@@ -473,4 +499,12 @@ func (b *bootstrapper) finish() error {
 
 	// Start consensus
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
+}
+
+// setFetchFrom populates fetchFrom using [beacons]
+func (b *bootstrapper) setFetchFrom(beacons validators.Set) {
+	b.fetchFrom = ids.NewShortSet(beacons.Len())
+	for _, vdr := range beacons.List() {
+		b.fetchFrom.Add(vdr.ID())
+	}
 }
