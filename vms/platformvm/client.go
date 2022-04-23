@@ -29,22 +29,22 @@ type Client interface {
 	// ExportKey returns the private key corresponding to [address] from [user]'s account
 	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (string, error)
 	// ImportKey imports the specified [privateKey] to [user]'s keystore
-	ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (ids.ShortID, error)
 	// GetBalance returns the balance of [addrs] on the P Chain
 	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
 	// CreateAddress creates a new address for [user]
-	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error)
+	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error)
 	// ListAddresses returns an array of platform addresses controlled by [user]
-	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error)
+	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
 		addrs []ids.ShortID,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
+	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addrs]
 	// from [sourceChain]
 	GetAtomicUTXOs(
@@ -52,12 +52,12 @@ type Client interface {
 		addrs []ids.ShortID,
 		sourceChain string,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
+	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetSubnets returns information about the specified subnets
-	GetSubnets(context.Context, []ids.ID, ...rpc.Option) ([]APISubnet, error)
+	GetSubnets(context.Context, []ids.ID, ...rpc.Option) ([]ClientSubnet, error)
 	// GetStakingAssetID returns the assetID of the asset used for staking on
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
@@ -68,15 +68,15 @@ type Client interface {
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
 	GetCurrentSupply(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]string, error)
+	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.ShortID, error)
 	// AddValidator issues a transaction to add a validator to the primary network
 	// and returns the txID
 	AddValidator(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		rewardAddress string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		rewardAddress ids.ShortID,
 		nodeID ids.ShortID,
 		stakeAmount,
 		startTime,
@@ -89,9 +89,9 @@ type Client interface {
 	AddDelegator(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		rewardAddress string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		rewardAddress ids.ShortID,
 		nodeID ids.ShortID,
 		stakeAmount,
 		startTime,
@@ -103,9 +103,9 @@ type Client interface {
 	AddSubnetValidator(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		subnetID string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		subnetID ids.ID,
 		nodeID ids.ShortID,
 		stakeAmount,
 		startTime,
@@ -116,9 +116,9 @@ type Client interface {
 	CreateSubnet(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		controlKeys []string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		controlKeys []ids.ShortID,
 		threshold uint32,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -241,13 +241,16 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.S
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,
 		PrivateKey: privateKey,
 	}, res, options...)
-	return res.Address, err
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return addressconverter.ParseAddressToID(res.Address)
 }
 
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
@@ -262,26 +265,32 @@ func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ..
 	return res, err
 }
 
-func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error) {
+func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "createAddress", &user, res, options...)
-	return res.Address, err
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return addressconverter.ParseAddressToID(res.Address)
 }
 
-func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error) {
+func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest(ctx, "listAddresses", &user, res, options...)
-	return res.Addresses, err
+	if err != nil {
+		return nil, err
+	}
+	return addressconverter.ParseAddressesToID(res.Addresses)
 }
 
 func (c *client) GetUTXOs(
 	ctx context.Context,
 	addrs []ids.ShortID,
 	limit uint32,
-	startAddress string,
-	startUTXOID string,
+	startAddress ids.ShortID,
+	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([][]byte, api.Index, error) {
+) ([][]byte, ids.ShortID, ids.ID, error) {
 	return c.GetAtomicUTXOs(ctx, addrs, "", limit, startAddress, startUTXOID, options...)
 }
 
@@ -290,46 +299,82 @@ func (c *client) GetAtomicUTXOs(
 	addrs []ids.ShortID,
 	sourceChain string,
 	limit uint32,
-	startAddress string,
-	startUTXOID string,
+	startAddress ids.ShortID,
+	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([][]byte, api.Index, error) {
+) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
 	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
 	if err != nil {
-		return nil, api.Index{}, err
+		return nil, ids.ShortID{}, ids.Empty, err
 	}
+	startAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, startAddress[:])
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	startUTXOIDStr := startUTXOID.String()
 	err = c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrsStr,
 		SourceChain: sourceChain,
 		Limit:       json.Uint32(limit),
 		StartIndex: api.Index{
-			Address: startAddress,
-			UTXO:    startUTXOID,
+			Address: startAddressStr,
+			UTXO:    startUTXOIDStr,
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
 	if err != nil {
-		return nil, api.Index{}, err
+		return nil, ids.ShortID{}, ids.Empty, err
 	}
 
 	utxos := make([][]byte, len(res.UTXOs))
 	for i, utxo := range res.UTXOs {
 		utxoBytes, err := formatting.Decode(res.Encoding, utxo)
 		if err != nil {
-			return nil, api.Index{}, err
+			return nil, ids.ShortID{}, ids.Empty, err
 		}
 		utxos[i] = utxoBytes
 	}
-	return utxos, res.EndIndex, nil
+	endAddr, err := addressconverter.ParseAddressToID(res.EndIndex.Address)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	endUTXOID, err := ids.FromString(res.EndIndex.UTXO)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	return utxos, endAddr, endUTXOID, nil
 }
 
-func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Option) ([]APISubnet, error) {
+// ClientSubnet is a representation of a subnet used in client methods
+type ClientSubnet struct {
+	// ID of the subnet
+	ID ids.ID
+	// Each element of [ControlKeys] the address of a public key.
+	// A transaction to add a validator to this subnet requires
+	// signatures from [Threshold] of these keys to be valid.
+	ControlKeys []ids.ShortID
+	Threshold   uint32
+}
+
+func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Option) ([]ClientSubnet, error) {
 	res := &GetSubnetsResponse{}
 	err := c.requester.SendRequest(ctx, "getSubnets", &GetSubnetsArgs{
 		IDs: ids,
 	}, res, options...)
-	return res.Subnets, err
+	if err != nil {
+		return nil, err
+	}
+	subnets := make([]ClientSubnet, len(res.Subnets))
+	for i, APIsubnet := range res.Subnets {
+		subnets[i].ID = APIsubnet.ID
+		subnets[i].ControlKeys, err = addressconverter.ParseAddressesToID(APIsubnet.ControlKeys)
+		if err != nil {
+			return nil, err
+		}
+		subnets[i].Threshold = uint32(APIsubnet.Threshold)
+	}
+	return subnets, err
 }
 
 func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error) {
@@ -382,21 +427,31 @@ func (c *client) GetCurrentSupply(ctx context.Context, options ...rpc.Option) (u
 	return uint64(res.Supply), err
 }
 
-func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]string, error) {
+func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.ShortID, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
 		Size:     json.Uint16(sampleSize),
 	}, res, options...)
-	return res.Validators, err
+	if err != nil {
+		return nil, err
+	}
+	validators := make([]ids.ShortID, len(res.Validators))
+	for i, validatorStr := range res.Validators {
+		validators[i], err = ids.ShortFromPrefixedString(validatorStr, constants.NodeIDPrefix)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return validators, nil
 }
 
 func (c *client) AddValidator(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	rewardAddress string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	rewardAddress ids.ShortID,
 	nodeID ids.ShortID,
 	stakeAmount,
 	startTime,
@@ -405,11 +460,19 @@ func (c *client) AddValidator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	rewardAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, rewardAddress[:])
+	if err != nil {
+		return ids.Empty, err
+	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
-	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
+	err = c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:      user,
-			JSONFromAddrs: api.JSONFromAddrs{From: from},
+			JSONFromAddrs: api.JSONFromAddrs{From: fromStr},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -417,7 +480,7 @@ func (c *client) AddValidator(
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		RewardAddress:     rewardAddress,
+		RewardAddress:     rewardAddressStr,
 		DelegationFeeRate: json.Float32(delegationFeeRate),
 	}, res, options...)
 	return res.TxID, err
@@ -426,9 +489,9 @@ func (c *client) AddValidator(
 func (c *client) AddDelegator(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	rewardAddress string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	rewardAddress ids.ShortID,
 	nodeID ids.ShortID,
 	stakeAmount,
 	startTime,
@@ -436,19 +499,31 @@ func (c *client) AddDelegator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	rewardAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, rewardAddress[:])
+	if err != nil {
+		return ids.Empty, err
+	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
-	err := c.requester.SendRequest(ctx, "addDelegator", &AddDelegatorArgs{
+	err = c.requester.SendRequest(ctx, "addDelegator", &AddDelegatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		}, APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		RewardAddress: rewardAddress,
+		RewardAddress: rewardAddressStr,
 	}, res, options...)
 	return res.TxID, err
 }
@@ -456,9 +531,9 @@ func (c *client) AddDelegator(
 func (c *client) AddSubnetValidator(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	subnetID string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	subnetID ids.ID,
 	nodeID ids.ShortID,
 	stakeAmount,
 	startTime,
@@ -466,12 +541,20 @@ func (c *client) AddSubnetValidator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
-	err := c.requester.SendRequest(ctx, "addSubnetValidator", &AddSubnetValidatorArgs{
+	err = c.requester.SendRequest(ctx, "addSubnetValidator", &AddSubnetValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -479,7 +562,7 @@ func (c *client) AddSubnetValidator(
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		SubnetID: subnetID,
+		SubnetID: subnetID.String(),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -487,21 +570,33 @@ func (c *client) AddSubnetValidator(
 func (c *client) CreateSubnet(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	controlKeys []string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	controlKeys []ids.ShortID,
 	threshold uint32,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	controlKeysStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, controlKeys)
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		APISubnet: APISubnet{
-			ControlKeys: controlKeys,
+			ControlKeys: controlKeysStr,
 			Threshold:   json.Uint32(threshold),
 		},
 	}, res, options...)

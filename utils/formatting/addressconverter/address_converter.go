@@ -47,3 +47,27 @@ func FormatAddressesFromID(
 	}
 	return addrsStr, nil
 }
+
+func ParseAddressToID(addrStr string) (ids.ShortID, error) {
+	_, _, addrBytes, err := formatting.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	addr, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return addr, nil
+}
+
+func ParseAddressesToID(addrsStr []string) ([]ids.ShortID, error) {
+	var err error
+	addrs := make([]ids.ShortID, len(addrsStr))
+	for i, addrStr := range addrsStr {
+		addrs[i], err = ParseAddressToID(addrStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return addrs, nil
+}
