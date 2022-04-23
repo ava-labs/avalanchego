@@ -62,9 +62,11 @@ func (requester jsonRPCRequester) SendJSONRPCRequest(
 	}
 
 	url := fmt.Sprintf("%s/%s%s", requester.uri, endpoint, queryParamsStr)
+	logSafeUrl := stripPassword(url)
+
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
-		return fmt.Errorf("problem while creating JSON RPC POST request to %s: %s", url, err)
+		return fmt.Errorf("problem while creating JSON RPC POST request to %s: %s", logSafeUrl, err)
 	}
 
 	req.Header = headers
@@ -72,7 +74,7 @@ func (requester jsonRPCRequester) SendJSONRPCRequest(
 
 	resp, err := requester.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("problem while making JSON RPC POST request to %s: %w", url, err)
+		return fmt.Errorf("problem while making JSON RPC POST request to %s: %w", logSafeUrl, err)
 	}
 	statusCode := resp.StatusCode
 
