@@ -76,8 +76,8 @@ type Client interface {
 		user api.UserPass,
 		from []string,
 		changeAddr string,
-		rewardAddress,
-		nodeID string,
+		rewardAddress string,
+		nodeID ids.ShortID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -91,8 +91,8 @@ type Client interface {
 		user api.UserPass,
 		from []string,
 		changeAddr string,
-		rewardAddress,
-		nodeID string,
+		rewardAddress string,
+		nodeID ids.ShortID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -105,8 +105,8 @@ type Client interface {
 		user api.UserPass,
 		from []string,
 		changeAddr string,
-		subnetID,
-		nodeID string,
+		subnetID string,
+		nodeID ids.ShortID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -191,7 +191,7 @@ type Client interface {
 	GetMaxStakeAmount(
 		ctx context.Context,
 		subnetID ids.ID,
-		nodeID string,
+		nodeID ids.ShortID,
 		startTime uint64,
 		endTime uint64,
 		options ...rpc.Option,
@@ -396,8 +396,8 @@ func (c *client) AddValidator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
-	rewardAddress,
-	nodeID string,
+	rewardAddress string,
+	nodeID ids.ShortID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -412,7 +412,7 @@ func (c *client) AddValidator(
 			JSONFromAddrs: api.JSONFromAddrs{From: from},
 		},
 		APIStaker: APIStaker{
-			NodeID:      nodeID,
+			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -428,8 +428,8 @@ func (c *client) AddDelegator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
-	rewardAddress,
-	nodeID string,
+	rewardAddress string,
+	nodeID ids.ShortID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -443,7 +443,7 @@ func (c *client) AddDelegator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		}, APIStaker: APIStaker{
-			NodeID:      nodeID,
+			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -458,8 +458,8 @@ func (c *client) AddSubnetValidator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
-	subnetID,
-	nodeID string,
+	subnetID string,
+	nodeID ids.ShortID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -474,7 +474,7 @@ func (c *client) AddSubnetValidator(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
 		APIStaker: APIStaker{
-			NodeID:      nodeID,
+			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -711,11 +711,11 @@ func (c *client) GetTotalStake(ctx context.Context, options ...rpc.Option) (uint
 	return uint64(res.Stake), err
 }
 
-func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID string, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
+func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.ShortID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
 	res := new(GetMaxStakeAmountReply)
 	err := c.requester.SendRequest(ctx, "getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
-		NodeID:    nodeID,
+		NodeID:    nodeID.PrefixedString(constants.NodeIDPrefix),
 		StartTime: json.Uint64(startTime),
 		EndTime:   json.Uint64(endTime),
 	}, res, options...)
