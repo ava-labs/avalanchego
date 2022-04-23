@@ -5,6 +5,8 @@ package platformvm
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -384,6 +386,122 @@ func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options
 		SubnetID: subnetID,
 	}, res, options...)
 	return res.AssetID, err
+}
+
+const (
+	txIDKey        = "txID"
+	startTimeKey   = "startTime"
+	endTimeKey     = "endTime"
+	stakeAmountKey = "stakeAmount"
+	nodeIDKey      = "nodeID"
+	weightKey      = "weight"
+
+	rewardOwnerKey     = "rewardOwner"
+	locktimeKey        = "locktime"
+	thresholdKey       = "threshold"
+	addressesKey       = "addresses"
+	potentialRewardKey = "potentialReward"
+)
+
+type ClientOwner struct {
+	Locktime  uint64
+	Threshold uint32
+	Addresses []ids.ShortID
+}
+
+type ClientStaker struct {
+	TxID            ids.ID
+	StartTime       time.Time
+	EndTime         time.Time
+	StakeAmount     uint64
+	NodeID          ids.ShortID
+	Weight          uint64
+	RewardOwner     ClientOwner
+	PotentialReward uint64
+	DelegationFee   float32
+	Uptime          float32
+	Connected       bool
+	Delegators      []ClientStaker
+}
+
+func getClientStaker(vdrDgtMap map[string]interface{}) (ClientStaker, error) {
+	var err error
+	clientStaker := ClientStaker{}
+	txIDIntf, ok := vdrDgtMap[txIDKey]
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("key %q not found in map", txIDKey)
+	}
+	txIDStr := txIDIntf.(string)
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", txIDKey, txIDIntf)
+	}
+	clientStaker.TxID, err = ids.FromString(txIDStr)
+	if err != nil {
+		return ClientStaker{}, fmt.Errorf("couldn't parse %q from %q to ids.ID: %w", txIDKey, txIDStr, err)
+	}
+	startTimeIntf, ok := vdrDgtMap[startTimeKey]
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("key %q not found in map", startTimeKey)
+	}
+	startTimeStr, ok := startTimeIntf.(string)
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", startTimeKey, startTimeIntf)
+	}
+	startTimeUint, err := strconv.ParseUint(startTimeStr, 10, 64)
+	if err != nil {
+		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", startTimeKey, startTimeStr, err)
+	}
+	clientStaker.StartTime = time.Unix(int64(startTimeUint), 0)
+	endTimeIntf, ok := vdrDgtMap[endTimeKey]
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("key %q not found in map", endTimeKey)
+	}
+	endTimeStr, ok := endTimeIntf.(string)
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", endTimeKey, endTimeIntf)
+	}
+	endTimeUint, err := strconv.ParseUint(endTimeStr, 10, 64)
+	if err != nil {
+		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", endTimeKey, endTimeStr, err)
+	}
+	clientStaker.EndTime = time.Unix(int64(endTimeUint), 0)
+	stakeAmountIntf, ok := vdrDgtMap[stakeAmountKey]
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("key %q not found in map", stakeAmountKey)
+	}
+	stakeAmountStr, ok := stakeAmountIntf.(string)
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", stakeAmountKey, stakeAmountIntf)
+	}
+	clientStaker.StakeAmount, err = strconv.ParseUint(stakeAmountStr, 10, 64)
+	if err != nil {
+		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", stakeAmountKey, stakeAmountStr, err)
+	}
+	nodeIDIntf, ok := vdrDgtMap[nodeIDKey]
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("key %q not found in map", nodeIDKey)
+	}
+	nodeIDStr, ok := nodeIDIntf.(string)
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", nodeIDKey, nodeIDIntf)
+	}
+	clientStaker.NodeID, err = ids.ShortFromPrefixedString(nodeIDStr, constants.NodeIDPrefix)
+	if err != nil {
+		return ClientStaker{}, err
+	}
+	potentialRewardIntf, ok := vdrDgtMap[potentialRewardKey]
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("key %q not found in map", potentialRewardKey)
+	}
+	potentialRewardStr, ok := potentialRewardIntf.(string)
+	if !ok {
+		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", potentialRewardKey, potentialRewardIntf)
+	}
+	clientStaker.PotentialReward, err = strconv.ParseUint(potentialRewardStr, 10, 64)
+	if err != nil {
+		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", potentialRewardKey, potentialRewardStr, err)
+	}
+	return clientStaker, nil
 }
 
 func (c *client) GetCurrentValidators(
