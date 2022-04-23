@@ -126,9 +126,10 @@ type Client interface {
 	ExportAVAX(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		to string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		to ids.ShortID,
+		toChainIDAlias string,
 		amount uint64,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -136,9 +137,9 @@ type Client interface {
 	ImportAVAX(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr,
-		to,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		to ids.ShortID,
 		sourceChain string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -146,17 +147,17 @@ type Client interface {
 	CreateBlockchain(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		subnetID ids.ID,
-		vmID string,
-		fxIDs []string,
+		vmID ids.ID,
+		fxIDs []ids.ID,
 		name string,
 		genesisData []byte,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-	GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error)
+	GetBlockchainStatus(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (status.BlockchainStatus, error)
 	// ValidatedBy returns the ID of the Subnet that validates [blockchainID]
 	ValidatedBy(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// Validates returns the list of blockchains that are validated by the subnet with ID [subnetID]
@@ -202,7 +203,7 @@ type Client interface {
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
 	// GetValidatorsAt returns the weights of the validator set of a provided subnet
 	// at the specified height.
-	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[string]uint64, error)
+	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.ShortID]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 }
@@ -606,20 +607,33 @@ func (c *client) CreateSubnet(
 func (c *client) ExportAVAX(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	to string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	to ids.ShortID,
+	toChainIDAlias string,
 	amount uint64,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(toChainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		To:     to,
+		To:     toStr,
 		Amount: json.Uint64(amount),
 	}, res, options...)
 	return res.TxID, err
@@ -628,20 +642,32 @@ func (c *client) ExportAVAX(
 func (c *client) ImportAVAX(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr,
-	to,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	to ids.ShortID,
 	sourceChain string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "importAVAX", &ImportAVAXArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "importAVAX", &ImportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		To:          to,
+		To:          toStr,
 		SourceChain: sourceChain,
 	}, res, options...)
 	return res.TxID, err
@@ -650,11 +676,11 @@ func (c *client) ImportAVAX(
 func (c *client) CreateBlockchain(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	subnetID ids.ID,
-	vmID string,
-	fxIDs []string,
+	vmID ids.ID,
+	fxIDs []ids.ID,
 	name string,
 	genesisData []byte,
 	options ...rpc.Option,
@@ -665,15 +691,27 @@ func (c *client) CreateBlockchain(
 	}
 
 	res := &api.JSONTxID{}
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	fxIDsStr := make([]string, len(fxIDs))
+	for i, fxID := range fxIDs {
+		fxIDsStr[i] = fxID.String()
+	}
 	err = c.requester.SendRequest(ctx, "createBlockchain", &CreateBlockchainArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SubnetID:    subnetID,
-		VMID:        vmID,
-		FxIDs:       fxIDs,
+		VMID:        vmID.String(),
+		FxIDs:       fxIDsStr,
 		Name:        name,
 		GenesisData: genesisDataStr,
 		Encoding:    formatting.Hex,
@@ -681,10 +719,10 @@ func (c *client) CreateBlockchain(
 	return res.TxID, err
 }
 
-func (c *client) GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error) {
+func (c *client) GetBlockchainStatus(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (status.BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest(ctx, "getBlockchainStatus", &GetBlockchainStatusArgs{
-		BlockchainID: blockchainID,
+		BlockchainID: blockchainID.String(),
 	}, res, options...)
 	return res.Status, err
 }
@@ -840,13 +878,21 @@ func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 	return res.Timestamp, err
 }
 
-func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[string]uint64, error) {
+func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.ShortID]uint64, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
 		Height:   json.Uint64(height),
 	}, res, options...)
-	return res.Validators, err
+	validators := map[ids.ShortID]uint64{}
+	for validatorStr, validatorWeight := range res.Validators {
+		validatorID, err := ids.ShortFromPrefixedString(validatorStr, constants.NodeIDPrefix)
+		if err != nil {
+			return nil, err
+		}
+		validators[validatorID] = validatorWeight
+	}
+	return validators, err
 }
 
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
