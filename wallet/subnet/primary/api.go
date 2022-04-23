@@ -6,7 +6,6 @@ package primary
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -41,10 +40,10 @@ type UTXOClient interface {
 		addrs []ids.ShortID,
 		sourceChain string,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
+	) ([][]byte, ids.ShortID, ids.ID, error)
 }
 
 func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context, x.Context, UTXOs, error) {
@@ -131,11 +130,11 @@ func AddAllUTXOs(
 ) error {
 	var (
 		sourceChainIDStr = sourceChainID.String()
-		startAddr        string
-		startUTXO        string
+		startAddr        ids.ShortID
+		startUTXO        ids.ID
 	)
 	for {
-		utxosBytes, index, err := client.GetAtomicUTXOs(
+		utxosBytes, endAddr, endUTXO, err := client.GetAtomicUTXOs(
 			ctx,
 			addrs,
 			sourceChainIDStr,
@@ -163,8 +162,8 @@ func AddAllUTXOs(
 			break
 		}
 
-		startAddr = index.Address
-		startUTXO = index.UTXO
+		startAddr = endAddr
+		startUTXO = endUTXO
 	}
 	return nil
 }

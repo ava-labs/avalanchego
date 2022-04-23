@@ -42,10 +42,10 @@ type Client interface {
 		ctx context.Context,
 		addrs []ids.ShortID,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
+	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addrs]
 	// from [sourceChain]
 	GetAtomicUTXOs(
@@ -53,10 +53,10 @@ type Client interface {
 		addrs []ids.ShortID,
 		sourceChain string,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
+	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetAssetDescription returns a description of [assetID]
 	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
@@ -251,10 +251,10 @@ func (c *client) GetUTXOs(
 	ctx context.Context,
 	addrs []ids.ShortID,
 	limit uint32,
-	startAddress string,
-	startUTXOID string,
+	startAddress ids.ShortID,
+	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([][]byte, api.Index, error) {
+) ([][]byte, ids.ShortID, ids.ID, error) {
 	return c.GetAtomicUTXOs(ctx, addrs, "", limit, startAddress, startUTXOID, options...)
 }
 
@@ -263,38 +263,51 @@ func (c *client) GetAtomicUTXOs(
 	addrs []ids.ShortID,
 	sourceChain string,
 	limit uint32,
-	startAddress string,
-	startUTXOID string,
+	startAddress ids.ShortID,
+	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([][]byte, api.Index, error) {
+) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
 	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
 	if err != nil {
-		return nil, api.Index{}, err
+		return nil, ids.ShortID{}, ids.Empty, err
 	}
+	startAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, startAddress[:])
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	startUTXOIDStr := startUTXOID.String()
 	err = c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrsStr,
 		SourceChain: sourceChain,
 		Limit:       cjson.Uint32(limit),
 		StartIndex: api.Index{
-			Address: startAddress,
-			UTXO:    startUTXOID,
+			Address: startAddressStr,
+			UTXO:    startUTXOIDStr,
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
 	if err != nil {
-		return nil, api.Index{}, err
+		return nil, ids.ShortID{}, ids.Empty, err
 	}
 
 	utxos := make([][]byte, len(res.UTXOs))
 	for i, utxo := range res.UTXOs {
 		utxoBytes, err := formatting.Decode(res.Encoding, utxo)
 		if err != nil {
-			return nil, api.Index{}, err
+			return nil, ids.ShortID{}, ids.Empty, err
 		}
 		utxos[i] = utxoBytes
 	}
-	return utxos, res.EndIndex, nil
+	endAddr, err := addressconverter.ParseAddressToID(res.EndIndex.Address)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	endUTXOID, err := ids.FromString(res.EndIndex.UTXO)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	return utxos, endAddr, endUTXOID, nil
 }
 
 func (c *client) GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
