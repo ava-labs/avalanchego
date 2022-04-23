@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -26,11 +27,11 @@ type WalletClient interface {
 	Send(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		amount uint64,
-		assetID,
-		to,
+		assetID ids.ID,
+		to ids.ShortID,
 		memo string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -38,9 +39,9 @@ type WalletClient interface {
 	SendMultiple(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		outputs []SendOutput,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		outputs []ClientSendOutput,
 		memo string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -49,12 +50,15 @@ type WalletClient interface {
 // implementation of an AVM wallet client for interacting with avm managed wallet on [chain]
 type walletClient struct {
 	requester rpc.EndpointRequester
+	// used for address ID -> string conversion
+	hrp string
 }
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
-func NewWalletClient(uri, chain string) WalletClient {
+func NewWalletClient(uri, chain string, networkID uint32) WalletClient {
 	return &walletClient{
 		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet"),
+		hrp:       constants.GetHRP(networkID),
 	}
 }
 
@@ -71,28 +75,52 @@ func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte, options ...r
 	return res.TxID, err
 }
 
+// ClientSendOutput specifies that [Amount] of asset [AssetID] be sent to [To]
+type ClientSendOutput struct {
+	// The amount of funds to send
+	Amount uint64
+
+	// ID of the asset being sent
+	AssetID ids.ID
+
+	// Address of the recipient
+	To ids.ShortID
+}
+
 func (c *walletClient) Send(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	amount uint64,
-	assetID,
-	to,
+	assetID ids.ID,
+	to ids.ShortID,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "send", &SendArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "send", &SendArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SendOutput: SendOutput{
 			Amount:  cjson.Uint64(amount),
-			AssetID: assetID,
-			To:      to,
+			AssetID: assetID.String(),
+			To:      toStr,
 		},
 		Memo: memo,
 	}, res, options...)
@@ -102,18 +130,35 @@ func (c *walletClient) Send(
 func (c *walletClient) SendMultiple(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	outputs []SendOutput,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	clientOutputs []ClientSendOutput,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	outputs := make([]SendOutput, len(clientOutputs))
+	for i, clientOutput := range clientOutputs {
+		outputs[i].Amount = cjson.Uint64(clientOutput.Amount)
+		outputs[i].AssetID = clientOutput.AssetID.String()
+		outputs[i].To, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientOutput.To[:])
+		if err != nil {
+			return ids.Empty, err
+		}
+	}
+	err = c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Outputs: outputs,
 		Memo:    memo,

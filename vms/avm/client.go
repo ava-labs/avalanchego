@@ -497,25 +497,37 @@ func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey st
 func (c *client) Send(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	amount uint64,
-	assetID,
-	to,
+	assetID ids.ID,
+	to ids.ShortID,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "send", &SendArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "send", &SendArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SendOutput: SendOutput{
 			Amount:  cjson.Uint64(amount),
-			AssetID: assetID,
-			To:      to,
+			AssetID: assetID.String(),
+			To:      toStr,
 		},
 		Memo: memo,
 	}, res, options...)
@@ -525,18 +537,35 @@ func (c *client) Send(
 func (c *client) SendMultiple(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	outputs []SendOutput,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	clientOutputs []ClientSendOutput,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	outputs := make([]SendOutput, len(clientOutputs))
+	for i, clientOutput := range clientOutputs {
+		outputs[i].Amount = cjson.Uint64(clientOutput.Amount)
+		outputs[i].AssetID = clientOutput.AssetID.String()
+		outputs[i].To, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientOutput.To[:])
+		if err != nil {
+			return ids.Empty, err
+		}
+	}
+	err = c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Outputs: outputs,
 		Memo:    memo,
