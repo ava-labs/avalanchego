@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"net/url"
-	"strings"
 )
 
 func stripPassword(uri string) string {
@@ -11,10 +10,5 @@ func stripPassword(uri string) string {
 		return uri
 	}
 
-	_, passSet := u.User.Password()
-	if passSet {
-		return strings.Replace(u.String(), u.User.String()+"@", u.User.Username()+":***@", 1)
-	}
-
-	return u.String()
+	return u.Redacted()
 }
