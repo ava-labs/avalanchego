@@ -32,7 +32,7 @@ type InboundMsgBuilder interface {
 	InboundGetAcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
-		keys []uint64,
+		heights []uint64,
 		deadline time.Duration,
 		nodeID ids.ShortID,
 	) InboundMessage
@@ -191,7 +191,7 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
-	keys []uint64,
+	heights []uint64,
 	deadline time.Duration,
 	nodeID ids.ShortID,
 ) InboundMessage {
@@ -202,7 +202,7 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			Deadline:       uint64(deadline),
-			SummaryHeights: keys,
+			SummaryHeights: heights,
 		},
 		nodeID:         nodeID,
 		expirationTime: received.Add(deadline),

@@ -51,7 +51,7 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		keys []uint64,
+		heights []uint64,
 	) (OutboundMessage, error)
 
 	AcceptedStateSummary(
@@ -264,7 +264,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	keys []uint64,
+	heights []uint64,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
 		GetAcceptedStateSummary,
@@ -272,7 +272,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			Deadline:       uint64(deadline),
-			SummaryHeights: keys,
+			SummaryHeights: heights,
 		},
 		b.compress && GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages may be compressed
 		false,
