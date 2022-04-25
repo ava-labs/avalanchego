@@ -18,7 +18,7 @@ fi
 
 MODE=$2
 if [[ -z "${MODE}" ]]; then
-  echo "Missing version argument!"
+  echo "Missing mode argument!"
   echo "Usage: ${0} [VERSION] [MODE] [GENESIS_ADDRESS]" >> /dev/stderr
   exit 255
 fi

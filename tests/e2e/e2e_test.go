@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -199,7 +198,7 @@ done:
 	}
 	gomega.Expect(ci.Save(outputPath)).Should(gomega.BeNil())
 
-	b, err := ioutil.ReadFile(outputPath)
+	b, err := os.ReadFile(outputPath)
 	gomega.Expect(err).Should(gomega.BeNil())
 	outf("\n{{blue}}$ cat %s:{{/}}\n%s\n", outputPath, string(b))
 })
@@ -264,7 +263,7 @@ func (ci clusterInfo) Save(p string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(p, ob, fsModeWrite)
+	return os.WriteFile(p, ob, fsModeWrite)
 }
 
 func getVMID(vmName string) (ids.ID, error) {
