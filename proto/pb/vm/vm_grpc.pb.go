@@ -55,8 +55,6 @@ type VMClient interface {
 	ParseStateSummary(ctx context.Context, in *ParseStateSummaryRequest, opts ...grpc.CallOption) (*ParseStateSummaryResponse, error)
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
 	SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*SummaryAcceptResponse, error)
-	GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error)
-	StateSyncableBlockRegister(ctx context.Context, in *StateSyncableBlockRegisterRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type vMClient struct {
@@ -346,24 +344,6 @@ func (c *vMClient) SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, 
 	return out, nil
 }
 
-func (c *vMClient) GetStateSyncResult(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStateSyncResultResponse, error) {
-	out := new(GetStateSyncResultResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/GetStateSyncResult", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMClient) StateSyncableBlockRegister(ctx context.Context, in *StateSyncableBlockRegisterRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vm.VM/StateSyncableBlockRegister", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // VMServer is the server API for VM service.
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
@@ -400,8 +380,6 @@ type VMServer interface {
 	ParseStateSummary(context.Context, *ParseStateSummaryRequest) (*ParseStateSummaryResponse, error)
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
 	SummaryAccept(context.Context, *SummaryAcceptRequest) (*SummaryAcceptResponse, error)
-	GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error)
-	StateSyncableBlockRegister(context.Context, *StateSyncableBlockRegisterRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -501,12 +479,6 @@ func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRe
 }
 func (UnimplementedVMServer) SummaryAccept(context.Context, *SummaryAcceptRequest) (*SummaryAcceptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SummaryAccept not implemented")
-}
-func (UnimplementedVMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*GetStateSyncResultResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetStateSyncResult not implemented")
-}
-func (UnimplementedVMServer) StateSyncableBlockRegister(context.Context, *StateSyncableBlockRegisterRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StateSyncableBlockRegister not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -1079,42 +1051,6 @@ func _VM_SummaryAccept_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_GetStateSyncResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).GetStateSyncResult(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vm.VM/GetStateSyncResult",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).GetStateSyncResult(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VM_StateSyncableBlockRegister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StateSyncableBlockRegisterRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).StateSyncableBlockRegister(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vm.VM/StateSyncableBlockRegister",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).StateSyncableBlockRegister(ctx, req.(*StateSyncableBlockRegisterRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // VM_ServiceDesc is the grpc.ServiceDesc for VM service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1245,14 +1181,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SummaryAccept",
 			Handler:    _VM_SummaryAccept_Handler,
-		},
-		{
-			MethodName: "GetStateSyncResult",
-			Handler:    _VM_GetStateSyncResult_Handler,
-		},
-		{
-			MethodName: "StateSyncableBlockRegister",
-			Handler:    _VM_StateSyncableBlockRegister_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

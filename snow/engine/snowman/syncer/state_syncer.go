@@ -54,12 +54,6 @@ type stateSyncer struct {
 	// we track the (possibly empty) local summary to help engine
 	// choosing among multiple validated summaries
 	locallyAvailableSummary block.Summary
-	// once vm finishes processing rebuilding its state via state summaries
-	// the full block associated with state summary must be download.
-	// lastSummaryBlkRequestedFrom tracks the validator reached out to for the full block
-	// and ensures that the full block will be downloaded only from that validator.
-	lastSummaryBlkRequestedFrom ids.ShortID
-	lastSummaryBlkID            ids.ID
 
 	// Holds the beacons that were sampled for the accepted frontier
 	frontierSeeders validators.Set
@@ -261,7 +255,6 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		preferredStateSummary.ID(), size,
 	)
 
-	ss.lastSummaryBlkID = preferredStateSummary.BlockID()
 	accepted, err := preferredStateSummary.Accept()
 	if err != nil {
 		return err
@@ -462,86 +455,12 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
 
 	case common.StateSyncDone:
-		if err := ss.stateSyncVM.GetStateSyncResult(); err != nil {
-			ss.Ctx.Log.Warn("Could not retrieve state sync result. err: %v", err)
-			return err
-		}
-		return ss.requestBlk(ss.lastSummaryBlkID)
+		return ss.onDoneStateSyncing(ss.requestID)
 
 	default:
 		ss.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
 	}
 	return nil
-}
-
-// following completion of state sync on VM side, engine needs to request
-// the full block associated with state summary.
-func (ss *stateSyncer) requestBlk(blkID ids.ID) error {
-	// pick random beacon
-	vdrsList, err := ss.StateSyncBeacons.Sample(1)
-	if err != nil {
-		return err
-	}
-	vdrID := vdrsList[0].ID()
-
-	// request the block
-	ss.requestID++
-	ss.Sender.SendGet(vdrID, ss.requestID, blkID)
-	ss.lastSummaryBlkRequestedFrom = vdrID
-	return nil
-}
-
-// following completion of state sync on VM side, block associated with state summary is requested.
-// Pass it to VM, declare state sync done and move onto bootstrapping
-func (ss *stateSyncer) Put(validatorID ids.ShortID, requestID uint32, blkBytes []byte) error {
-	// ignores any late responses
-	if requestID != ss.requestID {
-		ss.Ctx.Log.Debug("Received an Out-of-Sync Put - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID, ss.requestID, requestID)
-		return nil
-	}
-
-	if validatorID != ss.lastSummaryBlkRequestedFrom {
-		ss.Ctx.Log.Debug("Received a Put message from %s unexpectedly", validatorID)
-		return nil
-	}
-
-	stateSyncableBlk, err := ss.stateSyncVM.ParseStateSyncableBlock(blkBytes)
-	if err != nil {
-		ss.Ctx.Log.Debug("Received unparsable block from vdr %s, err %v. Requesting it again.",
-			validatorID,
-			err,
-		)
-		return ss.requestBlk(ss.lastSummaryBlkID)
-	}
-
-	receivedBlockID := stateSyncableBlk.ID()
-	if receivedBlockID != ss.lastSummaryBlkID {
-		ss.Ctx.Log.Debug("Received wrong block; expected ID %s, received ID %s, Requesting it again.",
-			receivedBlockID,
-			ss.lastSummaryBlkID)
-		return ss.requestBlk(ss.lastSummaryBlkID)
-	}
-
-	if err := stateSyncableBlk.Register(); err != nil {
-		return err
-	}
-
-	return ss.onDoneStateSyncing(ss.requestID)
-}
-
-// following completion of state sync on VM side, block associated with state summary is requested.
-// Since Put failed, request again the block to a different validator
-func (ss *stateSyncer) GetFailed(validatorID ids.ShortID, requestID uint32) error {
-	// ignores any late responses
-	if requestID != ss.requestID {
-		ss.Ctx.Log.Debug("Received an Out-of-Sync GetFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID, ss.requestID, requestID)
-		return ss.requestBlk(ss.lastSummaryBlkID)
-	}
-
-	ss.Ctx.Log.Warn("Failed downloading Last Summary block. Retrying block download.")
-	return ss.requestBlk(ss.lastSummaryBlkID)
 }
 
 func (ss *stateSyncer) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {

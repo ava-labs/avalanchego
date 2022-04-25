@@ -13,11 +13,11 @@ var _ block.Summary = &statefulSummary{}
 
 type statefulSummary struct {
 	summary.ProposerSummaryIntf
+	vm *VM
 
 	// stateful inner summary, retrieved via Parse
-	innerSummary block.Summary
-
-	vm *VM
+	innerSummary  block.Summary
+	proposerBlock Block
 }
 
 func (ss *statefulSummary) Accept() (bool, error) {
@@ -26,13 +26,14 @@ func (ss *statefulSummary) Accept() (bool, error) {
 	// state sync after a shutdown since height index allows retrieving
 	// proposerBlkID from innerSummary.Height.
 	if ss.ID() != ids.Empty {
-		if err := ss.vm.updateHeightIndex(ss.Height(), ss.BlockID()); err != nil {
-			return false, err
+		//Store the block
+		if postForkBlk, ok := ss.proposerBlock.(PostForkBlock); ok {
+			if err := ss.vm.storePostForkBlock(postForkBlk); err != nil {
+				return false, err
+			}
 		}
 
-		if err := ss.vm.db.Commit(); err != nil {
-			return false, err
-		}
+		ss.vm.syncSummary = ss
 	}
 
 	return ss.innerSummary.Accept()

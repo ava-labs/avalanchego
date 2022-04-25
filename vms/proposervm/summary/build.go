@@ -6,7 +6,6 @@ package summary
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -17,9 +16,9 @@ func BuildEmptyProposerSummary() (ProposerSummaryIntf, error) {
 	}, nil
 }
 
-func BuildProposerSummary(proBlkID ids.ID, coreSummary block.Summary) (ProposerSummaryIntf, error) {
+func BuildProposerSummary(proBlkBytes []byte, coreSummary block.Summary) (ProposerSummaryIntf, error) {
 	statelessSummary := StatelessSummary{
-		ProBlkID:     proBlkID,
+		ProBlkBytes:  proBlkBytes,
 		InnerSummary: coreSummary.Bytes(),
 	}
 

@@ -4,7 +4,6 @@
 package metervm
 
 import (
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -68,30 +67,4 @@ func (vm *blockVM) GetStateSummary(height uint64) (block.Summary, error) {
 	vm.stateSummaryMetrics.getStateSummary.Observe(float64(end.Sub(start)))
 
 	return summary, err
-}
-
-func (vm *blockVM) GetStateSyncResult() error {
-	if vm.ssVM == nil {
-		return block.ErrStateSyncableVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	err := vm.ssVM.GetStateSyncResult()
-	end := vm.clock.Time()
-	vm.stateSummaryMetrics.getStateSyncResult.Observe(float64(end.Sub(start)))
-
-	return err
-}
-
-func (vm *blockVM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {
-	if vm.ssVM == nil {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-
-	start := vm.clock.Time()
-	stateSyncableBlk, err := vm.ssVM.ParseStateSyncableBlock(blkBytes)
-	end := vm.clock.Time()
-	vm.stateSummaryMetrics.parseStateSyncableBlock.Observe(float64(end.Sub(start)))
-
-	return stateSyncableBlk, err
 }

@@ -176,30 +176,3 @@ func (vm *VMServer) SummaryAccept(
 		Err:      errorToErrCode[err],
 	}, errorToRPCError(err)
 }
-
-func (vm *VMServer) GetStateSyncResult(context.Context, *emptypb.Empty) (*vmpb.GetStateSyncResultResponse, error) {
-	err := block.ErrStateSyncableVMNotImplemented
-
-	if vm.ssVM != nil {
-		err = vm.ssVM.GetStateSyncResult()
-	}
-
-	return &vmpb.GetStateSyncResultResponse{
-		Err: errorToErrCode[err],
-	}, errorToRPCError(err)
-}
-
-func (vm *VMServer) StateSyncableBlockRegister(
-	_ context.Context,
-	req *vmpb.StateSyncableBlockRegisterRequest,
-) (*emptypb.Empty, error) {
-	if vm.ssVM == nil {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-	summary, err := vm.ssVM.ParseStateSyncableBlock(req.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &emptypb.Empty{}, summary.Register()
-}

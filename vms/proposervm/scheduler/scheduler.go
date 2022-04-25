@@ -32,15 +32,19 @@ type scheduler struct {
 	// from telling the engine to call its VM's BuildBlock method until the
 	// given time
 	newBuildBlockTime chan time.Time
+
+	// notifyCallback
+	notifyCallback func(common.Message) error
 }
 
-func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
+func New(log logging.Logger, toEngine chan<- common.Message, notifyCallback func(common.Message) error) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, cap(toEngine))
 	return &scheduler{
 		log:               log,
 		fromVM:            vmToEngine,
 		toEngine:          toEngine,
 		newBuildBlockTime: make(chan time.Time),
+		notifyCallback:    notifyCallback,
 	}, vmToEngine
 }
 
@@ -70,6 +74,10 @@ waitloop:
 		for {
 			select {
 			case msg := <-s.fromVM:
+				if err := s.notifyCallback(msg); err != nil {
+					s.log.Error("error handling notifyCallback: %s", err)
+					return
+				}
 				// Give the engine the message from the VM asking the engine to
 				// build a block
 				select {

@@ -14,13 +14,13 @@ import (
 func TestParse(t *testing.T) {
 	assert := assert.New(t)
 
-	proBlkID := ids.ID{'p', 'r', 'o', 'I', 'D'}
+	proBlkBytes := []byte("proBlkBytes")
 	coreSummary := &block.TestSummary{
 		HeightV: 2022,
 		IDV:     ids.ID{'I', 'D'},
 		BytesV:  []byte{'b', 'y', 't', 'e', 's'},
 	}
-	builtSummary, err := BuildProposerSummary(proBlkID, coreSummary)
+	builtSummary, err := BuildProposerSummary(proBlkBytes, coreSummary)
 	assert.NoError(err)
 
 	proSummaryBytes := builtSummary.Bytes()
@@ -33,7 +33,7 @@ func TestParse(t *testing.T) {
 
 	assert.Equal(builtSummary.Bytes(), parsedBlock.Bytes())
 	assert.Equal(builtSummary.ID(), parsedBlock.ID())
-	assert.Equal(builtSummary.BlockID(), parsedBlock.BlockID())
+	assert.Equal(builtSummary.BlockBytes(), parsedBlock.BlockBytes())
 	assert.Equal(builtSummary.InnerBytes(), parsedBlock.InnerBytes())
 }
 

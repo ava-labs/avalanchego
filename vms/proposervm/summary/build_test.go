@@ -14,18 +14,17 @@ import (
 func TestBuild(t *testing.T) {
 	assert := assert.New(t)
 
-	proBlkID := ids.ID{'p', 'r', 'o', 'I', 'D'}
+	proBlkBytes := []byte("proBlkBytes")
 	coreSummary := &block.TestSummary{
 		HeightV: 2022,
 		IDV:     ids.ID{'I', 'D'},
 		BytesV:  []byte{'b', 'y', 't', 'e', 's'},
 	}
-	builtSummary, err := BuildProposerSummary(proBlkID, coreSummary)
+	builtSummary, err := BuildProposerSummary(proBlkBytes, coreSummary)
 	assert.NoError(err)
 
 	assert.Equal(builtSummary.Height(), coreSummary.Height())
-
-	assert.Equal(builtSummary.BlockID(), proBlkID)
+	assert.Equal(builtSummary.BlockBytes(), proBlkBytes)
 	assert.Equal(builtSummary.InnerBytes(), coreSummary.Bytes())
 }
 
@@ -39,6 +38,6 @@ func TestBuildEmptySummary(t *testing.T) {
 	assert.Equal(builtSummary.ID(), ids.Empty)
 	assert.Equal(builtSummary.Height(), uint64(0))
 	assert.Equal(builtSummary.Bytes(), []byte(nil))
-	assert.Equal(builtSummary.BlockID(), ids.Empty)
+	assert.Equal(builtSummary.BlockBytes(), []byte(nil))
 	assert.Equal(builtSummary.InnerBytes(), emptySummary.Bytes())
 }

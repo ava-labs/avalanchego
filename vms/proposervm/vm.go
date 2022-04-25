@@ -78,6 +78,8 @@ type VM struct {
 	// timestamp if the last accepted block has been a PostForkOption block
 	// since having initialized the VM.
 	lastAcceptedTime time.Time
+
+	syncSummary *statefulSummary
 }
 
 func New(
@@ -119,7 +121,7 @@ func (vm *VM) Initialize(
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
+	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine, vm.notifyCallback)
 	vm.Scheduler = scheduler
 	vm.toScheduler = vmToEngine
 

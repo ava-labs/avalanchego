@@ -5,8 +5,6 @@ package block
 
 import (
 	"errors"
-
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 var (
@@ -40,14 +38,4 @@ type StateSyncableVM interface {
 	// GetStateSummary retrieves the summary related to height, if available.
 	// Returns ErrUnknownStateSummary if summary is not available
 	GetStateSummary(summaryHeight uint64) (Summary, error)
-
-	// VM State Sync process must run asynchronously; moreover, once it is done,
-	// VM will notify engine which in turn will issue a GetStateSyncResult call.
-	// GetStateSyncResult returns the result of state sync
-	GetStateSyncResult() error
-
-	// ParseStateSyncableBlock parses [blkBytes] into a state syncable block.
-	// This is called after the block associated with a state summary
-	// has been downloaded from the network.
-	ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error)
 }

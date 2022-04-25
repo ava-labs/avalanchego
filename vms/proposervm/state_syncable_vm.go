@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -47,7 +47,11 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 			vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 			return nil, block.ErrUnknownStateSummary
 		}
-		proSummary, err = summary.BuildProposerSummary(proBlkID, innerSummary)
+		proBlk, err := vm.GetBlock(proBlkID)
+		if err != nil {
+			return nil, block.ErrUnknownStateSummary
+		}
+		proSummary, err = summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 		if err != nil {
 			return nil, err
 		}
@@ -71,15 +75,19 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 		return nil, err // including block.ErrUnknownStateSummary case
 	}
 
-	// retrieve ProBlkID
+	// retrieve ProBlk
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this should never happen, since that would mean proVM has become out of sync with innerVM
 		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 		return nil, block.ErrUnknownStateSummary
 	}
+	proBlk, err := vm.GetBlock(proBlkID)
+	if err != nil {
+		return nil, block.ErrUnknownStateSummary
+	}
 
-	proSummary, err := summary.BuildProposerSummary(proBlkID, innerSummary)
+	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 	return &statefulSummary{
 		ProposerSummaryIntf: proSummary,
 		innerSummary:        innerSummary,
@@ -103,11 +111,16 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse inner summary due to: %w", err)
 	}
+	block, err := vm.ParseBlock(statelessSummary.BlockBytes())
+	if err != nil {
+		return nil, fmt.Errorf("could not parse proposervm block bytes from summary due to: %w", err)
+	}
 
 	return &statefulSummary{
 		ProposerSummaryIntf: &summary.ProposerSummary{
 			StatelessSummaryIntf: statelessSummary,
 			SummaryHeight:        innerSummary.Height(),
+			SummaryBlock:         block,
 		},
 		innerSummary: innerSummary,
 		vm:           vm,
@@ -124,15 +137,19 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 		return nil, err // including block.ErrUnknownStateSummary case
 	}
 
-	// retrieve ProBlkID
+	// retrieve ProBlk
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this should never happen, since that would mean proVM has become out of sync with innerVM
 		vm.ctx.Log.Warn("Block height index missing at height %d: %s", innerSummary.Height(), err)
 		return nil, block.ErrUnknownStateSummary
 	}
+	proBlk, err := vm.GetBlock(proBlkID)
+	if err != nil {
+		return nil, block.ErrUnknownStateSummary
+	}
 
-	proSummary, err := summary.BuildProposerSummary(proBlkID, innerSummary)
+	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 	return &statefulSummary{
 		ProposerSummaryIntf: proSummary,
 		innerSummary:        innerSummary,
@@ -140,31 +157,9 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	}, err
 }
 
-func (vm *VM) GetStateSyncResult() error {
-	if vm.innerStateSyncVM == nil {
-		return block.ErrStateSyncableVMNotImplemented
+func (vm *VM) notifyCallback(msg common.Message) error {
+	if msg != common.StateSyncDone {
+		return nil
 	}
-
-	return vm.innerStateSyncVM.GetStateSyncResult()
-}
-
-func (vm *VM) ParseStateSyncableBlock(blkBytes []byte) (snowman.StateSyncableBlock, error) {
-	if vm.innerStateSyncVM == nil {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-
-	proposerBlk, err := vm.parseBlock(blkBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	innerStateSyncableBlk, err := vm.innerStateSyncVM.ParseStateSyncableBlock(proposerBlk.getInnerBlk().Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	return &stateSyncableBlock{
-		Block:                 proposerBlk,
-		innerStateSyncableBlk: innerStateSyncableBlk,
-	}, nil
+	return vm.syncSummary.proposerBlock.acceptOuterBlk()
 }

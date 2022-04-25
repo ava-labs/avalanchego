@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -40,6 +41,7 @@ func init() {
 type ProposerSummaryIntf interface {
 	StatelessSummaryIntf
 	Height() uint64
+	Block() snowman.Block
 }
 
 func NewProposerSummary() ProposerSummaryIntf {
@@ -49,6 +51,8 @@ func NewProposerSummary() ProposerSummaryIntf {
 type ProposerSummary struct {
 	StatelessSummaryIntf
 	SummaryHeight uint64
+	SummaryBlock  snowman.Block
 }
 
-func (ps *ProposerSummary) Height() uint64 { return ps.SummaryHeight }
+func (ps *ProposerSummary) Height() uint64       { return ps.SummaryHeight }
+func (ps *ProposerSummary) Block() snowman.Block { return ps.SummaryBlock }

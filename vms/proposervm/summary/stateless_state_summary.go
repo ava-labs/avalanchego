@@ -11,28 +11,27 @@ import (
 var _ StatelessSummaryIntf = &StatelessSummary{}
 
 type StatelessSummaryIntf interface {
-	Bytes() []byte   // part of block.Summary interface
-	ID() ids.ID      // part of block.Summary interface
-	BlockID() ids.ID // part of block.Summary interface
+	Bytes() []byte // part of block.Summary interface
+	ID() ids.ID    // part of block.Summary interface
 
 	InnerBytes() []byte
+	BlockBytes() []byte
 
 	initialize(bytes []byte) error
 }
 
 type StatelessSummary struct {
-	ProBlkID     ids.ID `serialize:"true"`
+	ProBlkBytes  []byte `serialize:"true"`
 	InnerSummary []byte `serialize:"true"`
 
 	ProposerSummaryBytes []byte
 	ProposerSummaryID    ids.ID
 }
 
-func (ss *StatelessSummary) Bytes() []byte   { return ss.ProposerSummaryBytes }
-func (ss *StatelessSummary) ID() ids.ID      { return ss.ProposerSummaryID }
-func (ss *StatelessSummary) BlockID() ids.ID { return ss.ProBlkID }
-
+func (ss *StatelessSummary) Bytes() []byte      { return ss.ProposerSummaryBytes }
+func (ss *StatelessSummary) ID() ids.ID         { return ss.ProposerSummaryID }
 func (ss *StatelessSummary) InnerBytes() []byte { return ss.InnerSummary }
+func (ss *StatelessSummary) BlockBytes() []byte { return ss.ProBlkBytes }
 
 func (ss *StatelessSummary) initialize(bytes []byte) error {
 	ss.ProposerSummaryBytes = bytes

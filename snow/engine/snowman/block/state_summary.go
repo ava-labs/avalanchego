@@ -22,7 +22,6 @@ type Summary interface {
 	Bytes() []byte
 	Height() uint64
 	ID() ids.ID
-	BlockID() ids.ID
 
 	Accept() (bool, error)
 }
