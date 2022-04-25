@@ -21,8 +21,8 @@ type Client interface {
 	MemoryProfile(context.Context, ...rpc.Option) (bool, error)
 	LockProfile(context.Context, ...rpc.Option) (bool, error)
 	Alias(ctx context.Context, endpoint string, alias string, options ...rpc.Option) (bool, error)
-	AliasChain(ctx context.Context, chainID string, alias string, options ...rpc.Option) (bool, error)
-	GetChainAliases(ctx context.Context, chainID string, options ...rpc.Option) ([]string, error)
+	AliasChain(ctx context.Context, chainID ids.ID, alias string, options ...rpc.Option) (bool, error)
+	GetChainAliases(ctx context.Context, chainID ids.ID, options ...rpc.Option) ([]string, error)
 	Stacktrace(context.Context, ...rpc.Option) (bool, error)
 	LoadVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error)
 }
@@ -72,19 +72,19 @@ func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...r
 	return res.Success, err
 }
 
-func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) (bool, error) {
+func (c *client) AliasChain(ctx context.Context, chain ids.ID, alias string, options ...rpc.Option) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
-		Chain: chain,
+		Chain: chain.String(),
 		Alias: alias,
 	}, res, options...)
 	return res.Success, err
 }
 
-func (c *client) GetChainAliases(ctx context.Context, chain string, options ...rpc.Option) ([]string, error) {
+func (c *client) GetChainAliases(ctx context.Context, chain ids.ID, options ...rpc.Option) ([]string, error) {
 	res := &GetChainAliasesReply{}
 	err := c.requester.SendRequest(ctx, "getChainAliases", &GetChainAliasesArgs{
-		Chain: chain,
+		Chain: chain.String(),
 	}, res, options...)
 	return res.Aliases, err
 }

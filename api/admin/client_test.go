@@ -172,7 +172,7 @@ func TestAliasChain(t *testing.T) {
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: test.Success}, test.Err)}
-		success, err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
+		success, err := mockClient.AliasChain(context.Background(), ids.ID{1}, "chain-alias")
 		// if there is error as expected, the test passes
 		if err != nil && test.Err != nil {
 			continue
@@ -193,7 +193,7 @@ func TestGetChainAliases(t *testing.T) {
 			Aliases: expectedReply,
 		}, nil)}
 
-		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
+		reply, err := mockClient.GetChainAliases(context.Background(), ids.ID{1})
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, expectedReply, reply)
 	})
@@ -201,7 +201,7 @@ func TestGetChainAliases(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
 
-		_, err := mockClient.GetChainAliases(context.Background(), "chain")
+		_, err := mockClient.GetChainAliases(context.Background(), ids.ID{1})
 
 		assert.EqualError(t, err, "some error")
 	})

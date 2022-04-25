@@ -5,8 +5,10 @@ package info
 
 import (
 	"context"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -16,12 +18,12 @@ var _ Client = &client{}
 // Client interface for an Info API Client
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
-	GetNodeID(context.Context, ...rpc.Option) (string, error)
+	GetNodeID(context.Context, ...rpc.Option) (ids.ShortID, error)
 	GetNodeIP(context.Context, ...rpc.Option) (string, error)
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
 	GetBlockchainID(context.Context, string, ...rpc.Option) (ids.ID, error)
-	Peers(context.Context, ...rpc.Option) ([]Peer, error)
+	Peers(context.Context, ...rpc.Option) ([]ClientPeer, error)
 	IsBootstrapped(context.Context, string, ...rpc.Option) (bool, error)
 	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
 	Uptime(context.Context, ...rpc.Option) (*UptimeResponse, error)
@@ -46,10 +48,14 @@ func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*Ge
 	return res, err
 }
 
-func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (string, error) {
+func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.ShortID, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest(ctx, "getNodeID", struct{}{}, res, options...)
-	return res.NodeID, err
+	nodeID, err := ids.ShortFromPrefixedString(res.NodeID, constants.NodeIDPrefix)
+	if err != nil {
+		return ids.ShortEmpty, err
+	}
+	return nodeID, err
 }
 
 func (c *client) GetNodeIP(ctx context.Context, options ...rpc.Option) (string, error) {
@@ -78,10 +84,40 @@ func (c *client) GetBlockchainID(ctx context.Context, alias string, options ...r
 	return res.BlockchainID, err
 }
 
-func (c *client) Peers(ctx context.Context, options ...rpc.Option) ([]Peer, error) {
+type ClientPeer struct {
+	IP             string
+	PublicIP       string
+	ID             ids.ShortID
+	Version        string
+	LastSent       time.Time
+	LastReceived   time.Time
+	ObservedUptime uint8
+	TrackedSubnets []ids.ID
+	Benched        []ids.ID
+}
+
+func (c *client) Peers(ctx context.Context, options ...rpc.Option) ([]ClientPeer, error) {
 	res := &PeersReply{}
 	err := c.requester.SendRequest(ctx, "peers", struct{}{}, res, options...)
-	return res.Peers, err
+	if err != nil {
+		return nil, err
+	}
+	clientPeers := make([]ClientPeer, len(res.Peers))
+	for i, peer := range res.Peers {
+		clientPeers[i].IP = peer.IP
+		clientPeers[i].PublicIP = peer.PublicIP
+		clientPeers[i].ID, err = ids.ShortFromPrefixedString(peer.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return nil, err
+		}
+		clientPeers[i].Version = peer.Version
+		clientPeers[i].LastSent = peer.LastSent
+		clientPeers[i].LastReceived = peer.LastReceived
+		clientPeers[i].ObservedUptime = uint8(peer.ObservedUptime)
+		clientPeers[i].TrackedSubnets = peer.TrackedSubnets
+		clientPeers[i].Benched = peer.Benched
+	}
+	return clientPeers, err
 }
 
 func (c *client) IsBootstrapped(ctx context.Context, chainID string, options ...rpc.Option) (bool, error) {
