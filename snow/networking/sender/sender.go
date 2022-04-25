@@ -165,7 +165,7 @@ func (s *sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, 
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []uint64) {
+func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, heights []uint64) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -183,12 +183,12 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, keys, deadline, s.ctx.NodeID)
+		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, heights, deadline, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.GetAcceptedStateSummary(s.ctx.ChainID, requestID, deadline, keys)
+	outMsg, err := s.msgCreator.GetAcceptedStateSummary(s.ctx.ChainID, requestID, deadline, heights)
 
 	// Send the message over the network.
 	var sentTo ids.ShortSet

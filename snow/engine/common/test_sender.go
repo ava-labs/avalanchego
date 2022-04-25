@@ -103,9 +103,9 @@ func (s *SenderTest) SendStateSummaryFrontier(validatorID ids.ShortID, requestID
 // SendGetAcceptedStateSummary calls SendGetAcceptedStateSummaryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []uint64) {
+func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, heights []uint64) {
 	if s.SendGetAcceptedStateSummaryF != nil {
-		s.SendGetAcceptedStateSummaryF(nodeIDs, requestID, keys)
+		s.SendGetAcceptedStateSummaryF(nodeIDs, requestID, heights)
 	} else if s.CantSendGetAcceptedStateSummary && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendGetAcceptedStateSummaryF")
 	}
