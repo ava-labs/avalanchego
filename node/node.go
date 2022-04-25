@@ -354,6 +354,11 @@ func (n *Node) Dispatch() error {
 		n.Shutdown(1)
 	})
 
+	// Add state sync nodes to the peer network
+	for i, peerIP := range n.Config.StateSyncIPs {
+		n.Net.ManuallyTrack(n.Config.StateSyncIDs[i], peerIP)
+	}
+
 	// Add bootstrap nodes to the peer network
 	for i, peerIP := range n.Config.BootstrapIPs {
 		n.Net.ManuallyTrack(n.Config.BootstrapIDs[i], peerIP)
@@ -635,6 +640,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		ResetProposerVMHeightIndex:              n.Config.ResetProposerVMHeightIndex,
 	})
 

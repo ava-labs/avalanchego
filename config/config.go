@@ -445,6 +445,44 @@ func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) 
 	return config, nil
 }
 
+func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
+	var (
+		config       = node.StateSyncConfig{}
+		stateSyncIPs = strings.Split(v.GetString(StateSyncIPsKey), ",")
+		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
+	)
+
+	for _, ip := range stateSyncIPs {
+		if ip == "" {
+			continue
+		}
+		addr, err := utils.ToIPDesc(ip)
+		if err != nil {
+			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync ip %s: %w", ip, err)
+		}
+		config.StateSyncIPs = append(config.StateSyncIPs, addr)
+	}
+
+	for _, id := range stateSyncIDs {
+		if id == "" {
+			continue
+		}
+		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+		if err != nil {
+			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync peer id %s: %w", id, err)
+		}
+		config.StateSyncIDs = append(config.StateSyncIDs, nodeID)
+	}
+
+	lenIPs := len(config.StateSyncIPs)
+	lenIDs := len(config.StateSyncIDs)
+	if lenIPs != lenIDs {
+		return node.StateSyncConfig{}, fmt.Errorf("expected the number of stateSyncIPs (%d) to match the number of stateSyncIDs (%d)", lenIPs, lenIDs)
+	}
+
+	return config, nil
+}
+
 func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{
 		RetryBootstrap:                          v.GetBool(RetryBootstrapKey),
@@ -488,7 +526,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		}
 		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
 		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
 	}
@@ -1128,6 +1166,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Crypto
 	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
+
+	// StateSync Configs
+	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Bootstrap Configs
 	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
