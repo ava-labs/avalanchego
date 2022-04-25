@@ -462,9 +462,8 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
 
 	case common.StateSyncDone:
-		// retrieve the blkID to request
 		if err := ss.stateSyncVM.GetStateSyncResult(); err != nil {
-			ss.Ctx.Log.Warn("Could not retrieve last summary block ID to complete state sync. Err: %v", err)
+			ss.Ctx.Log.Warn("Could not retrieve state sync result. err: %v", err)
 			return err
 		}
 		return ss.requestBlk(ss.lastSummaryBlkID)

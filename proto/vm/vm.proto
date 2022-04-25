@@ -313,8 +313,7 @@ message GetStateSyncResultResponse {
 }
 
 message StateSyncableBlockRegisterRequest {
-  bytes id = 1;
-  uint32 err = 2;
+  bytes bytes = 1;
 }
 // end of StateSyncableVM related messages
 

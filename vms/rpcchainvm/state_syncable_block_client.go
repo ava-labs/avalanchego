@@ -23,7 +23,7 @@ func (b *StateSyncableBlockClient) Register() error {
 	_, err := b.vm.client.StateSyncableBlockRegister(
 		context.Background(),
 		&vmpb.StateSyncableBlockRegisterRequest{
-			Id: b.id[:],
+			Bytes: b.Bytes(),
 		},
 	)
 	return err
