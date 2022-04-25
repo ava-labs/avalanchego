@@ -180,7 +180,7 @@ func NewClient(uri, chain string) Client {
 }
 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
-	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -567,7 +567,7 @@ func (c *client) MintNFT(
 	to string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
-	payloadStr, err := formatting.EncodeWithChecksum(formatting.Hex, payload)
+	payloadStr, err := formatting.Encode(formatting.Hex, payload)
 	if err != nil {
 		return ids.ID{}, err
 	}

@@ -546,7 +546,7 @@ func (c *client) CreateBlockchain(
 	genesisData []byte,
 	options ...rpc.Option,
 ) (ids.ID, error) {
-	genesisDataStr, err := formatting.EncodeWithChecksum(formatting.Hex, genesisData)
+	genesisDataStr, err := formatting.Encode(formatting.Hex, genesisData)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -599,7 +599,7 @@ func (c *client) GetBlockchains(ctx context.Context, options ...rpc.Option) ([]A
 }
 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
-	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
