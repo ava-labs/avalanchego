@@ -64,7 +64,7 @@ type Client interface {
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]interface{}, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]ClientStaker, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
 	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
@@ -401,6 +401,12 @@ const (
 	thresholdKey       = "threshold"
 	addressesKey       = "addresses"
 	potentialRewardKey = "potentialReward"
+
+	delegationFeeKey = "delegationFee"
+	uptimeKey        = "uptime"
+	connectedKey     = "connected"
+
+	delegatorsKey = "delegators"
 )
 
 type ClientOwner struct {
@@ -484,6 +490,18 @@ func getFloat32ValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (flo
 	return float32(vFloat64), nil
 }
 
+func getBoolValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (bool, error) {
+	vStr, err := getStringValFromMapIntf(vdrDgtMap, key)
+	if err != nil {
+		return false, err
+	}
+	vBool, err := strconv.ParseBool(vStr)
+	if err != nil {
+		return false, fmt.Errorf("could not parse %q from %q to bool: %w", key, vStr, err)
+	}
+	return vBool, nil
+}
+
 func getClientOwnerFromMapIntf(vdrDgtMap map[string]interface{}) (ClientOwner, error) {
 	var err error
 	rewardOwnerIntf, ok := vdrDgtMap[rewardOwnerKey]
@@ -518,6 +536,22 @@ func getClientOwnerFromMapIntf(vdrDgtMap map[string]interface{}) (ClientOwner, e
 	return clientOwner, nil
 }
 
+func getClientStakersFromMapIntf(stakersSliceIntf []interface{}, isValidator bool) ([]ClientStaker, error) {
+	var err error
+	clientStakers := make([]ClientStaker, len(stakersSliceIntf))
+	for i, stakerMapIntf := range stakersSliceIntf {
+		stakerMap, ok := stakerMapIntf.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("expected map[string]interface{} got %T", stakerMapIntf)
+		}
+		clientStakers[i], err = getClientStakerFromMapIntf(stakerMap, isValidator)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return clientStakers, nil
+}
+
 func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bool) (ClientStaker, error) {
 	var err error
 	clientStaker := ClientStaker{}
@@ -541,12 +575,6 @@ func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bo
 	if err != nil {
 		return ClientStaker{}, err
 	}
-	if isValidator {
-		clientStaker.Weight, err = getUint64ValFromMapIntf(vdrDgtMap, weightKey)
-		if err != nil {
-			return ClientStaker{}, err
-		}
-	}
 	nodeIDStr, err := getStringValFromMapIntf(vdrDgtMap, nodeIDKey)
 	if err != nil {
 		return ClientStaker{}, err
@@ -563,6 +591,36 @@ func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bo
 	if err != nil {
 		return ClientStaker{}, err
 	}
+	if isValidator {
+		clientStaker.Weight, err = getUint64ValFromMapIntf(vdrDgtMap, weightKey)
+		if err != nil {
+			return ClientStaker{}, err
+		}
+		clientStaker.DelegationFee, err = getFloat32ValFromMapIntf(vdrDgtMap, delegationFeeKey)
+		if err != nil {
+			return ClientStaker{}, err
+		}
+		clientStaker.Uptime, err = getFloat32ValFromMapIntf(vdrDgtMap, uptimeKey)
+		if err != nil {
+			return ClientStaker{}, err
+		}
+		clientStaker.Connected, err = getBoolValFromMapIntf(vdrDgtMap, connectedKey)
+		if err != nil {
+			return ClientStaker{}, err
+		}
+		dgtsIntf, ok := vdrDgtMap[delegatorsKey]
+		if !ok {
+			return ClientStaker{}, fmt.Errorf("key %q not found in map", delegatorsKey)
+		}
+		dgts, ok := dgtsIntf.([]interface{})
+		if !ok {
+			return ClientStaker{}, fmt.Errorf("expected []interface{} for %q got %T", delegatorsKey, dgtsIntf)
+		}
+		clientStaker.Delegators, err = getClientStakersFromMapIntf(dgts, false)
+		if err != nil {
+			return ClientStaker{}, err
+		}
+	}
 	return clientStaker, nil
 }
 
@@ -571,7 +629,7 @@ func (c *client) GetCurrentValidators(
 	subnetID ids.ID,
 	nodeIDs []ids.ShortID,
 	options ...rpc.Option,
-) ([]interface{}, error) {
+) ([]ClientStaker, error) {
 	nodeIDsStr := []string{}
 	for _, nodeID := range nodeIDs {
 		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
@@ -581,7 +639,11 @@ func (c *client) GetCurrentValidators(
 		SubnetID: subnetID,
 		NodeIDs:  nodeIDsStr,
 	}, res, options...)
-	return res.Validators, err
+	clientStakers, err := getClientStakersFromMapIntf(res.Validators, true)
+	if err != nil {
+		return nil, err
+	}
+	return clientStakers, nil
 }
 
 func (c *client) GetPendingValidators(
