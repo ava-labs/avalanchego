@@ -18,16 +18,14 @@ var _ block.Summary = &SummaryClient{}
 type SummaryClient struct {
 	vm *VMClient
 
-	height  uint64
-	id      ids.ID
-	bytes   []byte
-	blockID ids.ID
+	height uint64
+	id     ids.ID
+	bytes  []byte
 }
 
-func (s *SummaryClient) Bytes() []byte   { return s.bytes }
-func (s *SummaryClient) Height() uint64  { return s.height }
-func (s *SummaryClient) ID() ids.ID      { return s.id }
-func (s *SummaryClient) BlockID() ids.ID { return s.blockID }
+func (s *SummaryClient) Bytes() []byte  { return s.bytes }
+func (s *SummaryClient) Height() uint64 { return s.height }
+func (s *SummaryClient) ID() ids.ID     { return s.id }
 
 func (s *SummaryClient) Accept() (bool, error) {
 	resp, err := s.vm.client.SummaryAccept(
