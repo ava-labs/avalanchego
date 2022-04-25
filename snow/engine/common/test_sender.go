@@ -76,10 +76,6 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
 	s.CantSendAppGossipSpecific = cant
-	s.CantSendGetStateSummaryFrontier = cant
-	s.CantSendStateSummaryFrontier = cant
-	s.CantSendGetAcceptedStateSummary = cant
-	s.CantSendAcceptedStateSummary = cant
 }
 
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
