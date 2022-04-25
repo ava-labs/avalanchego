@@ -328,13 +328,76 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	}
 
 	switch op {
+	case message.GetStateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		_ = reqID
+		// TODO: call the engine here
+		return nil
+
+	case message.StateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summary := msg.Get(message.SummaryBytes).([]byte)
+		_, _ = reqID, summary
+		// TODO: call the engine here
+		return nil
+
+	case message.GetStateSummaryFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		_ = reqID
+		// TODO: call the engine here
+		return nil
+
+	case message.GetAcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		msgKeys, err := getKeys(msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s%s, %d): %s",
+				op,
+				constants.NodeIDPrefix,
+				nodeID,
+				reqID,
+				err,
+			)
+			return nil
+		}
+		_, _ = reqID, msgKeys
+		// TODO: call the engine here
+		return nil
+
+	case message.AcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaryIDs, err := getIDs(message.SummaryIDs, msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s%s, %d): %s",
+				op,
+				constants.NodeIDPrefix,
+				nodeID,
+				reqID,
+				err,
+			)
+			_ = reqID
+			// TODO: call the engine here
+			return nil
+		}
+		_, _ = reqID, summaryIDs
+		// TODO: call the engine here
+		return nil
+
+	case message.GetAcceptedStateSummaryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		_ = reqID
+		// TODO: call the engine here
+		return nil
+
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return engine.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -354,7 +417,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -370,7 +433,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -431,7 +494,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
-		votes, err := getContainerIDs(msg)
+		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",

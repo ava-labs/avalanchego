@@ -10,22 +10,36 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 )
 
-var errDuplicatedContainerID = errors.New("inbound message contains duplicated container ID")
+var errDuplicatedID = errors.New("inbound message contains duplicated ID")
 
-func getContainerIDs(msg message.InboundMessage) ([]ids.ID, error) {
-	containerIDsBytes := msg.Get(message.ContainerIDs).([][]byte)
-	res := make([]ids.ID, len(containerIDsBytes))
-	idSet := ids.NewSet(len(containerIDsBytes))
-	for i, containerIDBytes := range containerIDsBytes {
-		containerID, err := ids.ToID(containerIDBytes)
+func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
+	idsBytes := msg.Get(field).([][]byte)
+	res := make([]ids.ID, len(idsBytes))
+	idSet := ids.NewSet(len(idsBytes))
+
+	for i, bytes := range idsBytes {
+		id, err := ids.ToID(bytes)
 		if err != nil {
 			return nil, err
 		}
-		if idSet.Contains(containerID) {
-			return nil, errDuplicatedContainerID
+		if idSet.Contains(id) {
+			return nil, errDuplicatedID
 		}
-		res[i] = containerID
-		idSet.Add(containerID)
+		res[i] = id
+		idSet.Add(id)
 	}
 	return res, nil
+}
+
+func getKeys(msg message.InboundMessage) ([]uint64, error) {
+	keys := msg.Get(message.SummaryHeights).([]uint64)
+	keysSet := make(map[uint64]struct{}, len(keys))
+
+	for _, key := range keys {
+		if _, found := keysSet[key]; found {
+			return nil, errDuplicatedID
+		}
+		keysSet[key] = struct{}{}
+	}
+	return keys, nil
 }

@@ -15,6 +15,35 @@ var _ InboundMsgBuilder = &inMsgBuilder{}
 type InboundMsgBuilder interface {
 	Parser
 
+	InboundGetStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		summary []byte,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundGetAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		heights []uint64,
+		deadline time.Duration,
+		nodeID ids.ShortID,
+	) InboundMessage
+
+	InboundAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		summaryIDs []ids.ID,
+		nodeID ids.ShortID,
+	) InboundMessage
+
 	InboundGetAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
@@ -123,6 +152,82 @@ func (b *inMsgBuilder) SetTime(t time.Time) {
 	b.Codec.SetTime(t)
 }
 
+func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	nodeID ids.ShortID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessage{
+		op: GetStateSummaryFrontier,
+		fields: map[Field]interface{}{
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+		},
+		nodeID:         nodeID,
+		expirationTime: received.Add(deadline),
+	}
+}
+
+func (b *inMsgBuilder) InboundStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	summary []byte,
+	nodeID ids.ShortID,
+) InboundMessage {
+	return &inboundMessage{
+		op: StateSummaryFrontier,
+		fields: map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			SummaryBytes: summary,
+		},
+		nodeID: nodeID,
+	}
+}
+
+func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	heights []uint64,
+	deadline time.Duration,
+	nodeID ids.ShortID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessage{
+		op: GetAcceptedStateSummary,
+		fields: map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			Deadline:       uint64(deadline),
+			SummaryHeights: heights,
+		},
+		nodeID:         nodeID,
+		expirationTime: received.Add(deadline),
+	}
+}
+
+func (b *inMsgBuilder) InboundAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	summaryIDs []ids.ID,
+	nodeID ids.ShortID,
+) InboundMessage {
+	summaryIDBytes := make([][]byte, len(summaryIDs))
+	encodeIDs(summaryIDs, summaryIDBytes)
+	return &inboundMessage{
+		op: AcceptedStateSummary,
+		fields: map[Field]interface{}{
+			ChainID:    chainID[:],
+			RequestID:  requestID,
+			SummaryIDs: summaryIDBytes,
+		},
+		nodeID: nodeID,
+	}
+}
+
 func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
@@ -149,7 +254,7 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: AcceptedFrontier,
 		fields: map[Field]interface{}{
@@ -170,7 +275,7 @@ func (b *inMsgBuilder) InboundGetAccepted(
 ) InboundMessage {
 	received := b.clock.Time()
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: GetAccepted,
 		fields: map[Field]interface{}{
@@ -191,7 +296,7 @@ func (b *inMsgBuilder) InboundAccepted(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: Accepted,
 		fields: map[Field]interface{}{
@@ -254,7 +359,7 @@ func (b *inMsgBuilder) InboundChits(
 	nodeID ids.ShortID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeContainerIDs(containerIDs, containerIDBytes)
+	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		op: Chits,
 		fields: map[Field]interface{}{
@@ -361,9 +466,9 @@ func (b *inMsgBuilder) InboundAncestors(
 	}
 }
 
-func encodeContainerIDs(containerIDs []ids.ID, result [][]byte) {
-	for i, containerID := range containerIDs {
-		copy := containerID
+func encodeIDs(ids []ids.ID, result [][]byte) {
+	for i, id := range ids {
+		copy := id
 		result[i] = copy[:]
 	}
 }

@@ -11,6 +11,8 @@ import (
 )
 
 var (
+	_ Sender = &SenderTest{}
+
 	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
 	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
 	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
@@ -21,6 +23,8 @@ var (
 type SenderTest struct {
 	T *testing.T
 
+	CantSendGetStateSummaryFrontier, CantSendStateSummaryFrontier,
+	CantSendGetAcceptedStateSummary, CantSendAcceptedStateSummary,
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
 	CantSendGetAccepted, CantSendAccepted,
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
@@ -28,26 +32,34 @@ type SenderTest struct {
 	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
-	SendGetAcceptedFrontierF func(ids.ShortSet, uint32)
-	SendAcceptedFrontierF    func(ids.ShortID, uint32, []ids.ID)
-	SendGetAcceptedF         func(ids.ShortSet, uint32, []ids.ID)
-	SendAcceptedF            func(ids.ShortID, uint32, []ids.ID)
-	SendGetF                 func(ids.ShortID, uint32, ids.ID)
-	SendGetAncestorsF        func(ids.ShortID, uint32, ids.ID)
-	SendPutF                 func(ids.ShortID, uint32, ids.ID, []byte)
-	SendAncestorsF           func(ids.ShortID, uint32, [][]byte)
-	SendPushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
-	SendPullQueryF           func(ids.ShortSet, uint32, ids.ID)
-	SendChitsF               func(ids.ShortID, uint32, []ids.ID)
-	SendGossipF              func(ids.ID, []byte)
-	SendAppRequestF          func(ids.ShortSet, uint32, []byte) error
-	SendAppResponseF         func(ids.ShortID, uint32, []byte) error
-	SendAppGossipF           func([]byte) error
-	SendAppGossipSpecificF   func(ids.ShortSet, []byte) error
+	SendGetStateSummaryFrontierF func(ids.ShortSet, uint32)
+	SendStateSummaryFrontierF    func(ids.ShortID, uint32, []byte)
+	SendGetAcceptedStateSummaryF func(ids.ShortSet, uint32, []uint64)
+	SendAcceptedStateSummaryF    func(ids.ShortID, uint32, []ids.ID)
+	SendGetAcceptedFrontierF     func(ids.ShortSet, uint32)
+	SendAcceptedFrontierF        func(ids.ShortID, uint32, []ids.ID)
+	SendGetAcceptedF             func(ids.ShortSet, uint32, []ids.ID)
+	SendAcceptedF                func(ids.ShortID, uint32, []ids.ID)
+	SendGetF                     func(ids.ShortID, uint32, ids.ID)
+	SendGetAncestorsF            func(ids.ShortID, uint32, ids.ID)
+	SendPutF                     func(ids.ShortID, uint32, ids.ID, []byte)
+	SendAncestorsF               func(ids.ShortID, uint32, [][]byte)
+	SendPushQueryF               func(ids.ShortSet, uint32, ids.ID, []byte)
+	SendPullQueryF               func(ids.ShortSet, uint32, ids.ID)
+	SendChitsF                   func(ids.ShortID, uint32, []ids.ID)
+	SendGossipF                  func(ids.ID, []byte)
+	SendAppRequestF              func(ids.ShortSet, uint32, []byte) error
+	SendAppResponseF             func(ids.ShortID, uint32, []byte) error
+	SendAppGossipF               func([]byte) error
+	SendAppGossipSpecificF       func(ids.ShortSet, []byte) error
 }
 
 // Default set the default callable value to [cant]
 func (s *SenderTest) Default(cant bool) {
+	s.CantSendGetStateSummaryFrontier = cant
+	s.CantSendStateSummaryFrontier = cant
+	s.CantSendGetAcceptedStateSummary = cant
+	s.CantSendAcceptedStateSummary = cant
 	s.CantSendGetAcceptedFrontier = cant
 	s.CantSendAcceptedFrontier = cant
 	s.CantSendGetAccepted = cant
@@ -64,6 +76,50 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
 	s.CantSendAppGossipSpecific = cant
+}
+
+// SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
+// wasn't initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendGetStateSummaryFrontier(validatorIDs ids.ShortSet, requestID uint32) {
+	if s.SendGetStateSummaryFrontierF != nil {
+		s.SendGetStateSummaryFrontierF(validatorIDs, requestID)
+	} else if s.CantSendGetStateSummaryFrontier && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendGetStateSummaryFrontier")
+	}
+}
+
+// SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it
+// wasn't initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendStateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) {
+	if s.SendStateSummaryFrontierF != nil {
+		s.SendStateSummaryFrontierF(validatorID, requestID, summary)
+	} else if s.CantSendStateSummaryFrontier && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendStateSummaryFrontier")
+	}
+}
+
+// SendGetAcceptedStateSummary calls SendGetAcceptedStateSummaryF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, heights []uint64) {
+	if s.SendGetAcceptedStateSummaryF != nil {
+		s.SendGetAcceptedStateSummaryF(nodeIDs, requestID, heights)
+	} else if s.CantSendGetAcceptedStateSummary && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendGetAcceptedStateSummaryF")
+	}
+}
+
+// SendAcceptedStateSummary calls SendAcceptedStateSummaryF if it was initialized. If it wasn't
+// initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) SendAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) {
+	if s.SendAcceptedStateSummaryF != nil {
+		s.SendAcceptedStateSummaryF(validatorID, requestID, summaryIDs)
+	} else if s.CantSendAcceptedStateSummary && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendAcceptedStateSummary")
+	}
 }
 
 // SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized.

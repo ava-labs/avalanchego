@@ -90,6 +90,166 @@ func New(
 // Context of this sender
 func (s *sender) Context() *snow.ConsensusContext { return s.ctx }
 
+func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.ShortSet, requestID uint32) {
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
+
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
+	}
+
+	// Sending a message to myself. No need to send it over the network.
+	// Just put it right into the router. Asynchronously to avoid deadlock.
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
+		inMsg := s.msgCreator.InboundGetStateSummaryFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
+		go s.router.HandleInbound(inMsg)
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.GetStateSummaryFrontier(s.ctx.ChainID, requestID, deadline)
+	s.ctx.Log.AssertNoError(err)
+
+	// Send the message over the network.
+	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	for nodeID := range nodeIDs {
+		if !sentTo.Contains(nodeID) {
+			s.ctx.Log.Debug(
+				"failed to send GetStateSummaryFrontier(%s, %s, %d)",
+				nodeID,
+				s.ctx.ChainID,
+				requestID,
+			)
+		}
+	}
+}
+
+func (s *sender) SendStateSummaryFrontier(nodeID ids.ShortID, requestID uint32, summary []byte) {
+	// Sending this message to myself.
+	if nodeID == s.ctx.NodeID {
+		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, summary, nodeID)
+		go s.router.HandleInbound(inMsg)
+		return
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.StateSummaryFrontier(s.ctx.ChainID, requestID, summary)
+	if err != nil {
+		s.ctx.Log.Error(
+			"failed to build StateSummaryFrontier(%s, %d, %v): %s",
+			s.ctx.ChainID,
+			requestID,
+			summary,
+			err,
+		)
+		return
+	}
+
+	// Send the message over the network.
+	nodeIDs := ids.NewShortSet(1)
+	nodeIDs.Add(nodeID)
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
+		s.ctx.Log.Debug(
+			"failed to send StateSummaryFrontier(%s, %s, %d, %s)",
+			nodeID,
+			s.ctx.ChainID,
+			requestID,
+			summary,
+		)
+	}
+}
+
+func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, heights []uint64) {
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
+
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
+	}
+
+	// Sending a message to myself. No need to send it over the network.
+	// Just put it right into the router. Asynchronously to avoid deadlock.
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
+		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, heights, deadline, s.ctx.NodeID)
+		go s.router.HandleInbound(inMsg)
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.GetAcceptedStateSummary(s.ctx.ChainID, requestID, deadline, heights)
+
+	// Send the message over the network.
+	var sentTo ids.ShortSet
+	if err == nil {
+		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	} else {
+		s.ctx.Log.Error(
+			"failed to build GetAcceptedStateSummary(%s, %d, %s): %s",
+			s.ctx.ChainID,
+			requestID,
+			heights,
+			err,
+		)
+	}
+
+	for nodeID := range nodeIDs {
+		if !sentTo.Contains(nodeID) {
+			s.ctx.Log.Debug(
+				"failed to send GetAcceptedStateSummary(%s, %s, %d, %s)",
+				nodeID,
+				s.ctx.ChainID,
+				requestID,
+				heights,
+			)
+		}
+	}
+}
+
+func (s *sender) SendAcceptedStateSummary(nodeID ids.ShortID, requestID uint32, summaryIDs []ids.ID) {
+	if nodeID == s.ctx.NodeID {
+		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
+		go s.router.HandleInbound(inMsg)
+		return
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.AcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs)
+	if err != nil {
+		s.ctx.Log.Error(
+			"failed to build AcceptedStateSummary(%s, %d, %s): %s",
+			s.ctx.ChainID,
+			requestID,
+			summaryIDs,
+			err,
+		)
+		return
+	}
+
+	// Send the message over the network.
+	nodeIDs := ids.NewShortSet(1)
+	nodeIDs.Add(nodeID)
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
+		s.ctx.Log.Debug("failed to send AcceptedStateSummary(%s, %s, %d, %s)",
+			nodeID,
+			s.ctx.ChainID,
+			requestID,
+			summaryIDs,
+		)
+	}
+}
+
 func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
