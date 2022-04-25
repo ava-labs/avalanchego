@@ -361,7 +361,7 @@ func (n *network) Connected(nodeID ids.ShortID) {
 func (n *network) AllowConnection(nodeID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
-		n.wantsConnection(nodeID)
+		n.WantsConnection(nodeID)
 }
 
 func (n *network) Track(ip utils.IPCertDesc) {
