@@ -116,13 +116,13 @@ func getFloat32ValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (flo
 }
 
 func getBoolValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (bool, error) {
-	vStr, err := getStringValFromMapIntf(vdrDgtMap, key)
-	if err != nil {
-		return false, err
+	vIntf, ok := vdrDgtMap[key]
+	if !ok {
+		return false, fmt.Errorf("key %q not found in map", key)
 	}
-	vBool, err := strconv.ParseBool(vStr)
-	if err != nil {
-		return false, fmt.Errorf("could not parse %q from %q to bool: %w", key, vStr, err)
+	vBool := vIntf.(bool)
+	if !ok {
+		return false, fmt.Errorf("expected bool for %q got %T", key, vIntf)
 	}
 	return vBool, nil
 }
@@ -150,18 +150,25 @@ func getClientOwnerFromMapIntf(vdrDgtMap map[string]interface{}) (ClientOwner, e
 	if !ok {
 		return ClientOwner{}, fmt.Errorf("key %q not found in map", addressesKey)
 	}
-	addresses, ok := addressesIntf.([]string)
+	addressesSliceIntf, ok := addressesIntf.([]interface{})
 	if !ok {
-		return ClientOwner{}, fmt.Errorf("expected []string{} for %q got %T", addressesKey, addressesIntf)
+		return ClientOwner{}, fmt.Errorf("expected []interface{} for %q got %T", addressesKey, addressesIntf)
 	}
-	clientOwner.Addresses, err = addressconverter.ParseAddressesToID(addresses)
-	if err != nil {
-		return ClientOwner{}, err
+	clientOwner.Addresses = make([]ids.ShortID, len(addressesSliceIntf))
+	for i, addressIntf := range addressesSliceIntf {
+		address, ok := addressIntf.(string)
+		if !ok {
+			return ClientOwner{}, fmt.Errorf("expected string got %T", addressIntf)
+		}
+		clientOwner.Addresses[i], err = addressconverter.ParseAddressToID(address)
+		if err != nil {
+			return ClientOwner{}, err
+		}
 	}
 	return clientOwner, nil
 }
 
-func getClientStakersFromMapIntf(stakersSliceIntf []interface{}, isValidator bool) ([]ClientStaker, error) {
+func getClientStakersFromMapIntf(stakersSliceIntf []interface{}, subnetID ids.ID, isValidator bool) ([]ClientStaker, error) {
 	var err error
 	clientStakers := make([]ClientStaker, len(stakersSliceIntf))
 	for i, stakerMapIntf := range stakersSliceIntf {
@@ -169,7 +176,7 @@ func getClientStakersFromMapIntf(stakersSliceIntf []interface{}, isValidator boo
 		if !ok {
 			return nil, fmt.Errorf("expected map[string]interface{} got %T", stakerMapIntf)
 		}
-		clientStakers[i], err = getClientStakerFromMapIntf(stakerMap, isValidator)
+		clientStakers[i], err = getClientStakerFromMapIntf(stakerMap, subnetID, isValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +184,7 @@ func getClientStakersFromMapIntf(stakersSliceIntf []interface{}, isValidator boo
 	return clientStakers, nil
 }
 
-func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bool) (ClientStaker, error) {
+func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, subnetID ids.ID, isValidator bool) (ClientStaker, error) {
 	var err error
 	clientStaker := ClientStaker{}
 	txIDStr, err := getStringValFromMapIntf(vdrDgtMap, txIDKey)
@@ -196,9 +203,11 @@ func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bo
 	if err != nil {
 		return ClientStaker{}, err
 	}
-	clientStaker.StakeAmount, err = getUint64ValFromMapIntf(vdrDgtMap, stakeAmountKey)
-	if err != nil {
-		return ClientStaker{}, err
+	if subnetID == constants.PrimaryNetworkID {
+		clientStaker.StakeAmount, err = getUint64ValFromMapIntf(vdrDgtMap, stakeAmountKey)
+		if err != nil {
+			return ClientStaker{}, err
+		}
 	}
 	nodeIDStr, err := getStringValFromMapIntf(vdrDgtMap, nodeIDKey)
 	if err != nil {
@@ -217,9 +226,11 @@ func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bo
 		return ClientStaker{}, err
 	}
 	if isValidator {
-		clientStaker.Weight, err = getUint64ValFromMapIntf(vdrDgtMap, weightKey)
-		if err != nil {
-			return ClientStaker{}, err
+		if subnetID != constants.PrimaryNetworkID {
+			clientStaker.Weight, err = getUint64ValFromMapIntf(vdrDgtMap, weightKey)
+			if err != nil {
+				return ClientStaker{}, err
+			}
 		}
 		clientStaker.DelegationFee, err = getFloat32ValFromMapIntf(vdrDgtMap, delegationFeeKey)
 		if err != nil {
@@ -237,13 +248,15 @@ func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bo
 		if !ok {
 			return ClientStaker{}, fmt.Errorf("key %q not found in map", delegatorsKey)
 		}
-		dgts, ok := dgtsIntf.([]interface{})
-		if !ok {
-			return ClientStaker{}, fmt.Errorf("expected []interface{} for %q got %T", delegatorsKey, dgtsIntf)
-		}
-		clientStaker.Delegators, err = getClientStakersFromMapIntf(dgts, false)
-		if err != nil {
-			return ClientStaker{}, err
+		if dgtsIntf != nil {
+			dgts, ok := dgtsIntf.([]interface{})
+			if !ok {
+				return ClientStaker{}, fmt.Errorf("expected []interface{} for %q got %T", delegatorsKey, dgtsIntf)
+			}
+			clientStaker.Delegators, err = getClientStakersFromMapIntf(dgts, subnetID, false)
+			if err != nil {
+				return ClientStaker{}, err
+			}
 		}
 	}
 	return clientStaker, nil

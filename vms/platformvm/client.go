@@ -404,7 +404,7 @@ func (c *client) GetCurrentValidators(
 	if err != nil {
 		return nil, err
 	}
-	clientStakers, err := getClientStakersFromMapIntf(res.Validators, true)
+	clientStakers, err := getClientStakersFromMapIntf(res.Validators, subnetID, true)
 	if err != nil {
 		return nil, err
 	}
