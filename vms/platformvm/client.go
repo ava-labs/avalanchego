@@ -424,82 +424,144 @@ type ClientStaker struct {
 	Delegators      []ClientStaker
 }
 
-func getClientStaker(vdrDgtMap map[string]interface{}) (ClientStaker, error) {
+func getStringValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (string, error) {
+	vIntf, ok := vdrDgtMap[key]
+	if !ok {
+		return "", fmt.Errorf("key %q not found in map", key)
+	}
+	vStr := vIntf.(string)
+	if !ok {
+		return "", fmt.Errorf("expected string for %q got %T", key, vIntf)
+	}
+	return vStr, nil
+}
+
+func getTimeValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (time.Time, error) {
+	timeStr, err := getStringValFromMapIntf(vdrDgtMap, key)
+	if err != nil {
+		return time.Time{}, err
+	}
+	timeUint, err := strconv.ParseUint(timeStr, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not parse %q from %q to uint: %w", key, timeStr, err)
+	}
+	return time.Unix(int64(timeUint), 0), nil
+}
+
+func getUint64ValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (uint64, error) {
+	vStr, err := getStringValFromMapIntf(vdrDgtMap, key)
+	if err != nil {
+		return 0, err
+	}
+	vUint64, err := strconv.ParseUint(vStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse %q from %q to uint: %w", key, vStr, err)
+	}
+	return vUint64, nil
+}
+
+func getUint32ValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (uint32, error) {
+	vStr, err := getStringValFromMapIntf(vdrDgtMap, key)
+	if err != nil {
+		return 0, err
+	}
+	vUint64, err := strconv.ParseUint(vStr, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse %q from %q to uint: %w", key, vStr, err)
+	}
+	return uint32(vUint64), nil
+}
+
+func getFloat32ValFromMapIntf(vdrDgtMap map[string]interface{}, key string) (float32, error) {
+	vStr, err := getStringValFromMapIntf(vdrDgtMap, key)
+	if err != nil {
+		return 0, err
+	}
+	vFloat64, err := strconv.ParseFloat(vStr, 32)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse %q from %q to uint: %w", key, vStr, err)
+	}
+	return float32(vFloat64), nil
+}
+
+func getClientOwnerFromMapIntf(vdrDgtMap map[string]interface{}) (ClientOwner, error) {
+	var err error
+	rewardOwnerIntf, ok := vdrDgtMap[rewardOwnerKey]
+	if !ok {
+		return ClientOwner{}, fmt.Errorf("key %q not found in map", rewardOwnerKey)
+	}
+	rewardOwnerMap, ok := rewardOwnerIntf.(map[string]interface{})
+	if !ok {
+		return ClientOwner{}, fmt.Errorf("expected map[string]interface{} for %q got %T", rewardOwnerKey, rewardOwnerIntf)
+	}
+	clientOwner := ClientOwner{}
+	clientOwner.Locktime, err = getUint64ValFromMapIntf(rewardOwnerMap, locktimeKey)
+	if err != nil {
+		return ClientOwner{}, err
+	}
+	clientOwner.Threshold, err = getUint32ValFromMapIntf(rewardOwnerMap, thresholdKey)
+	if err != nil {
+		return ClientOwner{}, err
+	}
+	addressesIntf, ok := rewardOwnerMap[addressesKey]
+	if !ok {
+		return ClientOwner{}, fmt.Errorf("key %q not found in map", addressesKey)
+	}
+	addresses, ok := addressesIntf.([]string)
+	if !ok {
+		return ClientOwner{}, fmt.Errorf("expected []string{} for %q got %T", addressesKey, addressesIntf)
+	}
+	clientOwner.Addresses, err = addressconverter.ParseAddressesToID(addresses)
+	if err != nil {
+		return ClientOwner{}, err
+	}
+	return clientOwner, nil
+}
+
+func getClientStakerFromMapIntf(vdrDgtMap map[string]interface{}, isValidator bool) (ClientStaker, error) {
 	var err error
 	clientStaker := ClientStaker{}
-	txIDIntf, ok := vdrDgtMap[txIDKey]
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("key %q not found in map", txIDKey)
-	}
-	txIDStr := txIDIntf.(string)
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", txIDKey, txIDIntf)
+	txIDStr, err := getStringValFromMapIntf(vdrDgtMap, txIDKey)
+	if err != nil {
+		return ClientStaker{}, err
 	}
 	clientStaker.TxID, err = ids.FromString(txIDStr)
 	if err != nil {
 		return ClientStaker{}, fmt.Errorf("couldn't parse %q from %q to ids.ID: %w", txIDKey, txIDStr, err)
 	}
-	startTimeIntf, ok := vdrDgtMap[startTimeKey]
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("key %q not found in map", startTimeKey)
-	}
-	startTimeStr, ok := startTimeIntf.(string)
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", startTimeKey, startTimeIntf)
-	}
-	startTimeUint, err := strconv.ParseUint(startTimeStr, 10, 64)
+	clientStaker.StartTime, err = getTimeValFromMapIntf(vdrDgtMap, startTimeKey)
 	if err != nil {
-		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", startTimeKey, startTimeStr, err)
+		return ClientStaker{}, err
 	}
-	clientStaker.StartTime = time.Unix(int64(startTimeUint), 0)
-	endTimeIntf, ok := vdrDgtMap[endTimeKey]
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("key %q not found in map", endTimeKey)
-	}
-	endTimeStr, ok := endTimeIntf.(string)
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", endTimeKey, endTimeIntf)
-	}
-	endTimeUint, err := strconv.ParseUint(endTimeStr, 10, 64)
+	clientStaker.EndTime, err = getTimeValFromMapIntf(vdrDgtMap, endTimeKey)
 	if err != nil {
-		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", endTimeKey, endTimeStr, err)
+		return ClientStaker{}, err
 	}
-	clientStaker.EndTime = time.Unix(int64(endTimeUint), 0)
-	stakeAmountIntf, ok := vdrDgtMap[stakeAmountKey]
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("key %q not found in map", stakeAmountKey)
-	}
-	stakeAmountStr, ok := stakeAmountIntf.(string)
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", stakeAmountKey, stakeAmountIntf)
-	}
-	clientStaker.StakeAmount, err = strconv.ParseUint(stakeAmountStr, 10, 64)
+	clientStaker.StakeAmount, err = getUint64ValFromMapIntf(vdrDgtMap, stakeAmountKey)
 	if err != nil {
-		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", stakeAmountKey, stakeAmountStr, err)
+		return ClientStaker{}, err
 	}
-	nodeIDIntf, ok := vdrDgtMap[nodeIDKey]
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("key %q not found in map", nodeIDKey)
+	if isValidator {
+		clientStaker.Weight, err = getUint64ValFromMapIntf(vdrDgtMap, weightKey)
+		if err != nil {
+			return ClientStaker{}, err
+		}
 	}
-	nodeIDStr, ok := nodeIDIntf.(string)
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", nodeIDKey, nodeIDIntf)
+	nodeIDStr, err := getStringValFromMapIntf(vdrDgtMap, nodeIDKey)
+	if err != nil {
+		return ClientStaker{}, err
 	}
 	clientStaker.NodeID, err = ids.ShortFromPrefixedString(nodeIDStr, constants.NodeIDPrefix)
 	if err != nil {
 		return ClientStaker{}, err
 	}
-	potentialRewardIntf, ok := vdrDgtMap[potentialRewardKey]
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("key %q not found in map", potentialRewardKey)
-	}
-	potentialRewardStr, ok := potentialRewardIntf.(string)
-	if !ok {
-		return ClientStaker{}, fmt.Errorf("expected string for %q got %T", potentialRewardKey, potentialRewardIntf)
-	}
-	clientStaker.PotentialReward, err = strconv.ParseUint(potentialRewardStr, 10, 64)
+	clientStaker.RewardOwner, err = getClientOwnerFromMapIntf(vdrDgtMap)
 	if err != nil {
-		return ClientStaker{}, fmt.Errorf("could not parse %q from %q to uint: %w", potentialRewardKey, potentialRewardStr, err)
+		return ClientStaker{}, err
+	}
+	clientStaker.PotentialReward, err = getUint64ValFromMapIntf(vdrDgtMap, potentialRewardKey)
+	if err != nil {
+		return ClientStaker{}, err
 	}
 	return clientStaker, nil
 }
