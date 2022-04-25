@@ -58,19 +58,19 @@ type Client interface {
 		options ...rpc.Option,
 	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetAssetDescription returns a description of [assetID]
-	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
+	GetAssetDescription(ctx context.Context, assetID ids.ID, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
-	GetBalance(ctx context.Context, addr ids.ShortID, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
+	GetBalance(ctx context.Context, addr ids.ShortID, assetID ids.ID, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
 	// CreateAsset creates a new asset and returns its assetID
-	GetAllBalances(context.Context, ids.ShortID, bool, ...rpc.Option) (*GetAllBalancesReply, error)
+	GetAllBalances(context.Context, ids.ShortID, bool, ...rpc.Option) ([]ClientBalance, error)
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr,
-		name,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		name string,
 		symbol string,
 		denomination byte,
 		holders []*Holder,
@@ -82,8 +82,8 @@ type Client interface {
 		ctx context.Context,
 		user api.UserPass,
 		from []string,
-		changeAddr,
-		name,
+		changeAddr string,
+		name string,
 		symbol string,
 		denomination byte,
 		holders []*Holder,
@@ -94,8 +94,8 @@ type Client interface {
 		ctx context.Context,
 		user api.UserPass,
 		from []string,
-		changeAddr,
-		name,
+		changeAddr string,
+		name string,
 		symbol string,
 		denomination byte,
 		minters []Owners,
@@ -106,8 +106,8 @@ type Client interface {
 		ctx context.Context,
 		user api.UserPass,
 		from []string,
-		changeAddr,
-		name,
+		changeAddr string,
+		name string,
 		symbol string,
 		minters []Owners,
 		options ...rpc.Option,
@@ -127,7 +127,7 @@ type Client interface {
 		from []string,
 		changeAddr string,
 		amount uint64,
-		assetID,
+		assetID string,
 		to string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -155,7 +155,7 @@ type Client interface {
 	) (ids.ID, error)
 	// Import sends an import transaction to import funds from [sourceChain] and
 	// returns the ID of the newly created transaction
-	Import(ctx context.Context, user api.UserPass, to, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
+	Import(ctx context.Context, user api.UserPass, to string, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
 	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 	// Returns the ID of the newly created atomic transaction
 	Export(
@@ -310,10 +310,10 @@ func (c *client) GetAtomicUTXOs(
 	return utxos, endAddr, endUTXOID, nil
 }
 
-func (c *client) GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
+func (c *client) GetAssetDescription(ctx context.Context, assetID ids.ID, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
 	err := c.requester.SendRequest(ctx, "getAssetDescription", &GetAssetDescriptionArgs{
-		AssetID: assetID,
+		AssetID: assetID.String(),
 	}, res, options...)
 	return res, err
 }
@@ -321,7 +321,7 @@ func (c *client) GetAssetDescription(ctx context.Context, assetID string, option
 func (c *client) GetBalance(
 	ctx context.Context,
 	addr ids.ShortID,
-	assetID string,
+	assetID ids.ID,
 	includePartial bool,
 	options ...rpc.Option,
 ) (*GetBalanceReply, error) {
@@ -332,10 +332,15 @@ func (c *client) GetBalance(
 	}
 	err = c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
 		Address:        addrStr,
-		AssetID:        assetID,
+		AssetID:        assetID.String(),
 		IncludePartial: includePartial,
 	}, res, options...)
 	return res, err
+}
+
+type ClientBalance struct {
+	AssetID ids.ID
+	Balance uint64
 }
 
 func (c *client) GetAllBalances(
@@ -343,7 +348,7 @@ func (c *client) GetAllBalances(
 	addr ids.ShortID,
 	includePartial bool,
 	options ...rpc.Option,
-) (*GetAllBalancesReply, error) {
+) ([]ClientBalance, error) {
 	res := &GetAllBalancesReply{}
 	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
 	if err != nil {
@@ -353,15 +358,23 @@ func (c *client) GetAllBalances(
 		JSONAddress:    api.JSONAddress{Address: addrStr},
 		IncludePartial: includePartial,
 	}, res, options...)
-	return res, err
+	clientBalances := make([]ClientBalance, len(res.Balances))
+	for i, balance := range res.Balances {
+		clientBalances[i].AssetID, err = ids.FromString(balance.AssetID)
+		if err != nil {
+			return nil, err
+		}
+		clientBalances[i].Balance = uint64(balance.Balance)
+	}
+	return clientBalances, err
 }
 
 func (c *client) CreateAsset(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr,
-	name,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	name string,
 	symbol string,
 	denomination byte,
 	holders []*Holder,
@@ -369,11 +382,19 @@ func (c *client) CreateAsset(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
-	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Name:           name,
 		Symbol:         symbol,
