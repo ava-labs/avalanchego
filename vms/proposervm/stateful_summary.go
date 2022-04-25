@@ -26,7 +26,7 @@ func (ss *statefulSummary) Accept() (bool, error) {
 	// state sync after a shutdown since height index allows retrieving
 	// proposerBlkID from innerSummary.Height.
 	if ss.ID() != ids.Empty {
-		//Store the block
+		// Store the block
 		if postForkBlk, ok := ss.proposerBlock.(PostForkBlock); ok {
 			if err := ss.vm.storePostForkBlock(postForkBlk); err != nil {
 				return false, err
