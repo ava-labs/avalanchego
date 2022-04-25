@@ -199,7 +199,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 			"failed to build GetAcceptedStateSummary(%s, %d, %s): %s",
 			s.ctx.ChainID,
 			requestID,
-			keys,
+			heights,
 			err,
 		)
 	}
@@ -211,7 +211,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uin
 				nodeID,
 				s.ctx.ChainID,
 				requestID,
-				keys,
+				heights,
 			)
 		}
 	}
