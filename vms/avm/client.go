@@ -73,99 +73,100 @@ type Client interface {
 		name string,
 		symbol string,
 		denomination byte,
-		holders []*Holder,
-		minters []Owners,
+		holders []*ClientHolder,
+		minters []ClientOwners,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
 	CreateFixedCapAsset(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		name string,
 		symbol string,
 		denomination byte,
-		holders []*Holder,
+		holders []*ClientHolder,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
 	CreateVariableCapAsset(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		name string,
 		symbol string,
 		denomination byte,
-		minters []Owners,
+		minters []ClientOwners,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateNFTAsset creates a new NFT asset and returns its assetID
 	CreateNFTAsset(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		name string,
 		symbol string,
-		minters []Owners,
+		minters []ClientOwners,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateAddress creates a new address controlled by [user]
-	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error)
+	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error)
 	// ListAddresses returns all addresses on this chain controlled by [user]
-	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error)
+	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
 	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (string, error)
 	// ImportKey imports [privateKey] to [user]
-	ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (ids.ShortID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
 	Mint(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		amount uint64,
-		assetID string,
-		to string,
+		assetID ids.ID,
+		to ids.ShortID,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendNFT sends an NFT and returns the ID of the newly created transaction
 	SendNFT(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		assetID string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		assetID ids.ID,
 		groupID uint32,
-		to string,
+		to ids.ShortID,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 	MintNFT(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		assetID string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		assetID ids.ID,
 		payload []byte,
-		to string,
+		to ids.ShortID,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// Import sends an import transaction to import funds from [sourceChain] and
 	// returns the ID of the newly created transaction
-	Import(ctx context.Context, user api.UserPass, to string, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
+	Import(ctx context.Context, user api.UserPass, to ids.ShortID, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
 	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 	// Returns the ID of the newly created atomic transaction
 	Export(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		amount uint64,
-		to string,
-		assetID string,
+		to ids.ShortID,
+		toChainIDAlias string,
+		assetID ids.ID,
 		options ...rpc.Option,
 	) (ids.ID, error)
 }
@@ -369,6 +370,18 @@ func (c *client) GetAllBalances(
 	return clientBalances, err
 }
 
+// ClientHolder describes how much an address owns of an asset
+type ClientHolder struct {
+	Amount  uint64
+	Address ids.ShortID
+}
+
+// ClientOwners describes who can perform an action
+type ClientOwners struct {
+	Threshold uint32
+	Minters   []ids.ShortID
+}
+
 func (c *client) CreateAsset(
 	ctx context.Context,
 	user api.UserPass,
@@ -377,8 +390,8 @@ func (c *client) CreateAsset(
 	name string,
 	symbol string,
 	denomination byte,
-	holders []*Holder,
-	minters []Owners,
+	clientHolders []*ClientHolder,
+	clientMinters []ClientOwners,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
@@ -389,6 +402,22 @@ func (c *client) CreateAsset(
 	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
 	if err != nil {
 		return ids.Empty, err
+	}
+	holders := make([]*Holder, len(clientHolders))
+	for i, clientHolder := range clientHolders {
+		holders[i].Amount = cjson.Uint64(clientHolder.Amount)
+		holders[i].Address, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientHolder.Address[:])
+		if err != nil {
+			return ids.Empty, err
+		}
+	}
+	minters := make([]Owners, len(clientMinters))
+	for i, clientMinter := range clientMinters {
+		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
+		minters[i].Minters, err = addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, clientMinter.Minters)
+		if err != nil {
+			return ids.Empty, err
+		}
 	}
 	err = c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -408,20 +437,36 @@ func (c *client) CreateAsset(
 func (c *client) CreateFixedCapAsset(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr,
-	name,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	name string,
 	symbol string,
 	denomination byte,
-	holders []*Holder,
+	clientHolders []*ClientHolder,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
-	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	holders := make([]*Holder, len(clientHolders))
+	for i, clientHolder := range clientHolders {
+		holders[i].Amount = cjson.Uint64(clientHolder.Amount)
+		holders[i].Address, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientHolder.Address[:])
+		if err != nil {
+			return ids.Empty, err
+		}
+	}
+	err = c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Name:           name,
 		Symbol:         symbol,
@@ -434,20 +479,36 @@ func (c *client) CreateFixedCapAsset(
 func (c *client) CreateVariableCapAsset(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr,
-	name,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	name string,
 	symbol string,
 	denomination byte,
-	minters []Owners,
+	clientMinters []ClientOwners,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
-	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	minters := make([]Owners, len(clientMinters))
+	for i, clientMinter := range clientMinters {
+		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
+		minters[i].Minters, err = addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, clientMinter.Minters)
+		if err != nil {
+			return ids.Empty, err
+		}
+	}
+	err = c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Name:         name,
 		Symbol:       symbol,
@@ -460,19 +521,35 @@ func (c *client) CreateVariableCapAsset(
 func (c *client) CreateNFTAsset(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr,
-	name,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	name string,
 	symbol string,
-	minters []Owners,
+	clientMinters []ClientOwners,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
-	err := c.requester.SendRequest(ctx, "createNFTAsset", &CreateNFTAssetArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	minters := make([]Owners, len(clientMinters))
+	for i, clientMinter := range clientMinters {
+		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
+		minters[i].Minters, err = addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, clientMinter.Minters)
+		if err != nil {
+			return ids.Empty, err
+		}
+	}
+	err = c.requester.SendRequest(ctx, "createNFTAsset", &CreateNFTAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Name:       name,
 		Symbol:     symbol,
@@ -481,16 +558,22 @@ func (c *client) CreateNFTAsset(
 	return res.AssetID, err
 }
 
-func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error) {
+func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "createAddress", &user, res, options...)
-	return res.Address, err
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return addressconverter.ParseAddressToID(res.Address)
 }
 
-func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error) {
+func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest(ctx, "listAddresses", &user, res, options...)
-	return res.Addresses, err
+	if err != nil {
+		return nil, err
+	}
+	return addressconverter.ParseAddressesToID(res.Addresses)
 }
 
 func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (string, error) {
@@ -506,13 +589,16 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.Shor
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,
 		PrivateKey: privateKey,
 	}, res, options...)
-	return res.Address, err
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return addressconverter.ParseAddressToID(res.Address)
 }
 
 func (c *client) Send(
@@ -597,23 +683,35 @@ func (c *client) SendMultiple(
 func (c *client) Mint(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	amount uint64,
-	assetID,
-	to string,
+	assetID ids.ID,
+	to ids.ShortID,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "mint", &MintArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "mint", &MintArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Amount:  cjson.Uint64(amount),
-		AssetID: assetID,
-		To:      to,
+		AssetID: assetID.String(),
+		To:      toStr,
 	}, res, options...)
 	return res.TxID, err
 }
@@ -621,23 +719,35 @@ func (c *client) Mint(
 func (c *client) SendNFT(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	assetID string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	assetID ids.ID,
 	groupID uint32,
-	to string,
+	to ids.ShortID,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "sendNFT", &SendNFTArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "sendNFT", &SendNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		AssetID: assetID,
+		AssetID: assetID.String(),
 		GroupID: cjson.Uint32(groupID),
-		To:      to,
+		To:      toStr,
 	}, res, options...)
 	return res.TxID, err
 }
@@ -645,11 +755,11 @@ func (c *client) SendNFT(
 func (c *client) MintNFT(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	assetID string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	assetID ids.ID,
 	payload []byte,
-	to string,
+	to ids.ShortID,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	payloadStr, err := formatting.EncodeWithChecksum(formatting.Hex, payload)
@@ -657,25 +767,41 @@ func (c *client) MintNFT(
 		return ids.ID{}, err
 	}
 	res := &api.JSONTxID{}
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
 	err = c.requester.SendRequest(ctx, "mintNFT", &MintNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		AssetID:  assetID,
+		AssetID:  assetID.String(),
 		Payload:  payloadStr,
-		To:       to,
+		To:       toStr,
 		Encoding: formatting.Hex,
 	}, res, options...)
 	return res.TxID, err
 }
 
-func (c *client) Import(ctx context.Context, user api.UserPass, to, sourceChain string, options ...rpc.Option) (ids.ID, error) {
+func (c *client) Import(ctx context.Context, user api.UserPass, to ids.ShortID, sourceChain string, options ...rpc.Option) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "import", &ImportArgs{
+	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "import", &ImportArgs{
 		UserPass:    user,
-		To:          to,
+		To:          toStr,
 		SourceChain: sourceChain,
 	}, res, options...)
 	return res.TxID, err
@@ -684,23 +810,36 @@ func (c *client) Import(ctx context.Context, user api.UserPass, to, sourceChain 
 func (c *client) Export(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	amount uint64,
-	to string,
-	assetID string,
+	to ids.ShortID,
+	toChainIDAlias string,
+	assetID ids.ID,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "export", &ExportArgs{
+	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
+	if err != nil {
+		return ids.Empty, err
+	}
+	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	toStr, err := formatting.FormatAddress(toChainIDAlias, c.hrp, to[:])
+	if err != nil {
+		return ids.Empty, err
+	}
+	err = c.requester.SendRequest(ctx, "export", &ExportArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Amount:  cjson.Uint64(amount),
-		To:      to,
-		AssetID: assetID,
+		To:      toStr,
+		AssetID: assetID.String(),
 	}, res, options...)
 	return res.TxID, err
 }
