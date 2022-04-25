@@ -125,6 +125,7 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 }
 
 // Decode [str] to bytes using the given encoding
+// If [str] is the empty string, returns a nil byte slice and nil error
 func Decode(encoding Encoding, str string) ([]byte, error) {
 	switch {
 	case !encoding.valid():
