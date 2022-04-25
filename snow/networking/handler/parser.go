@@ -16,6 +16,7 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 	idsBytes := msg.Get(field).([][]byte)
 	res := make([]ids.ID, len(idsBytes))
 	idSet := ids.NewSet(len(idsBytes))
+
 	for i, bytes := range idsBytes {
 		id, err := ids.ToID(bytes)
 		if err != nil {
@@ -31,8 +32,8 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 }
 
 func getKeys(msg message.InboundMessage) ([]uint64, error) {
-	keys := msg.Get(message.SummaryKeys).([]uint64)
-	keysSet := make(map[uint64]struct{})
+	keys := msg.Get(message.SummaryHeights).([]uint64)
+	keysSet := make(map[uint64]struct{}, len(keys))
 
 	for _, key := range keys {
 		if _, found := keysSet[key]; found {

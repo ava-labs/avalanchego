@@ -51,9 +51,9 @@ const (
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
 	GetAcceptedFailed
+	GetAncestorsFailed
 	GetFailed
 	QueryFailed
-	GetAncestorsFailed
 	AppRequestFailed
 	Timeout
 	Connected
@@ -106,9 +106,9 @@ var (
 	ConsensusInternalOps = []Op{
 		GetAcceptedFrontierFailed,
 		GetAcceptedFailed,
+		GetAncestorsFailed,
 		GetFailed,
 		QueryFailed,
-		GetAncestorsFailed,
 		AppRequestFailed,
 		Timeout,
 		Connected,
@@ -136,9 +136,9 @@ var (
 		Chits,
 		GetAcceptedFrontierFailed,
 		GetAcceptedFailed,
+		GetAncestorsFailed,
 		GetFailed,
 		QueryFailed,
-		GetAncestorsFailed,
 		Connected,
 		Disconnected,
 
@@ -230,15 +230,15 @@ var (
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
-		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, SummaryKeys},
+		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, SummaryHeights},
 		AcceptedStateSummary:    {ChainID, RequestID, SummaryIDs},
 	}
 )
 
 func (op Op) Compressible() bool {
 	switch op {
-	case PeerList, Put, Ancestors,
-		PushQuery, AppRequest, AppResponse, AppGossip,
+	case PeerList, Put, Ancestors, PushQuery,
+		AppRequest, AppResponse, AppGossip,
 		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
 		return true
 	default:
@@ -297,12 +297,12 @@ func (op Op) String() string {
 		return "get_accepted_frontier_failed"
 	case GetAcceptedFailed:
 		return "get_accepted_failed"
+	case GetAncestorsFailed:
+		return "get_ancestors_failed"
 	case GetFailed:
 		return "get_failed"
 	case QueryFailed:
 		return "query_failed"
-	case GetAncestorsFailed:
-		return "get_ancestors_failed"
 	case AppRequestFailed:
 		return "app_request_failed"
 	case GetStateSummaryFrontierFailed:

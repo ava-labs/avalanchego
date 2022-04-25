@@ -396,7 +396,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				reqID,
 				err,
 			)
-			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+			return nil
 		}
 		return engine.GetAcceptedStateSummary(nodeID, reqID, msgKeys)
 
