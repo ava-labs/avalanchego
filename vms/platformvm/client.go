@@ -639,6 +639,9 @@ func (c *client) GetCurrentValidators(
 		SubnetID: subnetID,
 		NodeIDs:  nodeIDsStr,
 	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
 	clientStakers, err := getClientStakersFromMapIntf(res.Validators, true)
 	if err != nil {
 		return nil, err
