@@ -36,7 +36,10 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 		return nil, err
 	}
 
-	var proSummary summary.ProposerSummaryIntf
+	var (
+		proSummary summary.ProposerSummaryIntf
+		proBlk     Block
+	)
 	if innerSummary.ID() == ids.Empty {
 		// summary with emptyID signals no local summary is available in InnerVM
 		proSummary, err = summary.BuildEmptyProposerSummary()
@@ -47,7 +50,7 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 			vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
 			return nil, block.ErrUnknownStateSummary
 		}
-		proBlk, err := vm.GetBlock(proBlkID)
+		proBlk, err = vm.getBlock(proBlkID)
 		if err != nil {
 			return nil, block.ErrUnknownStateSummary
 		}
@@ -60,6 +63,7 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	return &statefulSummary{
 		ProposerSummaryIntf: proSummary,
 		innerSummary:        innerSummary,
+		proposerBlock:       proBlk,
 		vm:                  vm,
 	}, err
 }
@@ -111,7 +115,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse inner summary due to: %w", err)
 	}
-	block, err := vm.ParseBlock(statelessSummary.BlockBytes())
+	block, err := vm.parseBlock(statelessSummary.BlockBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not parse proposervm block bytes from summary due to: %w", err)
 	}
@@ -122,8 +126,9 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 			SummaryHeight:        innerSummary.Height(),
 			SummaryBlock:         block,
 		},
-		innerSummary: innerSummary,
-		vm:           vm,
+		innerSummary:  innerSummary,
+		proposerBlock: block,
+		vm:            vm,
 	}, nil
 }
 
