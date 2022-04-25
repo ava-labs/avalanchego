@@ -58,7 +58,7 @@ type Client interface {
 		options ...rpc.Option,
 	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetAssetDescription returns a description of [assetID]
-	GetAssetDescription(ctx context.Context, assetID ids.ID, options ...rpc.Option) (*GetAssetDescriptionReply, error)
+	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
 	GetBalance(ctx context.Context, addr ids.ShortID, assetID ids.ID, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
@@ -311,10 +311,10 @@ func (c *client) GetAtomicUTXOs(
 	return utxos, endAddr, endUTXOID, nil
 }
 
-func (c *client) GetAssetDescription(ctx context.Context, assetID ids.ID, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
+func (c *client) GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
 	err := c.requester.SendRequest(ctx, "getAssetDescription", &GetAssetDescriptionArgs{
-		AssetID: assetID.String(),
+		AssetID: assetID,
 	}, res, options...)
 	return res, err
 }
