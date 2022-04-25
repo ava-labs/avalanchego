@@ -24,7 +24,7 @@ type Client interface {
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
 	GetBlockchainID(context.Context, string, ...rpc.Option) (ids.ID, error)
 	Peers(context.Context, ...rpc.Option) ([]ClientPeer, error)
-	IsBootstrapped(context.Context, string, ...rpc.Option) (bool, error)
+	IsBootstrapped(context.Context, ids.ID, ...rpc.Option) (bool, error)
 	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
 	Uptime(context.Context, ...rpc.Option) (*UptimeResponse, error)
 	GetVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, error)
@@ -123,10 +123,10 @@ func (c *client) Peers(ctx context.Context, options ...rpc.Option) ([]ClientPeer
 	return clientPeers, err
 }
 
-func (c *client) IsBootstrapped(ctx context.Context, chainID string, options ...rpc.Option) (bool, error) {
+func (c *client) IsBootstrapped(ctx context.Context, chainID ids.ID, options ...rpc.Option) (bool, error) {
 	res := &IsBootstrappedResponse{}
 	err := c.requester.SendRequest(ctx, "isBootstrapped", &IsBootstrappedArgs{
-		Chain: chainID,
+		Chain: chainID.String(),
 	}, res, options...)
 	return res.IsBootstrapped, err
 }
