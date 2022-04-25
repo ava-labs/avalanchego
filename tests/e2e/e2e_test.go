@@ -99,6 +99,26 @@ func init() {
 	)
 }
 
+const vmName = "subnetevm"
+
+var vmID ids.ID
+
+func init() {
+	// TODO: add "getVMID" util function in avalanchego and import from "avalanchego"
+	b := make([]byte, 32)
+	copy(b, []byte(vmName))
+	var err error
+	vmID, err = ids.ToID(b)
+	if err != nil {
+		panic(err)
+	}
+}
+
+const (
+	modeTest = "test"
+	modeRun  = "run"
+)
+
 var (
 	cli             client.Client
 	subnetEVMRPCEps []string
@@ -123,7 +143,7 @@ var _ = ginkgo.BeforeSuite(func() {
 			execPath,
 			client.WithPluginDir(pluginDir),
 			client.WithCustomVMs(map[string]string{
-				"subnetevm": vmGenesisPath,
+				vmName: vmGenesisPath,
 			}))
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
@@ -135,15 +155,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	// "start" is async, so wait some time for cluster health
 	time.Sleep(2 * time.Minute)
 
-	ctx, cancel := createDefaultCtx()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	_, err = cli.Health(ctx)
 	cancel()
 	gomega.Expect(err).Should(gomega.BeNil())
 
 	subnetEVMRPCEps = make([]string, 0)
 	blockchainID, logsDir := "", ""
-	k, err := getVMID("subnetevm")
-	gomega.Expect(err).Should(gomega.BeNil())
 
 	// wait up to 5-minute for custom VM installation
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
@@ -156,7 +174,7 @@ done:
 		}
 
 		outf("{{magenta}}checking custom VM status{{/}}\n")
-		cctx, ccancel := createDefaultCtx()
+		cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		resp, err := cli.Status(cctx)
 		ccancel()
 		gomega.Expect(err).Should(gomega.BeNil())
@@ -164,7 +182,7 @@ done:
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
 
-		if v, ok := resp.ClusterInfo.CustomVms[k.String()]; ok {
+		if v, ok := resp.ClusterInfo.CustomVms[vmID.String()]; ok {
 			blockchainID = v.BlockchainId
 			outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", v)
 			break done
@@ -176,7 +194,7 @@ done:
 	gomega.Expect(blockchainID).Should(gomega.Not(gomega.BeEmpty()))
 	gomega.Expect(logsDir).Should(gomega.Not(gomega.BeEmpty()))
 
-	cctx, ccancel := createDefaultCtx()
+	cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	uris, err := cli.URIs(cctx)
 	ccancel()
 	gomega.Expect(err).Should(gomega.BeNil())
@@ -205,14 +223,14 @@ done:
 
 var _ = ginkgo.AfterSuite(func() {
 	switch mode {
-	case "test":
+	case modeTest:
 		outf("{{red}}shutting down cluster{{/}}\n")
-		ctx, cancel := createDefaultCtx()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		_, err := cli.Stop(ctx)
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
 
-	case "run":
+	case modeRun:
 		outf("{{red}}skipping shutting down cluster{{/}}\n")
 	}
 
@@ -222,17 +240,13 @@ var _ = ginkgo.AfterSuite(func() {
 
 var _ = ginkgo.Describe("[basic]", func() {
 	ginkgo.It("can TODO", func() {
-		if mode != "test" {
+		if mode != modeTest {
 			ginkgo.Skip("mode is not 'test'; skipping...")
 		}
 
 		// TODO: e2e tests specific for subnet-evm
 	})
 })
-
-func createDefaultCtx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 2*time.Minute)
-}
 
 // Outputs to stdout.
 //
@@ -264,13 +278,4 @@ func (ci clusterInfo) Save(p string) error {
 		return err
 	}
 	return os.WriteFile(p, ob, fsModeWrite)
-}
-
-func getVMID(vmName string) (ids.ID, error) {
-	if len(vmName) > 32 {
-		return ids.Empty, fmt.Errorf("VM name must be <= 32 bytes, found %d", len(vmName))
-	}
-	b := make([]byte, 32)
-	copy(b, []byte(vmName))
-	return ids.ToID(b)
 }
