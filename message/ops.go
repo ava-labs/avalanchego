@@ -106,9 +106,9 @@ var (
 	ConsensusInternalOps = []Op{
 		GetAcceptedFrontierFailed,
 		GetAcceptedFailed,
+		GetAncestorsFailed,
 		GetFailed,
 		QueryFailed,
-		GetAncestorsFailed,
 		AppRequestFailed,
 		Timeout,
 		Connected,
@@ -136,9 +136,9 @@ var (
 		Chits,
 		GetAcceptedFrontierFailed,
 		GetAcceptedFailed,
+		GetAncestorsFailed,
 		GetFailed,
 		QueryFailed,
-		GetAncestorsFailed,
 		Connected,
 		Disconnected,
 
@@ -297,12 +297,12 @@ func (op Op) String() string {
 		return "get_accepted_frontier_failed"
 	case GetAcceptedFailed:
 		return "get_accepted_failed"
+	case GetAncestorsFailed:
+		return "get_ancestors_failed"
 	case GetFailed:
 		return "get_failed"
 	case QueryFailed:
 		return "query_failed"
-	case GetAncestorsFailed:
-		return "get_ancestors_failed"
 	case AppRequestFailed:
 		return "app_request_failed"
 	case GetStateSummaryFrontierFailed:
