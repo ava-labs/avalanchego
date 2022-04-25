@@ -51,6 +51,9 @@ func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*Ge
 func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.ShortID, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest(ctx, "getNodeID", struct{}{}, res, options...)
+	if err != nil {
+		return ids.ShortEmpty, err
+	}
 	nodeID, err := ids.ShortFromPrefixedString(res.NodeID, constants.NodeIDPrefix)
 	if err != nil {
 		return ids.ShortEmpty, err
