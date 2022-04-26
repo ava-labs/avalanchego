@@ -57,7 +57,7 @@ func (b *postForkOption) Reject() error {
 }
 
 func (b *postForkOption) Status() choices.Status {
-	if b.status == choices.Accepted && b.Height() < b.vm.lastAcceptedHeight {
+	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
 		return choices.Processing
 	}
 	return b.status
