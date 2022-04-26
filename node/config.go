@@ -89,6 +89,11 @@ type StakingConfig struct {
 	StakingCertPath       string          `json:"stakingCertPath"`
 }
 
+type StateSyncConfig struct {
+	StateSyncIDs []ids.ShortID  `json:"stateSyncIDs"`
+	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
+}
+
 type BootstrapConfig struct {
 	// Should Bootstrap be retried
 	RetryBootstrap bool `json:"retryBootstrap"`
@@ -131,6 +136,7 @@ type Config struct {
 	IPConfig            `json:"ipConfig"`
 	StakingConfig       `json:"stakingConfig"`
 	genesis.TxFeeConfig `json:"txFeeConfig"`
+	StateSyncConfig     `json:"stateSyncConfig"`
 	BootstrapConfig     `json:"bootstrapConfig"`
 	DatabaseConfig      `json:"databaseConfig"`
 

@@ -181,6 +181,10 @@ type ManagerConfig struct {
 	ApricotPhase4MinPChainHeight uint64
 
 	ResetProposerVMHeightIndex bool
+
+	// TODO: Use StateSyncBeacons as an override when creating the syncer config
+	//       to specify who to sync from.
+	StateSyncBeacons []ids.ShortID
 }
 
 type manager struct {
