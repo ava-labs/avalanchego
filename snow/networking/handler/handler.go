@@ -330,26 +330,20 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.GetStateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		_ = reqID
-		// TODO: call the engine here
-		return nil
+		return engine.GetStateSummaryFrontier(nodeID, reqID)
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		summary := msg.Get(message.SummaryBytes).([]byte)
-		_, _ = reqID, summary
-		// TODO: call the engine here
-		return nil
+		return engine.StateSummaryFrontier(nodeID, reqID, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		_ = reqID
-		// TODO: call the engine here
-		return nil
+		return engine.GetStateSummaryFrontierFailed(nodeID, reqID)
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
-		msgKeys, err := getKeys(msg)
+		summaryHeights, err := getSummaryHeights(msg)
 		if err != nil {
 			h.ctx.Log.Debug(
 				"Malformed message %s from (%s%s, %d): %s",
@@ -361,9 +355,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
-		_, _ = reqID, msgKeys
-		// TODO: call the engine here
-		return nil
+		return engine.GetAcceptedStateSummary(nodeID, reqID, summaryHeights)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -377,19 +369,13 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				reqID,
 				err,
 			)
-			_ = reqID
-			// TODO: call the engine here
-			return nil
+			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
 		}
-		_, _ = reqID, summaryIDs
-		// TODO: call the engine here
-		return nil
+		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		_ = reqID
-		// TODO: call the engine here
-		return nil
+		return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
 
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)

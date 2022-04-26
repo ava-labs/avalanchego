@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 )
 
-var errDuplicatedID = errors.New("inbound message contains duplicated ID")
+var (
+	errDuplicatedID     = errors.New("inbound message contains duplicated ID")
+	errDuplicatedHeight = errors.New("inbound message contains duplicated height")
+)
 
 func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 	idsBytes := msg.Get(field).([][]byte)
@@ -31,15 +34,15 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 	return res, nil
 }
 
-func getKeys(msg message.InboundMessage) ([]uint64, error) {
-	keys := msg.Get(message.SummaryHeights).([]uint64)
-	keysSet := make(map[uint64]struct{}, len(keys))
+func getSummaryHeights(msg message.InboundMessage) ([]uint64, error) {
+	heights := msg.Get(message.SummaryHeights).([]uint64)
+	heightsSet := make(map[uint64]struct{}, len(heights))
 
-	for _, key := range keys {
-		if _, found := keysSet[key]; found {
-			return nil, errDuplicatedID
+	for _, height := range heights {
+		if _, found := heightsSet[height]; found {
+			return nil, errDuplicatedHeight
 		}
-		keysSet[key] = struct{}{}
+		heightsSet[height] = struct{}{}
 	}
-	return keys, nil
+	return heights, nil
 }
