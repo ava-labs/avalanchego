@@ -203,7 +203,7 @@ func NewNetwork(
 		Network:              nil, // This is set below.
 		Router:               router,
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
-		VersionParser:        version.NewDefaultApplicationParser(),
+		VersionParser:        version.DefaultApplicationParser,
 		MySubnets:            config.WhitelistedSubnets,
 		Beacons:              config.Beacons,
 		NetworkID:            config.NetworkID,

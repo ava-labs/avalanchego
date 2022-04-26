@@ -45,11 +45,7 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var (
-	versionParser = version.NewDefaultApplicationParser()
-
-	_ vmpb.VMServer = &VMServer{}
-)
+var _ vmpb.VMServer = &VMServer{}
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
@@ -94,9 +90,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
-	versionParser := version.NewDefaultParser()
 	for i, vDBReq := range req.DbServers {
-		version, err := versionParser.Parse(vDBReq.Version)
+		version, err := version.DefaultParser.Parse(vDBReq.Version)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
@@ -493,7 +488,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*e
 		return nil, err
 	}
 
-	peerVersion, err := versionParser.Parse(req.Version)
+	peerVersion, err := version.DefaultApplicationParser.Parse(req.Version)
 	if err != nil {
 		return nil, err
 	}

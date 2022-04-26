@@ -869,7 +869,7 @@ func (n *Node) initInfoAPI() error {
 		n.Config.VMManager,
 		&n.Config.NetworkConfig.MyIP,
 		n.Net,
-		version.NewDefaultApplicationParser(),
+		version.DefaultApplicationParser,
 		primaryValidators,
 		n.benchlistManager,
 	)

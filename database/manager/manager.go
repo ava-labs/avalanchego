@@ -123,7 +123,6 @@ func new(
 	log logging.Logger,
 	currentVersion version.Version,
 ) (Manager, error) {
-	parser := version.NewDefaultParser()
 	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
 
 	currentDB, err := newDB(currentDBPath, dbConfig, log)
@@ -161,7 +160,7 @@ func new(
 			return nil
 		}
 		_, dbName := filepath.Split(path)
-		version, err := parser.Parse(dbName)
+		version, err := version.DefaultParser.Parse(dbName)
 		if err != nil {
 			// If the database directory contains any directories that don't
 			// match the expected version format, ignore them.
