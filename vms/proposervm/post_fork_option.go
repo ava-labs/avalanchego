@@ -41,6 +41,7 @@ func (b *postForkOption) Accept() error {
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)
+	b.vm.lastAcceptedHeight = b.Height()
 
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected
