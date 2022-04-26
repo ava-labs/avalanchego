@@ -29,19 +29,21 @@ func (b *postForkOption) Timestamp() time.Time {
 }
 
 func (b *postForkOption) Accept() error {
+	// Update in-memory references
+	b.status = choices.Accepted
+	b.vm.lastAcceptedHeight = b.Height()
+
 	blkID := b.ID()
+	delete(b.vm.verifiedBlocks, blkID)
+
+	// Persist this block, its height index, and its status
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
 
-	// Persist this block, its height index, and its status
-	b.status = choices.Accepted
 	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
-
-	delete(b.vm.verifiedBlocks, blkID)
-	b.vm.lastAcceptedHeight = b.Height()
 
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected
