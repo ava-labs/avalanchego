@@ -69,15 +69,15 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, heights []uint64) error {
 	if gh.ssVM == nil {
 		gh.log.Debug("State sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
 		return nil
 	}
 
-	summaryIDs := make([]ids.ID, 0, len(keys))
-	for _, key := range keys {
-		summary, err := gh.ssVM.GetStateSummary(key)
+	summaryIDs := make([]ids.ID, 0, len(heights))
+	for _, height := range heights {
+		summary, err := gh.ssVM.GetStateSummary(height)
 		if err == common.ErrStateSyncableVMNotImplemented {
 			// this may happen with rpcchainVMs
 			return nil
