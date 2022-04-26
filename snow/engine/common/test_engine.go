@@ -162,12 +162,6 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAppRequestFailed = cant
 	e.CantAppResponse = cant
 	e.CantAppGossip = cant
-	e.CantGetStateSummaryFrontier = cant
-	e.CantStateSummaryFrontier = cant
-	e.CantGetStateSummaryFrontierFailed = cant
-	e.CantGetAcceptedStateSummary = cant
-	e.CantAcceptedStateSummary = cant
-	e.CantGetAcceptedStateSummaryFailed = cant
 	e.CantGetVM = cant
 }
 
