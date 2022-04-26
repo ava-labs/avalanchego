@@ -14,10 +14,75 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
+	assert := assert.New(t)
+
+	// Build state syncer
+	sender := &common.SenderTest{T: t}
+	commonCfg := &common.Config{
+		Ctx:    snow.DefaultConsensusContextTest(),
+		Sender: sender,
+	}
+
+	// Non state syncableVM case
+	nonStateSyncableVM := &block.TestVM{
+		TestVM: common.TestVM{T: t},
+	}
+	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
+	assert.NoError(err)
+
+	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
+	assert.NoError(err)
+	syncer := New(cfg, func(lastReqID uint32) error { return nil })
+
+	enabled, err := syncer.IsEnabled()
+	assert.NoError(err)
+	assert.False(enabled)
+
+	// State syncableVM case
+	commonCfg.Ctx = snow.DefaultConsensusContextTest() // reset metrics
+
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			T: t,
+		},
+	}
+	dummyGetter, err = getter.New(fullVM, *commonCfg)
+	assert.NoError(err)
+
+	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
+	assert.NoError(err)
+	syncer = New(cfg, func(lastReqID uint32) error { return nil })
+
+	// test: VM does not really implement state syncing
+	fullVM.StateSyncEnabledF = func() (bool, error) {
+		return false, block.ErrStateSyncableVMNotImplemented
+	}
+	enabled, err = syncer.IsEnabled()
+	assert.NoError(err)
+	assert.False(enabled)
+
+	// test: VM does not support state syncing
+	fullVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
+	enabled, err = syncer.IsEnabled()
+	assert.NoError(err)
+	assert.False(enabled)
+
+	// test: VM does support state syncing
+	fullVM.StateSyncEnabledF = func() (bool, error) { return true, nil }
+	enabled, err = syncer.IsEnabled()
+	assert.NoError(err)
+	assert.True(enabled)
+}
 
 func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert := assert.New(t)

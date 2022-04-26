@@ -522,5 +522,10 @@ func (ss *stateSyncer) IsEnabled() (bool, error) {
 		return false, nil
 	}
 
-	return ss.stateSyncVM.StateSyncEnabled()
+	enabled, err := ss.stateSyncVM.StateSyncEnabled()
+	if err == block.ErrStateSyncableVMNotImplemented {
+		return false, nil
+	}
+
+	return enabled, err
 }
