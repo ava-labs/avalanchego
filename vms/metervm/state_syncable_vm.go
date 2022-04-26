@@ -26,7 +26,7 @@ func (vm *blockVM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetOngoingSyncStateSummary()
 	end := vm.clock.Time()
-	vm.stateSummaryMetrics.GetOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
+	vm.stateSummaryMetrics.getOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
 
 	return summary, err
 }
