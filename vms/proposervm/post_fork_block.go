@@ -48,7 +48,12 @@ func (b *postForkBlock) Reject() error {
 	return nil
 }
 
-func (b *postForkBlock) Status() choices.Status { return b.status }
+func (b *postForkBlock) Status() choices.Status {
+	if b.status == choices.Accepted && b.Height() < b.vm.lastAcceptedHeight {
+		return choices.Processing
+	}
+	return b.status
+}
 
 // Return this block's parent, or a *missing.Block if
 // we don't have the parent.

@@ -56,7 +56,12 @@ func (b *postForkOption) Reject() error {
 	return nil
 }
 
-func (b *postForkOption) Status() choices.Status { return b.status }
+func (b *postForkOption) Status() choices.Status {
+	if b.status == choices.Accepted && b.Height() < b.vm.lastAcceptedHeight {
+		return choices.Processing
+	}
+	return b.status
+}
 
 func (b *postForkOption) Parent() ids.ID {
 	return b.ParentID()

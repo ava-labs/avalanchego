@@ -103,7 +103,7 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight, false)
+	proVM := New(coreVM, proBlkStartTime, minPChainHeight)
 
 	valState := &validators.TestState{
 		T: t,
@@ -839,7 +839,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1169,7 +1169,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
@@ -1251,7 +1251,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(coreVM, time.Time{}, 0, false)
+	proVM = New(coreVM, time.Time{}, 0)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
@@ -1775,7 +1775,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1953,7 +1953,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
