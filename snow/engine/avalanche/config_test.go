@@ -45,6 +45,7 @@ func DefaultConfig() (common.Config, bootstrap.Config, Config) {
 				OptimalProcessing:     100,
 				MaxOutstandingItems:   1,
 				MaxItemProcessingTime: 1,
+				MixedQueryNumPush:     1,
 			},
 			Parents:   2,
 			BatchSize: 1,

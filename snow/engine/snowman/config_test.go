@@ -26,6 +26,7 @@ func DefaultConfigs() Config {
 			OptimalProcessing:     100,
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
+			MixedQueryNumPush:     1,
 		},
 		Consensus: &snowman.Topological{},
 	}
