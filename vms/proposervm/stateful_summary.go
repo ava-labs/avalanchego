@@ -11,24 +11,32 @@ import (
 
 var _ block.Summary = &statefulSummary{}
 
+// statefulSummary implements block.Summary by layering three objects:
+// 1- summary.StatelessSummary carries all summary marshallable content along with
+// data immediately retrievable from it.
+// 2- summary.ProposerSummary adds to summary.StatelessSummary height, as retrieved
+// by innerSummary
+// 3- statefulSummary add to summary.ProposerSummary the implementation
+// of block.Summary.Accept, to handle processing of the validated summary.
+// Note that summary.StatelessSummary contains data to build both innerVM summary
+// and the full proposerVM block associated with the summary.
 type statefulSummary struct {
 	summary.ProposerSummary
-	vm *VM
 
-	// stateful inner summary, retrieved via Parse
+	// inner summary, retrieved via Parse
 	innerSummary block.Summary
 
 	// block associated with the summary
 	proposerBlock Block
+
+	vm *VM
 }
 
 func (ss *statefulSummary) Accept() (bool, error) {
-	// A non-empty summary must update the block height index with its blockID
-	// (i.e. the ID of the block summary refers to). This helps resuming
-	// state sync after a shutdown since height index allows retrieving
-	// proposerBlkID from innerSummary.Height.
+	// a non-empty statefulSummary carries the full proposerVM block associated
+	// with the summary. We store this block and update height index with it,
+	// so that state sync could resume after a shutdown.
 	if ss.ID() != ids.Empty {
-		// Store the block
 		if postForkBlk, ok := ss.proposerBlock.(PostForkBlock); ok {
 			if err := ss.vm.storePostForkBlock(postForkBlk); err != nil {
 				return false, err

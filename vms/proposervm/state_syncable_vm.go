@@ -52,6 +52,8 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 		}
 		proBlk, err = vm.getBlock(proBlkID)
 		if err != nil {
+			// this should never happen, it's proVM being out of sync with innerVM
+			vm.ctx.Log.Warn("unknown block associated with ongoing inner summary: %s", err)
 			return nil, block.ErrUnknownStateSummary
 		}
 		proSummary, err = summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
@@ -88,6 +90,8 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 	}
 	proBlk, err := vm.GetBlock(proBlkID)
 	if err != nil {
+		// this should never happen, it's proVM being out of sync with innerVM
+		vm.ctx.Log.Warn("unknown block associated with inner summary: %s", err)
 		return nil, block.ErrUnknownStateSummary
 	}
 
@@ -148,6 +152,8 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	}
 	proBlk, err := vm.GetBlock(proBlkID)
 	if err != nil {
+		// this should never happen, it's proVM being out of sync with innerVM
+		vm.ctx.Log.Warn("unknown block associated with inner summary: %s", err)
 		return nil, block.ErrUnknownStateSummary
 	}
 

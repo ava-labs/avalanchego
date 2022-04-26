@@ -37,7 +37,11 @@ type scheduler struct {
 	notifyCallback func(common.Message) error
 }
 
-func New(log logging.Logger, toEngine chan<- common.Message, notifyCallback func(common.Message) error) (Scheduler, chan<- common.Message) {
+func New(
+	log logging.Logger,
+	toEngine chan<- common.Message,
+	notifyCallback func(common.Message) error,
+) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, cap(toEngine))
 	return &scheduler{
 		log:               log,
