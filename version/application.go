@@ -32,7 +32,7 @@ type application struct {
 	str string
 }
 
-// NewDefaultApplication returns a new version with default separators
+// NewDefaultApplication returns a new SemanticVersion with default separators
 func NewDefaultApplication(
 	app string,
 	major int,
@@ -49,7 +49,7 @@ func NewDefaultApplication(
 	)
 }
 
-// NewApplication returns a new version
+// NewApplication returns a new Application
 func NewApplication(
 	app string,
 	appSeparator string,

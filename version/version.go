@@ -6,6 +6,8 @@ package version
 import (
 	"errors"
 	"fmt"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -30,21 +32,24 @@ type Version interface {
 	Compare(o Version) int
 }
 
-type version struct {
-	major, minor, patch int
-	str                 string
+type SemanticVersion struct {
+	Major_  int    `yaml:"major"`
+	Minor_  int    `yaml:"minor"`
+	Patch_  int    `yaml:"patch"`
+	String_ string `yaml:"string"`
 }
 
 func NewDefaultVersion(major, minor, patch int) Version {
+	zap.NewProductionEncoderConfig()
 	return NewVersion(major, minor, patch, defaultVersionPrefix, defaultVersionSeparator)
 }
 
-func NewVersion(major, minor, patch int, prefix, versionSeparator string) Version {
-	return &version{
-		major: major,
-		minor: minor,
-		patch: patch,
-		str: fmt.Sprintf(
+func NewVersion(major, minor, patch int, prefix, versionSeparator string) *SemanticVersion {
+	return &SemanticVersion{
+		Major_: major,
+		Minor_: minor,
+		Patch_: patch,
+		String_: fmt.Sprintf(
 			"%s%d%s%d%s%d",
 			prefix,
 			major,
@@ -56,13 +61,13 @@ func NewVersion(major, minor, patch int, prefix, versionSeparator string) Versio
 	}
 }
 
-func (v *version) String() string { return v.str }
-func (v *version) Major() int     { return v.major }
-func (v *version) Minor() int     { return v.minor }
-func (v *version) Patch() int     { return v.patch }
+func (v *SemanticVersion) String() string { return v.String_ }
+func (v *SemanticVersion) Major() int     { return v.Major_ }
+func (v *SemanticVersion) Minor() int     { return v.Minor_ }
+func (v *SemanticVersion) Patch() int     { return v.Patch_ }
 
 // Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
-func (v *version) Compare(o Version) int {
+func (v *SemanticVersion) Compare(o Version) int {
 	{
 		vm := v.Major()
 		om := o.Major()
