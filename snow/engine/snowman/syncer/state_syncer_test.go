@@ -63,14 +63,6 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	assert.NoError(err)
 	syncer = New(cfg, func(lastReqID uint32) error { return nil })
 
-	// test: VM does not really implement state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) {
-		return false, block.ErrStateSyncableVMNotImplemented
-	}
-	enabled, err = syncer.IsEnabled()
-	assert.NoError(err)
-	assert.False(enabled)
-
 	// test: VM does not support state syncing
 	fullVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
 	enabled, err = syncer.IsEnabled()

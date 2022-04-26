@@ -36,31 +36,29 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 		return nil, err
 	}
 
-	var (
-		proSummary summary.ProposerSummary
-		proBlk     Block
-	)
 	if innerSummary.ID() == ids.Empty {
 		// summary with emptyID signals no local summary is available in InnerVM
-		proSummary, err = summary.BuildEmptyProposerSummary()
-	} else {
-		proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
-		if err != nil {
-			// this should never happen, it's proVM being out of sync with innerVM
-			vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
-			return nil, block.ErrUnknownStateSummary
-		}
-		proBlk, err = vm.getBlock(proBlkID)
-		if err != nil {
-			// this should never happen, it's proVM being out of sync with innerVM
-			vm.ctx.Log.Warn("unknown block associated with ongoing inner summary: %s", err)
-			return nil, block.ErrUnknownStateSummary
-		}
-		proSummary, err = summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
-		if err != nil {
-			return nil, err
-		}
+		return &statefulSummary{
+			ProposerSummary: summary.BuildEmptyProposerSummary(),
+			innerSummary:    innerSummary,
+			proposerBlock:   nil,
+			vm:              vm,
+		}, nil
 	}
+
+	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
+	if err != nil {
+		// this should never happen, it's proVM being out of sync with innerVM
+		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
+		return nil, block.ErrUnknownStateSummary
+	}
+	proBlk, err := vm.getBlock(proBlkID)
+	if err != nil {
+		// this should never happen, it's proVM being out of sync with innerVM
+		vm.ctx.Log.Warn("could not find block associated with inner summary: %s", err)
+		return nil, block.ErrUnknownStateSummary
+	}
+	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 
 	return &statefulSummary{
 		ProposerSummary: proSummary,
@@ -91,7 +89,7 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 	proBlk, err := vm.GetBlock(proBlkID)
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with innerVM
-		vm.ctx.Log.Warn("unknown block associated with inner summary: %s", err)
+		vm.ctx.Log.Warn("could not find block associated with inner summary: %s", err)
 		return nil, block.ErrUnknownStateSummary
 	}
 
@@ -153,7 +151,7 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	proBlk, err := vm.GetBlock(proBlkID)
 	if err != nil {
 		// this should never happen, it's proVM being out of sync with innerVM
-		vm.ctx.Log.Warn("unknown block associated with inner summary: %s", err)
+		vm.ctx.Log.Warn("could not find block associated with inner summary: %s", err)
 		return nil, block.ErrUnknownStateSummary
 	}
 

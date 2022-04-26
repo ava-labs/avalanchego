@@ -9,9 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-// emptySummary has an ad-hoc construction in that it must have an empty summary ID
-func BuildEmptyProposerSummary() (ProposerSummary, error) {
-	return NewProposerSummary(&StatelessSummary{}, 0), nil
+func BuildEmptyProposerSummary() ProposerSummary {
+	return NewProposerSummary(&StatelessSummary{}, 0)
 }
 
 func BuildProposerSummary(

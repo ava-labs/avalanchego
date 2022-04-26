@@ -32,8 +32,7 @@ func TestBuildEmptySummary(t *testing.T) {
 	assert := assert.New(t)
 
 	emptySummary := &block.TestSummary{}
-	builtSummary, err := BuildEmptyProposerSummary()
-	assert.NoError(err)
+	builtSummary := BuildEmptyProposerSummary()
 
 	assert.Equal(builtSummary.ID(), ids.Empty)
 	assert.Equal(builtSummary.Height(), uint64(0))

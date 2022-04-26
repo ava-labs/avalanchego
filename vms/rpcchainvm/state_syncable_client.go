@@ -22,6 +22,10 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	err = errCodeToError[resp.Err]
+	if err == block.ErrStateSyncableVMNotImplemented {
+		return false, nil
+	}
 	return resp.Enabled, errCodeToError[resp.Err]
 }
 

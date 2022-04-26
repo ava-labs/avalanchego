@@ -158,7 +158,6 @@ func (h *handler) selectStartingGear() (common.Engine, error) {
 		return h.bootstrapper, nil
 	}
 
-	var stateSyncEnabled bool
 	stateSyncEnabled, err := h.stateSyncer.IsEnabled()
 	if err != nil {
 		return nil, err
