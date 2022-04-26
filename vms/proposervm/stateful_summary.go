@@ -12,7 +12,7 @@ import (
 var _ block.Summary = &statefulSummary{}
 
 type statefulSummary struct {
-	summary.ProposerSummaryIntf
+	summary.ProposerSummary
 	vm *VM
 
 	// stateful inner summary, retrieved via Parse

@@ -9,12 +9,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
-	_ ProposerSummaryIntf = &ProposerSummary{}
+	_ ProposerSummary = &proposerSummary{}
 
 	cdc codec.Manager
 
@@ -38,21 +37,24 @@ func init() {
 	}
 }
 
-type ProposerSummaryIntf interface {
+type ProposerSummary interface {
 	StatelessSummaryIntf
-	Height() uint64
-	Block() snowman.Block
+	Height() uint64 // part of block.Summary interface
 }
 
-func NewProposerSummary() ProposerSummaryIntf {
-	return &ProposerSummary{}
+func NewProposerSummary(
+	statelessSummary StatelessSummaryIntf,
+	height uint64,
+) ProposerSummary {
+	return &proposerSummary{
+		StatelessSummaryIntf: statelessSummary,
+		SummaryHeight:        height,
+	}
 }
 
-type ProposerSummary struct {
+type proposerSummary struct {
 	StatelessSummaryIntf
 	SummaryHeight uint64
-	SummaryBlock  snowman.Block
 }
 
-func (ps *ProposerSummary) Height() uint64       { return ps.SummaryHeight }
-func (ps *ProposerSummary) Block() snowman.Block { return ps.SummaryBlock }
+func (ps *proposerSummary) Height() uint64 { return ps.SummaryHeight }

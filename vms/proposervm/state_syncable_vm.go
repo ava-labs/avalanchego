@@ -37,7 +37,7 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	}
 
 	var (
-		proSummary summary.ProposerSummaryIntf
+		proSummary summary.ProposerSummary
 		proBlk     Block
 	)
 	if innerSummary.ID() == ids.Empty {
@@ -61,10 +61,10 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	}
 
 	return &statefulSummary{
-		ProposerSummaryIntf: proSummary,
-		innerSummary:        innerSummary,
-		proposerBlock:       proBlk,
-		vm:                  vm,
+		ProposerSummary: proSummary,
+		innerSummary:    innerSummary,
+		proposerBlock:   proBlk,
+		vm:              vm,
 	}, err
 }
 
@@ -93,9 +93,9 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 
 	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 	return &statefulSummary{
-		ProposerSummaryIntf: proSummary,
-		innerSummary:        innerSummary,
-		vm:                  vm,
+		ProposerSummary: proSummary,
+		innerSummary:    innerSummary,
+		vm:              vm,
 	}, err
 }
 
@@ -111,7 +111,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 		return nil, err
 	}
 
-	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerBytes())
+	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerSummaryBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not parse inner summary due to: %w", err)
 	}
@@ -120,15 +120,12 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 		return nil, fmt.Errorf("could not parse proposervm block bytes from summary due to: %w", err)
 	}
 
+	proposerSummary := summary.NewProposerSummary(statelessSummary, innerSummary.Height())
 	return &statefulSummary{
-		ProposerSummaryIntf: &summary.ProposerSummary{
-			StatelessSummaryIntf: statelessSummary,
-			SummaryHeight:        innerSummary.Height(),
-			SummaryBlock:         block,
-		},
-		innerSummary:  innerSummary,
-		proposerBlock: block,
-		vm:            vm,
+		ProposerSummary: proposerSummary,
+		innerSummary:    innerSummary,
+		proposerBlock:   block,
+		vm:              vm,
 	}, nil
 }
 
@@ -156,9 +153,9 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 
 	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 	return &statefulSummary{
-		ProposerSummaryIntf: proSummary,
-		innerSummary:        innerSummary,
-		vm:                  vm,
+		ProposerSummary: proSummary,
+		innerSummary:    innerSummary,
+		vm:              vm,
 	}, err
 }
 

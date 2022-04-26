@@ -14,7 +14,7 @@ type StatelessSummaryIntf interface {
 	Bytes() []byte // part of block.Summary interface
 	ID() ids.ID    // part of block.Summary interface
 
-	InnerBytes() []byte
+	InnerSummaryBytes() []byte
 	BlockBytes() []byte
 
 	initialize(bytes []byte) error
@@ -28,10 +28,10 @@ type StatelessSummary struct {
 	ProposerSummaryID    ids.ID
 }
 
-func (ss *StatelessSummary) Bytes() []byte      { return ss.ProposerSummaryBytes }
-func (ss *StatelessSummary) ID() ids.ID         { return ss.ProposerSummaryID }
-func (ss *StatelessSummary) InnerBytes() []byte { return ss.InnerSummary }
-func (ss *StatelessSummary) BlockBytes() []byte { return ss.ProBlkBytes }
+func (ss *StatelessSummary) Bytes() []byte             { return ss.ProposerSummaryBytes }
+func (ss *StatelessSummary) ID() ids.ID                { return ss.ProposerSummaryID }
+func (ss *StatelessSummary) InnerSummaryBytes() []byte { return ss.InnerSummary }
+func (ss *StatelessSummary) BlockBytes() []byte        { return ss.ProBlkBytes }
 
 func (ss *StatelessSummary) initialize(bytes []byte) error {
 	ss.ProposerSummaryBytes = bytes

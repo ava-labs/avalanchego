@@ -10,13 +10,14 @@ import (
 )
 
 // emptySummary has an ad-hoc construction in that it must have an empty summary ID
-func BuildEmptyProposerSummary() (ProposerSummaryIntf, error) {
-	return &ProposerSummary{
-		StatelessSummaryIntf: &StatelessSummary{},
-	}, nil
+func BuildEmptyProposerSummary() (ProposerSummary, error) {
+	return NewProposerSummary(&StatelessSummary{}, 0), nil
 }
 
-func BuildProposerSummary(proBlkBytes []byte, coreSummary block.Summary) (ProposerSummaryIntf, error) {
+func BuildProposerSummary(
+	proBlkBytes []byte,
+	coreSummary block.Summary,
+) (ProposerSummary, error) {
 	statelessSummary := StatelessSummary{
 		ProBlkBytes:  proBlkBytes,
 		InnerSummary: coreSummary.Bytes(),
@@ -30,8 +31,5 @@ func BuildProposerSummary(proBlkBytes []byte, coreSummary block.Summary) (Propos
 		return nil, err
 	}
 
-	return &ProposerSummary{
-		StatelessSummaryIntf: &statelessSummary,
-		SummaryHeight:        coreSummary.Height(),
-	}, nil
+	return NewProposerSummary(&statelessSummary, coreSummary.Height()), nil
 }

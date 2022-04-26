@@ -34,7 +34,7 @@ func TestParse(t *testing.T) {
 	assert.Equal(builtSummary.Bytes(), parsedBlock.Bytes())
 	assert.Equal(builtSummary.ID(), parsedBlock.ID())
 	assert.Equal(builtSummary.BlockBytes(), parsedBlock.BlockBytes())
-	assert.Equal(builtSummary.InnerBytes(), parsedBlock.InnerBytes())
+	assert.Equal(builtSummary.InnerSummaryBytes(), parsedBlock.InnerSummaryBytes())
 }
 
 func TestParseGibberish(t *testing.T) {
