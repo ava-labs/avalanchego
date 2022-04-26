@@ -47,6 +47,16 @@ type getter struct {
 	getAncestorsVtxs metric.Averager
 }
 
+func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+	gh.log.Debug("GetStateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, heights []uint64) error {
+	gh.log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+	return nil
+}
+
 func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge()
 	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
