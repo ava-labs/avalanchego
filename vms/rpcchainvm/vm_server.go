@@ -45,11 +45,7 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var (
-	versionParser = version.NewDefaultApplicationParser()
-
-	_ vmpb.VMServer = &VMServer{}
-)
+var _ vmpb.VMServer = &VMServer{}
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
@@ -94,9 +90,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
-	versionParser := version.NewDefaultParser()
 	for i, vDBReq := range req.DbServers {
-		version, err := versionParser.Parse(vDBReq.Version)
+		version, err := version.DefaultParser.Parse(vDBReq.Version)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
@@ -200,15 +195,14 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		return nil, err
 	}
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
 		Status:               uint32(choices.Accepted),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
-		Timestamp:            timeBytes,
-	}, err
+		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
@@ -332,14 +326,13 @@ func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmpb.BuildBloc
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.BuildBlockResponse{
 		Id:        blkID[:],
 		ParentId:  parentID[:],
 		Bytes:     blk.Bytes(),
 		Height:    blk.Height(),
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) ParseBlock(_ context.Context, req *vmpb.ParseBlockRequest) (*vmpb.ParseBlockResponse, error) {
@@ -349,14 +342,13 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmpb.ParseBlockRequest) (
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.ParseBlockResponse{
 		Id:        blkID[:],
 		ParentId:  parentID[:],
 		Status:    uint32(blk.Status()),
 		Height:    blk.Height(),
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) GetAncestors(_ context.Context, req *vmpb.GetAncestorsRequest) (*vmpb.GetAncestorsResponse, error) {
@@ -406,17 +398,19 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmpb.GetBlockRequest) (*vmp
 	}
 	blk, err := vm.vm.GetBlock(id)
 	if err != nil {
-		return nil, err
+		return &vmpb.GetBlockResponse{
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
 	}
+
 	parentID := blk.Parent()
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.GetBlockResponse{
 		ParentId:  parentID[:],
 		Bytes:     blk.Bytes(),
 		Status:    uint32(blk.Status()),
 		Height:    blk.Height(),
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequest) (*emptypb.Empty, error) {
@@ -494,7 +488,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*e
 		return nil, err
 	}
 
-	peerVersion, err := versionParser.Parse(req.Version)
+	peerVersion, err := version.DefaultApplicationParser.Parse(req.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -515,8 +509,8 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emp
 	if err != nil {
 		return nil, err
 	}
-	var deadline time.Time
-	if err := deadline.UnmarshalBinary(req.Deadline); err != nil {
+	deadline, err := grpcutils.TimestampAsTime(req.Deadline)
+	if err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestId, deadline, req.Request)
@@ -554,10 +548,9 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmpb.BlockVerifyRequest)
 	if err := blk.Verify(); err != nil {
 		return nil, err
 	}
-	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmpb.BlockVerifyResponse{
-		Timestamp: timeBytes,
-	}, err
+		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) BlockAccept(_ context.Context, req *vmpb.BlockAcceptRequest) (*emptypb.Empty, error) {

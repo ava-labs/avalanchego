@@ -19,8 +19,9 @@ type WeightTracker interface {
 
 func NewWeightTracker(beacons validators.Set, startupAlpha uint64) WeightTracker {
 	return &weightTracker{
-		beacons:      beacons,
-		startupAlpha: startupAlpha,
+		beacons:               beacons,
+		startupAlpha:          startupAlpha,
+		enoughConnectedWeight: startupAlpha == 0,
 	}
 }
 

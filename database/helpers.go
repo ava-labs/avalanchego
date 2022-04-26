@@ -153,6 +153,13 @@ func Size(db Iteratee) (int, error) {
 	return size, iterator.Error()
 }
 
+func IsEmpty(db Iteratee) (bool, error) {
+	iterator := db.NewIterator()
+	defer iterator.Release()
+
+	return !iterator.Next(), iterator.Error()
+}
+
 func Clear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
 	return ClearPrefix(readerDB, deleterDB, nil)
 }

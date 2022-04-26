@@ -14,9 +14,8 @@ import (
 )
 
 func TestVotingFinishesWithAbandonedDep(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
@@ -106,9 +105,8 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 }
 
 func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
@@ -241,9 +239,8 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 }
 
 func TestSharedDependency(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)

@@ -43,12 +43,24 @@ type getter struct {
 	getAncestorsBlks metric.Averager
 }
 
-func (gh *getter) GetAcceptedFrontier(nodeID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(validatorID ids.NodeID, requestID uint32) error {
+	// TODO: Respond to this request with a StateSummaryFrontier if the VM
+	//       supports state sync.
+	return nil
+}
+
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.NodeID, requestID uint32, heights []uint64) error {
+	// TODO: Respond to this request with a AcceptedStateSummary if the VM
+	//       supports state sync.
+	return nil
+}
+
+func (gh *getter) GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error {
 	lastAccepted, err := gh.vm.LastAccepted()
 	if err != nil {
 		return err
 	}
-	gh.sender.SendAcceptedFrontier(nodeID, requestID, []ids.ID{lastAccepted})
+	gh.sender.SendAcceptedFrontier(validatorID, requestID, []ids.ID{lastAccepted})
 	return nil
 }
 

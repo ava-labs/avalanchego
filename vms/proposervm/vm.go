@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -88,7 +89,6 @@ func New(
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 	}
-
 	proVM.resetHeightIndexOngoing.SetValue(resetHeightIndex)
 	return proVM
 }
@@ -156,6 +156,49 @@ func (vm *VM) Initialize(
 		return nil // nothing else to do
 	}
 
+	indexIsEmpty, err := vm.State.IsIndexEmpty()
+	if err != nil {
+		return err
+	}
+	if indexIsEmpty {
+		if err := vm.State.SetIndexHasReset(); err != nil {
+			return err
+		}
+		if err := vm.State.Commit(); err != nil {
+			return err
+		}
+	} else {
+		indexWasReset, err := vm.State.HasIndexReset()
+		if err != nil {
+			return fmt.Errorf("retrieving value of required index reset failed with: %w", err)
+		}
+
+		if !indexWasReset {
+			vm.resetHeightIndexOngoing.SetValue(true)
+		}
+	}
+
+	if !vm.resetHeightIndexOngoing.GetValue() {
+		// We are not going to wipe the height index
+
+		switch innerHVM.VerifyHeightIndex() {
+		case nil:
+			// We are not going to wait for the height index to be repaired.
+			shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+			if err != nil {
+				return err
+			}
+			if !shouldRepair {
+				vm.ctx.Log.Info("block height index was successfully verified")
+				vm.hIndexer.MarkRepaired()
+				return nil
+			}
+		case block.ErrIndexIncomplete:
+		default:
+			return err
+		}
+	}
+
 	// asynchronously rebuild height index, if needed
 	go func() {
 		// If index reset has been requested, carry it out first
@@ -204,7 +247,10 @@ func (vm *VM) Initialize(
 			}
 		}
 
+		vm.ctx.Lock.Lock()
 		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+		vm.ctx.Lock.Unlock()
+
 		if err != nil {
 			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
 			return
@@ -528,7 +574,6 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.Status()); err != nil {
 		return err
 	}
-
 	height := blk.Height()
 	blkID := blk.ID()
 	if err := vm.updateHeightIndex(height, blkID); err != nil {

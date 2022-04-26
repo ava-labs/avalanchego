@@ -32,6 +32,8 @@ type Transitive struct {
 	metrics
 
 	// list of NoOpsHandler for messages dropped by engine
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
@@ -68,12 +70,14 @@ func newTransitive(config Config) (*Transitive, error) {
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config:                  config,
-		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
-		AcceptedHandler:         common.NewNoOpAcceptedHandler(config.Ctx.Log),
-		AncestorsHandler:        common.NewNoOpAncestorsHandler(config.Ctx.Log),
-		pending:                 make(map[ids.ID]snowman.Block),
-		nonVerifieds:            NewAncestorTree(),
+		Config:                      config,
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
+		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
+		pending:                     make(map[ids.ID]snowman.Block),
+		nonVerifieds:                NewAncestorTree(),
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -593,8 +597,9 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 	}
 }
 
-// send a push query for this block
-func (t *Transitive) pushQuery(blk snowman.Block) {
+// Send a query for this block. Some validators will be sent
+// a Push Query and some will be sent a Pull Query.
+func (t *Transitive) sendMixedQuery(blk snowman.Block) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
@@ -609,11 +614,16 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
-		vdrList := vdrBag.List()
-		vdrSet := ids.NewNodeIDSet(len(vdrList))
-		vdrSet.Add(vdrList...)
-
-		t.Sender.SendPushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+		// Send a push query to some of the validators, and a pull query to the rest.
+		// Note that [vdrList] doesn't contain duplicates so its length may be < k.
+		common.SendMixedQuery(
+			t.Sender,
+			vdrBag.List(),
+			t.Params.MixedQueryNumPush,
+			t.RequestID,
+			blk.ID(),
+			blk.Bytes(),
+		)
 	}
 }
 
@@ -712,13 +722,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.pushQuery(blk)
+		t.sendMixedQuery(blk)
 	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.pushQuery(blk)
+			t.sendMixedQuery(blk)
 		}
 
 		blkID := blk.ID()

@@ -4,8 +4,6 @@
 package common
 
 import (
-	"time"
-
 	stdmath "math"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,10 +24,6 @@ const (
 	// GetAcceptedFrontier and GetAccepted messages sent but not responded
 	// to/failed
 	MaxOutstandingBootstrapRequests = 50
-
-	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
-	// vertices during a call to GetAncestors
-	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
 var _ Bootstrapper = &bootstrapper{}

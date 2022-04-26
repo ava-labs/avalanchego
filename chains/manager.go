@@ -106,13 +106,18 @@ type Manager interface {
 
 // ChainParameters defines the chain being created
 type ChainParameters struct {
-	ID          ids.ID   // The ID of the chain being created
-	SubnetID    ids.ID   // ID of the subnet that validates this chain
-	GenesisData []byte   // The genesis data of this chain's ledger
-	VMAlias     string   // The ID of the vm this chain is running
-	FxAliases   []string // The IDs of the feature extensions this chain is running
-
-	CustomBeacons validators.Set // Should only be set if the default beacons can't be used.
+	// The ID of the chain being created.
+	ID ids.ID
+	// ID of the subnet that validates this chain.
+	SubnetID ids.ID
+	// The genesis data of this chain's ledger.
+	GenesisData []byte
+	// The ID of the vm this chain is running.
+	VMAlias string
+	// The IDs of the feature extensions this chain is running.
+	FxAliases []string
+	// Should only be set if the default beacons can't be used.
+	CustomBeacons validators.Set
 }
 
 type chain struct {
@@ -181,6 +186,10 @@ type ManagerConfig struct {
 	ApricotPhase4MinPChainHeight uint64
 
 	ResetProposerVMHeightIndex bool
+
+	// TODO: Use StateSyncBeacons as an override when creating the syncer config
+	//       to specify who to sync from.
+	StateSyncBeacons []ids.NodeID
 }
 
 type manager struct {
@@ -623,7 +632,7 @@ func (m *manager) createAvalancheChain(
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -636,7 +645,6 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
@@ -650,7 +658,6 @@ func (m *manager) createAvalancheChain(
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
 		VM:            vm,
-		WeightTracker: weightTracker,
 	}
 	bootstrapper, err := avbootstrap.New(
 		bootstrapperConfig,
@@ -832,7 +839,7 @@ func (m *manager) createSnowmanChain(
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		StartupAlpha:                   (3*bootstrapWeight + 3) / 4,
+		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -845,7 +852,6 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	weightTracker := tracker.NewWeightTracker(beacons, commonCfg.StartupAlpha)
 	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
@@ -857,7 +863,6 @@ func (m *manager) createSnowmanChain(
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		WeightTracker: weightTracker,
 		Bootstrapped:  m.unblockChains,
 	}
 	bootstrapper, err := smbootstrap.New(

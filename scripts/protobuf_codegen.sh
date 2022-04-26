@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# buf is required see:https://docs.buf.build/installation
-
 # any version changes here should also be bumped in Dockerfile.buf
 BUF_VERSION='1.3.1'
 PROTOC_GEN_GO_VERSION='v1.27.1'
 PROTOC_GEN_GO_GRPC_VERSION='1.2.0'
+
+# buf is required see:https://docs.buf.build/installation
+# go install google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
+# go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@${PROTOC_GEN_GO_GRPC_VERSION}
 
 if ! [[ "$0" =~ scripts/protobuf_codegen.sh ]]; then
   echo "must be run from repository root"

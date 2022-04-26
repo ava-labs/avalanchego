@@ -22,8 +22,9 @@ var (
 	heightPrefix   = []byte("height")
 	metadataPrefix = []byte("metadata")
 
-	forkKey       = []byte("fork")
-	checkpointKey = []byte("checkpoint")
+	forkKey          = []byte("fork")
+	checkpointKey    = []byte("checkpoint")
+	resetOccurredKey = []byte("resetOccurred")
 )
 
 type HeightIndexGetter interface {
@@ -32,11 +33,14 @@ type HeightIndexGetter interface {
 	// Fork height is stored when the first post-fork block/option is accepted.
 	// Before that, fork height won't be found.
 	GetForkHeight() (uint64, error)
+	IsIndexEmpty() (bool, error)
+	HasIndexReset() (bool, error)
 }
 
 type HeightIndexWriter interface {
 	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
 	SetForkHeight(height uint64) error
+	SetIndexHasReset() error
 }
 
 // A checkpoint is the blockID of the next block to be considered
@@ -81,6 +85,25 @@ func NewHeightIndex(db database.Database, commitable versiondb.Commitable) Heigh
 	}
 }
 
+func (hi *heightIndex) IsIndexEmpty() (bool, error) {
+	heightsIsEmpty, err := database.IsEmpty(hi.heightDB)
+	if err != nil {
+		return false, err
+	}
+	if !heightsIsEmpty {
+		return false, nil
+	}
+	return database.IsEmpty(hi.metadataDB)
+}
+
+func (hi *heightIndex) HasIndexReset() (bool, error) {
+	return hi.metadataDB.Has(resetOccurredKey)
+}
+
+func (hi *heightIndex) SetIndexHasReset() error {
+	return hi.metadataDB.Put(resetOccurredKey, nil)
+}
+
 func (hi *heightIndex) ResetHeightIndex() error {
 	var (
 		itHeight   = hi.heightDB.NewIterator()
@@ -106,6 +129,10 @@ func (hi *heightIndex) ResetHeightIndex() error {
 		if err := hi.metadataDB.Delete(itMetadata.Key()); err != nil {
 			return err
 		}
+	}
+
+	if err := hi.SetIndexHasReset(); err != nil {
+		return err
 	}
 
 	errs := wrappers.Errs{}

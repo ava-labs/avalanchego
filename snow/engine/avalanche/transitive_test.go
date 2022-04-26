@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -66,12 +67,9 @@ func TestEngineShutdown(t *testing.T) {
 }
 
 func TestEngineAdd(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -80,7 +78,6 @@ func TestEngineAdd(t *testing.T) {
 	}
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	sender.Default(true)
@@ -172,12 +169,9 @@ func TestEngineAdd(t *testing.T) {
 }
 
 func TestEngineQuery(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -186,14 +180,12 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	manager.Default(true)
@@ -463,12 +455,9 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	engCfg.Params = avalanche.Parameters{
@@ -481,6 +470,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			OptimalProcessing:     100,
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
+			MixedQueryNumPush:     3,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -501,14 +491,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -737,12 +725,9 @@ func TestEngineBlockedIssue(t *testing.T) {
 }
 
 func TestEngineAbandonResponse(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -751,11 +736,9 @@ func TestEngineAbandonResponse(t *testing.T) {
 	}
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	sender.Default(true)
@@ -819,12 +802,9 @@ func TestEngineAbandonResponse(t *testing.T) {
 }
 
 func TestEngineScheduleRepoll(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -861,14 +841,12 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	}
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	manager.Default(true)
 	manager.CantEdge = false
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	sender.Default(true)
@@ -913,21 +891,17 @@ func TestEngineScheduleRepoll(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendTx(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -940,7 +914,6 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	manager.Default(true)
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
-	bootCfg.VM = vm
 	engCfg.VM = vm
 	vm.Default(true)
 
@@ -1022,20 +995,16 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1044,12 +1013,10 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	}
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 	manager.Default(true)
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
-	bootCfg.VM = vm
 	engCfg.VM = vm
 	vm.Default(true)
 
@@ -1138,20 +1105,16 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 }
 
 func TestEngineIssueRepoll(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1161,7 +1124,6 @@ func TestEngineIssueRepoll(t *testing.T) {
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1213,7 +1175,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 }
 
 func TestEngineReissue(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	engCfg.Params.BatchSize = 2
 	engCfg.Params.BetaVirtuous = 5
@@ -1222,13 +1184,9 @@ func TestEngineReissue(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1238,12 +1196,10 @@ func TestEngineReissue(t *testing.T) {
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1403,7 +1359,7 @@ func TestEngineReissue(t *testing.T) {
 }
 
 func TestEngineLargeIssue(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -1411,13 +1367,9 @@ func TestEngineLargeIssue(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1427,12 +1379,10 @@ func TestEngineLargeIssue(t *testing.T) {
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1585,23 +1535,18 @@ func TestEngineGetVertex(t *testing.T) {
 }
 
 func TestEngineInsufficientValidators(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1662,12 +1607,9 @@ func TestEngineInsufficientValidators(t *testing.T) {
 }
 
 func TestEnginePushGossip(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1678,12 +1620,10 @@ func TestEnginePushGossip(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1756,12 +1696,9 @@ func TestEnginePushGossip(t *testing.T) {
 }
 
 func TestEngineSingleQuery(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1772,12 +1709,10 @@ func TestEngineSingleQuery(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1834,12 +1769,9 @@ func TestEngineSingleQuery(t *testing.T) {
 }
 
 func TestEngineParentBlockingInsert(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1850,12 +1782,10 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -1945,12 +1875,9 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 }
 
 func TestEngineBlockingChitRequest(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -1961,12 +1888,10 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2073,12 +1998,9 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 }
 
 func TestEngineBlockingChitResponse(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -2089,13 +2011,11 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
 	engCfg.Manager = manager
-	bootCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -2212,12 +2132,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 }
 
 func TestEngineMissingTx(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -2228,12 +2145,10 @@ func TestEngineMissingTx(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2351,12 +2266,9 @@ func TestEngineMissingTx(t *testing.T) {
 }
 
 func TestEngineIssueBlockingTx(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -2365,7 +2277,6 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	}
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2421,12 +2332,9 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 }
 
 func TestEngineReissueAbortedVertex(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -2437,12 +2345,10 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2560,7 +2466,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
+	wt := tracker.NewWeightTracker(vals, 0)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
 	bootCfg.WeightTracker = wt
@@ -2836,10 +2742,9 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -2997,10 +2902,9 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
 	bootCfg.Beacons = vals
 	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
+	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3276,12 +3180,9 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3290,7 +3191,6 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	}
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -3385,12 +3285,9 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 }
 
 func TestEnginePartiallyValidVertex(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3399,7 +3296,6 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	}
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -3474,15 +3370,13 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 }
 
 func TestEngineGossip(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -3530,12 +3424,9 @@ func TestEngineGossip(t *testing.T) {
 }
 
 func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3549,11 +3440,9 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{
@@ -3684,12 +3573,9 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 }
 
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3698,11 +3584,9 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{
@@ -3837,15 +3721,12 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	engCfg.Params.ConcurrentRepolls = 3
 	engCfg.Params.BetaRogue = 3
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3854,7 +3735,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	sender := &common.SenderTest{T: t}
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
@@ -3862,7 +3742,6 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	gVtx := &avalanche.TestVertex{
@@ -3952,7 +3831,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDuplicatedIssuance(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -3960,13 +3839,9 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -3981,7 +3856,6 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -4070,15 +3944,13 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	engCfg.Params.Alpha = 2
 	engCfg.Params.K = 2
+	engCfg.Params.MixedQueryNumPush = 2
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr0 := ids.GenerateTestNodeID()
@@ -4094,12 +3966,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -4207,12 +4077,9 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBubbleVotes(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -4222,12 +4089,10 @@ func TestEngineBubbleVotes(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	utxos := []ids.ID{
@@ -4360,7 +4225,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 }
 
 func TestEngineIssue(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4369,13 +4234,9 @@ func TestEngineIssue(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, bootCfg.StartupAlpha)
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
@@ -4385,12 +4246,10 @@ func TestEngineIssue(t *testing.T) {
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -4512,7 +4371,7 @@ func TestEngineIssue(t *testing.T) {
 // dependency fails verification.
 func TestAbandonTx(t *testing.T) {
 	assert := assert.New(t)
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4523,7 +4382,6 @@ func TestAbandonTx(t *testing.T) {
 		CantSendGetAcceptedFrontier: false,
 	}
 	sender.Default(true)
-	bootCfg.Sender = sender
 	engCfg.Sender = sender
 
 	engCfg.Validators = validators.NewSet()
@@ -4536,14 +4394,12 @@ func TestAbandonTx(t *testing.T) {
 	manager.Default(true)
 	manager.CantEdge = false
 	manager.CantGetVtx = false
-	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
 	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
 	vm.Default(true)
 	vm.CantSetState = false
 
-	bootCfg.VM = vm
 	engCfg.VM = vm
 
 	te, err := newTransitive(engCfg)
@@ -4653,4 +4509,120 @@ func TestAbandonTx(t *testing.T) {
 	assert.False(te.pending.Contains(vtx1.ID()))
 	// sanity check that there is indeed an outstanding vertex request
 	assert.True(te.outstandingVtxReqs.Len() == 1)
+}
+
+func TestSendMixedQuery(t *testing.T) {
+	_, _, engCfg := DefaultConfig()
+	sender := &common.SenderTest{T: t}
+	engCfg.Sender = sender
+	sender.Default(true)
+	vdrSet := engCfg.Validators
+	manager := vertex.NewTestManager(t)
+	engCfg.Manager = manager
+	// Override the parameters k and MixedQueryPullPortion,
+	// and update the validator set to have k validators.
+	engCfg.Params.K = 20
+	engCfg.Params.Alpha = 12
+	engCfg.Params.MixedQueryNumPush = 12
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startReqID := uint32(0)
+	if err := te.Start(startReqID); err != nil {
+		t.Fatal(err)
+	}
+
+	vdrsList := []validators.Validator{}
+	vdrs := ids.NodeIDSet{}
+	for i := 0; i < te.Config.Params.K; i++ {
+		vdr := ids.GenerateTestNodeID()
+		vdrs.Add(vdr)
+		vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
+	}
+	if err := vdrSet.Set(vdrsList); err != nil {
+		t.Fatal(err)
+	}
+
+	// [blk1] is a child of [gBlk] and passes verification
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{
+			&avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			}},
+		},
+		BytesV: []byte{1},
+	}
+
+	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
+		switch {
+		case bytes.Equal(b, vtx1.Bytes()):
+			return vtx1, nil
+		default:
+			t.Fatalf("Unknown block bytes")
+			return nil, nil
+		}
+	}
+
+	pullQuerySent := new(bool)
+	pullQueryReqID := new(uint32)
+	pullQueriedVdrs := ids.NodeIDSet{}
+	sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID) {
+		switch {
+		case *pullQuerySent:
+			t.Fatalf("Asked multiple times")
+		case vtxID != vtx1.ID():
+			t.Fatalf("Expected engine to request vtx1")
+		}
+		pullQueriedVdrs.Union(inVdrs)
+		*pullQuerySent = true
+		*pullQueryReqID = requestID
+	}
+
+	pushQuerySent := new(bool)
+	pushQueryReqID := new(uint32)
+	pushQueriedVdrs := ids.NodeIDSet{}
+	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+		switch {
+		case *pushQuerySent:
+			t.Fatal("Asked multiple times")
+		case vtxID != vtx1.ID():
+		case !bytes.Equal(vtx, vtx1.Bytes()):
+			t.Fatal("got unexpected block bytes instead of blk1")
+		}
+		*pushQuerySent = true
+		*pushQueryReqID = requestID
+		pushQueriedVdrs.Union(inVdrs)
+	}
+
+	// Give the engine vtx1. It should insert it into consensus and send a mixed query
+	// consisting of 12 pull queries and 8 push queries.
+	if err := te.Put(vdrSet.List()[0].ID(), constants.GossipMsgRequestID, vtx1.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	switch {
+	case !*pullQuerySent:
+		t.Fatal("expected us to send pull queries")
+	case !*pushQuerySent:
+		t.Fatal("expected us to send push queries")
+	case *pushQueryReqID != *pullQueryReqID:
+		t.Fatalf("expected equal push query (%v) and pull query (%v) req IDs", *pushQueryReqID, *pullQueryReqID)
+	case pushQueriedVdrs.Len()+pullQueriedVdrs.Len() != te.Config.Params.K:
+		t.Fatalf("expected num push queried (%d) + num pull queried (%d) to be %d", pushQueriedVdrs.Len(), pullQueriedVdrs.Len(), te.Config.Params.K)
+	case pushQueriedVdrs.Len() != te.Params.MixedQueryNumPush:
+		t.Fatalf("expected num push queried (%d) to be %d", pullQueriedVdrs.Len(), te.Params.MixedQueryNumPush)
+	}
+
+	pullQueriedVdrs.Union(pushQueriedVdrs) // Now this holds all queried validators (push and pull)
+	for vdr := range pullQueriedVdrs {
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("got unexpected vdr %v", vdr)
+		}
+	}
 }

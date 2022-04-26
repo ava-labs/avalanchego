@@ -42,10 +42,12 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 	b := &bootstrapper{
 		Config: config,
 
-		PutHandler:   common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler: common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler: common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:   common.NewNoOpAppHandler(config.Ctx.Log),
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
 
 		processedCache:           &cache.LRU{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
@@ -83,6 +85,8 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
@@ -263,10 +267,11 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.SetState(snow.Bootstrapping)
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if b.WeightTracker.EnoughConnectedWeight() {
+	if !b.WeightTracker.EnoughConnectedWeight() {
 		return nil
 	}
 
+	b.started = true
 	return b.Startup()
 }
 
