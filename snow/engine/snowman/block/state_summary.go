@@ -15,9 +15,8 @@ import (
 // ID must allow summaries comparison and verification as an alternative to Bytes;
 // it is used to verify what summaries votes are casted for.
 // Byte returns the Summary content which is defined by the VM and opaque to the engine.
-// BlockID represent the ID of the block associated with summary
 // Finally Accept method triggers VM to start state syncing with given summary. The returned
-// boolean confirms to the engine whether state sync is actually started or skipped by the VM.
+// boolean confirms to the engine whether VM actually starts state sync or skips it.
 type Summary interface {
 	Bytes() []byte
 	Height() uint64

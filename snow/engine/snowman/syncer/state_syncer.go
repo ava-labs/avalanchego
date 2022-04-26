@@ -27,8 +27,8 @@ var _ common.StateSyncer = &stateSyncer{}
 
 // summary content as received from network, along with accumulated weight.
 type weightedSummary struct {
-	block.Summary
-	weight uint64
+	s block.Summary
+	w uint64
 }
 
 type stateSyncer struct {
@@ -121,7 +121,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.ShortID, requestID u
 	if summary, err := ss.stateSyncVM.ParseStateSummary(summaryBytes); err == nil {
 		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
 			ss.weightedSummaries[summary.ID()] = weightedSummary{
-				Summary: summary,
+				s: summary,
 			}
 		}
 	} else {
@@ -206,13 +206,13 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 			ss.Ctx.Log.Debug("Received a vote from %s for unknown summary %s. Skipped.", validatorID, summaryID)
 			continue
 		}
-		previousWeight := ws.weight
+		previousWeight := ws.w
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
 			ss.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
 			newWeight = stdmath.MaxUint64
 		}
-		ws.weight = newWeight
+		ws.w = newWeight
 		ss.weightedSummaries[summaryID] = ws
 	}
 
@@ -228,7 +228,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 	// We've received the filtered accepted frontier from every state sync validator
 	// Drop all summaries without a sufficient weight behind them
 	for key, ws := range ss.weightedSummaries {
-		if ws.weight < ss.Alpha {
+		if ws.w < ss.Alpha {
 			delete(ss.weightedSummaries, key)
 		}
 	}
@@ -272,7 +272,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 // selectSyncableStateSummary chooses a state summary from all
 // the network validated summaries.
 func (ss *stateSyncer) selectSyncableStateSummary() block.Summary {
-	highestSummary := uint64(0)
+	maxSummaryHeight := uint64(0)
 	preferredStateSummaryID := ids.Empty
 
 	// by default pick highest summary, unless locallyAvailableSummary is still valid.
@@ -283,12 +283,12 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.Summary {
 			break
 		}
 
-		if highestSummary < ws.Summary.Height() {
-			highestSummary = ws.Summary.Height()
+		if maxSummaryHeight < ws.s.Height() {
+			maxSummaryHeight = ws.s.Height()
 			preferredStateSummaryID = id
 		}
 	}
-	return ss.weightedSummaries[preferredStateSummaryID].Summary
+	return ss.weightedSummaries[preferredStateSummaryID].s
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
@@ -365,7 +365,7 @@ func (ss *stateSyncer) startup() error {
 
 	if localSummary.ID() != ids.Empty {
 		ss.weightedSummaries[localSummary.ID()] = weightedSummary{
-			Summary: localSummary,
+			s: localSummary,
 		}
 	}
 
@@ -425,8 +425,8 @@ func (ss *stateSyncer) sendGetAccepted() error {
 	}
 
 	acceptedSummaryHeights := make([]uint64, 0, len(ss.weightedSummaries))
-	for _, summary := range ss.weightedSummaries {
-		acceptedSummaryHeights = append(acceptedSummaryHeights, summary.Height())
+	for _, ws := range ss.weightedSummaries {
+		acceptedSummaryHeights = append(acceptedSummaryHeights, ws.s.Height())
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
 	ss.contactedVoters.Add(vdrs.List()...)

@@ -16,7 +16,9 @@ type statefulSummary struct {
 	vm *VM
 
 	// stateful inner summary, retrieved via Parse
-	innerSummary  block.Summary
+	innerSummary block.Summary
+
+	// block associated with the summary
 	proposerBlock Block
 }
 

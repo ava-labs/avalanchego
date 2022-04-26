@@ -203,7 +203,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// valid summary is recorded
 	ws, ok := syncer.weightedSummaries[summaryID]
 	assert.True(ok)
-	assert.True(bytes.Equal(ws.Summary.Bytes(), summaryBytes))
+	assert.True(bytes.Equal(ws.s.Bytes(), summaryBytes))
 
 	// other listed vdrs are reached for data
 	assert.True(
@@ -507,7 +507,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// responsiveVoter still pending
 	assert.True(syncer.contactedVoters.Contains(responsiveVoterID))
-	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
+	assert.True(syncer.weightedSummaries[summaryID].w == 0)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedVoterID := ids.GenerateTestShortID()
@@ -516,7 +516,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
-	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
+	assert.True(syncer.weightedSummaries[summaryID].w == 0)
 
 	// check a valid response is duly recorded
 	assert.NoError(syncer.AcceptedStateSummary(
@@ -529,7 +529,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	assert.False(syncer.contactedSeeders.Contains(responsiveVoterID))
 	voterWeight, found := vdrs.GetWeight(responsiveVoterID)
 	assert.True(found)
-	assert.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
+	assert.True(syncer.weightedSummaries[summaryID].w == voterWeight)
 
 	// other listed voters are reached out
 	assert.True(
@@ -626,7 +626,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
-	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
+	assert.True(syncer.weightedSummaries[summaryID].w == 0)
 
 	// other listed voters are reached out, even in the face of vote
 	// on unknown summary

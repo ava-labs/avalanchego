@@ -20,10 +20,10 @@ type StateSyncableVM interface {
 	// StateSyncEnabled should return false, nil
 	StateSyncEnabled() (bool, error)
 
-	// GetOngoingSyncStateSummary returns an in-progress state summary if it exists. This
-	// allows the engine to ask the network if the ongoing summary is still supported by the
-	// network. This simplifies the task of the StateSyncableVM to decide whether to
-	// continue an in-progress sync or start over.
+	// GetOngoingSyncStateSummary returns an in-progress state summary if it exists.
+	// The engine can then ask the network if the ongoing summary is still supported,
+	// thus helping StateSyncableVM to decide whether to continue an in-progress sync
+	// or start over.
 	// If no local state summary exists, GetOngoingSyncStateSummary returns an
 	// Empty Summary with empty ID, zero height, and nil bytes.
 	GetOngoingSyncStateSummary() (Summary, error)
