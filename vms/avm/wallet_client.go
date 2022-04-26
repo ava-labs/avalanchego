@@ -30,7 +30,7 @@ type WalletClient interface {
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
 		amount uint64,
-		assetID ids.ID,
+		assetID string,
 		to ids.ShortID,
 		memo string,
 		options ...rpc.Option,
@@ -81,7 +81,7 @@ type ClientSendOutput struct {
 	Amount uint64
 
 	// ID of the asset being sent
-	AssetID ids.ID
+	AssetID string
 
 	// Address of the recipient
 	To ids.ShortID
@@ -93,7 +93,7 @@ func (c *walletClient) Send(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	amount uint64,
-	assetID ids.ID,
+	assetID string,
 	to ids.ShortID,
 	memo string,
 	options ...rpc.Option,
@@ -119,7 +119,7 @@ func (c *walletClient) Send(
 		},
 		SendOutput: SendOutput{
 			Amount:  cjson.Uint64(amount),
-			AssetID: assetID.String(),
+			AssetID: assetID,
 			To:      toStr,
 		},
 		Memo: memo,
@@ -148,7 +148,7 @@ func (c *walletClient) SendMultiple(
 	outputs := make([]SendOutput, len(clientOutputs))
 	for i, clientOutput := range clientOutputs {
 		outputs[i].Amount = cjson.Uint64(clientOutput.Amount)
-		outputs[i].AssetID = clientOutput.AssetID.String()
+		outputs[i].AssetID = clientOutput.AssetID
 		outputs[i].To, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientOutput.To[:])
 		if err != nil {
 			return ids.Empty, err

@@ -61,10 +61,10 @@ type Client interface {
 	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
-	GetBalance(ctx context.Context, addr ids.ShortID, assetID ids.ID, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
+	GetBalance(ctx context.Context, addr ids.ShortID, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
 	// CreateAsset creates a new asset and returns its assetID
-	GetAllBalances(context.Context, ids.ShortID, bool, ...rpc.Option) ([]ClientBalance, error)
+	GetAllBalances(context.Context, ids.ShortID, bool, ...rpc.Option) ([]Balance, error)
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -127,7 +127,7 @@ type Client interface {
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
 		amount uint64,
-		assetID ids.ID,
+		assetID string,
 		to ids.ShortID,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -137,7 +137,7 @@ type Client interface {
 		user api.UserPass,
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
-		assetID ids.ID,
+		assetID string,
 		groupID uint32,
 		to ids.ShortID,
 		options ...rpc.Option,
@@ -148,7 +148,7 @@ type Client interface {
 		user api.UserPass,
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
-		assetID ids.ID,
+		assetID string,
 		payload []byte,
 		to ids.ShortID,
 		options ...rpc.Option,
@@ -166,7 +166,7 @@ type Client interface {
 		amount uint64,
 		to ids.ShortID,
 		toChainIDAlias string,
-		assetID ids.ID,
+		assetID string,
 		options ...rpc.Option,
 	) (ids.ID, error)
 }
@@ -322,7 +322,7 @@ func (c *client) GetAssetDescription(ctx context.Context, assetID string, option
 func (c *client) GetBalance(
 	ctx context.Context,
 	addr ids.ShortID,
-	assetID ids.ID,
+	assetID string,
 	includePartial bool,
 	options ...rpc.Option,
 ) (*GetBalanceReply, error) {
@@ -333,15 +333,10 @@ func (c *client) GetBalance(
 	}
 	err = c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
 		Address:        addrStr,
-		AssetID:        assetID.String(),
+		AssetID:        assetID,
 		IncludePartial: includePartial,
 	}, res, options...)
 	return res, err
-}
-
-type ClientBalance struct {
-	AssetID ids.ID
-	Balance uint64
 }
 
 func (c *client) GetAllBalances(
@@ -349,7 +344,7 @@ func (c *client) GetAllBalances(
 	addr ids.ShortID,
 	includePartial bool,
 	options ...rpc.Option,
-) ([]ClientBalance, error) {
+) ([]Balance, error) {
 	res := &GetAllBalancesReply{}
 	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
 	if err != nil {
@@ -359,15 +354,7 @@ func (c *client) GetAllBalances(
 		JSONAddress:    api.JSONAddress{Address: addrStr},
 		IncludePartial: includePartial,
 	}, res, options...)
-	clientBalances := make([]ClientBalance, len(res.Balances))
-	for i, balance := range res.Balances {
-		clientBalances[i].AssetID, err = ids.FromString(balance.AssetID)
-		if err != nil {
-			return nil, err
-		}
-		clientBalances[i].Balance = uint64(balance.Balance)
-	}
-	return clientBalances, err
+	return res.Balances, err
 }
 
 // ClientHolder describes how much an address owns of an asset
@@ -607,7 +594,7 @@ func (c *client) Send(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	amount uint64,
-	assetID ids.ID,
+	assetID string,
 	to ids.ShortID,
 	memo string,
 	options ...rpc.Option,
@@ -633,7 +620,7 @@ func (c *client) Send(
 		},
 		SendOutput: SendOutput{
 			Amount:  cjson.Uint64(amount),
-			AssetID: assetID.String(),
+			AssetID: assetID,
 			To:      toStr,
 		},
 		Memo: memo,
@@ -662,7 +649,7 @@ func (c *client) SendMultiple(
 	outputs := make([]SendOutput, len(clientOutputs))
 	for i, clientOutput := range clientOutputs {
 		outputs[i].Amount = cjson.Uint64(clientOutput.Amount)
-		outputs[i].AssetID = clientOutput.AssetID.String()
+		outputs[i].AssetID = clientOutput.AssetID
 		outputs[i].To, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientOutput.To[:])
 		if err != nil {
 			return ids.Empty, err
@@ -686,7 +673,7 @@ func (c *client) Mint(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	amount uint64,
-	assetID ids.ID,
+	assetID string,
 	to ids.ShortID,
 	options ...rpc.Option,
 ) (ids.ID, error) {
@@ -710,7 +697,7 @@ func (c *client) Mint(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		Amount:  cjson.Uint64(amount),
-		AssetID: assetID.String(),
+		AssetID: assetID,
 		To:      toStr,
 	}, res, options...)
 	return res.TxID, err
@@ -721,7 +708,7 @@ func (c *client) SendNFT(
 	user api.UserPass,
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
-	assetID ids.ID,
+	assetID string,
 	groupID uint32,
 	to ids.ShortID,
 	options ...rpc.Option,
@@ -745,7 +732,7 @@ func (c *client) SendNFT(
 			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		AssetID: assetID.String(),
+		AssetID: assetID,
 		GroupID: cjson.Uint32(groupID),
 		To:      toStr,
 	}, res, options...)
@@ -757,7 +744,7 @@ func (c *client) MintNFT(
 	user api.UserPass,
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
-	assetID ids.ID,
+	assetID string,
 	payload []byte,
 	to ids.ShortID,
 	options ...rpc.Option,
@@ -785,7 +772,7 @@ func (c *client) MintNFT(
 			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
-		AssetID:  assetID.String(),
+		AssetID:  assetID,
 		Payload:  payloadStr,
 		To:       toStr,
 		Encoding: formatting.Hex,
@@ -815,7 +802,7 @@ func (c *client) Export(
 	amount uint64,
 	to ids.ShortID,
 	toChainIDAlias string,
-	assetID ids.ID,
+	assetID string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
@@ -839,7 +826,7 @@ func (c *client) Export(
 		},
 		Amount:  cjson.Uint64(amount),
 		To:      toStr,
-		AssetID: assetID.String(),
+		AssetID: assetID,
 	}, res, options...)
 	return res.TxID, err
 }

@@ -150,14 +150,14 @@ type Client interface {
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
 		subnetID ids.ID,
-		vmID ids.ID,
-		fxIDs []ids.ID,
+		vmID string,
+		fxIDs []string,
 		name string,
 		genesisData []byte,
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-	GetBlockchainStatus(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (status.BlockchainStatus, error)
+	GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error)
 	// ValidatedBy returns the ID of the Subnet that validates [blockchainID]
 	ValidatedBy(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// Validates returns the list of blockchains that are validated by the subnet with ID [subnetID]
@@ -686,8 +686,8 @@ func (c *client) CreateBlockchain(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	subnetID ids.ID,
-	vmID ids.ID,
-	fxIDs []ids.ID,
+	vmID string,
+	fxIDs []string,
 	name string,
 	genesisData []byte,
 	options ...rpc.Option,
@@ -706,10 +706,6 @@ func (c *client) CreateBlockchain(
 	if err != nil {
 		return ids.Empty, err
 	}
-	fxIDsStr := make([]string, len(fxIDs))
-	for i, fxID := range fxIDs {
-		fxIDsStr[i] = fxID.String()
-	}
 	err = c.requester.SendRequest(ctx, "createBlockchain", &CreateBlockchainArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
@@ -717,8 +713,8 @@ func (c *client) CreateBlockchain(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SubnetID:    subnetID,
-		VMID:        vmID.String(),
-		FxIDs:       fxIDsStr,
+		VMID:        vmID,
+		FxIDs:       fxIDs,
 		Name:        name,
 		GenesisData: genesisDataStr,
 		Encoding:    formatting.Hex,
@@ -726,10 +722,10 @@ func (c *client) CreateBlockchain(
 	return res.TxID, err
 }
 
-func (c *client) GetBlockchainStatus(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (status.BlockchainStatus, error) {
+func (c *client) GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest(ctx, "getBlockchainStatus", &GetBlockchainStatusArgs{
-		BlockchainID: blockchainID.String(),
+		BlockchainID: blockchainID,
 	}, res, options...)
 	return res.Status, err
 }
