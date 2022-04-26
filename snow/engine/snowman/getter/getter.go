@@ -49,7 +49,7 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, heights []uint64) error {
 	// TODO: Respond to this request with a AcceptedStateSummary if the VM
 	//       supports state sync.
 	return nil
