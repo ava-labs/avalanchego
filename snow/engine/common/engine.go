@@ -32,7 +32,8 @@ type Engine interface {
 
 type Handler interface {
 	AllGetsServer
-	StateSyncHandler
+	StateSummaryFrontierHandler
+	AcceptedStateSummaryHandler
 	AcceptedFrontierHandler
 	AcceptedHandler
 	AncestorsHandler
@@ -44,17 +45,18 @@ type Handler interface {
 }
 
 type AllGetsServer interface {
-	GetStateSummaryHandler
+	GetStateSummaryFrontierHandler
+	GetAcceptedStateSummaryHandler
 	GetAcceptedFrontierHandler
 	GetAcceptedHandler
 	GetAncestorsHandler
 	GetHandler
 }
 
-// GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
-// state sumaries messages from another validator. Functions only return fatal
-// errors.
-type GetStateSummaryHandler interface {
+// GetStateSummaryFrontierHandler defines how a consensus engine reacts to a get
+// state summary frontier message from another validator. Functions only return
+// fatal errors.
+type GetStateSummaryFrontierHandler interface {
 	// Notify this engine of a request for the frontier of state summaries.
 	//
 	// The accepted frontier is the last state summary available locally.
@@ -62,24 +64,15 @@ type GetStateSummaryHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is utilizing a unique requestID.
 	//
-	// This engine should respond with an StateSummaryFrontier message with the same
-	// requestID, and the engine's current state summary frontier.
+	// This engine should respond with an StateSummaryFrontier message with the
+	// same requestID, and the engine's current state summary frontier.
 	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
-
-	// Notify this engine of a request to return state summaries IDs referenced by the provided keys.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is utilizing a unique requestID. However, the validatorID is
-	// assumed to be authenticated.
-	//
-	// This engine should respond with an AcceptedStateSummary message with the same
-	// requestID, and the subset of the state summaries that this node has locally available.
-	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error
 }
 
-// StateSyncHandler defines how a consensus engine reacts to state summary
-// messages from other validators. Functions only return fatal errors.
-type StateSyncHandler interface {
+// StateSummaryFrontierHandler defines how a consensus engine reacts to a state
+// summary frontier message from other validators. Functions only return fatal
+// errors.
+type StateSummaryFrontierHandler interface {
 	// Notify this engine of a state summary frontier.
 	//
 	// This function can be called by any validator. It is not safe to assume
@@ -88,8 +81,8 @@ type StateSyncHandler interface {
 	// state summary.
 	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
 
-	// Notify this engine that a get state summary frontier request it issued has
-	// failed.
+	// Notify this engine that a get state summary frontier request it issued
+	// has failed.
 	//
 	// This function will be called if the engine sent a GetStateSummaryFrontier
 	// message that is not anticipated to be responded to. This could be because
@@ -99,7 +92,29 @@ type StateSyncHandler interface {
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetStateSummaryFrontier message.
 	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
+}
 
+// GetAcceptedStateSummaryHandler defines how a consensus engine reacts to a get
+// accepted state summary message from another validator. Functions only return
+// fatal errors.
+type GetAcceptedStateSummaryHandler interface {
+	// Notify this engine of a request to return state summary IDs referenced by
+	// the provided keys.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is utilizing a unique requestID. However, the validatorID is
+	// assumed to be authenticated.
+	//
+	// This engine should respond with an AcceptedStateSummary message with the
+	// same requestID, and the subset of the state summaries that this node has
+	// locally available.
+	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error
+}
+
+// AcceptedStateSummaryHandler defines how a consensus engine reacts to an
+// accepted state summary message from another validator. Functions only return
+// fatal errors.
+type AcceptedStateSummaryHandler interface {
 	// Notify this engine of a set of state summaries.
 	//
 	// This function can be called by any validator. It is not safe to assume

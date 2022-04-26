@@ -12,40 +12,49 @@ import (
 )
 
 var (
-	_ StateSyncHandler        = &noOpStateSyncHandler{}
-	_ AcceptedFrontierHandler = &noOpAcceptedFrontierHandler{}
-	_ AcceptedHandler         = &noOpAcceptedHandler{}
-	_ AncestorsHandler        = &noOpAncestorsHandler{}
-	_ PutHandler              = &noOpPutHandler{}
-	_ QueryHandler            = &noOpQueryHandler{}
-	_ ChitsHandler            = &noOpChitsHandler{}
-	_ AppHandler              = &noOpAppHandler{}
+	_ StateSummaryFrontierHandler = &noOpStateSummaryFrontierHandler{}
+	_ AcceptedStateSummaryHandler = &noOpAcceptedStateSummaryHandler{}
+	_ AcceptedFrontierHandler     = &noOpAcceptedFrontierHandler{}
+	_ AcceptedHandler             = &noOpAcceptedHandler{}
+	_ AncestorsHandler            = &noOpAncestorsHandler{}
+	_ PutHandler                  = &noOpPutHandler{}
+	_ QueryHandler                = &noOpQueryHandler{}
+	_ ChitsHandler                = &noOpChitsHandler{}
+	_ AppHandler                  = &noOpAppHandler{}
 )
 
-type noOpStateSyncHandler struct {
+type noOpStateSummaryFrontierHandler struct {
 	log logging.Logger
 }
 
-func NewNoOpStateSyncHandler(log logging.Logger) StateSyncHandler {
-	return &noOpStateSyncHandler{log: log}
+func NewNoOpStateSummaryFrontierHandler(log logging.Logger) StateSummaryFrontierHandler {
+	return &noOpStateSummaryFrontierHandler{log: log}
 }
 
-func (nop *noOpStateSyncHandler) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
+func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error {
 	nop.log.Debug("StateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpStateSyncHandler) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpStateSummaryFrontierHandler) GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	nop.log.Debug("GetStateSummaryFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpStateSyncHandler) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error {
+type noOpAcceptedStateSummaryHandler struct {
+	log logging.Logger
+}
+
+func NewNoOpAcceptedStateSummaryHandler(log logging.Logger) AcceptedStateSummaryHandler {
+	return &noOpAcceptedStateSummaryHandler{log: log}
+}
+
+func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error {
 	nop.log.Debug("AcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
 
-func (nop *noOpStateSyncHandler) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
+func (nop *noOpAcceptedStateSummaryHandler) GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error {
 	nop.log.Debug("GetAcceptedStateSummaryFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
 	return nil
 }
