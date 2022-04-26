@@ -34,9 +34,9 @@ type StateSummarySender interface {
 
 type AcceptedStateSummarySender interface {
 	// SendGetAcceptedStateSummary requests that every node in [nodeIDs] sends an
-	// AcceptedStateSummary message with all the state summary IDs referenced by [keys]
+	// AcceptedStateSummary message with all the state summary IDs referenced by [heights]
 	// that the node thinks are accepted.
-	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, keys []uint64)
+	SendGetAcceptedStateSummary(nodeIDs ids.ShortSet, requestID uint32, heights []uint64)
 
 	// SendAcceptedStateSummary responds to a AcceptedStateSummary message with a
 	// set of summary ids that are accepted.

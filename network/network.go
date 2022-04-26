@@ -73,7 +73,7 @@ type Network interface {
 	WantsConnection(ids.ShortID) bool
 
 	// Attempt to connect to this IP. The network will never stop attempting to
-	// connect to this IP.
+	// connect to this ID.
 	ManuallyTrack(nodeID ids.ShortID, ip utils.IPDesc)
 
 	// PeerInfo returns information about peers. If [nodeIDs] is empty, returns
@@ -361,7 +361,7 @@ func (n *network) Connected(nodeID ids.ShortID) {
 func (n *network) AllowConnection(nodeID ids.ShortID) bool {
 	return !n.config.RequireValidatorToConnect ||
 		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
-		n.wantsConnection(nodeID)
+		n.WantsConnection(nodeID)
 }
 
 func (n *network) Track(ip utils.IPCertDesc) {
@@ -542,10 +542,10 @@ func (n *network) Dispatch() error {
 func (n *network) WantsConnection(nodeID ids.ShortID) bool {
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
+
 	return n.wantsConnection(nodeID)
 }
 
-// wantsConnection is unexported and must be called with n.peersLock already locked
 func (n *network) wantsConnection(nodeID ids.ShortID) bool {
 	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
