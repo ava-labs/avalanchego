@@ -269,22 +269,13 @@ func (c *client) GetAtomicUTXOs(
 	options ...rpc.Option,
 ) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
-	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.Empty, err
-	}
-	startAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, startAddress[:])
-	if err != nil {
-		return nil, ids.ShortID{}, ids.Empty, err
-	}
-	startUTXOIDStr := startUTXOID.String()
-	err = c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
-		Addresses:   addrsStr,
+	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
+		Addresses:   ids.ShortIDSliceToStringSlice(addrs),
 		SourceChain: sourceChain,
 		Limit:       cjson.Uint32(limit),
 		StartIndex: api.Index{
-			Address: startAddressStr,
-			UTXO:    startUTXOIDStr,
+			Address: startAddress.String(),
+			UTXO:    startUTXOID.String(),
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
@@ -327,12 +318,8 @@ func (c *client) GetBalance(
 	options ...rpc.Option,
 ) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
-	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
-	if err != nil {
-		return nil, err
-	}
-	err = c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
-		Address:        addrStr,
+	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
+		Address:        addr.String(),
 		AssetID:        assetID,
 		IncludePartial: includePartial,
 	}, res, options...)
@@ -346,12 +333,8 @@ func (c *client) GetAllBalances(
 	options ...rpc.Option,
 ) ([]Balance, error) {
 	res := &GetAllBalancesReply{}
-	addrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, addr[:])
-	if err != nil {
-		return nil, err
-	}
-	err = c.requester.SendRequest(ctx, "getAllBalances", &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addrStr},
+	err := c.requester.SendRequest(ctx, "getAllBalances", &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addr.String()},
 		IncludePartial: includePartial,
 	}, res, options...)
 	return res.Balances, err
@@ -382,35 +365,22 @@ func (c *client) CreateAsset(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
+	var err error
 	holders := make([]*Holder, len(clientHolders))
 	for i, clientHolder := range clientHolders {
 		holders[i].Amount = cjson.Uint64(clientHolder.Amount)
-		holders[i].Address, err = formatting.FormatAddress(chainIDAlias, c.hrp, clientHolder.Address[:])
-		if err != nil {
-			return ids.Empty, err
-		}
+		holders[i].Address = clientHolder.Address.String()
 	}
 	minters := make([]Owners, len(clientMinters))
 	for i, clientMinter := range clientMinters {
 		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
-		minters[i].Minters, err = addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, clientMinter.Minters)
-		if err != nil {
-			return ids.Empty, err
-		}
+		minters[i].Minters = ids.ShortIDSliceToStringSlice(clientMinter.Minters)
 	}
 	err = c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		Name:           name,
 		Symbol:         symbol,

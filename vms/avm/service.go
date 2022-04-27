@@ -209,7 +209,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		sourceChain = chainID
 	}
 
-	addrSet, err := avax.ParseLocalAddresses(service.vm, args.Addresses)
+	addrSet, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		startAddr, err = service.vm.ParseLocalAddress(args.StartIndex.Address)
+		startAddr, err = avax.ParseServiceAddress(service.vm, args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
@@ -344,7 +344,7 @@ type GetBalanceReply struct {
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
-	addr, err := service.vm.ParseLocalAddress(args.Address)
+	addr, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -412,7 +412,7 @@ type GetAllBalancesReply struct {
 func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetAllBalances called with address: %s", args.Address)
 
-	address, err := service.vm.ParseLocalAddress(args.Address)
+	address, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -504,7 +504,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -555,7 +555,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
 	}
 	for _, holder := range args.InitialHolders {
-		addr, err := service.vm.ParseLocalAddress(holder.Address)
+		addr, err := avax.ParseServiceAddress(service.vm, holder.Address)
 		if err != nil {
 			return err
 		}
@@ -574,13 +574,11 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 				Addrs:     make([]ids.ShortID, 0, len(owner.Minters)),
 			},
 		}
-		for _, address := range owner.Minters {
-			addr, err := service.vm.ParseLocalAddress(address)
-			if err != nil {
-				return err
-			}
-			minter.Addrs = append(minter.Addrs, addr)
+		minterAddrsSet, err := avax.ParseServiceAddresses(service.vm, owner.Minters)
+		if err != nil {
+			return err
 		}
+		minter.Addrs = minterAddrsSet.List()
 		ids.SortShortIDs(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
