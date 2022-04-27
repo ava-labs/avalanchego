@@ -111,7 +111,7 @@ func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, 
 	}
 
 	// Parse to address
-	address, err := service.vm.ParseLocalAddress(args.Address)
+	address, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
@@ -1101,13 +1101,13 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return err
 	}
 
-	to, err := service.vm.ParseLocalAddress(args.To)
+	to, err := avax.ParseServiceAddress(service.vm, args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -1214,13 +1214,13 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	// Parse the to address
-	to, err := service.vm.ParseLocalAddress(args.To)
+	to, err := avax.ParseServiceAddress(service.vm, args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -1321,7 +1321,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return err
 	}
 
-	to, err := service.vm.ParseLocalAddress(args.To)
+	to, err := avax.ParseServiceAddress(service.vm, args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1332,7 +1332,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -1444,7 +1444,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 		return fmt.Errorf("problem parsing chainID %q: %w", args.SourceChain, err)
 	}
 
-	to, err := service.vm.ParseLocalAddress(args.To)
+	to, err := avax.ParseServiceAddress(service.vm, args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1542,7 +1542,10 @@ type ExportArgs struct {
 	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
 
-	// ID of the address that will receive the AVAX. This address includes the
+	// Chain the funds are going to. Optional. Used if To address does not include the chainID.
+	TargetChain string `json:"targetChain"`
+
+	// ID of the address that will receive the AVAX. This address may include the
 	// chainID, which is used to determine what the destination chain is.
 	To string `json:"to"`
 
@@ -1561,7 +1564,17 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 		return err
 	}
 
-	chainID, to, err := service.vm.ParseAddress(args.To)
+	// Get the chainID
+	chainID, _, err := service.vm.ParseAddress(args.To)
+	if err != nil {
+		chainID, err = service.vm.ctx.BCLookup.Lookup(args.TargetChain)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Parse the to address
+	to, err := avax.ParseServiceAddress(service.vm, args.To)
 	if err != nil {
 		return err
 	}
@@ -1571,7 +1584,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}

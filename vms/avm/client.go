@@ -19,8 +19,6 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-const chainIDAlias = "X"
-
 // Interface compliance
 var _ Client = &client{}
 
@@ -174,15 +172,12 @@ type Client interface {
 // implementation for an AVM client for interacting with avm [chain]
 type client struct {
 	requester rpc.EndpointRequester
-	// used for address ID -> string conversion
-	hrp string
 }
 
 // NewClient returns an AVM client for interacting with avm [chain]
-func NewClient(uri string, chain string, networkID uint32) Client {
+func NewClient(uri string, chain string) Client {
 	return &client{
 		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s", constants.ChainAliasPrefix+chain), "avm"),
-		hrp:       constants.GetHRP(networkID),
 	}
 }
 
@@ -588,27 +583,15 @@ func (c *client) Mint(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "mint", &MintArgs{
+	err := c.requester.SendRequest(ctx, "mint", &MintArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		Amount:  cjson.Uint64(amount),
 		AssetID: assetID,
-		To:      toStr,
+		To:      to.String(),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -624,27 +607,15 @@ func (c *client) SendNFT(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "sendNFT", &SendNFTArgs{
+	err := c.requester.SendRequest(ctx, "sendNFT", &SendNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		AssetID: assetID,
 		GroupID: cjson.Uint32(groupID),
-		To:      toStr,
+		To:      to.String(),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -664,27 +635,15 @@ func (c *client) MintNFT(
 		return ids.ID{}, err
 	}
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
 	err = c.requester.SendRequest(ctx, "mintNFT", &MintNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		AssetID:  assetID,
 		Payload:  payloadStr,
-		To:       toStr,
+		To:       to.String(),
 		Encoding: formatting.Hex,
 	}, res, options...)
 	return res.TxID, err
@@ -692,13 +651,9 @@ func (c *client) MintNFT(
 
 func (c *client) Import(ctx context.Context, user api.UserPass, to ids.ShortID, sourceChain string, options ...rpc.Option) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "import", &ImportArgs{
+	err := c.requester.SendRequest(ctx, "import", &ImportArgs{
 		UserPass:    user,
-		To:          toStr,
+		To:          to.String(),
 		SourceChain: sourceChain,
 	}, res, options...)
 	return res.TxID, err
@@ -711,32 +666,21 @@ func (c *client) Export(
 	changeAddr ids.ShortID,
 	amount uint64,
 	to ids.ShortID,
-	toChainIDAlias string,
+	targetChain string,
 	assetID string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	toStr, err := formatting.FormatAddress(toChainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "export", &ExportArgs{
+	err := c.requester.SendRequest(ctx, "export", &ExportArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		Amount:  cjson.Uint64(amount),
-		To:      toStr,
-		AssetID: assetID,
+		Amount:      cjson.Uint64(amount),
+		TargetChain: targetChain,
+		To:          to.String(),
+		AssetID:     assetID,
 	}, res, options...)
 	return res.TxID, err
 }
