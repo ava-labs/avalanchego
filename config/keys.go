@@ -112,6 +112,7 @@ const (
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
 	SnowMaxProcessingKey                               = "snow-max-processing"
 	SnowMaxTimeProcessingKey                           = "snow-max-time-processing"
+	SnowMixedQueryNumPushKey                           = "snow-mixed-query-num-push"
 	WhitelistedSubnetsKey                              = "whitelisted-subnets"
 	AdminAPIEnabledKey                                 = "api-admin-enabled"
 	InfoAPIEnabledKey                                  = "api-info-enabled"

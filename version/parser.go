@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+var (
+	DefaultParser            = NewParser(defaultVersionPrefix, defaultVersionSeparator)
+	DefaultApplicationParser = NewApplicationParser(defaultAppSeparator, defaultVersionSeparator)
+)
+
 // Parser defines the interface of a Version parser
 type Parser interface {
 	Parse(string) (Version, error)
@@ -18,8 +23,6 @@ type parser struct {
 	prefix    string
 	separator string
 }
-
-func NewDefaultParser() Parser { return NewParser(defaultVersionPrefix, defaultVersionSeparator) }
 
 func NewParser(prefix, separator string) Parser {
 	return &parser{
@@ -70,11 +73,6 @@ type ApplicationParser interface {
 type applicationParser struct {
 	appSeparator  string
 	versionParser *parser
-}
-
-// NewDefaultApplicationParser returns a new parser with the default separators
-func NewDefaultApplicationParser() ApplicationParser {
-	return NewApplicationParser(defaultAppSeparator, defaultVersionSeparator)
 }
 
 // NewApplicationParser returns a new parser

@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -469,6 +470,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			OptimalProcessing:     100,
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
+			MixedQueryNumPush:     3,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -3946,6 +3948,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	engCfg.Params.Alpha = 2
 	engCfg.Params.K = 2
+	engCfg.Params.MixedQueryNumPush = 2
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -4506,4 +4509,120 @@ func TestAbandonTx(t *testing.T) {
 	assert.False(te.pending.Contains(vtx1.ID()))
 	// sanity check that there is indeed an outstanding vertex request
 	assert.True(te.outstandingVtxReqs.Len() == 1)
+}
+
+func TestSendMixedQuery(t *testing.T) {
+	_, _, engCfg := DefaultConfig()
+	sender := &common.SenderTest{T: t}
+	engCfg.Sender = sender
+	sender.Default(true)
+	vdrSet := engCfg.Validators
+	manager := vertex.NewTestManager(t)
+	engCfg.Manager = manager
+	// Override the parameters k and MixedQueryPullPortion,
+	// and update the validator set to have k validators.
+	engCfg.Params.K = 20
+	engCfg.Params.Alpha = 12
+	engCfg.Params.MixedQueryNumPush = 12
+	te, err := newTransitive(engCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startReqID := uint32(0)
+	if err := te.Start(startReqID); err != nil {
+		t.Fatal(err)
+	}
+
+	vdrsList := []validators.Validator{}
+	vdrs := ids.ShortSet{}
+	for i := 0; i < te.Config.Params.K; i++ {
+		vdr := ids.GenerateTestShortID()
+		vdrs.Add(vdr)
+		vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
+	}
+	if err := vdrSet.Set(vdrsList); err != nil {
+		t.Fatal(err)
+	}
+
+	// [blk1] is a child of [gBlk] and passes verification
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{
+			&avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Accepted,
+			}},
+		},
+		BytesV: []byte{1},
+	}
+
+	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
+		switch {
+		case bytes.Equal(b, vtx1.Bytes()):
+			return vtx1, nil
+		default:
+			t.Fatalf("Unknown block bytes")
+			return nil, nil
+		}
+	}
+
+	pullQuerySent := new(bool)
+	pullQueryReqID := new(uint32)
+	pullQueriedVdrs := ids.ShortSet{}
+	sender.SendPullQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID) {
+		switch {
+		case *pullQuerySent:
+			t.Fatalf("Asked multiple times")
+		case vtxID != vtx1.ID():
+			t.Fatalf("Expected engine to request vtx1")
+		}
+		pullQueriedVdrs.Union(inVdrs)
+		*pullQuerySent = true
+		*pullQueryReqID = requestID
+	}
+
+	pushQuerySent := new(bool)
+	pushQueryReqID := new(uint32)
+	pushQueriedVdrs := ids.ShortSet{}
+	sender.SendPushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+		switch {
+		case *pushQuerySent:
+			t.Fatal("Asked multiple times")
+		case vtxID != vtx1.ID():
+		case !bytes.Equal(vtx, vtx1.Bytes()):
+			t.Fatal("got unexpected block bytes instead of blk1")
+		}
+		*pushQuerySent = true
+		*pushQueryReqID = requestID
+		pushQueriedVdrs.Union(inVdrs)
+	}
+
+	// Give the engine vtx1. It should insert it into consensus and send a mixed query
+	// consisting of 12 pull queries and 8 push queries.
+	if err := te.Put(vdrSet.List()[0].ID(), constants.GossipMsgRequestID, vtx1.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	switch {
+	case !*pullQuerySent:
+		t.Fatal("expected us to send pull queries")
+	case !*pushQuerySent:
+		t.Fatal("expected us to send push queries")
+	case *pushQueryReqID != *pullQueryReqID:
+		t.Fatalf("expected equal push query (%v) and pull query (%v) req IDs", *pushQueryReqID, *pullQueryReqID)
+	case pushQueriedVdrs.Len()+pullQueriedVdrs.Len() != te.Config.Params.K:
+		t.Fatalf("expected num push queried (%d) + num pull queried (%d) to be %d", pushQueriedVdrs.Len(), pullQueriedVdrs.Len(), te.Config.Params.K)
+	case pushQueriedVdrs.Len() != te.Params.MixedQueryNumPush:
+		t.Fatalf("expected num push queried (%d) to be %d", pullQueriedVdrs.Len(), te.Params.MixedQueryNumPush)
+	}
+
+	pullQueriedVdrs.Union(pushQueriedVdrs) // Now this holds all queried validators (push and pull)
+	for vdr := range pullQueriedVdrs {
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("got unexpected vdr %v", vdr)
+		}
+	}
 }
