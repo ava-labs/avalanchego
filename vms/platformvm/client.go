@@ -60,7 +60,7 @@ type Client interface {
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]ClientStaker, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]ClientPrimaryValidator, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
 	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
@@ -369,7 +369,7 @@ func (c *client) GetCurrentValidators(
 	subnetID ids.ID,
 	nodeIDs []ids.ShortID,
 	options ...rpc.Option,
-) ([]ClientStaker, error) {
+) ([]ClientPrimaryValidator, error) {
 	nodeIDsStr := []string{}
 	for _, nodeID := range nodeIDs {
 		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
@@ -382,11 +382,11 @@ func (c *client) GetCurrentValidators(
 	if err != nil {
 		return nil, err
 	}
-	clientStakers, err := getClientStakersFromMapIntf(res.Validators, subnetID, true)
+	validators, err := getClientPrimaryValidators(res.Validators)
 	if err != nil {
 		return nil, err
 	}
-	return clientStakers, nil
+	return validators, nil
 }
 
 func (c *client) GetPendingValidators(
