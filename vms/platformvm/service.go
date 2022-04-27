@@ -1473,13 +1473,13 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	}
 
 	// Parse the to address
-	to, err := service.vm.ParseLocalAddress(args.To)
+	to, err := avax.ParseServiceAddress(service.vm, args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -1502,7 +1502,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	}
 	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -1591,7 +1591,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -1614,7 +1614,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 	changeAddr := keys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -2134,13 +2134,9 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
 	}
 
-	addrs := ids.ShortSet{}
-	for _, addrStr := range args.Addresses { // Parse addresses from string
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse address %s: %w", addrStr, err)
-		}
-		addrs.Add(addr)
+	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	if err != nil {
+		return err
 	}
 
 	currentStakers := service.vm.internalState.CurrentStakerChainState()

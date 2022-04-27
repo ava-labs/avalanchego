@@ -17,8 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
-const chainIDAlias = "P"
-
 // Interface compliance
 var _ Client = &client{}
 
@@ -589,25 +587,13 @@ func (c *client) ImportAVAX(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	toStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "importAVAX", &ImportAVAXArgs{
+	err := c.requester.SendRequest(ctx, "importAVAX", &ImportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		To:          toStr,
+		To:          to.String(),
 		SourceChain: sourceChain,
 	}, res, options...)
 	return res.TxID, err
@@ -631,19 +617,11 @@ func (c *client) CreateBlockchain(
 	}
 
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
 	err = c.requester.SendRequest(ctx, "createBlockchain", &CreateBlockchainArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		SubnetID:    subnetID,
 		VMID:        vmID,
@@ -743,13 +721,9 @@ func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason 
 
 func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (uint64, [][]byte, error) {
 	res := new(GetStakeReply)
-	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
-	if err != nil {
-		return 0, nil, err
-	}
-	err = c.requester.SendRequest(ctx, "getStake", &GetStakeArgs{
+	err := c.requester.SendRequest(ctx, "getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
-			Addresses: addrsStr,
+			Addresses: ids.ShortIDSliceToStringSlice(addrs),
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
