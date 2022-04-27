@@ -72,7 +72,7 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 	}{
 		{
 			id:     constants.PlatformChainID,
-			client: platformvm.NewClient(uri, networkID),
+			client: platformvm.NewClient(uri),
 			codec:  platformvm.Codec,
 		},
 		{

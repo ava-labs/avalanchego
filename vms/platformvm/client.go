@@ -209,15 +209,12 @@ type Client interface {
 // Client implementation for interacting with the P Chain endpoint
 type client struct {
 	requester rpc.EndpointRequester
-	// used for address ID -> string conversion
-	hrp string
 }
 
 // NewClient returns a Client for interacting with the P Chain endpoint
-func NewClient(uri string, networkID uint32) Client {
+func NewClient(uri string) Client {
 	return &client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/P", "platform"),
-		hrp:       constants.GetHRP(networkID),
 	}
 }
 

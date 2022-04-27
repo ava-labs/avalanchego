@@ -61,7 +61,7 @@ func NewWalletWithState(
 	pBackend := p.NewBackend(pCTX, pUTXOs, pTXs)
 	pBuilder := p.NewBuilder(kc.Addrs, pBackend)
 	pSigner := p.NewSigner(kc, pBackend)
-	pClient := platformvm.NewClient(uri, pCTX.NetworkID())
+	pClient := platformvm.NewClient(uri)
 
 	xChainID := xCTX.BlockchainID()
 	xUTXOs := NewChainUTXOs(xChainID, utxos)
