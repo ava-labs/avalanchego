@@ -237,19 +237,27 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 
 	// if we don't have enough weight for the state summary to be accepted then retry or fail the state sync
 	size := len(ss.weightedSummaries)
-	if size == 0 && ss.StateSyncBeacons.Len() > 0 {
-		// retry the fast sync if the weight is not enough to fast sync
+	if size == 0 {
+		// retry the state sync if the weight is not enough to state sync
 		failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedVoters)
 		if err != nil {
 			return err
 		}
 
-		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
-		if ss.Config.RetryBootstrap && ss.StateSyncBeacons.Weight()-ss.Alpha < failedBeaconWeight {
+		// if we had too many timeouts when asking for validator votes, we should restart
+		// state sync hoping for the network problems to go away; otherwise, we received
+		// enough (>= ss.Alpha) responses, but no state summary was supported by a majority
+		// of validators (i.e. votes are split between minorities supporting different state
+		// summaries), so there is no point in retrying state sync; we should move ahead to bootstrapping
+		votingStakes := ss.StateSyncBeacons.Weight() - failedBeaconWeight
+		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {
 			ss.Ctx.Log.Debug("Not enough votes received, restarting state sync... - Beacons: %d - Failed syncer: %d "+
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedVoters.Len(), ss.attempts)
 			return ss.restart()
 		}
+
+		// if we do not restart state sync, move on to bootstrapping.
+		return ss.onDoneStateSyncing(ss.requestID)
 	}
 
 	preferredStateSummary := ss.selectSyncableStateSummary()
@@ -267,7 +275,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.ShortID, requestID u
 		return nil
 	}
 
-	// VM did not accept the summary. Just move on with bootstrapping
+	// VM did not accept the summary, move on to bootstrapping.
 	return ss.onDoneStateSyncing(ss.requestID)
 }
 
@@ -427,8 +435,14 @@ func (ss *stateSyncer) sendGetAccepted() error {
 	}
 
 	acceptedSummaryHeights := make([]uint64, 0, len(ss.weightedSummaries))
+	seenHeights := make(map[uint64]struct{}, len(ss.weightedSummaries))
 	for _, ws := range ss.weightedSummaries {
-		acceptedSummaryHeights = append(acceptedSummaryHeights, ws.summary.Height())
+		height := ws.summary.Height()
+		if _, seen := seenHeights[height]; seen {
+			continue // avoid passing duplicate heights to SendGetAcceptedStateSummary
+		}
+		seenHeights[height] = struct{}{}
+		acceptedSummaryHeights = append(acceptedSummaryHeights, height)
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
 	ss.contactedVoters.Add(vdrs.List()...)
