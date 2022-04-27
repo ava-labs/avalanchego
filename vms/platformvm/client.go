@@ -252,12 +252,8 @@ func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey st
 
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
-	addrsStr := make([]string, len(addrs))
-	for i, addr := range addrs {
-		addrsStr[i] = addr.String()
-	}
 	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceRequest{
-		Addresses: addrsStr,
+		Addresses: ids.ShortIDSliceToStringSlice(addrs),
 	}, res, options...)
 	return res, err
 }
@@ -301,12 +297,8 @@ func (c *client) GetAtomicUTXOs(
 	options ...rpc.Option,
 ) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
-	addrsStr := make([]string, len(addrs))
-	for i, addr := range addrs {
-		addrsStr[i] = addr.String()
-	}
 	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
-		Addresses:   addrsStr,
+		Addresses:   ids.ShortIDSliceToStringSlice(addrs),
 		SourceChain: sourceChain,
 		Limit:       json.Uint32(limit),
 		StartIndex: api.Index{
@@ -467,7 +459,7 @@ func (c *client) AddValidator(
 	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:      user,
-			JSONFromAddrs: api.JSONFromAddrs{From: fromStr},
+			JSONFromAddrs: api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
