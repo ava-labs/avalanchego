@@ -68,7 +68,7 @@ func NewWalletWithState(
 	xBackend := x.NewBackend(xCTX, xChainID, xUTXOs)
 	xBuilder := x.NewBuilder(kc.Addrs, xBackend)
 	xSigner := x.NewSigner(kc, xBackend)
-	xClient := avm.NewClient(uri, "X", xCTX.NetworkID())
+	xClient := avm.NewClient(uri, "X")
 
 	return NewWallet(
 		p.NewWallet(pBuilder, pSigner, pClient, pBackend),

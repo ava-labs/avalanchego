@@ -48,11 +48,7 @@ type UTXOClient interface {
 
 func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context, x.Context, UTXOs, error) {
 	infoClient := info.NewClient(uri)
-	networkID, err := infoClient.GetNetworkID(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	xClient := avm.NewClient(uri, "X", networkID)
+	xClient := avm.NewClient(uri, "X")
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {

@@ -157,7 +157,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 			tests.Outf("{{blue}}waiting before querying metrics{{/}}\n")
 
 			for _, u := range uris {
-				xc := avm.NewClient(u, "X", constants.MainnetID)
+				xc := avm.NewClient(u, "X")
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
 				cancel()

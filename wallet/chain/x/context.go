@@ -34,11 +34,7 @@ type context struct {
 
 func NewContextFromURI(ctx stdcontext.Context, uri string) (Context, error) {
 	infoClient := info.NewClient(uri)
-	networkID, err := infoClient.GetNetworkID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	xChainClient := avm.NewClient(uri, "X", networkID)
+	xChainClient := avm.NewClient(uri, "X")
 	return NewContextFromClients(ctx, infoClient, xChainClient)
 }
 
