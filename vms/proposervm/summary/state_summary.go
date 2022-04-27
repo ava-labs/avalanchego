@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -25,15 +24,8 @@ const codecVersion = 0
 func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
 	cdc = codec.NewManager(math.MaxInt32)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		lc.RegisterType(&StatelessSummary{}),
-
-		cdc.RegisterCodec(codecVersion, lc),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
+	if err := cdc.RegisterCodec(codecVersion, lc); err != nil {
+		panic(err)
 	}
 }
 
