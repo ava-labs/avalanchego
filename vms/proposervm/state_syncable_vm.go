@@ -34,24 +34,7 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 		return nil, err // includes database.ErrNotFound case
 	}
 
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
-	if err != nil {
-		// this is an unexpected error that means proVM is out of sync with innerVM
-		return nil, err
-	}
-	proBlk, err := vm.getBlock(proBlkID)
-	if err != nil {
-		// this is an unexpected error that means proVM is out of sync with innerVM
-		return nil, err
-	}
-	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
-
-	return &statefulSummary{
-		ProposerSummary: proSummary,
-		innerSummary:    innerSummary,
-		proposerBlock:   proBlk,
-		vm:              vm,
-	}, err
+	return vm.buildStateSummary(innerSummary)
 }
 
 func (vm *VM) GetLastStateSummary() (block.Summary, error) {
@@ -65,24 +48,7 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 		return nil, err // including database.ErrNotFound case
 	}
 
-	// retrieve ProBlk
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
-	if err != nil {
-		// this is an unexpected error that means proVM is out of sync with innerVM
-		return nil, err
-	}
-	proBlk, err := vm.GetBlock(proBlkID)
-	if err != nil {
-		// this is an unexpected error that means proVM is out of sync with innerVM
-		return nil, err
-	}
-
-	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
-	return &statefulSummary{
-		ProposerSummary: proSummary,
-		innerSummary:    innerSummary,
-		vm:              vm,
-	}, err
+	return vm.buildStateSummary(innerSummary)
 }
 
 // Note: it's important that ParseStateSummary do not use any index or state
@@ -125,6 +91,10 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 		return nil, err // including database.ErrNotFound case
 	}
 
+	return vm.buildStateSummary(innerSummary)
+}
+
+func (vm *VM) buildStateSummary(innerSummary block.Summary) (*statefulSummary, error) {
 	// retrieve ProBlk
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
