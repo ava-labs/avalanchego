@@ -191,13 +191,13 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is already a primary network validator",
-				tx.Validator.NodeID.String(),
+				tx.Validator.NodeID,
 			)
 		}
 		if err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.String(),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -207,13 +207,13 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is about to become a primary network validator",
-				tx.Validator.NodeID.String(),
+				tx.Validator.NodeID,
 			)
 		}
 		if err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is about to become a validator: %w",
-				tx.Validator.NodeID.String(),
+				tx.Validator.NodeID,
 				err,
 			)
 		}

@@ -716,7 +716,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
 		vdr := response.Validators[i].(APIPrimaryValidator)
-		if vdr.NodeID != validatorNodeID.String() {
+		if vdr.NodeID != validatorNodeID {
 			continue
 		}
 		found = true

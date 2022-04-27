@@ -59,7 +59,7 @@ func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {
 		s.RewardAddress.Bytes(),
 	)
 	return UnparsedStaker{
-		NodeID:        s.NodeID.String(),
+		NodeID:        s.NodeID,
 		RewardAddress: avaxAddr,
 		DelegationFee: s.DelegationFee,
 	}, err

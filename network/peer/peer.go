@@ -239,7 +239,7 @@ func (p *peer) Info() Info {
 	return Info{
 		IP:             p.conn.RemoteAddr().String(),
 		PublicIP:       publicIPStr,
-		ID:             p.id.String(),
+		ID:             p.id,
 		Version:        p.version.String(),
 		LastSent:       time.Unix(atomic.LoadInt64(&p.lastSent), 0),
 		LastReceived:   time.Unix(atomic.LoadInt64(&p.lastReceived), 0),
