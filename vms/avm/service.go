@@ -653,7 +653,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -710,13 +710,11 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 				Threshold: uint32(owner.Threshold),
 			},
 		}
-		for _, address := range owner.Minters {
-			addr, err := service.vm.ParseLocalAddress(address)
-			if err != nil {
-				return err
-			}
-			minter.Addrs = append(minter.Addrs, addr)
+		minterAddrsSet, err := avax.ParseServiceAddresses(service.vm, owner.Minters)
+		if err != nil {
+			return err
 		}
+		minter.Addrs = minterAddrsSet.List()
 		ids.SortShortIDs(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
@@ -820,7 +818,7 @@ type ExportKeyReply struct {
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Debug("AVM: ExportKey called for user %q", args.Username)
 
-	addr, err := service.vm.ParseLocalAddress(args.Address)
+	addr, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address %q: %w", args.Address, err)
 	}
@@ -955,7 +953,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
@@ -1002,7 +1000,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amounts[assetID] = newAmount
 
 		// Parse the to address
-		to, err := service.vm.ParseLocalAddress(output.To)
+		to, err := avax.ParseServiceAddress(service.vm, output.To)
 		if err != nil {
 			return fmt.Errorf("problem parsing to address %q: %w", output.To, err)
 		}
