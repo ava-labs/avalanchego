@@ -8,20 +8,20 @@ import (
 	"strings"
 )
 
-// ShortBag is a multiset of ShortIDs.
-type ShortBag struct {
-	counts map[ShortID]int
+// NodeIDBag is a multiset of NodeIDs.
+type NodeIDBag struct {
+	counts map[NodeID]int
 	size   int
 }
 
-func (b *ShortBag) init() {
+func (b *NodeIDBag) init() {
 	if b.counts == nil {
-		b.counts = make(map[ShortID]int, minBagSize)
+		b.counts = make(map[NodeID]int, minBagSize)
 	}
 }
 
 // Add increases the number of times each id has been seen by one.
-func (b *ShortBag) Add(ids ...ShortID) {
+func (b *NodeIDBag) Add(ids ...NodeID) {
 	for _, id := range ids {
 		b.AddCount(id, 1)
 	}
@@ -30,7 +30,7 @@ func (b *ShortBag) Add(ids ...ShortID) {
 // AddCount increases the nubmer of times the id has been seen by count.
 //
 // count must be >= 0
-func (b *ShortBag) AddCount(id ShortID, count int) {
+func (b *NodeIDBag) AddCount(id NodeID, count int) {
 	if count <= 0 {
 		return
 	}
@@ -43,13 +43,13 @@ func (b *ShortBag) AddCount(id ShortID, count int) {
 }
 
 // Count returns the number of times the id has been added.
-func (b *ShortBag) Count(id ShortID) int {
+func (b *NodeIDBag) Count(id NodeID) int {
 	b.init()
 	return b.counts[id]
 }
 
 // Remove sets the count of the provided ID to zero.
-func (b *ShortBag) Remove(id ShortID) {
+func (b *NodeIDBag) Remove(id NodeID) {
 	b.init()
 	count := b.counts[id]
 	delete(b.counts, id)
@@ -57,13 +57,13 @@ func (b *ShortBag) Remove(id ShortID) {
 }
 
 // Len returns the number of times an id has been added.
-func (b *ShortBag) Len() int { return b.size }
+func (b *NodeIDBag) Len() int { return b.size }
 
 // List returns a list of all IDs that have been added,
 // without duplicates.
 // e.g. a bag with {ID1, ID1, ID2} returns ids.ShortID[]{ID1, ID2}
-func (b *ShortBag) List() []ShortID {
-	idList := make([]ShortID, len(b.counts))
+func (b *NodeIDBag) List() []NodeID {
+	idList := make([]NodeID, len(b.counts))
 	i := 0
 	for id := range b.counts {
 		idList[i] = id
@@ -73,7 +73,7 @@ func (b *ShortBag) List() []ShortID {
 }
 
 // Equals returns true if the bags contain the same elements
-func (b *ShortBag) Equals(oIDs ShortBag) bool {
+func (b *NodeIDBag) Equals(oIDs NodeIDBag) bool {
 	if b.Len() != oIDs.Len() {
 		return false
 	}
@@ -85,7 +85,7 @@ func (b *ShortBag) Equals(oIDs ShortBag) bool {
 	return true
 }
 
-func (b *ShortBag) PrefixedString(prefix string) string {
+func (b *NodeIDBag) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
@@ -96,4 +96,4 @@ func (b *ShortBag) PrefixedString(prefix string) string {
 	return sb.String()
 }
 
-func (b *ShortBag) String() string { return b.PrefixedString("") }
+func (b *NodeIDBag) String() string { return b.PrefixedString("") }

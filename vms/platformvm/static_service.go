@@ -11,7 +11,6 @@ import (
 	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -55,7 +54,7 @@ type APIStaker struct {
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	NodeID      string       `json:"nodeID"`
+	NodeID      ids.NodeID   `json:"nodeID"`
 }
 
 // APIOwner is the repr. of a reward owner sent over APIs.
@@ -265,10 +264,6 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-		nodeID, err := ids.ShortFromPrefixedString(validator.NodeID, constants.NodeIDPrefix)
-		if err != nil {
-			return err
-		}
 
 		owner := &secp256k1fx.OutputOwners{
 			Locktime:  uint64(validator.RewardOwner.Locktime),
@@ -294,7 +289,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				BlockchainID: ids.Empty,
 			}},
 			Validator: Validator{
-				NodeID: nodeID,
+				NodeID: validator.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(validator.EndTime),
 				Wght:   weight,

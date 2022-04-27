@@ -28,7 +28,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
-	vdr0 := ids.GenerateTestShortID()
+	vdr0 := ids.GenerateTestNodeID()
 	err = vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
@@ -53,11 +53,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.NodeID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
-	bootstrapper.GetAcceptedF = func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+	bootstrapper.GetAcceptedF = func(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -68,7 +68,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	mc.SetTime(pastTime)
 	handler.clock.Set(pastTime)
 
-	nodeID := ids.ShortEmpty
+	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	chainID := ids.ID{}
@@ -100,7 +100,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
-	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
@@ -132,7 +132,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.NodeID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
 	handler.SetBootstrapper(bootstrapper)
@@ -149,7 +149,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
-	nodeID := ids.ShortEmpty
+	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
@@ -167,7 +167,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
@@ -196,7 +196,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(nodeID ids.NodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}
@@ -206,7 +206,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
-	nodeID := ids.ShortEmpty
+	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inMsg := mc.InternalFailedRequest(message.GetFailed, nodeID, chainID, reqID)
@@ -226,7 +226,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
-	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)

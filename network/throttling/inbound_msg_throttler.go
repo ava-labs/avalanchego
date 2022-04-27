@@ -20,11 +20,11 @@ type InboundMsgThrottler interface {
 	// For every call to Acquire([msgSize], [nodeID]), we must (!) call
 	// Release([msgSize], [nodeID]) when done processing the message
 	// (or when we give up trying to read the message.)
-	Acquire(msgSize uint64, nodeID ids.ShortID)
+	Acquire(msgSize uint64, nodeID ids.NodeID)
 
 	// Mark that we're done processing a message of size [msgSize]
 	// from [nodeID].
-	Release(msgSize uint64, nodeID ids.ShortID)
+	Release(msgSize uint64, nodeID ids.NodeID)
 }
 
 type InboundMsgThrottlerConfig struct {
@@ -101,7 +101,7 @@ type inboundMsgThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *inboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 	// Acquire space on the inbound message buffer
 	t.bufferThrottler.Acquire(nodeID)
 	// Acquire bandwidth
@@ -112,7 +112,7 @@ func (t *inboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID]).
 // See InboundMsgThrottler interface.
-func (t *inboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgThrottler) Release(msgSize uint64, nodeID ids.NodeID) {
 	// Release space on the inbound message buffer
 	t.bufferThrottler.Release(nodeID)
 	// Release space on the inbound message byte buffer
@@ -120,11 +120,11 @@ func (t *inboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 }
 
 // See BandwidthThrottler.
-func (t *inboundMsgThrottler) AddNode(nodeID ids.ShortID) {
+func (t *inboundMsgThrottler) AddNode(nodeID ids.NodeID) {
 	t.bandwidthThrottler.AddNode(nodeID)
 }
 
 // See BandwidthThrottler.
-func (t *inboundMsgThrottler) RemoveNode(nodeID ids.ShortID) {
+func (t *inboundMsgThrottler) RemoveNode(nodeID ids.NodeID) {
 	t.bandwidthThrottler.RemoveNode(nodeID)
 }

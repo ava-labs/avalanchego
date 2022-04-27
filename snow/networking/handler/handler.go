@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
@@ -32,7 +31,7 @@ var _ Handler = &handler{}
 type Handler interface {
 	common.Timer
 	Context() *snow.ConsensusContext
-	IsValidator(nodeID ids.ShortID) bool
+	IsValidator(nodeID ids.NodeID) bool
 
 	SetStateSyncer(engine common.StateSyncer)
 	StateSyncer() common.StateSyncer
@@ -136,7 +135,7 @@ func New(
 
 func (h *handler) Context() *snow.ConsensusContext { return h.ctx }
 
-func (h *handler) IsValidator(nodeID ids.ShortID) bool {
+func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 	return !h.ctx.IsValidatorOnly() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)
@@ -388,9 +387,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		summaryHeights, err := getSummaryHeights(msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
+				"Malformed message %s from (%s, %d): %s",
 				op,
-				constants.NodeIDPrefix,
 				nodeID,
 				reqID,
 				err,
@@ -404,9 +402,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		summaryIDs, err := getIDs(message.SummaryIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
+				"Malformed message %s from (%s, %d): %s",
 				op,
-				constants.NodeIDPrefix,
 				nodeID,
 				reqID,
 				err,
@@ -428,12 +425,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
@@ -448,12 +441,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return nil
 		}
@@ -464,12 +453,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.GetAcceptedFailed(nodeID, reqID)
 		}
@@ -525,12 +510,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.QueryFailed(nodeID, reqID)
 		}
@@ -549,10 +530,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	default:
 		return fmt.Errorf(
-			"attempt to submit unhandled sync msg %s from %s%s",
-			op,
-			constants.NodeIDPrefix,
-			nodeID,
+			"attempt to submit unhandled sync msg %s from %s",
+			op, nodeID,
 		)
 	}
 }
@@ -615,10 +594,8 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	default:
 		return fmt.Errorf(
-			"attempt to submit unhandled async msg %s from %s%s",
-			op,
-			constants.NodeIDPrefix,
-			nodeID,
+			"attempt to submit unhandled async msg %s from %s",
+			op, nodeID,
 		)
 	}
 }
@@ -693,10 +670,8 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, b
 		// If this message's deadline has passed, don't process it.
 		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
 			h.ctx.Log.Verbo(
-				"Dropping message from %s%s due to timeout: %s",
-				constants.NodeIDPrefix,
-				msg.NodeID(),
-				msg,
+				"Dropping message from %s due to timeout: %s",
+				msg.NodeID(), msg,
 			)
 			h.metrics.expired.Inc()
 			msg.OnFinishedHandling()

@@ -22,7 +22,7 @@ var (
 	UncompressingBuilder OutboundMsgBuilder
 	TestCodec            Codec
 
-	dummyNodeID             = ids.ShortEmpty
+	dummyNodeID             = ids.EmptyNodeID
 	dummyOnFinishedHandling = func() {}
 )
 

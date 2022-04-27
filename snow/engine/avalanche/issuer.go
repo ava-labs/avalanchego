@@ -114,7 +114,7 @@ func (i *issuer) Update() {
 		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
-	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
+	vdrBag := ids.NodeIDBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}

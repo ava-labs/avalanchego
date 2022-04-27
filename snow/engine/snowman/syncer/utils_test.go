@@ -64,7 +64,7 @@ func buildTestPeers(t *testing.T) validators.Set {
 	// so to test the effect of cap on number of requests sent out
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
-		beaconID := ids.GenerateTestShortID()
+		beaconID := ids.GenerateTestNodeID()
 		assert.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
 	}
 	return vdrs
@@ -104,8 +104,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	return syncer, fullVM, sender
 }
 
-func pickRandomFrom(population map[ids.ShortID]uint32) ids.ShortID {
-	res := ids.ShortEmpty
+func pickRandomFrom(population map[ids.NodeID]uint32) ids.NodeID {
+	res := ids.EmptyNodeID
 	for k := range population {
 		res = k
 		break

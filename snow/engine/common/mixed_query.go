@@ -13,7 +13,7 @@ import "github.com/ava-labs/avalanchego/ids"
 // [sender] is used to actually send the queries.
 func SendMixedQuery(
 	sender Sender,
-	vdrs []ids.ShortID,
+	vdrs []ids.NodeID,
 	numPushTo int,
 	reqID uint32,
 	containerID ids.ID,
@@ -23,12 +23,12 @@ func SendMixedQuery(
 		numPushTo = len(vdrs)
 	}
 	if numPushTo > 0 {
-		sendPushQueryTo := ids.NewShortSet(numPushTo)
+		sendPushQueryTo := ids.NewNodeIDSet(numPushTo)
 		sendPushQueryTo.Add(vdrs[:numPushTo]...)
 		sender.SendPushQuery(sendPushQueryTo, reqID, containerID, container)
 	}
 	if numPullTo := len(vdrs) - numPushTo; numPullTo > 0 {
-		sendPullQueryTo := ids.NewShortSet(numPullTo)
+		sendPullQueryTo := ids.NewNodeIDSet(numPullTo)
 		sendPullQueryTo.Add(vdrs[numPushTo:]...)
 		sender.SendPullQuery(sendPullQueryTo, reqID, containerID)
 	}

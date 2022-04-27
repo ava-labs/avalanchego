@@ -20,10 +20,10 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
 			return nil, nil
 		},
 	}
@@ -40,12 +40,12 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
-	validatorID := ids.GenerateTestShortID()
-	nonValidatorID := ids.GenerateTestShortID()
+	validatorID := ids.GenerateTestNodeID()
+	nonValidatorID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-			return map[ids.ShortID]uint64{
+		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+			return map[ids.NodeID]uint64{
 				validatorID: 10,
 			}, nil
 		},
@@ -67,14 +67,14 @@ func TestWindowerChangeByHeight(t *testing.T) {
 
 	subnetID := ids.ID{0, 1}
 	chainID := ids.ID{0, 2}
-	validatorIDs := make([]ids.ShortID, MaxWindows)
+	validatorIDs := make([]ids.NodeID, MaxWindows)
 	for i := range validatorIDs {
-		validatorIDs[i] = ids.ShortID{byte(i + 1)}
+		validatorIDs[i] = ids.NodeID{byte(i + 1)}
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-			validators := make(map[ids.ShortID]uint64, MaxWindows)
+		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+			validators := make(map[ids.NodeID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
 				validators[id] = 1
 			}
@@ -127,14 +127,14 @@ func TestWindowerChangeByChain(t *testing.T) {
 	chainID1 := ids.ID{}
 	_, _ = rand.Read(chainID1[:]) // #nosec G404
 
-	validatorIDs := make([]ids.ShortID, MaxWindows)
+	validatorIDs := make([]ids.NodeID, MaxWindows)
 	for i := range validatorIDs {
-		validatorIDs[i] = ids.ShortID{byte(i + 1)}
+		validatorIDs[i] = ids.NodeID{byte(i + 1)}
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-			validators := make(map[ids.ShortID]uint64, MaxWindows)
+		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+			validators := make(map[ids.NodeID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
 				validators[id] = 1
 			}

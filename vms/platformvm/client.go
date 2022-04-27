@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -59,13 +58,13 @@ type Client interface {
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]interface{}, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]interface{}, []interface{}, error)
+	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
 	GetCurrentSupply(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]string, error)
+	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error)
 	// AddValidator issues a transaction to add a validator to the primary network
 	// and returns the txID
 	AddValidator(
@@ -73,8 +72,8 @@ type Client interface {
 		user api.UserPass,
 		from []string,
 		changeAddr string,
-		rewardAddress,
-		nodeID string,
+		rewardAddress string,
+		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -88,8 +87,8 @@ type Client interface {
 		user api.UserPass,
 		from []string,
 		changeAddr string,
-		rewardAddress,
-		nodeID string,
+		rewardAddress string,
+		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -102,8 +101,8 @@ type Client interface {
 		user api.UserPass,
 		from []string,
 		changeAddr string,
-		subnetID,
-		nodeID string,
+		subnetID string,
+		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -188,7 +187,7 @@ type Client interface {
 	GetMaxStakeAmount(
 		ctx context.Context,
 		subnetID ids.ID,
-		nodeID string,
+		nodeID ids.NodeID,
 		startTime uint64,
 		endTime uint64,
 		options ...rpc.Option,
@@ -199,7 +198,7 @@ type Client interface {
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
 	// GetValidatorsAt returns the weights of the validator set of a provided subnet
 	// at the specified height.
-	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[string]uint64, error)
+	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 }
@@ -325,17 +324,13 @@ func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options
 func (c *client) GetCurrentValidators(
 	ctx context.Context,
 	subnetID ids.ID,
-	nodeIDs []ids.ShortID,
+	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]interface{}, error) {
-	nodeIDsStr := []string{}
-	for _, nodeID := range nodeIDs {
-		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
-	}
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
-		NodeIDs:  nodeIDsStr,
+		NodeIDs:  nodeIDs,
 	}, res, options...)
 	return res.Validators, err
 }
@@ -343,17 +338,13 @@ func (c *client) GetCurrentValidators(
 func (c *client) GetPendingValidators(
 	ctx context.Context,
 	subnetID ids.ID,
-	nodeIDs []ids.ShortID,
+	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]interface{}, []interface{}, error) {
-	nodeIDsStr := []string{}
-	for _, nodeID := range nodeIDs {
-		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
-	}
 	res := &GetPendingValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getPendingValidators", &GetPendingValidatorsArgs{
 		SubnetID: subnetID,
-		NodeIDs:  nodeIDsStr,
+		NodeIDs:  nodeIDs,
 	}, res, options...)
 	return res.Validators, res.Delegators, err
 }
@@ -364,7 +355,7 @@ func (c *client) GetCurrentSupply(ctx context.Context, options ...rpc.Option) (u
 	return uint64(res.Supply), err
 }
 
-func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]string, error) {
+func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
@@ -378,8 +369,8 @@ func (c *client) AddValidator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
-	rewardAddress,
-	nodeID string,
+	rewardAddress string,
+	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -410,8 +401,8 @@ func (c *client) AddDelegator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
-	rewardAddress,
-	nodeID string,
+	rewardAddress string,
+	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -440,8 +431,8 @@ func (c *client) AddSubnetValidator(
 	user api.UserPass,
 	from []string,
 	changeAddr string,
-	subnetID,
-	nodeID string,
+	subnetID string,
+	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -689,7 +680,7 @@ func (c *client) GetTotalStake(ctx context.Context, options ...rpc.Option) (uint
 	return uint64(res.Stake), err
 }
 
-func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID string, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
+func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
 	res := new(GetMaxStakeAmountReply)
 	err := c.requester.SendRequest(ctx, "getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
@@ -723,7 +714,7 @@ func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 	return res.Timestamp, err
 }
 
-func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[string]uint64, error) {
+func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,

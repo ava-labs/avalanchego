@@ -45,7 +45,7 @@ type Info struct {
 
 type Parameters struct {
 	Version               version.Application
-	NodeID                ids.ShortID
+	NodeID                ids.NodeID
 	NetworkID             uint32
 	TxFee                 uint64
 	CreateAssetTxFee      uint64
@@ -112,14 +112,14 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
-	NodeID string `json:"nodeID"`
+	NodeID ids.NodeID `json:"nodeID"`
 }
 
 // GetNodeID returns the node ID of this node
 func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
 	service.log.Debug("Info: GetNodeID called")
 
-	reply.NodeID = service.NodeID.PrefixedString(constants.NodeIDPrefix)
+	reply.NodeID = service.NodeID
 	return nil
 }
 
@@ -183,7 +183,7 @@ func (service *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs,
 
 // PeersArgs are the arguments for calling Peers
 type PeersArgs struct {
-	NodeIDs []string `json:"nodeIDs"`
+	NodeIDs []ids.NodeID `json:"nodeIDs"`
 }
 
 type Peer struct {
@@ -203,26 +203,13 @@ type PeersReply struct {
 // Peers returns the list of current validators
 func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
 	service.log.Debug("Info: Peers called")
-	nodeIDs := make([]ids.ShortID, 0, len(args.NodeIDs))
-	for _, nodeID := range args.NodeIDs {
-		nID, err := ids.ShortFromPrefixedString(nodeID, constants.NodeIDPrefix)
-		if err != nil {
-			return err
-		}
-		nodeIDs = append(nodeIDs, nID)
-	}
 
-	peers := service.networking.PeerInfo(nodeIDs)
+	peers := service.networking.PeerInfo(args.NodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for i, peer := range peers {
-		nodeID, err := ids.ShortFromPrefixedString(peer.ID, constants.NodeIDPrefix)
-		if err != nil {
-			return err
-		}
-
 		peerInfo[i] = Peer{
 			Info:    peer,
-			Benched: service.benchlist.GetBenched(nodeID),
+			Benched: service.benchlist.GetBenched(peer.ID),
 		}
 	}
 

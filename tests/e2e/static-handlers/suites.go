@@ -151,7 +151,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
-					NodeID:    id.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    ids.NodeID(id),
 				},
 				RewardOwner: &platformvm.APIOwner{
 					Threshold: 1,

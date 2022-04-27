@@ -28,8 +28,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := keys[0].PublicKey().Address()
-	rewardAddress := nodeID
+	rewardAddress := keys[0].PublicKey().Address()
+	nodeID := ids.NodeID(rewardAddress)
 
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDelegatorTx
@@ -74,8 +74,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 }
 
 func TestAddDelegatorTxExecute(t *testing.T) {
-	nodeID := keys[0].PublicKey().Address()
-	rewardAddress := nodeID
+	rewardAddress := keys[0].PublicKey().Address()
+	nodeID := ids.NodeID(rewardAddress)
 
 	factory := crypto.FactorySECP256K1R{}
 	keyIntf, err := factory.NewPrivateKey()
@@ -83,7 +83,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	newValidatorKey := keyIntf.(*crypto.PrivateKeySECP256K1R)
-	newValidatorID := newValidatorKey.PublicKey().Address()
+	newValidatorID := ids.NodeID(newValidatorKey.PublicKey().Address())
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
 
@@ -148,7 +148,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		stakeAmount   uint64
 		startTime     uint64
 		endTime       uint64
-		nodeID        ids.ShortID
+		nodeID        ids.NodeID
 		rewardAddress ids.ShortID
 		feeKeys       []*crypto.PrivateKeySECP256K1R
 		setup         func(vm *VM)
@@ -365,7 +365,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
-		id,
+		ids.NodeID(id),
 		id,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -397,7 +397,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
 		uint64(firstDelegatorStartTime.Unix()),
 		uint64(firstDelegatorEndTime.Unix()),
-		id,
+		ids.NodeID(id),
 		keys[0].PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 		ids.ShortEmpty, // change addr
@@ -430,7 +430,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.MinDelegatorStake,
 		uint64(secondDelegatorStartTime.Unix()),
 		uint64(secondDelegatorEndTime.Unix()),
-		id,
+		ids.NodeID(id),
 		keys[0].PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[3]},
 		ids.ShortEmpty, // change addr
@@ -454,7 +454,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.MinDelegatorStake,
 		uint64(thirdDelegatorStartTime.Unix()),
 		uint64(thirdDelegatorEndTime.Unix()),
-		id,
+		ids.NodeID(id),
 		keys[0].PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[4]},
 		ids.ShortEmpty, // change addr
@@ -530,7 +530,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				validatorStake,
 				uint64(validatorStartTime.Unix()),
 				uint64(validatorEndTime.Unix()),
-				id,
+				ids.NodeID(id),
 				id,
 				reward.PercentDenominator,
 				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
@@ -553,7 +553,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator1Stake,
 				uint64(delegator1StartTime.Unix()),
 				uint64(delegator1EndTime.Unix()),
-				id,
+				ids.NodeID(id),
 				keys[0].PublicKey().Address(),
 				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 				changeAddr,
@@ -575,7 +575,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator2Stake,
 				uint64(delegator2StartTime.Unix()),
 				uint64(delegator2EndTime.Unix()),
-				id,
+				ids.NodeID(id),
 				keys[0].PublicKey().Address(),
 				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 				changeAddr,
@@ -597,7 +597,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator3Stake,
 				uint64(delegator3StartTime.Unix()),
 				uint64(delegator3EndTime.Unix()),
-				id,
+				ids.NodeID(id),
 				keys[0].PublicKey().Address(),
 				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 				changeAddr,
@@ -619,7 +619,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				delegator4Stake,
 				uint64(delegator4StartTime.Unix()),
 				uint64(delegator4EndTime.Unix()),
-				id,
+				ids.NodeID(id),
 				keys[0].PublicKey().Address(),
 				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 				changeAddr,

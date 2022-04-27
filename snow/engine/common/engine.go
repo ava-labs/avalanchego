@@ -66,7 +66,7 @@ type GetStateSummaryFrontierHandler interface {
 	//
 	// This engine should respond with an StateSummaryFrontier message with the
 	// same requestID, and the engine's current state summary frontier.
-	GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error
+	GetStateSummaryFrontier(validatorID ids.NodeID, requestID uint32) error
 }
 
 // StateSummaryFrontierHandler defines how a consensus engine reacts to a state
@@ -79,7 +79,7 @@ type StateSummaryFrontierHandler interface {
 	// this message is in response to a GetStateSummaryFrontier message, is
 	// utilizing a unique requestID, or that the summary bytes are from a valid
 	// state summary.
-	StateSummaryFrontier(validatorID ids.ShortID, requestID uint32, summary []byte) error
+	StateSummaryFrontier(validatorID ids.NodeID, requestID uint32, summary []byte) error
 
 	// Notify this engine that a get state summary frontier request it issued
 	// has failed.
@@ -91,7 +91,7 @@ type StateSummaryFrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetStateSummaryFrontier message.
-	GetStateSummaryFrontierFailed(validatorID ids.ShortID, requestID uint32) error
+	GetStateSummaryFrontierFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAcceptedStateSummaryHandler defines how a consensus engine reacts to a get
@@ -108,7 +108,7 @@ type GetAcceptedStateSummaryHandler interface {
 	// This engine should respond with an AcceptedStateSummary message with the
 	// same requestID, and the subset of the state summaries that this node has
 	// locally available.
-	GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, keys []uint64) error
+	GetAcceptedStateSummary(validatorID ids.NodeID, requestID uint32, keys []uint64) error
 }
 
 // AcceptedStateSummaryHandler defines how a consensus engine reacts to an
@@ -121,7 +121,7 @@ type AcceptedStateSummaryHandler interface {
 	// this message is in response to a GetAcceptedStateSummary message,
 	// is utilizing a unique requestID, or that the summaryIDs are a subset of the
 	// state summaries requested by key from a GetAcceptedStateSummary message.
-	AcceptedStateSummary(validatorID ids.ShortID, requestID uint32, summaryIDs []ids.ID) error
+	AcceptedStateSummary(validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
 
 	// Notify this engine that a get accepted state summary request it issued has
 	// failed.
@@ -133,7 +133,7 @@ type AcceptedStateSummaryHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedStateSummary message.
-	GetAcceptedStateSummaryFailed(validatorID ids.ShortID, requestID uint32) error
+	GetAcceptedStateSummaryFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
@@ -150,7 +150,7 @@ type GetAcceptedFrontierHandler interface {
 	//
 	// This engine should respond with an AcceptedFrontier message with the same
 	// requestID, and the engine's current accepted frontier.
-	GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error
+	GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error
 }
 
 // AcceptedFrontierHandler defines how a consensus engine reacts to accepted
@@ -163,7 +163,7 @@ type AcceptedFrontierHandler interface {
 	// utilizing a unique requestID, or that the containerIDs from a valid
 	// frontier.
 	AcceptedFrontier(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
@@ -178,7 +178,7 @@ type AcceptedFrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedFrontier message.
-	GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error
+	GetAcceptedFrontierFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAcceptedHandler defines how a consensus engine reacts to a get accepted
@@ -194,7 +194,7 @@ type GetAcceptedHandler interface {
 	// requestID, and the subset of the containerIDs that this node has decided
 	// are accepted.
 	GetAccepted(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
@@ -211,7 +211,7 @@ type AcceptedHandler interface {
 	// unique requestID, or that the containerIDs are a subset of the
 	// containerIDs from a GetAccepted message.
 	Accepted(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
 	) error
@@ -225,7 +225,7 @@ type AcceptedHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAccepted message.
-	GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error
+	GetAcceptedFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAncestorsHandler defines how a consensus engine reacts to a get ancestors
@@ -247,7 +247,7 @@ type GetAncestorsHandler interface {
 	// If this engine doesn't have some ancestors, it should reply with its best
 	// effort attempt at getting them. If this engine doesn't have [containerID]
 	// it can ignore this message.
-	GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
+	GetAncestors(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
 }
 
 // AncestorsHandler defines how a consensus engine reacts to bootstrapping
@@ -269,7 +269,7 @@ type AncestorsHandler interface {
 	// message, that this message has a unique requestID or that any of the
 	// containers in [containers] are valid.
 	Ancestors(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		containers [][]byte,
 	) error
@@ -283,7 +283,7 @@ type AncestorsHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the GetAncestors message.
-	GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error
+	GetAncestorsFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetHandler defines how a consensus engine reacts to get message from another
@@ -302,7 +302,7 @@ type GetHandler interface {
 	// This engine should respond with a Put message with the same requestID if
 	// the container was locally available. Otherwise, the message can be safely
 	// dropped.
-	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
+	Get(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
 }
 
 // PutHandler defines how a consensus engine reacts to put messages from other
@@ -313,7 +313,7 @@ type PutHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is utilizing a unique requestID.
 	Put(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		container []byte,
 	) error
@@ -326,7 +326,7 @@ type PutHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the Get message.
-	GetFailed(validatorID ids.ShortID, requestID uint32) error
+	GetFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // QueryHandler defines how a consensus engine reacts to query messages from
@@ -344,7 +344,7 @@ type QueryHandler interface {
 	// preferences in a Chits message. The Chits message should have the same
 	// requestID that was passed in here.
 	PullQuery(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
 	) error
@@ -364,7 +364,7 @@ type QueryHandler interface {
 	// in a Chits message. The Chits message should have the same requestID that
 	// was passed in here.
 	PushQuery(
-		validatorID ids.ShortID,
+		validatorID ids.NodeID,
 		requestID uint32,
 		container []byte,
 	) error
@@ -378,7 +378,7 @@ type ChitsHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a PullQuery or a PushQuery message.
 	// However, the validatorID is assumed to be authenticated.
-	Chits(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
+	Chits(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error
 
 	// Notify this engine that a query it issued has failed.
 	//
@@ -389,7 +389,7 @@ type ChitsHandler interface {
 	//
 	// The validatorID and the requestID are assumed to be the same as those
 	// sent in the Query message.
-	QueryFailed(validatorID ids.ShortID, requestID uint32) error
+	QueryFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
 // AppHandler defines how a consensus engine reacts to app specific messages.
@@ -406,7 +406,7 @@ type AppHandler interface {
 	// This node should typically send an AppResponse to [nodeID] in response to
 	// a valid message using the same request ID before the deadline. However,
 	// the VM may arbitrarily choose to not send a response to this request.
-	AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error
+	AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
 
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
@@ -418,7 +418,7 @@ type AppHandler interface {
 	// * This engine sent a request to [nodeID] with ID [requestID].
 	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
+	AppRequestFailed(nodeID ids.NodeID, requestID uint32) error
 
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
@@ -437,7 +437,7 @@ type AppHandler interface {
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another AppRequest, or it may give
 	// up trying to get the requested information.
-	AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error
+	AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error
 
 	// Notify this engine of a gossip message from [nodeID].
 	//
@@ -449,7 +449,7 @@ type AppHandler interface {
 	//
 	// A node may gossip the same message multiple times. That is,
 	// AppGossip([nodeID], [msg]) may be called multiple times.
-	AppGossip(nodeID ids.ShortID, msg []byte) error
+	AppGossip(nodeID ids.NodeID, msg []byte) error
 }
 
 // InternalHandler defines how this consensus engine reacts to messages from

@@ -107,7 +107,7 @@ type Config struct {
 	TLSConfig    *tls.Config   `json:"-"`
 
 	Namespace          string              `json:"namespace"`
-	MyNodeID           ids.ShortID         `json:"myNodeID"`
+	MyNodeID           ids.NodeID          `json:"myNodeID"`
 	MyIP               utils.DynamicIPDesc `json:"myIP"`
 	NetworkID          uint32              `json:"networkID"`
 	MaxClockDifference time.Duration       `json:"maxClockDifference"`

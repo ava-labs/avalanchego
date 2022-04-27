@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -192,13 +191,13 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is already a primary network validator",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 			)
 		}
 		if err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -208,13 +207,13 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is about to become a primary network validator",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 			)
 		}
 		if err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is about to become a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -264,7 +263,7 @@ func (vm *VM) newAddValidatorTx(
 	stakeAmt, // Amount the validator stakes
 	startTime, // Unix time they start validating
 	endTime uint64, // Unix time they stop validating
-	nodeID ids.ShortID, // ID of the node we want to validate with
+	nodeID ids.NodeID, // ID of the node we want to validate with
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens

@@ -15,21 +15,21 @@ const (
 )
 
 type req struct {
-	vdr ids.ShortID
+	vdr ids.NodeID
 	id  uint32
 }
 
 // Requests tracks pending container messages from a peer.
 type Requests struct {
-	reqsToID map[ids.ShortID]map[uint32]ids.ID
+	reqsToID map[ids.NodeID]map[uint32]ids.ID
 	idToReq  map[ids.ID]req
 }
 
 // Add a request. Assumes that requestIDs are unique. Assumes that containerIDs
 // are only in one request at a time.
-func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
+func (r *Requests) Add(vdr ids.NodeID, requestID uint32, containerID ids.ID) {
 	if r.reqsToID == nil {
-		r.reqsToID = make(map[ids.ShortID]map[uint32]ids.ID, minRequestsSize)
+		r.reqsToID = make(map[ids.NodeID]map[uint32]ids.ID, minRequestsSize)
 	}
 	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
@@ -50,7 +50,7 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 // Remove attempts to abandon a requestID sent to a validator. If the request is
 // currently outstanding, the requested ID will be returned along with true. If
 // the request isn't currently outstanding, false will be returned.
-func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
+func (r *Requests) Remove(vdr ids.NodeID, requestID uint32) (ids.ID, bool) {
 	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
 		return ids.ID{}, false

@@ -150,7 +150,7 @@ type ManagerConfig struct {
 	Net                         network.Network    // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	Validators                  validators.Manager // Validators validating on this chain
-	NodeID                      ids.ShortID        // The ID of this node
+	NodeID                      ids.NodeID         // The ID of this node
 	NetworkID                   uint32             // ID of the network this node is connected to
 	Server                      server.Server      // Handles HTTP API calls
 	Keystore                    keystore.Keystore
@@ -186,7 +186,7 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	StateSyncBeacons []ids.ShortID
+	StateSyncBeacons []ids.NodeID
 }
 
 type manager struct {
