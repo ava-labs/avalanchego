@@ -23,7 +23,6 @@ func (b *preForkBlock) Accept() error {
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
-
 	return b.acceptInnerBlk()
 }
 
