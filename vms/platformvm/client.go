@@ -231,13 +231,9 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 
 func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (string, error) {
 	res := &ExportKeyReply{}
-	addressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, address[:])
-	if err != nil {
-		return "", err
-	}
-	err = c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
+	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
-		Address:  addressStr,
+		Address:  address.String(),
 	}, res, options...)
 	return res.PrivateKey, err
 }
@@ -256,11 +252,11 @@ func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey st
 
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
-	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
-	if err != nil {
-		return nil, err
+	addrsStr := make([]string, len(addrs))
+	for i, addr := range addrs {
+		addrsStr[i] = addr.String()
 	}
-	err = c.requester.SendRequest(ctx, "getBalance", &GetBalanceRequest{
+	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceRequest{
 		Addresses: addrsStr,
 	}, res, options...)
 	return res, err
@@ -305,22 +301,17 @@ func (c *client) GetAtomicUTXOs(
 	options ...rpc.Option,
 ) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
-	addrsStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, addrs)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.Empty, err
+	addrsStr := make([]string, len(addrs))
+	for i, addr := range addrs {
+		addrsStr[i] = addr.String()
 	}
-	startAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, startAddress[:])
-	if err != nil {
-		return nil, ids.ShortID{}, ids.Empty, err
-	}
-	startUTXOIDStr := startUTXOID.String()
-	err = c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
+	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   addrsStr,
 		SourceChain: sourceChain,
 		Limit:       json.Uint32(limit),
 		StartIndex: api.Index{
-			Address: startAddressStr,
-			UTXO:    startUTXOIDStr,
+			Address: startAddress.String(),
+			UTXO:    startUTXOID.String(),
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
@@ -468,16 +459,12 @@ func (c *client) AddValidator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	rewardAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, rewardAddress[:])
-	if err != nil {
-		return ids.Empty, err
+	fromStr := make([]string, len(from))
+	for i, addr := range from {
+		fromStr[i] = addr.String()
 	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
-	err = c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
+	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:      user,
 			JSONFromAddrs: api.JSONFromAddrs{From: fromStr},
@@ -488,7 +475,7 @@ func (c *client) AddValidator(
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		RewardAddress:     rewardAddressStr,
+		RewardAddress:     rewardAddress.String(),
 		DelegationFeeRate: json.Float32(delegationFeeRate),
 	}, res, options...)
 	return res.TxID, err

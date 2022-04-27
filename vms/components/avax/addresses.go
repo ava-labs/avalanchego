@@ -107,3 +107,26 @@ func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, err
 	}
 	return addrs, nil
 }
+
+func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) {
+    addr, err := ids.ShortFromString(addrStr)
+    if err != nil {
+		addr, err = a.ParseLocalAddress(addrStr)
+		if err != nil {
+			return ids.ShortEmpty, fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
+		}
+    }
+    return addr, nil
+}
+
+func ParseServiceAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
+	addrs := make(ids.ShortSet, len(addrStrs))
+	for _, addrStr := range addrStrs {
+		addr, err := ParseServiceAddress(a, addrStr)
+		if err != nil {
+			return nil, err
+		}
+		addrs.Add(addr)
+	}
+	return addrs, nil
+}

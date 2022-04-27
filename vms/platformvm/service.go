@@ -104,7 +104,7 @@ type ExportKeyReply struct {
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Debug("Platform: ExportKey called")
 
-	address, err := service.vm.ParseLocalAddress(args.Address)
+	address, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
 	}
@@ -201,14 +201,10 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 
 	service.vm.ctx.Log.Debug("Platform: GetBalance called for addresses %v", args.Addresses)
 
-	addrs := ids.ShortSet{}
-	for _, addrStr := range args.Addresses {
-		// Parse to address
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse argument %q to address: %w", addrStr, err)
-		}
-		addrs.Add(addr)
+	// Parse to address
+	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	if err != nil {
+		return err
 	}
 
 	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
@@ -399,20 +395,16 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		sourceChain = chainID
 	}
 
-	addrSet := ids.ShortSet{}
-	for _, addrStr := range args.Addresses {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
-		}
-		addrSet.Add(addr)
+	addrSet, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	if err != nil {
+		return err
 	}
 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
 		var err error
-		startAddr, err = service.vm.ParseLocalAddress(args.StartIndex.Address)
+		startAddr, err = avax.ParseServiceAddress(service.vm, args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
@@ -426,7 +418,6 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
-		err       error
 	)
 	limit := int(args.Limit)
 	if limit <= 0 || maxPageSize < limit {
@@ -1021,13 +1012,13 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseLocalAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
 	if err != nil {
 		return err
 	}
 
 	// Parse the reward address
-	rewardAddress, err := service.vm.ParseLocalAddress(args.RewardAddress)
+	rewardAddress, err := avax.ParseServiceAddress(service.vm, args.RewardAddress)
 	if err != nil {
 		return fmt.Errorf("problem while parsing reward address: %w", err)
 	}
