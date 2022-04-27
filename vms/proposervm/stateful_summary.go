@@ -8,18 +8,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
-var _ block.Summary = &statefulSummary{}
+var _ block.Summary = &postForkStatefulSummary{}
 
-// statefulSummary implements block.Summary by layering three objects:
+// postForkStatefulSummary implements block.Summary by layering three objects:
 // 1- summary.StatelessSummary carries all summary marshallable content along with
 // data immediately retrievable from it.
 // 2- summary.ProposerSummary adds to summary.StatelessSummary height, as retrieved
 // by innerSummary
-// 3- statefulSummary add to summary.ProposerSummary the implementation
+// 3- postForkStatefulSummary add to summary.ProposerSummary the implementation
 // of block.Summary.Accept, to handle processing of the validated summary.
 // Note that summary.StatelessSummary contains data to build both innerVM summary
 // and the full proposerVM block associated with the summary.
-type statefulSummary struct {
+type postForkStatefulSummary struct {
 	summary.ProposerSummary
 
 	// inner summary, retrieved via Parse
@@ -27,11 +27,9 @@ type statefulSummary struct {
 
 	// block associated with the summary
 	proposerBlock Block
-
-	vm *VM
 }
 
-func (ss *statefulSummary) Accept() (bool, error) {
+func (ss *postForkStatefulSummary) Accept() (bool, error) {
 	// a statefulSummary carries the full proposerVM block associated
 	// with the summary. We store this block and update height index with it,
 	// so that state sync could resume after a shutdown.

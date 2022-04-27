@@ -60,7 +60,8 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 
 	statelessSummary, err := summary.Parse(summaryBytes)
 	if err != nil {
-		return nil, err
+		// it may be a preFork summary
+		return vm.innerStateSyncVM.ParseStateSummary(summaryBytes)
 	}
 
 	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerSummaryBytes())
@@ -73,11 +74,10 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 	}
 
 	proposerSummary := summary.NewProposerSummary(statelessSummary, innerSummary.Height())
-	return &statefulSummary{
+	return &postForkStatefulSummary{
 		ProposerSummary: proposerSummary,
 		innerSummary:    innerSummary,
 		proposerBlock:   block,
-		vm:              vm,
 	}, nil
 }
 
@@ -94,7 +94,16 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	return vm.buildStateSummary(innerSummary)
 }
 
-func (vm *VM) buildStateSummary(innerSummary block.Summary) (*statefulSummary, error) {
+func (vm *VM) buildStateSummary(innerSummary block.Summary) (block.Summary, error) {
+	forkHeight, err := vm.GetForkHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	if innerSummary.Height() < forkHeight {
+		return innerSummary, nil
+	}
+
 	// retrieve ProBlk
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
@@ -108,9 +117,8 @@ func (vm *VM) buildStateSummary(innerSummary block.Summary) (*statefulSummary, e
 	}
 
 	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
-	return &statefulSummary{
+	return &postForkStatefulSummary{
 		ProposerSummary: proSummary,
 		innerSummary:    innerSummary,
-		vm:              vm,
 	}, err
 }
