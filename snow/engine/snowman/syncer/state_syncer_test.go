@@ -9,15 +9,73 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
+	assert := assert.New(t)
+
+	// Build state syncer
+	sender := &common.SenderTest{T: t}
+	commonCfg := &common.Config{
+		Ctx:    snow.DefaultConsensusContextTest(),
+		Sender: sender,
+	}
+
+	// Non state syncableVM case
+	nonStateSyncableVM := &block.TestVM{
+		TestVM: common.TestVM{T: t},
+	}
+	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
+	assert.NoError(err)
+
+	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
+	assert.NoError(err)
+	syncer := New(cfg, func(lastReqID uint32) error { return nil })
+
+	enabled, err := syncer.IsEnabled()
+	assert.NoError(err)
+	assert.False(enabled)
+
+	// State syncableVM case
+	commonCfg.Ctx = snow.DefaultConsensusContextTest() // reset metrics
+
+	fullVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{T: t},
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
+			T: t,
+		},
+	}
+	dummyGetter, err = getter.New(fullVM, *commonCfg)
+	assert.NoError(err)
+
+	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
+	assert.NoError(err)
+	syncer = New(cfg, func(lastReqID uint32) error { return nil })
+
+	// test: VM does not support state syncing
+	fullVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
+	enabled, err = syncer.IsEnabled()
+	assert.NoError(err)
+	assert.False(enabled)
+
+	// test: VM does support state syncing
+	fullVM.StateSyncEnabledF = func() (bool, error) { return true, nil }
+	enabled, err = syncer.IsEnabled()
+	assert.NoError(err)
+	assert.True(enabled)
+}
 
 func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert := assert.New(t)
@@ -38,9 +96,10 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	sender.CantSendGetStateSummaryFrontier = true
 	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, u uint32) {}
+	startReqID := uint32(0)
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
-	startReqID := uint32(0)
+	assert.False(commonCfg.WeightTracker.EnoughConnectedWeight())
 	assert.NoError(syncer.Start(startReqID))
 	assert.False(syncer.started)
 
@@ -49,6 +108,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.NoError(vdrs.AddWeight(vdr0, startupAlpha/2))
 	assert.NoError(syncer.Connected(vdr0, version.CurrentApp))
 
+	assert.False(commonCfg.WeightTracker.EnoughConnectedWeight())
 	assert.NoError(syncer.Start(startReqID))
 	assert.False(syncer.started)
 
@@ -57,11 +117,12 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.NoError(vdrs.AddWeight(vdr, startupAlpha))
 	assert.NoError(syncer.Connected(vdr, version.CurrentApp))
 
+	assert.True(commonCfg.WeightTracker.EnoughConnectedWeight())
 	assert.NoError(syncer.Start(startReqID))
 	assert.True(syncer.started)
 }
 
-func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
+func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) {
 	assert := assert.New(t)
 
 	vdrs := buildTestPeers(t)
@@ -75,17 +136,55 @@ func TestStateSyncIsSkippedIfNoBeaconIsProvided(t *testing.T) {
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
-	// set VM to check for StateSync call
-	fullVM.CantSetSyncableStateSummaries = true
-
-	// check that StateSync is called immediately with no frontiers
-	fullVM.SetSyncableStateSummariesF = func(s []common.Summary) error {
-		assert.True(len(s) == 0)
-		return nil
+	// mock VM to simulate a valid summary is returned
+	localSummary := &block.TestSummary{
+		HeightV: 2000,
+		IDV:     summaryID,
+		BytesV:  summaryBytes,
+	}
+	fullVM.CantStateSyncGetOngoingSummary = true
+	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
+		return localSummary, nil
 	}
 
-	// Start syncer without errors
-	assert.NoError(syncer.Start(uint32(0) /*startReqID*/))
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+
+	assert.True(syncer.locallyAvailableSummary == localSummary)
+	ws, ok := syncer.weightedSummaries[summaryID]
+	assert.True(ok)
+	assert.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
+}
+
+func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T) {
+	assert := assert.New(t)
+
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
+	commonCfg := common.Config{
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+	}
+	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
+
+	// mock VM to simulate a no summary returned
+	fullVM.CantStateSyncGetOngoingSummary = true
+	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
+		return nil, database.ErrNotFound
+	}
+
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+
+	assert.Nil(syncer.locallyAvailableSummary)
+	assert.Empty(syncer.weightedSummaries)
 }
 
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
@@ -159,11 +258,11 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
 		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -202,7 +301,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// valid summary is recorded
 	ws, ok := syncer.weightedSummaries[summaryID]
 	assert.True(ok)
-	assert.True(bytes.Equal(ws.Summary.Bytes(), summaryBytes))
+	assert.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
 
 	// other listed vdrs are reached for data
 	assert.True(
@@ -246,7 +345,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	isSummaryDecoded := false
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
 		isSummaryDecoded = true
 		return nil, fmt.Errorf("invalid state summary")
 	}
@@ -313,7 +412,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
 		assert.True(len(summaryBytes) == 0)
 		return nil, fmt.Errorf("empty summary")
 	}
@@ -335,13 +434,12 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 			len(contactedFrontiersProviders) == vdrs.Len())
 
 	// mock VM to simulate a valid but late summary is returned
-
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
 		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -381,12 +479,12 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(b []byte) (block.Summary, error) {
 		assert.True(bytes.Equal(b, summaryBytes))
 		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -449,11 +547,11 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
 		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -561,11 +659,11 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
 		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
+			HeightV: key,
+			IDV:     summaryID,
+			BytesV:  summaryBytes,
 		}, nil
 	}
 
@@ -658,21 +756,26 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
+	summary := &block.TestSummary{
+		HeightV: key,
+		IDV:     summaryID,
+		BytesV:  summaryBytes,
+		T:       t,
+	}
+	minoritySummary := &block.TestSummary{
+		HeightV: minorityKey,
+		IDV:     minoritySummaryID,
+		BytesV:  minoritySummaryBytes,
+		T:       t,
+	}
+
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (common.Summary, error) {
+	fullVM.ParseStateSummaryF = func(b []byte) (block.Summary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
-			return &block.TestSummary{
-				SummaryKey:   key,
-				SummaryID:    summaryID,
-				ContentBytes: summaryBytes,
-			}, nil
+			return summary, nil
 		case bytes.Equal(b, minoritySummaryBytes):
-			return &block.TestSummary{
-				SummaryKey:   minorityKey,
-				SummaryID:    minoritySummaryID,
-				ContentBytes: minoritySummaryBytes,
-			}, nil
+			return minoritySummary, nil
 		default:
 			return nil, fmt.Errorf("unknown state summary")
 		}
@@ -718,13 +821,15 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
-	isVMStateSyncCalled := false
-	fullVM.CantSetSyncableStateSummaries = true
-	fullVM.SetSyncableStateSummariesF = func(summaries []common.Summary) error {
-		isVMStateSyncCalled = true
-		assert.True(len(summaries) == 1)
-		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
-		return nil
+	majoritySummaryCalled := false
+	minoritySummaryCalled := false
+	summary.AcceptF = func() (bool, error) {
+		majoritySummaryCalled = true
+		return true, nil
+	}
+	minoritySummary.AcceptF = func() (bool, error) {
+		minoritySummaryCalled = true
+		return true, nil
 	}
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
@@ -762,7 +867,8 @@ func TestSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// check that finally summary is passed to VM
-	assert.True(isVMStateSyncCalled)
+	assert.True(majoritySummaryCalled)
+	assert.False(minoritySummaryCalled)
 }
 
 func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
@@ -791,13 +897,15 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
+	minoritySummary := &block.TestSummary{
+		HeightV: minorityKey,
+		IDV:     minoritySummaryID,
+		BytesV:  minoritySummaryBytes,
+		T:       t,
+	}
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (common.Summary, error) {
-		return &block.TestSummary{
-			SummaryKey:   key,
-			SummaryID:    summaryID,
-			ContentBytes: summaryBytes,
-		}, nil
+	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.Summary, error) {
+		return minoritySummary, nil
 	}
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
@@ -828,13 +936,10 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 	assert.False(syncer.contactedSeeders.Len() != 0)
 
-	isVMStateSyncCalled := false
-	fullVM.CantSetSyncableStateSummaries = true
-	fullVM.SetSyncableStateSummariesF = func(summaries []common.Summary) error {
-		isVMStateSyncCalled = true
-		assert.True(len(summaries) == 1)
-		assert.True(bytes.Equal(summaries[0].Bytes(), summaryBytes))
-		return nil
+	minoritySummaryCalled := false
+	minoritySummary.AcceptF = func() (bool, error) {
+		minoritySummaryCalled = true
+		return true, nil
 	}
 
 	// Let a majority of voters timeout.
@@ -862,9 +967,37 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	}
 
 	// No state summary is passed to VM
-	assert.False(isVMStateSyncCalled)
+	assert.False(minoritySummaryCalled)
 
 	// instead the whole process is restared
 	assert.False(syncer.contactedVoters.Len() != 0) // no voters reached
 	assert.True(syncer.contactedSeeders.Len() != 0) // frontiers providers reached again
+}
+
+func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
+	assert := assert.New(t)
+
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
+	commonCfg := common.Config{
+		Ctx:                         snow.DefaultConsensusContextTest(),
+		Beacons:                     vdrs,
+		SampleK:                     vdrs.Len(),
+		Alpha:                       (vdrs.Weight() + 1) / 2,
+		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
+		RetryBootstrap:              true, // this sets RetryStateSyncing too
+		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
+	}
+	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
+	_ = fullVM
+
+	stateSyncFullyDone := false
+	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+		stateSyncFullyDone = true
+		return nil
+	}
+
+	// Any Put response before StateSyncDone is received from VM is dropped
+	assert.NoError(syncer.Notify(common.StateSyncDone))
+	assert.True(stateSyncFullyDone)
 }

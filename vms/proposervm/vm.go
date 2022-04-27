@@ -50,7 +50,7 @@ type VM struct {
 	block.ChainVM
 	activationTime      time.Time
 	minimumPChainHeight uint64
-	coreStateSyncVM     block.StateSyncableVM
+	innerStateSyncVM    block.StateSyncableVM
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -81,6 +81,7 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
+	state              snow.State
 }
 
 func New(
@@ -93,7 +94,7 @@ func New(
 		ChainVM:             vm,
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
-		coreStateSyncVM:     ssVM,
+		innerStateSyncVM:    ssVM,
 	}
 }
 
@@ -165,7 +166,21 @@ func (vm *VM) Shutdown() error {
 
 func (vm *VM) SetState(state snow.State) error {
 	vm.bootstrapped = (state == snow.NormalOp)
-	return vm.ChainVM.SetState(state)
+	if err := vm.ChainVM.SetState(state); err != nil {
+		return err
+	}
+
+	if vm.state == snow.StateSyncing && state == snow.Bootstrapping {
+		// when going from StateSyncing to Bootstrapping, if state sync
+		// has failed or was skipped, repairAcceptedChainByHeight rolls
+		// back the chain to the previously last accepted block. If
+		// state sync has completed successfully, this call is a no-op.
+		if err := vm.repairAcceptedChainByHeight(); err != nil {
+			return err
+		}
+	}
+	vm.state = state
+	return nil
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -177,11 +192,15 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	return preferredBlock.buildChild()
 }
 
-func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+func (vm *VM) parseBlock(b []byte) (Block, error) {
 	if blk, err := vm.parsePostForkBlock(b); err == nil {
 		return blk, nil
 	}
 	return vm.parsePreForkBlock(b)
+}
+
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+	return vm.parseBlock(b)
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {

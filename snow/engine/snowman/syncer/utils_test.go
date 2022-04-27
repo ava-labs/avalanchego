@@ -6,6 +6,7 @@ package syncer
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -28,6 +29,7 @@ var (
 	minoritySummaryBytes []byte
 
 	unknownSummaryID ids.ID
+	emptySummary     *block.TestSummary
 )
 
 type fullVM struct {
@@ -53,10 +55,13 @@ func init() {
 	}
 
 	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+
+	emptySummary = &block.TestSummary{}
 }
 
-// helper to build
 func buildTestPeers(t *testing.T) validators.Set {
+	// we consider more than maxOutstandingStateSyncRequests peers
+	// so to test the effect of cap on number of requests sent out
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
@@ -79,7 +84,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 			TestVM: common.TestVM{T: t},
 		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
-			TestStateSyncableVM: common.TestStateSyncableVM{T: t},
+			T: t,
 		},
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
@@ -92,8 +97,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	assert.True(t, ok)
 	assert.True(t, syncer.stateSyncVM != nil)
 
-	fullVM.GetOngoingStateSyncSummaryF = func() (common.Summary, error) {
-		return nil, common.ErrNoStateSyncOngoing
+	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
+		return nil, database.ErrNotFound
 	}
 
 	return syncer, fullVM, sender

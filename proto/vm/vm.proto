@@ -37,13 +37,11 @@ service VM {
 
   // State sync
   rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
-  rpc GetOngoingStateSyncSummary(google.protobuf.Empty) returns (GetOngoingStateSyncSummaryResponse);
+  rpc GetOngoingSyncStateSummary(google.protobuf.Empty) returns (GetOngoingSyncStateSummaryResponse);
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
-  rpc SetSyncableStateSummaries(SetSyncableStateSummariesRequest) returns (SetSyncableStateSummariesResponse);
-  rpc GetStateSyncResult(google.protobuf.Empty) returns (GetStateSyncResultResponse);
-  rpc SetLastStateSummaryBlock(SetLastStateSummaryBlockRequest) returns (SetLastStateSummaryBlockResponse);
+  rpc SummaryAccept(SummaryAcceptRequest) returns (SummaryAcceptResponse);
 }
 
 message InitializeRequest {
@@ -265,12 +263,12 @@ message StateSyncEnabledResponse {
 }
 
 message StateSyncSummary {
-  uint64 key = 1;
+  uint64 height = 1;
   bytes id = 2;
   bytes content = 3;
 }
 
-message GetOngoingStateSyncSummaryResponse {
+message GetOngoingSyncStateSummaryResponse {
   StateSyncSummary summary = 1;
   uint32 err = 2;
 }
@@ -290,7 +288,7 @@ message ParseStateSummaryResponse {
 }
 
 message GetStateSummaryRequest {
-  uint64 key = 1;
+  uint64 height = 1;
 }
 
 message GetStateSummaryResponse {
@@ -298,27 +296,13 @@ message GetStateSummaryResponse {
   uint32 err = 2;
 }
 
-message SetSyncableStateSummariesRequest {
-  repeated StateSyncSummary summaries = 1;
+message SummaryAcceptRequest {
+  bytes bytes = 1;
+}
+
+message SummaryAcceptResponse {
+  bool accepted = 1;
   uint32 err = 2;
-}
-
-message SetSyncableStateSummariesResponse {
-  uint32 err = 1;
-}
-
-message GetStateSyncResultResponse {
-  bytes bytes = 1;
-  uint64 height = 2;
-  uint32 err = 3;
-}
-
-message SetLastStateSummaryBlockRequest {
-  bytes bytes = 1;
-}
-
-message SetLastStateSummaryBlockResponse {
-  uint32 err = 1;
 }
 // end of StateSyncableVM related messages
 

@@ -5,54 +5,79 @@ package block
 
 import (
 	"errors"
-
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"testing"
 )
 
 var (
-	_ common.Summary  = &TestSummary{}
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
-	errGetStateSyncResult       = errors.New("unexpectedly called GetStateSyncResult")
-	errSetLastStateSummaryBlock = errors.New("unexpectedly called SetLastStateSummaryBlock")
+	errStateSyncEnabled           = errors.New("unexpectedly called StateSyncEnabled")
+	errGetLastStateSummary        = errors.New("unexpectedly called GetLastStateSummary")
+	errParseStateSummary          = errors.New("unexpectedly called ParseStateSummary")
+	errGetStateSummary            = errors.New("unexpectedly called GetStateSummary")
+	errStateSyncGetOngoingSummary = errors.New("unexpectedly called StateSyncGetOngoingSummary")
 )
 
-type TestSummary struct {
-	SummaryKey   uint64
-	SummaryID    ids.ID
-	ContentBytes []byte
-}
-
-func (s *TestSummary) Bytes() []byte { return s.ContentBytes }
-func (s *TestSummary) Key() uint64   { return s.SummaryKey }
-func (s *TestSummary) ID() ids.ID    { return s.SummaryID }
-
 type TestStateSyncableVM struct {
-	common.TestStateSyncableVM
+	T *testing.T
 
-	CantGetStateSyncResult, CantSetLastStateSummaryBlock bool
+	CantStateSyncEnabled, CantStateSyncGetOngoingSummary,
+	CantGetLastStateSummary, CantParseStateSummary,
+	CantGetStateSummary bool
 
-	GetStateSyncResultF       func() (ids.ID, uint64, error)
-	SetLastStateSummaryBlockF func(blkBytes []byte) error
+	StateSyncEnabledF           func() (bool, error)
+	GetOngoingSyncStateSummaryF func() (Summary, error)
+	GetLastStateSummaryF        func() (Summary, error)
+	ParseStateSummaryF          func(summaryBytes []byte) (Summary, error)
+	GetStateSummaryF            func(uint64) (Summary, error)
 }
 
-func (tss *TestStateSyncableVM) GetStateSyncResult() (ids.ID, uint64, error) {
-	if tss.GetStateSyncResultF != nil {
-		return tss.GetStateSyncResultF()
+func (tss *TestStateSyncableVM) StateSyncEnabled() (bool, error) {
+	if tss.StateSyncEnabledF != nil {
+		return tss.StateSyncEnabledF()
 	}
-	if tss.CantGetStateSyncResult && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called GetStateSyncResult")
+	if tss.CantStateSyncEnabled && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called StateSyncEnabled")
 	}
-	return ids.Empty, 0, errGetStateSyncResult
+	return false, errStateSyncEnabled
 }
 
-func (tss *TestStateSyncableVM) SetLastStateSummaryBlock(blkBytes []byte) error {
-	if tss.SetLastStateSummaryBlockF != nil {
-		return tss.SetLastStateSummaryBlockF(blkBytes)
+func (tss *TestStateSyncableVM) GetOngoingSyncStateSummary() (Summary, error) {
+	if tss.GetOngoingSyncStateSummaryF != nil {
+		return tss.GetOngoingSyncStateSummaryF()
 	}
-	if tss.CantSetLastStateSummaryBlock && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called SetLastStateSummaryBlock")
+	if tss.CantStateSyncGetOngoingSummary && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called StateSyncGetOngoingSummary")
 	}
-	return errSetLastStateSummaryBlock
+	return nil, errStateSyncGetOngoingSummary
+}
+
+func (tss *TestStateSyncableVM) GetLastStateSummary() (Summary, error) {
+	if tss.GetLastStateSummaryF != nil {
+		return tss.GetLastStateSummaryF()
+	}
+	if tss.CantGetLastStateSummary && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called GetLastStateSummary")
+	}
+	return nil, errGetLastStateSummary
+}
+
+func (tss *TestStateSyncableVM) ParseStateSummary(summaryBytes []byte) (Summary, error) {
+	if tss.ParseStateSummaryF != nil {
+		return tss.ParseStateSummaryF(summaryBytes)
+	}
+	if tss.CantParseStateSummary && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called ParseStateSummary")
+	}
+	return nil, errParseStateSummary
+}
+
+func (tss *TestStateSyncableVM) GetStateSummary(key uint64) (Summary, error) {
+	if tss.GetStateSummaryF != nil {
+		return tss.GetStateSummaryF(key)
+	}
+	if tss.CantGetStateSummary && tss.T != nil {
+		tss.T.Fatalf("Unexpectedly called GetStateSummary")
+	}
+	return nil, errGetStateSummary
 }
