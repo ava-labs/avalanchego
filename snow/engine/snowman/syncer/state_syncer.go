@@ -53,7 +53,7 @@ type stateSyncer struct {
 	stateSyncVM        block.StateSyncableVM
 	onDoneStateSyncing func(lastReqID uint32) error
 
-	// we track the (possibly empty) local summary to help engine
+	// we track the (possibly nil) local summary to help engine
 	// choosing among multiple validated summaries
 	locallyAvailableSummary block.Summary
 
