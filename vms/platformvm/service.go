@@ -1347,19 +1347,17 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 		return errNoAmount
 	}
 
-	// Get the chainID
-	chainID, _, err := service.vm.ParseAddress(args.To)
+	// Get the chainID and parse the to address
+	chainID, to, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		chainID, err = service.vm.ctx.BCLookup.Lookup(args.TargetChain)
 		if err != nil {
 			return err
 		}
-	}
-
-	// Parse the to address
-	to, err := avax.ParseServiceAddress(service.vm, args.To)
-	if err != nil {
-		return err
+		to, err = ids.ShortFromString(args.To)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Parse the from addresses
