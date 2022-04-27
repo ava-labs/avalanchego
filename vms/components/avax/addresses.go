@@ -109,11 +109,12 @@ func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, err
 }
 
 func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) {
-	addr, err := ids.ShortFromString(addrStr)
-	if err != nil {
-		addr, err = a.ParseLocalAddress(addrStr)
+	addr, localAddrErr := a.ParseLocalAddress(addrStr)
+	if localAddrErr != nil {
+		var err error
+		addr, err = ids.ShortFromString(addrStr)
 		if err != nil {
-			return ids.ShortEmpty, fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
+			return ids.ShortEmpty, fmt.Errorf("couldn't parse address %q: %w", addrStr, localAddrErr)
 		}
 	}
 	return addr, nil
