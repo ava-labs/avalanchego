@@ -6,7 +6,6 @@ package proposervm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -37,15 +36,13 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with innerVM
-		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
-		return nil, database.ErrNotFound
+		// this is an unexpected error that means proVM is out of sync with innerVM
+		return nil, err
 	}
 	proBlk, err := vm.getBlock(proBlkID)
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with innerVM
-		vm.ctx.Log.Warn("could not find block associated with inner summary: %s", err)
-		return nil, database.ErrNotFound
+		// this is an unexpected error that means proVM is out of sync with innerVM
+		return nil, err
 	}
 	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
 
@@ -71,15 +68,13 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 	// retrieve ProBlk
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, since that would mean proVM has become out of sync with innerVM
-		vm.ctx.Log.Warn("inner summary unknown to proposer VM. Block height index missing: %s", err)
-		return nil, database.ErrNotFound
+		// this is an unexpected error that means proVM is out of sync with innerVM
+		return nil, err
 	}
 	proBlk, err := vm.GetBlock(proBlkID)
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with innerVM
-		vm.ctx.Log.Warn("could not find block associated with inner summary: %s", err)
-		return nil, database.ErrNotFound
+		// this is an unexpected error that means proVM is out of sync with innerVM
+		return nil, err
 	}
 
 	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
@@ -133,15 +128,13 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	// retrieve ProBlk
 	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
-		// this should never happen, since that would mean proVM has become out of sync with innerVM
-		vm.ctx.Log.Warn("Block height index missing at height %d: %s", innerSummary.Height(), err)
-		return nil, database.ErrNotFound
+		// this is an unexpected error that means proVM is out of sync with innerVM
+		return nil, err
 	}
 	proBlk, err := vm.GetBlock(proBlkID)
 	if err != nil {
-		// this should never happen, it's proVM being out of sync with innerVM
-		vm.ctx.Log.Warn("could not find block associated with inner summary: %s", err)
-		return nil, database.ErrNotFound
+		// this is an unexpected error that means proVM is out of sync with innerVM
+		return nil, err
 	}
 
 	proSummary, err := summary.BuildProposerSummary(proBlk.Bytes(), innerSummary)
