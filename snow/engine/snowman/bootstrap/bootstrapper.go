@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -32,10 +33,12 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 	b := &bootstrapper{
 		Config: config,
 
-		PutHandler:   common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler: common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler: common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:   common.NewNoOpAppHandler(config.Ctx.Log),
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -70,6 +73,10 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 
 	config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
+
+	// initialize set of validators to fetch containers from using [Config.Beacons]
+	b.setFetchFrom(b.Config.Beacons)
+
 	return b, nil
 }
 
@@ -77,6 +84,8 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
@@ -105,14 +114,24 @@ type bootstrapper struct {
 	parser *parser
 
 	awaitingTimeout bool
+
+	// set of validators to fetch containers from
+	// initialized to config.Beacons, vdrs responding
+	// with empty GetAncestors messages are removed
+	// from this set so we avoid contacting them again
+	fetchFrom ids.NodeIDSet
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]
-func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
+func (b *bootstrapper) Ancestors(vdr ids.NodeID, requestID uint32, blks [][]byte) error {
 	lenBlks := len(blks)
 	if lenBlks == 0 {
 		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
+		// avoid contacting [vdr] about ancestors again
+		if err := b.markUnavailable(vdr); err != nil {
+			return err
+		}
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
 	if lenBlks > b.Config.AncestorsMaxContainersReceived {
@@ -153,7 +172,7 @@ func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byt
 	return b.process(requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
@@ -164,7 +183,7 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(blkID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -181,7 +200,7 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 	return nil
 }
 
-func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
+func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
 	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
 	}
@@ -294,15 +313,26 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 		return b.checkFinish()
 	}
 
-	validators, err := b.Config.Beacons.Sample(1) // validator to send request to
-	if err != nil {
+	validatorID, ok := b.fetchFrom.Peek()
+	if !ok {
 		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
 	}
-	validatorID := validators[0].ID()
 	b.Config.SharedCfg.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
 	b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
+	return nil
+}
+
+// markUnavailable removes [vdr] from the set of validators used to fetch ancestors.
+// if the set becomes empty, it is reset to [b.Config.Beacons] so bootstrapping can continue.
+func (b *bootstrapper) markUnavailable(vdr ids.NodeID) error {
+	b.fetchFrom.Remove(vdr)
+
+	// if [fetchFrom] has become empty, reset it to [b.Config.Beacons]
+	if b.fetchFrom.Len() == 0 {
+		b.setFetchFrom(b.Config.Beacons)
+	}
 	return nil
 }
 
@@ -473,4 +503,12 @@ func (b *bootstrapper) finish() error {
 
 	// Start consensus
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
+}
+
+// setFetchFrom populates fetchFrom using [beacons]
+func (b *bootstrapper) setFetchFrom(beacons validators.Set) {
+	b.fetchFrom = ids.NewNodeIDSet(beacons.Len())
+	for _, vdr := range beacons.List() {
+		b.fetchFrom.Add(vdr.ID())
+	}
 }

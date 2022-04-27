@@ -36,7 +36,7 @@ type rawTestPeer struct {
 	config         *Config
 	conn           net.Conn
 	cert           *x509.Certificate
-	nodeID         ids.ShortID
+	nodeID         ids.NodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 
@@ -64,8 +64,8 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	tlsCert1, err := staking.NewTLSCert()
 	assert.NoError(err)
 
-	nodeID0 := CertToID(tlsCert0.Leaf)
-	nodeID1 := CertToID(tlsCert1.Leaf)
+	nodeID0 := ids.NodeIDFromCert(tlsCert0.Leaf)
+	nodeID1 := ids.NodeIDFromCert(tlsCert1.Leaf)
 
 	mc := newMessageCreator(t)
 
@@ -83,7 +83,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		OutboundMsgThrottler: throttling.NewNoOutboundThrottler(),
 		VersionCompatibility: version.GetCompatibility(constants.LocalID),
-		VersionParser:        version.NewDefaultApplicationParser(),
+		VersionParser:        version.DefaultApplicationParser,
 		MySubnets:            ids.Set{},
 		Beacons:              validators.NewSet(),
 		NetworkID:            constants.LocalID,

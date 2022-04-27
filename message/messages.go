@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -25,7 +24,7 @@ type InboundMessage interface {
 	BytesSavedCompression() int
 	Op() Op
 	Get(Field) interface{}
-	NodeID() ids.ShortID
+	NodeID() ids.NodeID
 	ExpirationTime() time.Time
 	OnFinishedHandling()
 }
@@ -34,7 +33,7 @@ type inboundMessage struct {
 	op                    Op
 	bytesSavedCompression int
 	fields                map[Field]interface{}
-	nodeID                ids.ShortID
+	nodeID                ids.NodeID
 	expirationTime        time.Time
 	onFinishedHandling    func()
 }
@@ -52,7 +51,7 @@ func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSav
 func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[field] }
 
 // NodeID returns the node that the msg was sent by.
-func (inMsg *inboundMessage) NodeID() ids.ShortID { return inMsg.nodeID }
+func (inMsg *inboundMessage) NodeID() ids.NodeID { return inMsg.nodeID }
 
 // ExpirationTime returns the time this message doesn't need to be responded to.
 // A zero time means message does not expire.
@@ -68,7 +67,7 @@ func (inMsg *inboundMessage) OnFinishedHandling() {
 
 func (inMsg *inboundMessage) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s%s", inMsg.op, constants.NodeIDPrefix, inMsg.nodeID))
+	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s", inMsg.op, inMsg.nodeID))
 	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
 		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
 	}

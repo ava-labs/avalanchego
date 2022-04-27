@@ -18,9 +18,9 @@ var _ TimeTracker = &cpuTracker{}
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
-	StartCPU(ids.ShortID, time.Time)
-	StopCPU(ids.ShortID, time.Time)
-	Utilization(ids.ShortID, time.Time) float64
+	StartCPU(ids.NodeID, time.Time)
+	StopCPU(ids.NodeID, time.Time)
+	Utilization(ids.NodeID, time.Time) float64
 	CumulativeUtilization(time.Time) float64
 	Len() int
 }
@@ -50,7 +50,7 @@ func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
 // getMeter returns the meter used to measure CPU time spent processing
 // messages from [vdr]
 // assumes the lock is held
-func (ct *cpuTracker) getMeter(vdr ids.ShortID) uptime.Meter {
+func (ct *cpuTracker) getMeter(vdr ids.NodeID) uptime.Meter {
 	meter, exists := ct.cpuSpenders.Get(vdr)
 	if exists {
 		return meter.(uptime.Meter)
@@ -63,7 +63,7 @@ func (ct *cpuTracker) getMeter(vdr ids.ShortID) uptime.Meter {
 
 // UtilizeTime registers the use of CPU time by [vdr] from [startTime]
 // to [endTime]
-func (ct *cpuTracker) StartCPU(vdr ids.ShortID, startTime time.Time) {
+func (ct *cpuTracker) StartCPU(vdr ids.NodeID, startTime time.Time) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
@@ -74,7 +74,7 @@ func (ct *cpuTracker) StartCPU(vdr ids.ShortID, startTime time.Time) {
 
 // UtilizeTime registers the use of CPU time by [vdr] from [startTime]
 // to [endTime]
-func (ct *cpuTracker) StopCPU(vdr ids.ShortID, endTime time.Time) {
+func (ct *cpuTracker) StopCPU(vdr ids.NodeID, endTime time.Time) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
@@ -84,7 +84,7 @@ func (ct *cpuTracker) StopCPU(vdr ids.ShortID, endTime time.Time) {
 }
 
 // Utilization returns the current EWMA of CPU utilization for [vdr]
-func (ct *cpuTracker) Utilization(vdr ids.ShortID, currentTime time.Time) float64 {
+func (ct *cpuTracker) Utilization(vdr ids.NodeID, currentTime time.Time) float64 {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 

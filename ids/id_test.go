@@ -5,6 +5,7 @@ package ids
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -206,5 +207,31 @@ func TestIsSortedAndUnique(t *testing.T) {
 	}
 	if !IsSortedAndUniqueIDs(sorted) {
 		t.Fatal("Wrongly rejected sorted, unique IDs")
+	}
+}
+
+func TestIDMapMarshalling(t *testing.T) {
+	originalMap := map[ID]int{
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
+	}
+	mapJSON, err := json.Marshal(originalMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unmarshalledMap map[ID]int
+	err = json.Unmarshal(mapJSON, &unmarshalledMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(originalMap) != len(unmarshalledMap) {
+		t.Fatalf("wrong map lengths")
+	}
+	for originalID, num := range originalMap {
+		if unmarshalledMap[originalID] != num {
+			t.Fatalf("map was incorrectly Unmarshalled")
+		}
 	}
 }

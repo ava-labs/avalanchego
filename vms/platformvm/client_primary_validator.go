@@ -23,7 +23,7 @@ type ClientStaker struct {
 	EndTime     uint64
 	Weight      *uint64
 	StakeAmount *uint64
-	NodeID      ids.ShortID
+	NodeID      ids.NodeID
 }
 
 // ClientOwner is the repr. of a reward owner sent over client
@@ -67,10 +67,7 @@ func APIStakerToClientStaker(validator APIStaker) (ClientStaker, error) {
 		v := uint64(*validator.StakeAmount)
 		clientStaker.StakeAmount = &v
 	}
-	clientStaker.NodeID, err = ids.ShortFromPrefixedString(validator.NodeID, constants.NodeIDPrefix)
-	if err != nil {
-		return ClientStaker{}, err
-	}
+	clientStaker.NodeID = validator.NodeID
 	return clientStaker, nil
 }
 

@@ -106,13 +106,18 @@ type Manager interface {
 
 // ChainParameters defines the chain being created
 type ChainParameters struct {
-	ID          ids.ID   // The ID of the chain being created
-	SubnetID    ids.ID   // ID of the subnet that validates this chain
-	GenesisData []byte   // The genesis data of this chain's ledger
-	VMAlias     string   // The ID of the vm this chain is running
-	FxAliases   []string // The IDs of the feature extensions this chain is running
-
-	CustomBeacons validators.Set // Should only be set if the default beacons can't be used.
+	// The ID of the chain being created.
+	ID ids.ID
+	// ID of the subnet that validates this chain.
+	SubnetID ids.ID
+	// The genesis data of this chain's ledger.
+	GenesisData []byte
+	// The ID of the vm this chain is running.
+	VMAlias string
+	// The IDs of the feature extensions this chain is running.
+	FxAliases []string
+	// Should only be set if the default beacons can't be used.
+	CustomBeacons validators.Set
 }
 
 type chain struct {
@@ -144,7 +149,7 @@ type ManagerConfig struct {
 	Net                         network.Network    // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	Validators                  validators.Manager // Validators validating on this chain
-	NodeID                      ids.ShortID        // The ID of this node
+	NodeID                      ids.NodeID         // The ID of this node
 	NetworkID                   uint32             // ID of the network this node is connected to
 	Server                      server.Server      // Handles HTTP API calls
 	Keystore                    keystore.Keystore
@@ -180,7 +185,9 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	ResetProposerVMHeightIndex bool
+	// TODO: Use StateSyncBeacons as an override when creating the syncer config
+	//       to specify who to sync from.
+	StateSyncBeacons []ids.NodeID
 }
 
 type manager struct {
@@ -789,7 +796,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight, m.ResetProposerVMHeightIndex)
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

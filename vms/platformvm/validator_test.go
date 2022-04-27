@@ -6,6 +6,8 @@ package platformvm
 import (
 	"errors"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
@@ -15,7 +17,7 @@ func TestValidatorBoundedBy(t *testing.T) {
 	aStartTime := uint64(0)
 	aEndTIme := uint64(1)
 	a := &Validator{
-		NodeID: keys[0].PublicKey().Address(),
+		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
 		Start:  aStartTime,
 		End:    aEndTIme,
 		Wght:   defaultWeight,
@@ -24,7 +26,7 @@ func TestValidatorBoundedBy(t *testing.T) {
 	bStartTime := uint64(2)
 	bEndTime := uint64(3)
 	b := &Validator{
-		NodeID: keys[0].PublicKey().Address(),
+		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
 		Start:  bStartTime,
 		End:    bEndTime,
 		Wght:   defaultWeight,

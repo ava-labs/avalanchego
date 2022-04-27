@@ -12,8 +12,8 @@ import (
 var _ WeightTracker = &weightTracker{}
 
 type WeightTracker interface {
-	AddWeightForNode(nodeID ids.ShortID) error
-	RemoveWeightForNode(nodeID ids.ShortID) error
+	AddWeightForNode(nodeID ids.NodeID) error
+	RemoveWeightForNode(nodeID ids.NodeID) error
 	EnoughConnectedWeight() bool
 }
 
@@ -32,7 +32,7 @@ type weightTracker struct {
 	enoughConnectedWeight bool
 }
 
-func (wt *weightTracker) AddWeightForNode(nodeID ids.ShortID) error {
+func (wt *weightTracker) AddWeightForNode(nodeID ids.NodeID) error {
 	if wt.enoughConnectedWeight {
 		return nil
 	}
@@ -51,7 +51,7 @@ func (wt *weightTracker) AddWeightForNode(nodeID ids.ShortID) error {
 	return nil
 }
 
-func (wt *weightTracker) RemoveWeightForNode(nodeID ids.ShortID) error {
+func (wt *weightTracker) RemoveWeightForNode(nodeID ids.NodeID) error {
 	if weight, ok := wt.beacons.GetWeight(nodeID); ok {
 		// TODO: Account for weight changes in a more robust manner.
 

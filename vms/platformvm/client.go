@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	addressconverter "github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -60,13 +59,13 @@ type Client interface {
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]ClientPrimaryValidator, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPrimaryValidator, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.ShortID, options ...rpc.Option) ([]interface{}, []interface{}, error)
+	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
 	GetCurrentSupply(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.ShortID, error)
+	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error)
 	// AddValidator issues a transaction to add a validator to the primary network
 	// and returns the txID
 	AddValidator(
@@ -75,7 +74,7 @@ type Client interface {
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
 		rewardAddress ids.ShortID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -90,7 +89,7 @@ type Client interface {
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
 		rewardAddress ids.ShortID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -104,7 +103,7 @@ type Client interface {
 		from []ids.ShortID,
 		changeAddr ids.ShortID,
 		subnetID ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -190,7 +189,7 @@ type Client interface {
 	GetMaxStakeAmount(
 		ctx context.Context,
 		subnetID ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		startTime uint64,
 		endTime uint64,
 		options ...rpc.Option,
@@ -201,7 +200,7 @@ type Client interface {
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
 	// GetValidatorsAt returns the weights of the validator set of a provided subnet
 	// at the specified height.
-	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.ShortID]uint64, error)
+	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 }
@@ -367,17 +366,13 @@ func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options
 func (c *client) GetCurrentValidators(
 	ctx context.Context,
 	subnetID ids.ID,
-	nodeIDs []ids.ShortID,
+	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]ClientPrimaryValidator, error) {
-	nodeIDsStr := []string{}
-	for _, nodeID := range nodeIDs {
-		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
-	}
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
-		NodeIDs:  nodeIDsStr,
+		NodeIDs:  nodeIDs,
 	}, res, options...)
 	if err != nil {
 		return nil, err
@@ -392,17 +387,13 @@ func (c *client) GetCurrentValidators(
 func (c *client) GetPendingValidators(
 	ctx context.Context,
 	subnetID ids.ID,
-	nodeIDs []ids.ShortID,
+	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]interface{}, []interface{}, error) {
-	nodeIDsStr := []string{}
-	for _, nodeID := range nodeIDs {
-		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
-	}
 	res := &GetPendingValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getPendingValidators", &GetPendingValidatorsArgs{
 		SubnetID: subnetID,
-		NodeIDs:  nodeIDsStr,
+		NodeIDs:  nodeIDs,
 	}, res, options...)
 	return res.Validators, res.Delegators, err
 }
@@ -413,23 +404,13 @@ func (c *client) GetCurrentSupply(ctx context.Context, options ...rpc.Option) (u
 	return uint64(res.Supply), err
 }
 
-func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.ShortID, error) {
+func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
 		Size:     json.Uint16(sampleSize),
 	}, res, options...)
-	if err != nil {
-		return nil, err
-	}
-	validators := make([]ids.ShortID, len(res.Validators))
-	for i, validatorStr := range res.Validators {
-		validators[i], err = ids.ShortFromPrefixedString(validatorStr, constants.NodeIDPrefix)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return validators, nil
+    return res.Validators, err
 }
 
 func (c *client) AddValidator(
@@ -438,7 +419,7 @@ func (c *client) AddValidator(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	rewardAddress ids.ShortID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -454,7 +435,7 @@ func (c *client) AddValidator(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
-			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
+			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -471,7 +452,7 @@ func (c *client) AddDelegator(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	rewardAddress ids.ShortID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -485,7 +466,7 @@ func (c *client) AddDelegator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		}, APIStaker: APIStaker{
-			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
+			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -501,7 +482,7 @@ func (c *client) AddSubnetValidator(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	subnetID ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -516,7 +497,7 @@ func (c *client) AddSubnetValidator(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
-			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
+			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -751,11 +732,11 @@ func (c *client) GetTotalStake(ctx context.Context, options ...rpc.Option) (uint
 	return uint64(res.Stake), err
 }
 
-func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.ShortID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
+func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
 	res := new(GetMaxStakeAmountReply)
 	err := c.requester.SendRequest(ctx, "getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
-		NodeID:    nodeID.PrefixedString(constants.NodeIDPrefix),
+		NodeID:    nodeID,
 		StartTime: json.Uint64(startTime),
 		EndTime:   json.Uint64(endTime),
 	}, res, options...)
@@ -785,21 +766,13 @@ func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 	return res.Timestamp, err
 }
 
-func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.ShortID]uint64, error) {
+func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
 		Height:   json.Uint64(height),
 	}, res, options...)
-	validators := map[ids.ShortID]uint64{}
-	for validatorStr, validatorWeight := range res.Validators {
-		validatorID, err := ids.ShortFromPrefixedString(validatorStr, constants.NodeIDPrefix)
-		if err != nil {
-			return nil, err
-		}
-		validators[validatorID] = validatorWeight
-	}
-	return validators, err
+    return res.Validators, err
 }
 
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {

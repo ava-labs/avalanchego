@@ -22,8 +22,8 @@ type ExternalSenderTest struct {
 
 	CantSend, CantGossip bool
 
-	SendF   func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet
-	GossipF func(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int) ids.ShortSet
+	SendF   func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet
+	GossipF func(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int) ids.NodeIDSet
 }
 
 // Default set the default callable value to [cant]
@@ -34,10 +34,10 @@ func (s *ExternalSenderTest) Default(cant bool) {
 
 func (s *ExternalSenderTest) Send(
 	msg message.OutboundMessage,
-	nodeIDs ids.ShortSet,
+	nodeIDs ids.NodeIDSet,
 	subnetID ids.ID,
 	validatorOnly bool,
-) ids.ShortSet {
+) ids.NodeIDSet {
 	if s.SendF != nil {
 		return s.SendF(msg, nodeIDs, subnetID, validatorOnly)
 	}
@@ -60,7 +60,7 @@ func (s *ExternalSenderTest) Gossip(
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
 	numPeersToSend int,
-) ids.ShortSet {
+) ids.NodeIDSet {
 	if s.GossipF != nil {
 		return s.GossipF(msg, subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
 	}

@@ -16,7 +16,7 @@ var errBadSubnetID = errors.New("subnet ID can't be primary network ID")
 // Validator is a validator.
 type Validator struct {
 	// Node ID of the validator
-	NodeID ids.ShortID `serialize:"true" json:"nodeID"`
+	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 
 	// Unix time this validator starts validating
 	Start uint64 `serialize:"true" json:"start"`
@@ -29,7 +29,7 @@ type Validator struct {
 }
 
 // ID returns the node ID of the validator
-func (v *Validator) ID() ids.ShortID { return v.NodeID }
+func (v *Validator) ID() ids.NodeID { return v.NodeID }
 
 // StartTime is the time that this validator will enter the validator set
 func (v *Validator) StartTime() time.Time { return time.Unix(int64(v.Start), 0) }

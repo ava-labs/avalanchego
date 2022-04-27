@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
@@ -32,7 +31,7 @@ var _ Handler = &handler{}
 type Handler interface {
 	common.Timer
 	Context() *snow.ConsensusContext
-	IsValidator(nodeID ids.ShortID) bool
+	IsValidator(nodeID ids.NodeID) bool
 	SetBootstrapper(engine common.BootstrapableEngine)
 	Bootstrapper() common.BootstrapableEngine
 	SetConsensus(engine common.Engine)
@@ -131,7 +130,7 @@ func New(
 
 func (h *handler) Context() *snow.ConsensusContext { return h.ctx }
 
-func (h *handler) IsValidator(nodeID ids.ShortID) bool {
+func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 	return !h.ctx.IsValidatorOnly() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)
@@ -328,21 +327,64 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	}
 
 	switch op {
+	case message.GetStateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return engine.GetStateSummaryFrontier(nodeID, reqID)
+
+	case message.StateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summary := msg.Get(message.SummaryBytes).([]byte)
+		return engine.StateSummaryFrontier(nodeID, reqID, summary)
+
+	case message.GetStateSummaryFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return engine.GetStateSummaryFrontierFailed(nodeID, reqID)
+
+	case message.GetAcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaryHeights, err := getSummaryHeights(msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s, %d): %s",
+				op,
+				nodeID,
+				reqID,
+				err,
+			)
+			return nil
+		}
+		return engine.GetAcceptedStateSummary(nodeID, reqID, summaryHeights)
+
+	case message.AcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaryIDs, err := getIDs(message.SummaryIDs, msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s, %d): %s",
+				op,
+				nodeID,
+				reqID,
+				err,
+			)
+			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+		}
+		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
+
+	case message.GetAcceptedStateSummaryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return engine.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
@@ -354,15 +396,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return nil
 		}
@@ -370,15 +408,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.GetAcceptedFailed(nodeID, reqID)
 		}
@@ -431,15 +465,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
-		votes, err := getContainerIDs(msg)
+		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.QueryFailed(nodeID, reqID)
 		}
@@ -458,10 +488,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	default:
 		return fmt.Errorf(
-			"attempt to submit unhandled sync msg %s from %s%s",
-			op,
-			constants.NodeIDPrefix,
-			nodeID,
+			"attempt to submit unhandled sync msg %s from %s",
+			op, nodeID,
 		)
 	}
 }
@@ -524,10 +552,8 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	default:
 		return fmt.Errorf(
-			"attempt to submit unhandled async msg %s from %s%s",
-			op,
-			constants.NodeIDPrefix,
-			nodeID,
+			"attempt to submit unhandled async msg %s from %s",
+			op, nodeID,
 		)
 	}
 }
@@ -600,10 +626,8 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, b
 		// If this message's deadline has passed, don't process it.
 		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
 			h.ctx.Log.Verbo(
-				"Dropping message from %s%s due to timeout: %s",
-				constants.NodeIDPrefix,
-				msg.NodeID(),
-				msg,
+				"Dropping message from %s due to timeout: %s",
+				msg.NodeID(), msg,
 			)
 			h.metrics.expired.Inc()
 			msg.OnFinishedHandling()

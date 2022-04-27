@@ -82,7 +82,7 @@ func NewSet(
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
 //         should be made.
-func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
+func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 	if _, exists := s.polls.Get(requestID); exists {
 		s.log.Debug("dropping poll due to duplicated requestID: %d", requestID)
 		return false
@@ -102,7 +102,7 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
+func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
@@ -157,7 +157,7 @@ func (s *set) processFinishedPolls() []ids.Bag {
 
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Drop(requestID uint32, vdr ids.ShortID) []ids.Bag {
+func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",

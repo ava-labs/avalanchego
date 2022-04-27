@@ -25,11 +25,11 @@ type ChainVM struct {
 }
 
 // AppGossip provides a mock function with given fields: nodeID, msg
-func (_m *ChainVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (_m *ChainVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	ret := _m.Called(nodeID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, []byte) error); ok {
 		r0 = rf(nodeID, msg)
 	} else {
 		r0 = ret.Error(0)
@@ -39,11 +39,11 @@ func (_m *ChainVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 }
 
 // AppRequest provides a mock function with given fields: nodeID, requestID, deadline, request
-func (_m *ChainVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (_m *ChainVM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	ret := _m.Called(nodeID, requestID, deadline, request)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, time.Time, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, time.Time, []byte) error); ok {
 		r0 = rf(nodeID, requestID, deadline, request)
 	} else {
 		r0 = ret.Error(0)
@@ -53,11 +53,11 @@ func (_m *ChainVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline tim
 }
 
 // AppRequestFailed provides a mock function with given fields: nodeID, requestID
-func (_m *ChainVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (_m *ChainVM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(nodeID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
 		r0 = rf(nodeID, requestID)
 	} else {
 		r0 = ret.Error(0)
@@ -67,11 +67,11 @@ func (_m *ChainVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error 
 }
 
 // AppResponse provides a mock function with given fields: nodeID, requestID, response
-func (_m *ChainVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (_m *ChainVM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	ret := _m.Called(nodeID, requestID, response)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []byte) error); ok {
 		r0 = rf(nodeID, requestID, response)
 	} else {
 		r0 = ret.Error(0)
@@ -104,11 +104,11 @@ func (_m *ChainVM) BuildBlock() (snowman.Block, error) {
 }
 
 // Connected provides a mock function with given fields: id, nodeVersion
-func (_m *ChainVM) Connected(id ids.ShortID, nodeVersion version.Application) error {
+func (_m *ChainVM) Connected(id ids.NodeID, nodeVersion version.Application) error {
 	ret := _m.Called(id, nodeVersion)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, version.Application) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, version.Application) error); ok {
 		r0 = rf(id, nodeVersion)
 	} else {
 		r0 = ret.Error(0)
@@ -164,11 +164,11 @@ func (_m *ChainVM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error
 }
 
 // Disconnected provides a mock function with given fields: id
-func (_m *ChainVM) Disconnected(id ids.ShortID) error {
+func (_m *ChainVM) Disconnected(id ids.NodeID) error {
 	ret := _m.Called(id)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID) error); ok {
 		r0 = rf(id)
 	} else {
 		r0 = ret.Error(0)

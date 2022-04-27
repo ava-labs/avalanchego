@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 )
@@ -44,28 +43,28 @@ func newNetwork(activationTime time.Time, appSender common.AppSender, vm *VM) *n
 	return n
 }
 
-func (n *network) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, msgBytes []byte) error {
+func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.ShortID, requestID uint32, msgBytes []byte) error {
+func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
+func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	n.log.Debug(
 		"AppGossip message handler called from %s with %d bytes",
-		nodeID.PrefixedString(constants.NodeIDPrefix),
+		nodeID,
 		len(msgBytes),
 	)
 
@@ -84,7 +83,7 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	if !ok {
 		n.log.Debug(
 			"dropping unexpected message from %s",
-			nodeID.PrefixedString(constants.NodeIDPrefix),
+			nodeID,
 		)
 		return nil
 	}
@@ -117,7 +116,7 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	if err = n.mempool.AddUnverifiedTx(tx); err != nil {
 		n.log.Debug(
 			"AppResponse failed AddUnverifiedTx from %s with: %s",
-			nodeID.PrefixedString(constants.NodeIDPrefix),
+			nodeID,
 			err,
 		)
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // issuer issues [vtx] into consensus after its dependencies are met.
@@ -113,18 +114,21 @@ func (i *issuer) Update() {
 		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
-	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
+	vdrBag := ids.NodeIDBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
-	vdrList := vdrBag.List()
-	vdrSet := ids.NewShortSet(len(vdrList))
-	vdrSet.Add(vdrList...)
-
 	i.t.RequestID++
 	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
-		i.t.Sender.SendPushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+		common.SendMixedQuery(
+			i.t.Sender,
+			vdrBag.List(),
+			i.t.Params.MixedQueryNumPush,
+			i.t.RequestID,
+			vtxID,
+			i.vtx.Bytes(),
+		)
 	}
 
 	// Notify vertices waiting on this one that it (and its transactions) have been issued.

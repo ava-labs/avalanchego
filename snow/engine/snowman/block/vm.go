@@ -52,10 +52,7 @@ type ChainVM interface {
 type Getter interface {
 	// Attempt to load a block.
 	//
-	// If the block does not exist, an error should be returned.
-	//
-	// TODO: Update the invariant to report database.ErrNotFound if the
-	//       operation is missing.
+	// If the block does not exist, database.ErrNotFound should be returned.
 	GetBlock(ids.ID) (snowman.Block, error)
 }
 

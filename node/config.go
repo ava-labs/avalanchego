@@ -89,6 +89,11 @@ type StakingConfig struct {
 	StakingCertPath       string          `json:"stakingCertPath"`
 }
 
+type StateSyncConfig struct {
+	StateSyncIDs []ids.NodeID   `json:"stateSyncIDs"`
+	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
+}
+
 type BootstrapConfig struct {
 	// Should Bootstrap be retried
 	RetryBootstrap bool `json:"retryBootstrap"`
@@ -110,7 +115,7 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.ShortID  `json:"bootstrapIDs"`
+	BootstrapIDs []ids.NodeID   `json:"bootstrapIDs"`
 	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
 }
 
@@ -131,6 +136,7 @@ type Config struct {
 	IPConfig            `json:"ipConfig"`
 	StakingConfig       `json:"stakingConfig"`
 	genesis.TxFeeConfig `json:"txFeeConfig"`
+	StateSyncConfig     `json:"stateSyncConfig"`
 	BootstrapConfig     `json:"bootstrapConfig"`
 	DatabaseConfig      `json:"databaseConfig"`
 
@@ -196,7 +202,4 @@ type Config struct {
 
 	// VM management
 	VMManager vms.Manager `json:"-"`
-
-	// Reset proposerVM height index
-	ResetProposerVMHeightIndex bool `json:"resetProposerVMHeightIndex"`
 }

@@ -18,7 +18,7 @@ var _ Client = &client{}
 // Client interface for an Info API Client
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
-	GetNodeID(context.Context, ...rpc.Option) (ids.ShortID, error)
+	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, error)
 	GetNodeIP(context.Context, ...rpc.Option) (string, error)
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
@@ -48,17 +48,10 @@ func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*Ge
 	return res, err
 }
 
-func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.ShortID, error) {
+func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.NodeID, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest(ctx, "getNodeID", struct{}{}, res, options...)
-	if err != nil {
-		return ids.ShortEmpty, err
-	}
-	nodeID, err := ids.ShortFromPrefixedString(res.NodeID, constants.NodeIDPrefix)
-	if err != nil {
-		return ids.ShortEmpty, err
-	}
-	return nodeID, err
+    return res.NodeID, err
 }
 
 func (c *client) GetNodeIP(ctx context.Context, options ...rpc.Option) (string, error) {

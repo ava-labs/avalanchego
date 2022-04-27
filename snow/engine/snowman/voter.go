@@ -10,7 +10,7 @@ import (
 // Voter records chits received from [vdr] once its dependencies are met.
 type voter struct {
 	t         *Transitive
-	vdr       ids.ShortID
+	vdr       ids.NodeID
 	requestID uint32
 	response  ids.ID
 	deps      ids.Set
