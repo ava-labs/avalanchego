@@ -21,7 +21,7 @@ type NoopHandler struct {
 func (h NoopHandler) HandleTx(nodeID ids.NodeID, requestID uint32, _ *Tx) error {
 	h.Log.Debug(
 		"dropping unexpected Tx message from %s with requestID %s",
-		nodeID.String(),
+		nodeID,
 		requestID,
 	)
 	return nil

@@ -200,7 +200,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID.String(),
+				NodeID:    nodeID,
 			},
 			RewardOwner: &APIOwner{
 				Threshold: 1,
@@ -275,7 +275,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID.String(),
+				NodeID:    nodeID,
 			},
 			RewardOwner: &APIOwner{
 				Threshold: 1,

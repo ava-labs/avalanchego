@@ -13,10 +13,9 @@ import (
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
-	id := ids.NodeID{1, 2, 3}
-	nodeID := id.String()
+	nodeID := ids.NodeID{1, 2, 3}
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +60,6 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
 	nodeID := ids.NodeID{1, 2, 3}
-	nodeIDStr := nodeID.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
@@ -76,7 +74,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   15,
-			NodeID:    nodeIDStr,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -108,7 +106,6 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	nodeID := ids.NodeID{1, 2, 3}
-	nodeIDStr := nodeID.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
@@ -124,7 +121,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   5,
-			NodeID:    nodeIDStr,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -156,7 +153,6 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	nodeID := ids.NodeID{1}
-	nodeIDStr := nodeID.String()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 	if err != nil {
@@ -172,7 +168,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   20,
-			NodeID:    nodeIDStr,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -188,7 +184,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 3,
 			EndTime:   15,
-			NodeID:    nodeIDStr,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,
@@ -204,7 +200,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		APIStaker: APIStaker{
 			StartTime: 1,
 			EndTime:   10,
-			NodeID:    nodeIDStr,
+			NodeID:    nodeID,
 		},
 		RewardOwner: &APIOwner{
 			Threshold: 1,

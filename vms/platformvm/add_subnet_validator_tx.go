@@ -130,7 +130,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 		if err != nil && err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.String(),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -159,7 +159,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 				}
 				return nil, nil, fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
-					tx.Validator.NodeID.String(),
+					tx.Validator.NodeID,
 					err,
 				)
 			}

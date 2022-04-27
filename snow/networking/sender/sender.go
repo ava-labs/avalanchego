@@ -413,7 +413,7 @@ func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending GetAncestors to node %s. RequestID: %d. ContainerID: %s",
-		nodeID.String(),
+		nodeID,
 		requestID,
 		containerID,
 	)
@@ -505,7 +505,7 @@ func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [
 func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending Get to node %s. RequestID: %d. ContainerID: %s",
-		nodeID.String(),
+		nodeID,
 		requestID,
 		containerID,
 	)
@@ -563,7 +563,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo(
 		"Sending Put to node %s. RequestID: %d. ContainerID: %s",
-		nodeID.String(),
+		nodeID,
 		requestID,
 		containerID,
 	)
@@ -756,7 +756,7 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
 	s.ctx.Log.Verbo(
 		"Sending Chits to node %s. RequestID: %d. Votes: %s",
-		nodeID.String(),
+		nodeID,
 		requestID,
 		votes,
 	)

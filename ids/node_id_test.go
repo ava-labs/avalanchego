@@ -2,6 +2,7 @@ package ids
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -176,26 +177,28 @@ func TestSortNodeIDs(t *testing.T) {
 	}
 }
 
-func TestIsSortedAndUniqueNodeIDs(t *testing.T) {
-	unsorted := []NodeID{
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+func TestNodeIDMapMarshalling(t *testing.T) {
+	originalMap := map[NodeID]int{
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
-	if IsSortedAndUniqueNodeIDs(unsorted) {
-		t.Fatal("Wrongly accepted unsorted IDs")
+	mapJSON, err := json.Marshal(originalMap)
+	if err != nil {
+		t.Fatal(err)
 	}
-	duplicated := []NodeID{
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+
+	var unmarshalledMap map[NodeID]int
+	err = json.Unmarshal(mapJSON, &unmarshalledMap)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if IsSortedAndUniqueNodeIDs(duplicated) {
-		t.Fatal("Wrongly accepted duplicated IDs")
+
+	if len(originalMap) != len(unmarshalledMap) {
+		t.Fatalf("wrong map lengths")
 	}
-	sorted := []NodeID{
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if !IsSortedAndUniqueNodeIDs(sorted) {
-		t.Fatal("Wrongly rejected sorted, unique IDs")
+	for originalID, num := range originalMap {
+		if unmarshalledMap[originalID] != num {
+			t.Fatalf("map was incorrectly Unmarshalled")
+		}
 	}
 }

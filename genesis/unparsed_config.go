@@ -54,21 +54,16 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 }
 
 type UnparsedStaker struct {
-	NodeID        string `json:"nodeID"`
-	RewardAddress string `json:"rewardAddress"`
-	DelegationFee uint32 `json:"delegationFee"`
+	NodeID        ids.NodeID `json:"nodeID"`
+	RewardAddress string     `json:"rewardAddress"`
+	DelegationFee uint32     `json:"delegationFee"`
 }
 
 func (us UnparsedStaker) Parse() (Staker, error) {
 	s := Staker{
+		NodeID:        us.NodeID,
 		DelegationFee: us.DelegationFee,
 	}
-
-	nodeID, err := ids.NodeIDFromString(us.NodeID)
-	if err != nil {
-		return s, err
-	}
-	s.NodeID = nodeID
 
 	_, _, avaxAddrBytes, err := formatting.ParseAddress(us.RewardAddress)
 	if err != nil {

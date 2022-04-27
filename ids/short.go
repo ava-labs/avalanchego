@@ -73,6 +73,10 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (id *ShortID) UnmarshalText(text []byte) error {
+	return id.UnmarshalJSON(text)
+}
+
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
 func (id ShortID) Bytes() []byte { return id[:] }
@@ -90,6 +94,10 @@ func (id ShortID) String() string {
 // PrefixedString returns the String representation with a prefix added
 func (id ShortID) PrefixedString(prefix string) string {
 	return prefix + id.String()
+}
+
+func (id ShortID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
 }
 
 type sortShortIDData []ShortID
