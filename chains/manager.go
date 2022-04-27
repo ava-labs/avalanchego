@@ -185,8 +185,6 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	ResetProposerVMHeightIndex bool
-
 	// TODO: Use StateSyncBeacons as an override when creating the syncer config
 	//       to specify who to sync from.
 	StateSyncBeacons []ids.ShortID
@@ -798,7 +796,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight, m.ResetProposerVMHeightIndex)
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

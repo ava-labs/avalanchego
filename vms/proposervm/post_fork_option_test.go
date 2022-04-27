@@ -726,7 +726,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	// Restart the node.
 
 	ctx := proVM.ctx
-	proVM = New(coreVM, time.Time{}, 0, false)
+	proVM = New(coreVM, time.Time{}, 0)
 
 	coreVM.InitializeF = func(*snow.Context, manager.Manager,
 		[]byte, []byte, []byte, chan<- common.Message,
