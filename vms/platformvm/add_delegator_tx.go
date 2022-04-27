@@ -174,7 +174,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 		if err != nil && err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -203,7 +203,7 @@ func (tx *UnsignedAddDelegatorTx) Execute(
 				}
 				return nil, nil, fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+					tx.Validator.NodeID,
 					err,
 				)
 			}
@@ -291,7 +291,7 @@ func (vm *VM) newAddDelegatorTx(
 	stakeAmt, // Amount the delegator stakes
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
-	nodeID ids.ShortID, // ID of the node we are delegating to
+	nodeID ids.NodeID, // ID of the node we are delegating to
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
@@ -486,7 +486,7 @@ func maxStakeAmount(
 
 func (vm *VM) maxStakeAmount(
 	subnetID ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	startTime time.Time,
 	endTime time.Time,
 ) (uint64, error) {
@@ -504,7 +504,7 @@ func (vm *VM) maxStakeAmount(
 
 func (vm *VM) maxSubnetStakeAmount(
 	subnetID ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	startTime time.Time,
 	endTime time.Time,
 ) (uint64, error) {
@@ -543,7 +543,7 @@ func (vm *VM) maxSubnetStakeAmount(
 }
 
 func (vm *VM) maxPrimarySubnetStakeAmount(
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	startTime time.Time,
 	endTime time.Time,
 ) (uint64, error) {

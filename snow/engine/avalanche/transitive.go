@@ -92,29 +92,29 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
-	t.Ctx.Log.Verbo("Put(%s, %d) called", vdr, requestID)
+func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	t.Ctx.Log.Verbo("Put(%s, %d) called", nodeID, requestID)
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes(vtxBytes))
-		return t.GetFailed(vdr, requestID)
+		return t.GetFailed(nodeID, requestID)
 	}
 
 	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
 		t.metrics.numUselessPutBytes.Add(float64(len(vtxBytes)))
 	}
 
-	if _, err := t.issueFrom(vdr, vtx); err != nil {
+	if _, err := t.issueFrom(nodeID, vtx); err != nil {
 		return err
 	}
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	vtxID, ok := t.outstandingVtxReqs.Remove(vdr, requestID)
+func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
+	vtxID, ok := t.outstandingVtxReqs.Remove(nodeID, requestID)
 	if !ok {
-		t.Ctx.Log.Debug("GetFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
+		t.Ctx.Log.Debug("GetFailed(%s, %d) called without having sent corresponding Get", nodeID, requestID)
 		return nil
 	}
 
@@ -135,19 +135,19 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	// Will send chits to [vdr] once we have [vtxID] and its dependencies
+func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	// Will send chits to [nodeID] once we have [vtxID] and its dependencies
 	c := &convincer{
 		consensus: t.Consensus,
 		sender:    t.Sender,
-		vdr:       vdr,
+		vdr:       nodeID,
 		requestID: requestID,
 		errs:      &t.errs,
 	}
 
 	// If we have [vtxID], put it into consensus if we haven't already.
 	// If not, fetch it.
-	inConsensus, err := t.issueFromByID(vdr, vtxID)
+	inConsensus, err := t.issueFromByID(nodeID, vtxID)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byte) error {
+func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
@@ -175,22 +175,22 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxBytes []byt
 		t.metrics.numUselessPushQueryBytes.Add(float64(len(vtxBytes)))
 	}
 
-	if _, err := t.issueFrom(vdr, vtx); err != nil {
+	if _, err := t.issueFrom(nodeID, vtx); err != nil {
 		return err
 	}
 
-	return t.PullQuery(vdr, requestID, vtx.ID())
+	return t.PullQuery(nodeID, requestID, vtx.ID())
 }
 
-func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
 	v := &voter{
 		t:         t,
-		vdr:       vdr,
+		vdr:       nodeID,
 		requestID: requestID,
 		response:  votes,
 	}
 	for _, vote := range votes {
-		if added, err := t.issueFromByID(vdr, vote); err != nil {
+		if added, err := t.issueFromByID(nodeID, vote); err != nil {
 			return err
 		} else if !added {
 			v.deps.Add(vote)
@@ -202,35 +202,35 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	return t.Chits(vdr, requestID, nil)
+func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
+	return t.Chits(nodeID, requestID, nil)
 }
 
-func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	// Notify the VM that a request it made failed
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
-func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (t *Transitive) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
-func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }
 
-func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
+func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 	return t.VM.Disconnected(nodeID)
 }
 
@@ -359,20 +359,20 @@ func (t *Transitive) repoll() {
 // issueFromByID issues the branch ending with vertex [vtxID] to consensus.
 // Fetches [vtxID] if we don't have it locally.
 // Returns true if [vtx] has been added to consensus (now or previously)
-func (t *Transitive) issueFromByID(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(nodeID ids.NodeID, vtxID ids.ID) (bool, error) {
 	vtx, err := t.Manager.GetVtx(vtxID)
 	if err != nil {
 		// We don't have [vtxID]. Request it.
-		t.sendRequest(vdr, vtxID)
+		t.sendRequest(nodeID, vtxID)
 		return false, nil
 	}
-	return t.issueFrom(vdr, vtx)
+	return t.issueFrom(nodeID, vtx)
 }
 
 // issueFrom issues the branch ending with [vtx] to consensus.
 // Assumes we have [vtx] locally
 // Returns true if [vtx] has been added to consensus (now or previously)
-func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
+func (t *Transitive) issueFrom(nodeID ids.NodeID, vtx avalanche.Vertex) (bool, error) {
 	issued := true
 	// Before we issue [vtx] into consensus, we have to issue its ancestors.
 	// Go through [vtx] and its ancestors. issue each ancestor that hasn't yet been issued.
@@ -400,7 +400,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, err
 		for _, parent := range parents {
 			if !parent.Status().Fetched() {
 				// We don't have the parent. Request it.
-				t.sendRequest(vdr, parent.ID())
+				t.sendRequest(nodeID, parent.ID())
 				// We're missing an ancestor so we can't have issued the vtx in this method's argument
 				issued = false
 			} else {
@@ -566,13 +566,13 @@ func (t *Transitive) issueRepoll() {
 		return
 	}
 
-	vdrBag := ids.ShortBag{} // IDs of validators to be sampled
+	vdrBag := ids.NodeIDBag{} // IDs of validators to be sampled
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
 	vdrList := vdrBag.List()
-	vdrSet := ids.NewShortSet(len(vdrList))
+	vdrSet := ids.NewNodeIDSet(len(vdrList))
 	vdrSet.Add(vdrList...)
 
 	// Poll the network
@@ -626,13 +626,13 @@ func (t *Transitive) issueStopVtx() error {
 }
 
 // Send a request to [vdr] asking them to send us vertex [vtxID]
-func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
+func (t *Transitive) sendRequest(nodeID ids.NodeID, vtxID ids.ID) {
 	if t.outstandingVtxReqs.Contains(vtxID) {
 		t.Ctx.Log.Debug("not sending request for vertex %s because there is already an outstanding request for it", vtxID)
 		return
 	}
 	t.RequestID++
-	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.SendGet(vdr, t.RequestID, vtxID)
+	t.outstandingVtxReqs.Add(nodeID, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
+	t.Sender.SendGet(nodeID, t.RequestID, vtxID)
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }

@@ -119,12 +119,12 @@ type bootstrapper struct {
 	// initialized to config.Beacons, vdrs responding
 	// with empty GetAncestors messages are removed
 	// from this set so we avoid contacting them again
-	fetchFrom ids.ShortSet
+	fetchFrom ids.NodeIDSet
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]
-func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
+func (b *bootstrapper) Ancestors(vdr ids.NodeID, requestID uint32, blks [][]byte) error {
 	lenBlks := len(blks)
 	if lenBlks == 0 {
 		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
@@ -172,7 +172,7 @@ func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, blks [][]byt
 	return b.process(requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
@@ -183,7 +183,7 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(blkID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Applica
 	return nil
 }
 
-func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
+func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
 	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 
 // markUnavailable removes [vdr] from the set of validators used to fetch ancestors.
 // if the set becomes empty, it is reset to [b.Config.Beacons] so bootstrapping can continue.
-func (b *bootstrapper) markUnavailable(vdr ids.ShortID) error {
+func (b *bootstrapper) markUnavailable(vdr ids.NodeID) error {
 	b.fetchFrom.Remove(vdr)
 
 	// if [fetchFrom] has become empty, reset it to [b.Config.Beacons]
@@ -507,7 +507,7 @@ func (b *bootstrapper) finish() error {
 
 // setFetchFrom populates fetchFrom using [beacons]
 func (b *bootstrapper) setFetchFrom(beacons validators.Set) {
-	b.fetchFrom = ids.NewShortSet(beacons.Len())
+	b.fetchFrom = ids.NewNodeIDSet(beacons.Len())
 	for _, vdr := range beacons.List() {
 		b.fetchFrom.Add(vdr.ID())
 	}

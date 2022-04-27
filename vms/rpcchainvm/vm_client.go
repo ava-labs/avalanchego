@@ -511,7 +511,7 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return resp, err
 }
 
-func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VMClient) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	_, err := vm.client.AppRequest(
 		context.Background(),
 		&vmpb.AppRequestMsg{
@@ -524,7 +524,7 @@ func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, deadline ti
 	return err
 }
 
-func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (vm *VMClient) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	_, err := vm.client.AppResponse(
 		context.Background(),
 		&vmpb.AppResponseMsg{
@@ -536,7 +536,7 @@ func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response [
 	return err
 }
 
-func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (vm *VMClient) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	_, err := vm.client.AppRequestFailed(
 		context.Background(),
 		&vmpb.AppRequestFailedMsg{
@@ -547,7 +547,7 @@ func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error
 	return err
 }
 
-func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (vm *VMClient) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		context.Background(),
 		&vmpb.AppGossipMsg{
@@ -661,7 +661,7 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
-func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (vm *VMClient) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	_, err := vm.client.Connected(context.Background(), &vmpb.ConnectedRequest{
 		NodeId:  nodeID[:],
 		Version: nodeVersion.String(),
@@ -669,7 +669,7 @@ func (vm *VMClient) Connected(nodeID ids.ShortID, nodeVersion version.Applicatio
 	return err
 }
 
-func (vm *VMClient) Disconnected(nodeID ids.ShortID) error {
+func (vm *VMClient) Disconnected(nodeID ids.NodeID) error {
 	_, err := vm.client.Disconnected(context.Background(), &vmpb.DisconnectedRequest{
 		NodeId: nodeID[:],
 	})

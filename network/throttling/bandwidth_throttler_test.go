@@ -31,7 +31,7 @@ func TestBandwidthThrottler(t *testing.T) {
 	assert.Len(throttler.limiters, 0)
 
 	// Add a node
-	nodeID1 := ids.GenerateTestShortID()
+	nodeID1 := ids.GenerateTestNodeID()
 	throttler.AddNode(nodeID1)
 	assert.Len(throttler.limiters, 1)
 

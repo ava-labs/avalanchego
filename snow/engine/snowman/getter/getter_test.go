@@ -41,7 +41,7 @@ func testSetup(t *testing.T) (*block.TestVM, *common.SenderTest, common.Config) 
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestShortID()
+	peer := ids.GenerateTestNodeID()
 	if err := peers.AddWeight(peer, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -93,11 +93,11 @@ func TestAcceptedFrontier(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedFrontierF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAcceptedFrontier(ids.ShortEmpty, 0); err != nil {
+	if err := bs.GetAcceptedFrontier(ids.EmptyNodeID, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -156,11 +156,11 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(ids.ShortEmpty, 0, blkIDs); err != nil {
+	if err := bs.GetAccepted(ids.EmptyNodeID, 0, blkIDs); err != nil {
 		t.Fatal(err)
 	}
 

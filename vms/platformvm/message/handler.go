@@ -5,24 +5,23 @@ package message
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ Handler = NoopHandler{}
 
 type Handler interface {
-	HandleTx(nodeID ids.ShortID, requestID uint32, msg *Tx) error
+	HandleTx(nodeID ids.NodeID, requestID uint32, msg *Tx) error
 }
 
 type NoopHandler struct {
 	Log logging.Logger
 }
 
-func (h NoopHandler) HandleTx(nodeID ids.ShortID, requestID uint32, _ *Tx) error {
+func (h NoopHandler) HandleTx(nodeID ids.NodeID, requestID uint32, _ *Tx) error {
 	h.Log.Debug(
 		"dropping unexpected Tx message from %s with requestID %s",
-		nodeID.PrefixedString(constants.NodeIDPrefix),
+		nodeID,
 		requestID,
 	)
 	return nil

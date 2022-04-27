@@ -75,7 +75,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	if err != nil {
 		return nil, err
 	}
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +483,7 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionRespo
 }
 
 func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +497,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*e
 }
 
 func (vm *VMServer) Disconnected(_ context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +505,7 @@ func (vm *VMServer) Disconnected(_ context.Context, req *vmpb.DisconnectedReques
 }
 
 func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +517,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emp
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFail
 }
 
 func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +533,7 @@ func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*e
 }
 
 func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToShortID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}

@@ -90,7 +90,7 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs []ids.ShortID  `json:"stateSyncIDs"`
+	StateSyncIDs []ids.NodeID   `json:"stateSyncIDs"`
 	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
 }
 
@@ -115,7 +115,7 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.ShortID  `json:"bootstrapIDs"`
+	BootstrapIDs []ids.NodeID   `json:"bootstrapIDs"`
 	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
 }
 

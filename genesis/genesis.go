@@ -403,7 +403,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
-					NodeID:    staker.NodeID.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    staker.NodeID,
 				},
 				RewardOwner: &platformvm.APIOwner{
 					Threshold: 1,
