@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -34,11 +33,11 @@ func newInboundMsgByteThrottler(
 			remainingVdrBytes:      config.VdrAllocSize,
 			remainingAtLargeBytes:  config.AtLargeAllocSize,
 			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
 		waitingToAcquire:    linkedhashmap.New(),
-		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
+		nodeToWaitingMsgIDs: make(map[ids.NodeID][]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
 }
@@ -48,7 +47,7 @@ type msgMetadata struct {
 	// Need this many more bytes before Acquire returns
 	bytesNeeded uint64
 	// The sender of this incoming message
-	nodeID ids.ShortID
+	nodeID ids.NodeID
 	// Closed when the message can be read.
 	closeOnAcquireChan chan struct{}
 }
@@ -62,7 +61,7 @@ type inboundMsgByteThrottler struct {
 	nextMsgID uint64
 	// Node ID --> IDs of messages this node is waiting to acquire,
 	// order from oldest to most recent.
-	nodeToWaitingMsgIDs map[ids.ShortID][]uint64
+	nodeToWaitingMsgIDs map[ids.NodeID][]uint64
 	// Msg ID --> *msgMetadata
 	waitingToAcquire linkedhashmap.LinkedHashmap
 	// Invariant: The relative order of messages from a given node
@@ -82,7 +81,7 @@ type inboundMsgByteThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.awaitingRelease.Inc()
@@ -166,7 +165,7 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -237,7 +236,7 @@ func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 		msgIntf, exists := t.waitingToAcquire.Get(msgID)
 		if !exists {
 			// This should never happen
-			t.log.Warn("couldn't find message %s from %s%s", msgID, constants.NodeIDPrefix, nodeID)
+			t.log.Warn("couldn't find message %s from %s", msgID, nodeID)
 			break
 		}
 		// Give [msg] all the bytes we can

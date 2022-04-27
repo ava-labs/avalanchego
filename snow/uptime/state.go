@@ -10,7 +10,7 @@ import (
 )
 
 type State interface {
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
-	GetStartTime(nodeID ids.ShortID) (startTime time.Time, err error)
+	GetUptime(nodeID ids.NodeID) (upDuration time.Duration, lastUpdated time.Time, err error)
+	SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error
+	GetStartTime(nodeID ids.NodeID) (startTime time.Time, err error)
 }

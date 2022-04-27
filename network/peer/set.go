@@ -24,14 +24,14 @@ type Set interface {
 
 	// GetByID attempts to fetch a [peer] whose [peer.ID] is equal to [nodeID].
 	// If no such peer exists in the set, then [false] will be returned.
-	GetByID(nodeID ids.ShortID) (Peer, bool)
+	GetByID(nodeID ids.NodeID) (Peer, bool)
 
 	// GetByIndex attempts to fetch a peer who has been allocated [index]. If
 	// [index] < 0 or [index] >= [Len], then false will be returned.
 	GetByIndex(index int) (Peer, bool)
 
 	// Remove any [peer] whose [peer.ID] is equal to [nodeID] from the set.
-	Remove(nodeID ids.ShortID)
+	Remove(nodeID ids.NodeID)
 
 	// Len returns the number of peers currently in this set.
 	Len() int
@@ -46,12 +46,12 @@ type Set interface {
 
 	// Info returns information about the requested peers if they are in the
 	// set.
-	Info(nodeIDs []ids.ShortID) []Info
+	Info(nodeIDs []ids.NodeID) []Info
 }
 
 type set struct {
-	peersMap   map[ids.ShortID]int // nodeID -> peer's index in peersSlice
-	peersSlice []Peer              // invariant: len(peersSlice) == len(peersMap)
+	peersMap   map[ids.NodeID]int // nodeID -> peer's index in peersSlice
+	peersSlice []Peer             // invariant: len(peersSlice) == len(peersMap)
 }
 
 // NewSet returns a set that does not internally manage synchronization.
@@ -60,7 +60,7 @@ type set struct {
 // remaining methods are safe for concurrent use.
 func NewSet() Set {
 	return &set{
-		peersMap: make(map[ids.ShortID]int),
+		peersMap: make(map[ids.NodeID]int),
 	}
 }
 
@@ -75,7 +75,7 @@ func (s *set) Add(peer Peer) {
 	}
 }
 
-func (s *set) GetByID(nodeID ids.ShortID) (Peer, bool) {
+func (s *set) GetByID(nodeID ids.NodeID) (Peer, bool) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {
 		return nil, false
@@ -90,7 +90,7 @@ func (s *set) GetByIndex(index int) (Peer, bool) {
 	return s.peersSlice[index], true
 }
 
-func (s *set) Remove(nodeID ids.ShortID) {
+func (s *set) Remove(nodeID ids.NodeID) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {
 		return
@@ -146,7 +146,7 @@ func (s *set) AllInfo() []Info {
 	return peerInfo
 }
 
-func (s *set) Info(nodeIDs []ids.ShortID) []Info {
+func (s *set) Info(nodeIDs []ids.NodeID) []Info {
 	peerInfo := make([]Info, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
 		if peer, ok := s.GetByID(nodeID); ok {

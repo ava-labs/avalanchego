@@ -38,20 +38,20 @@ type Set interface {
 	Set([]Validator) error
 
 	// AddWeight to a staker.
-	AddWeight(ids.ShortID, uint64) error
+	AddWeight(ids.NodeID, uint64) error
 
 	// GetWeight retrieves the validator weight from the set.
-	GetWeight(ids.ShortID) (uint64, bool)
+	GetWeight(ids.NodeID) (uint64, bool)
 
 	// SubsetWeight returns the sum of the weights of the validators.
-	SubsetWeight(ids.ShortSet) (uint64, error)
+	SubsetWeight(ids.NodeIDSet) (uint64, error)
 
 	// RemoveWeight from a staker.
-	RemoveWeight(ids.ShortID, uint64) error
+	RemoveWeight(ids.NodeID, uint64) error
 
 	// Contains returns true if there is a validator with the specified ID
 	// currently in the set.
-	Contains(ids.ShortID) bool
+	Contains(ids.NodeID) bool
 
 	// Len returns the number of validators currently in the set.
 	Len() int
@@ -67,17 +67,17 @@ type Set interface {
 	Sample(size int) ([]Validator, error)
 
 	// MaskValidator hides the named validator from future samplings
-	MaskValidator(ids.ShortID) error
+	MaskValidator(ids.NodeID) error
 
 	// RevealValidator ensures the named validator is not hidden from future
 	// samplings
-	RevealValidator(ids.ShortID) error
+	RevealValidator(ids.NodeID) error
 }
 
 // NewSet returns a new, empty set of validators.
 func NewSet() Set {
 	return &set{
-		vdrMap:  make(map[ids.ShortID]int),
+		vdrMap:  make(map[ids.NodeID]int),
 		sampler: sampler.NewWeightedWithoutReplacement(),
 	}
 }
@@ -85,7 +85,7 @@ func NewSet() Set {
 // NewBestSet returns a new, empty set of validators.
 func NewBestSet(expectedSampleSize int) Set {
 	return &set{
-		vdrMap:  make(map[ids.ShortID]int),
+		vdrMap:  make(map[ids.NodeID]int),
 		sampler: sampler.NewBestWeightedWithoutReplacement(expectedSampleSize),
 	}
 }
@@ -96,13 +96,13 @@ func NewBestSet(expectedSampleSize int) Set {
 type set struct {
 	initialized      bool
 	lock             sync.RWMutex
-	vdrMap           map[ids.ShortID]int
+	vdrMap           map[ids.NodeID]int
 	vdrSlice         []*validator
 	vdrWeights       []uint64
 	vdrMaskedWeights []uint64
 	sampler          sampler.WeightedWithoutReplacement
 	totalWeight      uint64
-	maskedVdrs       ids.ShortSet
+	maskedVdrs       ids.NodeIDSet
 }
 
 func (s *set) Set(vdrs []Validator) error {
@@ -129,7 +129,7 @@ func (s *set) set(vdrs []Validator) error {
 		s.vdrWeights = s.vdrWeights[:0]
 		s.vdrMaskedWeights = s.vdrMaskedWeights[:0]
 	}
-	s.vdrMap = make(map[ids.ShortID]int, lenVdrs)
+	s.vdrMap = make(map[ids.NodeID]int, lenVdrs)
 	s.totalWeight = 0
 	s.initialized = false
 
@@ -166,7 +166,7 @@ func (s *set) set(vdrs []Validator) error {
 	return nil
 }
 
-func (s *set) AddWeight(vdrID ids.ShortID, weight uint64) error {
+func (s *set) AddWeight(vdrID ids.NodeID, weight uint64) error {
 	if weight == 0 {
 		return nil // This validator would never be sampled anyway
 	}
@@ -176,7 +176,7 @@ func (s *set) AddWeight(vdrID ids.ShortID, weight uint64) error {
 	return s.addWeight(vdrID, weight)
 }
 
-func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
+func (s *set) addWeight(vdrID ids.NodeID, weight uint64) error {
 	var vdr *validator
 	i, ok := s.vdrMap[vdrID]
 	if !ok {
@@ -209,21 +209,21 @@ func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
 	return nil
 }
 
-func (s *set) GetWeight(vdrID ids.ShortID) (uint64, bool) {
+func (s *set) GetWeight(vdrID ids.NodeID) (uint64, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.getWeight(vdrID)
 }
 
-func (s *set) getWeight(vdrID ids.ShortID) (uint64, bool) {
+func (s *set) getWeight(vdrID ids.NodeID) (uint64, bool) {
 	if index, ok := s.vdrMap[vdrID]; ok {
 		return s.vdrMaskedWeights[index], true
 	}
 	return 0, false
 }
 
-func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
+func (s *set) SubsetWeight(subset ids.NodeIDSet) (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -242,7 +242,7 @@ func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
 	return totalWeight, nil
 }
 
-func (s *set) RemoveWeight(vdrID ids.ShortID, weight uint64) error {
+func (s *set) RemoveWeight(vdrID ids.NodeID, weight uint64) error {
 	if weight == 0 {
 		return nil
 	}
@@ -252,7 +252,7 @@ func (s *set) RemoveWeight(vdrID ids.ShortID, weight uint64) error {
 	return s.removeWeight(vdrID, weight)
 }
 
-func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
+func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
 	i, ok := s.vdrMap[vdrID]
 	if !ok {
 		return nil
@@ -278,14 +278,14 @@ func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
 	return nil
 }
 
-func (s *set) Get(vdrID ids.ShortID) (Validator, bool) {
+func (s *set) Get(vdrID ids.NodeID) (Validator, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.get(vdrID)
 }
 
-func (s *set) get(vdrID ids.ShortID) (Validator, bool) {
+func (s *set) get(vdrID ids.NodeID) (Validator, bool) {
 	index, ok := s.vdrMap[vdrID]
 	if !ok {
 		return nil, false
@@ -293,7 +293,7 @@ func (s *set) get(vdrID ids.ShortID) (Validator, bool) {
 	return s.vdrSlice[index], true
 }
 
-func (s *set) remove(vdrID ids.ShortID) error {
+func (s *set) remove(vdrID ids.NodeID) error {
 	// Get the element to remove
 	i, contains := s.vdrMap[vdrID]
 	if !contains {
@@ -328,14 +328,14 @@ func (s *set) remove(vdrID ids.ShortID) error {
 	return nil
 }
 
-func (s *set) Contains(vdrID ids.ShortID) bool {
+func (s *set) Contains(vdrID ids.NodeID) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.contains(vdrID)
 }
 
-func (s *set) contains(vdrID ids.ShortID) bool {
+func (s *set) contains(vdrID ids.NodeID) bool {
 	_, contains := s.vdrMap[vdrID]
 	return contains
 }
@@ -436,14 +436,14 @@ func (s *set) prefixedString(prefix string) string {
 	return sb.String()
 }
 
-func (s *set) MaskValidator(vdrID ids.ShortID) error {
+func (s *set) MaskValidator(vdrID ids.NodeID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	return s.maskValidator(vdrID)
 }
 
-func (s *set) maskValidator(vdrID ids.ShortID) error {
+func (s *set) maskValidator(vdrID ids.NodeID) error {
 	if s.maskedVdrs.Contains(vdrID) {
 		return nil
 	}
@@ -463,14 +463,14 @@ func (s *set) maskValidator(vdrID ids.ShortID) error {
 	return nil
 }
 
-func (s *set) RevealValidator(vdrID ids.ShortID) error {
+func (s *set) RevealValidator(vdrID ids.NodeID) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	return s.revealValidator(vdrID)
 }
 
-func (s *set) revealValidator(vdrID ids.ShortID) error {
+func (s *set) revealValidator(vdrID ids.NodeID) error {
 	if !s.maskedVdrs.Contains(vdrID) {
 		return nil
 	}

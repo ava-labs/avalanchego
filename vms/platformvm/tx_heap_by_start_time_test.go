@@ -26,7 +26,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 		vm.MinValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+1),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+1), // endTime
-		ids.ShortID{},                           // node ID
+		ids.NodeID{},                            // node ID
 		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
@@ -41,7 +41,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 		vm.MinValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+2),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+2), // endTime
-		ids.ShortID{1},                          // node ID
+		ids.NodeID{1},                           // node ID
 		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
@@ -56,7 +56,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 		vm.MinValidatorStake,                                               // stake amount
 		uint64(defaultGenesisTime.Unix()+3),                                // startTime
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()+3), // endTime
-		ids.ShortID{},                           // node ID
+		ids.NodeID{},                            // node ID
 		ids.ShortID{1, 2, 3, 4, 5, 6, 7},        // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key

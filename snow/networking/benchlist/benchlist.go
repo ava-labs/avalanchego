@@ -34,18 +34,18 @@ var _ heap.Interface = &benchedQueue{}
 // the full network timeout for a response.
 type Benchlist interface {
 	// RegisterResponse registers the response to a query message
-	RegisterResponse(validatorID ids.ShortID)
+	RegisterResponse(nodeID ids.NodeID)
 	// RegisterFailure registers that we didn't receive a response within the timeout
-	RegisterFailure(validatorID ids.ShortID)
+	RegisterFailure(nodeID ids.NodeID)
 	// IsBenched returns true if messages to [validatorID]
 	// should not be sent over the network and should immediately fail.
-	IsBenched(validatorID ids.ShortID) bool
+	IsBenched(nodeID ids.NodeID) bool
 }
 
 // Data about a validator who is benched
 type benchData struct {
 	benchedUntil time.Time
-	validatorID  ids.ShortID
+	validatorID  ids.NodeID
 	index        int
 }
 
@@ -106,10 +106,10 @@ type benchlist struct {
 	// Validator ID --> Consecutive failure information
 	// [streaklock] must be held when touching [failureStreaks]
 	streaklock     sync.Mutex
-	failureStreaks map[ids.ShortID]failureStreak
+	failureStreaks map[ids.NodeID]failureStreak
 
 	// IDs of validators that are currently benched
-	benchlistSet ids.ShortSet
+	benchlistSet ids.NodeIDSet
 
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
@@ -147,8 +147,8 @@ func NewBenchlist(
 	benchlist := &benchlist{
 		chainID:                chainID,
 		log:                    log,
-		failureStreaks:         make(map[ids.ShortID]failureStreak),
-		benchlistSet:           ids.ShortSet{},
+		failureStreaks:         make(map[ids.NodeID]failureStreak),
+		benchlistSet:           ids.NodeIDSet{},
 		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,
@@ -228,43 +228,43 @@ func (b *benchlist) setNextLeaveTime() {
 	b.timer.SetTimeoutIn(nextLeave)
 }
 
-// IsBenched returns true if messages to [validatorID]
+// IsBenched returns true if messages to [nodeID]
 // should not be sent over the network and should immediately fail.
-func (b *benchlist) IsBenched(validatorID ids.ShortID) bool {
+func (b *benchlist) IsBenched(nodeID ids.NodeID) bool {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
-	return b.isBenched(validatorID)
+	return b.isBenched(nodeID)
 }
 
-// isBenched checks if [validatorID] is currently benched
+// isBenched checks if [nodeID] is currently benched
 // and calls cleanup if its benching period has elapsed
 // Assumes [b.lock] is held.
-func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
-	if _, ok := b.benchlistSet[validatorID]; ok {
+func (b *benchlist) isBenched(nodeID ids.NodeID) bool {
+	if _, ok := b.benchlistSet[nodeID]; ok {
 		return true
 	}
 	return false
 }
 
 // RegisterResponse notes that we received a response from validator [validatorID]
-func (b *benchlist) RegisterResponse(validatorID ids.ShortID) {
+func (b *benchlist) RegisterResponse(nodeID ids.NodeID) {
 	b.streaklock.Lock()
 	defer b.streaklock.Unlock()
-	delete(b.failureStreaks, validatorID)
+	delete(b.failureStreaks, nodeID)
 }
 
 // RegisterResponse notes that a request to validator [validatorID] timed out
-func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
+func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if b.benchlistSet.Contains(validatorID) {
+	if b.benchlistSet.Contains(nodeID) {
 		// This validator is benched. Ignore failures until they're not.
 		return
 	}
 
 	b.streaklock.Lock()
-	failureStreak := b.failureStreaks[validatorID]
+	failureStreak := b.failureStreaks[nodeID]
 	// Increment consecutive failures
 	failureStreak.consecutive++
 	now := b.clock.Time()
@@ -273,17 +273,17 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 		// This is the first consecutive failure
 		failureStreak.firstFailure = now
 	}
-	b.failureStreaks[validatorID] = failureStreak
+	b.failureStreaks[nodeID] = failureStreak
 	b.streaklock.Unlock()
 
 	if failureStreak.consecutive >= b.threshold && now.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
-		b.bench(validatorID)
+		b.bench(nodeID)
 	}
 }
 
 // Assumes [b.lock] is held
-// Assumes [validatorID] is not already benched
-func (b *benchlist) bench(validatorID ids.ShortID) {
+// Assumes [nodeID] is not already benched
+func (b *benchlist) bench(nodeID ids.NodeID) {
 	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
 	if err != nil {
 		// This should never happen
@@ -291,7 +291,7 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 		return
 	}
 
-	validatorStake, isVdr := b.vdrs.GetWeight(validatorID)
+	validatorStake, isVdr := b.vdrs.GetWeight(nodeID)
 	if !isVdr {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
@@ -301,7 +301,7 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen
-		b.log.Error("overflow calculating new benched stake with validator %s", validatorID)
+		b.log.Error("overflow calculating new benched stake with validator %s", nodeID)
 		return
 	}
 
@@ -311,7 +311,7 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	if float64(newBenchedStake) > maxBenchedStake {
 		b.log.Debug(
 			"not benching %s because benched stake (%f) would exceed max (%f)",
-			validatorID,
+			nodeID,
 			float64(newBenchedStake),
 			maxBenchedStake,
 		)
@@ -327,20 +327,20 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	benchedUntil := minBenchedUntil.Add(time.Duration(rand.Float64() * float64(diff))) // #nosec G404
 
 	// Add to benchlist times with randomized delay
-	b.benchlistSet.Add(validatorID)
-	b.benchable.Benched(b.chainID, validatorID)
+	b.benchlistSet.Add(nodeID)
+	b.benchable.Benched(b.chainID, nodeID)
 
 	b.streaklock.Lock()
-	delete(b.failureStreaks, validatorID)
+	delete(b.failureStreaks, nodeID)
 	b.streaklock.Unlock()
 
 	heap.Push(
 		&b.benchedQueue,
-		&benchData{validatorID: validatorID, benchedUntil: benchedUntil},
+		&benchData{validatorID: nodeID, benchedUntil: benchedUntil},
 	)
 	b.log.Debug(
 		"benching validator %s for %s after %d consecutive failed queries.",
-		validatorID,
+		nodeID,
 		benchedUntil.Sub(now),
 		b.threshold,
 	)

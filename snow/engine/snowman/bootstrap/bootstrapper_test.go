@@ -27,7 +27,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -50,7 +50,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestShortID()
+	peer := ids.GenerateTestNodeID()
 	if err := peers.AddWeight(peer, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -148,11 +148,11 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.NoError(err)
 
 	vm.CantConnected = true
-	vm.ConnectedF = func(ids.ShortID, version.Application) error { return nil }
+	vm.ConnectedF = func(ids.NodeID, version.Application) error { return nil }
 
 	frontierRequested := false
 	sender.CantSendGetAcceptedFrontier = false
-	sender.SendGetAcceptedFrontierF = func(ss ids.ShortSet, u uint32) {
+	sender.SendGetAcceptedFrontierF = func(ss ids.NodeIDSet, u uint32) {
 		frontierRequested = true
 	}
 
@@ -162,7 +162,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.False(frontierRequested)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
-	vdr0 := ids.GenerateTestShortID()
+	vdr0 := ids.GenerateTestNodeID()
 	assert.NoError(peers.AddWeight(vdr0, startupAlpha/2))
 	assert.NoError(bs.Connected(vdr0, version.CurrentApp))
 
@@ -170,7 +170,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.False(frontierRequested)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
-	vdr := ids.GenerateTestShortID()
+	vdr := ids.GenerateTestNodeID()
 	assert.NoError(peers.AddWeight(vdr, startupAlpha))
 	assert.NoError(bs.Connected(vdr, version.CurrentApp))
 	assert.True(frontierRequested)
@@ -357,7 +357,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	requestID := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -381,7 +381,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		t.Fatal("should not have sent new request")
 	}
 
-	if err := bs.Ancestors(ids.ShortID{1, 2, 3}, *requestID, [][]byte{blkBytes1}); err != nil { // respond from wrong peer
+	if err := bs.Ancestors(ids.NodeID{1, 2, 3}, *requestID, [][]byte{blkBytes1}); err != nil { // respond from wrong peer
 		t.Fatal(err)
 	} else if oldReqID != *requestID {
 		t.Fatal("should not have sent new request")
@@ -524,7 +524,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -684,7 +684,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	requestID := new(uint32)
 	requested := ids.Empty
 	expectedPeerID := peerID
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != expectedPeerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", expectedPeerID, vdr)
 		}
@@ -709,7 +709,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	// add another vdr to the fetch set to test behavior on empty response
-	newPeerID := ids.GenerateTestShortID()
+	newPeerID := ids.GenerateTestNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 	expectedPeerID = newPeerID
 
@@ -857,7 +857,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -988,7 +988,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -1159,7 +1159,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}

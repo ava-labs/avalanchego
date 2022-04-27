@@ -43,7 +43,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -65,7 +65,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -97,7 +97,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -123,7 +123,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -145,7 +145,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -180,7 +180,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix())-1,
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -196,7 +196,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -212,8 +212,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID, // node ID
-		nodeID, // reward address
+		ids.NodeID(nodeID), // node ID
+		nodeID,             // reward address
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
@@ -233,7 +233,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.MinValidatorStake,     // stake amount
 		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-		nodeID,                     // node ID
+		ids.NodeID(nodeID),         // node ID
 		key2.PublicKey().Address(), // reward address
 		reward.PercentDenominator,  // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -261,7 +261,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
+		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},

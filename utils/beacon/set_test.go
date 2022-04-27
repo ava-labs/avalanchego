@@ -16,9 +16,9 @@ import (
 func TestSet(t *testing.T) {
 	assert := assert.New(t)
 
-	id0 := ids.ShortID{0}
-	id1 := ids.ShortID{1}
-	id2 := ids.ShortID{2}
+	id0 := ids.NodeID{0}
+	id1 := ids.NodeID{1}
+	id2 := ids.NodeID{2}
 
 	ip0 := utils.IPDesc{
 		IP:   net.IPv4zero,

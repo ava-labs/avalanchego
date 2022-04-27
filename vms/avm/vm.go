@@ -105,11 +105,11 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 }
 
-func (vm *VM) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	return nil
 }
 
-func (vm *VM) Disconnected(nodeID ids.ShortID) error {
+func (vm *VM) Disconnected(nodeID ids.NodeID) error {
 	return nil
 }
 
@@ -1062,21 +1062,21 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (vm *VM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (vm *VM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return nil
 }

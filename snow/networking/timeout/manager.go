@@ -26,7 +26,7 @@ type Manager interface {
 	TimeoutDuration() time.Duration
 	// IsBenched returns true if messages to [nodeID] regarding [chainID]
 	// should not be sent over the network and should immediately fail.
-	IsBenched(nodeID ids.ShortID, chainID ids.ID) bool
+	IsBenched(nodeID ids.NodeID, chainID ids.ID) bool
 	// Register the existence of the given chain.
 	// Must be called before any method calls that use the
 	// ID of the chain.
@@ -35,7 +35,7 @@ type Manager interface {
 	// [nodeID] for chain [chainID]. If we don't receive a response in
 	// time, [timeoutHandler] is executed.
 	RegisterRequest(
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		chainID ids.ID,
 		op message.Op,
 		requestID ids.ID,
@@ -52,7 +52,7 @@ type Manager interface {
 	// requestID we sent them. [latency] is the time between us
 	// sending them the request and receiving their response.
 	RegisterResponse(
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		chainID ids.ID,
 		requestID ids.ID,
 		op message.Op,
@@ -89,7 +89,9 @@ func (m *manager) TimeoutDuration() time.Duration {
 	return m.tm.TimeoutDuration()
 }
 
-func (m *manager) IsBenched(nodeID ids.ShortID, chainID ids.ID) bool {
+// IsBenched returns true if messages to [nodeID] regarding [chainID]
+// should not be sent over the network and should immediately fail.
+func (m *manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
 	return m.benchlistMgr.IsBenched(nodeID, chainID)
 }
 
@@ -103,8 +105,11 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	return nil
 }
 
+// RegisterRequest notes that we expect a response of type [op] from
+// [nodeID] regarding chain [chainID]. If we don't receive a response in
+// time, [timeoutHandler]  is executed.
 func (m *manager) RegisterRequest(
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	chainID ids.ID,
 	op message.Op,
 	requestID ids.ID,
@@ -118,8 +123,10 @@ func (m *manager) RegisterRequest(
 	return m.tm.Put(requestID, op, newTimeoutHandler), true
 }
 
+// RegisterResponse registers that we received a response from [nodeID]
+// regarding the given request ID and chain.
 func (m *manager) RegisterResponse(
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID ids.ID,
 	op message.Op,

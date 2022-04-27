@@ -29,7 +29,7 @@ var (
 	errParsedUnknownVertex = errors.New("parsed unknown vertex")
 )
 
-func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -52,7 +52,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestShortID()
+	peer := ids.GenerateTestNodeID()
 	if err := peers.AddWeight(peer, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	requestID := new(uint32)
 	reqVtxID := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		switch {
 		case vdr != peerID:
 			t.Fatalf("Should have requested vertex from %s, requested from %s",
@@ -446,7 +446,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -588,7 +588,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -712,7 +712,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -834,7 +834,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -972,7 +972,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -1165,7 +1165,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}

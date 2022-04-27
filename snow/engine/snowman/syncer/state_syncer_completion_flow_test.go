@@ -64,11 +64,11 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 	var (
 		blkRequested  bool
 		reqBlkID      ids.ID
-		reachedNodeID = ids.ShortID{'n', 'o', 'd', 'e', 'I', 'D'}
+		reachedNodeID = ids.NodeID{'n', 'o', 'd', 'e', 'I', 'D'}
 		sentReqID     uint32
 	)
 	sender.CantSendGet = true
-	sender.SendGetF = func(nodeID ids.ShortID, reqID uint32, blkID ids.ID) {
+	sender.SendGetF = func(nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
 		blkRequested = true
 		reachedNodeID = nodeID
 		sentReqID = reqID
@@ -93,7 +93,7 @@ func TestAtStateSyncDoneLastSummaryBlockIsRequested(t *testing.T) {
 
 	// if Put message is received from wrong validator, node waits to for the right node to respond
 	blkRequested = false
-	wrongNodeID := ids.ShortID{'w', 'r', 'o', 'n', 'g'}
+	wrongNodeID := ids.NodeID{'w', 'r', 'o', 'n', 'g'}
 	assert.NoError(syncer.Put(wrongNodeID, sentReqID, []byte{}))
 	assert.False(blkRequested)
 	assert.True(reqBlkID == lastSummaryBlkID)

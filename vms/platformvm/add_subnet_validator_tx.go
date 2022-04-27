@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -131,7 +130,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 		if err != nil && err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -160,7 +159,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 				}
 				return nil, nil, fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+					tx.Validator.NodeID,
 					err,
 				)
 			}
@@ -255,7 +254,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 	weight, // Sampling weight of the new validator
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they top delegating
-	nodeID ids.ShortID, // ID of the node validating
+	nodeID ids.NodeID, // ID of the node validating
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 	changeAddr ids.ShortID, // Address to send change to, if there is any

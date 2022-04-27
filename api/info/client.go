@@ -16,7 +16,7 @@ var _ Client = &client{}
 // Client interface for an Info API Client
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
-	GetNodeID(context.Context, ...rpc.Option) (string, error)
+	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, error)
 	GetNodeIP(context.Context, ...rpc.Option) (string, error)
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
@@ -46,7 +46,7 @@ func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*Ge
 	return res, err
 }
 
-func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (string, error) {
+func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.NodeID, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest(ctx, "getNodeID", struct{}{}, res, options...)
 	return res.NodeID, err

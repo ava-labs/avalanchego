@@ -49,7 +49,7 @@ type getter struct {
 	getAncestorsBlks metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(validatorID ids.NodeID, requestID uint32) error {
 	if gh.ssVM == nil {
 		gh.log.Debug("State sync not supported. GetStateSummaryFrontier(%s, %d) dropped.", validatorID, requestID)
 		return nil
@@ -69,7 +69,7 @@ func (gh *getter) GetStateSummaryFrontier(validatorID ids.ShortID, requestID uin
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uint32, heights []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.NodeID, requestID uint32, heights []uint64) error {
 	if gh.ssVM == nil {
 		gh.log.Debug("State sync not supported. GetAcceptedStateSummary(%s, %d) dropped.", validatorID, requestID)
 		return nil
@@ -90,7 +90,7 @@ func (gh *getter) GetAcceptedStateSummary(validatorID ids.ShortID, requestID uin
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+func (gh *getter) GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error {
 	lastAccepted, err := gh.vm.LastAccepted()
 	if err != nil {
 		return err
@@ -99,18 +99,18 @@ func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
 	return nil
 }
 
-func (gh *getter) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
 		if blk, err := gh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
-	gh.sender.SendAccepted(validatorID, requestID, acceptedIDs)
+	gh.sender.SendAccepted(nodeID, requestID, acceptedIDs)
 	return nil
 }
 
-func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes, err := block.GetAncestors(
 		gh.vm,
 		blkID,
@@ -120,26 +120,26 @@ func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, blkID 
 	)
 	if err != nil {
 		gh.log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
-			err, validatorID, requestID, blkID)
+			err, nodeID, requestID, blkID)
 		return nil
 	}
 
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(validatorID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(nodeID, requestID, ancestorsBytes)
 	return nil
 }
 
-func (gh *getter) Get(validatorID ids.ShortID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	blk, err := gh.vm.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
 		// block has been pruned.
-		gh.log.Debug("Get(%s, %d, %s) failed with: %s", validatorID, requestID, blkID, err)
+		gh.log.Debug("Get(%s, %d, %s) failed with: %s", nodeID, requestID, blkID, err)
 		return nil
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	gh.sender.SendPut(validatorID, requestID, blkID, blk.Bytes())
+	gh.sender.SendPut(nodeID, requestID, blkID, blk.Bytes())
 	return nil
 }

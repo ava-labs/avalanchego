@@ -19,14 +19,14 @@ type InboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundStateSummaryFrontier(
 		chainID ids.ID,
 		requestID uint32,
 		summary []byte,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundGetAcceptedStateSummary(
@@ -34,28 +34,28 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		heights []uint64,
 		deadline time.Duration,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundAcceptedStateSummary(
 		chainID ids.ID,
 		requestID uint32,
 		summaryIDs []ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundGetAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundAcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundGetAccepted(
@@ -63,21 +63,21 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		containerIDs []ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundAccepted(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundAncestors(
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage // used in UTs only
 
 	InboundPushQuery(
@@ -86,7 +86,7 @@ type InboundMsgBuilder interface {
 		deadline time.Duration,
 		containerID ids.ID,
 		container []byte,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundPullQuery(
@@ -94,14 +94,14 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		containerID ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundChits(
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundAppRequest(
@@ -109,14 +109,14 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		msg []byte,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundAppResponse(
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundGet(
@@ -124,7 +124,7 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		deadline time.Duration,
 		containerID ids.ID,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage
 
 	InboundPut(
@@ -132,7 +132,7 @@ type InboundMsgBuilder interface {
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 	) InboundMessage // used in UTs only
 }
 
@@ -156,7 +156,7 @@ func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -175,7 +175,7 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	summary []byte,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		op: StateSummaryFrontier,
@@ -193,7 +193,7 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	requestID uint32,
 	heights []uint64,
 	deadline time.Duration,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -213,7 +213,7 @@ func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	summaryIDs []ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
@@ -232,7 +232,7 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -251,7 +251,7 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -271,7 +271,7 @@ func (b *inMsgBuilder) InboundGetAccepted(
 	requestID uint32,
 	deadline time.Duration,
 	containerIDs []ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	containerIDBytes := make([][]byte, len(containerIDs))
@@ -293,7 +293,7 @@ func (b *inMsgBuilder) InboundAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -314,7 +314,7 @@ func (b *inMsgBuilder) InboundPushQuery(
 	deadline time.Duration,
 	containerID ids.ID,
 	container []byte,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -336,7 +336,7 @@ func (b *inMsgBuilder) InboundPullQuery(
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -356,7 +356,7 @@ func (b *inMsgBuilder) InboundChits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -376,7 +376,7 @@ func (b *inMsgBuilder) InboundAppRequest(
 	requestID uint32,
 	deadline time.Duration,
 	msg []byte,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -396,7 +396,7 @@ func (b *inMsgBuilder) InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
 	msg []byte,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage {
 	return &inboundMessage{
 		op: AppResponse,
@@ -414,7 +414,7 @@ func (b *inMsgBuilder) InboundGet(
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage { // used in UTs only
 	received := b.clock.Time()
 	return &inboundMessage{
@@ -435,7 +435,7 @@ func (b *inMsgBuilder) InboundPut(
 	requestID uint32,
 	containerID ids.ID,
 	container []byte,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage { // used in UTs only
 	return &inboundMessage{
 		op: Put,
@@ -453,7 +453,7 @@ func (b *inMsgBuilder) InboundAncestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 ) InboundMessage { // used in UTs only
 	return &inboundMessage{
 		op: Ancestors,

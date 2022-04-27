@@ -14,7 +14,7 @@ import (
 func TestSendMixedQuery(t *testing.T) {
 	type test struct {
 		senderF   func() *MockSender
-		vdrs      []ids.ShortID
+		vdrs      []ids.NodeID
 		numPushTo int
 	}
 	reqID := uint32(1337)
@@ -23,13 +23,13 @@ func TestSendMixedQuery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	vdr1, vdr2, vdr3 := ids.GenerateTestShortID(), ids.GenerateTestShortID(), ids.GenerateTestShortID()
+	vdr1, vdr2, vdr3 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	tests := []test{
 		{
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.ShortSet{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
+					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerID,
 					containerBytes,
@@ -41,33 +41,33 @@ func TestSendMixedQuery(t *testing.T) {
 				).Times(0)
 				return s
 			},
-			vdrs:      []ids.ShortID{vdr1, vdr2, vdr3},
+			vdrs:      []ids.NodeID{vdr1, vdr2, vdr3},
 			numPushTo: 3,
 		},
 		{
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.ShortSet{vdr1: struct{}{}},
+					ids.NodeIDSet{vdr1: struct{}{}},
 					reqID,
 					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
-					ids.ShortSet{vdr2: struct{}{}, vdr3: struct{}{}},
+					ids.NodeIDSet{vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerID,
 				).Times(1)
 				return s
 			},
-			vdrs:      []ids.ShortID{vdr1, vdr2, vdr3},
+			vdrs:      []ids.NodeID{vdr1, vdr2, vdr3},
 			numPushTo: 1,
 		},
 		{
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.ShortSet{vdr1: struct{}{}, vdr2: struct{}{}},
+					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
 					containerID,
 					containerBytes,
@@ -79,7 +79,7 @@ func TestSendMixedQuery(t *testing.T) {
 				).Times(0)
 				return s
 			},
-			vdrs:      []ids.ShortID{vdr1, vdr2},
+			vdrs:      []ids.NodeID{vdr1, vdr2},
 			numPushTo: 2,
 		},
 		{
@@ -92,20 +92,20 @@ func TestSendMixedQuery(t *testing.T) {
 					containerBytes,
 				).Times(0)
 				s.EXPECT().SendPullQuery(
-					ids.ShortSet{vdr1: struct{}{}},
+					ids.NodeIDSet{vdr1: struct{}{}},
 					reqID,
 					containerID,
 				).Times(1)
 				return s
 			},
-			vdrs:      []ids.ShortID{vdr1},
+			vdrs:      []ids.NodeID{vdr1},
 			numPushTo: 0,
 		},
 		{
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.ShortSet{vdr1: struct{}{}, vdr2: struct{}{}},
+					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
 					containerID,
 					containerBytes,
@@ -117,7 +117,7 @@ func TestSendMixedQuery(t *testing.T) {
 				).Times(0)
 				return s
 			},
-			vdrs:      []ids.ShortID{vdr1, vdr2},
+			vdrs:      []ids.NodeID{vdr1, vdr2},
 			numPushTo: 4,
 		},
 	}
