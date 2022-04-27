@@ -451,10 +451,6 @@ func (c *client) AddValidator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr := make([]string, len(from))
-	for i, addr := range from {
-		fromStr[i] = addr.String()
-	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
 	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
