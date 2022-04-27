@@ -202,7 +202,4 @@ type Config struct {
 
 	// VM management
 	VMManager vms.Manager `json:"-"`
-
-	// Reset proposerVM height index
-	ResetProposerVMHeightIndex bool `json:"resetProposerVMHeightIndex"`
 }

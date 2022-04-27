@@ -74,29 +74,28 @@ type VM struct {
 	context        context.Context
 	onShutdown     func()
 
-	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
-	// timestamp if the last accepted block has been a PostForkOption block
-	// since having initialized the VM.
+	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp
+	// if the last accepted block has been a PostForkOption block since having
+	// initialized the VM.
 	lastAcceptedTime time.Time
 
-	syncSummary *statefulSummary
+	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
+	lastAcceptedHeight uint64
+	syncSummary        *statefulSummary
 }
 
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
-	resetHeightIndex bool,
 ) *VM {
 	ssVM, _ := vm.(block.StateSyncableVM)
-	proVM := &VM{
+	return &VM{
 		ChainVM:             vm,
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 		innerStateSyncVM:    ssVM,
 	}
-	proVM.resetHeightIndexOngoing.SetValue(resetHeightIndex)
-	return proVM
 }
 
 func (vm *VM) Initialize(
@@ -148,18 +147,104 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repairAcceptedChain(); err != nil {
+	if err := vm.repair(indexerState); err != nil {
 		return err
 	}
 
-	if err := vm.setLastAcceptedOptionTime(); err != nil {
+	return vm.setLastAcceptedMetadata()
+}
+
+// shutdown ops then propagate shutdown to innerVM
+func (vm *VM) Shutdown() error {
+	vm.onShutdown()
+
+	if err := vm.db.Commit(); err != nil {
+		return err
+	}
+	return vm.ChainVM.Shutdown()
+}
+
+func (vm *VM) SetState(state snow.State) error {
+	vm.bootstrapped = (state == snow.NormalOp)
+	return vm.ChainVM.SetState(state)
+}
+
+func (vm *VM) BuildBlock() (snowman.Block, error) {
+	preferredBlock, err := vm.getBlock(vm.preferred)
+	if err != nil {
+		return nil, err
+	}
+
+	return preferredBlock.buildChild()
+}
+
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+	if blk, err := vm.parsePostForkBlock(b); err == nil {
+		return blk, nil
+	}
+	return vm.parsePreForkBlock(b)
+}
+
+func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
+	return vm.getBlock(id)
+}
+
+func (vm *VM) SetPreference(preferred ids.ID) error {
+	if vm.preferred == preferred {
+		return nil
+	}
+	vm.preferred = preferred
+
+	blk, err := vm.getPostForkBlock(preferred)
+	if err != nil {
+		return vm.ChainVM.SetPreference(preferred)
+	}
+
+	if err := vm.ChainVM.SetPreference(blk.getInnerBlk().ID()); err != nil {
 		return err
 	}
 
+	pChainHeight, err := blk.pChainHeight()
+	if err != nil {
+		return err
+	}
+
+	// reset scheduler
+	minDelay, err := vm.Windower.Delay(blk.Height()+1, pChainHeight, vm.ctx.NodeID)
+	if err != nil {
+		vm.ctx.Log.Debug("failed to fetch the expected delay due to: %s", err)
+		// A nil error is returned here because it is possible that
+		// bootstrapping caused the last accepted block to move past the latest
+		// P-chain height. This will cause building blocks to return an error
+		// until the P-chain's height has advanced.
+		return nil
+	}
+	if minDelay < minBlockDelay {
+		minDelay = minBlockDelay
+	}
+
+	preferredTime := blk.Timestamp()
+	nextStartTime := preferredTime.Add(minDelay)
+	vm.Scheduler.SetBuildBlockTime(nextStartTime)
+
+	vm.ctx.Log.Debug("set preference to %s with timestamp %v; build time scheduled at %v",
+		blk.ID(), preferredTime, nextStartTime)
+	return nil
+}
+
+func (vm *VM) LastAccepted() (ids.ID, error) {
+	lastAccepted, err := vm.State.GetLastAccepted()
+	if err == database.ErrNotFound {
+		return vm.ChainVM.LastAccepted()
+	}
+	return lastAccepted, err
+}
+
+func (vm *VM) repair(indexerState state.State) error {
 	// check and possibly rebuild height index
 	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
 	if !ok {
-		return nil // nothing else to do
+		return vm.repairAcceptedChainByIteration()
 	}
 
 	indexIsEmpty, err := vm.State.IsIndexEmpty()
@@ -186,7 +271,6 @@ func (vm *VM) Initialize(
 
 	if !vm.resetHeightIndexOngoing.GetValue() {
 		// We are not going to wipe the height index
-
 		switch innerHVM.VerifyHeightIndex() {
 		case nil:
 			// We are not going to wait for the height index to be repaired.
@@ -197,12 +281,16 @@ func (vm *VM) Initialize(
 			if !shouldRepair {
 				vm.ctx.Log.Info("block height index was successfully verified")
 				vm.hIndexer.MarkRepaired()
-				return nil
+				return vm.repairAcceptedChainByHeight()
 			}
 		case block.ErrIndexIncomplete:
 		default:
 			return err
 		}
+	}
+
+	if err := vm.repairAcceptedChainByIteration(); err != nil {
+		return err
 	}
 
 	// asynchronously rebuild height index, if needed
@@ -282,101 +370,10 @@ func (vm *VM) Initialize(
 			vm.ctx.Log.Error("block height indexing failed: %s", err)
 		}
 	}()
-
 	return nil
 }
 
-// shutdown ops then propagate shutdown to innerVM
-func (vm *VM) Shutdown() error {
-	vm.onShutdown()
-
-	if err := vm.db.Commit(); err != nil {
-		return err
-	}
-	return vm.ChainVM.Shutdown()
-}
-
-func (vm *VM) SetState(state snow.State) error {
-	vm.bootstrapped = (state == snow.NormalOp)
-	return vm.ChainVM.SetState(state)
-}
-
-func (vm *VM) BuildBlock() (snowman.Block, error) {
-	preferredBlock, err := vm.getBlock(vm.preferred)
-	if err != nil {
-		return nil, err
-	}
-
-	return preferredBlock.buildChild()
-}
-
-func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	return vm.parseBlock(b)
-}
-
-func (vm *VM) parseBlock(b []byte) (Block, error) {
-	if blk, err := vm.parsePostForkBlock(b); err == nil {
-		return blk, nil
-	}
-	return vm.parsePreForkBlock(b)
-}
-
-func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	return vm.getBlock(id)
-}
-
-func (vm *VM) SetPreference(preferred ids.ID) error {
-	if vm.preferred == preferred {
-		return nil
-	}
-	vm.preferred = preferred
-
-	blk, err := vm.getPostForkBlock(preferred)
-	if err != nil {
-		return vm.ChainVM.SetPreference(preferred)
-	}
-
-	if err := vm.ChainVM.SetPreference(blk.getInnerBlk().ID()); err != nil {
-		return err
-	}
-
-	pChainHeight, err := blk.pChainHeight()
-	if err != nil {
-		return err
-	}
-
-	// reset scheduler
-	minDelay, err := vm.Windower.Delay(blk.Height()+1, pChainHeight, vm.ctx.NodeID)
-	if err != nil {
-		vm.ctx.Log.Debug("failed to fetch the expected delay due to: %s", err)
-		// A nil error is returned here because it is possible that
-		// bootstrapping caused the last accepted block to move past the latest
-		// P-chain height. This will cause building blocks to return an error
-		// until the P-chain's height has advanced.
-		return nil
-	}
-	if minDelay < minBlockDelay {
-		minDelay = minBlockDelay
-	}
-
-	preferredTime := blk.Timestamp()
-	nextStartTime := preferredTime.Add(minDelay)
-	vm.Scheduler.SetBuildBlockTime(nextStartTime)
-
-	vm.ctx.Log.Debug("set preference to %s with timestamp %v; build time scheduled at %v",
-		blk.ID(), preferredTime, nextStartTime)
-	return nil
-}
-
-func (vm *VM) LastAccepted() (ids.ID, error) {
-	lastAccepted, err := vm.State.GetLastAccepted()
-	if err == database.ErrNotFound {
-		return vm.ChainVM.LastAccepted()
-	}
-	return lastAccepted, err
-}
-
-func (vm *VM) repairAcceptedChain() error {
+func (vm *VM) repairAcceptedChainByIteration() error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block isn't indexed yet, then the underlying
@@ -446,7 +443,67 @@ func (vm *VM) repairAcceptedChain() error {
 	}
 }
 
-func (vm *VM) setLastAcceptedOptionTime() error {
+func (vm *VM) repairAcceptedChainByHeight() error {
+	innerLastAcceptedID, err := vm.ChainVM.LastAccepted()
+	if err != nil {
+		return err
+	}
+	innerLastAccepted, err := vm.ChainVM.GetBlock(innerLastAcceptedID)
+	if err != nil {
+		return err
+	}
+	proLastAcceptedID, err := vm.State.GetLastAccepted()
+	if err == database.ErrNotFound {
+		// If the last accepted block isn't indexed yet, then the underlying
+		// chain is the only chain and there is nothing to repair.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	proLastAccepted, err := vm.getPostForkBlock(proLastAcceptedID)
+	if err != nil {
+		return err
+	}
+
+	proLastAcceptedHeight := proLastAccepted.Height()
+	innerLastAcceptedHeight := innerLastAccepted.Height()
+	if proLastAcceptedHeight < innerLastAcceptedHeight {
+		return fmt.Errorf("proposervm height index (%d) should never be lower than the inner height index (%d)", proLastAcceptedHeight, innerLastAcceptedHeight)
+	}
+	if proLastAcceptedHeight == innerLastAcceptedHeight {
+		// There is nothing to repair - as the heights match
+		return nil
+	}
+
+	// The inner vm must be behind the proposer vm, so we must roll the proposervm back.
+	forkHeight, err := vm.State.GetForkHeight()
+	if err != nil {
+		return err
+	}
+
+	if forkHeight > innerLastAcceptedHeight {
+		// We are rolling back past the fork, so we should just forget about all of our proposervm indices.
+
+		if err := vm.State.DeleteLastAccepted(); err != nil {
+			return err
+		}
+		return vm.db.Commit()
+	}
+
+	newProLastAcceptedID, err := vm.State.GetBlockIDAtHeight(innerLastAcceptedHeight)
+	if err != nil {
+		return err
+	}
+
+	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
+		return err
+	}
+	return vm.db.Commit()
+}
+
+func (vm *VM) setLastAcceptedMetadata() error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block wasn't a PostFork block, then we don't
@@ -457,18 +514,21 @@ func (vm *VM) setLastAcceptedOptionTime() error {
 		return err
 	}
 
-	lastAccepted, _, err := vm.State.GetBlock(lastAcceptedID)
+	lastAccepted, err := vm.getPostForkBlock(lastAcceptedID)
 	if err != nil {
 		return err
 	}
 
-	if _, ok := lastAccepted.(statelessblock.SignedBlock); ok {
+	// Set the last accepted height
+	vm.lastAcceptedHeight = lastAccepted.Height()
+
+	if _, ok := lastAccepted.getStatelessBlk().(statelessblock.SignedBlock); ok {
 		// If the last accepted block wasn't a PostForkOption, then we don't
 		// initialize the time.
 		return nil
 	}
 
-	acceptedParent, err := vm.getPostForkBlock(lastAccepted.ParentID())
+	acceptedParent, err := vm.getPostForkBlock(lastAccepted.Parent())
 	if err != nil {
 		return err
 	}

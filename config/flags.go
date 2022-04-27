@@ -287,6 +287,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
 	fs.Int(SnowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, 2*time.Minute, "Maximum amount of time an item should be processing and still be healthy")
+	fs.Uint(SnowMixedQueryNumPushKey, 10, fmt.Sprintf("When a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushKey))
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
@@ -297,7 +298,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
-	fs.Bool(ResetProposerVMHeightIndexKey, false, "if true, proposervm height index is wiped on startup")
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled")
 

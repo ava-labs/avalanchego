@@ -125,6 +125,7 @@ func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 			OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
 			MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
 			MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
+			MixedQueryNumPush:     int(v.GetUint(SnowMixedQueryNumPushKey)),
 		},
 		BatchSize: v.GetInt(SnowAvalancheBatchSizeKey),
 		Parents:   v.GetInt(SnowAvalancheNumParentsKey),
@@ -1200,12 +1201,5 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// VM Aliases
 	nodeConfig.VMManager, err = getVMManager(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// reset proposerVM height index
-	nodeConfig.ResetProposerVMHeightIndex = v.GetBool(ResetProposerVMHeightIndexKey)
-
-	return nodeConfig, nil
+	return nodeConfig, err
 }

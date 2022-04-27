@@ -641,7 +641,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
-		ResetProposerVMHeightIndex:              n.Config.ResetProposerVMHeightIndex,
 	})
 
 	// Notify the API server when new chains are created
@@ -869,7 +868,7 @@ func (n *Node) initInfoAPI() error {
 		n.Config.VMManager,
 		&n.Config.NetworkConfig.MyIP,
 		n.Net,
-		version.NewDefaultApplicationParser(),
+		version.DefaultApplicationParser,
 		primaryValidators,
 		n.benchlistManager,
 	)

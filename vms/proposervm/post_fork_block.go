@@ -30,20 +30,20 @@ func (b *postForkBlock) Accept() error {
 }
 
 func (b *postForkBlock) acceptOuterBlk() error {
+	// Update in-memory references
+	b.status = choices.Accepted
+	b.vm.lastAcceptedTime = b.Timestamp()
+	b.vm.lastAcceptedHeight = b.Height()
+
 	blkID := b.ID()
+	delete(b.vm.verifiedBlocks, blkID)
+
+	// Persist this block, its height index, and its status
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
 
-	// Persist this block, its height index, and its status
-	b.status = choices.Accepted
-	if err := b.vm.storePostForkBlock(b); err != nil {
-		return err
-	}
-
-	delete(b.vm.verifiedBlocks, blkID)
-	b.vm.lastAcceptedTime = b.Timestamp()
-	return nil
+	return b.vm.storePostForkBlock(b)
 }
 
 func (b *postForkBlock) acceptInnerBlk() error {
@@ -59,7 +59,12 @@ func (b *postForkBlock) Reject() error {
 	return nil
 }
 
-func (b *postForkBlock) Status() choices.Status { return b.status }
+func (b *postForkBlock) Status() choices.Status {
+	if b.status == choices.Accepted && b.Height() > b.vm.lastAcceptedHeight {
+		return choices.Processing
+	}
+	return b.status
+}
 
 // Return this block's parent, or a *missing.Block if
 // we don't have the parent.
