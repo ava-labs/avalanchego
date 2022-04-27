@@ -7,10 +7,7 @@ import (
 	"errors"
 )
 
-var (
-	ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
-	ErrUnknownStateSummary           = errors.New("state summary not found")
-)
+var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
 // StateSyncableVM represents functionalities to allow Snowman VMs to sync to a given state,
 // rather then boostrapping from genesis.
@@ -24,18 +21,17 @@ type StateSyncableVM interface {
 	// The engine can then ask the network if the ongoing summary is still supported,
 	// thus helping StateSyncableVM to decide whether to continue an in-progress sync
 	// or start over.
-	// If no local state summary exists, GetOngoingSyncStateSummary returns an
-	// Empty Summary with empty ID, zero height, and nil bytes.
+	// Returns database.ErrNotFound if there is no in-progress sync.
 	GetOngoingSyncStateSummary() (Summary, error)
 
 	// GetLastStateSummary returns latest Summary with an optional error
-	// Returns ErrUnknownStateSummary if summary is not available
+	// Returns database.ErrNotFound if summary is not available
 	GetLastStateSummary() (Summary, error)
 
 	// ParseStateSummary builds a Summary out of summaryBytes
 	ParseStateSummary(summaryBytes []byte) (Summary, error)
 
 	// GetStateSummary retrieves the summary related to height, if available.
-	// Returns ErrUnknownStateSummary if summary is not available
+	// Returns database.ErrNotFound if summary is not available
 	GetStateSummary(summaryHeight uint64) (Summary, error)
 }

@@ -17,7 +17,6 @@ var (
 		4: block.ErrIndexIncomplete,
 
 		5: block.ErrStateSyncableVMNotImplemented,
-		6: block.ErrUnknownStateSummary,
 	}
 	errorToErrCode = map[error]uint32{
 		database.ErrClosed:   1,
@@ -27,7 +26,6 @@ var (
 		block.ErrIndexIncomplete:               4,
 
 		block.ErrStateSyncableVMNotImplemented: 5,
-		block.ErrUnknownStateSummary:           6,
 	}
 )
 

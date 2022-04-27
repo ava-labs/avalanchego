@@ -9,10 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-func BuildEmptyProposerSummary() ProposerSummary {
-	return NewProposerSummary(&StatelessSummary{}, 0)
-}
-
 func BuildProposerSummary(
 	proBlkBytes []byte,
 	coreSummary block.Summary,

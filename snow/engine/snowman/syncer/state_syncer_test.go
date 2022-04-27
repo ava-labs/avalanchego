@@ -9,6 +9,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -157,7 +158,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	assert.True(bytes.Equal(ws.s.Bytes(), summaryBytes))
 }
 
-func TestStateSyncEmptyLocalSummaryIsNotIncludedAmongFrontiers(t *testing.T) {
+func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T) {
 	assert := assert.New(t)
 
 	vdrs := buildTestPeers(t)
@@ -171,15 +172,10 @@ func TestStateSyncEmptyLocalSummaryIsNotIncludedAmongFrontiers(t *testing.T) {
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
-	// mock VM to simulate a valid summary is returned
-	emptyLocalSummary := &block.TestSummary{
-		HeightV: 0,
-		IDV:     ids.Empty,
-		BytesV:  nil,
-	}
+	// mock VM to simulate a no summary returned
 	fullVM.CantStateSyncGetOngoingSummary = true
 	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
-		return emptyLocalSummary, nil
+		return nil, database.ErrNotFound
 	}
 
 	// Connect enough stake to start syncer
@@ -187,9 +183,8 @@ func TestStateSyncEmptyLocalSummaryIsNotIncludedAmongFrontiers(t *testing.T) {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
 
-	assert.True(syncer.locallyAvailableSummary == emptyLocalSummary)
-	_, ok := syncer.weightedSummaries[summaryID]
-	assert.False(ok)
+	assert.Nil(syncer.locallyAvailableSummary)
+	assert.Empty(syncer.weightedSummaries)
 }
 
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {

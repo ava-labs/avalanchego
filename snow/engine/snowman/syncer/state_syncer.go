@@ -9,6 +9,7 @@ import (
 
 	stdmath "math"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -279,7 +280,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.Summary {
 	// by default pick highest summary, unless locallyAvailableSummary is still valid.
 	// In such case we pick locallyAvailableSummary to allow VM resuming state syncing.
 	for id, ws := range ss.weightedSummaries {
-		if id == ss.locallyAvailableSummary.ID() {
+		if ss.locallyAvailableSummary != nil && id == ss.locallyAvailableSummary.ID() {
 			preferredStateSummaryID = id
 			break
 		}
@@ -359,28 +360,25 @@ func (ss *stateSyncer) startup() error {
 
 	// check if there is an ongoing state sync; if so add its state summary
 	// to the frontier to request votes on
-	// Note that summary with emptyID represents no ongoing summary
-	// empty summaries are not validated over network
+	// Note: database.ErrNotFound means there is no ongoing summary
 	localSummary, err := ss.stateSyncVM.GetOngoingSyncStateSummary()
-	if err != nil {
-		return err
-	}
-	ss.locallyAvailableSummary = localSummary
-
-	if localSummary.ID() != ids.Empty {
+	switch err {
+	case database.ErrNotFound:
+		// no action needed
+	case nil:
+		ss.locallyAvailableSummary = localSummary
 		ss.weightedSummaries[localSummary.ID()] = weightedSummary{
 			s: localSummary,
 		}
+	default:
+		return err
 	}
 
 	// initiate messages exchange
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
-		// Accept must always be called on exactly one state summary if state sync is enabled
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
-		if _, err := ss.locallyAvailableSummary.Accept(); err != nil {
-			return err
-		}
+		return ss.onDoneStateSyncing(ss.requestID)
 	}
 
 	ss.requestID++

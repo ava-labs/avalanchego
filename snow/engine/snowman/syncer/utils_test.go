@@ -6,6 +6,7 @@ package syncer
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -97,8 +98,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	assert.True(t, syncer.stateSyncVM != nil)
 
 	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
-		emptySummary.T = t
-		return emptySummary, nil
+		return nil, database.ErrNotFound
 	}
 
 	return syncer, fullVM, sender
