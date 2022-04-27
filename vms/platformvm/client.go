@@ -454,8 +454,9 @@ func (c *client) AddValidator(
 	jsonStakeAmount := json.Uint64(stakeAmount)
 	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass:      user,
-			JSONFromAddrs: api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			UserPass:       user,
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -482,31 +483,19 @@ func (c *client) AddDelegator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	rewardAddressStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, rewardAddress[:])
-	if err != nil {
-		return ids.Empty, err
-	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
-	err = c.requester.SendRequest(ctx, "addDelegator", &AddDelegatorArgs{
+	err := c.requester.SendRequest(ctx, "addDelegator", &AddDelegatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		}, APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		RewardAddress: rewardAddressStr,
+		RewardAddress: rewardAddress.String(),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -524,20 +513,12 @@ func (c *client) AddSubnetValidator(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
 	jsonStakeAmount := json.Uint64(stakeAmount)
-	err = c.requester.SendRequest(ctx, "addSubnetValidator", &AddSubnetValidatorArgs{
+	err := c.requester.SendRequest(ctx, "addSubnetValidator", &AddSubnetValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
