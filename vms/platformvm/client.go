@@ -541,7 +541,7 @@ func (c *client) CreateSubnet(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-    err := c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
+	err := c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
@@ -566,15 +566,15 @@ func (c *client) ExportAVAX(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-    err := c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
+	err := c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-        TargetChain: targetChain,
-		To:     to.String(),
-		Amount: json.Uint64(amount),
+		TargetChain: targetChain,
+		To:          to.String(),
+		Amount:      json.Uint64(amount),
 	}, res, options...)
 	return res.TxID, err
 }
