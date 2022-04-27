@@ -410,7 +410,7 @@ func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSi
 		SubnetID: subnetID,
 		Size:     json.Uint16(sampleSize),
 	}, res, options...)
-    return res.Validators, err
+	return res.Validators, err
 }
 
 func (c *client) AddValidator(
@@ -772,7 +772,7 @@ func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height ui
 		SubnetID: subnetID,
 		Height:   json.Uint64(height),
 	}, res, options...)
-    return res.Validators, err
+	return res.Validators, err
 }
 
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {

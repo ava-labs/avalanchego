@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	addressconverter "github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
 )
 
@@ -54,7 +53,6 @@ type ClientPrimaryDelegator struct {
 }
 
 func APIStakerToClientStaker(validator APIStaker) (ClientStaker, error) {
-	var err error
 	var clientStaker ClientStaker
 	clientStaker.TxID = validator.TxID
 	clientStaker.StartTime = uint64(validator.StartTime)
