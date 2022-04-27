@@ -541,26 +541,14 @@ func (c *client) CreateSubnet(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	controlKeysStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, controlKeys)
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
+    err := c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APISubnet: APISubnet{
-			ControlKeys: controlKeysStr,
+			ControlKeys: ids.ShortIDSliceToStringSlice(controlKeys),
 			Threshold:   json.Uint32(threshold),
 		},
 	}, res, options...)
@@ -573,30 +561,19 @@ func (c *client) ExportAVAX(
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
 	to ids.ShortID,
-	toChainIDAlias string,
+	targetChain string,
 	amount uint64,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	fromStr, err := addressconverter.FormatAddressesFromID(chainIDAlias, c.hrp, from)
-	if err != nil {
-		return ids.Empty, err
-	}
-	changeAddrStr, err := formatting.FormatAddress(chainIDAlias, c.hrp, changeAddr[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	toStr, err := formatting.FormatAddress(toChainIDAlias, c.hrp, to[:])
-	if err != nil {
-		return ids.Empty, err
-	}
-	err = c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
+    err := c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		To:     toStr,
+        TargetChain: targetChain,
+		To:     to.String(),
 		Amount: json.Uint64(amount),
 	}, res, options...)
 	return res.TxID, err
