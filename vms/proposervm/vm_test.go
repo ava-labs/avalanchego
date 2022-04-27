@@ -1257,6 +1257,15 @@ func TestInnerVMRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fetchedBlock, err := proVM.GetBlock(parsedBlock.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := fetchedBlock.Status(); status != choices.Accepted {
+		t.Fatalf("unexpected status %s. Expected %s", status, choices.Accepted)
+	}
+
 	// Restart the node and have the inner VM rollback state.
 
 	coreBlk.StatusV = choices.Processing

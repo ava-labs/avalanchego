@@ -32,7 +32,6 @@ func (b *postForkOption) Accept() error {
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
-
 	return b.acceptInnerBlk()
 }
 
@@ -48,7 +47,6 @@ func (b *postForkOption) acceptOuterBlk() error {
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-
 	return b.vm.storePostForkBlock(b)
 }
 
