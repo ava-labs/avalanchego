@@ -81,7 +81,7 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
-	syncSummary        *statefulSummary
+	state              snow.State
 }
 
 func New(
@@ -120,7 +120,7 @@ func (vm *VM) Initialize(
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine, vm.notifyCallback)
+	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
 	vm.Scheduler = scheduler
 	vm.toScheduler = vmToEngine
 
@@ -166,7 +166,21 @@ func (vm *VM) Shutdown() error {
 
 func (vm *VM) SetState(state snow.State) error {
 	vm.bootstrapped = (state == snow.NormalOp)
-	return vm.ChainVM.SetState(state)
+	if err := vm.ChainVM.SetState(state); err != nil {
+		return err
+	}
+
+	if vm.state == snow.StateSyncing && state == snow.Bootstrapping {
+		// when going from StateSyncing to Bootstrapping, if state sync
+		// has failed or was skipped, repairAcceptedChainByHeight rolls
+		// back the chain to the previously last accepted block. If
+		// state sync has completed successfully, this call is a no-op.
+		if err := vm.repairAcceptedChainByHeight(); err != nil {
+			return err
+		}
+	}
+	vm.state = state
+	return nil
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {

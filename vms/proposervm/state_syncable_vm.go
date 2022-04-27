@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -151,11 +150,4 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 		innerSummary:    innerSummary,
 		vm:              vm,
 	}, err
-}
-
-func (vm *VM) notifyCallback(msg common.Message) error {
-	if msg != common.StateSyncDone {
-		return nil
-	}
-	return vm.syncSummary.proposerBlock.acceptOuterBlk()
 }

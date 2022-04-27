@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -33,18 +32,11 @@ type statefulSummary struct {
 }
 
 func (ss *statefulSummary) Accept() (bool, error) {
-	// a non-empty statefulSummary carries the full proposerVM block associated
+	// a statefulSummary carries the full proposerVM block associated
 	// with the summary. We store this block and update height index with it,
 	// so that state sync could resume after a shutdown.
-	if ss.ID() != ids.Empty {
-		if postForkBlk, ok := ss.proposerBlock.(PostForkBlock); ok {
-			if err := ss.vm.storePostForkBlock(postForkBlk); err != nil {
-				return false, err
-			}
-		}
-
-		ss.vm.syncSummary = ss
+	if err := ss.proposerBlock.acceptOuterBlk(); err != nil {
+		return false, err
 	}
-
 	return ss.innerSummary.Accept()
 }
