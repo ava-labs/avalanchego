@@ -28,9 +28,8 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 	})
 	errs.Add(reg.Register(expired))
 
-	meteredOps := message.ConsensusOps
-	messages := make(map[message.Op]metric.Averager, len(meteredOps))
-	for _, op := range meteredOps {
+	messages := make(map[message.Op]metric.Averager, len(message.ConsensusOps))
+	for _, op := range message.ConsensusOps {
 		opStr := op.String()
 		messages[op] = metric.NewAveragerWithErrs(
 			namespace,
