@@ -31,10 +31,10 @@ type Version interface {
 }
 
 type SemanticVersion struct {
-	Major_  int    `yaml:"major"`
-	Minor_  int    `yaml:"minor"`
-	Patch_  int    `yaml:"patch"`
-	String_ string `yaml:"string"`
+	MajorVersion int    `yaml:"major"`
+	MinorVersion int    `yaml:"minor"`
+	PatchVersion int    `yaml:"patch"`
+	Str          string `yaml:"string"`
 }
 
 func NewDefaultVersion(major, minor, patch int) Version {
@@ -43,10 +43,10 @@ func NewDefaultVersion(major, minor, patch int) Version {
 
 func NewVersion(major, minor, patch int, prefix, versionSeparator string) *SemanticVersion {
 	return &SemanticVersion{
-		Major_: major,
-		Minor_: minor,
-		Patch_: patch,
-		String_: fmt.Sprintf(
+		MajorVersion: major,
+		MinorVersion: minor,
+		PatchVersion: patch,
+		Str: fmt.Sprintf(
 			"%s%d%s%d%s%d",
 			prefix,
 			major,
@@ -58,10 +58,10 @@ func NewVersion(major, minor, patch int, prefix, versionSeparator string) *Seman
 	}
 }
 
-func (v *SemanticVersion) String() string { return v.String_ }
-func (v *SemanticVersion) Major() int     { return v.Major_ }
-func (v *SemanticVersion) Minor() int     { return v.Minor_ }
-func (v *SemanticVersion) Patch() int     { return v.Patch_ }
+func (v *SemanticVersion) String() string { return v.Str }
+func (v *SemanticVersion) Major() int     { return v.MajorVersion }
+func (v *SemanticVersion) Minor() int     { return v.MinorVersion }
+func (v *SemanticVersion) Patch() int     { return v.PatchVersion }
 
 // Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
 func (v *SemanticVersion) Compare(o Version) int {
