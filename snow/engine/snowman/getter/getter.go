@@ -26,11 +26,6 @@ func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error
 		log:    commonCfg.Ctx.Log,
 	}
 
-	ssVM, ok := gh.vm.(block.StateSyncableVM)
-	if ok {
-		gh.ssVM = ssVM
-	}
-
 	var err error
 	gh.getAncestorsBlks, err = metric.NewAverager(
 		"bs",
