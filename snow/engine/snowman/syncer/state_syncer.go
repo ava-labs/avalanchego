@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -127,7 +128,8 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 			}
 		}
 	} else {
-		ss.Ctx.Log.Debug("Could not parse summary from bytes%s: %v", summaryBytes, err)
+		ss.Ctx.Log.Debug("Could not parse summary from bytes: %s", err)
+		ss.Ctx.Log.Verbo("%s", formatting.DumpBytes(summaryBytes))
 	}
 
 	ss.sendGetStateSummaryFrontiers()
