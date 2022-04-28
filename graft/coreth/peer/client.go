@@ -29,7 +29,7 @@ type Client interface {
 	// Request synchronously sends request to the selected nodeID
 	// Returns response bytes
 	// Returns errRequestFailed if request should be retried
-	Request(nodeID ids.ShortID, request []byte) ([]byte, error)
+	Request(nodeID ids.NodeID, request []byte) ([]byte, error)
 
 	// Gossip sends given gossip message to peers
 	Gossip(gossip []byte) error
@@ -58,7 +58,7 @@ func (c *client) RequestAny(minVersion version.Application, request []byte) ([]b
 
 // Request synchronously sends [request] message to specified [nodeID]
 // This function blocks until a response is received from the peer
-func (c *client) Request(nodeID ids.ShortID, request []byte) ([]byte, error) {
+func (c *client) Request(nodeID ids.NodeID, request []byte) ([]byte, error) {
 	waitingHandler := newWaitingResponseHandler()
 	if err := c.network.Request(nodeID, request, waitingHandler); err != nil {
 		return nil, err

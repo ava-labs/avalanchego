@@ -15,18 +15,18 @@ var _ GossipHandler = NoopMempoolGossipHandler{}
 
 // GossipHandler handles incoming gossip messages
 type GossipHandler interface {
-	HandleAtomicTx(nodeID ids.ShortID, msg AtomicTxGossip) error
-	HandleEthTxs(nodeID ids.ShortID, msg EthTxsGossip) error
+	HandleAtomicTx(nodeID ids.NodeID, msg AtomicTxGossip) error
+	HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip) error
 }
 
 type NoopMempoolGossipHandler struct{}
 
-func (NoopMempoolGossipHandler) HandleAtomicTx(nodeID ids.ShortID, msg AtomicTxGossip) error {
+func (NoopMempoolGossipHandler) HandleAtomicTx(nodeID ids.NodeID, msg AtomicTxGossip) error {
 	log.Debug("dropping unexpected AtomicTxGossip message", "peerID", nodeID)
 	return nil
 }
 
-func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.ShortID, msg EthTxsGossip) error {
+func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip) error {
 	log.Debug("dropping unexpected EthTxsGossip message", "peerID", nodeID)
 	return nil
 }
@@ -37,18 +37,18 @@ func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.ShortID, msg EthTxsGossi
 // on this struct.
 // Also see GossipHandler for implementation style.
 type RequestHandler interface {
-	HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
-	HandleAtomicTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
-	HandleBlockRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request BlockRequest) ([]byte, error)
-	HandleCodeRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, codeRequest CodeRequest) ([]byte, error)
+	HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
+	HandleAtomicTrieLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
+	HandleBlockRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request BlockRequest) ([]byte, error)
+	HandleCodeRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, codeRequest CodeRequest) ([]byte, error)
 }
 
 // ResponseHandler handles response for a sent request
 // Only one of OnResponse or OnFailure is called for a given requestID, not both
 type ResponseHandler interface {
 	// OnResponse is invoked when the peer responded to a request
-	OnResponse(nodeID ids.ShortID, requestID uint32, response []byte) error
+	OnResponse(nodeID ids.NodeID, requestID uint32, response []byte) error
 	// OnFailure is invoked when there was a failure in processing a request
 	// The FailureReason outlines the underlying cause.
-	OnFailure(nodeID ids.ShortID, requestID uint32) error
+	OnFailure(nodeID ids.NodeID, requestID uint32) error
 }

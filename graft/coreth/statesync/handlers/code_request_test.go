@@ -36,7 +36,7 @@ func TestCodeRequestHandler(t *testing.T) {
 	codeRequestHandler := NewCodeRequestHandler(database, stats.NewNoopHandlerStats(), codec)
 
 	// query for known code entry
-	responseBytes, err := codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestShortID(), 1, message.CodeRequest{Hash: codeHash})
+	responseBytes, err := codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 1, message.CodeRequest{Hash: codeHash})
 	assert.NoError(t, err)
 
 	var response message.CodeResponse
@@ -46,7 +46,7 @@ func TestCodeRequestHandler(t *testing.T) {
 	assert.True(t, bytes.Equal(codeBytes, response.Data))
 
 	// query for missing code entry
-	responseBytes, err = codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestShortID(), 2, message.CodeRequest{Hash: common.BytesToHash([]byte("some unknown hash"))})
+	responseBytes, err = codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 2, message.CodeRequest{Hash: common.BytesToHash([]byte("some unknown hash"))})
 	assert.NoError(t, err)
 	assert.Nil(t, responseBytes)
 
@@ -58,7 +58,7 @@ func TestCodeRequestHandler(t *testing.T) {
 	codeHash = crypto.Keccak256Hash(codeBytes)
 	rawdb.WriteCode(database, codeHash, codeBytes)
 
-	responseBytes, err = codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestShortID(), 3, message.CodeRequest{Hash: codeHash})
+	responseBytes, err = codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 3, message.CodeRequest{Hash: codeHash})
 	assert.NoError(t, err)
 	assert.NotNil(t, responseBytes)
 

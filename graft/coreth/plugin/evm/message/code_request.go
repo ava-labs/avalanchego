@@ -23,7 +23,7 @@ func (c CodeRequest) String() string {
 	return fmt.Sprintf("CodeRequest(Hash=%s)", c.Hash)
 }
 
-func (c CodeRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler RequestHandler) ([]byte, error) {
+func (c CodeRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
 	return handler.HandleCodeRequest(ctx, nodeID, requestID, c)
 }
 
