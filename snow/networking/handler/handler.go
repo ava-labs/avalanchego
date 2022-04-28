@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -30,6 +31,8 @@ var _ Handler = &handler{}
 
 type Handler interface {
 	common.Timer
+	health.Checker
+
 	Context() *snow.ConsensusContext
 	IsValidator(nodeID ids.NodeID) bool
 
@@ -203,6 +206,17 @@ func (h *handler) Start(recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
 	}
+}
+
+func (h *handler) HealthCheck() (interface{}, error) {
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
+
+	engine, err := h.getEngine()
+	if err != nil {
+		return nil, err
+	}
+	return engine.HealthCheck()
 }
 
 // Push the message onto the handler's queue
