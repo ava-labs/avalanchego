@@ -871,7 +871,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	assert.False(minoritySummaryCalled)
 }
 
-func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
+func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	assert := assert.New(t)
 
 	vdrs := buildTestPeers(t)
@@ -972,6 +972,147 @@ func TestVotingIsRestartedIfMajorityIsNotReached(t *testing.T) {
 	// instead the whole process is restared
 	assert.False(syncer.contactedVoters.Len() != 0) // no voters reached
 	assert.True(syncer.contactedSeeders.Len() != 0) // frontiers providers reached again
+}
+
+func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.T) {
+	assert := assert.New(t)
+
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
+	commonCfg := common.Config{
+		Ctx:           snow.DefaultConsensusContextTest(),
+		Beacons:       vdrs,
+		SampleK:       vdrs.Len(),
+		Alpha:         (vdrs.Weight() + 1) / 2,
+		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+	}
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
+
+	// set sender to track nodes reached out
+	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedFrontiersProviders[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate a valid minoritySummary1 is returned
+	minoritySummary1 := &block.TestStateSummary{
+		HeightV: key,
+		IDV:     summaryID,
+		BytesV:  summaryBytes,
+		T:       t,
+	}
+	minoritySummary2 := &block.TestStateSummary{
+		HeightV: minorityKey,
+		IDV:     minoritySummaryID,
+		BytesV:  minoritySummaryBytes,
+		T:       t,
+	}
+
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+		switch {
+		case bytes.Equal(b, summaryBytes):
+			return minoritySummary1, nil
+		case bytes.Equal(b, minoritySummaryBytes):
+			return minoritySummary2, nil
+		default:
+			return nil, fmt.Errorf("unknown state summary")
+		}
+	}
+
+	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// let all contacted vdrs respond with majority or minority summaries
+	for {
+		reachedSeeders := syncer.contactedSeeders.Len()
+		if reachedSeeders == 0 {
+			break
+		}
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedFrontiersProviders[beaconID]
+
+		if reachedSeeders%2 == 0 {
+			assert.NoError(syncer.StateSummaryFrontier(
+				beaconID,
+				reqID,
+				summaryBytes,
+			))
+		} else {
+			assert.NoError(syncer.StateSummaryFrontier(
+				beaconID,
+				reqID,
+				minoritySummaryBytes,
+			))
+		}
+	}
+	assert.False(syncer.contactedSeeders.Len() != 0)
+
+	majoritySummaryCalled := false
+	minoritySummaryCalled := false
+	minoritySummary1.AcceptF = func() (bool, error) {
+		majoritySummaryCalled = true
+		return true, nil
+	}
+	minoritySummary2.AcceptF = func() (bool, error) {
+		minoritySummaryCalled = true
+		return true, nil
+	}
+
+	stateSyncFullyDone := false
+	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+		stateSyncFullyDone = true
+		return nil
+	}
+
+	// let all votes respond in time without any summary reaching a majority.
+	// We achieve it by making most nodes voting for an invalid summaryID.
+	votingWeightStake := uint64(0)
+	for syncer.contactedVoters.Len() != 0 {
+		voterID, found := syncer.contactedVoters.Peek()
+		assert.True(found)
+		reqID := contactedVoters[voterID]
+
+		switch {
+		case votingWeightStake < commonCfg.Alpha/2:
+			assert.NoError(syncer.AcceptedStateSummary(
+				voterID,
+				reqID,
+				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
+			))
+			bw, _ := vdrs.GetWeight(voterID)
+			votingWeightStake += bw
+
+		default:
+			assert.NoError(syncer.AcceptedStateSummary(
+				voterID,
+				reqID,
+				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},
+			))
+			bw, _ := vdrs.GetWeight(voterID)
+			votingWeightStake += bw
+		}
+	}
+
+	// check that finally summary is passed to VM
+	assert.False(majoritySummaryCalled)
+	assert.False(minoritySummaryCalled)
+	assert.True(stateSyncFullyDone) // no restart, just move to boostrapping
 }
 
 func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
