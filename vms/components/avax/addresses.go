@@ -121,7 +121,7 @@ func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) 
 }
 
 func ParseServiceAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
-	addrs := make(ids.ShortSet, len(addrStrs))
+	addrs := ids.NewShortSet(len(addrStrs))
 	for _, addrStr := range addrStrs {
 		addr, err := ParseServiceAddress(a, addrStr)
 		if err != nil {
