@@ -11,7 +11,7 @@ import (
 
 func BuildProposerSummary(
 	proBlkBytes []byte,
-	coreSummary block.Summary,
+	coreSummary block.StateSummary,
 ) (ProposerSummary, error) {
 	statelessSummary := StatelessSummary{
 		ProBlkBytes:  proBlkBytes,

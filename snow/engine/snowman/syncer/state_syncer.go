@@ -29,7 +29,7 @@ var _ common.StateSyncer = &stateSyncer{}
 
 // summary content as received from network, along with accumulated weight.
 type weightedSummary struct {
-	summary block.Summary
+	summary block.StateSummary
 	weight  uint64
 }
 
@@ -55,7 +55,7 @@ type stateSyncer struct {
 
 	// we track the (possibly nil) local summary to help engine
 	// choosing among multiple validated summaries
-	locallyAvailableSummary block.Summary
+	locallyAvailableSummary block.StateSummary
 
 	// Holds the beacons that were sampled for the accepted frontier
 	frontierSeeders validators.Set
@@ -281,7 +281,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 
 // selectSyncableStateSummary chooses a state summary from all
 // the network validated summaries.
-func (ss *stateSyncer) selectSyncableStateSummary() block.Summary {
+func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 	maxSummaryHeight := uint64(0)
 	preferredStateSummaryID := ids.Empty
 

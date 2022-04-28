@@ -12,72 +12,74 @@ var (
 	_ StateSyncableVM = &TestStateSyncableVM{}
 
 	errStateSyncEnabled           = errors.New("unexpectedly called StateSyncEnabled")
+	errStateSyncGetOngoingSummary = errors.New("unexpectedly called StateSyncGetOngoingSummary")
 	errGetLastStateSummary        = errors.New("unexpectedly called GetLastStateSummary")
 	errParseStateSummary          = errors.New("unexpectedly called ParseStateSummary")
 	errGetStateSummary            = errors.New("unexpectedly called GetStateSummary")
-	errStateSyncGetOngoingSummary = errors.New("unexpectedly called StateSyncGetOngoingSummary")
 )
 
 type TestStateSyncableVM struct {
 	T *testing.T
 
-	CantStateSyncEnabled, CantStateSyncGetOngoingSummary,
-	CantGetLastStateSummary, CantParseStateSummary,
+	CantStateSyncEnabled,
+	CantStateSyncGetOngoingSummary,
+	CantGetLastStateSummary,
+	CantParseStateSummary,
 	CantGetStateSummary bool
 
 	StateSyncEnabledF           func() (bool, error)
-	GetOngoingSyncStateSummaryF func() (Summary, error)
-	GetLastStateSummaryF        func() (Summary, error)
-	ParseStateSummaryF          func(summaryBytes []byte) (Summary, error)
-	GetStateSummaryF            func(uint64) (Summary, error)
+	GetOngoingSyncStateSummaryF func() (StateSummary, error)
+	GetLastStateSummaryF        func() (StateSummary, error)
+	ParseStateSummaryF          func(summaryBytes []byte) (StateSummary, error)
+	GetStateSummaryF            func(uint64) (StateSummary, error)
 }
 
-func (tss *TestStateSyncableVM) StateSyncEnabled() (bool, error) {
-	if tss.StateSyncEnabledF != nil {
-		return tss.StateSyncEnabledF()
+func (vm *TestStateSyncableVM) StateSyncEnabled() (bool, error) {
+	if vm.StateSyncEnabledF != nil {
+		return vm.StateSyncEnabledF()
 	}
-	if tss.CantStateSyncEnabled && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called StateSyncEnabled")
+	if vm.CantStateSyncEnabled && vm.T != nil {
+		vm.T.Fatal(errStateSyncEnabled)
 	}
 	return false, errStateSyncEnabled
 }
 
-func (tss *TestStateSyncableVM) GetOngoingSyncStateSummary() (Summary, error) {
-	if tss.GetOngoingSyncStateSummaryF != nil {
-		return tss.GetOngoingSyncStateSummaryF()
+func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary() (StateSummary, error) {
+	if vm.GetOngoingSyncStateSummaryF != nil {
+		return vm.GetOngoingSyncStateSummaryF()
 	}
-	if tss.CantStateSyncGetOngoingSummary && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called StateSyncGetOngoingSummary")
+	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
+		vm.T.Fatal(errStateSyncGetOngoingSummary)
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
 
-func (tss *TestStateSyncableVM) GetLastStateSummary() (Summary, error) {
-	if tss.GetLastStateSummaryF != nil {
-		return tss.GetLastStateSummaryF()
+func (vm *TestStateSyncableVM) GetLastStateSummary() (StateSummary, error) {
+	if vm.GetLastStateSummaryF != nil {
+		return vm.GetLastStateSummaryF()
 	}
-	if tss.CantGetLastStateSummary && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called GetLastStateSummary")
+	if vm.CantGetLastStateSummary && vm.T != nil {
+		vm.T.Fatal(errGetLastStateSummary)
 	}
 	return nil, errGetLastStateSummary
 }
 
-func (tss *TestStateSyncableVM) ParseStateSummary(summaryBytes []byte) (Summary, error) {
-	if tss.ParseStateSummaryF != nil {
-		return tss.ParseStateSummaryF(summaryBytes)
+func (vm *TestStateSyncableVM) ParseStateSummary(summaryBytes []byte) (StateSummary, error) {
+	if vm.ParseStateSummaryF != nil {
+		return vm.ParseStateSummaryF(summaryBytes)
 	}
-	if tss.CantParseStateSummary && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called ParseStateSummary")
+	if vm.CantParseStateSummary && vm.T != nil {
+		vm.T.Fatal(errParseStateSummary)
 	}
 	return nil, errParseStateSummary
 }
 
-func (tss *TestStateSyncableVM) GetStateSummary(key uint64) (Summary, error) {
-	if tss.GetStateSummaryF != nil {
-		return tss.GetStateSummaryF(key)
+func (vm *TestStateSyncableVM) GetStateSummary(key uint64) (StateSummary, error) {
+	if vm.GetStateSummaryF != nil {
+		return vm.GetStateSummaryF(key)
 	}
-	if tss.CantGetStateSummary && tss.T != nil {
-		tss.T.Fatalf("Unexpectedly called GetStateSummary")
+	if vm.CantGetStateSummary && vm.T != nil {
+		vm.T.Fatal(errGetStateSummary)
 	}
 	return nil, errGetStateSummary
 }

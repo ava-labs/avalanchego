@@ -11,8 +11,8 @@ import (
 var _ StatelessSummaryIntf = &StatelessSummary{}
 
 type StatelessSummaryIntf interface {
-	Bytes() []byte // part of block.Summary interface
-	ID() ids.ID    // part of block.Summary interface
+	Bytes() []byte // part of block.StateSummary interface
+	ID() ids.ID    // part of block.StateSummary interface
 
 	InnerSummaryBytes() []byte
 	BlockBytes() []byte

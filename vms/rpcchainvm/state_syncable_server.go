@@ -34,7 +34,7 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 	*emptypb.Empty,
 ) (*vmpb.GetOngoingSyncStateSummaryResponse, error) {
 	var (
-		summary block.Summary
+		summary block.StateSummary
 		err     error
 	)
 
@@ -65,7 +65,7 @@ func (vm *VMServer) GetLastStateSummary(
 	empty *emptypb.Empty,
 ) (*vmpb.GetLastStateSummaryResponse, error) {
 	var (
-		summary block.Summary
+		summary block.StateSummary
 		err     error
 	)
 
@@ -96,7 +96,7 @@ func (vm *VMServer) ParseStateSummary(
 	req *vmpb.ParseStateSummaryRequest,
 ) (*vmpb.ParseStateSummaryResponse, error) {
 	var (
-		summary block.Summary
+		summary block.StateSummary
 		err     error
 	)
 
@@ -127,7 +127,7 @@ func (vm *VMServer) GetStateSummary(
 	req *vmpb.GetStateSummaryRequest,
 ) (*vmpb.GetStateSummaryResponse, error) {
 	var (
-		summary block.Summary
+		summary block.StateSummary
 		err     error
 	)
 
@@ -164,7 +164,7 @@ func (vm *VMServer) SummaryAccept(
 	if vm.ssVM == nil {
 		accepted, err = false, block.ErrStateSyncableVMNotImplemented
 	} else {
-		var summary block.Summary
+		var summary block.StateSummary
 		summary, err = vm.ssVM.ParseStateSummary(req.Bytes)
 		if err == nil {
 			accepted, err = summary.Accept()

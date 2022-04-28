@@ -12,7 +12,7 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var _ block.Summary = &SummaryClient{}
+var _ block.StateSummary = &SummaryClient{}
 
 // SummaryClient is an implementation of Summary that talks over RPC.
 type SummaryClient struct {

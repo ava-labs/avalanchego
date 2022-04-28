@@ -29,7 +29,7 @@ func (vm *VMClient) StateSyncEnabled() (bool, error) {
 	return resp.Enabled, errCodeToError[resp.Err]
 }
 
-func (vm *VMClient) GetOngoingSyncStateSummary() (block.Summary, error) {
+func (vm *VMClient) GetOngoingSyncStateSummary() (block.StateSummary, error) {
 	resp, err := vm.client.GetOngoingSyncStateSummary(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (vm *VMClient) GetOngoingSyncStateSummary() (block.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) GetLastStateSummary() (block.Summary, error) {
+func (vm *VMClient) GetLastStateSummary() (block.StateSummary, error) {
 	resp, err := vm.client.GetLastStateSummary(
 		context.Background(),
 		&emptypb.Empty{},
@@ -68,7 +68,7 @@ func (vm *VMClient) GetLastStateSummary() (block.Summary, error) {
 	}, err
 }
 
-func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
+func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
 	resp, err := vm.client.ParseStateSummary(
 		context.Background(),
 		&vmpb.ParseStateSummaryRequest{
@@ -91,7 +91,7 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.Summary, error
 	}, err
 }
 
-func (vm *VMClient) GetStateSummary(height uint64) (block.Summary, error) {
+func (vm *VMClient) GetStateSummary(height uint64) (block.StateSummary, error) {
 	resp, err := vm.client.GetStateSummary(
 		context.Background(),
 		&vmpb.GetStateSummaryRequest{

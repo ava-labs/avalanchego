@@ -29,7 +29,7 @@ var (
 	minoritySummaryBytes []byte
 
 	unknownSummaryID ids.ID
-	emptySummary     *block.TestSummary
+	emptySummary     *block.TestStateSummary
 )
 
 type fullVM struct {
@@ -56,7 +56,7 @@ func init() {
 
 	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
 
-	emptySummary = &block.TestSummary{}
+	emptySummary = &block.TestStateSummary{}
 }
 
 func buildTestPeers(t *testing.T) validators.Set {
@@ -97,7 +97,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	assert.True(t, ok)
 	assert.True(t, syncer.stateSyncVM != nil)
 
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.Summary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
 

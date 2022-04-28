@@ -11,14 +11,14 @@ import (
 )
 
 var (
-	_ Summary = &TestSummary{}
+	_ StateSummary = &TestStateSummary{}
 
 	errAccept = errors.New("unexpectedly called Accept")
 )
 
-type TestSummary struct {
-	HeightV uint64
+type TestStateSummary struct {
 	IDV     ids.ID
+	HeightV uint64
 	BytesV  []byte
 
 	T          *testing.T
@@ -26,16 +26,16 @@ type TestSummary struct {
 	AcceptF    func() (bool, error)
 }
 
-func (s *TestSummary) Bytes() []byte  { return s.BytesV }
-func (s *TestSummary) Height() uint64 { return s.HeightV }
-func (s *TestSummary) ID() ids.ID     { return s.IDV }
+func (s *TestStateSummary) ID() ids.ID     { return s.IDV }
+func (s *TestStateSummary) Height() uint64 { return s.HeightV }
+func (s *TestStateSummary) Bytes() []byte  { return s.BytesV }
 
-func (s *TestSummary) Accept() (bool, error) {
+func (s *TestStateSummary) Accept() (bool, error) {
 	if s.AcceptF != nil {
 		return s.AcceptF()
 	}
 	if s.CantAccept && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Accept")
+		s.T.Fatal(errAccept)
 	}
 	return false, errAccept
 }

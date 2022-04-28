@@ -8,22 +8,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
-var _ block.Summary = &postForkStatefulSummary{}
+var _ block.StateSummary = &postForkStatefulSummary{}
 
-// postForkStatefulSummary implements block.Summary by layering three objects:
+// postForkStatefulSummary implements block.StateSummary by layering three objects:
 // 1- summary.StatelessSummary carries all summary marshallable content along with
 // data immediately retrievable from it.
 // 2- summary.ProposerSummary adds to summary.StatelessSummary height, as retrieved
 // by innerSummary
 // 3- postForkStatefulSummary add to summary.ProposerSummary the implementation
-// of block.Summary.Accept, to handle processing of the validated summary.
+// of block.StateSummary.Accept, to handle processing of the validated summary.
 // Note that summary.StatelessSummary contains data to build both innerVM summary
 // and the full proposerVM block associated with the summary.
 type postForkStatefulSummary struct {
 	summary.ProposerSummary
 
 	// inner summary, retrieved via Parse
-	innerSummary block.Summary
+	innerSummary block.StateSummary
 
 	// block associated with the summary
 	proposerBlock Block

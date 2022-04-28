@@ -19,7 +19,7 @@ func (vm *blockVM) StateSyncEnabled() (bool, error) {
 	return enabled, err
 }
 
-func (vm *blockVM) GetOngoingSyncStateSummary() (block.Summary, error) {
+func (vm *blockVM) GetOngoingSyncStateSummary() (block.StateSummary, error) {
 	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -31,7 +31,7 @@ func (vm *blockVM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) GetLastStateSummary() (block.Summary, error) {
+func (vm *blockVM) GetLastStateSummary() (block.StateSummary, error) {
 	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -44,7 +44,7 @@ func (vm *blockVM) GetLastStateSummary() (block.Summary, error) {
 	return summary, err
 }
 
-func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
+func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
 	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -56,7 +56,7 @@ func (vm *blockVM) ParseStateSummary(summaryBytes []byte) (block.Summary, error)
 	return summary, err
 }
 
-func (vm *blockVM) GetStateSummary(height uint64) (block.Summary, error) {
+func (vm *blockVM) GetStateSummary(height uint64) (block.StateSummary, error) {
 	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}

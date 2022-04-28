@@ -31,7 +31,7 @@ func init() {
 
 type ProposerSummary interface {
 	StatelessSummaryIntf
-	Height() uint64 // part of block.Summary interface
+	Height() uint64 // part of block.StateSummary interface
 }
 
 func NewProposerSummary(

@@ -15,7 +15,7 @@ func TestParse(t *testing.T) {
 	assert := assert.New(t)
 
 	proBlkBytes := []byte("proBlkBytes")
-	coreSummary := &block.TestSummary{
+	coreSummary := &block.TestStateSummary{
 		HeightV: 2022,
 		IDV:     ids.ID{'I', 'D'},
 		BytesV:  []byte{'b', 'y', 't', 'e', 's'},

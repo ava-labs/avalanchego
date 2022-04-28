@@ -24,7 +24,7 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 	return vm.innerStateSyncVM.StateSyncEnabled()
 }
 
-func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
+func (vm *VM) GetOngoingSyncStateSummary() (block.StateSummary, error) {
 	if vm.innerStateSyncVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -37,7 +37,7 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.Summary, error) {
 	return vm.buildStateSummary(innerSummary)
 }
 
-func (vm *VM) GetLastStateSummary() (block.Summary, error) {
+func (vm *VM) GetLastStateSummary() (block.StateSummary, error) {
 	if vm.innerStateSyncVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -53,7 +53,7 @@ func (vm *VM) GetLastStateSummary() (block.Summary, error) {
 
 // Note: it's important that ParseStateSummary do not use any index or state
 // to allow summaries being parsed also by freshly started node with no previous state.
-func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
+func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
 	if vm.innerStateSyncVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -81,7 +81,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.Summary, error) {
 	}, nil
 }
 
-func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
+func (vm *VM) GetStateSummary(height uint64) (block.StateSummary, error) {
 	if vm.innerStateSyncVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
@@ -94,7 +94,7 @@ func (vm *VM) GetStateSummary(height uint64) (block.Summary, error) {
 	return vm.buildStateSummary(innerSummary)
 }
 
-func (vm *VM) buildStateSummary(innerSummary block.Summary) (block.Summary, error) {
+func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSummary, error) {
 	forkHeight, err := vm.GetForkHeight()
 	if err != nil {
 		return nil, err
