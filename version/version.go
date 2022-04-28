@@ -6,8 +6,6 @@ package version
 import (
 	"errors"
 	"fmt"
-
-	"go.uber.org/zap"
 )
 
 const (
@@ -40,7 +38,6 @@ type SemanticVersion struct {
 }
 
 func NewDefaultVersion(major, minor, patch int) Version {
-	zap.NewProductionEncoderConfig()
 	return NewVersion(major, minor, patch, defaultVersionPrefix, defaultVersionSeparator)
 }
 

@@ -49,7 +49,7 @@ func NewDefaultApplication(
 	)
 }
 
-// NewApplication returns a new Application
+// NewApplication returns a new version
 func NewApplication(
 	app string,
 	appSeparator string,
