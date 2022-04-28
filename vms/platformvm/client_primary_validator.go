@@ -73,8 +73,10 @@ func APIOwnerToClientOwner(rewardOwner *APIOwner) (*ClientOwner, error) {
 	if rewardOwner == nil {
 		return nil, nil
 	}
-	var err error
-	var clientOwner ClientOwner
+	var (
+		err         error
+		clientOwner ClientOwner
+	)
 	clientOwner.Locktime = uint64(rewardOwner.Locktime)
 	clientOwner.Threshold = uint32(rewardOwner.Threshold)
 	clientOwner.Addresses, err = addressconverter.ParseAddressesToID(rewardOwner.Addresses)
