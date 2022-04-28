@@ -32,10 +32,14 @@ type Handler interface {
 	common.Timer
 	Context() *snow.ConsensusContext
 	IsValidator(nodeID ids.NodeID) bool
-	SetBootstrapper(engine common.Engine)
-	Bootstrapper() common.Engine
+
+	SetStateSyncer(engine common.StateSyncer)
+	StateSyncer() common.StateSyncer
+	SetBootstrapper(engine common.BootstrapableEngine)
+	Bootstrapper() common.BootstrapableEngine
 	SetConsensus(engine common.Engine)
 	Consensus() common.Engine
+
 	SetOnStopped(onStopped func())
 	Start(recoverPanic bool)
 	Push(msg message.InboundMessage)
@@ -61,7 +65,8 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
-	bootstrapper common.Engine
+	stateSyncer  common.StateSyncer
+	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
@@ -136,19 +141,48 @@ func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetBootstrapper(engine common.Engine) { h.bootstrapper = engine }
-func (h *handler) Bootstrapper() common.Engine          { return h.bootstrapper }
+func (h *handler) SetStateSyncer(engine common.StateSyncer) { h.stateSyncer = engine }
+func (h *handler) StateSyncer() common.StateSyncer          { return h.stateSyncer }
+
+func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
+func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
 
 func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
 func (h *handler) Consensus() common.Engine          { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
+func (h *handler) selectStartingGear() (common.Engine, error) {
+	if h.stateSyncer == nil {
+		return h.bootstrapper, nil
+	}
+
+	stateSyncEnabled, err := h.stateSyncer.IsEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	if !stateSyncEnabled {
+		return h.bootstrapper, nil
+	}
+
+	// drop bootstrap state from previous runs
+	// before starting state sync
+	return h.stateSyncer, h.bootstrapper.Clear()
+}
+
 func (h *handler) Start(recoverPanic bool) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	if err := h.bootstrapper.Start(0); err != nil {
+	gear, err := h.selectStartingGear()
+	if err != nil {
+		h.ctx.Log.Error("chain failed to select starting gear with: %s", err)
+		h.shutdown()
+		return
+	}
+
+	if err := gear.Start(0); err != nil {
 		h.ctx.Log.Error("chain failed to start with %s", err)
 		h.shutdown()
 		return
@@ -614,6 +648,8 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 func (h *handler) getEngine() (common.Engine, error) {
 	state := h.ctx.GetState()
 	switch state {
+	case snow.StateSyncing:
+		return h.stateSyncer, nil
 	case snow.Bootstrapping:
 		return h.bootstrapper, nil
 	case snow.NormalOp:

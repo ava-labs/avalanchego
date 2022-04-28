@@ -26,7 +26,7 @@ const (
 	maxOutstandingStateSyncRequests = 50
 )
 
-var _ common.Engine = &stateSyncer{}
+var _ common.StateSyncer = &stateSyncer{}
 
 // summary content as received from network, along with accumulated weight.
 type weightedSummary struct {
@@ -533,3 +533,12 @@ func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 }
 
 func (ss *stateSyncer) GetVM() common.VM { return ss.VM }
+
+func (ss *stateSyncer) IsEnabled() (bool, error) {
+	if ss.stateSyncVM == nil {
+		// state sync is not implemented
+		return false, nil
+	}
+
+	return ss.stateSyncVM.StateSyncEnabled()
+}

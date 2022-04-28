@@ -9,6 +9,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -16,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
-	safeMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/stretchr/testify/assert"
+
+	safeMath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {

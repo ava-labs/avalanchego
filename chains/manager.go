@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -185,8 +186,6 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	// TODO: Use StateSyncBeacons as an override when creating the syncer config
-	//       to specify who to sync from.
 	StateSyncBeacons []ids.NodeID
 }
 
@@ -847,31 +846,13 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	// create bootstrap gear
-	bootstrapCfg := smbootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-		Bootstrapped:  m.unblockChains,
-	}
-	bootstrapper, err := smbootstrap.New(
-		bootstrapCfg,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
-	}
-	handler.SetBootstrapper(bootstrapper)
-
-	// create engine gear
+	// Create engine, bootstrapper and state-syncer in this order,
+	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:           bootstrapCfg.Ctx,
+		Ctx:           commonCfg.Ctx,
 		AllGetsServer: snowGetHandler,
-		VM:            bootstrapCfg.VM,
-		Sender:        bootstrapCfg.Sender,
+		VM:            vm,
+		Sender:        commonCfg.Sender,
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     &smcon.Topological{},
@@ -882,6 +863,40 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.SetConsensus(engine)
 
+	// create bootstrap gear
+	bootstrapCfg := smbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+		Bootstrapped:  m.unblockChains,
+	}
+	bootstrapper, err := smbootstrap.New(
+		bootstrapCfg,
+		engine.Start,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
+	}
+	handler.SetBootstrapper(bootstrapper)
+
+	// create state sync gear
+	stateSyncCfg, err := syncer.NewConfig(
+		commonCfg,
+		m.StateSyncBeacons,
+		snowGetHandler,
+		vm,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
+	}
+
+	stateSyncer := syncer.New(
+		stateSyncCfg,
+		bootstrapper.Start,
+	)
+	handler.SetStateSyncer(stateSyncer)
+
 	// Register health checks
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
@@ -889,6 +904,8 @@ func (m *manager) createSnowmanChain(
 		ctx.Lock.Lock()
 		defer ctx.Lock.Unlock()
 		switch ctx.GetState() {
+		case snow.StateSyncing:
+			return stateSyncer.HealthCheck()
 		case snow.Bootstrapping:
 			return bootstrapper.HealthCheck()
 		case snow.NormalOp:
