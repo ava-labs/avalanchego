@@ -114,11 +114,11 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
 
+	b.Ctx.SetState(snow.Bootstrapping)
 	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
-	b.Ctx.SetState(snow.Bootstrapping)
 
 	// Set the starting height
 	lastAcceptedID, err := b.VM.LastAccepted()
