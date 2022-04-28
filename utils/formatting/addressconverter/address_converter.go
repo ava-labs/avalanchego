@@ -53,8 +53,7 @@ func ParseAddressToID(addrStr string) (ids.ShortID, error) {
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	addr, err := ids.ToShortID(addrBytes)
-	return addr, nil
+	return ids.ToShortID(addrBytes)
 }
 
 func ParseAddressesToID(addrsStr []string) ([]ids.ShortID, error) {

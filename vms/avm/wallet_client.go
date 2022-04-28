@@ -121,11 +121,11 @@ func (c *walletClient) SendMultiple(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	outputs := make([]SendOutput, len(clientOutputs))
-	for i, clientOutput := range clientOutputs {
-		outputs[i].Amount = cjson.Uint64(clientOutput.Amount)
-		outputs[i].AssetID = clientOutput.AssetID
-		outputs[i].To = clientOutput.To.String()
+	serviceOutputs := make([]SendOutput, len(outputs))
+	for i, output := range outputs {
+		serviceOutputs[i].Amount = cjson.Uint64(output.Amount)
+		serviceOutputs[i].AssetID = output.AssetID
+		serviceOutputs[i].To = output.To.String()
 	}
 	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -133,7 +133,7 @@ func (c *walletClient) SendMultiple(
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		Outputs: outputs,
+		Outputs: serviceOutputs,
 		Memo:    memo,
 	}, res, options...)
 	return res.TxID, err
