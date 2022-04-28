@@ -175,7 +175,7 @@ type client struct {
 }
 
 // NewClient returns an AVM client for interacting with avm [chain]
-func NewClient(uri string, chain string) Client {
+func NewClient(uri, chain string) Client {
 	return &client{
 		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s", constants.ChainAliasPrefix+chain), "avm"),
 	}
