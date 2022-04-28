@@ -466,19 +466,11 @@ func (ss *stateSyncer) AppRequestFailed(nodeID ids.NodeID, requestID uint32) err
 }
 
 func (ss *stateSyncer) Notify(msg common.Message) error {
-	// if state sync and bootstrap is done, we shouldn't receive StateSyncDone from the VM
-	ss.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
-	switch msg {
-	case common.PendingTxs:
-		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
-
-	case common.StateSyncDone:
-		return ss.onDoneStateSyncing(ss.requestID)
-
-	default:
+	if msg != common.StateSyncDone {
 		ss.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+		return nil
 	}
-	return nil
+	return ss.onDoneStateSyncing(ss.requestID)
 }
 
 func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
