@@ -116,7 +116,7 @@ func (c *walletClient) SendMultiple(
 	user api.UserPass,
 	from []ids.ShortID,
 	changeAddr ids.ShortID,
-	clientOutputs []ClientSendOutput,
+	outputs []ClientSendOutput,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
