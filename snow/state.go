@@ -11,6 +11,7 @@ var ErrUnknownState = errors.New("unknown state")
 
 const (
 	Initializing = iota
+	StateSyncing
 	Bootstrapping
 	NormalOp
 )
@@ -19,6 +20,8 @@ func (st State) String() string {
 	switch st {
 	case Initializing:
 		return "Initializing state"
+	case StateSyncing:
+		return "State syncing state"
 	case Bootstrapping:
 		return "Bootstrapping state"
 	case NormalOp:
