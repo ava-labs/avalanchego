@@ -3,11 +3,14 @@
 
 package common
 
-// StateSyncer controls selection and network verification of
-// state summaries driving VM state syncing. It collects
-// the latest state summaries and elicit votes on them, making sure
-// that a qualified majority of nodes support the state summaries.
+// StateSyncer controls the selection and verification of state summaries
+// to drive VM state syncing. It collects the latest state summaries and elicit
+// votes on them, making sure that a qualified majority of nodes support the
+// selected state summary.
 type StateSyncer interface {
 	Engine
+
+	// IsEnabled returns true if the underlying VM wants to perform state sync.
+	// Any returned error will be considered fatal.
 	IsEnabled() (bool, error)
 }
