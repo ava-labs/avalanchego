@@ -20,7 +20,7 @@ func Max64(max uint64, nums ...uint64) uint64 {
 	return max
 }
 
-// Min64 returns the minimum of the values provided
+// Min returns the minimum of the values provided
 func Min(min int, nums ...int) int {
 	for _, num := range nums {
 		if num < min {
