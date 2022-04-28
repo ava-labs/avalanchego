@@ -267,6 +267,9 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 		preferredStateSummary.ID(), size,
 	)
 
+	if err := ss.VM.SetState(snow.StateSyncing); err != nil {
+		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
+	}
 	accepted, err := preferredStateSummary.Accept()
 	if err != nil {
 		return err
@@ -332,9 +335,6 @@ func (ss *stateSyncer) Start(startReqID uint32) error {
 
 func (ss *stateSyncer) startup() error {
 	ss.Config.Ctx.Log.Info("starting state sync")
-	if err := ss.VM.SetState(snow.StateSyncing); err != nil {
-		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
-	}
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]weightedSummary)
