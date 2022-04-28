@@ -454,6 +454,93 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	assert.True(len(syncer.weightedSummaries) == 0)
 }
 
+func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
+	assert := assert.New(t)
+
+	vdrs := buildTestPeers(t)
+	startupAlpha := (3*vdrs.Weight() + 3) / 4
+	commonCfg := common.Config{
+		Ctx:                         snow.DefaultConsensusContextTest(),
+		Beacons:                     vdrs,
+		SampleK:                     vdrs.Len(),
+		Alpha:                       (vdrs.Weight() + 1) / 2,
+		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
+		RetryBootstrap:              true,
+		RetryBootstrapWarnFrequency: 1,
+	}
+	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
+
+	// set sender to track nodes reached out
+	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	sender.CantSendGetStateSummaryFrontier = true
+	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+		for nodeID := range ss {
+			contactedFrontiersProviders[nodeID] = reqID
+		}
+	}
+
+	// mock VM to simulate a valid summary is returned
+	fullVM.CantParseStateSummary = true
+	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+		switch {
+		case bytes.Equal(b, summaryBytes):
+			return &block.TestStateSummary{
+				HeightV: key,
+				IDV:     summaryID,
+				BytesV:  summaryBytes,
+			}, nil
+		case bytes.Equal(b, nil):
+			return nil, fmt.Errorf("Empty Summary")
+		default:
+			return nil, fmt.Errorf("unexpected Summary")
+		}
+	}
+
+	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
+	sender.CantSendGetAcceptedStateSummary = true
+	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+		for nodeID := range ss {
+			contactedVoters[nodeID] = reqID
+		}
+	}
+
+	// Connect enough stake to start syncer
+	for _, vdr := range vdrs.List() {
+		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+	}
+	assert.True(syncer.contactedSeeders.Len() != 0)
+
+	// let just one node respond and all others timeout
+	maxResponses := 1
+	reachedSeedersCount := syncer.Config.SampleK
+	for reachedSeedersCount >= 0 {
+		beaconID, found := syncer.contactedSeeders.Peek()
+		assert.True(found)
+		reqID := contactedFrontiersProviders[beaconID]
+
+		if maxResponses > 0 {
+			assert.NoError(syncer.StateSummaryFrontier(
+				beaconID,
+				reqID,
+				summaryBytes,
+			))
+		} else {
+			assert.NoError(syncer.GetStateSummaryFrontierFailed(
+				beaconID,
+				reqID,
+			))
+		}
+		maxResponses--
+		reachedSeedersCount--
+	}
+
+	// check that some frontier seeders are reached again for the frontier
+	assert.True(syncer.contactedSeeders.Len() > 0)
+
+	// check that no vote requests are issued
+	assert.True(len(contactedVoters) == 0)
+}
+
 func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	assert := assert.New(t)
 

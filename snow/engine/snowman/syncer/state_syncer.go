@@ -59,8 +59,11 @@ type stateSyncer struct {
 	locallyAvailableSummary block.StateSummary
 
 	// Holds the beacons that were sampled for the accepted frontier
+	// Won't be consumed as seeders are reached out. Used to rescale
+	// alpha for frontiers
 	frontierSeeders validators.Set
-	// IDs of validators we should request state summary frontier from
+	// IDs of validators we should request state summary frontier from.
+	// Will be consumed seeders are reached out for frontier.
 	targetSeeders ids.NodeIDSet
 	// IDs of validators we requested a state summary frontier from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
@@ -139,31 +142,28 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 		return nil
 	}
 
-	// We've received the accepted frontier from every state syncer
-	// Ask each state syncer to filter the list of containers that we were
-	// told are on the accepted frontier such that the list only contains containers
-	// they think are accepted
-
-	// Create a newAlpha taking using the sampled beacon
-	// Keep the proportion of b.Alpha in the newAlpha
-	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
-	newAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
-
+	// All nodes reached out for the summary frontier have responded or timeout.
+	// If enough of them have indeed responded we'll go ahead and ask
+	// each state syncer (no just a sample) to filter the list of state summaries
+	// that we were told are on the accepted frontier.
+	// If we got too many timeouts, we restart state syncing hoping that network
+	// problems go away and we could collect a more qualified frontier.
+	// We assume frontier is qualified is an alpha proportion of frontier seeders have responded
+	frontierAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
 	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
 	if err != nil {
 		return err
 	}
 
-	// fail the fast sync if the weight is not enough to fast sync
-	if float64(ss.frontierSeeders.Weight())-newAlpha < float64(failedBeaconWeight) {
-		if ss.Config.RetryBootstrap {
-			ss.Ctx.Log.Debug("Not enough frontiers received, restarting state sync... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedSeeders.Len(), ss.attempts)
-			return ss.restart()
-		}
-
+	frontierStake := ss.frontierSeeders.Weight() - failedBeaconWeight
+	if float64(frontierStake) < frontierAlpha {
 		ss.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
 			"state sync attempt: %d", ss.failedSeeders.Len(), ss.attempts)
+
+		if ss.Config.RetryBootstrap {
+			ss.Ctx.Log.Debug("Restarting state sync")
+			return ss.restart()
+		}
 	}
 
 	ss.requestID++
