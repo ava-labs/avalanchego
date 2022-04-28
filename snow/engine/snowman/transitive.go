@@ -338,9 +338,14 @@ func (t *Transitive) Start(startReqID uint32) error {
 		return err
 	}
 
-	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
+	t.Ctx.Log.Info("consensus starting with %s as the last accepted block", lastAcceptedID)
 	t.metrics.bootstrapFinished.Set(1)
+
 	t.Ctx.SetState(snow.NormalOp)
+	if err := t.VM.SetState(snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
+			err)
+	}
 	return nil
 }
 

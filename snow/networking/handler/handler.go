@@ -172,20 +172,22 @@ func (h *handler) selectStartingGear() (common.Engine, error) {
 }
 
 func (h *handler) Start(recoverPanic bool) {
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
+
 	gear, err := h.selectStartingGear()
-	if err == nil {
-		err = gear.Start(0)
-	}
-
-	h.dispatch(recoverPanic)
-
-	// If startup errored, then shutdown the chain with the fatal error.
 	if err != nil {
-		h.StopWithError(err)
+		h.ctx.Log.Error("chain failed to select starting gear with: %s", err)
+		h.shutdown()
+		return
 	}
-}
 
-func (h *handler) dispatch(recoverPanic bool) {
+	if err := gear.Start(0); err != nil {
+		h.ctx.Log.Error("chain failed to start with %s", err)
+		h.shutdown()
+		return
+	}
+
 	if recoverPanic {
 		go h.ctx.Log.RecoverAndExit(h.dispatchSync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the sync dispatcher")
@@ -196,12 +198,11 @@ func (h *handler) dispatch(recoverPanic bool) {
 		go h.ctx.Log.RecoverAndExit(h.dispatchChans, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the chan dispatcher")
 		})
-		return
+	} else {
+		go h.ctx.Log.RecoverAndPanic(h.dispatchSync)
+		go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
+		go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
 	}
-
-	go h.ctx.Log.RecoverAndPanic(h.dispatchSync)
-	go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
-	go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
 }
 
 // Push the message onto the handler's queue
@@ -691,17 +692,24 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	currentEngine, err := h.getEngine()
-	if err == nil {
-		if err := currentEngine.Shutdown(); err != nil {
-			h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+	h.shutdown()
+}
+
+func (h *handler) shutdown() {
+	defer func() {
+		if h.onStopped != nil {
+			go h.onStopped()
 		}
-	} else {
-		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		close(h.closed)
+	}()
+
+	currentEngine, err := h.getEngine()
+	if err != nil {
+		h.ctx.Log.Error("Error while fetching current engine during shutdown: %s", err)
+		return
 	}
 
-	if h.onStopped != nil {
-		go h.onStopped()
+	if err := currentEngine.Shutdown(); err != nil {
+		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
-	close(h.closed)
 }

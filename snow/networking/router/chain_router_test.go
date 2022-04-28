@@ -97,6 +97,7 @@ func TestShutdown(t *testing.T) {
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
+
 	chainRouter.Shutdown()
 
 	ticker := time.NewTicker(250 * time.Millisecond)
@@ -198,6 +199,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
+
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
@@ -317,6 +319,7 @@ func TestRouterTimeout(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	chainRouter.AddChain(handler)
+
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
@@ -407,6 +410,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
+
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
@@ -525,6 +529,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	handler.SetConsensus(engine)
 
 	chainRouter.AddChain(handler)
+
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 

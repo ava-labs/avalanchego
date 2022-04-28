@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -84,6 +85,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handler.Push(msg)
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+
 	handler.Start(false)
 
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -147,6 +149,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping)
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+
 	handler.Start(false)
 
 	nodeID := ids.EmptyNodeID
@@ -204,6 +207,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+
 	handler.Start(false)
 
 	nodeID := ids.EmptyNodeID
@@ -264,6 +268,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+
 	handler.Start(false)
 	msgFromVMChan <- 0
 
