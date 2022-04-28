@@ -509,10 +509,8 @@ func (ss *stateSyncer) Context() *snow.ConsensusContext { return ss.Config.Ctx }
 
 func (ss *stateSyncer) IsBootstrapped() bool { return ss.Ctx.GetState() == snow.NormalOp }
 
-// Halt implements the InternalHandler interface
 func (ss *stateSyncer) Halt() {}
 
-// Timeout implements the InternalHandler interface
 func (ss *stateSyncer) Timeout() error { return nil }
 
 func (ss *stateSyncer) HealthCheck() (interface{}, error) {
