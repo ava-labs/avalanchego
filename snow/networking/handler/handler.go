@@ -32,8 +32,8 @@ type Handler interface {
 	common.Timer
 	Context() *snow.ConsensusContext
 	IsValidator(nodeID ids.NodeID) bool
-	SetBootstrapper(engine common.BootstrapableEngine)
-	Bootstrapper() common.BootstrapableEngine
+	SetBootstrapper(engine common.Engine)
+	Bootstrapper() common.Engine
 	SetConsensus(engine common.Engine)
 	Consensus() common.Engine
 	SetOnStopped(onStopped func())
@@ -61,7 +61,7 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
-	bootstrapper common.BootstrapableEngine
+	bootstrapper common.Engine
 	engine       common.Engine
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
@@ -136,8 +136,8 @@ func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
-func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
+func (h *handler) SetBootstrapper(engine common.Engine) { h.bootstrapper = engine }
+func (h *handler) Bootstrapper() common.Engine          { return h.bootstrapper }
 
 func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
 func (h *handler) Consensus() common.Engine          { return h.engine }
@@ -145,6 +145,15 @@ func (h *handler) Consensus() common.Engine          { return h.engine }
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
 func (h *handler) Start(recoverPanic bool) {
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
+
+	if err := h.bootstrapper.Start(0); err != nil {
+		h.ctx.Log.Error("chain failed to start with %s", err)
+		h.shutdown()
+		return
+	}
+
 	if recoverPanic {
 		go h.ctx.Log.RecoverAndExit(h.dispatchSync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the sync dispatcher")
@@ -647,17 +656,24 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	currentEngine, err := h.getEngine()
-	if err == nil {
-		if err := currentEngine.Shutdown(); err != nil {
-			h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+	h.shutdown()
+}
+
+func (h *handler) shutdown() {
+	defer func() {
+		if h.onStopped != nil {
+			go h.onStopped()
 		}
-	} else {
-		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		close(h.closed)
+	}()
+
+	currentEngine, err := h.getEngine()
+	if err != nil {
+		h.ctx.Log.Error("Error while fetching current engine during shutdown: %s", err)
+		return
 	}
 
-	if h.onStopped != nil {
-		go h.onStopped()
+	if err := currentEngine.Shutdown(); err != nil {
+		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
-	close(h.closed)
 }

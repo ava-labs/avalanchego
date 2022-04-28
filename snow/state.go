@@ -7,15 +7,18 @@ import "errors"
 
 type State uint8
 
-var ErrUnknownState = errors.New("unknown node state")
+var ErrUnknownState = errors.New("unknown state")
 
 const (
-	Bootstrapping = iota + 1
+	Initializing = iota
+	Bootstrapping
 	NormalOp
 )
 
 func (st State) String() string {
 	switch st {
+	case Initializing:
+		return "Initializing state"
 	case Bootstrapping:
 		return "Bootstrapping state"
 	case NormalOp:

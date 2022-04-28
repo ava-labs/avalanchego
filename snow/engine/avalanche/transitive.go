@@ -303,10 +303,14 @@ func (t *Transitive) Start(startReqID uint32) error {
 		}
 	}
 
-	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
+	t.Ctx.Log.Info("consensus starting with %d vertices in the accepted frontier", len(frontier))
 	t.metrics.bootstrapFinished.Set(1)
 
 	t.Ctx.SetState(snow.NormalOp)
+	if err := t.VM.SetState(snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to notify VM that consensus has started: %w",
+			err)
+	}
 	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
 }
 

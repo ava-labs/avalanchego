@@ -305,28 +305,21 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// handler is started.
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
-	ctx := chain.Handler.Context()
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
-	// Notify the bootstrapper that it has started executing.
-	err = chain.Handler.Bootstrapper().Start(0)
-
-	// Tell the chain to start processing messages.
-	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
-
-	// If startup errored, then shutdown the chain with the fatal error.
-	if err != nil {
-		chain.Handler.StopWithError(err)
-	}
-
-	// Register bootstrapped health checks after P chain is started.
+	// Register bootstrapped health checks after P chain has been added to
+	// chains.
+	//
+	// Note: Registering this after the chain has been tracked prevents a race
+	//       condition between the health check and adding the first chain to
+	//       the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
 			chain.Handler.StopWithError(err)
 		}
 	}
+
+	// Tell the chain to start processing messages.
+	// If the X, P, or C Chain panics, do not attempt to recover
+	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
 }
 
 // Create a chain
@@ -384,10 +377,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		ConsensusDispatcher: m.ConsensusEvents,
 		Registerer:          consensusMetrics,
 	}
-	// We set the state to bootstrapping here because bootstrapping is the first
-	// state, and failing to initialize the state before it's first access would
-	// cause a panic.
-	ctx.SetState(snow.Bootstrapping)
+	// We set the state to Initializing here because failing to set the state
+	// before it's first access would cause a panic.
+	ctx.SetState(snow.Initializing)
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
 		if sbConfigs.ValidatorOnly {

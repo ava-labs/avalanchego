@@ -29,57 +29,6 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
-	b := &bootstrapper{
-		Config: config,
-
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
-		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
-
-		Fetcher: common.Fetcher{
-			OnFinished: onFinished,
-		},
-		executedStateTransitions: math.MaxInt32,
-		startingAcceptedFrontier: ids.Set{},
-	}
-
-	lastAcceptedID, err := b.VM.LastAccepted()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted ID: %w", err)
-	}
-	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get last accepted block: %w", err)
-	}
-	b.startingHeight = lastAccepted.Height()
-
-	if err := b.metrics.Initialize("bs", config.Ctx.Registerer); err != nil {
-		return nil, err
-	}
-
-	b.parser = &parser{
-		log:         config.Ctx.Log,
-		numAccepted: b.numAccepted,
-		numDropped:  b.numDropped,
-		vm:          b.VM,
-	}
-	if err := b.Blocked.SetParser(b.parser); err != nil {
-		return nil, err
-	}
-
-	config.Bootstrapable = b
-	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
-
-	// initialize set of validators to fetch containers from using [Config.Beacons]
-	b.setFetchFrom(b.Config.Beacons)
-
-	return b, nil
-}
-
 type bootstrapper struct {
 	Config
 
@@ -120,6 +69,75 @@ type bootstrapper struct {
 	// with empty GetAncestors messages are removed
 	// from this set so we avoid contacting them again
 	fetchFrom ids.NodeIDSet
+}
+
+func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
+	b := &bootstrapper{
+		Config: config,
+
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
+
+		Fetcher: common.Fetcher{
+			OnFinished: onFinished,
+		},
+		executedStateTransitions: math.MaxInt32,
+	}
+
+	if err := b.metrics.Initialize("bs", config.Ctx.Registerer); err != nil {
+		return nil, err
+	}
+
+	b.parser = &parser{
+		log:         config.Ctx.Log,
+		numAccepted: b.numAccepted,
+		numDropped:  b.numDropped,
+		vm:          b.VM,
+	}
+	if err := b.Blocked.SetParser(b.parser); err != nil {
+		return nil, err
+	}
+
+	config.Bootstrapable = b
+	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
+
+	// initialize set of validators to fetch containers from using [Config.Beacons]
+	b.setFetchFrom(b.Config.Beacons)
+
+	return b, nil
+}
+
+func (b *bootstrapper) Start(startReqID uint32) error {
+	b.Ctx.Log.Info("Starting bootstrap...")
+
+	b.Ctx.SetState(snow.Bootstrapping)
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
+			err)
+	}
+
+	// Set the starting height
+	lastAcceptedID, err := b.VM.LastAccepted()
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted ID: %w", err)
+	}
+	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block: %w", err)
+	}
+	b.startingHeight = lastAccepted.Height()
+	b.Config.SharedCfg.RequestID = startReqID
+
+	if !b.WeightTracker.EnoughConnectedWeight() {
+		return nil
+	}
+
+	b.started = true
+	return b.Startup()
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
@@ -217,7 +235,7 @@ func (b *bootstrapper) Timeout() error {
 	if !b.Config.Subnet.IsBootstrapped() {
 		return b.Restart(true)
 	}
-	return b.finish()
+	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 
 func (b *bootstrapper) Gossip() error { return nil }
@@ -231,19 +249,6 @@ func (b *bootstrapper) Notify(common.Message) error { return nil }
 
 func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
 
-func (b *bootstrapper) Start(startReqID uint32) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
-	b.Ctx.SetState(snow.Bootstrapping)
-	b.Config.SharedCfg.RequestID = startReqID
-
-	if !b.WeightTracker.EnoughConnectedWeight() {
-		return nil
-	}
-
-	b.started = true
-	return b.Startup()
-}
-
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
 	intf := map[string]interface{}{
@@ -256,11 +261,6 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
-	}
-
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
@@ -492,16 +492,6 @@ func (b *bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	return b.finish()
-}
-
-func (b *bootstrapper) finish() error {
-	if err := b.VM.SetState(snow.NormalOp); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
-			err)
-	}
-
-	// Start consensus
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 

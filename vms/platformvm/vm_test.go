@@ -1970,7 +1970,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx := defaultContext()
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
-	consensusCtx.SetState(snow.Bootstrapping)
+	consensusCtx.SetState(snow.Initializing)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -2148,13 +2148,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
-
-	if err := bootstrapper.Start(0); err != nil {
-		t.Fatal(err)
-	}
+	ctx.Lock.Unlock()
 
 	handler.Start(false)
 
+	ctx.Lock.Lock()
 	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
 		t.Fatal(err)
 	}
