@@ -104,7 +104,7 @@ func TestBlockRequestHandler(t *testing.T) {
 			}
 			blockRequest.Parents = test.requestedParents
 
-			responseBytes, err := blockRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestShortID(), 1, blockRequest)
+			responseBytes, err := blockRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, blockRequest)
 			if err != nil {
 				t.Fatal("unexpected error during block request", err)
 			}
@@ -177,7 +177,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 		return blk
 	}, codec, stats.NewNoopHandlerStats())
 
-	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestShortID(), 1, message.BlockRequest{
+	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
 		Hash:    blocks[10].Hash(),
 		Height:  blocks[10].NumberU64(),
 		Parents: uint16(8),

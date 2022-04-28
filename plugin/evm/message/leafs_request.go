@@ -55,7 +55,7 @@ func (l LeafsRequest) String() string {
 	)
 }
 
-func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler RequestHandler) ([]byte, error) {
+func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
 	switch l.NodeType {
 	case StateTrieNode:
 		return handler.HandleStateTrieLeafsRequest(ctx, nodeID, requestID, l)

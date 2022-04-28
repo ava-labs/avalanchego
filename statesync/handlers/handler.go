@@ -33,18 +33,18 @@ func NewSyncHandler(
 	}
 }
 
-func (s *syncHandler) HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
+func (s *syncHandler) HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
 	return s.stateTrieLeafsRequestHandler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)
 }
 
-func (s *syncHandler) HandleAtomicTrieLeafsRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
+func (s *syncHandler) HandleAtomicTrieLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
 	return s.atomicTrieLeafsRequestHandler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)
 }
 
-func (s *syncHandler) HandleBlockRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, blockRequest message.BlockRequest) ([]byte, error) {
+func (s *syncHandler) HandleBlockRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, blockRequest message.BlockRequest) ([]byte, error) {
 	return s.blockRequestHandler.OnBlockRequest(ctx, nodeID, requestID, blockRequest)
 }
 
-func (s *syncHandler) HandleCodeRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, codeRequest message.CodeRequest) ([]byte, error) {
+func (s *syncHandler) HandleCodeRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, codeRequest message.CodeRequest) ([]byte, error) {
 	return s.codeRequestHandler.OnCodeRequest(ctx, nodeID, requestID, codeRequest)
 }

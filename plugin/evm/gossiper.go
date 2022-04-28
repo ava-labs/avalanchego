@@ -417,7 +417,7 @@ func NewGossipHandler(vm *VM) *GossipHandler {
 	}
 }
 
-func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, msg message.AtomicTxGossip) error {
+func (h *GossipHandler) HandleAtomicTx(nodeID ids.NodeID, msg message.AtomicTxGossip) error {
 	log.Trace(
 		"AppGossip called with AtomicTxGossip",
 		"peerID", nodeID,
@@ -467,7 +467,7 @@ func (h *GossipHandler) HandleAtomicTx(nodeID ids.ShortID, msg message.AtomicTxG
 	return nil
 }
 
-func (h *GossipHandler) HandleEthTxs(nodeID ids.ShortID, msg message.EthTxsGossip) error {
+func (h *GossipHandler) HandleEthTxs(nodeID ids.NodeID, msg message.EthTxsGossip) error {
 	log.Trace(
 		"AppGossip called with EthTxsGossip",
 		"peerID", nodeID,

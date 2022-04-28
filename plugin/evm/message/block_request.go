@@ -30,7 +30,7 @@ func (b BlockRequest) String() string {
 	)
 }
 
-func (b BlockRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler RequestHandler) ([]byte, error) {
+func (b BlockRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
 	return handler.HandleBlockRequest(ctx, nodeID, requestID, b)
 }
 

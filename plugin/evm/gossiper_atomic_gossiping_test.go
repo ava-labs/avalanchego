@@ -83,7 +83,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 		assert.NoError(vm.Shutdown())
 	}()
 
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 
 	var (
 		txGossiped     int
@@ -98,7 +98,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 		txGossiped++
 		return nil
 	}
-	sender.SendAppRequestF = func(_ ids.ShortSet, _ uint32, _ []byte) error {
+	sender.SendAppRequestF = func(_ ids.NodeIDSet, _ uint32, _ []byte) error {
 		txRequested = true
 		return nil
 	}
@@ -168,7 +168,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 		txGossiped++
 		return nil
 	}
-	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
+	sender.SendAppRequestF = func(ids.NodeIDSet, uint32, []byte) error {
 		txRequested = true
 		return nil
 	}
@@ -187,7 +187,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	// Gossip the transaction to the VM and ensure that it is not added to the mempool
 	// and is not re-gossipped.
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	msg := message.AtomicTxGossip{
 		Tx: tx.Bytes(),
 	}
@@ -205,7 +205,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	// Gossip the transaction that conflicts with the originally
 	// discarded tx and ensure it is accepted into the mempool and gossipped
 	// to the network.
-	nodeID = ids.GenerateTestShortID()
+	nodeID = ids.GenerateTestNodeID()
 	msg = message.AtomicTxGossip{
 		Tx: conflictingTx.Bytes(),
 	}
