@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	addressconverter "github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
+	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"

@@ -110,7 +110,7 @@ func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, err
 
 // ParseServiceAddress get address ID from address string, being it either localized (using address manager,
 // doing also components validations), or not localized.
-// If both attemps fail, reports error from localized address parsing
+// If both attempts fail, reports error from localized address parsing
 func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) {
 	addr, localAddrErr := a.ParseLocalAddress(addrStr)
 	if localAddrErr != nil {

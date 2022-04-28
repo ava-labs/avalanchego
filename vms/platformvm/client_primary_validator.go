@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 
 	"github.com/ava-labs/avalanchego/ids"
-	addressconverter "github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
+	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
 )
 
 // ClientStaker is the representation of a staker sent via client.
@@ -52,7 +52,7 @@ type ClientPrimaryDelegator struct {
 	PotentialReward *uint64
 }
 
-func APIStakerToClientStaker(validator APIStaker) (ClientStaker, error) {
+func apiStakerToClientStaker(validator APIStaker) ClientStaker {
 	var clientStaker ClientStaker
 	clientStaker.TxID = validator.TxID
 	clientStaker.StartTime = uint64(validator.StartTime)
@@ -66,10 +66,10 @@ func APIStakerToClientStaker(validator APIStaker) (ClientStaker, error) {
 		clientStaker.StakeAmount = &v
 	}
 	clientStaker.NodeID = validator.NodeID
-	return clientStaker, nil
+	return clientStaker
 }
 
-func APIOwnerToClientOwner(rewardOwner *APIOwner) (*ClientOwner, error) {
+func apiOwnerToClientOwner(rewardOwner *APIOwner) (*ClientOwner, error) {
 	if rewardOwner == nil {
 		return nil, nil
 	}
@@ -95,11 +95,8 @@ func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrim
 		if err != nil {
 			return nil, err
 		}
-		clientValidators[i].ClientStaker, err = APIStakerToClientStaker(validator.APIStaker)
-		if err != nil {
-			return nil, err
-		}
-		clientValidators[i].RewardOwner, err = APIOwnerToClientOwner(validator.RewardOwner)
+		clientValidators[i].ClientStaker = apiStakerToClientStaker(validator.APIStaker)
+		clientValidators[i].RewardOwner, err = apiOwnerToClientOwner(validator.RewardOwner)
 		if err != nil {
 			return nil, err
 		}
@@ -118,18 +115,13 @@ func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrim
 		}
 		clientValidators[i].Delegators = make([]ClientPrimaryDelegator, len(validator.Delegators))
 		for j, delegator := range validator.Delegators {
-			clientValidators[i].Delegators[j].ClientStaker, err = APIStakerToClientStaker(delegator.APIStaker)
+			clientValidators[i].Delegators[j].ClientStaker = apiStakerToClientStaker(delegator.APIStaker)
+			clientValidators[i].Delegators[j].RewardOwner, err = apiOwnerToClientOwner(delegator.RewardOwner)
 			if err != nil {
 				return nil, err
 			}
-			clientValidators[i].Delegators[j].RewardOwner, err = APIOwnerToClientOwner(delegator.RewardOwner)
-			if err != nil {
-				return nil, err
-			}
-			if delegator.PotentialReward != nil {
-				v := uint64(*delegator.PotentialReward)
-				clientValidators[i].Delegators[j].PotentialReward = &v
-			}
+			v := uint64(*delegator.PotentialReward)
+			clientValidators[i].Delegators[j].PotentialReward = &v
 		}
 	}
 	return clientValidators, nil

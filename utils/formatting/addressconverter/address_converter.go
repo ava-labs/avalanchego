@@ -4,8 +4,6 @@
 package addressconverter
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
@@ -28,24 +26,6 @@ func ConvertAddresses(destChain string, toHRP string, addresses []string) ([]str
 		convertedAddrs[i] = newAddrStr
 	}
 	return convertedAddrs, nil
-}
-
-// FormatAddressesFromID takes in a chain prefix, HRP, and slice of ids.ShortID to produce a
-// slice of strings for the given addresses.
-func FormatAddressesFromID(
-	chainIDAlias string,
-	hrp string,
-	addrs []ids.ShortID,
-) ([]string, error) {
-	var err error
-	addrsStr := make([]string, len(addrs))
-	for i, addr := range addrs {
-		addrsStr[i], err = formatting.FormatAddress(chainIDAlias, hrp, addr[:])
-		if err != nil {
-			return nil, fmt.Errorf("could not format address %s, chain %s, hrp %s: %w", addr, chainIDAlias, hrp, err)
-		}
-	}
-	return addrsStr, nil
 }
 
 func ParseAddressToID(addrStr string) (ids.ShortID, error) {
