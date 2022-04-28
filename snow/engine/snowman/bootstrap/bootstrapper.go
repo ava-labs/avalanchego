@@ -269,11 +269,9 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
 		len(pendingContainerIDs), len(acceptedContainerIDs))
-
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
-			// known block, decide if it needs processing.
 			if height := blk.Height(); height > b.tipHeight {
 				b.tipHeight = height
 			}
@@ -282,13 +280,11 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			} else {
 				toProcess = append(toProcess, blk)
 			}
-			continue
-		}
-
-		// unknown block, request it.
-		b.Blocked.AddMissingID(blkID)
-		if err := b.fetch(blkID); err != nil {
-			return err
+		} else {
+			b.Blocked.AddMissingID(blkID)
+			if err := b.fetch(blkID); err != nil {
+				return err
+			}
 		}
 	}
 
