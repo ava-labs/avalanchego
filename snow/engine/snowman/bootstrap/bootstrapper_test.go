@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -20,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -70,7 +71,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonConfig)
+	snowGetHandler, err := getter.New(vm, commonConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +117,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	snowGetHandler, err := getter.New(vm, commonCfg)
 	assert.NoError(err)
 	cfg := Config{
 		Config:        commonCfg,
@@ -147,6 +148,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	bs, err := New(cfg, dummyCallback)
 	assert.NoError(err)
 
+	vm.CantSetState = false
 	vm.CantConnected = true
 	vm.ConnectedF = func(ids.NodeID, version.Application) error { return nil }
 
@@ -157,8 +159,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
-	startReqID := uint32(0)
-	assert.NoError(bs.Start(startReqID))
+	assert.NoError(bs.Start(0))
 	assert.False(frontierRequested)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
@@ -166,7 +167,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.NoError(peers.AddWeight(vdr0, startupAlpha/2))
 	assert.NoError(bs.Connected(vdr0, version.CurrentApp))
 
-	assert.NoError(bs.Start(startReqID))
+	assert.NoError(bs.Start(0))
 	assert.False(frontierRequested)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
@@ -219,8 +220,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -248,7 +249,6 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	vm.CantSetState = false
 	err = bs.ForceAccepted(acceptedIDs)
 	switch {
 	case err != nil: // should finish
@@ -302,6 +302,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		BytesV:  blkBytes2,
 	}
 
+	vm.CantSetState = false
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -317,8 +318,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -473,8 +473,8 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -537,7 +537,6 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
@@ -632,8 +631,8 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -697,7 +696,6 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
@@ -806,8 +804,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -944,8 +941,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -995,7 +992,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted([]ids.ID{blkID1, blkID2}); err != nil { // should request blk2 and blk1
 		t.Fatal(err)
 	}
@@ -1153,8 +1149,8 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("unexpected bootstrapper type")
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1165,8 +1161,6 @@ func TestRestartBootstrapping(t *testing.T) {
 		}
 		requestIDs[vtxID] = reqID
 	}
-
-	vm.CantSetState = false
 
 	// Force Accept blk3
 	if err := bs.ForceAccepted([]ids.ID{blkID3}); err != nil { // should request blk3

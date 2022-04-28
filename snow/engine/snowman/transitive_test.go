@@ -53,6 +53,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	engCfg.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -62,7 +63,6 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 
-	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
@@ -77,8 +77,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -427,6 +426,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -447,8 +447,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -909,6 +908,7 @@ func TestVoteCanceling(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -932,8 +932,7 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1026,8 +1025,7 @@ func TestEngineNoQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1076,8 +1074,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1731,6 +1728,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -1751,8 +1749,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1848,6 +1845,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -1869,8 +1867,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1973,6 +1970,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -1993,8 +1991,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
