@@ -306,7 +306,7 @@ func (b *bootstrapper) Restart(reset bool) error {
 	return b.Startup()
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	vdrs := ids.NewNodeIDSet(1)
@@ -323,7 +323,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	}
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *bootstrapper) sendGetAccepted() {
 	vdrs := ids.NewNodeIDSet(1)
