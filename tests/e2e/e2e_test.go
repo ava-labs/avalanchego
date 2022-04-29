@@ -153,6 +153,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	// TODO: network runner health should imply custom VM healthiness
 	// or provide a separate API for custom VM healthiness
 	// "start" is async, so wait some time for cluster health
+	outf("\n{{magenta}}sleeping before checking custom VM status...{{/}}\n")
 	time.Sleep(2 * time.Minute)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -164,6 +165,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	blockchainID, logsDir := "", ""
 
 	// wait up to 5-minute for custom VM installation
+	outf("\n{{magenta}}waiting for all custom VMs to report healthy...{{/}}\n")
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
 done:
 	for ctx.Err() == nil {
