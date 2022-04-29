@@ -22,7 +22,7 @@ At a high level, Avalanche engine takes care of the following two state syncing 
 - Frontier retrieval: Avalanche engine retrieves from the network the most recent state summaries from a random subset of network validators.
 - Frontier validation: Avalanche engine validates these summaries by requesting all connected validators whether they support these state summaries.
 
-These phases are devised to stop a malicious actor from poisoning a VM with a crafted state summary or DoSing it with an unavailable one. Similar to Avalanche's bootstrapping process, security is achieved by feeding state summaries to the VM only if a sufficiently high fraction of network stake has validated them.
+These phases are devised to stop a malicious actor from poisoning a VM with a crafted state summary or convincing it to attempt to sync a state summary that is unavailable. Similar to Avalanche's bootstrapping process, security is achieved by feeding state summaries to the VM only if a sufficiently high fraction of network stake has validated them.
 
 In the following we detail these phases.
 
@@ -44,7 +44,7 @@ Avalanche engine does not pose major constraints on the state summary structure 
 
 `Height` is a `uint64` type and represents the block height state summaries refers to. `Height` offers the succinct way to address a state summary.
 
-`ID` is a `ids.ID` type and in our intention is the verifiable way to address a state summary. In our C-chain implementation, a state summary `ID` it's the hash of state summary bytes.
+`ID` is a `ids.ID` type and in our intention is the verifiable way to address a state summary. In our C-chain implementation, a state summary `ID` is the hash of the state summary bytes.
 
 ### Frontier validation
 

@@ -142,13 +142,13 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 		return nil
 	}
 
-	// All nodes reached out for the summary frontier have responded or timeout.
+	// All nodes reached out for the summary frontier have responded or timed out.
 	// If enough of them have indeed responded we'll go ahead and ask
-	// each state syncer (no just a sample) to filter the list of state summaries
+	// each state syncer (not just a sample) to filter the list of state summaries
 	// that we were told are on the accepted frontier.
 	// If we got too many timeouts, we restart state syncing hoping that network
-	// problems go away and we could collect a more qualified frontier.
-	// We assume frontier is qualified is an alpha proportion of frontier seeders have responded
+	// problems will go away and we can collect a qualified frontier.
+	// We assume the frontier is qualified after an alpha proportion of frontier seeders have responded
 	frontierAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
 	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
 	if err != nil {
@@ -405,7 +405,7 @@ func (ss *stateSyncer) restart() error {
 	return ss.startup()
 }
 
-// Ask up to [maxOutstandingStateSyncRequests] state sync validators at times
+// Ask up to [maxOutstandingStateSyncRequests] state sync validators at a time
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
