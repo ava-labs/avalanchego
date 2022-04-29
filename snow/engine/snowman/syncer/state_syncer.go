@@ -409,14 +409,14 @@ func (ss *stateSyncer) restart() error {
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	vdrs := ids.NewNodeIDSet(1)
-	for ss.targetSeeders.Len() > 0 && vdrs.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
+		ss.pendingSeeders.Add(vdr)
 	}
 
 	if vdrs.Len() > 0 {
 		ss.Sender.SendGetStateSummaryFrontier(vdrs, ss.requestID)
-		ss.pendingSeeders.Add(vdrs.List()...)
 	}
 }
 
@@ -426,9 +426,10 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 func (ss *stateSyncer) sendGetAccepted() error {
 	// pick voters to contact
 	vdrs := ids.NewNodeIDSet(1)
-	for ss.targetVoters.Len() > 0 && vdrs.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)
+		ss.pendingVoters.Add(vdr)
 	}
 
 	if len(vdrs) == 0 {
@@ -446,7 +447,6 @@ func (ss *stateSyncer) sendGetAccepted() error {
 		acceptedSummaryHeights = append(acceptedSummaryHeights, height)
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
-	ss.pendingVoters.Add(vdrs.List()...)
 	ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 		vdrs.Len(), ss.targetVoters.Len())
 	return nil
