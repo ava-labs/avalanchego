@@ -245,8 +245,11 @@ fi
 
 #################################
 if [[ ${MODE} == "test" ]]; then
+  echo "network-runner RPC server was running on PID ${PID} as test mode; terminating the process..."
   kill -9 ${PID}
 else
-  echo "network-runner RPC server is running on PID ${PID}"
+  echo "network-runner RPC server is running on PID ${PID}; use 'pkill -P ${PID}' to terminate"
 fi
+
+#################################
 echo "ALL SUCCESS!"
