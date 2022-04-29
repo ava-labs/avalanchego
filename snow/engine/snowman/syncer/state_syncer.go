@@ -161,7 +161,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 	}
 
 	ss.requestID++
-	return ss.sendGetAccepted()
+	return ss.sendGetAcceptedStateSummaries()
 }
 
 func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.NodeID, requestID uint32) error {
@@ -214,7 +214,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 		ss.weightedSummaries[summaryID] = ws
 	}
 
-	if err := ss.sendGetAccepted(); err != nil {
+	if err := ss.sendGetAcceptedStateSummaries(); err != nil {
 		return err
 	}
 
@@ -423,7 +423,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 // Ask up to [common.MaxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
-func (ss *stateSyncer) sendGetAccepted() error {
+func (ss *stateSyncer) sendGetAcceptedStateSummaries() error {
 	// pick voters to contact
 	vdrs := ids.NewNodeIDSet(1)
 	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
