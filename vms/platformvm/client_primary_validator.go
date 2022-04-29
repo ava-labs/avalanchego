@@ -11,18 +11,19 @@ import (
 )
 
 // ClientStaker is the representation of a staker sent via client.
-// [TxID] is the txID of the transaction that added this staker.
-// [Amount] is the amount of tokens being staked.
-// [StartTime] is the Unix time when they start staking
-// [Endtime] is the Unix time repr. of when they are done staking
-// [NodeID] is the node ID of the staker
 type ClientStaker struct {
-	TxID        ids.ID
-	StartTime   uint64
-	EndTime     uint64
-	Weight      *uint64
+	// the txID of the transaction that added this staker.
+	TxID ids.ID
+	// the Unix time when they start staking
+	StartTime uint64
+	// the Unix time when they are done staking
+	EndTime uint64
+	// the validator weight when sampling validators
+	Weight *uint64
+	// the amount of tokens being staked.
 	StakeAmount *uint64
-	NodeID      ids.NodeID
+	// the node ID of the staker
+	NodeID ids.NodeID
 }
 
 // ClientOwner is the repr. of a reward owner sent over client
