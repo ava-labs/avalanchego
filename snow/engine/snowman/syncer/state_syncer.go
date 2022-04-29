@@ -76,6 +76,10 @@ type stateSyncer struct {
 	// summaryID --> (summary, weight)
 	weightedSummaries map[ids.ID]weightedSummary
 
+	// summaries received may be different even if referring to the same height
+	// we keep a list of deduplcated height ready for voting
+	uniqueSummariesHeights map[uint64]struct{}
+
 	// number of times the state sync has been attempted
 	attempts int
 }
@@ -119,10 +123,16 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
 	if summary, err := ss.stateSyncVM.ParseStateSummary(summaryBytes); err == nil {
-		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
-			ss.weightedSummaries[summary.ID()] = weightedSummary{
+		summaryID := summary.ID()
+		summaryHeight := summary.Height()
+
+		if _, exists := ss.weightedSummaries[summaryID]; !exists {
+			ss.weightedSummaries[summaryID] = weightedSummary{
 				summary: summary,
 			}
+		}
+		if _, seen := ss.uniqueSummariesHeights[summaryHeight]; !seen {
+			ss.uniqueSummariesHeights[summaryHeight] = struct{}{}
 		}
 	} else {
 		ss.Ctx.Log.Debug("Could not parse summary from bytes: %s", err)
@@ -161,7 +171,7 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 	}
 
 	ss.requestID++
-	return ss.sendGetAccepted()
+	return ss.sendGetAcceptedStateSummaries()
 }
 
 func (ss *stateSyncer) GetStateSummaryFrontierFailed(validatorID ids.NodeID, requestID uint32) error {
@@ -214,7 +224,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 		ss.weightedSummaries[summaryID] = ws
 	}
 
-	if err := ss.sendGetAccepted(); err != nil {
+	if err := ss.sendGetAcceptedStateSummaries(); err != nil {
 		return err
 	}
 
@@ -337,6 +347,7 @@ func (ss *stateSyncer) startup() error {
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]weightedSummary)
+	ss.uniqueSummariesHeights = make(map[uint64]struct{})
 
 	ss.targetSeeders.Clear()
 	ss.pendingSeeders.Clear()
@@ -409,44 +420,39 @@ func (ss *stateSyncer) restart() error {
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	vdrs := ids.NewNodeIDSet(1)
-	for ss.targetSeeders.Len() > 0 && vdrs.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
+		ss.pendingSeeders.Add(vdr)
 	}
 
 	if vdrs.Len() > 0 {
 		ss.Sender.SendGetStateSummaryFrontier(vdrs, ss.requestID)
-		ss.pendingSeeders.Add(vdrs.List()...)
 	}
 }
 
 // Ask up to [common.MaxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
-func (ss *stateSyncer) sendGetAccepted() error {
+func (ss *stateSyncer) sendGetAcceptedStateSummaries() error {
 	// pick voters to contact
 	vdrs := ids.NewNodeIDSet(1)
-	for ss.targetVoters.Len() > 0 && vdrs.Len() < common.MaxOutstandingBroadcastRequests {
+	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)
+		ss.pendingVoters.Add(vdr)
 	}
 
 	if len(vdrs) == 0 {
 		return nil
 	}
 
+	// send deduplicated heights
 	acceptedSummaryHeights := make([]uint64, 0, len(ss.weightedSummaries))
-	seenHeights := make(map[uint64]struct{}, len(ss.weightedSummaries))
-	for _, ws := range ss.weightedSummaries {
-		height := ws.summary.Height()
-		if _, seen := seenHeights[height]; seen {
-			continue // avoid passing duplicate heights to SendGetAcceptedStateSummary
-		}
-		seenHeights[height] = struct{}{}
+	for height := range ss.uniqueSummariesHeights {
 		acceptedSummaryHeights = append(acceptedSummaryHeights, height)
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
-	ss.pendingVoters.Add(vdrs.List()...)
 	ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 		vdrs.Len(), ss.targetVoters.Len())
 	return nil
