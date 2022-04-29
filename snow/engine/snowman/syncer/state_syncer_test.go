@@ -217,7 +217,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	assert.True(len(contactedFrontiersProviders) == safeMath.Min(vdrs.Len(), maxOutstandingStateSyncRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
-		assert.True(syncer.contactedSeeders.Contains(beaconID))
+		assert.True(syncer.pendingSeeders.Contains(beaconID))
 	}
 
 	// check that, obviously, no summary is yet registered
@@ -276,7 +276,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 		math.MaxInt32,
 		summaryBytes,
 	))
-	assert.True(syncer.contactedSeeders.Contains(responsiveBeaconID)) // responsiveBeacon still pending
+	assert.True(syncer.pendingSeeders.Contains(responsiveBeaconID)) // responsiveBeacon still pending
 	assert.True(len(syncer.weightedSummaries) == 0)
 
 	// check a response from unsolicited node is dropped
@@ -296,7 +296,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.contactedSeeders.Contains(responsiveBeaconID))
+	assert.False(syncer.pendingSeeders.Contains(responsiveBeaconID))
 
 	// valid summary is recorded
 	ws, ok := syncer.weightedSummaries[summaryID]
@@ -362,7 +362,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.contactedSeeders.Contains(responsiveBeaconID))
+	assert.False(syncer.pendingSeeders.Contains(responsiveBeaconID))
 
 	// invalid summary is not recorded
 	assert.True(isSummaryDecoded)
@@ -424,7 +424,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	))
 
 	// unresponsiveBeacon not pending anymore
-	assert.False(syncer.contactedSeeders.Contains(unresponsiveBeaconID))
+	assert.False(syncer.pendingSeeders.Contains(unresponsiveBeaconID))
 	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
 
 	// even in case of timeouts, other listed vdrs
@@ -508,13 +508,13 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let just one node respond and all others timeout
 	maxResponses := 1
 	reachedSeedersCount := syncer.Config.SampleK
 	for reachedSeedersCount >= 0 {
-		beaconID, found := syncer.contactedSeeders.Peek()
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -535,7 +535,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	}
 
 	// check that some frontier seeders are reached again for the frontier
-	assert.True(syncer.contactedSeeders.Len() > 0)
+	assert.True(syncer.pendingSeeders.Len() > 0)
 
 	// check that no vote requests are issued
 	assert.True(len(contactedVoters) == 0)
@@ -587,11 +587,11 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
-	for syncer.contactedSeeders.Len() != 0 {
-		beaconID, found := syncer.contactedSeeders.Peek()
+	for syncer.pendingSeeders.Len() != 0 {
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -601,7 +601,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.contactedSeeders.Len() != 0)
+	assert.False(syncer.pendingSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -654,11 +654,11 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
-	for syncer.contactedSeeders.Len() != 0 {
-		beaconID, found := syncer.contactedSeeders.Peek()
+	for syncer.pendingSeeders.Len() != 0 {
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -668,7 +668,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.contactedSeeders.Len() != 0)
+	assert.False(syncer.pendingSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -690,7 +690,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveVoter still pending
-	assert.True(syncer.contactedVoters.Contains(responsiveVoterID))
+	assert.True(syncer.pendingVoters.Contains(responsiveVoterID))
 	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
 
 	// check a response from unsolicited node is dropped
@@ -710,7 +710,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.contactedSeeders.Contains(responsiveVoterID))
+	assert.False(syncer.pendingSeeders.Contains(responsiveVoterID))
 	voterWeight, found := vdrs.GetWeight(responsiveVoterID)
 	assert.True(found)
 	assert.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
@@ -766,11 +766,11 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
-	for syncer.contactedSeeders.Len() != 0 {
-		beaconID, found := syncer.contactedSeeders.Peek()
+	for syncer.pendingSeeders.Len() != 0 {
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -780,7 +780,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.contactedSeeders.Len() != 0)
+	assert.False(syncer.pendingSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
@@ -804,7 +804,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	assert.False(found)
 
 	// check that responsiveVoter cannot cast another vote
-	assert.False(syncer.contactedSeeders.Contains(responsiveVoterID))
+	assert.False(syncer.pendingSeeders.Contains(responsiveVoterID))
 	assert.NoError(syncer.AcceptedStateSummary(
 		responsiveVoterID,
 		responsiveVoterReqID,
@@ -880,15 +880,15 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond with majority or minority summaries
 	for {
-		reachedSeeders := syncer.contactedSeeders.Len()
+		reachedSeeders := syncer.pendingSeeders.Len()
 		if reachedSeeders == 0 {
 			break
 		}
-		beaconID, found := syncer.contactedSeeders.Peek()
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -906,7 +906,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			))
 		}
 	}
-	assert.False(syncer.contactedSeeders.Len() != 0)
+	assert.False(syncer.pendingSeeders.Len() != 0)
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
@@ -921,8 +921,8 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
 	cumulatedWeight := uint64(0)
-	for syncer.contactedVoters.Len() != 0 {
-		voterID, found := syncer.contactedVoters.Peek()
+	for syncer.pendingVoters.Len() != 0 {
+		voterID, found := syncer.pendingVoters.Peek()
 		assert.True(found)
 		reqID := contactedVoters[voterID]
 
@@ -1007,11 +1007,11 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
-	for syncer.contactedSeeders.Len() != 0 {
-		beaconID, found := syncer.contactedSeeders.Peek()
+	for syncer.pendingSeeders.Len() != 0 {
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -1021,7 +1021,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.contactedSeeders.Len() != 0)
+	assert.False(syncer.pendingSeeders.Len() != 0)
 
 	minoritySummaryCalled := false
 	minoritySummary.AcceptF = func() (bool, error) {
@@ -1031,8 +1031,8 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	// Let a majority of voters timeout.
 	timedOutWeight := uint64(0)
-	for syncer.contactedVoters.Len() != 0 {
-		voterID, found := syncer.contactedVoters.Peek()
+	for syncer.pendingVoters.Len() != 0 {
+		voterID, found := syncer.pendingVoters.Peek()
 		assert.True(found)
 		reqID := contactedVoters[voterID]
 
@@ -1057,8 +1057,8 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	assert.False(minoritySummaryCalled)
 
 	// instead the whole process is restared
-	assert.False(syncer.contactedVoters.Len() != 0) // no voters reached
-	assert.True(syncer.contactedSeeders.Len() != 0) // frontiers providers reached again
+	assert.False(syncer.pendingVoters.Len() != 0) // no voters reached
+	assert.True(syncer.pendingSeeders.Len() != 0) // frontiers providers reached again
 }
 
 func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.T) {
@@ -1122,15 +1122,15 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	for _, vdr := range vdrs.List() {
 		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
 	}
-	assert.True(syncer.contactedSeeders.Len() != 0)
+	assert.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond with majority or minority summaries
 	for {
-		reachedSeeders := syncer.contactedSeeders.Len()
+		reachedSeeders := syncer.pendingSeeders.Len()
 		if reachedSeeders == 0 {
 			break
 		}
-		beaconID, found := syncer.contactedSeeders.Peek()
+		beaconID, found := syncer.pendingSeeders.Peek()
 		assert.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
@@ -1148,7 +1148,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 			))
 		}
 	}
-	assert.False(syncer.contactedSeeders.Len() != 0)
+	assert.False(syncer.pendingSeeders.Len() != 0)
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
@@ -1170,8 +1170,8 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	// let all votes respond in time without any summary reaching a majority.
 	// We achieve it by making most nodes voting for an invalid summaryID.
 	votingWeightStake := uint64(0)
-	for syncer.contactedVoters.Len() != 0 {
-		voterID, found := syncer.contactedVoters.Peek()
+	for syncer.pendingVoters.Len() != 0 {
+		voterID, found := syncer.pendingVoters.Peek()
 		assert.True(found)
 		reqID := contactedVoters[voterID]
 

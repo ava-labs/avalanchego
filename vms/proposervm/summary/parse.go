@@ -7,7 +7,7 @@ import "fmt"
 
 func Parse(summaryBytes []byte) (StatelessSummaryIntf, error) {
 	var summary StatelessSummary
-	ver, err := cdc.Unmarshal(summaryBytes, &summary)
+	ver, err := Codec.Unmarshal(summaryBytes, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal summary due to: %w", err)
 	}

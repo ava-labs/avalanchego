@@ -14,7 +14,7 @@ import (
 var (
 	_ ProposerSummary = &proposerSummary{}
 
-	cdc codec.Manager
+	Codec codec.Manager
 
 	errWrongStateSyncVersion = errors.New("wrong state sync key version")
 )
@@ -23,8 +23,8 @@ const codecVersion = 0
 
 func init() {
 	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	cdc = codec.NewManager(math.MaxInt32)
-	if err := cdc.RegisterCodec(codecVersion, lc); err != nil {
+	Codec = codec.NewManager(math.MaxInt32)
+	if err := Codec.RegisterCodec(codecVersion, lc); err != nil {
 		panic(err)
 	}
 }

@@ -18,7 +18,7 @@ func BuildProposerSummary(
 		InnerSummary: coreSummary.Bytes(),
 	}
 
-	proSummaryBytes, err := cdc.Marshal(codecVersion, &statelessSummary)
+	proSummaryBytes, err := Codec.Marshal(codecVersion, &statelessSummary)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposer summary due to: %w", err)
 	}
