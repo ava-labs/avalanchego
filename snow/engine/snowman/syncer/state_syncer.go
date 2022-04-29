@@ -333,6 +333,11 @@ func (ss *stateSyncer) Start(startReqID uint32) error {
 	return ss.startup()
 }
 
+// startup do start the whole state sync process by
+// sampling frontier seeders, listing state syncers to request votes to
+// and reaching out frontier seeders if any. Othewise it move immediately
+// to bootstrapping. Unlike Start, startup does not check
+// whether sufficient stake amount is connected.
 func (ss *stateSyncer) startup() error {
 	ss.Config.Ctx.Log.Info("starting state sync")
 

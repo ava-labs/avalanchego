@@ -65,4 +65,5 @@ Avalanche engine declares state syncing complete in the following cases:
 1. `Summary.Accept()` returns `(false, nil)` signalling that VM considers the summary valid but skips the whole syncing process. This may happen if VM estimates that bootstrapping till block frontier would be faster than state syncing with the provided summary.
 2. VM notifies  `StateSyncDone` via `Notify`.
 
+Note that any error returned from `Summary.Accept()` is considered fatal and cause node to shutdown.
 As state sync complete, Avalanche engine moves ahead to bootstrapping the remaining blocks till block frontier.
