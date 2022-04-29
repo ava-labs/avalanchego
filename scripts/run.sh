@@ -182,7 +182,7 @@ EOF
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: use "go install -v github.com/ava-labs/avalanche-network-runner/cmd/avalanche-network-runner@v${NETWORK_RUNNER_VERSION}"
-NETWORK_RUNNER_VERSION=1.0.11
+NETWORK_RUNNER_VERSION=1.0.12
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
@@ -232,7 +232,21 @@ echo "running e2e tests"
 --output-path=/tmp/avalanchego-v${VERSION}/output.yaml \
 --mode=${MODE}
 
+#################################
+# e.g., print out MetaMask endpoints
+if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
+  echo "cluster is ready!"
+  go run scripts/parser/main.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID $GENESIS_ADDRESS
+else
+  echo "cluster is not ready in time... terminating ${PID}"
+  kill ${PID}
+  exit 255
+fi
+
+#################################
 if [[ ${MODE} == "test" ]]; then
   kill -9 ${PID}
+else
+  echo "network-runner RPC server is running on PID ${PID}"
 fi
 echo "ALL SUCCESS!"
