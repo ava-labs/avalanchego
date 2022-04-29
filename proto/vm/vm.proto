@@ -266,16 +266,15 @@ message StateSyncSummary {
   uint64 height = 1;
   bytes id = 2;
   bytes content = 3;
+  uint32 err = 4;
 }
 
 message GetOngoingSyncStateSummaryResponse {
   StateSyncSummary summary = 1;
-  uint32 err = 2;
 }
 
 message GetLastStateSummaryResponse {
   StateSyncSummary summary = 1;
-  uint32 err = 2;
 }
 
 message ParseStateSummaryRequest {
@@ -284,7 +283,6 @@ message ParseStateSummaryRequest {
 
 message ParseStateSummaryResponse {
   StateSyncSummary summary = 1;
-  uint32 err = 2;
 }
 
 message GetStateSummaryRequest {
@@ -293,7 +291,6 @@ message GetStateSummaryRequest {
 
 message GetStateSummaryResponse {
   StateSyncSummary summary = 1;
-  uint32 err = 2;
 }
 
 message StateSummaryAcceptRequest {

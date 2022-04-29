@@ -56,7 +56,9 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 	}
 
 	return &vmpb.GetOngoingSyncStateSummaryResponse{
-		Err: errorToErrCode[err],
+		Summary: &vmpb.StateSyncSummary{
+			Err: errorToErrCode[err],
+		},
 	}, errorToRPCError(err)
 }
 
@@ -77,7 +79,9 @@ func (vm *VMServer) GetLastStateSummary(
 
 	if err != nil {
 		return &vmpb.GetLastStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Summary: &vmpb.StateSyncSummary{
+				Err: errorToErrCode[err],
+			},
 		}, errorToRPCError(err)
 	}
 
@@ -108,7 +112,9 @@ func (vm *VMServer) ParseStateSummary(
 
 	if err != nil {
 		return &vmpb.ParseStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Summary: &vmpb.StateSyncSummary{
+				Err: errorToErrCode[err],
+			},
 		}, errorToRPCError(err)
 	}
 
@@ -139,7 +145,9 @@ func (vm *VMServer) GetStateSummary(
 
 	if err != nil {
 		return &vmpb.GetStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Summary: &vmpb.StateSyncSummary{
+				Err: errorToErrCode[err],
+			},
 		}, errorToRPCError(err)
 	}
 

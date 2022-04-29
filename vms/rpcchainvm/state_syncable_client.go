@@ -34,17 +34,7 @@ func (vm *VMClient) GetOngoingSyncStateSummary() (block.StateSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
-	}
-
-	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
-	}, err
+	return vm.grpcResponseToSummaryClient(resp.Summary)
 }
 
 func (vm *VMClient) GetLastStateSummary() (block.StateSummary, error) {
@@ -55,17 +45,7 @@ func (vm *VMClient) GetLastStateSummary() (block.StateSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
-	}
-
-	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
-	}, err
+	return vm.grpcResponseToSummaryClient(resp.Summary)
 }
 
 func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
@@ -78,17 +58,7 @@ func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.StateSummary, 
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
-	}
-
-	summaryID, err := ids.ToID(resp.Summary.Id)
-	return &SummaryClient{
-		vm:     vm,
-		height: resp.Summary.Height,
-		id:     summaryID,
-		bytes:  resp.Summary.Content,
-	}, err
+	return vm.grpcResponseToSummaryClient(resp.Summary)
 }
 
 func (vm *VMClient) GetStateSummary(height uint64) (block.StateSummary, error) {
@@ -101,15 +71,24 @@ func (vm *VMClient) GetStateSummary(height uint64) (block.StateSummary, error) {
 	if err != nil {
 		return nil, err
 	}
+	return vm.grpcResponseToSummaryClient(resp.Summary)
+}
+
+// helper function turning responses from grpc into SummaryClient
+func (vm *VMClient) grpcResponseToSummaryClient(
+	resp *vmpb.StateSyncSummary,
+) (*SummaryClient, error) {
+	// ErrStateSyncableVMNotImplemented is handled ad-hoc, being
+	// passed as response field. We deal with it first
 	if errCode := resp.Err; errCode != 0 {
 		return nil, errCodeToError[errCode]
 	}
 
-	summaryID, err := ids.ToID(resp.Summary.Id)
+	summaryID, err := ids.ToID(resp.Id)
 	return &SummaryClient{
 		vm:     vm,
-		height: resp.Summary.Height,
+		height: resp.Height,
 		id:     summaryID,
-		bytes:  resp.Summary.Content,
+		bytes:  resp.Content,
 	}, err
 }
