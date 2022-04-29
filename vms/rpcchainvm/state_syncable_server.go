@@ -155,8 +155,8 @@ func (vm *VMServer) GetStateSummary(
 
 func (vm *VMServer) SummaryAccept(
 	_ context.Context,
-	req *vmpb.SummaryAcceptRequest,
-) (*vmpb.SummaryAcceptResponse, error) {
+	req *vmpb.StateSummaryAcceptRequest,
+) (*vmpb.StateSummaryAcceptResponse, error) {
 	var (
 		accepted bool
 		err      error
@@ -171,7 +171,7 @@ func (vm *VMServer) SummaryAccept(
 		}
 	}
 
-	return &vmpb.SummaryAcceptResponse{
+	return &vmpb.StateSummaryAcceptResponse{
 		Accepted: accepted,
 		Err:      errorToErrCode[err],
 	}, errorToRPCError(err)

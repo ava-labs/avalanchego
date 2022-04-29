@@ -41,7 +41,7 @@ service VM {
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
-  rpc SummaryAccept(SummaryAcceptRequest) returns (SummaryAcceptResponse);
+  rpc StateSummaryAccept(StateSummaryAcceptRequest) returns (StateSummaryAcceptResponse);
 }
 
 message InitializeRequest {
@@ -296,11 +296,11 @@ message GetStateSummaryResponse {
   uint32 err = 2;
 }
 
-message SummaryAcceptRequest {
+message StateSummaryAcceptRequest {
   bytes bytes = 1;
 }
 
-message SummaryAcceptResponse {
+message StateSummaryAcceptResponse {
   bool accepted = 1;
   uint32 err = 2;
 }

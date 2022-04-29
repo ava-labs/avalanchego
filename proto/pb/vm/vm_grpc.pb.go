@@ -54,7 +54,7 @@ type VMClient interface {
 	GetLastStateSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetLastStateSummaryResponse, error)
 	ParseStateSummary(ctx context.Context, in *ParseStateSummaryRequest, opts ...grpc.CallOption) (*ParseStateSummaryResponse, error)
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
-	SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*SummaryAcceptResponse, error)
+	StateSummaryAccept(ctx context.Context, in *StateSummaryAcceptRequest, opts ...grpc.CallOption) (*StateSummaryAcceptResponse, error)
 }
 
 type vMClient struct {
@@ -335,9 +335,9 @@ func (c *vMClient) GetStateSummary(ctx context.Context, in *GetStateSummaryReque
 	return out, nil
 }
 
-func (c *vMClient) SummaryAccept(ctx context.Context, in *SummaryAcceptRequest, opts ...grpc.CallOption) (*SummaryAcceptResponse, error) {
-	out := new(SummaryAcceptResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/SummaryAccept", in, out, opts...)
+func (c *vMClient) StateSummaryAccept(ctx context.Context, in *StateSummaryAcceptRequest, opts ...grpc.CallOption) (*StateSummaryAcceptResponse, error) {
+	out := new(StateSummaryAcceptResponse)
+	err := c.cc.Invoke(ctx, "/vm.VM/StateSummaryAccept", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ type VMServer interface {
 	GetLastStateSummary(context.Context, *emptypb.Empty) (*GetLastStateSummaryResponse, error)
 	ParseStateSummary(context.Context, *ParseStateSummaryRequest) (*ParseStateSummaryResponse, error)
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
-	SummaryAccept(context.Context, *SummaryAcceptRequest) (*SummaryAcceptResponse, error)
+	StateSummaryAccept(context.Context, *StateSummaryAcceptRequest) (*StateSummaryAcceptResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
 
@@ -477,8 +477,8 @@ func (UnimplementedVMServer) ParseStateSummary(context.Context, *ParseStateSumma
 func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSummary not implemented")
 }
-func (UnimplementedVMServer) SummaryAccept(context.Context, *SummaryAcceptRequest) (*SummaryAcceptResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SummaryAccept not implemented")
+func (UnimplementedVMServer) StateSummaryAccept(context.Context, *StateSummaryAcceptRequest) (*StateSummaryAcceptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StateSummaryAccept not implemented")
 }
 func (UnimplementedVMServer) mustEmbedUnimplementedVMServer() {}
 
@@ -1033,20 +1033,20 @@ func _VM_GetStateSummary_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_SummaryAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SummaryAcceptRequest)
+func _VM_StateSummaryAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateSummaryAcceptRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServer).SummaryAccept(ctx, in)
+		return srv.(VMServer).StateSummaryAccept(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/vm.VM/SummaryAccept",
+		FullMethod: "/vm.VM/StateSummaryAccept",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).SummaryAccept(ctx, req.(*SummaryAcceptRequest))
+		return srv.(VMServer).StateSummaryAccept(ctx, req.(*StateSummaryAcceptRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1179,8 +1179,8 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_GetStateSummary_Handler,
 		},
 		{
-			MethodName: "SummaryAccept",
-			Handler:    _VM_SummaryAccept_Handler,
+			MethodName: "StateSummaryAccept",
+			Handler:    _VM_StateSummaryAccept_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -28,9 +28,9 @@ func (s *SummaryClient) Height() uint64 { return s.height }
 func (s *SummaryClient) ID() ids.ID     { return s.id }
 
 func (s *SummaryClient) Accept() (bool, error) {
-	resp, err := s.vm.client.SummaryAccept(
+	resp, err := s.vm.client.StateSummaryAccept(
 		context.Background(),
-		&vmpb.SummaryAcceptRequest{
+		&vmpb.StateSummaryAcceptRequest{
 			Bytes: s.bytes,
 		},
 	)
