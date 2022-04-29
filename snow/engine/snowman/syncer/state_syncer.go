@@ -482,12 +482,12 @@ func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion version.Applicat
 		return err
 	}
 
-	if ss.WeightTracker.EnoughConnectedWeight() && !ss.started {
-		ss.started = true
-		return ss.startup()
+	if ss.started || !ss.WeightTracker.EnoughConnectedWeight() {
+		return nil
 	}
 
-	return nil
+	ss.started = true
+	return ss.startup()
 }
 
 func (ss *stateSyncer) Disconnected(nodeID ids.NodeID) error {
