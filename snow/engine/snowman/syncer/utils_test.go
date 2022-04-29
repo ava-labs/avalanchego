@@ -60,10 +60,10 @@ func init() {
 }
 
 func buildTestPeers(t *testing.T) validators.Set {
-	// we consider more than maxOutstandingStateSyncRequests peers
+	// we consider more than common.MaxOutstandingBroadcastRequests peers
 	// so to test the effect of cap on number of requests sent out
 	vdrs := validators.NewSet()
-	for idx := 0; idx < 2*maxOutstandingStateSyncRequests; idx++ {
+	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
 		assert.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
 	}

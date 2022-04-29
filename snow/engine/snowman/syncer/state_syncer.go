@@ -61,7 +61,7 @@ type stateSyncer struct {
 	targetSeeders ids.NodeIDSet
 	// IDs of validators we requested a state summary frontier from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	contactedSeeders ids.NodeIDSet
+	pendingSeeders ids.NodeIDSet
 	// IDs of validators that failed to respond with their state summary frontier
 	failedSeeders ids.NodeIDSet
 
@@ -69,7 +69,7 @@ type stateSyncer struct {
 	targetVoters ids.NodeIDSet
 	// IDs of validators we requested filtering the accepted state summaries from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	contactedVoters ids.NodeIDSet
+	pendingVoters ids.NodeIDSet
 	// IDs of validators that failed to respond with their filtered accepted state summaries
 	failedVoters ids.NodeIDSet
 
@@ -107,13 +107,13 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 		return nil
 	}
 
-	if !ss.contactedSeeders.Contains(validatorID) {
+	if !ss.pendingSeeders.Contains(validatorID) {
 		ss.Ctx.Log.Debug("Received a StateSummaryFrontier message from %s unexpectedly", validatorID)
 		return nil
 	}
 
 	// Mark that we received a response from [validatorID]
-	ss.contactedSeeders.Remove(validatorID)
+	ss.pendingSeeders.Remove(validatorID)
 
 	// retrieve summary ID and register frontier;
 	// make sure next beacons are reached out
@@ -132,17 +132,17 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 	ss.sendGetStateSummaryFrontiers()
 
 	// still waiting on requests
-	if ss.contactedSeeders.Len() != 0 {
+	if ss.pendingSeeders.Len() != 0 {
 		return nil
 	}
 
-	// All nodes reached out for the summary frontier have responded or timeout.
+	// All nodes reached out for the summary frontier have responded or timed out.
 	// If enough of them have indeed responded we'll go ahead and ask
-	// each state syncer (no just a sample) to filter the list of state summaries
+	// each state syncer (not just a sample) to filter the list of state summaries
 	// that we were told are on the accepted frontier.
 	// If we got too many timeouts, we restart state syncing hoping that network
-	// problems go away and we could collect a more qualified frontier.
-	// We assume frontier is qualified is an alpha proportion of frontier seeders have responded
+	// problems will go away and we can collect a qualified frontier.
+	// We assume the frontier is qualified after an alpha proportion of frontier seeders have responded
 	frontierAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
 	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
 	if err != nil {
@@ -186,12 +186,12 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 		return nil
 	}
 
-	if !ss.contactedVoters.Contains(validatorID) {
+	if !ss.pendingVoters.Contains(validatorID) {
 		ss.Ctx.Log.Debug("Received an AcceptedStateSummary message from %s unexpectedly", validatorID)
 		return nil
 	}
 	// Mark that we received a response from [validatorID]
-	ss.contactedVoters.Remove(validatorID)
+	ss.pendingVoters.Remove(validatorID)
 
 	weight := uint64(0)
 	if w, ok := ss.StateSyncBeacons.GetWeight(validatorID); ok {
@@ -219,7 +219,7 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 	}
 
 	// wait on pending responses
-	if ss.contactedVoters.Len() != 0 {
+	if ss.pendingVoters.Len() != 0 {
 		return nil
 	}
 
@@ -327,6 +327,11 @@ func (ss *stateSyncer) Start(startReqID uint32) error {
 	return ss.startup()
 }
 
+// startup do start the whole state sync process by
+// sampling frontier seeders, listing state syncers to request votes to
+// and reaching out frontier seeders if any. Othewise it move immediately
+// to bootstrapping. Unlike Start, startup does not check
+// whether sufficient stake amount is connected.
 func (ss *stateSyncer) startup() error {
 	ss.Config.Ctx.Log.Info("starting state sync")
 
@@ -334,10 +339,10 @@ func (ss *stateSyncer) startup() error {
 	ss.weightedSummaries = make(map[ids.ID]weightedSummary)
 
 	ss.targetSeeders.Clear()
-	ss.contactedSeeders.Clear()
+	ss.pendingSeeders.Clear()
 	ss.failedSeeders.Clear()
 	ss.targetVoters.Clear()
-	ss.contactedVoters.Clear()
+	ss.pendingVoters.Clear()
 	ss.failedVoters.Clear()
 
 	// sample K beacons to retrieve frontier from
@@ -399,7 +404,7 @@ func (ss *stateSyncer) restart() error {
 	return ss.startup()
 }
 
-// Ask up to [common.MaxOutstandingBootstrapRequests] state sync validators at times
+// Ask up to [common.MaxOutstandingBroadcastRequests] state sync validators at a time
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
@@ -411,11 +416,11 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 
 	if vdrs.Len() > 0 {
 		ss.Sender.SendGetStateSummaryFrontier(vdrs, ss.requestID)
-		ss.contactedSeeders.Add(vdrs.List()...)
+		ss.pendingSeeders.Add(vdrs.List()...)
 	}
 }
 
-// Ask up to [common.MaxOutstandingBootstrapRequests] syncers validators to send
+// Ask up to [common.MaxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAccepted() error {
@@ -441,7 +446,7 @@ func (ss *stateSyncer) sendGetAccepted() error {
 		acceptedSummaryHeights = append(acceptedSummaryHeights, height)
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
-	ss.contactedVoters.Add(vdrs.List()...)
+	ss.pendingVoters.Add(vdrs.List()...)
 	ss.Ctx.Log.Debug("sent %d more GetAcceptedStateSummary messages with %d more to send",
 		vdrs.Len(), ss.targetVoters.Len())
 	return nil
