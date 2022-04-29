@@ -18,7 +18,8 @@ const (
 	// (i.e. it would like to add a new block/vertex to consensus)
 	PendingTxs Message = iota
 
-	// snowman-VM related messages for state sync capable VMs
+	// StateSyncDone notifies the state syncer engine that the VM has finishing
+	// syncing the requested state summary.
 	StateSyncDone
 
 	// StopVertex notifies a consensus that it has a pending stop vertex

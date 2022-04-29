@@ -9,6 +9,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -16,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
-	safeMath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/stretchr/testify/assert"
+
+	safeMath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
@@ -214,7 +216,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// check that vdrs are reached out for frontiers
-	assert.True(len(contactedFrontiersProviders) == safeMath.Min(vdrs.Len(), maxOutstandingStateSyncRequests))
+	assert.True(len(contactedFrontiersProviders) == safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		assert.True(syncer.pendingSeeders.Contains(beaconID))
@@ -254,7 +256,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
-	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
+	assert.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
@@ -339,7 +341,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
-	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
+	assert.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
 
 	// mock VM to simulate an invalid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
@@ -405,7 +407,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
 	assert.True(initiallyReachedOutBeaconsSize > 0)
-	assert.True(initiallyReachedOutBeaconsSize <= maxOutstandingStateSyncRequests)
+	assert.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
 
 	// pick one of the vdrs that have been reached out
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
@@ -606,7 +608,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
 	assert.True(initiallyContactedVotersSize > 0)
-	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
+	assert.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
 }
 
 func TestUnRequestedVotesAreDropped(t *testing.T) {
@@ -673,7 +675,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
 	assert.True(initiallyContactedVotersSize > 0)
-	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
+	assert.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
 	assert.True(found)
@@ -785,7 +787,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
 	assert.True(initiallyContactedVotersSize > 0)
-	assert.True(initiallyContactedVotersSize <= maxOutstandingStateSyncRequests)
+	assert.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
 	assert.True(found)

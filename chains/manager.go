@@ -679,20 +679,7 @@ func (m *manager) createAvalancheChain(
 	// Register health check for this chain
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	// Grab the context lock before calling the chain's health check
-	check := health.CheckerFunc(func() (interface{}, error) {
-		ctx.Lock.Lock()
-		defer ctx.Lock.Unlock()
-		switch ctx.GetState() {
-		case snow.Bootstrapping:
-			return bootstrapper.HealthCheck()
-		case snow.NormalOp:
-			return engine.HealthCheck()
-		default:
-			return nil, fmt.Errorf("unknown state; could not check health")
-		}
-	})
-	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -891,7 +878,6 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
-
 	stateSyncer := syncer.New(
 		stateSyncCfg,
 		bootstrapper.Start,
@@ -901,21 +887,7 @@ func (m *manager) createSnowmanChain(
 	// Register health checks
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	check := health.CheckerFunc(func() (interface{}, error) {
-		ctx.Lock.Lock()
-		defer ctx.Lock.Unlock()
-		switch ctx.GetState() {
-		case snow.StateSyncing:
-			return stateSyncer.HealthCheck()
-		case snow.Bootstrapping:
-			return bootstrapper.HealthCheck()
-		case snow.NormalOp:
-			return engine.HealthCheck()
-		default:
-			return nil, fmt.Errorf("unknown state; could not check health")
-		}
-	})
-	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 

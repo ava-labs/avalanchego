@@ -14,8 +14,17 @@ type Config struct {
 	common.Config
 	common.AllGetsServer
 
-	SampleK          int
-	Alpha            uint64
+	// SampleK determines the number of nodes to attempt to fetch the latest
+	// state sync summary from. In order for a round of voting to succeed, there
+	// must be at least one correct node sampled.
+	SampleK int
+
+	// Alpha specifies the amount of weight that validators must put behind a
+	// state summary to consider it valid to sync to.
+	Alpha uint64
+
+	// StateSyncBeacons are the nodes that will be used to sample and vote over
+	// state summaries.
 	StateSyncBeacons validators.Set
 
 	VM block.ChainVM
@@ -33,6 +42,8 @@ func NewConfig(
 		syncSampleK      = commonCfg.SampleK
 	)
 
+	// If the user has manually provided state syncer IDs, then override the
+	// state sync beacons to them.
 	if len(stateSyncerIDs) != 0 {
 		stateSyncBeacons = validators.NewSet()
 		for _, peerID := range stateSyncerIDs {

@@ -20,12 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const (
-	// maxOutstandingStateSyncRequests is the maximum number of
-	// messages sent but not responded to/failed for each relevant message type
-	maxOutstandingStateSyncRequests = 50
-)
-
 var _ common.StateSyncer = &stateSyncer{}
 
 // summary content as received from network, along with accumulated weight.
@@ -410,12 +404,12 @@ func (ss *stateSyncer) restart() error {
 	return ss.startup()
 }
 
-// Ask up to [maxOutstandingStateSyncRequests] state sync validators at a time
+// Ask up to [common.MaxOutstandingBroadcastRequests] state sync validators at a time
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	vdrs := ids.NewNodeIDSet(1)
-	for ss.targetSeeders.Len() > 0 && vdrs.Len() < maxOutstandingStateSyncRequests {
+	for ss.targetSeeders.Len() > 0 && vdrs.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
 	}
@@ -426,13 +420,13 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	}
 }
 
-// Ask up to [maxOutstandingStateSyncRequests] syncers validators to send
+// Ask up to [common.MaxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAccepted() error {
 	// pick voters to contact
 	vdrs := ids.NewNodeIDSet(1)
-	for ss.targetVoters.Len() > 0 && vdrs.Len() < maxOutstandingStateSyncRequests {
+	for ss.targetVoters.Len() > 0 && vdrs.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)
 	}
@@ -471,19 +465,11 @@ func (ss *stateSyncer) AppRequestFailed(nodeID ids.NodeID, requestID uint32) err
 }
 
 func (ss *stateSyncer) Notify(msg common.Message) error {
-	// if state sync and bootstrap is done, we shouldn't receive StateSyncDone from the VM
-	ss.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
-	switch msg {
-	case common.PendingTxs:
-		ss.Ctx.Log.Warn("Message %s received in state sync. Dropped.", msg.String())
-
-	case common.StateSyncDone:
-		return ss.onDoneStateSyncing(ss.requestID)
-
-	default:
+	if msg != common.StateSyncDone {
 		ss.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+		return nil
 	}
-	return nil
+	return ss.onDoneStateSyncing(ss.requestID)
 }
 
 func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
@@ -495,12 +481,12 @@ func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion version.Applicat
 		return err
 	}
 
-	if ss.WeightTracker.EnoughConnectedWeight() && !ss.started {
-		ss.started = true
-		return ss.startup()
+	if ss.started || !ss.WeightTracker.EnoughConnectedWeight() {
+		return nil
 	}
 
-	return nil
+	ss.started = true
+	return ss.startup()
 }
 
 func (ss *stateSyncer) Disconnected(nodeID ids.NodeID) error {
@@ -522,10 +508,8 @@ func (ss *stateSyncer) Context() *snow.ConsensusContext { return ss.Config.Ctx }
 
 func (ss *stateSyncer) IsBootstrapped() bool { return ss.Ctx.GetState() == snow.NormalOp }
 
-// Halt implements the InternalHandler interface
 func (ss *stateSyncer) Halt() {}
 
-// Timeout implements the InternalHandler interface
 func (ss *stateSyncer) Timeout() error { return nil }
 
 func (ss *stateSyncer) HealthCheck() (interface{}, error) {
