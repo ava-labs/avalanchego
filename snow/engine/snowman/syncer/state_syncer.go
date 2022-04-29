@@ -76,6 +76,10 @@ type stateSyncer struct {
 	// summaryID --> (summary, weight)
 	weightedSummaries map[ids.ID]weightedSummary
 
+	// summaries received may be different even if referring to the same height
+	// we keep a list of deduplcated height ready for voting
+	uniqueSummariesHeights map[uint64]struct{}
+
 	// number of times the state sync has been attempted
 	attempts int
 }
@@ -119,10 +123,16 @@ func (ss *stateSyncer) StateSummaryFrontier(validatorID ids.NodeID, requestID ui
 	// make sure next beacons are reached out
 	// even in case invalid summaries are received
 	if summary, err := ss.stateSyncVM.ParseStateSummary(summaryBytes); err == nil {
-		if _, exists := ss.weightedSummaries[summary.ID()]; !exists {
-			ss.weightedSummaries[summary.ID()] = weightedSummary{
+		summaryID := summary.ID()
+		summaryHeight := summary.Height()
+
+		if _, exists := ss.weightedSummaries[summaryID]; !exists {
+			ss.weightedSummaries[summaryID] = weightedSummary{
 				summary: summary,
 			}
+		}
+		if _, seen := ss.uniqueSummariesHeights[summaryHeight]; !seen {
+			ss.uniqueSummariesHeights[summaryHeight] = struct{}{}
 		}
 	} else {
 		ss.Ctx.Log.Debug("Could not parse summary from bytes: %s", err)
@@ -337,6 +347,7 @@ func (ss *stateSyncer) startup() error {
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]weightedSummary)
+	ss.uniqueSummariesHeights = make(map[uint64]struct{})
 
 	ss.targetSeeders.Clear()
 	ss.pendingSeeders.Clear()
@@ -436,14 +447,9 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() error {
 		return nil
 	}
 
+	// send deduplicated heights
 	acceptedSummaryHeights := make([]uint64, 0, len(ss.weightedSummaries))
-	seenHeights := make(map[uint64]struct{}, len(ss.weightedSummaries))
-	for _, ws := range ss.weightedSummaries {
-		height := ws.summary.Height()
-		if _, seen := seenHeights[height]; seen {
-			continue // avoid passing duplicate heights to SendGetAcceptedStateSummary
-		}
-		seenHeights[height] = struct{}{}
+	for height := range ss.uniqueSummariesHeights {
 		acceptedSummaryHeights = append(acceptedSummaryHeights, height)
 	}
 	ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, acceptedSummaryHeights)
