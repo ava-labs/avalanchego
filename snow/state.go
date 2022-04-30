@@ -27,7 +27,6 @@ func (st State) String() string {
 	case NormalOp:
 		return "Normal operations state"
 	default:
-		// State.Unknown treated as default
 		return "Unknown state"
 	}
 }
