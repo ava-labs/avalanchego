@@ -55,19 +55,6 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	bVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if ok {
-		vm.bVM = bVM
-	}
-	hVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if ok {
-		vm.hVM = hVM
-	}
-	ssVM, ok := vm.ChainVM.(block.StateSyncableVM)
-	if ok {
-		vm.ssVM = ssVM
-	}
-
 	registerer := prometheus.NewRegistry()
 	err := vm.blockMetrics.Initialize(
 		vm.bVM != nil,
