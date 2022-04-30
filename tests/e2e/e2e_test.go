@@ -141,6 +141,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		resp, err := cli.Start(
 			ctx,
 			execPath,
+			client.WithLogLevel(logLevel),
 			client.WithPluginDir(pluginDir),
 			client.WithCustomVMs(map[string]string{
 				vmName: vmGenesisPath,
