@@ -858,7 +858,6 @@ func (m *manager) createSnowmanChain(
 		VM:            vm,
 		Bootstrapped:  m.unblockChains,
 	}
-
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
 		engine.Start,
