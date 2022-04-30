@@ -20,10 +20,9 @@ const (
 	// sent but not responded to/failed
 	MaxOutstandingGetAncestorsRequests = 10
 
-	// MaxOutstandingBootstrapRequests is the maximum number of
-	// GetAcceptedFrontier and GetAccepted messages sent but not responded
-	// to/failed
-	MaxOutstandingBootstrapRequests = 50
+	// MaxOutstandingBroadcastRequests is the maximum number of requests to have
+	// outstanding when broadcasting.
+	MaxOutstandingBroadcastRequests = 50
 )
 
 var _ Bootstrapper = &bootstrapper{}
@@ -307,11 +306,11 @@ func (b *bootstrapper) Restart(reset bool) error {
 	return b.Startup()
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	vdrs := ids.NewNodeIDSet(1)
-	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
+	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)
@@ -324,11 +323,11 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	}
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *bootstrapper) sendGetAccepted() {
 	vdrs := ids.NewNodeIDSet(1)
-	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
+	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)

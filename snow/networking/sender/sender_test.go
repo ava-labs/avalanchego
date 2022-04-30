@@ -5,7 +5,6 @@ package sender
 
 import (
 	"math/rand"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -33,29 +32,6 @@ var defaultGossipConfig = GossipConfig{
 	OnAcceptPeerSize:          2,
 	AppGossipValidatorSize:    2,
 	AppGossipNonValidatorSize: 2,
-}
-
-func TestSenderContext(t *testing.T) {
-	context := snow.DefaultConsensusContextTest()
-	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
-	externalSender := &ExternalSenderTest{TB: t}
-	externalSender.Default(true)
-	senderIntf, err := New(
-		context,
-		msgCreator,
-		externalSender,
-		&router.ChainRouter{},
-		nil,
-		defaultGossipConfig,
-	)
-	assert.NoError(t, err)
-	sender := senderIntf.(*sender)
-
-	if res := sender.Context(); !reflect.DeepEqual(res, context) {
-		t.Fatalf("Got %#v, expected %#v", res, context)
-	}
 }
 
 func TestTimeout(t *testing.T) {

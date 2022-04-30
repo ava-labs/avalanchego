@@ -282,8 +282,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+		return nil
 	}
-	return nil
 }
 
 func (t *Transitive) Context() *snow.ConsensusContext {
