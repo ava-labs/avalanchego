@@ -23,12 +23,6 @@ var (
 	_ block.StateSyncableVM      = &blockVM{}
 )
 
-func NewBlockVM(vm block.ChainVM) block.ChainVM {
-	return &blockVM{
-		ChainVM: vm,
-	}
-}
-
 type blockVM struct {
 	block.ChainVM
 	bVM  block.BatchedChainVM
@@ -36,8 +30,19 @@ type blockVM struct {
 	ssVM block.StateSyncableVM
 
 	blockMetrics
-	stateSummaryMetrics
 	clock mockable.Clock
+}
+
+func NewBlockVM(vm block.ChainVM) block.ChainVM {
+	bVM, _ := vm.(block.BatchedChainVM)
+	hVM, _ := vm.(block.HeightIndexedChainVM)
+	ssVM, _ := vm.(block.StateSyncableVM)
+	return &blockVM{
+		ChainVM: vm,
+		bVM:     bVM,
+		hVM:     hVM,
+		ssVM:    ssVM,
+	}
 }
 
 func (vm *blockVM) Initialize(
@@ -64,13 +69,14 @@ func (vm *blockVM) Initialize(
 	}
 
 	registerer := prometheus.NewRegistry()
-	_, supportsBatchedFetching := vm.ChainVM.(block.BatchedChainVM)
-	if err := vm.blockMetrics.Initialize(supportsBatchedFetching, "", registerer); err != nil {
-		return err
-	}
-
-	var err error
-	if vm.stateSummaryMetrics, err = newStateSummaryMetrics("", registerer); err != nil {
+	err := vm.blockMetrics.Initialize(
+		vm.bVM != nil,
+		vm.hVM != nil,
+		vm.ssVM != nil,
+		"",
+		registerer,
+	)
+	if err != nil {
 		return err
 	}
 
