@@ -247,8 +247,6 @@ func (b *bootstrapper) Shutdown() error {
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-
 func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck()
 	intf := map[string]interface{}{

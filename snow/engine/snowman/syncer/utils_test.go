@@ -6,6 +6,8 @@ package syncer
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -13,50 +15,42 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/stretchr/testify/assert"
+)
+
+const (
+	key         uint64 = 2022
+	minorityKey uint64 = 2000
 )
 
 var (
 	_ block.ChainVM         = fullVM{}
 	_ block.StateSyncableVM = fullVM{}
 
-	key          uint64
+	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
+
+	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	summaryID    ids.ID
-	summaryBytes []byte
 
-	minorityKey          uint64
+	minoritySummaryBytes = []byte{'m', 'i', 'n', 'o', 'r', 'i', 't', 'y'}
 	minoritySummaryID    ids.ID
-	minoritySummaryBytes []byte
-
-	unknownSummaryID ids.ID
-	emptySummary     *block.TestStateSummary
 )
-
-type fullVM struct {
-	*block.TestVM
-	*block.TestStateSyncableVM
-}
 
 func init() {
 	var err error
-
-	key = uint64(2022)
-	summaryBytes = []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	summaryID, err = ids.ToID(hashing.ComputeHash256(summaryBytes))
 	if err != nil {
 		panic(err)
 	}
 
-	minorityKey = uint64(2000)
-	minoritySummaryBytes = []byte{'m', 'i', 'n', 'o', 'r', 'i', 't', 'y'}
 	minoritySummaryID, err = ids.ToID(hashing.ComputeHash256(minoritySummaryBytes))
 	if err != nil {
 		panic(err)
 	}
+}
 
-	unknownSummaryID = ids.ID{'g', 'a', 'r', 'b', 'a', 'g', 'e'}
-
-	emptySummary = &block.TestStateSummary{}
+type fullVM struct {
+	*block.TestVM
+	*block.TestStateSyncableVM
 }
 
 func buildTestPeers(t *testing.T) validators.Set {
@@ -104,11 +98,9 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	return syncer, fullVM, sender
 }
 
-func pickRandomFrom(population map[ids.NodeID]uint32) ids.NodeID {
-	res := ids.EmptyNodeID
-	for k := range population {
-		res = k
-		break
+func pickRandomFrom(nodes map[ids.NodeID]uint32) ids.NodeID {
+	for node := range nodes {
+		return node
 	}
-	return res
+	return ids.EmptyNodeID
 }

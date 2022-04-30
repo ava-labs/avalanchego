@@ -158,6 +158,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	ws, ok := syncer.weightedSummaries[summaryID]
 	assert.True(ok)
 	assert.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
+	assert.Zero(ws.weight)
 }
 
 func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T) {

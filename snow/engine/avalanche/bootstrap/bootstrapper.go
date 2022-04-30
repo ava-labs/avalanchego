@@ -260,8 +260,6 @@ func (b *bootstrapper) Shutdown() error {
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
 

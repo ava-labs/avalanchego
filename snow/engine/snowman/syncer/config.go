@@ -36,6 +36,8 @@ func NewConfig(
 	snowGetHandler common.AllGetsServer,
 	vm block.ChainVM,
 ) (Config, error) {
+	// Initialize the default values that will be used if stateSyncerIDs is
+	// empty.
 	var (
 		stateSyncBeacons = commonCfg.Beacons
 		syncAlpha        = commonCfg.Alpha
