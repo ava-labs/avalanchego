@@ -44,7 +44,6 @@ type Handler interface {
 	Consensus() common.Engine
 
 	SetOnStopped(onStopped func())
-
 	Start(recoverPanic bool)
 	Push(msg message.InboundMessage)
 	Stop()
