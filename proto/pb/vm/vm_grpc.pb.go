@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VMClient interface {
+	// ChainVM
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
 	SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -41,19 +42,23 @@ type VMClient interface {
 	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error)
-	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
-	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// BatchedChainVM
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
 	BatchedParseBlock(ctx context.Context, in *BatchedParseBlockRequest, opts ...grpc.CallOption) (*BatchedParseBlockResponse, error)
+	// HeightIndexedChainVM
 	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
-	// State sync
+	// StateSyncableVM
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
 	GetOngoingSyncStateSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetOngoingSyncStateSummaryResponse, error)
 	GetLastStateSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetLastStateSummaryResponse, error)
 	ParseStateSummary(ctx context.Context, in *ParseStateSummaryRequest, opts ...grpc.CallOption) (*ParseStateSummaryResponse, error)
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
+	// Block
+	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
+	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// StateSummary
 	StateSummaryAccept(ctx context.Context, in *StateSummaryAcceptRequest, opts ...grpc.CallOption) (*StateSummaryAcceptResponse, error)
 }
 
@@ -227,33 +232,6 @@ func (c *vMClient) Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.C
 	return out, nil
 }
 
-func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
-	out := new(BlockVerifyResponse)
-	err := c.cc.Invoke(ctx, "/vm.VM/BlockVerify", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMClient) BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vm.VM/BlockAccept", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/vm.VM/BlockReject", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *vMClient) GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error) {
 	out := new(GetAncestorsResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/GetAncestors", in, out, opts...)
@@ -335,6 +313,33 @@ func (c *vMClient) GetStateSummary(ctx context.Context, in *GetStateSummaryReque
 	return out, nil
 }
 
+func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
+	out := new(BlockVerifyResponse)
+	err := c.cc.Invoke(ctx, "/vm.VM/BlockVerify", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/BlockAccept", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/BlockReject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) StateSummaryAccept(ctx context.Context, in *StateSummaryAcceptRequest, opts ...grpc.CallOption) (*StateSummaryAcceptResponse, error) {
 	out := new(StateSummaryAcceptResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/StateSummaryAccept", in, out, opts...)
@@ -348,6 +353,7 @@ func (c *vMClient) StateSummaryAccept(ctx context.Context, in *StateSummaryAccep
 // All implementations must embed UnimplementedVMServer
 // for forward compatibility
 type VMServer interface {
+	// ChainVM
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
 	SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error)
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
@@ -366,19 +372,23 @@ type VMServer interface {
 	AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error)
 	AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error)
 	Gather(context.Context, *emptypb.Empty) (*GatherResponse, error)
-	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
-	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
-	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
+	// BatchedChainVM
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
 	BatchedParseBlock(context.Context, *BatchedParseBlockRequest) (*BatchedParseBlockResponse, error)
+	// HeightIndexedChainVM
 	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
-	// State sync
+	// StateSyncableVM
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
 	GetOngoingSyncStateSummary(context.Context, *emptypb.Empty) (*GetOngoingSyncStateSummaryResponse, error)
 	GetLastStateSummary(context.Context, *emptypb.Empty) (*GetLastStateSummaryResponse, error)
 	ParseStateSummary(context.Context, *ParseStateSummaryRequest) (*ParseStateSummaryResponse, error)
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
+	// Block
+	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
+	BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error)
+	BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error)
+	// StateSummary
 	StateSummaryAccept(context.Context, *StateSummaryAcceptRequest) (*StateSummaryAcceptResponse, error)
 	mustEmbedUnimplementedVMServer()
 }
@@ -441,15 +451,6 @@ func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*emptypb
 func (UnimplementedVMServer) Gather(context.Context, *emptypb.Empty) (*GatherResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Gather not implemented")
 }
-func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
-}
-func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BlockAccept not implemented")
-}
-func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BlockReject not implemented")
-}
 func (UnimplementedVMServer) GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAncestors not implemented")
 }
@@ -476,6 +477,15 @@ func (UnimplementedVMServer) ParseStateSummary(context.Context, *ParseStateSumma
 }
 func (UnimplementedVMServer) GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStateSummary not implemented")
+}
+func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
+}
+func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockAccept not implemented")
+}
+func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockReject not implemented")
 }
 func (UnimplementedVMServer) StateSummaryAccept(context.Context, *StateSummaryAcceptRequest) (*StateSummaryAcceptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StateSummaryAccept not implemented")
@@ -817,60 +827,6 @@ func _VM_Gather_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VM_BlockVerify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlockVerifyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).BlockVerify(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vm.VM/BlockVerify",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).BlockVerify(ctx, req.(*BlockVerifyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VM_BlockAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlockAcceptRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).BlockAccept(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vm.VM/BlockAccept",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).BlockAccept(ctx, req.(*BlockAcceptRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VM_BlockReject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlockRejectRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMServer).BlockReject(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vm.VM/BlockReject",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).BlockReject(ctx, req.(*BlockRejectRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _VM_GetAncestors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAncestorsRequest)
 	if err := dec(in); err != nil {
@@ -1033,6 +989,60 @@ func _VM_GetStateSummary_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_BlockVerify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockVerifyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BlockVerify(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/BlockVerify",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BlockVerify(ctx, req.(*BlockVerifyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_BlockAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockAcceptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BlockAccept(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/BlockAccept",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BlockAccept(ctx, req.(*BlockAcceptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_BlockReject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockRejectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).BlockReject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/BlockReject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).BlockReject(ctx, req.(*BlockRejectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_StateSummaryAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StateSummaryAcceptRequest)
 	if err := dec(in); err != nil {
@@ -1131,18 +1141,6 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_Gather_Handler,
 		},
 		{
-			MethodName: "BlockVerify",
-			Handler:    _VM_BlockVerify_Handler,
-		},
-		{
-			MethodName: "BlockAccept",
-			Handler:    _VM_BlockAccept_Handler,
-		},
-		{
-			MethodName: "BlockReject",
-			Handler:    _VM_BlockReject_Handler,
-		},
-		{
 			MethodName: "GetAncestors",
 			Handler:    _VM_GetAncestors_Handler,
 		},
@@ -1177,6 +1175,18 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStateSummary",
 			Handler:    _VM_GetStateSummary_Handler,
+		},
+		{
+			MethodName: "BlockVerify",
+			Handler:    _VM_BlockVerify_Handler,
+		},
+		{
+			MethodName: "BlockAccept",
+			Handler:    _VM_BlockAccept_Handler,
+		},
+		{
+			MethodName: "BlockReject",
+			Handler:    _VM_BlockReject_Handler,
 		},
 		{
 			MethodName: "StateSummaryAccept",

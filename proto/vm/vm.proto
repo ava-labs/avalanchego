@@ -9,6 +9,7 @@ import "io/prometheus/client/metrics.proto";
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/vm";
 
 service VM {
+  // ChainVM
   rpc Initialize(InitializeRequest) returns (InitializeResponse);
   rpc SetState(SetStateRequest) returns (google.protobuf.Empty);
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -27,20 +28,28 @@ service VM {
   rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
   rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
   rpc Gather(google.protobuf.Empty) returns (GatherResponse);
-  rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
-  rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
-  rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
+
+  // BatchedChainVM
   rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
   rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
+
+  // HeightIndexedChainVM
   rpc VerifyHeightIndex(google.protobuf.Empty) returns (VerifyHeightIndexResponse);
   rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
 
-  // State sync
+  // StateSyncableVM
   rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
   rpc GetOngoingSyncStateSummary(google.protobuf.Empty) returns (GetOngoingSyncStateSummaryResponse);
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
+
+  // Block
+  rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
+  rpc BlockAccept(BlockAcceptRequest) returns (google.protobuf.Empty);
+  rpc BlockReject(BlockRejectRequest) returns (google.protobuf.Empty);
+
+  // StateSummary
   rpc StateSummaryAccept(StateSummaryAcceptRequest) returns (StateSummaryAcceptResponse);
 }
 
@@ -242,7 +251,6 @@ message BatchedParseBlockResponse {
   repeated ParseBlockResponse response = 1;
 }
 
-// HeightIndexedVM related messages
 message VerifyHeightIndexResponse {
   uint32 err = 1;
 }
@@ -256,33 +264,37 @@ message GetBlockIDAtHeightResponse {
   uint32 err = 2;
 }
 
-// StateSyncableVM related messages
+message GatherResponse {
+  repeated io.prometheus.client.MetricFamily metric_families = 1;
+}
+
 message StateSyncEnabledResponse {
   bool enabled = 1;
   uint32 err = 2;
 }
 
-message StateSyncSummary {
-  uint64 height = 1;
-  bytes id = 2;
-  bytes content = 3;
+message GetOngoingSyncStateSummaryResponse {
+  bytes id = 1;
+  uint64 height = 2;
+  bytes bytes = 3;
   uint32 err = 4;
 }
 
-message GetOngoingSyncStateSummaryResponse {
-  StateSyncSummary summary = 1;
-}
-
 message GetLastStateSummaryResponse {
-  StateSyncSummary summary = 1;
+  bytes id = 1;
+  uint64 height = 2;
+  bytes bytes = 3;
+  uint32 err = 4;
 }
 
 message ParseStateSummaryRequest {
-  bytes summary = 1;
+  bytes bytes = 1;
 }
 
 message ParseStateSummaryResponse {
-  StateSyncSummary summary = 1;
+  bytes id = 1;
+  uint64 height = 2;
+  uint32 err = 3;
 }
 
 message GetStateSummaryRequest {
@@ -290,7 +302,9 @@ message GetStateSummaryRequest {
 }
 
 message GetStateSummaryResponse {
-  StateSyncSummary summary = 1;
+  bytes id = 1;
+  bytes bytes = 2;
+  uint32 err = 3;
 }
 
 message StateSummaryAcceptRequest {
@@ -300,10 +314,4 @@ message StateSummaryAcceptRequest {
 message StateSummaryAcceptResponse {
   bool accepted = 1;
   uint32 err = 2;
-}
-// end of StateSyncableVM related messages
-
-
-message GatherResponse {
-  repeated io.prometheus.client.MetricFamily metric_families = 1;
 }
