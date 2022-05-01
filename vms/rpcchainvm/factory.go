@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	errWrongVM         = errors.New("wrong vm type")
-	_          Factory = &factory{}
+	errWrongVM = errors.New("wrong vm type")
+
+	_ Factory = &factory{}
 )
 
 type Factory interface {

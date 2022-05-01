@@ -13,6 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	dto "github.com/prometheus/client_model/go"
+
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 
 	"google.golang.org/grpc"
@@ -59,6 +61,12 @@ var (
 	_ block.ChainVM              = &VMClient{}
 	_ block.BatchedChainVM       = &VMClient{}
 	_ block.HeightIndexedChainVM = &VMClient{}
+	_ block.StateSyncableVM      = &VMClient{}
+	_ prometheus.Gatherer        = &VMClient{}
+
+	_ snowman.Block = &blockClient{}
+
+	_ block.StateSummary = &summaryClient{}
 )
 
 const (
@@ -68,7 +76,7 @@ const (
 	bytesToIDCacheSize  = 2048
 )
 
-// VMClient is an implementation of VM that talks over RPC.
+// VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
 	client vmpb.VMClient
@@ -213,7 +221,7 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	lastAcceptedBlk := &BlockClient{
+	lastAcceptedBlk := &blockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
@@ -320,7 +328,6 @@ func (vm *VMClient) SetState(state snow.State) error {
 	_, err := vm.client.SetState(context.Background(), &vmpb.SetStateRequest{
 		State: uint32(state),
 	})
-
 	return err
 }
 
@@ -382,6 +389,21 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 	return handlers, nil
 }
 
+func (vm *VMClient) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+	_, err := vm.client.Connected(context.Background(), &vmpb.ConnectedRequest{
+		NodeId:  nodeID[:],
+		Version: nodeVersion.String(),
+	})
+	return err
+}
+
+func (vm *VMClient) Disconnected(nodeID ids.NodeID) error {
+	_, err := vm.client.Disconnected(context.Background(), &vmpb.DisconnectedRequest{
+		NodeId: nodeID[:],
+	})
+	return err
+}
+
 func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	resp, err := vm.client.BuildBlock(context.Background(), &emptypb.Empty{})
 	if err != nil {
@@ -399,11 +421,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	}
 
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &BlockClient{
+	return &blockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
@@ -411,7 +429,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
-	}, nil
+	}, err
 }
 
 func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
@@ -438,11 +456,7 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 	}
 
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk := &BlockClient{
+	return &blockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
@@ -450,9 +464,7 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 		bytes:    bytes,
 		height:   resp.Height,
 		time:     time,
-	}
-
-	return blk, nil
+	}, err
 }
 
 func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
@@ -477,11 +489,7 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk := &BlockClient{
+	return &blockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
@@ -489,9 +497,7 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
-	}
-
-	return blk, nil
+	}, err
 }
 
 func (vm *VMClient) SetPreference(id ids.ID) error {
@@ -509,6 +515,17 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 		vm.ctx.Log.Warn("health check failed: %v", err)
 	}
 	return resp, err
+}
+
+func (vm *VMClient) Version() (string, error) {
+	resp, err := vm.client.Version(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
@@ -558,29 +575,12 @@ func (vm *VMClient) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return err
 }
 
-func (vm *VMClient) VerifyHeightIndex() error {
-	resp, err := vm.client.VerifyHeightIndex(
-		context.Background(),
-		&emptypb.Empty{},
-	)
+func (vm *VMClient) Gather() ([]*dto.MetricFamily, error) {
+	resp, err := vm.client.Gather(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return errCodeToError[resp.Err]
-}
-
-func (vm *VMClient) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	resp, err := vm.client.GetBlockIDAtHeight(
-		context.Background(),
-		&vmpb.GetBlockIDAtHeightRequest{Height: height},
-	)
-	if err != nil {
-		return ids.Empty, err
-	}
-	if errCode := resp.Err; errCode != 0 {
-		return ids.Empty, errCodeToError[errCode]
-	}
-	return ids.ToID(resp.BlkId)
+	return resp.MetricFamilies, nil
 }
 
 func (vm *VMClient) GetAncestors(
@@ -634,7 +634,7 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 			return nil, err
 		}
 
-		blk := &BlockClient{
+		res = append(res, &blockClient{
 			vm:       vm,
 			id:       id,
 			parentID: parentID,
@@ -642,42 +642,135 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 			bytes:    blksBytes[idx],
 			height:   blkResp.Height,
 			time:     time,
-		}
-
-		res = append(res, blk)
+		})
 	}
 
 	return res, nil
 }
 
-func (vm *VMClient) Version() (string, error) {
-	resp, err := vm.client.Version(
+func (vm *VMClient) VerifyHeightIndex() error {
+	resp, err := vm.client.VerifyHeightIndex(
 		context.Background(),
 		&emptypb.Empty{},
 	)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return resp.Version, nil
+	return errCodeToError[resp.Err]
 }
 
-func (vm *VMClient) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
-	_, err := vm.client.Connected(context.Background(), &vmpb.ConnectedRequest{
-		NodeId:  nodeID[:],
-		Version: nodeVersion.String(),
-	})
-	return err
+func (vm *VMClient) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	resp, err := vm.client.GetBlockIDAtHeight(
+		context.Background(),
+		&vmpb.GetBlockIDAtHeightRequest{Height: height},
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return ids.Empty, errCodeToError[errCode]
+	}
+	return ids.ToID(resp.BlkId)
 }
 
-func (vm *VMClient) Disconnected(nodeID ids.NodeID) error {
-	_, err := vm.client.Disconnected(context.Background(), &vmpb.DisconnectedRequest{
-		NodeId: nodeID[:],
-	})
-	return err
+func (vm *VMClient) StateSyncEnabled() (bool, error) {
+	resp, err := vm.client.StateSyncEnabled(
+		context.Background(),
+		&emptypb.Empty{},
+	)
+	if err != nil {
+		return false, err
+	}
+	err = errCodeToError[resp.Err]
+	if err == block.ErrStateSyncableVMNotImplemented {
+		return false, nil
+	}
+	return resp.Enabled, err
 }
 
-// BlockClient is an implementation of Block that talks over RPC.
-type BlockClient struct {
+func (vm *VMClient) GetOngoingSyncStateSummary() (block.StateSummary, error) {
+	resp, err := vm.client.GetOngoingSyncStateSummary(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
+
+	summaryID, err := ids.ToID(resp.Id)
+	return &summaryClient{
+		vm:     vm,
+		id:     summaryID,
+		height: resp.Height,
+		bytes:  resp.Bytes,
+	}, err
+}
+
+func (vm *VMClient) GetLastStateSummary() (block.StateSummary, error) {
+	resp, err := vm.client.GetLastStateSummary(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
+
+	summaryID, err := ids.ToID(resp.Id)
+	return &summaryClient{
+		vm:     vm,
+		id:     summaryID,
+		height: resp.Height,
+		bytes:  resp.Bytes,
+	}, err
+}
+
+func (vm *VMClient) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
+	resp, err := vm.client.ParseStateSummary(
+		context.Background(),
+		&vmpb.ParseStateSummaryRequest{
+			Bytes: summaryBytes,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
+
+	summaryID, err := ids.ToID(resp.Id)
+	return &summaryClient{
+		vm:     vm,
+		id:     summaryID,
+		height: resp.Height,
+		bytes:  summaryBytes,
+	}, err
+}
+
+func (vm *VMClient) GetStateSummary(summaryHeight uint64) (block.StateSummary, error) {
+	resp, err := vm.client.GetStateSummary(
+		context.Background(),
+		&vmpb.GetStateSummaryRequest{
+			Height: summaryHeight,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if errCode := resp.Err; errCode != 0 {
+		return nil, errCodeToError[errCode]
+	}
+
+	summaryID, err := ids.ToID(resp.Id)
+	return &summaryClient{
+		vm:     vm,
+		id:     summaryID,
+		height: summaryHeight,
+		bytes:  resp.Bytes,
+	}, err
+}
+
+type blockClient struct {
 	vm *VMClient
 
 	id       ids.ID
@@ -688,9 +781,9 @@ type BlockClient struct {
 	time     time.Time
 }
 
-func (b *BlockClient) ID() ids.ID { return b.id }
+func (b *blockClient) ID() ids.ID { return b.id }
 
-func (b *BlockClient) Accept() error {
+func (b *blockClient) Accept() error {
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmpb.BlockAcceptRequest{
 		Id: b.id[:],
@@ -698,7 +791,7 @@ func (b *BlockClient) Accept() error {
 	return err
 }
 
-func (b *BlockClient) Reject() error {
+func (b *blockClient) Reject() error {
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmpb.BlockRejectRequest{
 		Id: b.id[:],
@@ -706,13 +799,11 @@ func (b *BlockClient) Reject() error {
 	return err
 }
 
-func (b *BlockClient) Status() choices.Status { return b.status }
+func (b *blockClient) Status() choices.Status { return b.status }
 
-func (b *BlockClient) Parent() ids.ID {
-	return b.parentID
-}
+func (b *blockClient) Parent() ids.ID { return b.parentID }
 
-func (b *BlockClient) Verify() error {
+func (b *blockClient) Verify() error {
 	resp, err := b.vm.client.BlockVerify(context.Background(), &vmpb.BlockVerifyRequest{
 		Bytes: b.bytes,
 	})
@@ -724,6 +815,31 @@ func (b *BlockClient) Verify() error {
 	return err
 }
 
-func (b *BlockClient) Bytes() []byte        { return b.bytes }
-func (b *BlockClient) Height() uint64       { return b.height }
-func (b *BlockClient) Timestamp() time.Time { return b.time }
+func (b *blockClient) Bytes() []byte        { return b.bytes }
+func (b *blockClient) Height() uint64       { return b.height }
+func (b *blockClient) Timestamp() time.Time { return b.time }
+
+type summaryClient struct {
+	vm *VMClient
+
+	id     ids.ID
+	height uint64
+	bytes  []byte
+}
+
+func (s *summaryClient) ID() ids.ID     { return s.id }
+func (s *summaryClient) Height() uint64 { return s.height }
+func (s *summaryClient) Bytes() []byte  { return s.bytes }
+
+func (s *summaryClient) Accept() (bool, error) {
+	resp, err := s.vm.client.StateSummaryAccept(
+		context.Background(),
+		&vmpb.StateSummaryAcceptRequest{
+			Bytes: s.bytes,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	return resp.Accepted, errCodeToError[resp.Err]
+}

@@ -50,7 +50,10 @@ var _ vmpb.VMServer = &VMServer{}
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
 	vmpb.UnimplementedVMServer
-	vm block.ChainVM
+
+	vm   block.ChainVM
+	hVM  block.HeightIndexedChainVM
+	ssVM block.StateSyncableVM
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -61,8 +64,12 @@ type VMServer struct {
 
 // NewServer returns a vm instance connected to a remote vm instance
 func NewServer(vm block.ChainVM) *VMServer {
+	hVM, _ := vm.(block.HeightIndexedChainVM)
+	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
-		vm: vm,
+		vm:   vm,
+		hVM:  hVM,
+		ssVM: ssVM,
 	}
 }
 
@@ -205,34 +212,6 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	}, nil
 }
 
-func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
-	var err error
-	if hVM, ok := vm.vm.(block.HeightIndexedChainVM); ok {
-		err = hVM.VerifyHeightIndex()
-	} else {
-		err = block.ErrHeightIndexedVMNotImplemented
-	}
-	return &vmpb.VerifyHeightIndexResponse{
-		Err: errorToErrCode[err],
-	}, errorToRPCError(err)
-}
-
-func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmpb.GetBlockIDAtHeightRequest) (*vmpb.GetBlockIDAtHeightResponse, error) {
-	var (
-		blkID ids.ID
-		err   error
-	)
-	if hVM, ok := vm.vm.(block.HeightIndexedChainVM); ok {
-		blkID, err = hVM.GetBlockIDAtHeight(req.Height)
-	} else {
-		err = block.ErrHeightIndexedVMNotImplemented
-	}
-	return &vmpb.GetBlockIDAtHeightResponse{
-		BlkId: blkID[:],
-		Err:   errorToErrCode[err],
-	}, errorToRPCError(err)
-}
-
 func (vm *VMServer) SetState(_ context.Context, stateReq *vmpb.SetStateRequest) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, vm.vm.SetState(snow.State(stateReq.State))
 }
@@ -247,41 +226,6 @@ func (vm *VMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, e
 	vm.serverCloser.Stop()
 	errs.Add(vm.connCloser.Close())
 	return &emptypb.Empty{}, errs.Err
-}
-
-func (vm *VMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateStaticHandlersResponse, error) {
-	handlers, err := vm.vm.CreateStaticHandlers()
-	if err != nil {
-		return nil, err
-	}
-	resp := &vmpb.CreateStaticHandlersResponse{}
-	for prefix, h := range handlers {
-		handler := h
-
-		serverListener, err := grpcutils.NewListener()
-		if err != nil {
-			return nil, err
-		}
-		serverAddr := serverListener.Addr().String()
-
-		// Start the gRPC server which serves the HTTP service
-		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			if len(opts) == 0 {
-				opts = append(opts, grpcutils.DefaultServerOptions...)
-			}
-			server := grpc.NewServer(opts...)
-			vm.serverCloser.Add(server)
-			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
-			return server
-		})
-
-		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
-			Prefix:      prefix,
-			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverAddr,
-		})
-	}
-	return resp, nil
 }
 
 func (vm *VMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateHandlersResponse, error) {
@@ -319,6 +263,63 @@ func (vm *VMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.Creat
 	return resp, nil
 }
 
+func (vm *VMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*vmpb.CreateStaticHandlersResponse, error) {
+	handlers, err := vm.vm.CreateStaticHandlers()
+	if err != nil {
+		return nil, err
+	}
+	resp := &vmpb.CreateStaticHandlersResponse{}
+	for prefix, h := range handlers {
+		handler := h
+
+		serverListener, err := grpcutils.NewListener()
+		if err != nil {
+			return nil, err
+		}
+		serverAddr := serverListener.Addr().String()
+
+		// Start the gRPC server which serves the HTTP service
+		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
+			if len(opts) == 0 {
+				opts = append(opts, grpcutils.DefaultServerOptions...)
+			}
+			server := grpc.NewServer(opts...)
+			vm.serverCloser.Add(server)
+			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
+			return server
+		})
+
+		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
+			Prefix:      prefix,
+			LockOptions: uint32(handler.LockOptions),
+			ServerAddr:  serverAddr,
+		})
+	}
+	return resp, nil
+}
+
+func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+
+	peerVersion, err := version.DefaultApplicationParser.Parse(req.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, vm.vm.Connected(nodeID, peerVersion)
+}
+
+func (vm *VMServer) Disconnected(_ context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Disconnected(nodeID)
+}
+
 func (vm *VMServer) BuildBlock(context.Context, *emptypb.Empty) (*vmpb.BuildBlockResponse, error) {
 	blk, err := vm.vm.BuildBlock()
 	if err != nil {
@@ -348,46 +349,6 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmpb.ParseBlockRequest) (
 		Status:    uint32(blk.Status()),
 		Height:    blk.Height(),
 		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
-	}, nil
-}
-
-func (vm *VMServer) GetAncestors(_ context.Context, req *vmpb.GetAncestorsRequest) (*vmpb.GetAncestorsResponse, error) {
-	blkID, err := ids.ToID(req.BlkId)
-	if err != nil {
-		return nil, err
-	}
-	maxBlksNum := int(req.MaxBlocksNum)
-	maxBlksSize := int(req.MaxBlocksSize)
-	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
-
-	blocks, err := block.GetAncestors(
-		vm.vm,
-		blkID,
-		maxBlksNum,
-		maxBlksSize,
-		maxBlocksRetrivalTime,
-	)
-	return &vmpb.GetAncestorsResponse{
-		BlksBytes: blocks,
-	}, err
-}
-
-func (vm *VMServer) BatchedParseBlock(
-	ctx context.Context,
-	req *vmpb.BatchedParseBlockRequest,
-) (*vmpb.BatchedParseBlockResponse, error) {
-	blocks := make([]*vmpb.ParseBlockResponse, len(req.Request))
-	for i, blockBytes := range req.Request {
-		block, err := vm.ParseBlock(ctx, &vmpb.ParseBlockRequest{
-			Bytes: blockBytes,
-		})
-		if err != nil {
-			return nil, err
-		}
-		blocks[i] = block
-	}
-	return &vmpb.BatchedParseBlockResponse{
-		Response: blocks,
 	}, nil
 }
 
@@ -482,28 +443,6 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionRespo
 	}, err
 }
 
-func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-
-	peerVersion, err := version.DefaultApplicationParser.Parse(req.Version)
-	if err != nil {
-		return nil, err
-	}
-
-	return &emptypb.Empty{}, vm.vm.Connected(nodeID, peerVersion)
-}
-
-func (vm *VMServer) Disconnected(_ context.Context, req *vmpb.DisconnectedRequest) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.Disconnected(nodeID)
-}
-
 func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
@@ -538,6 +477,206 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 		return nil, err
 	}
 	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, req.Msg)
+}
+
+func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
+	mfs, err := vm.ctx.Metrics.Gather()
+	return &vmpb.GatherResponse{MetricFamilies: mfs}, err
+}
+
+func (vm *VMServer) GetAncestors(_ context.Context, req *vmpb.GetAncestorsRequest) (*vmpb.GetAncestorsResponse, error) {
+	blkID, err := ids.ToID(req.BlkId)
+	if err != nil {
+		return nil, err
+	}
+	maxBlksNum := int(req.MaxBlocksNum)
+	maxBlksSize := int(req.MaxBlocksSize)
+	maxBlocksRetrivalTime := time.Duration(req.MaxBlocksRetrivalTime)
+
+	blocks, err := block.GetAncestors(
+		vm.vm,
+		blkID,
+		maxBlksNum,
+		maxBlksSize,
+		maxBlocksRetrivalTime,
+	)
+	return &vmpb.GetAncestorsResponse{
+		BlksBytes: blocks,
+	}, err
+}
+
+func (vm *VMServer) BatchedParseBlock(
+	ctx context.Context,
+	req *vmpb.BatchedParseBlockRequest,
+) (*vmpb.BatchedParseBlockResponse, error) {
+	blocks := make([]*vmpb.ParseBlockResponse, len(req.Request))
+	for i, blockBytes := range req.Request {
+		block, err := vm.ParseBlock(ctx, &vmpb.ParseBlockRequest{
+			Bytes: blockBytes,
+		})
+		if err != nil {
+			return nil, err
+		}
+		blocks[i] = block
+	}
+	return &vmpb.BatchedParseBlockResponse{
+		Response: blocks,
+	}, nil
+}
+
+func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
+	var err error
+	if vm.hVM != nil {
+		err = vm.hVM.VerifyHeightIndex()
+	} else {
+		err = block.ErrHeightIndexedVMNotImplemented
+	}
+
+	return &vmpb.VerifyHeightIndexResponse{
+		Err: errorToErrCode[err],
+	}, errorToRPCError(err)
+}
+
+func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmpb.GetBlockIDAtHeightRequest) (*vmpb.GetBlockIDAtHeightResponse, error) {
+	var (
+		blkID ids.ID
+		err   error
+	)
+	if vm.hVM != nil {
+		blkID, err = vm.hVM.GetBlockIDAtHeight(req.Height)
+	} else {
+		err = block.ErrHeightIndexedVMNotImplemented
+	}
+
+	return &vmpb.GetBlockIDAtHeightResponse{
+		BlkId: blkID[:],
+		Err:   errorToErrCode[err],
+	}, errorToRPCError(err)
+}
+
+func (vm *VMServer) StateSyncEnabled(context.Context, *emptypb.Empty) (*vmpb.StateSyncEnabledResponse, error) {
+	var (
+		enabled bool
+		err     error
+	)
+	if vm.ssVM != nil {
+		enabled, err = vm.ssVM.StateSyncEnabled()
+	}
+
+	return &vmpb.StateSyncEnabledResponse{
+		Enabled: enabled,
+		Err:     errorToErrCode[err],
+	}, errorToRPCError(err)
+}
+
+func (vm *VMServer) GetOngoingSyncStateSummary(
+	context.Context,
+	*emptypb.Empty,
+) (*vmpb.GetOngoingSyncStateSummaryResponse, error) {
+	var (
+		summary block.StateSummary
+		err     error
+	)
+	if vm.ssVM != nil {
+		summary, err = vm.ssVM.GetOngoingSyncStateSummary()
+	} else {
+		err = block.ErrStateSyncableVMNotImplemented
+	}
+
+	if err != nil {
+		return &vmpb.GetOngoingSyncStateSummaryResponse{
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
+	}
+
+	summaryID := summary.ID()
+	return &vmpb.GetOngoingSyncStateSummaryResponse{
+		Id:     summaryID[:],
+		Height: summary.Height(),
+		Bytes:  summary.Bytes(),
+	}, nil
+}
+
+func (vm *VMServer) GetLastStateSummary(
+	ctx context.Context,
+	empty *emptypb.Empty,
+) (*vmpb.GetLastStateSummaryResponse, error) {
+	var (
+		summary block.StateSummary
+		err     error
+	)
+	if vm.ssVM != nil {
+		summary, err = vm.ssVM.GetLastStateSummary()
+	} else {
+		err = block.ErrStateSyncableVMNotImplemented
+	}
+
+	if err != nil {
+		return &vmpb.GetLastStateSummaryResponse{
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
+	}
+
+	summaryID := summary.ID()
+	return &vmpb.GetLastStateSummaryResponse{
+		Id:     summaryID[:],
+		Height: summary.Height(),
+		Bytes:  summary.Bytes(),
+	}, nil
+}
+
+func (vm *VMServer) ParseStateSummary(
+	ctx context.Context,
+	req *vmpb.ParseStateSummaryRequest,
+) (*vmpb.ParseStateSummaryResponse, error) {
+	var (
+		summary block.StateSummary
+		err     error
+	)
+	if vm.ssVM != nil {
+		summary, err = vm.ssVM.ParseStateSummary(req.Bytes)
+	} else {
+		err = block.ErrStateSyncableVMNotImplemented
+	}
+
+	if err != nil {
+		return &vmpb.ParseStateSummaryResponse{
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
+	}
+
+	summaryID := summary.ID()
+	return &vmpb.ParseStateSummaryResponse{
+		Id:     summaryID[:],
+		Height: summary.Height(),
+	}, nil
+}
+
+func (vm *VMServer) GetStateSummary(
+	ctx context.Context,
+	req *vmpb.GetStateSummaryRequest,
+) (*vmpb.GetStateSummaryResponse, error) {
+	var (
+		summary block.StateSummary
+		err     error
+	)
+	if vm.ssVM != nil {
+		summary, err = vm.ssVM.GetStateSummary(req.Height)
+	} else {
+		err = block.ErrStateSyncableVMNotImplemented
+	}
+
+	if err != nil {
+		return &vmpb.GetStateSummaryResponse{
+			Err: errorToErrCode[err],
+		}, errorToRPCError(err)
+	}
+
+	summaryID := summary.ID()
+	return &vmpb.GetStateSummaryResponse{
+		Id:    summaryID[:],
+		Bytes: summary.Bytes(),
+	}, nil
 }
 
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmpb.BlockVerifyRequest) (*vmpb.BlockVerifyResponse, error) {
@@ -581,4 +720,28 @@ func (vm *VMServer) BlockReject(_ context.Context, req *vmpb.BlockRejectRequest)
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (vm *VMServer) SummaryAccept(
+	_ context.Context,
+	req *vmpb.StateSummaryAcceptRequest,
+) (*vmpb.StateSummaryAcceptResponse, error) {
+	var (
+		accepted bool
+		err      error
+	)
+	if vm.ssVM != nil {
+		var summary block.StateSummary
+		summary, err = vm.ssVM.ParseStateSummary(req.Bytes)
+		if err == nil {
+			accepted, err = summary.Accept()
+		}
+	} else {
+		err = block.ErrStateSyncableVMNotImplemented
+	}
+
+	return &vmpb.StateSummaryAcceptResponse{
+		Accepted: accepted,
+		Err:      errorToErrCode[err],
+	}, errorToRPCError(err)
 }
