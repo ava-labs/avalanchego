@@ -27,7 +27,6 @@ func (b *preForkBlock) Accept() error {
 }
 
 func (b *preForkBlock) acceptOuterBlk() error {
-	// PreFork blocks do not need to update proposerVM height index
 	return nil
 }
 
