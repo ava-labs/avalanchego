@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,28 +46,49 @@ func helperBuildStateSyncTestObjects(t *testing.T) (fullVM, *VM) {
 		},
 	}
 
-	// We currently avoid calling vm.Initialize and prepare relevant VM attributes
-	// to be able to simply control height index status
-	// TODO ABENEGIA: go back to vm.Initialize and duly prepare vm state
+	// Preload DB with key showing height index has been purged of rejected blocks
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
+	vmDB := versiondb.New(prefixDB)
+	vmState := state.New(vmDB)
+	if err := vmState.SetIndexHasReset(); err != nil {
+		t.Fatal("could not preload key to vm state")
+	}
+	if err := vmDB.Commit(); err != nil {
+		t.Fatal("could not commit preloaded key")
+	}
 
+	// load innerVM expectations
+	innerGenesisBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'G', 'e', 'n', 's', 'y', 's', 'I', 'D'},
+		},
+		HeightV: 0,
+		BytesV:  []byte("genesis state"),
+	}
+	innerVM.InitializeF = func(*snow.Context, manager.Manager,
+		[]byte, []byte, []byte, chan<- common.Message,
+		[]*common.Fx, common.AppSender,
+	) error {
+		return nil
+	}
+	innerVM.VerifyHeightIndexF = func() error { return nil }
+	innerVM.LastAcceptedF = func() (ids.ID, error) { return innerGenesisBlk.ID(), nil }
+	innerVM.GetBlockF = func(i ids.ID) (snowman.Block, error) { return innerGenesisBlk, nil }
+
+	// createVM
 	vm := New(innerVM, time.Time{}, uint64(0))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
-	vm.ctx = ctx
 
-	vm.db = versiondb.New(prefixDB)
-	vm.State = state.New(vm.db)
-
-	indexerDB := versiondb.New(vm.db)
-	indexerState := state.New(indexerDB)
-	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
+	if err := vm.Initialize(ctx, dbManager, innerGenesisBlk.Bytes(), nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
 
 	return innerVM, vm
 }
@@ -78,17 +98,10 @@ func TestStateSyncEnabled(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 
-	// ProposerVM State Sync disabled if height index is not complete
-	assert.False(vm.hIndexer.IsRepaired())
-	innerVM.StateSyncEnabledF = func() (bool, error) { return true, nil }
-	enabled, err := vm.StateSyncEnabled()
-	assert.NoError(err)
-	assert.False(enabled)
-
 	// ProposerVM State Sync disabled if innerVM State sync is disabled
 	vm.hIndexer.MarkRepaired()
 	innerVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
-	enabled, err = vm.StateSyncEnabled()
+	enabled, err := vm.StateSyncEnabled()
 	assert.NoError(err)
 	assert.False(enabled)
 
