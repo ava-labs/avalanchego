@@ -73,10 +73,10 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 		return nil, fmt.Errorf("could not parse proposervm block bytes from summary due to: %w", err)
 	}
 
-	return &postForkStatefulSummary{
+	return &stateSummary{
 		statelessSummary: statelessSummary,
 		innerSummary:     innerSummary,
-		proposerBlock:    block,
+		block:            block,
 	}, nil
 }
 
@@ -116,9 +116,9 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	}
 
 	statelessSummary, err := summary.Build(proBlk.Bytes(), innerSummary.Bytes())
-	return &postForkStatefulSummary{
+	return &stateSummary{
 		statelessSummary: statelessSummary,
 		innerSummary:     innerSummary,
-		proposerBlock:    proBlk,
+		block:            proBlk,
 	}, err
 }
