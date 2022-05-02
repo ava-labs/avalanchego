@@ -3,17 +3,23 @@
 
 package summary
 
-import "fmt"
+import (
+	"fmt"
 
-func Parse(summaryBytes []byte) (StatelessSummaryIntf, error) {
-	var summary StatelessSummary
-	ver, err := Codec.Unmarshal(summaryBytes, &summary)
+	"github.com/ava-labs/avalanchego/utils/hashing"
+)
+
+func Parse(bytes []byte) (StateSummary, error) {
+	summary := stateSummary{
+		id:    hashing.ComputeHash256Array(bytes),
+		bytes: bytes,
+	}
+	version, err := c.Unmarshal(bytes, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal summary due to: %w", err)
 	}
-	if ver != codecVersion {
-		return nil, errWrongStateSyncVersion
+	if version != codecVersion {
+		return nil, errWrongCodecVersion
 	}
-
-	return &summary, summary.initialize(summaryBytes)
+	return &summary, nil
 }

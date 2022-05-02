@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -20,7 +21,7 @@ var _ block.StateSummary = &postForkStatefulSummary{}
 // Note that summary.StatelessSummary contains data to build both innerVM summary
 // and the full proposerVM block associated with the summary.
 type postForkStatefulSummary struct {
-	summary.ProposerSummary
+	statelessSummary summary.StateSummary
 
 	// inner summary, retrieved via Parse
 	innerSummary block.StateSummary
@@ -29,12 +30,24 @@ type postForkStatefulSummary struct {
 	proposerBlock Block
 }
 
-func (ss *postForkStatefulSummary) Accept() (bool, error) {
+func (s *postForkStatefulSummary) ID() ids.ID {
+	return s.statelessSummary.ID()
+}
+
+func (s *postForkStatefulSummary) Height() uint64 {
+	return s.innerSummary.Height()
+}
+
+func (s *postForkStatefulSummary) Bytes() []byte {
+	return s.statelessSummary.Bytes()
+}
+
+func (s *postForkStatefulSummary) Accept() (bool, error) {
 	// a statefulSummary carries the full proposerVM block associated
 	// with the summary. We store this block and update height index with it,
 	// so that state sync could resume after a shutdown.
-	if err := ss.proposerBlock.acceptOuterBlk(); err != nil {
+	if err := s.proposerBlock.acceptOuterBlk(); err != nil {
 		return false, err
 	}
-	return ss.innerSummary.Accept()
+	return s.innerSummary.Accept()
 }

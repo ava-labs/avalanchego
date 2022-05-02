@@ -6,24 +6,17 @@ package summary
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBuild(t *testing.T) {
 	assert := assert.New(t)
 
-	proBlkBytes := []byte("proBlkBytes")
-	coreSummary := &block.TestStateSummary{
-		HeightV: 2022,
-		IDV:     ids.ID{'I', 'D'},
-		BytesV:  []byte{'b', 'y', 't', 'e', 's'},
-	}
-	builtSummary, err := BuildProposerSummary(proBlkBytes, coreSummary)
+	block := []byte("blockBytes")
+	coreSummary := []byte("coreSummary")
+	builtSummary, err := Build(block, coreSummary)
 	assert.NoError(err)
 
-	assert.Equal(builtSummary.Height(), coreSummary.Height())
-	assert.Equal(builtSummary.BlockBytes(), proBlkBytes)
-	assert.Equal(builtSummary.InnerSummaryBytes(), coreSummary.Bytes())
+	assert.Equal(builtSummary.BlockBytes(), block)
+	assert.Equal(builtSummary.InnerSummaryBytes(), coreSummary)
 }

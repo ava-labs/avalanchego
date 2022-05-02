@@ -6,25 +6,24 @@ package summary
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func BuildProposerSummary(
-	proBlkBytes []byte,
-	coreSummary block.StateSummary,
-) (ProposerSummary, error) {
-	statelessSummary := StatelessSummary{
-		ProBlkBytes:  proBlkBytes,
-		InnerSummary: coreSummary.Bytes(),
+func Build(
+	block []byte,
+	coreSummary []byte,
+) (StateSummary, error) {
+	summary := stateSummary{
+		Block:        block,
+		InnerSummary: coreSummary,
 	}
 
-	proSummaryBytes, err := Codec.Marshal(codecVersion, &statelessSummary)
+	bytes, err := c.Marshal(codecVersion, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposer summary due to: %w", err)
 	}
-	if err := statelessSummary.initialize(proSummaryBytes); err != nil {
-		return nil, err
-	}
 
-	return NewProposerSummary(&statelessSummary, coreSummary.Height()), nil
+	summary.id = hashing.ComputeHash256Array(bytes)
+	summary.bytes = bytes
+	return &summary, nil
 }

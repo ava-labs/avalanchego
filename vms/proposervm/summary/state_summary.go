@@ -4,49 +4,31 @@
 package summary
 
 import (
-	"errors"
-	"math"
-
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	_ ProposerSummary = &proposerSummary{}
+var _ StateSummary = &stateSummary{}
 
-	Codec codec.Manager
-
-	errWrongStateSyncVersion = errors.New("wrong state sync key version")
-)
-
-const codecVersion = 0
-
-func init() {
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
-	Codec = codec.NewManager(math.MaxInt32)
-	if err := Codec.RegisterCodec(codecVersion, lc); err != nil {
-		panic(err)
-	}
+type StateSummary interface {
+	ID() ids.ID
+	BlockBytes() []byte
+	InnerSummaryBytes() []byte
+	Bytes() []byte
 }
 
-type ProposerSummary interface {
-	StatelessSummaryIntf
-	Height() uint64 // part of block.StateSummary interface
+type stateSummary struct {
+	// TODO: Rather than storing the full block here - we should only store
+	//       proposervm information. We would then modify the StateSummary
+	//       interface to expose the required information to generate the full
+	//       block.
+	Block        []byte `serialize:"true"`
+	InnerSummary []byte `serialize:"true"`
+
+	id    ids.ID
+	bytes []byte
 }
 
-func NewProposerSummary(
-	statelessSummary StatelessSummaryIntf,
-	height uint64,
-) ProposerSummary {
-	return &proposerSummary{
-		StatelessSummaryIntf: statelessSummary,
-		SummaryHeight:        height,
-	}
-}
-
-type proposerSummary struct {
-	StatelessSummaryIntf
-	SummaryHeight uint64
-}
-
-func (ps *proposerSummary) Height() uint64 { return ps.SummaryHeight }
+func (s *stateSummary) ID() ids.ID                { return s.id }
+func (s *stateSummary) BlockBytes() []byte        { return s.Block }
+func (s *stateSummary) InnerSummaryBytes() []byte { return s.InnerSummary }
+func (s *stateSummary) Bytes() []byte             { return s.bytes }

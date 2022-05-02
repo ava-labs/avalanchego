@@ -6,35 +6,25 @@ package summary
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParse(t *testing.T) {
 	assert := assert.New(t)
 
-	proBlkBytes := []byte("proBlkBytes")
-	coreSummary := &block.TestStateSummary{
-		HeightV: 2022,
-		IDV:     ids.ID{'I', 'D'},
-		BytesV:  []byte{'b', 'y', 't', 'e', 's'},
-	}
-	builtSummary, err := BuildProposerSummary(proBlkBytes, coreSummary)
+	block := []byte("blockBytes")
+	coreSummary := []byte("coreSummary")
+	builtSummary, err := Build(block, coreSummary)
 	assert.NoError(err)
 
-	proSummaryBytes := builtSummary.Bytes()
-
-	parsedSummaryIntf, err := Parse(proSummaryBytes)
+	summaryBytes := builtSummary.Bytes()
+	parsedSummary, err := Parse(summaryBytes)
 	assert.NoError(err)
 
-	parsedBlock, ok := parsedSummaryIntf.(*StatelessSummary)
-	assert.True(ok)
-
-	assert.Equal(builtSummary.Bytes(), parsedBlock.Bytes())
-	assert.Equal(builtSummary.ID(), parsedBlock.ID())
-	assert.Equal(builtSummary.BlockBytes(), parsedBlock.BlockBytes())
-	assert.Equal(builtSummary.InnerSummaryBytes(), parsedBlock.InnerSummaryBytes())
+	assert.Equal(builtSummary.Bytes(), parsedSummary.Bytes())
+	assert.Equal(builtSummary.ID(), parsedSummary.ID())
+	assert.Equal(builtSummary.BlockBytes(), parsedSummary.BlockBytes())
+	assert.Equal(builtSummary.InnerSummaryBytes(), parsedSummary.InnerSummaryBytes())
 }
 
 func TestParseGibberish(t *testing.T) {
