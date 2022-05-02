@@ -29,9 +29,14 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
+var (
+	_ block.ChainVM              = &expandedCoreVM{}
+	_ block.HeightIndexedChainVM = &expandedCoreVM{}
+)
+
 type expandedCoreVM struct {
-	*block.TestVM
-	*block.TestHeightIndexedVM
+	block.TestVM
+	block.TestHeightIndexedVM
 }
 
 var (
@@ -60,7 +65,7 @@ func initTestProposerVM(
 	proBlkStartTime time.Time,
 	minPChainHeight uint64,
 ) (
-	expandedCoreVM,
+	*expandedCoreVM,
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
@@ -77,13 +82,13 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := expandedCoreVM{
-		TestVM: &block.TestVM{
+	coreVM := &expandedCoreVM{
+		TestVM: block.TestVM{
 			TestVM: common.TestVM{
 				T: t,
 			},
 		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
+		TestHeightIndexedVM: block.TestHeightIndexedVM{
 			T: t,
 		},
 	}
