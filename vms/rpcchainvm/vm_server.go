@@ -722,7 +722,7 @@ func (vm *VMServer) BlockReject(_ context.Context, req *vmpb.BlockRejectRequest)
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) SummaryAccept(
+func (vm *VMServer) StateSummaryAccept(
 	_ context.Context,
 	req *vmpb.StateSummaryAcceptRequest,
 ) (*vmpb.StateSummaryAcceptResponse, error) {
