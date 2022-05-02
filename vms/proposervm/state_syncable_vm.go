@@ -110,7 +110,7 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 		// this is an unexpected error that means proVM is out of sync with innerVM
 		return nil, err
 	}
-	proBlk, err := vm.GetBlock(proBlkID)
+	proBlk, err := vm.getBlock(proBlkID)
 	if err != nil {
 		// this is an unexpected error that means proVM is out of sync with innerVM
 		return nil, err
@@ -120,5 +120,6 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	return &postForkStatefulSummary{
 		ProposerSummary: proSummary,
 		innerSummary:    innerSummary,
+		proposerBlock:   proBlk,
 	}, err
 }
