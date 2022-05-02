@@ -74,9 +74,9 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 	}
 
 	return &stateSummary{
-		statelessSummary: statelessSummary,
-		innerSummary:     innerSummary,
-		block:            block,
+		StateSummary: statelessSummary,
+		innerSummary: innerSummary,
+		block:        block,
 	}, nil
 }
 
@@ -117,8 +117,8 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 
 	statelessSummary, err := summary.Build(proBlk.Bytes(), innerSummary.Bytes())
 	return &stateSummary{
-		statelessSummary: statelessSummary,
-		innerSummary:     innerSummary,
-		block:            proBlk,
+		StateSummary: statelessSummary,
+		innerSummary: innerSummary,
+		block:        proBlk,
 	}, err
 }

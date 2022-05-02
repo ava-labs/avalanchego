@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -22,7 +21,7 @@ var _ block.StateSummary = &stateSummary{}
 // Note: summary.StatelessSummary contains the data to build both [innerSummary]
 //       and [block].
 type stateSummary struct {
-	statelessSummary summary.StateSummary
+	summary.StateSummary
 
 	// inner summary, retrieved via Parse
 	innerSummary block.StateSummary
@@ -31,16 +30,8 @@ type stateSummary struct {
 	block Block
 }
 
-func (s *stateSummary) ID() ids.ID {
-	return s.statelessSummary.ID()
-}
-
 func (s *stateSummary) Height() uint64 {
 	return s.innerSummary.Height()
-}
-
-func (s *stateSummary) Bytes() []byte {
-	return s.statelessSummary.Bytes()
 }
 
 func (s *stateSummary) Accept() (bool, error) {
