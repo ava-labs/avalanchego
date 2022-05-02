@@ -46,7 +46,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	vm.T = t
 	engCfg.VM = vm
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
 	if err != nil {
 		t.Fatal(err)
 	}

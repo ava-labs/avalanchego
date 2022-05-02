@@ -16,14 +16,19 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = &getter{}
 
-func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error) {
+func New(
+	vm block.ChainVM,
+	commonCfg common.Config,
+	stateSyncDisableRequests bool,
+) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
-		vm:     vm,
-		ssVM:   ssVM,
-		sender: commonCfg.Sender,
-		cfg:    commonCfg,
-		log:    commonCfg.Ctx.Log,
+		vm:                vm,
+		ssVM:              ssVM,
+		sender:            commonCfg.Sender,
+		cfg:               commonCfg,
+		stateSyncDisabled: stateSyncDisableRequests,
+		log:               commonCfg.Ctx.Log,
 	}
 
 	var err error
@@ -37,16 +42,22 @@ func New(vm block.ChainVM, commonCfg common.Config) (common.AllGetsServer, error
 }
 
 type getter struct {
-	vm     block.ChainVM
-	ssVM   block.StateSyncableVM // can be nil
-	sender common.Sender
-	cfg    common.Config
+	vm                block.ChainVM
+	ssVM              block.StateSyncableVM // can be nil
+	sender            common.Sender
+	cfg               common.Config
+	stateSyncDisabled bool
 
 	log              logging.Logger
 	getAncestorsBlks metric.Averager
 }
 
 func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) error {
+	if gh.stateSyncDisabled {
+		gh.log.Debug("state sync requests explicitly disabled. Dropping GetStateSummaryFrontier(%s, %d)", nodeID, requestID)
+		return nil
+	}
+
 	if gh.ssVM == nil {
 		gh.log.Debug("state sync not supported. Dropping GetStateSummaryFrontier(%s, %d)", nodeID, requestID)
 		return nil
@@ -64,6 +75,11 @@ func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) e
 }
 
 func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, heights []uint64) error {
+	if gh.stateSyncDisabled {
+		gh.log.Debug("state sync requests explicitly disabled. Dropping GetStateSummaryFrontier(%s, %d)", nodeID, requestID)
+		return nil
+	}
+
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
 	if len(heights) == 0 {

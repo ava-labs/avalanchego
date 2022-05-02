@@ -81,7 +81,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 			T: t,
 		},
 	}
-	dummyGetter, err := getter.New(fullVM, *commonCfg)
+	dummyGetter, err := getter.New(fullVM, *commonCfg, false /*StateSyncDisableRequests*/)
 	assert.NoError(t, err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)

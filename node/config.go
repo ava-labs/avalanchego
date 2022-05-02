@@ -90,8 +90,9 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs []ids.NodeID   `json:"stateSyncIDs"`
-	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
+	StateSyncIDs             []ids.NodeID   `json:"stateSyncIDs"`
+	StateSyncIPs             []utils.IPDesc `json:"stateSyncIPs"`
+	StateSyncDisableRequests bool           `json:"stateSyncDisableRequests"`
 }
 
 type BootstrapConfig struct {
