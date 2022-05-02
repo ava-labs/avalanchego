@@ -178,6 +178,9 @@ func (vm *VM) SetState(state snow.State) error {
 		if err := vm.repairAcceptedChainByHeight(); err != nil {
 			return err
 		}
+		if err := vm.setLastAcceptedMetadata(); err != nil {
+			return err
+		}
 	}
 	vm.state = state
 	return nil
@@ -526,6 +529,8 @@ func (vm *VM) setLastAcceptedMetadata() error {
 	if err == database.ErrNotFound {
 		// If the last accepted block wasn't a PostFork block, then we don't
 		// initialize the time.
+		vm.lastAcceptedHeight = 0
+		vm.lastAcceptedTime = time.Time{}
 		return nil
 	}
 	if err != nil {
