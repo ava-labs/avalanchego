@@ -529,7 +529,7 @@ func (vm *VM) setLastAcceptedMetadata() error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block wasn't a PostFork block, then we don't
-		// initialize the time.
+		// initialize the metadata.
 		vm.lastAcceptedHeight = 0
 		vm.lastAcceptedTime = time.Time{}
 		return nil
