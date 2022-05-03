@@ -1,69 +1,63 @@
 # State Sync: Engine role and workflow
 
-State sync promises to dramatically cut down a VM bootstrapping time by allowing to directly download and verify a VM state, rather than rebuilding it by re-processing all blocks history.
+State sync promises to dramatically cut down the time it takes for a validator to join a chain by directly downloading and verifying the state of the chain, rather than rebuilding the state by processing all historical blocks.
 
-Avalanche's approach to state sync leaves most of state sync specifics to each VM, to allow maximal flexibility. However Avalanche engine plays a well defined role in selecting and validating `state summaries`, which are the state sync *seeds* used by a VM to kickstart its syncing process.
+Avalanche's approach to state sync leaves most of specifics to each VM, to allow maximal flexibility. However, the Avalanche engine plays a well defined role in selecting and validating `state summaries`, which are the state sync *seeds* used by a VM to kickstart its syncing process.
 
-In this brief document, we clarify Avalanche engine role in state sync, the promises it makes and the requirements it imposes to any VM implementing state sync.
+In this document, we outline the engine's role in state sync and the requirements for VMs implementing state sync.
 
-## State syncable VM interface walkthrough
+## `StateSyncableVM` Interface
 
-`StateSyncableVM` interface collects all the features a VM needs to offer in order to support state sync. In the following we will clarify the meaning of each `StateSyncableVM` methods, along with its role in the whole flow.
+The [`StateSyncableVM`](./state_syncable_vm.go) interface enumerates all the features a VM must implement to support state sync.
 
-Avalanche engine can start its operation by state syncing or bootstrapping a VM. State syncing is the preferred choice, but it is selected only if the following conditions applies:
+The Avalanche engine begins bootstrapping a VM through state-sync if `StateSyncEnabled()` returns true. Otherwise, the engine falls back to processing all historical blocks.
 
-- `StateSyncEnabled` returns true, i.e. the VM explicitly indicated that it is available for state syncing;
-- in case VM implements Snowman++ congestion control, its block height index is *not* rebuilding. The index could be complete or empty (e.g. for freshly created VMs) but it must not currently be under reconstruction.
+The Avalanche engine performs two state-syncing phases:
 
-If both conditions above apply, Avalanche engine initiates state sync for the target VM; otherwise it falls back to bootstrapping the VM.
+- Frontier retrieval: retrieve the most recent state summaries from a random subset of validators
+- Frontier validation: the retrieved state summaries are voted on by all connected validators
 
-At a high level, Avalanche engine takes care of the following two state syncing phases:
-
-- Frontier retrieval: Avalanche engine retrieves from the network the most recent state summaries from a random subset of network validators.
-- Frontier validation: Avalanche engine validates these summaries by requesting all connected validators whether they support these state summaries.
-
-These phases are devised to stop a malicious actor from poisoning a VM with a crafted state summary or convincing it to attempt to sync a state summary that is unavailable. Similar to Avalanche's bootstrapping process, security is achieved by feeding state summaries to the VM only if a sufficiently high fraction of network stake has validated them.
-
-In the following we detail these phases.
+Security is guaranteed by accepting the state summary if and only if a sufficient fraction of stake has validated them. This prevents malicious actors from poisoning a VM with a corrupt or unavailable state summary.
 
 ### Frontier retrieval
 
-At first Avalanche engine checks whether enough stake is connected; if not, state syncing is stalled till enough validators are connected.
+The Avalanche engine waits to begin frontier retrieval until enough stake is connected.
 
-Before polling the network for state summaries frontier, Avalanche Engine retrieves the (possibly) locally available state summary from VM, via `GetOngoingSyncStateSummary` method; if available, this state summary is added to the frontier to be validated.
+The engine first calls `GetOngoingSyncStateSummary()` to retrieve a local state summary from the VM. If available, this state summary is added to the frontier.
 
-A state summary may be locally available if the VM was previously shut down while state syncing. By revalidating this local summary, Avalanche engine helps the VM understand whether its local state summary is still widely supported by the network, so that VM can resume state syncing from it, or whether VM should drop it in favour of a fresher, more available one.
+A state summary may be locally available if the VM was previously shut down while state syncing. By revalidating this local summary, Avalanche engine helps the VM understand whether its local state summary is still widely supported by the network. If the local state summary is widely supported, the engine will allow the VM to resume state syncing from it. Otherwise the VM will be requested to drop it in favour of a fresher, more available state summary.
 
 State summary frontier is collected as follows:
 
-1. Avalanche engine samples a random subset of validators and sends each of them a `GetStateSummaryFrontier` message to retrieve the latest state summaries.
-2. Each target validator pulls its latest state sync from VM via `GetLastStateSummary` method and respond with a `StateSummaryFrontier` message.
-3. `StateSummaryFrontier` responses are parsed via `ParseStateSummary` method and added to the state summary frontier to be then validated.
+1. The Avalanche engine samples a random subset of validators and sends each of them a `GetStateSummaryFrontier` message to retrieve the latest state summaries.
+2. Each target validator pulls its latest state summary from the VM via the `GetLastStateSummary` method, and responds with a `StateSummaryFrontier` message.
+3. `StateSummaryFrontier` responses are parsed via the `ParseStateSummary` method and added to the state summary frontier to be validated.
 
-Avalanche engine does not pose major constraints on the state summary structure as its parsing is left to the VM to implement. However Avalanche engine does require each state summary to be uniquely described by two identifiers, a `Height` and a `ID`. The reason for this double identification will be clearer as we describe the state summary validation phase.
+The Avalanche engine does not pose major constraints on the state summary structure; as its parsing is left to the VM to implement. However, the Avalanche engine does require each state summary to be uniquely described by two identifiers, `Height` and `ID`. The reason for this double identification will be clearer as we describe the state summary validation phase.
 
-`Height` is a `uint64` type and represents the block height state summaries refers to. `Height` offers the succinct way to address a state summary.
+`Height` is a `uint64` and represents the block height that the state summaries refers to. `Height` offers the most succinct way to address an accepted state summary.
 
-`ID` is a `ids.ID` type and in our intention is the verifiable way to address a state summary. In our C-chain implementation, a state summary `ID` is the hash of the state summary bytes.
+`ID` is an `ids.ID` type and is the verifiable way to address a state summary, regardless of its status. In most implementations, a state summary `ID` is the hash of the state summary's bytes.
 
 ### Frontier validation
 
-Once frontier has been retrieved, a network wide voting round is initiated to validate it. Avalanche engine addresses each connected validator with a `GetAcceptedStateSummary` message, listing state summary frontier `Height`s. `Height`s provide a uniquely yet succinct way to identify state summaries and they help reducing `GetAcceptedStateSummary` size.
+Once the frontiers have been retrieved, a network wide voting round is initiated to validate them. Avalanche sends a `GetAcceptedStateSummary` message to each connected validator, containing a list of the state summary frontier's `Height`s. `Height`s provide a unique yet succinct way to identify state summaries, and they help reduce the size of the  `GetAcceptedStateSummary` message.
 
-Target validators reached by `GetAcceptedStateSummary` message try pulling from VM all the listed state summaries via `GetStateSummary(summaryHeight uint64)` method. Validators prepare a `AcceptedStateSummary` message response by appending those state summaries `ID`s in the same order as `GetAcceptedStateSummary`; unknown or unsupported state summaries are simply skipped. We chose to respond with state summary `ID`s to hinder potential DoSser and ease up votes verification.
+When a validator receives a `GetAcceptedStateSummary` message, it will respond with `ID`s corresponding to the `Height`s sent in the message. This is done by calling `GetStateSummary(summaryHeight uint64)` on the VM for each `Height`. Unknown or unsupported state summary `Height`s are skipped. Responding with the summary `ID`s allows the client to verify votes easily and ensures the integrity of the state sync starting point.
 
-`AcceptedStateSummary` messages returned to state syncing node are validated by comparing responded state summaries `ID`s with the `ID`s calculated from state summary frontier previously retrieved. Valid responses are stored along with validator stake.
+`AcceptedStateSummary` messages returned to the state syncing node are validated by comparing responded state summaries `ID`s with the `ID`s calculated from state summary frontier previously retrieved. Valid responses are stored along with cumulative validator stake.
 
-Once all validators respond or timeout, Avalanche engine will select from the frontier all state summaries with a sufficient stake backing them.
+Once all validators respond or timeout, Avalanche will select all the state summaries with a sufficient stake verifying them.
 
-If no state summary is backed by sufficient stake, the whole process of collecting a state frontier and validating it is restarted again, up to a configurable number of times.
+If no state summary is backed by sufficient stake, the process of collecting a state frontier and validating it is restarted again, up to a configurable number of times.
 
-Of all the valid state summaries, one is selected and passed down to the VM by `Summary.Accept()` call. The preferred state summary is selected as follows: if the locally available one is still valid and supported by the network it will be accepted to allow VM resuming the previously interrupted state sync processing. Otherwise the highest state summary is picked. Note that Avalanche engine will hang on `Summary.Accept()` response, hence VM should perform actual state syncing asynchronously if it foresees a long processing.
+Of all the valid state summaries, one is selected and passed to the VM by calling `Summary.Accept()`. The preferred state summary is selected as follows: if the locally available one is still valid and supported by the network it will be accepted to allow the VM to resume the previously interrupted state sync. Otherwise, the most recent state summary (with the highest `Height` value) is picked. Note that Avalanche engine will block upon `Summary.Accept()`'s response, hence the VM should perform actual state syncing asynchronously.
 
-Avalanche engine declares state syncing complete in the following cases:
+The Avalanche engine declares state syncing complete in the following cases:
 
-1. `Summary.Accept()` returns `(false, nil)` signalling that VM considers the summary valid but skips the whole syncing process. This may happen if VM estimates that bootstrapping till block frontier would be faster than state syncing with the provided summary.
-2. VM notifies  `StateSyncDone` via `Notify`.
+1. `Summary.Accept()` returns `(false, nil)` signalling that the VM considered the summary valid but skips the whole syncing process. This may happen if the VM estimates that bootstrapping would be faster than state syncing with the provided summary.
+2. The VM sends `StateSyncDone` via the `Notify` channel.
 
-Note that any error returned from `Summary.Accept()` is considered fatal and cause node to shutdown.
-As state sync complete, Avalanche engine moves ahead to bootstrapping the remaining blocks till block frontier.
+Note that any error returned from `Summary.Accept()` is considered fatal and causes the engine to shutdown.
+
+After state sync is complete, Avalanche will continue bootstrapping the remaining blocks until the node has reached the block frontier.

@@ -4,6 +4,8 @@
 package state
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -14,6 +16,12 @@ import (
 
 const (
 	cacheSize = 8192 // max cache entries
+
+	deleteBatchSize = 4096
+
+	// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
+	// to ensure the async indexing does not bottleneck the node.
+	sleepDurationMultiplier = 5
 )
 
 var (
@@ -62,7 +70,7 @@ type HeightIndex interface {
 	HeightIndexBatchSupport
 
 	// ResetHeightIndex deletes all index DB entries
-	ResetHeightIndex() error
+	ResetHeightIndex(versiondb.Commitable) error
 }
 
 type heightIndex struct {
@@ -104,7 +112,7 @@ func (hi *heightIndex) SetIndexHasReset() error {
 	return hi.metadataDB.Put(resetOccurredKey, nil)
 }
 
-func (hi *heightIndex) ResetHeightIndex() error {
+func (hi *heightIndex) ResetHeightIndex(baseDB versiondb.Commitable) error {
 	var (
 		itHeight   = hi.heightDB.NewIterator()
 		itMetadata = hi.metadataDB.NewIterator()
@@ -118,9 +126,33 @@ func (hi *heightIndex) ResetHeightIndex() error {
 	hi.heightsCache.Flush()
 
 	// clear heightDB
+	deleteCount := 0
+	processingStart := time.Now()
 	for itHeight.Next() {
 		if err := hi.heightDB.Delete(itHeight.Key()); err != nil {
 			return err
+		}
+
+		deleteCount++
+		if deleteCount > deleteBatchSize {
+			if err := hi.Commit(); err != nil {
+				return err
+			}
+			if err := baseDB.Commit(); err != nil {
+				return err
+			}
+
+			// every deleteBatchSize ops, sleep to avoid clogging the node on this
+			deleteCount = 0
+			processingDuration := time.Since(processingStart)
+			// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
+			// to ensure the indexing does not bottleneck the node.
+			time.Sleep(processingDuration * sleepDurationMultiplier)
+			processingStart = time.Now()
+
+			// release iterator so underlying db does not hold on to the previous state
+			itHeight.Release()
+			itHeight = hi.heightDB.NewIterator()
 		}
 	}
 
@@ -131,16 +163,23 @@ func (hi *heightIndex) ResetHeightIndex() error {
 		}
 	}
 
-	if err := hi.SetIndexHasReset(); err != nil {
-		return err
-	}
-
 	errs := wrappers.Errs{}
 	errs.Add(
 		itHeight.Error(),
 		itMetadata.Error(),
 	)
-	return errs.Err
+	if errs.Errored() {
+		return errs.Err
+	}
+
+	if err := hi.SetIndexHasReset(); err != nil {
+		return err
+	}
+
+	if err := hi.Commit(); err != nil {
+		return err
+	}
+	return baseDB.Commit()
 }
 
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
