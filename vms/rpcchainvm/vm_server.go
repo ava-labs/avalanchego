@@ -49,7 +49,7 @@ var _ vmpb.VMServer = &VMServer{}
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vmpb.UnimplementedVMServer
+	vmpb.UnsafeVMServer
 
 	vm   block.ChainVM
 	hVM  block.HeightIndexedChainVM
@@ -722,7 +722,7 @@ func (vm *VMServer) BlockReject(_ context.Context, req *vmpb.BlockRejectRequest)
 	return &emptypb.Empty{}, nil
 }
 
-func (vm *VMServer) SummaryAccept(
+func (vm *VMServer) StateSummaryAccept(
 	_ context.Context,
 	req *vmpb.StateSummaryAcceptRequest,
 ) (*vmpb.StateSummaryAcceptResponse, error) {

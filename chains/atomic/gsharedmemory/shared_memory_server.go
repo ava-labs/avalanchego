@@ -18,7 +18,7 @@ var _ sharedmemorypb.SharedMemoryServer = &Server{}
 
 // Server is shared memory that is managed over RPC.
 type Server struct {
-	sharedmemorypb.UnimplementedSharedMemoryServer
+	sharedmemorypb.UnsafeSharedMemoryServer
 	sm atomic.SharedMemory
 	db database.Database
 

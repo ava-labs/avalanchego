@@ -18,7 +18,7 @@ var errUnknownIterator = errors.New("unknown iterator")
 
 // DatabaseServer is a database that is managed over RPC.
 type DatabaseServer struct {
-	rpcdbpb.UnimplementedDatabaseServer
+	rpcdbpb.UnsafeDatabaseServer
 	lock    sync.Mutex
 	db      database.Database
 	batches map[int64]database.Batch
