@@ -69,9 +69,17 @@ type Set interface {
 	// MaskValidator hides the named validator from future samplings
 	MaskValidator(ids.NodeID) error
 
-	// RevealValidator ensures the named validator is not hidden from future
-	// samplings
+	// When a validator's weight changes, or a validator is added/removed,
+	// this listener is called.
+	RegisterCallbackListener(SetCallbackListener)
+
 	RevealValidator(ids.NodeID) error
+}
+
+type SetCallbackListener interface {
+	OnValidatorAdded(validatorID ids.NodeID, weight uint64)
+	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
+	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
 }
 
 // NewSet returns a new, empty set of validators.
@@ -94,15 +102,16 @@ func NewBestSet(expectedSampleSize int) Set {
 // update a validators weight, one should ensure to call add with the updated
 // validator.
 type set struct {
-	initialized      bool
-	lock             sync.RWMutex
-	vdrMap           map[ids.NodeID]int
-	vdrSlice         []*validator
-	vdrWeights       []uint64
-	vdrMaskedWeights []uint64
-	sampler          sampler.WeightedWithoutReplacement
-	totalWeight      uint64
-	maskedVdrs       ids.NodeIDSet
+	initialized       bool
+	lock              sync.RWMutex
+	vdrMap            map[ids.NodeID]int
+	vdrSlice          []*validator
+	vdrWeights        []uint64
+	vdrMaskedWeights  []uint64
+	sampler           sampler.WeightedWithoutReplacement
+	totalWeight       uint64
+	maskedVdrs        ids.NodeIDSet
+	callbackListeners []SetCallbackListener
 }
 
 func (s *set) Set(vdrs []Validator) error {
@@ -113,6 +122,35 @@ func (s *set) Set(vdrs []Validator) error {
 }
 
 func (s *set) set(vdrs []Validator) error {
+	// find all the nodes that are going to be added or have their weight changed
+	nodesInResultSet := ids.NewNodeIDSet(len(vdrs))
+	for _, vdr := range vdrs {
+		vdrID := vdr.ID()
+		if nodesInResultSet.Contains(vdrID) {
+			continue
+		}
+		nodesInResultSet.Add(vdrID)
+
+		newWeight := vdr.Weight()
+		index, contains := s.vdrMap[vdrID]
+		if !contains {
+			s.callValidatorAddedCallbacks(vdrID, newWeight)
+			continue
+		}
+
+		existingWeight := s.vdrWeights[index]
+		if existingWeight != newWeight {
+			s.callWeightChangeCallbacks(vdrID, existingWeight, newWeight)
+		}
+	}
+
+	// find all nodes that are going to be removed
+	for nodeID, index := range s.vdrMap {
+		if !nodesInResultSet.Contains(nodeID) {
+			s.callValidatorRemovedCallbacks(nodeID, s.vdrWeights[index])
+		}
+	}
+
 	lenVdrs := len(vdrs)
 	// If the underlying arrays are much larger than necessary, resize them to
 	// allow garbage collection of unused memory
@@ -178,8 +216,8 @@ func (s *set) AddWeight(vdrID ids.NodeID, weight uint64) error {
 
 func (s *set) addWeight(vdrID ids.NodeID, weight uint64) error {
 	var vdr *validator
-	i, ok := s.vdrMap[vdrID]
-	if !ok {
+	i, nodeExists := s.vdrMap[vdrID]
+	if !nodeExists {
 		vdr = &validator{
 			nodeID: vdrID,
 		}
@@ -188,12 +226,18 @@ func (s *set) addWeight(vdrID ids.NodeID, weight uint64) error {
 		s.vdrWeights = append(s.vdrWeights, 0)
 		s.vdrMaskedWeights = append(s.vdrMaskedWeights, 0)
 		s.vdrMap[vdrID] = i
+		s.callValidatorAddedCallbacks(vdrID, weight)
 	} else {
 		vdr = s.vdrSlice[i]
 	}
 
+	oldWeight := s.vdrWeights[i]
 	s.vdrWeights[i] += weight
 	vdr.addWeight(weight)
+
+	if nodeExists {
+		s.callWeightChangeCallbacks(vdrID, oldWeight, vdr.weight)
+	}
 
 	if s.maskedVdrs.Contains(vdrID) {
 		return nil
@@ -261,7 +305,8 @@ func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
 	// Validator exists
 	vdr := s.vdrSlice[i]
 
-	weight = safemath.Min64(s.vdrWeights[i], weight)
+	oldWeight := s.vdrWeights[i]
+	weight = safemath.Min64(oldWeight, weight)
 	s.vdrWeights[i] -= weight
 	vdr.removeWeight(weight)
 	if !s.maskedVdrs.Contains(vdrID) {
@@ -270,9 +315,12 @@ func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
 	}
 
 	if vdr.Weight() == 0 {
+		s.callValidatorRemovedCallbacks(vdrID, oldWeight)
 		if err := s.remove(vdrID); err != nil {
 			return err
 		}
+	} else {
+		s.callWeightChangeCallbacks(vdrID, oldWeight, vdr.weight)
 	}
 	s.initialized = false
 	return nil
@@ -493,4 +541,32 @@ func (s *set) revealValidator(vdrID ids.NodeID) error {
 	s.initialized = false
 
 	return nil
+}
+
+func (s *set) RegisterCallbackListener(callbackListener SetCallbackListener) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.callbackListeners = append(s.callbackListeners, callbackListener)
+}
+
+// Assumes [s.lock] is held
+func (s *set) callWeightChangeCallbacks(node ids.NodeID, oldWeight, newWeight uint64) {
+	for _, callbackListener := range s.callbackListeners {
+		callbackListener.OnValidatorWeightChanged(node, oldWeight, newWeight)
+	}
+}
+
+// Assumes [s.lock] is held
+func (s *set) callValidatorAddedCallbacks(node ids.NodeID, weight uint64) {
+	for _, callbackListener := range s.callbackListeners {
+		callbackListener.OnValidatorAdded(node, weight)
+	}
+}
+
+// Assumes [s.lock] is held
+func (s *set) callValidatorRemovedCallbacks(node ids.NodeID, weight uint64) {
+	for _, callbackListener := range s.callbackListeners {
+		callbackListener.OnValidatorRemoved(node, weight)
+	}
 }

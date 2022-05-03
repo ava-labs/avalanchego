@@ -5,6 +5,7 @@ package validators
 
 import (
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -254,4 +255,145 @@ func TestSamplerMasked(t *testing.T) {
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
+}
+
+var _ SetCallbackListener = &callbackListener{}
+
+type callbackListener struct {
+	t         *testing.T
+	onWeight  func(ids.NodeID, uint64, uint64)
+	onAdd     func(ids.NodeID, uint64)
+	onRemoved func(ids.NodeID, uint64)
+}
+
+func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, weight uint64) {
+	if c.onAdd != nil {
+		c.onAdd(nodeID, weight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+	if c.onRemoved != nil {
+		c.onRemoved(nodeID, weight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func (c *callbackListener) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+	if c.onWeight != nil {
+		c.onWeight(nodeID, oldWeight, newWeight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func TestSetAddWeightCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(1)
+	weight1 := uint64(93)
+
+	s := NewSet()
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	callcount := 0
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+			assert.Equal(t, vdr0, nodeID)
+			assert.Equal(t, weight0, oldWeight)
+			assert.Equal(t, weight0+weight1, newWeight)
+			callcount++
+		},
+	})
+	err = s.AddWeight(vdr0, weight1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, callcount)
+}
+
+func TestSetRemoveWeightCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(93)
+	weight1 := uint64(92)
+
+	s := NewSet()
+	callcount := 0
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+			assert.Equal(t, vdr0, nodeID)
+			assert.Equal(t, weight0, oldWeight)
+			assert.Equal(t, weight0-weight1, newWeight)
+			callcount++
+		},
+	})
+	err = s.RemoveWeight(vdr0, weight1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, callcount)
+}
+
+func TestSetValidatorRemovedCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(93)
+
+	s := NewSet()
+	callcount := 0
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onRemoved: func(nodeID ids.NodeID, weight uint64) {
+			assert.Equal(t, vdr0, nodeID)
+			assert.Equal(t, weight0, weight)
+			callcount++
+		},
+	})
+	err = s.RemoveWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, callcount)
+}
+
+func TestSetValidatorSetCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(93)
+	vdr1 := ids.NodeID{2}
+	weight1 := uint64(94)
+	vdr2 := ids.NodeID{3}
+	weight2 := uint64(95)
+
+	s := NewSet()
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	err = s.AddWeight(vdr1, weight1)
+	assert.NoError(t, err)
+
+	newValidators := []Validator{&validator{nodeID: vdr0, weight: weight0}, &validator{nodeID: vdr2, weight: weight2}}
+	callcount := 0
+	var lock sync.Mutex
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			lock.Lock()
+			defer lock.Unlock()
+			assert.Equal(t, vdr2, nodeID)
+			assert.Equal(t, weight2, weight)
+			callcount++
+		},
+		onRemoved: func(nodeID ids.NodeID, weight uint64) {
+			lock.Lock()
+			defer lock.Unlock()
+			assert.Equal(t, vdr1, nodeID)
+			assert.Equal(t, weight1, weight)
+			callcount++
+		},
+	})
+
+	err = s.Set(newValidators)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, callcount)
 }
