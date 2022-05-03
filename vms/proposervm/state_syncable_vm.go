@@ -118,8 +118,7 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	}
 	block, err := vm.getPostForkBlock(blkID)
 	if err != nil {
-		// This is an unexpected error that means the height index is out of
-		// sync with block index.
+		vm.ctx.Log.Warn("failed to fetch proposervm block %s at height %d with %s", blkID, height, err)
 		return nil, err
 	}
 
