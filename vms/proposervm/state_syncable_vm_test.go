@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -20,9 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
-	"github.com/stretchr/testify/assert"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 type fullVM struct {
@@ -131,7 +133,19 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	assert.True(err == database.ErrNotFound)
 	assert.True(summary == nil)
 
-	// Pre fork summary case
+	// Pre fork summary case, fork height not reached hence not set yet
+	innerVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+		return innerSummary, nil
+	}
+	_, err = vm.GetForkHeight()
+	assert.Equal(err, database.ErrNotFound)
+	summary, err = vm.GetOngoingSyncStateSummary()
+	assert.NoError(err)
+	assert.True(summary.ID() == innerSummary.ID())
+	assert.True(summary.Height() == innerSummary.Height())
+	assert.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+
+	// Pre fork summary case, fork height already reached
 	innerVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
 		return innerSummary, nil
 	}
@@ -201,7 +215,19 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	assert.True(err == database.ErrNotFound)
 	assert.True(summary == nil)
 
-	// Pre fork summary case
+	// Pre fork summary case, fork height not reached hence not set yet
+	innerVM.GetLastStateSummaryF = func() (block.StateSummary, error) {
+		return innerSummary, nil
+	}
+	_, err = vm.GetForkHeight()
+	assert.Equal(err, database.ErrNotFound)
+	summary, err = vm.GetLastStateSummary()
+	assert.NoError(err)
+	assert.True(summary.ID() == innerSummary.ID())
+	assert.True(summary.Height() == innerSummary.Height())
+	assert.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+
+	// Pre fork summary case, fork height already reached
 	innerVM.GetLastStateSummaryF = func() (block.StateSummary, error) {
 		return innerSummary, nil
 	}
@@ -272,7 +298,20 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	assert.True(err == database.ErrNotFound)
 	assert.True(summary == nil)
 
-	// Pre fork summary case
+	// Pre fork summary case, fork height not reached hence not set yet
+	innerVM.GetStateSummaryF = func(h uint64) (block.StateSummary, error) {
+		assert.True(h == reqHeight)
+		return innerSummary, nil
+	}
+	_, err = vm.GetForkHeight()
+	assert.Equal(err, database.ErrNotFound)
+	summary, err = vm.GetStateSummary(reqHeight)
+	assert.NoError(err)
+	assert.True(summary.ID() == innerSummary.ID())
+	assert.True(summary.Height() == innerSummary.Height())
+	assert.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+
+	// Pre fork summary case, fork height already reached
 	innerVM.GetStateSummaryF = func(h uint64) (block.StateSummary, error) {
 		assert.True(h == reqHeight)
 		return innerSummary, nil
