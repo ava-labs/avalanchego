@@ -70,7 +70,7 @@ type VM struct {
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
-	bootstrapped   bool
+	consensusState snow.State
 	context        context.Context
 	onShutdown     func()
 
@@ -81,7 +81,6 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
-	state              snow.State
 }
 
 func New(
@@ -164,26 +163,25 @@ func (vm *VM) Shutdown() error {
 	return vm.ChainVM.Shutdown()
 }
 
-func (vm *VM) SetState(state snow.State) error {
-	vm.bootstrapped = (state == snow.NormalOp)
-	if err := vm.ChainVM.SetState(state); err != nil {
+func (vm *VM) SetState(newState snow.State) error {
+	if err := vm.ChainVM.SetState(newState); err != nil {
 		return err
 	}
 
-	if vm.state == snow.StateSyncing && state == snow.Bootstrapping {
-		// when going from StateSyncing to Bootstrapping, if state sync
-		// has failed or was skipped, repairAcceptedChainByHeight rolls
-		// back the chain to the previously last accepted block. If
-		// state sync has completed successfully, this call is a no-op.
-		if err := vm.repairAcceptedChainByHeight(); err != nil {
-			return err
-		}
-		if err := vm.setLastAcceptedMetadata(); err != nil {
-			return err
-		}
+	oldState := vm.consensusState
+	vm.consensusState = newState
+	if oldState != snow.StateSyncing {
+		return nil
 	}
-	vm.state = state
-	return nil
+
+	// When finishing StateSyncing, if state sync has failed or was skipped,
+	// repairAcceptedChainByHeight rolls back the chain to the previously last
+	// accepted block. If state sync has completed successfully, this call is a
+	// no-op.
+	if err := vm.repairAcceptedChainByHeight(); err != nil {
+		return err
+	}
+	return vm.setLastAcceptedMetadata()
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {

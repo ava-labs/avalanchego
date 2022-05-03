@@ -69,7 +69,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse inner summary due to: %w", err)
 	}
-	block, err := vm.parseBlock(statelessSummary.BlockBytes())
+	block, err := vm.parsePostForkBlock(statelessSummary.BlockBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not parse proposervm block bytes from summary due to: %w", err)
 	}
@@ -78,7 +78,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 		StateSummary: statelessSummary,
 		innerSummary: innerSummary,
 		block:        block,
-		vm:           vm,
+		state:        vm.State,
 	}, nil
 }
 
@@ -110,23 +110,22 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 		return nil, err
 	}
 
-	// retrieve ProBlk
-	proBlkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
+	blkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
 	if err != nil {
 		// this is an unexpected error that means proVM is out of sync with innerVM
 		return nil, err
 	}
-	proBlk, err := vm.getBlock(proBlkID)
+	block, err := vm.getPostForkBlock(blkID)
 	if err != nil {
 		// this is an unexpected error that means proVM is out of sync with innerVM
 		return nil, err
 	}
 
-	statelessSummary, err := summary.Build(forkHeight, proBlk.Bytes(), innerSummary.Bytes())
+	statelessSummary, err := summary.Build(forkHeight, block.Bytes(), innerSummary.Bytes())
 	return &stateSummary{
 		StateSummary: statelessSummary,
 		innerSummary: innerSummary,
-		block:        proBlk,
-		vm:           vm,
+		block:        block,
+		state:        vm.State,
 	}, err
 }

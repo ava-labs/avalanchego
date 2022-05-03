@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
@@ -27,9 +28,9 @@ type stateSummary struct {
 	innerSummary block.StateSummary
 
 	// block associated with the summary
-	block Block
+	block PostForkBlock
 
-	vm *VM
+	state state.HeightIndexWriter
 }
 
 func (s *stateSummary) Height() uint64 {
@@ -39,7 +40,7 @@ func (s *stateSummary) Height() uint64 {
 func (s *stateSummary) Accept() (bool, error) {
 	// set fork height first, before accepting proposerVM full block
 	// which updates height index (among other indices)
-	if err := s.vm.SetForkHeight(s.StateSummary.ForkHeight()); err != nil {
+	if err := s.state.SetForkHeight(s.StateSummary.ForkHeight()); err != nil {
 		return false, err
 	}
 

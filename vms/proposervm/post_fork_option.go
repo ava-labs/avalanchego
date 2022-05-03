@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = &postForkOption{}
+var _ PostForkBlock = &postForkOption{}
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {

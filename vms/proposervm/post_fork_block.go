@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = &postForkBlock{}
+var _ PostForkBlock = &postForkBlock{}
 
 type postForkBlock struct {
 	block.SignedBlock
