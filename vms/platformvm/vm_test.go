@@ -2090,7 +2090,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
 	assert.NoError(t, err)
 
 	bootstrapConfig := bootstrap.Config{

@@ -186,7 +186,8 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	StateSyncBeacons []ids.NodeID
+	StateSyncBeacons         []ids.NodeID
+	StateSyncDisableRequests bool
 }
 
 type manager struct {
@@ -828,7 +829,7 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg, m.StateSyncDisableRequests)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}

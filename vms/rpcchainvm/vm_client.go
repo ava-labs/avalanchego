@@ -56,7 +56,8 @@ import (
 )
 
 var (
-	errUnsupportedFXs = errors.New("unsupported feature extensions")
+	errUnsupportedFXs                       = errors.New("unsupported feature extensions")
+	errBatchedParseBlockWrongNumberOfBlocks = errors.New("BatchedParseBlock returned different number of blocks than expected")
 
 	_ block.ChainVM              = &VMClient{}
 	_ block.BatchedChainVM       = &VMClient{}
@@ -609,7 +610,7 @@ func (vm *VMClient) BatchedParseBlock(blksBytes [][]byte) ([]snowman.Block, erro
 		return nil, err
 	}
 	if len(blksBytes) != len(resp.Response) {
-		return nil, fmt.Errorf("BatchedParse block returned different number of blocks than expected")
+		return nil, errBatchedParseBlockWrongNumberOfBlocks
 	}
 
 	res := make([]snowman.Block, 0, len(blksBytes))

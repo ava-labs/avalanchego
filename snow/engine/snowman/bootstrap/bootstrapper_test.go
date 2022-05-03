@@ -71,7 +71,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := getter.New(vm, commonConfig)
+	snowGetHandler, err := getter.New(vm, commonConfig, false /*StateSyncDisableRequests*/)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
-	snowGetHandler, err := getter.New(vm, commonCfg)
+	snowGetHandler, err := getter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
 	assert.NoError(err)
 	cfg := Config{
 		Config:        commonCfg,

@@ -55,6 +55,7 @@ const (
 	APIAuthPasswordFileKey                             = "api-auth-password-file"
 	StateSyncIPsKey                                    = "state-sync-ips"
 	StateSyncIDsKey                                    = "state-sync-ids"
+	StateSyncDisableRequests                           = "state-sync-disable-requests"
 	BootstrapIPsKey                                    = "bootstrap-ips"
 	BootstrapIDsKey                                    = "bootstrap-ids"
 	StakingPortKey                                     = "staking-port"

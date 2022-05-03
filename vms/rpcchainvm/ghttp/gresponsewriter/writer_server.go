@@ -31,7 +31,7 @@ var (
 
 // Server is an http.ResponseWriter that is managed over RPC.
 type Server struct {
-	responsewriterpb.UnimplementedWriterServer
+	responsewriterpb.UnsafeWriterServer
 	writer http.ResponseWriter
 }
 

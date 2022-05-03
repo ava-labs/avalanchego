@@ -49,7 +49,7 @@ var _ vmpb.VMServer = &VMServer{}
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vmpb.UnimplementedVMServer
+	vmpb.UnsafeVMServer
 
 	vm   block.ChainVM
 	hVM  block.HeightIndexedChainVM
