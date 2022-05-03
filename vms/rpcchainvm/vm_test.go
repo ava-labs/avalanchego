@@ -10,6 +10,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"reflect"
+	"sort"
 	"testing"
 
 	j "encoding/json"
@@ -35,6 +37,27 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
+
+// Test_VMServerInterface ensures that the RPCs methods defined by VMServer
+// interface are implemented.
+func Test_VMServerInterface(t *testing.T) {
+	var wantMethods, gotMethods []string
+	pb := reflect.TypeOf((*vmpb.VMServer)(nil)).Elem()
+	for i := 0; i < pb.NumMethod()-1; i++ {
+		wantMethods = append(wantMethods, pb.Method(i).Name)
+	}
+	sort.Strings(wantMethods)
+
+	impl := reflect.TypeOf(&VMServer{})
+	for i := 0; i < impl.NumMethod(); i++ {
+		gotMethods = append(gotMethods, impl.Method(i).Name)
+	}
+	sort.Strings(gotMethods)
+
+	if !reflect.DeepEqual(gotMethods, wantMethods) {
+		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
+	}
+}
 
 // Test_VMCreateHandlers tests the Handle and HandleSimple RPCs by creating a plugin and
 // serving the handlers exposed by the subnet. The test then will exercise the service
