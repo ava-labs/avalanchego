@@ -11,12 +11,14 @@ var _ StateSummary = &stateSummary{}
 
 type StateSummary interface {
 	ID() ids.ID
+	ForkHeight() uint64
 	BlockBytes() []byte
 	InnerSummaryBytes() []byte
 	Bytes() []byte
 }
 
 type stateSummary struct {
+	Height uint64 `serialize:"true"`
 	// TODO: Rather than storing the full block here - we should only store
 	//       proposervm information. We would then modify the StateSummary
 	//       interface to expose the required information to generate the full
@@ -29,6 +31,7 @@ type stateSummary struct {
 }
 
 func (s *stateSummary) ID() ids.ID                { return s.id }
+func (s *stateSummary) ForkHeight() uint64        { return s.Height }
 func (s *stateSummary) BlockBytes() []byte        { return s.Block }
 func (s *stateSummary) InnerSummaryBytes() []byte { return s.InnerSummary }
 func (s *stateSummary) Bytes() []byte             { return s.bytes }

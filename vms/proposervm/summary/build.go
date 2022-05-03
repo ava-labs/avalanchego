@@ -10,10 +10,12 @@ import (
 )
 
 func Build(
+	forkHeight uint64,
 	block []byte,
 	coreSummary []byte,
 ) (StateSummary, error) {
 	summary := stateSummary{
+		Height:       forkHeight,
 		Block:        block,
 		InnerSummary: coreSummary,
 	}

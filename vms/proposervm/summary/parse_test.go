@@ -12,9 +12,10 @@ import (
 func TestParse(t *testing.T) {
 	assert := assert.New(t)
 
+	forkHeight := uint64(2022)
 	block := []byte("blockBytes")
 	coreSummary := []byte("coreSummary")
-	builtSummary, err := Build(block, coreSummary)
+	builtSummary, err := Build(forkHeight, block, coreSummary)
 	assert.NoError(err)
 
 	summaryBytes := builtSummary.Bytes()
@@ -23,6 +24,7 @@ func TestParse(t *testing.T) {
 
 	assert.Equal(builtSummary.Bytes(), parsedSummary.Bytes())
 	assert.Equal(builtSummary.ID(), parsedSummary.ID())
+	assert.Equal(builtSummary.ForkHeight(), parsedSummary.ForkHeight())
 	assert.Equal(builtSummary.BlockBytes(), parsedSummary.BlockBytes())
 	assert.Equal(builtSummary.InnerSummaryBytes(), parsedSummary.InnerSummaryBytes())
 }
