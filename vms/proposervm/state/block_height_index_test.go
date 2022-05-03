@@ -21,7 +21,7 @@ func TestHasIndexReset(t *testing.T) {
 	wasReset, err := s.HasIndexReset()
 	a.NoError(err)
 	a.False(wasReset)
-	err = s.ResetHeightIndex()
+	err = s.ResetHeightIndex(vdb)
 	a.NoError(err)
 	wasReset, err = s.HasIndexReset()
 	a.NoError(err)

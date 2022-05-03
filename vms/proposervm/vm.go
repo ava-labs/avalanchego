@@ -319,16 +319,8 @@ func (vm *VM) repair(indexerState state.State) error {
 	go func() {
 		// If index reset has been requested, carry it out first
 		if vm.resetHeightIndexOngoing.GetValue() {
-			if err := indexerState.ResetHeightIndex(); err != nil {
+			if err := indexerState.ResetHeightIndex(vm); err != nil {
 				vm.ctx.Log.Error("block height indexing reset failed with: %s", err)
-				return
-			}
-			if err := indexerState.Commit(); err != nil {
-				vm.ctx.Log.Error("block height indexing reset commit failed with: %s", err)
-				return
-			}
-			if err := vm.Commit(); err != nil {
-				vm.ctx.Log.Error("block height indexing reset atomic commit failed with: %s", err)
 				return
 			}
 
