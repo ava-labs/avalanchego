@@ -201,15 +201,11 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	return preferredBlock.buildChild()
 }
 
-func (vm *VM) parseBlock(b []byte) (Block, error) {
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if blk, err := vm.parsePostForkBlock(b); err == nil {
 		return blk, nil
 	}
 	return vm.parsePreForkBlock(b)
-}
-
-func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	return vm.parseBlock(b)
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
