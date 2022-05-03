@@ -28,6 +28,8 @@ type stateSummary struct {
 
 	// block associated with the summary
 	block Block
+
+	vm *VM
 }
 
 func (s *stateSummary) Height() uint64 {
@@ -35,9 +37,15 @@ func (s *stateSummary) Height() uint64 {
 }
 
 func (s *stateSummary) Accept() (bool, error) {
-	// a statefulSummary carries the full proposerVM block associated
-	// with the summary. We store this block and update height index with it,
-	// so that state sync could resume after a shutdown.
+	// set fork height first, before accepting proposerVM full block
+	// which updates height index (among other indices)
+	if err := s.vm.SetForkHeight(s.StateSummary.ForkHeight()); err != nil {
+		return false, err
+	}
+
+	// We store the full proposerVM block associated with the summary
+	// and update height index with it, so that state sync could resume
+	// after a shutdown.
 	if err := s.block.acceptOuterBlk(); err != nil {
 		return false, err
 	}

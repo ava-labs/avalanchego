@@ -6,6 +6,7 @@ package proposervm
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
@@ -77,6 +78,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 		StateSummary: statelessSummary,
 		innerSummary: innerSummary,
 		block:        block,
+		vm:           vm,
 	}, nil
 }
 
@@ -95,12 +97,17 @@ func (vm *VM) GetStateSummary(height uint64) (block.StateSummary, error) {
 
 func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSummary, error) {
 	forkHeight, err := vm.GetForkHeight()
-	if err != nil {
-		return nil, err
-	}
-
-	if innerSummary.Height() < forkHeight {
+	switch err {
+	case nil:
+		if innerSummary.Height() < forkHeight {
+			return innerSummary, nil
+		}
+	case database.ErrNotFound:
+		// fork has not been reached since there is not fork height
+		// just return innerSummary
 		return innerSummary, nil
+	default:
+		return nil, err
 	}
 
 	// retrieve ProBlk
@@ -115,10 +122,11 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 		return nil, err
 	}
 
-	statelessSummary, err := summary.Build(proBlk.Bytes(), innerSummary.Bytes())
+	statelessSummary, err := summary.Build(forkHeight, proBlk.Bytes(), innerSummary.Bytes())
 	return &stateSummary{
 		StateSummary: statelessSummary,
 		innerSummary: innerSummary,
 		block:        proBlk,
+		vm:           vm,
 	}, err
 }
