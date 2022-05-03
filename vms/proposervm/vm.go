@@ -48,9 +48,12 @@ var (
 
 type VM struct {
 	block.ChainVM
+	bVM  block.BatchedChainVM
+	hVM  block.HeightIndexedChainVM
+	ssVM block.StateSyncableVM
+
 	activationTime      time.Time
 	minimumPChainHeight uint64
-	innerStateSyncVM    block.StateSyncableVM
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -88,12 +91,17 @@ func New(
 	activationTime time.Time,
 	minimumPChainHeight uint64,
 ) *VM {
+	bVM, _ := vm.(block.BatchedChainVM)
+	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:             vm,
+		ChainVM: vm,
+		bVM:     bVM,
+		hVM:     hVM,
+		ssVM:    ssVM,
+
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
-		innerStateSyncVM:    ssVM,
 	}
 }
 

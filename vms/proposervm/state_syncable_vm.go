@@ -12,7 +12,7 @@ import (
 )
 
 func (vm *VM) StateSyncEnabled() (bool, error) {
-	if vm.innerStateSyncVM == nil {
+	if vm.ssVM == nil {
 		return false, nil
 	}
 
@@ -22,15 +22,15 @@ func (vm *VM) StateSyncEnabled() (bool, error) {
 		return false, nil
 	}
 
-	return vm.innerStateSyncVM.StateSyncEnabled()
+	return vm.ssVM.StateSyncEnabled()
 }
 
 func (vm *VM) GetOngoingSyncStateSummary() (block.StateSummary, error) {
-	if vm.innerStateSyncVM == nil {
+	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	innerSummary, err := vm.innerStateSyncVM.GetOngoingSyncStateSummary()
+	innerSummary, err := vm.ssVM.GetOngoingSyncStateSummary()
 	if err != nil {
 		return nil, err // includes database.ErrNotFound case
 	}
@@ -39,12 +39,12 @@ func (vm *VM) GetOngoingSyncStateSummary() (block.StateSummary, error) {
 }
 
 func (vm *VM) GetLastStateSummary() (block.StateSummary, error) {
-	if vm.innerStateSyncVM == nil {
+	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
 	// Extract inner vm's last state summary
-	innerSummary, err := vm.innerStateSyncVM.GetLastStateSummary()
+	innerSummary, err := vm.ssVM.GetLastStateSummary()
 	if err != nil {
 		return nil, err // including database.ErrNotFound case
 	}
@@ -55,17 +55,17 @@ func (vm *VM) GetLastStateSummary() (block.StateSummary, error) {
 // Note: it's important that ParseStateSummary do not use any index or state
 // to allow summaries being parsed also by freshly started node with no previous state.
 func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
-	if vm.innerStateSyncVM == nil {
+	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
 	statelessSummary, err := summary.Parse(summaryBytes)
 	if err != nil {
 		// it may be a preFork summary
-		return vm.innerStateSyncVM.ParseStateSummary(summaryBytes)
+		return vm.ssVM.ParseStateSummary(summaryBytes)
 	}
 
-	innerSummary, err := vm.innerStateSyncVM.ParseStateSummary(statelessSummary.InnerSummaryBytes())
+	innerSummary, err := vm.ssVM.ParseStateSummary(statelessSummary.InnerSummaryBytes())
 	if err != nil {
 		return nil, fmt.Errorf("could not parse inner summary due to: %w", err)
 	}
@@ -83,11 +83,11 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 }
 
 func (vm *VM) GetStateSummary(height uint64) (block.StateSummary, error) {
-	if vm.innerStateSyncVM == nil {
+	if vm.ssVM == nil {
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	innerSummary, err := vm.innerStateSyncVM.GetStateSummary(height)
+	innerSummary, err := vm.ssVM.GetStateSummary(height)
 	if err != nil {
 		return nil, err // including database.ErrNotFound case
 	}
