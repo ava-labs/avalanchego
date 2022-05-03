@@ -118,7 +118,8 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	}
 	block, err := vm.getPostForkBlock(blkID)
 	if err != nil {
-		// this is an unexpected error that means proVM is out of sync with innerVM
+		// This is an unexpected error that means the height index is out of
+		// sync with block index.
 		return nil, err
 	}
 
