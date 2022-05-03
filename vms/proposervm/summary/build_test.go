@@ -12,11 +12,13 @@ import (
 func TestBuild(t *testing.T) {
 	assert := assert.New(t)
 
+	forkHeight := uint64(2022)
 	block := []byte("blockBytes")
 	coreSummary := []byte("coreSummary")
-	builtSummary, err := Build(block, coreSummary)
+	builtSummary, err := Build(forkHeight, block, coreSummary)
 	assert.NoError(err)
 
+	assert.Equal(builtSummary.ForkHeight(), forkHeight)
 	assert.Equal(builtSummary.BlockBytes(), block)
 	assert.Equal(builtSummary.InnerSummaryBytes(), coreSummary)
 }
