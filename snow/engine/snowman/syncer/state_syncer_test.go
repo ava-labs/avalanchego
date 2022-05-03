@@ -5,7 +5,7 @@ package syncer
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"math"
 	"testing"
 
@@ -350,7 +350,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
 		isSummaryDecoded = true
-		return nil, fmt.Errorf("invalid state summary")
+		return nil, errors.New("invalid state summary")
 	}
 
 	// pick one of the vdrs that have been reached out
@@ -417,7 +417,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
 		assert.True(len(summaryBytes) == 0)
-		return nil, fmt.Errorf("empty summary")
+		return nil, errors.New("empty summary")
 	}
 
 	// assume timeout is reached and vdrs is marked as unresponsive
@@ -493,9 +493,9 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 				BytesV:  summaryBytes,
 			}, nil
 		case bytes.Equal(b, nil):
-			return nil, fmt.Errorf("Empty Summary")
+			return nil, errors.New("Empty Summary")
 		default:
-			return nil, fmt.Errorf("unexpected Summary")
+			return nil, errors.New("unexpected Summary")
 		}
 	}
 
@@ -867,7 +867,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		case bytes.Equal(b, minoritySummaryBytes):
 			return minoritySummary, nil
 		default:
-			return nil, fmt.Errorf("unknown state summary")
+			return nil, errors.New("unknown state summary")
 		}
 	}
 
@@ -1109,7 +1109,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 		case bytes.Equal(b, minoritySummaryBytes):
 			return minoritySummary2, nil
 		default:
-			return nil, fmt.Errorf("unknown state summary")
+			return nil, errors.New("unknown state summary")
 		}
 	}
 
