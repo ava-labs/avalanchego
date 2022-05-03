@@ -265,8 +265,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 func (vm *VM) repair(indexerState state.State) error {
 	// check and possibly rebuild height index
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
+	if vm.hVM == nil {
 		return vm.repairAcceptedChainByIteration()
 	}
 
