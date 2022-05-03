@@ -293,7 +293,7 @@ func (vm *VM) repair(indexerState state.State) error {
 
 	if !vm.resetHeightIndexOngoing.GetValue() {
 		// We are not going to wipe the height index
-		switch innerHVM.VerifyHeightIndex() {
+		switch vm.hVM.VerifyHeightIndex() {
 		case nil:
 			// We are not going to wait for the height index to be repaired.
 			shouldRepair, err := vm.shouldHeightIndexBeRepaired()
@@ -343,7 +343,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		for {
 			// The underlying VM expects the lock to be held here.
 			vm.ctx.Lock.Lock()
-			err := innerHVM.VerifyHeightIndex()
+			err := vm.hVM.VerifyHeightIndex()
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
