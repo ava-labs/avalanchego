@@ -110,9 +110,10 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 		return nil, err
 	}
 
-	blkID, err := vm.GetBlockIDAtHeight(innerSummary.Height())
+	height := innerSummary.Height()
+	blkID, err := vm.GetBlockIDAtHeight(height)
 	if err != nil {
-		// this is an unexpected error that means proVM is out of sync with innerVM
+		vm.ctx.Log.Debug("failed to fetch proposervm block ID at height %d with %s", height, err)
 		return nil, err
 	}
 	block, err := vm.getPostForkBlock(blkID)
