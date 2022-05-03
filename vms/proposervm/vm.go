@@ -41,18 +41,23 @@ var (
 	_ block.ChainVM              = &VM{}
 	_ block.BatchedChainVM       = &VM{}
 	_ block.HeightIndexedChainVM = &VM{}
+	_ block.StateSyncableVM      = &VM{}
 
 	dbPrefix = []byte("proposervm")
 )
 
 type VM struct {
 	block.ChainVM
+	bVM  block.BatchedChainVM
+	hVM  block.HeightIndexedChainVM
+	ssVM block.StateSyncableVM
+
 	activationTime      time.Time
 	minimumPChainHeight uint64
 
 	state.State
-	resetHeightIndexOngoing utils.AtomicBool
 	hIndexer                indexer.HeightIndexer
+	resetHeightIndexOngoing utils.AtomicBool
 
 	proposer.Windower
 	tree.Tree
@@ -68,7 +73,7 @@ type VM struct {
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
-	bootstrapped   bool
+	consensusState snow.State
 	context        context.Context
 	onShutdown     func()
 
@@ -86,8 +91,15 @@ func New(
 	activationTime time.Time,
 	minimumPChainHeight uint64,
 ) *VM {
+	bVM, _ := vm.(block.BatchedChainVM)
+	hVM, _ := vm.(block.HeightIndexedChainVM)
+	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:             vm,
+		ChainVM: vm,
+		bVM:     bVM,
+		hVM:     hVM,
+		ssVM:    ssVM,
+
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 	}
@@ -159,9 +171,25 @@ func (vm *VM) Shutdown() error {
 	return vm.ChainVM.Shutdown()
 }
 
-func (vm *VM) SetState(state snow.State) error {
-	vm.bootstrapped = (state == snow.NormalOp)
-	return vm.ChainVM.SetState(state)
+func (vm *VM) SetState(newState snow.State) error {
+	if err := vm.ChainVM.SetState(newState); err != nil {
+		return err
+	}
+
+	oldState := vm.consensusState
+	vm.consensusState = newState
+	if oldState != snow.StateSyncing {
+		return nil
+	}
+
+	// When finishing StateSyncing, if state sync has failed or was skipped,
+	// repairAcceptedChainByHeight rolls back the chain to the previously last
+	// accepted block. If state sync has completed successfully, this call is a
+	// no-op.
+	if err := vm.repairAcceptedChainByHeight(); err != nil {
+		return err
+	}
+	return vm.setLastAcceptedMetadata()
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -237,8 +265,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 func (vm *VM) repair(indexerState state.State) error {
 	// check and possibly rebuild height index
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
+	if vm.hVM == nil {
 		return vm.repairAcceptedChainByIteration()
 	}
 
@@ -266,7 +293,7 @@ func (vm *VM) repair(indexerState state.State) error {
 
 	if !vm.resetHeightIndexOngoing.GetValue() {
 		// We are not going to wipe the height index
-		switch innerHVM.VerifyHeightIndex() {
+		switch vm.hVM.VerifyHeightIndex() {
 		case nil:
 			// We are not going to wait for the height index to be repaired.
 			shouldRepair, err := vm.shouldHeightIndexBeRepaired()
@@ -316,7 +343,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		for {
 			// The underlying VM expects the lock to be held here.
 			vm.ctx.Lock.Lock()
-			err := innerHVM.VerifyHeightIndex()
+			err := vm.hVM.VerifyHeightIndex()
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
@@ -502,7 +529,9 @@ func (vm *VM) setLastAcceptedMetadata() error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block wasn't a PostFork block, then we don't
-		// initialize the time.
+		// initialize the metadata.
+		vm.lastAcceptedHeight = 0
+		vm.lastAcceptedTime = time.Time{}
 		return nil
 	}
 	if err != nil {

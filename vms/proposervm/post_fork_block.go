@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = &postForkBlock{}
+var _ PostForkBlock = &postForkBlock{}
 
 type postForkBlock struct {
 	block.SignedBlock
@@ -22,6 +22,13 @@ type postForkBlock struct {
 // 2) Persists this block in storage
 // 3) Calls Reject() on siblings of this block and their descendants.
 func (b *postForkBlock) Accept() error {
+	if err := b.acceptOuterBlk(); err != nil {
+		return err
+	}
+	return b.acceptInnerBlk()
+}
+
+func (b *postForkBlock) acceptOuterBlk() error {
 	// Update in-memory references
 	b.status = choices.Accepted
 	b.vm.lastAcceptedTime = b.Timestamp()
@@ -34,11 +41,10 @@ func (b *postForkBlock) Accept() error {
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
+	return b.vm.storePostForkBlock(b)
+}
 
-	if err := b.vm.storePostForkBlock(b); err != nil {
-		return err
-	}
-
+func (b *postForkBlock) acceptInnerBlk() error {
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected
 	return b.vm.Tree.Accept(b.innerBlk)

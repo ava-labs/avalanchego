@@ -30,6 +30,16 @@ import (
 )
 
 var (
+	_ block.ChainVM              = &expandedCoreVM{}
+	_ block.HeightIndexedChainVM = &expandedCoreVM{}
+)
+
+type expandedCoreVM struct {
+	block.TestVM
+	block.TestHeightIndexedVM
+}
+
+var (
 	pTestCert *tls.Certificate
 
 	genesisUnixTimestamp int64 = 1000
@@ -55,7 +65,7 @@ func initTestProposerVM(
 	proBlkStartTime time.Time,
 	minPChainHeight uint64,
 ) (
-	*block.TestVM,
+	*expandedCoreVM,
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
@@ -72,8 +82,13 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &expandedCoreVM{
+		TestVM: block.TestVM{
+			TestVM: common.TestVM{
+				T: t,
+			},
+		},
+		TestHeightIndexedVM: block.TestHeightIndexedVM{
 			T: t,
 		},
 	}
