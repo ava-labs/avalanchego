@@ -25,7 +25,7 @@ const _ = grpc.SupportPackageIsVersion7
 type VMClient interface {
 	// ChainVM
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
-	SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*SetStateResponse, error)
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
@@ -79,8 +79,8 @@ func (c *vMClient) Initialize(ctx context.Context, in *InitializeRequest, opts .
 	return out, nil
 }
 
-func (c *vMClient) SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *vMClient) SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*SetStateResponse, error) {
+	out := new(SetStateResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/SetState", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -355,7 +355,7 @@ func (c *vMClient) StateSummaryAccept(ctx context.Context, in *StateSummaryAccep
 type VMServer interface {
 	// ChainVM
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
-	SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error)
+	SetState(context.Context, *SetStateRequest) (*SetStateResponse, error)
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
@@ -400,7 +400,7 @@ type UnimplementedVMServer struct {
 func (UnimplementedVMServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
 }
-func (UnimplementedVMServer) SetState(context.Context, *SetStateRequest) (*emptypb.Empty, error) {
+func (UnimplementedVMServer) SetState(context.Context, *SetStateRequest) (*SetStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetState not implemented")
 }
 func (UnimplementedVMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

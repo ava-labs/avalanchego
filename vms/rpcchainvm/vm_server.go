@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -205,15 +204,36 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
-		Status:               uint32(choices.Accepted),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
 		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
 	}, nil
 }
 
-func (vm *VMServer) SetState(_ context.Context, stateReq *vmpb.SetStateRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, vm.vm.SetState(snow.State(stateReq.State))
+func (vm *VMServer) SetState(_ context.Context, stateReq *vmpb.SetStateRequest) (*vmpb.SetStateResponse, error) {
+	err := vm.vm.SetState(snow.State(stateReq.State))
+	if err != nil {
+		return nil, err
+	}
+
+	lastAccepted, err := vm.vm.LastAccepted()
+	if err != nil {
+		return nil, err
+	}
+
+	blk, err := vm.vm.GetBlock(lastAccepted)
+	if err != nil {
+		return nil, err
+	}
+
+	parentID := blk.Parent()
+	return &vmpb.SetStateResponse{
+		LastAcceptedId:       lastAccepted[:],
+		LastAcceptedParentId: parentID[:],
+		Height:               blk.Height(),
+		Bytes:                blk.Bytes(),
+		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
+	}, nil
 }
 
 func (vm *VMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

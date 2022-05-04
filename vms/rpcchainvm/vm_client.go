@@ -212,11 +212,6 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	status := choices.Status(resp.Status)
-	if err := status.Valid(); err != nil {
-		return err
-	}
-
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
 	if err != nil {
 		return err
@@ -226,7 +221,7 @@ func (vm *VMClient) Initialize(
 		vm:       vm,
 		id:       id,
 		parentID: parentID,
-		status:   status,
+		status:   choices.Accepted,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
 		time:     time,
@@ -326,10 +321,37 @@ func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
 }
 
 func (vm *VMClient) SetState(state snow.State) error {
-	_, err := vm.client.SetState(context.Background(), &vmpb.SetStateRequest{
+	resp, err := vm.client.SetState(context.Background(), &vmpb.SetStateRequest{
 		State: uint32(state),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	id, err := ids.ToID(resp.LastAcceptedId)
+	if err != nil {
+		return err
+	}
+
+	parentID, err := ids.ToID(resp.LastAcceptedParentId)
+	if err != nil {
+		return err
+	}
+
+	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	if err != nil {
+		return err
+	}
+
+	return vm.State.SetLastAcceptedBlock(&blockClient{
+		vm:       vm,
+		id:       id,
+		parentID: parentID,
+		status:   choices.Accepted,
+		bytes:    resp.Bytes,
+		height:   resp.Height,
+		time:     time,
+	})
 }
 
 func (vm *VMClient) Shutdown() error {
