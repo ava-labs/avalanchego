@@ -2,8 +2,15 @@
 set -e
 
 # e.g.,
-# ./scripts/run.sh 1.7.10 test 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
-# ./scripts/run.sh 1.7.10 run 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+#
+# run without e2e tests
+# ./scripts/run.sh 1.7.10 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+#
+# run without e2e tests with DEBUG log level
+# AVALANCHE_LOG_LEVEL=DEBUG ./scripts/run.sh 1.7.10 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+#
+# run with e2e tests
+# E2E=true ./scripts/run.sh 1.7.10 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 if ! [[ "$0" =~ scripts/run.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -12,28 +19,30 @@ fi
 VERSION=$1
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
-  echo "Usage: ${0} [VERSION] [MODE] [GENESIS_ADDRESS]" >> /dev/stderr
+  echo "Usage: ${0} [VERSION] [GENESIS_ADDRESS]" >> /dev/stderr
   exit 255
 fi
 
-MODE=$2
-if [[ -z "${MODE}" ]]; then
-  echo "Missing mode argument!"
-  echo "Usage: ${0} [VERSION] [MODE] [GENESIS_ADDRESS]" >> /dev/stderr
-  exit 255
-fi
-
-GENESIS_ADDRESS=$3
+GENESIS_ADDRESS=$2
 if [[ -z "${GENESIS_ADDRESS}" ]]; then
   echo "Missing address argument!"
-  echo "Usage: ${0} [VERSION] [MODE] [GENESIS_ADDRESS]" >> /dev/stderr
+  echo "Usage: ${0} [VERSION] [GENESIS_ADDRESS]" >> /dev/stderr
   exit 255
 fi
 
-echo "Running e2e tests with:"
+MODE=${MODE:-run}
+E2E=${E2E:-false}
+if [[ ${E2E} == true ]]; then
+  MODE="test"
+fi
+
+AVALANCHE_LOG_LEVEL=${AVALANCHE_LOG_LEVEL:-INFO}
+
+echo "Running with:"
 echo VERSION: ${VERSION}
 echo MODE: ${MODE}
 echo GENESIS_ADDRESS: ${GENESIS_ADDRESS}
+echo AVALANCHE_LOG_LEVEL: ${AVALANCHE_LOG_LEVEL}
 
 ############################
 # download avalanchego
@@ -182,7 +191,7 @@ EOF
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: use "go install -v github.com/ava-labs/avalanche-network-runner/cmd/avalanche-network-runner@v${NETWORK_RUNNER_VERSION}"
-NETWORK_RUNNER_VERSION=1.0.11
+NETWORK_RUNNER_VERSION=1.0.12
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
@@ -227,12 +236,37 @@ echo "running e2e tests"
 --network-runner-grpc-endpoint="0.0.0.0:12342" \
 --avalanchego-path=${AVALANCHEGO_PATH} \
 --avalanchego-plugin-dir=${AVALANCHEGO_PLUGIN_DIR} \
---avalanchego-log-level="DEBUG" \
+--avalanchego-log-level=${AVALANCHE_LOG_LEVEL} \
 --vm-genesis-path=/tmp/genesis.json \
 --output-path=/tmp/avalanchego-v${VERSION}/output.yaml \
 --mode=${MODE}
 
-if [[ ${MODE} == "test" ]]; then
-  kill -9 ${PID}
+#################################
+# e.g., print out MetaMask endpoints
+if [[ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ]]; then
+  echo "cluster is ready!"
+  go run scripts/parser/main.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID $GENESIS_ADDRESS
+else
+  echo "cluster is not ready in time... terminating ${PID}"
+  kill ${PID}
+  exit 255
 fi
-echo "ALL SUCCESS!"
+
+#################################
+if [[ ${MODE} == "test" ]]; then
+  # "e2e.test" already terminates the cluster for "test" mode
+  # just in case tests are aborted, manually terminate them again
+  echo "network-runner RPC server was running on PID ${PID} as test mode; terminating the process..."
+  pkill -P ${PID} || true
+  kill -2 ${PID}
+  pkill -9 -f srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy || true # in case pkill didn't work
+else
+  echo "network-runner RPC server is running on PID ${PID}..."
+  echo ""
+  echo "use the following command to terminate:"
+  echo ""
+  echo "pkill -P ${PID}"
+  echo "kill -2 ${PID}"
+  echo "pkill -9 -f srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
+  echo ""
+fi

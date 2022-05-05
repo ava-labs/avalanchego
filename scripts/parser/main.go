@@ -29,7 +29,6 @@ uris:
 type output struct {
 	Endpoint string   `yaml:"endpoint"`
 	Logs     string   `yaml:"logsDir"`
-	PID      int      `yaml:"pid"`
 	URIs     []string `yaml:"uris"`
 }
 
@@ -49,7 +48,6 @@ func main() {
 
 	color.Green("\n")
 	color.Green("Logs Directory: %s", o.Logs)
-	color.Green("PID: %d", o.PID)
 	color.Green("\n")
 
 	color.Green("EVM Chain ID: %s", os.Args[2])
