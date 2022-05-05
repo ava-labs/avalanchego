@@ -55,13 +55,13 @@ func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + fail to shutdown
-	vm.On("CreateStaticHandlers").Once().Return(nil, errOops)
-	vm.On("Shutdown").Once().Return(errOops)
+	vm.EXPECT().CreateStaticHandlers().Return(nil, errOops).Times(1)
+	vm.EXPECT().Shutdown().Return(errOops).Times(1)
 
 	assert.Error(t, errOops, resources.registerer.Register(id, vmFactory))
 }
@@ -72,13 +72,13 @@ func TestRegisterCreateHandlersFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + but succeed our shutdown
-	vm.On("CreateStaticHandlers").Once().Return(nil, errOops)
-	vm.On("Shutdown").Once().Return(nil)
+	vm.EXPECT().CreateStaticHandlers().Return(nil, errOops).Times(1)
+	vm.EXPECT().Shutdown().Return(nil).Times(1)
 
 	assert.Error(t, errOops, resources.registerer.Register(id, vmFactory))
 }
@@ -89,7 +89,7 @@ func TestRegisterAddRouteFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -97,7 +97,7 @@ func TestRegisterAddRouteFails(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	// We fail to create an endpoint for the handler
 	resources.mockServer.EXPECT().
 		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
@@ -113,7 +113,7 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -121,7 +121,7 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	// Registering the route fails
 	resources.mockServer.EXPECT().
 		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
@@ -138,7 +138,7 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -147,7 +147,7 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	resources.mockServer.EXPECT().
 		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
@@ -167,7 +167,7 @@ func TestRegisterHappyCase(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -176,7 +176,7 @@ func TestRegisterHappyCase(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	resources.mockServer.EXPECT().
 		AddRoute(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
@@ -224,13 +224,13 @@ func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + fail to shutdown
-	vm.On("CreateStaticHandlers").Once().Return(nil, errOops)
-	vm.On("Shutdown").Once().Return(errOops)
+	vm.EXPECT().CreateStaticHandlers().Return(nil, errOops).Times(1)
+	vm.EXPECT().Shutdown().Return(errOops).Times(1)
 
 	assert.Error(t, errOops, resources.registerer.RegisterWithReadLock(id, vmFactory))
 }
@@ -241,13 +241,13 @@ func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + but succeed our shutdown
-	vm.On("CreateStaticHandlers").Once().Return(nil, errOops)
-	vm.On("Shutdown").Once().Return(nil)
+	vm.EXPECT().CreateStaticHandlers().Return(nil, errOops).Times(1)
+	vm.EXPECT().Shutdown().Return(nil).Times(1)
 
 	assert.Error(t, errOops, resources.registerer.RegisterWithReadLock(id, vmFactory))
 }
@@ -258,7 +258,7 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -266,7 +266,7 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	// We fail to create an endpoint for the handler
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
@@ -282,7 +282,7 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -290,7 +290,7 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	// RegisterWithReadLocking the route fails
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
@@ -307,7 +307,7 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -316,7 +316,7 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).
@@ -336,7 +336,7 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
-	vm := &mocks.ChainVM{}
+	vm := mocks.NewMockChainVM(resources.ctrl)
 
 	handlers := map[string]*common.HTTPHandler{
 		"foo": {},
@@ -345,7 +345,7 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 
 	resources.mockManager.EXPECT().RegisterFactory(id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
-	vm.On("CreateStaticHandlers").Once().Return(handlers, nil)
+	vm.EXPECT().CreateStaticHandlers().Return(handlers, nil).Times(1)
 	resources.mockServer.EXPECT().
 		AddRouteWithReadLock(handlers["foo"], gomock.Any(), constants.VMAliasPrefix+id.String(), "foo").
 		Times(1).

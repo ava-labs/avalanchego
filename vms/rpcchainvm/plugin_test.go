@@ -19,13 +19,14 @@ import (
 // plugin_test collects objects and helpers generally helpful for various rpc tests
 
 const (
-	chainVMTestKey                    = "chainVMTest"
-	stateSyncEnabledTestKey           = "stateSyncEnabledTest"
-	getOngoingSyncStateSummaryTestKey = "getOngoingSyncStateSummaryTest"
-	getLastStateSummaryTestKey        = "getLastStateSummaryTest"
-	parseStateSummaryTestKey          = "parseStateSummaryTest"
-	getStateSummaryTestKey            = "getStateSummaryTest"
-	acceptStateSummaryTestKey         = "acceptStateSummaryTest"
+	chainVMTestKey                                 = "chainVMTest"
+	stateSyncEnabledTestKey                        = "stateSyncEnabledTest"
+	getOngoingSyncStateSummaryTestKey              = "getOngoingSyncStateSummaryTest"
+	getLastStateSummaryTestKey                     = "getLastStateSummaryTest"
+	parseStateSummaryTestKey                       = "parseStateSummaryTest"
+	getStateSummaryTestKey                         = "getStateSummaryTest"
+	acceptStateSummaryTestKey                      = "acceptStateSummaryTest"
+	lastAcceptedBlockPostStateSummaryAcceptTestKey = "lastAcceptedBlockPostStateSummaryAcceptTest"
 )
 
 var (
@@ -40,13 +41,14 @@ var (
 	}
 
 	TestServerPluginMap = map[string]func(*testing.T, bool) (plugin.Plugin, *gomock.Controller){
-		chainVMTestKey:                    chainVMTestPlugin,
-		stateSyncEnabledTestKey:           stateSyncEnabledTestPlugin,
-		getOngoingSyncStateSummaryTestKey: getOngoingSyncStateSummaryTestPlugin,
-		getLastStateSummaryTestKey:        getLastStateSummaryTestPlugin,
-		parseStateSummaryTestKey:          parseStateSummaryTestPlugin,
-		getStateSummaryTestKey:            getStateSummaryTestPlugin,
-		acceptStateSummaryTestKey:         acceptStateSummaryTestPlugin,
+		chainVMTestKey:                                 chainVMTestPlugin,
+		stateSyncEnabledTestKey:                        stateSyncEnabledTestPlugin,
+		getOngoingSyncStateSummaryTestKey:              getOngoingSyncStateSummaryTestPlugin,
+		getLastStateSummaryTestKey:                     getLastStateSummaryTestPlugin,
+		parseStateSummaryTestKey:                       parseStateSummaryTestPlugin,
+		getStateSummaryTestKey:                         getStateSummaryTestPlugin,
+		acceptStateSummaryTestKey:                      acceptStateSummaryTestPlugin,
+		lastAcceptedBlockPostStateSummaryAcceptTestKey: lastAcceptedBlockPostStateSummaryAcceptTestPlugin,
 	}
 )
 

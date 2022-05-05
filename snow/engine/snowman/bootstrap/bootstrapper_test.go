@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -234,8 +236,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		case blkID0:
 			return blk0, nil
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -333,12 +335,12 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 			if parsedBlk1 {
 				return blk1, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID2:
 			return blk2, nil
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -490,17 +492,17 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 			if parsedBlk1 {
 				return blk1, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID2:
 			if parsedBlk2 {
 				return blk2, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID3:
 			return blk3, nil
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -648,17 +650,17 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 			if parsedBlk1 {
 				return blk1, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID2:
 			if parsedBlk2 {
 				return blk2, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID3:
 			return blk3, nil
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -820,17 +822,17 @@ func TestBootstrapperAncestors(t *testing.T) {
 			if parsedBlk1 {
 				return blk1, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID2:
 			if parsedBlk2 {
 				return blk2, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID3:
 			return blk3, nil
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -956,15 +958,15 @@ func TestBootstrapperFinalized(t *testing.T) {
 			if parsedBlk1 {
 				return blk1, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID2:
 			if parsedBlk2 {
 				return blk2, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -1091,25 +1093,25 @@ func TestRestartBootstrapping(t *testing.T) {
 			if parsedBlk1 {
 				return blk1, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID2:
 			if parsedBlk2 {
 				return blk2, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID3:
 			if parsedBlk3 {
 				return blk3, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		case blkID4:
 			if parsedBlk4 {
 				return blk4, nil
 			}
-			return nil, errUnknownBlock
+			return nil, database.ErrNotFound
 		default:
-			t.Fatal(errUnknownBlock)
-			panic(errUnknownBlock)
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
 		}
 	}
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
@@ -1224,5 +1226,171 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatalf("Block should be accepted")
 	case blk4.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
+	}
+}
+
+func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
+	config, peerID, sender, vm := newConfig(t)
+
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 0,
+		BytesV:  utils.RandomBytes(32),
+	}
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		ParentV: blk0.IDV,
+		HeightV: 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+
+	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case blk0.ID():
+			return nil, database.ErrNotFound
+		case blk1.ID():
+			return blk1, nil
+		default:
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
+		}
+	}
+	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blkBytes, blk0.Bytes()):
+			return blk0, nil
+		case bytes.Equal(blkBytes, blk1.Bytes()):
+			return blk1, nil
+		}
+		t.Fatal(errUnknownBlock)
+		return nil, errUnknownBlock
+	}
+
+	bsIntf, err := New(
+		config,
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
+	}
+
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
+		t.Fatal(err)
+	}
+
+	requestIDs := map[ids.ID]uint32{}
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+		if vdr != peerID {
+			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
+		}
+		requestIDs[vtxID] = reqID
+	}
+
+	// Force Accept, the already transitively accepted, blk0
+	if err := bs.ForceAccepted([]ids.ID{blk0.ID()}); err != nil { // should request blk0
+		t.Fatal(err)
+	}
+
+	reqID, ok := requestIDs[blk0.ID()]
+	if !ok {
+		t.Fatalf("should have requested blk0")
+	}
+
+	if err := bs.Ancestors(peerID, reqID, [][]byte{blk0.Bytes()}); err != nil {
+		t.Fatal(err)
+	}
+
+	switch {
+	case config.Ctx.GetState() != snow.NormalOp:
+		t.Fatalf("Bootstrapping should have finished")
+	case blk0.Status() != choices.Processing:
+		t.Fatalf("Block should be processing")
+	case blk1.Status() != choices.Accepted:
+		t.Fatalf("Block should be accepted")
+	}
+}
+
+func TestBootstrapContinueAfterHalt(t *testing.T) {
+	config, _, _, vm := newConfig(t)
+
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  utils.RandomBytes(32),
+	}
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk0.IDV,
+		HeightV: 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk1.IDV,
+		HeightV: 2,
+		BytesV:  utils.RandomBytes(32),
+	}
+
+	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
+
+	bsIntf, err := New(
+		config,
+		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bs, ok := bsIntf.(*bootstrapper)
+	if !ok {
+		t.Fatal("unexpected bootstrapper type")
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case blk0.ID():
+			return blk0, nil
+		case blk1.ID():
+			bs.Halt()
+			return blk1, nil
+		case blk2.ID():
+			return blk2, nil
+		default:
+			t.Fatal(database.ErrNotFound)
+			panic(database.ErrNotFound)
+		}
+	}
+
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bs.ForceAccepted([]ids.ID{blk2.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
+	if bs.Blocked.NumMissingIDs() != 1 {
+		t.Fatal("Should have left blk1 as missing")
 	}
 }

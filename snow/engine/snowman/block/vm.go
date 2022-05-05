@@ -62,5 +62,7 @@ type Parser interface {
 	//
 	// The block should be represented by the full byte array, without extra
 	// bytes.
+	//
+	// It is expected for all historical blocks to be parseable.
 	ParseBlock([]byte) (snowman.Block, error)
 }
