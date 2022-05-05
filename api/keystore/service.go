@@ -25,7 +25,7 @@ func (s *service) CreateUser(_ *http.Request, args *api.UserPass, _ *api.EmptyRe
 	return s.ks.CreateUser(args.Username, args.Password)
 }
 
-func (s *service) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.EmptyReply) error {
+func (s *service) DeleteUser(_ *http.Request, args *api.UserPass, _ *api.EmptyReply) error {
 	s.ks.log.Debug("Keystore: DeleteUser called with %s", args.Username)
 
 	return s.ks.DeleteUser(args.Username, args.Password)
@@ -52,7 +52,7 @@ type ImportUserArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.EmptyReply) error {
+func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, _ *api.EmptyReply) error {
 	s.ks.log.Debug("Keystore: ImportUser called for %s", args.Username)
 
 	// Decode the user from string to bytes

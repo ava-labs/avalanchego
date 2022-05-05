@@ -45,7 +45,7 @@ type RevokeTokenArgs struct {
 	Token
 }
 
-func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *api.EmptyReply) error {
+func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, _ *api.EmptyReply) error {
 	s.auth.log.Debug("Auth: RevokeToken called")
 
 	return s.auth.RevokeToken(args.Token.Token, args.Password.Password)
@@ -56,7 +56,7 @@ type ChangePasswordArgs struct {
 	NewPassword string `json:"newPassword"` // New authorization password
 }
 
-func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *api.EmptyReply) error {
+func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, _ *api.EmptyReply) error {
 	s.auth.log.Debug("Auth: ChangePassword called")
 
 	return s.auth.ChangePassword(args.OldPassword, args.NewPassword)

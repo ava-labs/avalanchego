@@ -70,28 +70,28 @@ func NewService(config Config) (*common.HTTPHandler, error) {
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, reply *api.EmptyReply) error {
+func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: StartCPUProfiler called")
 
 	return service.profiler.StartCPUProfiler()
 }
 
 // StopCPUProfiler stops the cpu profile
-func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.EmptyReply) error {
+func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: StopCPUProfiler called")
 
 	return service.profiler.StopCPUProfiler()
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.EmptyReply) error {
+func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: MemoryProfile called")
 
 	return service.profiler.MemoryProfile()
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, reply *api.EmptyReply) error {
+func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: LockProfile called")
 
 	return service.profiler.LockProfile()
@@ -104,7 +104,7 @@ type AliasArgs struct {
 }
 
 // Alias attempts to alias an HTTP endpoint to a new name
-func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *api.EmptyReply) error {
+func (service *Admin) Alias(_ *http.Request, args *AliasArgs, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
@@ -121,7 +121,7 @@ type AliasChainArgs struct {
 }
 
 // AliasChain attempts to alias a chain to a new name
-func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *api.EmptyReply) error {
+func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
@@ -163,7 +163,7 @@ func (service *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs
 }
 
 // Stacktrace returns the current global stacktrace
-func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.EmptyReply) error {
+func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: Stacktrace called")
 
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
@@ -186,7 +186,7 @@ type SetLoggerLevelArgs struct {
 // Sets the display level of these loggers to args.LogLevel.
 // If args.DisplayLevel == nil, doesn't set the display level of these loggers.
 // If args.DisplayLevel != nil, must be a valid string representation of a log level.
-func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, reply *api.EmptyReply) error {
+func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, _ *api.EmptyReply) error {
 	service.Log.Debug("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
 
 	if args.LogLevel == nil && args.DisplayLevel == nil {
