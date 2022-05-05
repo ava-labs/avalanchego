@@ -436,7 +436,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				t.Fatalf("DeleteUser() failed: got %v, want %v", got, tt.want)
 			}
 
-			if err == nil && got == tt.want { // delete is successful
+			if err == nil { // delete is successful
 				if _, ok := ks.usernameToPassword[testUser]; ok {
 					t.Fatalf("DeleteUser() failed: expected the user %s should be delete from users map", testUser)
 				}
