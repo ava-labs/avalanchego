@@ -16,14 +16,14 @@ var _ Client = &client{}
 
 // Client interface for the Avalanche Platform Info API Endpoint
 type Client interface {
-	StartCPUProfiler(context.Context, ...rpc.Option) (bool, error)
-	StopCPUProfiler(context.Context, ...rpc.Option) (bool, error)
-	MemoryProfile(context.Context, ...rpc.Option) (bool, error)
-	LockProfile(context.Context, ...rpc.Option) (bool, error)
-	Alias(ctx context.Context, endpoint string, alias string, options ...rpc.Option) (bool, error)
-	AliasChain(ctx context.Context, chainID string, alias string, options ...rpc.Option) (bool, error)
+	StartCPUProfiler(context.Context, ...rpc.Option) error
+	StopCPUProfiler(context.Context, ...rpc.Option) error
+	MemoryProfile(context.Context, ...rpc.Option) error
+	LockProfile(context.Context, ...rpc.Option) error
+	Alias(ctx context.Context, endpoint string, alias string, options ...rpc.Option) error
+	AliasChain(ctx context.Context, chainID string, alias string, options ...rpc.Option) error
 	GetChainAliases(ctx context.Context, chainID string, options ...rpc.Option) ([]string, error)
-	Stacktrace(context.Context, ...rpc.Option) (bool, error)
+	Stacktrace(context.Context, ...rpc.Option) error
 	LoadVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error)
 }
 
@@ -39,46 +39,46 @@ func NewClient(uri string) Client {
 	}
 }
 
-func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, res, options...)
-	return res.Success, err
+	return err
 }
 
-func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, res, options...)
-	return res.Success, err
+	return err
 }
 
-func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, res, options...)
-	return res.Success, err
+	return err
 }
 
-func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "lockProfile", struct{}{}, res, options...)
-	return res.Success, err
+	return err
 }
 
-func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "alias", &AliasArgs{
 		Endpoint: endpoint,
 		Alias:    alias,
 	}, res, options...)
-	return res.Success, err
+	return err
 }
 
-func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
 		Chain: chain,
 		Alias: alias,
 	}, res, options...)
-	return res.Success, err
+	return err
 }
 
 func (c *client) GetChainAliases(ctx context.Context, chain string, options ...rpc.Option) ([]string, error) {
@@ -89,10 +89,10 @@ func (c *client) GetChainAliases(ctx context.Context, chain string, options ...r
 	return res.Aliases, err
 }
 
-func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
+func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) error {
+	res := &api.EmptyReply{}
 	err := c.requester.SendRequest(ctx, "stacktrace", struct{}{}, res, options...)
-	return res.Success, err
+	return err
 }
 
 func (c *client) LoadVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error) {
