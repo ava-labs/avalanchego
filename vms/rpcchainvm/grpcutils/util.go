@@ -186,3 +186,13 @@ func TimestampAsTime(ts *tspb.Timestamp) (time.Time, error) {
 func TimestampFromTime(time time.Time) *tspb.Timestamp {
 	return tspb.New(time)
 }
+
+// EnsureValidResponseCode ensures that the response code is valid otherwise it returns 500.
+func EnsureValidResponseCode(code int) int {
+	// Response code outside of this range is invalid and could panic.
+	// ref. https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+	if code < 100 || code > 599 {
+		return http.StatusInternalServerError
+	}
+	return code
+}
