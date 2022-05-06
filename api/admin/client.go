@@ -5,9 +5,11 @@ package admin
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -25,6 +27,9 @@ type Client interface {
 	GetChainAliases(ctx context.Context, chainID string, options ...rpc.Option) ([]string, error)
 	Stacktrace(context.Context, ...rpc.Option) (bool, error)
 	LoadVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error)
+	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) (bool, error)
+	GetLoggerLevel(ctx context.Context, loggerName string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
+	GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error)
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
@@ -99,4 +104,60 @@ func (c *client) LoadVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID
 	res := &LoadVMsReply{}
 	err := c.requester.SendRequest(ctx, "loadVMs", struct{}{}, res, options...)
 	return res.NewVMs, res.FailedVMs, err
+}
+
+func (c *client) SetLoggerLevel(
+	ctx context.Context,
+	loggerName,
+	logLevel,
+	displayLevel string,
+	options ...rpc.Option,
+) (bool, error) {
+	var (
+		res             = &api.SuccessResponse{}
+		logLevelArg     logging.Level
+		displayLevelArg logging.Level
+		err             error
+	)
+	if len(logLevel) > 0 {
+		logLevelArg, err = logging.ToLevel(logLevel)
+		if err != nil {
+			return false, fmt.Errorf("couldn't parse %q to log level", logLevel)
+		}
+	}
+	if len(displayLevel) > 0 {
+		displayLevelArg, err = logging.ToLevel(displayLevel)
+		if err != nil {
+			return false, fmt.Errorf("couldn't parse %q to log level", displayLevel)
+		}
+	}
+	err = c.requester.SendRequest(
+		ctx,
+		"setLoggerLevel",
+		&SetLoggerLevelArgs{
+			LoggerName:   loggerName,
+			LogLevel:     &logLevelArg,
+			DisplayLevel: &displayLevelArg,
+		},
+		res,
+		options...)
+	return res.Success, err
+}
+
+func (c *client) GetLoggerLevel(
+	ctx context.Context,
+	loggerName string,
+	options ...rpc.Option,
+) (map[string]LogAndDisplayLevels, error) {
+	res := &GetLoggerLevelReply{}
+	err := c.requester.SendRequest(ctx, "getLoggerLevel", &GetLoggerLevelArgs{
+		LoggerName: loggerName,
+	}, res, options...)
+	return res.LoggerLevels, err
+}
+
+func (c *client) GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error) {
+	var res interface{}
+	err := c.requester.SendRequest(ctx, "getConfig", struct{}{}, &res, options...)
+	return res, err
 }

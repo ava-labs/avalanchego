@@ -193,7 +193,7 @@ type SetLoggerLevelArgs struct {
 // If args.DisplayLevel == nil, doesn't set the display level of these loggers.
 // If args.DisplayLevel != nil, must be a valid string representation of a log level.
 func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
-	service.Log.Debug("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
+	service.Log.Debug("Admin: SetLoggerLevel called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
 
 	if args.LogLevel == nil && args.DisplayLevel == nil {
 		return errNoLogLevel
