@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
-// Interface compliance
 var _ Client = &client{}
 
 // Client interface for interacting with the P Chain endpoint
