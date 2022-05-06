@@ -5,7 +5,6 @@ package validators
 
 import (
 	"math"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -374,19 +373,14 @@ func TestSetValidatorSetCallback(t *testing.T) {
 
 	newValidators := []Validator{&validator{nodeID: vdr0, weight: weight0}, &validator{nodeID: vdr2, weight: weight2}}
 	callcount := 0
-	var lock sync.Mutex
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, weight uint64) {
-			lock.Lock()
-			defer lock.Unlock()
 			assert.Equal(t, vdr2, nodeID)
 			assert.Equal(t, weight2, weight)
 			callcount++
 		},
 		onRemoved: func(nodeID ids.NodeID, weight uint64) {
-			lock.Lock()
-			defer lock.Unlock()
 			assert.Equal(t, vdr1, nodeID)
 			assert.Equal(t, weight1, weight)
 			callcount++
