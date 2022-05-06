@@ -133,10 +133,8 @@ func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
-	loggingConfig := logging.DefaultConfig
-	if v.IsSet(LogsDirKey) {
-		loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
-	}
+	loggingConfig := logging.Config{}
+	loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
 	var err error
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
@@ -150,8 +148,13 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	if err != nil {
 		return loggingConfig, err
 	}
-	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.LogFormat, err = logging.ToFormat(v.GetString(LogFormatKey), os.Stdout.Fd())
 	loggingConfig.DisableWriterDisplaying = v.GetBool(LogDisableDisplayPluginLogsKey)
+	loggingConfig.MaxSize = int(v.GetUint(LogRotaterMaxSizeKey))
+	loggingConfig.MaxFiles = int(v.GetUint(LogRotaterMaxFilesKey))
+	loggingConfig.MaxAge = int(v.GetUint(LogRotaterMaxAgeKey))
+	loggingConfig.Compress = v.GetBool(LogRotaterCompressEnabledKey)
+
 	return loggingConfig, err
 }
 

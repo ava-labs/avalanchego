@@ -38,6 +38,7 @@ var (
 	defaultStakingPath     = filepath.Join(defaultDataDir, "staking")
 	defaultStakingKeyPath  = filepath.Join(defaultStakingPath, "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultStakingPath, "staker.crt")
+	defaultLogDirectory    = filepath.Join(defaultDataDir, "logs")
 	defaultConfigDir       = filepath.Join(defaultDataDir, "configs")
 	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
 	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
@@ -106,10 +107,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DBConfigContentKey, "", "Specifies base64 encoded database config content")
 
 	// Logging
-	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
+	fs.String(LogsDirKey, defaultLogDirectory, "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
-	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+	fs.String(LogFormatKey, "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
+	fs.Uint(LogRotaterMaxSizeKey, 8, "The maximum file size in megabytes of the log file before it gets rotated.")
+	fs.Uint(LogRotaterMaxFilesKey, 7, "The maximum number of old log files to retain. 0 means retain all old log files.")
+	fs.Uint(LogRotaterMaxAgeKey, 7, "The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files.")
+	fs.Bool(LogRotaterCompressEnabledKey, false, "Enables the compression of rotated log files through gzip.")
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
 	// Assertions

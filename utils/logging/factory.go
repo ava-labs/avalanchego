@@ -5,7 +5,14 @@ package logging
 
 import (
 	"fmt"
+	"os"
+	"path"
 	"sync"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var _ Factory = &factory{}
@@ -17,9 +24,6 @@ type Factory interface {
 
 	// MakeChain creates a new logger to log the events of chain [chainID]
 	MakeChain(chainID string) (Logger, error)
-
-	// MakeChainChild creates a new sublogger for a [name] module of a chain [chainId]
-	MakeChainChild(chainID string, name string) (Logger, error)
 
 	// SetLogLevels sets log levels for all loggers in factory with given logger name, level pairs.
 	SetLogLevel(name string, level Level) error
@@ -40,13 +44,19 @@ type Factory interface {
 	Close()
 }
 
+type logWrapper struct {
+	logger       Logger
+	displayLevel zap.AtomicLevel
+	logLevel     zap.AtomicLevel
+}
+
 type factory struct {
 	config Config
 	lock   sync.RWMutex
 
 	// For each logger created by this factory:
 	// Logger name --> the logger.
-	loggers map[string]Logger
+	loggers map[string]logWrapper
 }
 
 // NewFactory returns a new instance of a Factory producing loggers configured with
@@ -54,7 +64,7 @@ type factory struct {
 func NewFactory(config Config) Factory {
 	return &factory{
 		config:  config,
-		loggers: make(map[string]Logger),
+		loggers: make(map[string]logWrapper),
 	}
 }
 
@@ -63,8 +73,27 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	if _, ok := f.loggers[config.LoggerName]; ok {
 		return nil, fmt.Errorf("logger with name %q already exists", config.LoggerName)
 	}
-	l := newLog(config)
-	f.loggers[config.LoggerName] = l
+	consoleEnc := config.LogFormat.ConsoleEncoder()
+	fileEnc := config.LogFormat.FileEncoder()
+
+	consoleCore := NewWrappedCore(config.DisplayLevel, os.Stdout, consoleEnc)
+	consoleCore.WriterDisabled = config.DisableWriterDisplaying
+
+	rw := &lumberjack.Logger{
+		Filename:   path.Join(config.Directory, config.LoggerName+".log"),
+		MaxSize:    config.MaxSize,  // megabytes
+		MaxAge:     config.MaxAge,   // days
+		MaxBackups: config.MaxFiles, // files
+		Compress:   config.Compress,
+	}
+	fileCore := NewWrappedCore(config.LogLevel, rw, fileEnc)
+
+	l := NewLogger(config.Assertions, config.MsgPrefix, consoleCore, fileCore)
+	f.loggers[config.LoggerName] = logWrapper{
+		logger:       l,
+		displayLevel: consoleCore.AtomicLevel,
+		logLevel:     fileCore.AtomicLevel,
+	}
 	return l, nil
 }
 
@@ -87,16 +116,6 @@ func (f *factory) MakeChain(chainID string) (Logger, error) {
 	return f.makeLogger(config)
 }
 
-func (f *factory) MakeChainChild(chainID string, name string) (Logger, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	config := f.config
-	config.MsgPrefix = chainID + " Chain"
-	config.LoggerName = chainID + "." + name
-	return f.makeLogger(config)
-}
-
 func (f *factory) SetLogLevel(name string, level Level) error {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
@@ -105,7 +124,7 @@ func (f *factory) SetLogLevel(name string, level Level) error {
 	if !ok {
 		return fmt.Errorf("logger with name %q not found", name)
 	}
-	logger.SetLogLevel(level)
+	logger.logLevel.SetLevel(zapcore.Level(level))
 	return nil
 }
 
@@ -117,7 +136,7 @@ func (f *factory) SetDisplayLevel(name string, level Level) error {
 	if !ok {
 		return fmt.Errorf("logger with name %q not found", name)
 	}
-	logger.SetDisplayLevel(level)
+	logger.displayLevel.SetLevel(zapcore.Level(level))
 	return nil
 }
 
@@ -129,7 +148,7 @@ func (f *factory) GetLogLevel(name string) (Level, error) {
 	if !ok {
 		return -1, fmt.Errorf("logger with name %q not found", name)
 	}
-	return logger.GetLogLevel(), nil
+	return Level(logger.logLevel.Level()), nil
 }
 
 func (f *factory) GetDisplayLevel(name string) (Level, error) {
@@ -140,7 +159,7 @@ func (f *factory) GetDisplayLevel(name string) (Level, error) {
 	if !ok {
 		return -1, fmt.Errorf("logger with name %q not found", name)
 	}
-	return logger.GetDisplayLevel(), nil
+	return Level(logger.displayLevel.Level()), nil
 }
 
 func (f *factory) GetLoggerNames() []string {
@@ -158,8 +177,8 @@ func (f *factory) Close() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	for _, logger := range f.loggers {
-		logger.Stop()
+	for _, lw := range f.loggers {
+		lw.logger.Stop()
 	}
 	f.loggers = nil
 }
