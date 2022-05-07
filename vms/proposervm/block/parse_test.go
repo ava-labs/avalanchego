@@ -109,7 +109,7 @@ func TestParseUnsigned(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, ids.ShortID{})
 	assert.NoError(err)
 
 	builtBlockBytes := builtBlock.Bytes()

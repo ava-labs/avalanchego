@@ -30,6 +30,7 @@ func BuildUnsigned(
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
+	proposerID ids.ShortID,
 ) (SignedBlock, error) {
 	var block SignedBlock = &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
@@ -40,6 +41,7 @@ func BuildUnsigned(
 			Block:        blockBytes,
 		},
 		timestamp: timestamp,
+		proposer:  proposerID,
 	}
 
 	bytes, err := c.Marshal(version, &block)

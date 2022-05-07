@@ -289,6 +289,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		yBlock.Timestamp(),
 		0,
 		yBlockBytes,
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -490,6 +491,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		coreGenBlk.Timestamp(),
 		uint64(2000),
 		yBlock.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatalf("fail to manually build a block due to %s", err)
