@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
@@ -18,7 +19,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
-		addValidatorTx: &UnsignedAddValidatorTx{
+		addValidatorTx: &unsigned.AddValidatorTx{
 			Validator: validators.Validator{
 				Wght: node0Weight,
 			},
@@ -28,7 +29,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	nodeID1 := ids.GenerateTestNodeID()
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
-		addValidatorTx: &UnsignedAddValidatorTx{
+		addValidatorTx: &unsigned.AddValidatorTx{
 			Validator: validators.Validator{
 				Wght: node1Weight,
 			},
@@ -38,7 +39,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	nodeID2 := ids.GenerateTestNodeID()
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
-		addValidatorTx: &UnsignedAddValidatorTx{
+		addValidatorTx: &unsigned.AddValidatorTx{
 			Validator: validators.Validator{
 				Wght: node2Weight,
 			},
@@ -103,7 +104,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
 		validatorImpl: validatorImpl{
-			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+			subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
 				subnetID: {
 					Validator: validators.SubnetValidator{
 						Validator: validators.Validator{
@@ -119,7 +120,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
 		validatorImpl: validatorImpl{
-			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+			subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
 				subnetID: {
 					Validator: validators.SubnetValidator{
 						Validator: validators.Validator{
@@ -135,7 +136,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
 		validatorImpl: validatorImpl{
-			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+			subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
 				subnetID: {
 					Validator: validators.SubnetValidator{
 						Validator: validators.Validator{

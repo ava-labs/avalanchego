@@ -12,6 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 const (
@@ -34,21 +37,21 @@ var (
 )
 
 type Mempool interface {
-	Add(tx *Tx) error
+	Add(tx *signed.Tx) error
 	Has(txID ids.ID) bool
-	Get(txID ids.ID) *Tx
+	Get(txID ids.ID) *signed.Tx
 
-	AddDecisionTx(tx *Tx)
-	AddProposalTx(tx *Tx)
+	AddDecisionTx(tx *signed.Tx)
+	AddProposalTx(tx *signed.Tx)
 
 	HasDecisionTxs() bool
 	HasProposalTx() bool
 
-	RemoveDecisionTxs(txs []*Tx)
-	RemoveProposalTx(tx *Tx)
+	RemoveDecisionTxs(txs []*signed.Tx)
+	RemoveProposalTx(tx *signed.Tx)
 
-	PopDecisionTxs(maxTxsBytes int) []*Tx
-	PopProposalTx() *Tx
+	PopDecisionTxs(maxTxsBytes int) []*signed.Tx
+	PopProposalTx() *signed.Tx
 
 	MarkDropped(txID ids.ID)
 	WasDropped(txID ids.ID) bool
@@ -118,29 +121,32 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 	}, nil
 }
 
-func (m *mempool) Add(tx *Tx) error {
+func (m *mempool) Add(tx *signed.Tx) error {
 	// Note: a previously dropped tx can be re-added
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 	if m.Has(txID) {
 		return errDuplicatedTx
 	}
-	if txBytes := tx.Bytes(); len(txBytes) > m.bytesAvailable {
+	if txBytes := tx.Unsigned.Bytes(); len(txBytes) > m.bytesAvailable {
 		return errMempoolFull
 	}
 
-	inputs := tx.InputIDs()
+	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
 		return errConflictingTx
 	}
 
-	switch tx.UnsignedTx.(type) {
-	case TimedTx:
+	switch tx.Unsigned.(type) {
+	case timed.Tx:
 		m.AddProposalTx(tx)
-	case UnsignedDecisionTx:
+	case *unsigned.CreateChainTx,
+		*unsigned.CreateSubnetTx,
+		*unsigned.ImportTx,
+		*unsigned.ExportTx:
 		m.AddDecisionTx(tx)
 	default:
 		m.unknownTxs.Inc()
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.UnsignedTx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
 	}
 
 	// Mark these UTXOs as consumed in the mempool
@@ -155,19 +161,19 @@ func (m *mempool) Has(txID ids.ID) bool {
 	return m.Get(txID) != nil
 }
 
-func (m *mempool) Get(txID ids.ID) *Tx {
+func (m *mempool) Get(txID ids.ID) *signed.Tx {
 	if tx := m.unissuedDecisionTxs.Get(txID); tx != nil {
 		return tx
 	}
 	return m.unissuedProposalTxs.Get(txID)
 }
 
-func (m *mempool) AddDecisionTx(tx *Tx) {
+func (m *mempool) AddDecisionTx(tx *signed.Tx) {
 	m.unissuedDecisionTxs.Add(tx)
 	m.register(tx)
 }
 
-func (m *mempool) AddProposalTx(tx *Tx) {
+func (m *mempool) AddProposalTx(tx *signed.Tx) {
 	m.unissuedProposalTxs.Add(tx)
 	m.register(tx)
 }
@@ -176,27 +182,27 @@ func (m *mempool) HasDecisionTxs() bool { return m.unissuedDecisionTxs.Len() > 0
 
 func (m *mempool) HasProposalTx() bool { return m.unissuedProposalTxs.Len() > 0 }
 
-func (m *mempool) RemoveDecisionTxs(txs []*Tx) {
+func (m *mempool) RemoveDecisionTxs(txs []*signed.Tx) {
 	for _, tx := range txs {
-		txID := tx.ID()
+		txID := tx.Unsigned.ID()
 		if m.unissuedDecisionTxs.Remove(txID) != nil {
 			m.deregister(tx)
 		}
 	}
 }
 
-func (m *mempool) RemoveProposalTx(tx *Tx) {
-	txID := tx.ID()
+func (m *mempool) RemoveProposalTx(tx *signed.Tx) {
+	txID := tx.Unsigned.ID()
 	if m.unissuedProposalTxs.Remove(txID) != nil {
 		m.deregister(tx)
 	}
 }
 
-func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*Tx {
-	var txs []*Tx
+func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*signed.Tx {
+	var txs []*signed.Tx
 	for m.unissuedDecisionTxs.Len() > 0 {
 		tx := m.unissuedDecisionTxs.Peek()
-		txBytes := tx.Bytes()
+		txBytes := tx.Unsigned.Bytes()
 		if len(txBytes) > maxTxsBytes {
 			return txs
 		}
@@ -209,7 +215,7 @@ func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*Tx {
 	return txs
 }
 
-func (m *mempool) PopProposalTx() *Tx {
+func (m *mempool) PopProposalTx() *signed.Tx {
 	tx := m.unissuedProposalTxs.RemoveTop()
 	m.deregister(tx)
 	return tx
@@ -224,17 +230,17 @@ func (m *mempool) WasDropped(txID ids.ID) bool {
 	return exist
 }
 
-func (m *mempool) register(tx *Tx) {
-	txBytes := tx.Bytes()
+func (m *mempool) register(tx *signed.Tx) {
+	txBytes := tx.Unsigned.Bytes()
 	m.bytesAvailable -= len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 }
 
-func (m *mempool) deregister(tx *Tx) {
-	txBytes := tx.Bytes()
+func (m *mempool) deregister(tx *signed.Tx) {
+	txBytes := tx.Unsigned.Bytes()
 	m.bytesAvailable += len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 
-	inputs := tx.InputIDs()
+	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
 }

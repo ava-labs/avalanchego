@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
@@ -30,7 +32,9 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
 		t.Fatal(err)
-	} else if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 	}
 }
@@ -52,7 +56,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 	if err != nil {
 		t.Fatal(err)
-	} else if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 	if err := vm.Shutdown(); err != nil {
@@ -76,7 +82,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Proposes advancing timestamp to 1 second after genesis validators stop validating
 	if tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second)); err != nil {
 		t.Fatal(err)
-	} else if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
@@ -106,7 +114,12 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommit, onAbort, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+
+	statefulTx, err := MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	onCommit, onAbort, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +129,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if validator.AddValidatorTx().ID() != addPendingValidatorTx.ID() {
+	if validator.AddValidatorTx().ID() != addPendingValidatorTx.Unsigned.ID() {
 		t.Fatalf("Added the wrong tx to the validator set")
 	}
 
@@ -143,7 +156,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vdr.ID() != addPendingValidatorTx.ID() {
+	if vdr.ID() != addPendingValidatorTx.Unsigned.ID() {
 		t.Fatalf("Added the wrong tx to the pending validator set")
 	}
 
@@ -329,7 +342,11 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				onCommitState, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+				statefulTx, err := MakeStatefulTx(tx)
+				if err != nil {
+					t.Fatalf("couldn't make stateful tx: %s", err)
+				}
+				onCommitState, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 				assert.NoError(err)
 				onCommitState.Apply(vm.internalState)
 			}
@@ -440,7 +457,12 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitState, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+
+	statefulTx, err := MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	onCommitState, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +533,11 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			onCommitState, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+			statefulTx, err := MakeStatefulTx(tx)
+			if err != nil {
+				t.Fatalf("couldn't make stateful tx: %s", err)
+			}
+			onCommitState, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -544,7 +570,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
-	onCommit, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	statefulTx, err := MakeStatefulTx(tx)
+	assert.NoError(t, err)
+	onCommit, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(t, err)
 	onCommit.Apply(vm.internalState)
 	assert.NoError(t, vm.internalState.Commit())
@@ -576,7 +604,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Advance Time
 	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
-	onCommit, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	statefulTx, err = MakeStatefulTx(tx)
+	assert.NoError(t, err)
+	onCommit, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(t, err)
 	onCommit.Apply(vm.internalState)
 	assert.NoError(t, vm.internalState.Commit())
@@ -607,7 +637,9 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
-	onCommit, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	statefulTx, err := MakeStatefulTx(tx)
+	assert.NoError(t, err)
+	onCommit, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(t, err)
 	onCommit.Apply(vm.internalState)
 	assert.NoError(t, vm.internalState.Commit())
@@ -639,7 +671,9 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Advance Time
 	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
-	onCommit, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx)
+	statefulTx, err = MakeStatefulTx(tx)
+	assert.NoError(t, err)
+	onCommit, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
 	assert.NoError(t, err)
 	onCommit.Apply(vm.internalState)
 	assert.NoError(t, vm.internalState.Commit())
@@ -668,13 +702,15 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tx.UnsignedTx.(UnsignedProposalTx).InitiallyPrefersCommit(vm) {
+	statefulTx, err := MakeStatefulTx(tx)
+	assert.NoError(t, err)
+	if statefulTx.(StatefulProposalTx).InitiallyPrefersCommit(vm) {
 		t.Fatal("should not prefer to commit this tx because its proposed timestamp is outside of sync bound")
 	}
 
 	// advance wall clock time
 	vm.clock.Set(defaultGenesisTime.Add(1 * time.Second))
-	if !tx.UnsignedTx.(UnsignedProposalTx).InitiallyPrefersCommit(vm) {
+	if !statefulTx.(StatefulProposalTx).InitiallyPrefersCommit(vm) {
 		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
 	}
 }
@@ -700,15 +736,20 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var unmarshaledTx Tx
+	var unmarshaledTx signed.Tx
 	if _, err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
-	} else if tx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time {
+	} else if tx.Unsigned.(*unsigned.AdvanceTimeTx).Time != unmarshaledTx.Unsigned.(*unsigned.AdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")
 	}
 }
 
-func addPendingValidator(vm *VM, startTime time.Time, endTime time.Time, nodeID ids.NodeID, keys []*crypto.PrivateKeySECP256K1R) (*Tx, error) {
+func addPendingValidator(
+	vm *VM,
+	startTime, endTime time.Time,
+	nodeID ids.NodeID,
+	keys []*crypto.PrivateKeySECP256K1R,
+) (*signed.Tx, error) {
 	addPendingValidatorTx, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),

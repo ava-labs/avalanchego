@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -34,14 +35,14 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 	}
 
 	for _, chain := range genesis.Chains {
-		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
+		uChain := chain.Unsigned.(*unsigned.CreateChainTx)
 		switch uChain.VMID {
 		case constants.AVMID:
-			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "avm"}
-			chainAliases[chain.ID()] = GetXChainAliases()
+			apiAliases[constants.ChainAliasPrefix+chain.Unsigned.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "avm"}
+			chainAliases[chain.Unsigned.ID()] = GetXChainAliases()
 		case constants.EVMID:
-			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
-			chainAliases[chain.ID()] = GetCChainAliases()
+			apiAliases[constants.ChainAliasPrefix+chain.Unsigned.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
+			chainAliases[chain.Unsigned.ID()] = GetCChainAliases()
 		}
 	}
 	return apiAliases, chainAliases, nil

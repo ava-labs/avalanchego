@@ -9,8 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 const (
@@ -31,7 +30,7 @@ func init() {
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{c, gc} {
+	for _, c := range []linearcodec.Codec{c, gc} {
 		errs.Add(
 			c.RegisterType(&ProposalBlock{}),
 			c.RegisterType(&AbortBlock{}),
@@ -39,32 +38,7 @@ func init() {
 			c.RegisterType(&StandardBlock{}),
 			c.RegisterType(&AtomicBlock{}),
 
-			// The Fx is registered here because this is the same place it is
-			// registered in the AVM. This ensures that the typeIDs match up for
-			// utxos in shared memory.
-			c.RegisterType(&secp256k1fx.TransferInput{}),
-			c.RegisterType(&secp256k1fx.MintOutput{}),
-			c.RegisterType(&secp256k1fx.TransferOutput{}),
-			c.RegisterType(&secp256k1fx.MintOperation{}),
-			c.RegisterType(&secp256k1fx.Credential{}),
-			c.RegisterType(&secp256k1fx.Input{}),
-			c.RegisterType(&secp256k1fx.OutputOwners{}),
-
-			c.RegisterType(&UnsignedAddValidatorTx{}),
-			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
-			c.RegisterType(&UnsignedAddDelegatorTx{}),
-
-			c.RegisterType(&UnsignedCreateChainTx{}),
-			c.RegisterType(&UnsignedCreateSubnetTx{}),
-
-			c.RegisterType(&UnsignedImportTx{}),
-			c.RegisterType(&UnsignedExportTx{}),
-
-			c.RegisterType(&UnsignedAdvanceTimeTx{}),
-			c.RegisterType(&UnsignedRewardValidatorTx{}),
-
-			c.RegisterType(&stakeables.LockIn{}),
-			c.RegisterType(&stakeables.LockOut{}),
+			unsigned.RegisterUnsignedTxsTypes(c),
 		)
 	}
 	errs.Add(

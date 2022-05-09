@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -136,7 +137,7 @@ func TestNewImportTx(t *testing.T) {
 			}
 			assert.NoError(err)
 
-			unsignedTx := tx.UnsignedTx.(*UnsignedImportTx)
+			unsignedTx := tx.Unsigned.(*unsigned.ImportTx)
 			assert.NotEmpty(unsignedTx.ImportedInputs)
 			assert.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
 
@@ -169,7 +170,9 @@ func TestNewImportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			err = tx.UnsignedTx.SemanticVerify(vm, fakedState, tx)
+			statefulTx, err := MakeStatefulTx(tx)
+			assert.NoError(err)
+			err = statefulTx.SemanticVerify(vm, fakedState, tx)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

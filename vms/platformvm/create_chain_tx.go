@@ -4,98 +4,39 @@
 package platformvm
 
 import (
-	"errors"
 	"fmt"
 	"time"
-	"unicode"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var (
-	errInvalidVMID             = errors.New("invalid VM ID")
-	errFxIDsNotSortedAndUnique = errors.New("feature extensions IDs must be sorted and unique")
-	errNameTooLong             = errors.New("name too long")
-	errGenesisTooLong          = errors.New("genesis too long")
-	errIllegalNameCharacter    = errors.New("illegal name character")
-
-	_ UnsignedDecisionTx = &UnsignedCreateChainTx{}
-)
+var _ UnsignedDecisionTx = &StatefulCreateChainTx{}
 
 const (
 	maxNameLen    = 128
 	maxGenesisLen = units.MiB
 )
 
-// UnsignedCreateChainTx is an unsigned CreateChainTx
-type UnsignedCreateChainTx struct {
-	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
-	// ID of the Subnet that validates this blockchain
-	SubnetID ids.ID `serialize:"true" json:"subnetID"`
-	// A human readable name for the chain; need not be unique
-	ChainName string `serialize:"true" json:"chainName"`
-	// ID of the VM running on the new chain
-	VMID ids.ID `serialize:"true" json:"vmID"`
-	// IDs of the feature extensions running on the new chain
-	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
-	// Byte representation of genesis state of the new chain
-	GenesisData []byte `serialize:"true" json:"genesisData"`
-	// Authorizes this blockchain to be added to this subnet
-	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
+// StatefulCreateChainTx is an unsigned CreateChainTx
+type StatefulCreateChainTx struct {
+	*unsigned.CreateChainTx `serialize:"true"`
 }
 
-func (tx *UnsignedCreateChainTx) InputUTXOs() ids.Set { return nil }
+func (tx *StatefulCreateChainTx) InputUTXOs() ids.Set { return nil }
 
-func (tx *UnsignedCreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+func (tx *StatefulCreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	return ids.ID{}, nil, nil
 }
 
-func (tx *UnsignedCreateChainTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
-		return nil
-	case tx.SubnetID == constants.PrimaryNetworkID:
-		return errDSCantValidate
-	case len(tx.ChainName) > maxNameLen:
-		return errNameTooLong
-	case tx.VMID == ids.Empty:
-		return errInvalidVMID
-	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
-		return errFxIDsNotSortedAndUnique
-	case len(tx.GenesisData) > maxGenesisLen:
-		return errGenesisTooLong
-	}
-
-	for _, r := range tx.ChainName {
-		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
-			return errIllegalNameCharacter
-		}
-	}
-
-	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
-		return err
-	}
-	if err := tx.SubnetAuth.Verify(); err != nil {
-		return err
-	}
-
-	tx.syntacticallyVerified = true
-	return nil
-}
-
 // Attempts to verify this transaction with the provided state.
-func (tx *UnsignedCreateChainTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (tx *StatefulCreateChainTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
 	vs := newVersionedState(
 		parentState,
 		parentState.CurrentStakerChainState(),
@@ -106,10 +47,10 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(vm *VM, parentState MutableState
 }
 
 // Execute this transaction.
-func (tx *UnsignedCreateChainTx) Execute(
+func (tx *StatefulCreateChainTx) Execute(
 	vm *VM,
 	vs VersionedState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (
 	func() error,
 	error,
@@ -143,7 +84,7 @@ func (tx *UnsignedCreateChainTx) Execute(
 		return nil, err
 	}
 
-	subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
+	subnet, ok := subnetIntf.Unsigned.(*unsigned.CreateSubnetTx)
 	if !ok {
 		return nil, fmt.Errorf("%s isn't a subnet", tx.SubnetID)
 	}
@@ -176,7 +117,7 @@ func (vm *VM) newCreateChainTx(
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*signed.Tx, error) {
 	timestamp := vm.internalState.GetTimestamp()
 	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
 	ins, outs, _, signers, err := vm.stake(keys, 0, createBlockchainTxFee, changeAddr)
@@ -194,8 +135,8 @@ func (vm *VM) newCreateChainTx(
 	ids.SortIDs(fxIDs)
 
 	// Create the tx
-	utx := &UnsignedCreateChainTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	utx := &unsigned.CreateChainTx{
+		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
@@ -208,7 +149,7 @@ func (vm *VM) newCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &signed.Tx{Unsigned: utx}
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}

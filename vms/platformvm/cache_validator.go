@@ -5,26 +5,27 @@ package platformvm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var _ validator = &validatorImpl{}
 
 type validator interface {
-	Delegators() []*UnsignedAddDelegatorTx
-	SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx
+	Delegators() []*unsigned.AddDelegatorTx
+	SubnetValidators() map[ids.ID]*unsigned.AddSubnetValidatorTx
 }
 
 type validatorImpl struct {
 	// sorted in order of next operation, either addition or removal.
-	delegators []*UnsignedAddDelegatorTx
+	delegators []*unsigned.AddDelegatorTx
 	// maps subnetID to tx
-	subnets map[ids.ID]*UnsignedAddSubnetValidatorTx
+	subnets map[ids.ID]*unsigned.AddSubnetValidatorTx
 }
 
-func (v *validatorImpl) Delegators() []*UnsignedAddDelegatorTx {
+func (v *validatorImpl) Delegators() []*unsigned.AddDelegatorTx {
 	return v.delegators
 }
 
-func (v *validatorImpl) SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx {
+func (v *validatorImpl) SubnetValidators() map[ids.ID]*unsigned.AddSubnetValidatorTx {
 	return v.subnets
 }

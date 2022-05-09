@@ -1,0 +1,44 @@
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package unsigned
+
+import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+)
+
+var (
+	_ Tx = &RewardValidatorTx{}
+
+	ErrWrongTxType = errors.New("wrong transaction type")
+)
+
+// RewardValidatorTx is a transaction that represents a proposal to
+// remove a validator that is currently validating from the validator set.
+//
+// If this transaction is accepted and the next block accepted is a Commit
+// block, the validator is removed and the address that the validator specified
+// receives the staked AVAX as well as a validating reward.
+//
+// If this transaction is accepted and the next block accepted is an Abort
+// block, the validator is removed and the address that the validator specified
+// receives the staked AVAX but no reward.
+type RewardValidatorTx struct {
+	avax.Metadata
+
+	// ID of the tx that created the delegator/validator being removed/rewarded
+	TxID ids.ID `serialize:"true" json:"txID"`
+
+	// Marks if this validator should be rewarded according to this node.
+	ShouldPreferCommit bool
+}
+
+func (tx *RewardValidatorTx) InitCtx(*snow.Context) {}
+
+func (tx *RewardValidatorTx) InputIDs() ids.Set { return nil }
+
+func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error { return nil }

@@ -7,54 +7,35 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
+var _ StatefulProposalTx = &StatefulAdvanceTimeTx{}
 
-// UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
+// StatefulAdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
 // followed by a commit block) the staker set is also updated accordingly.
 // It must be that:
 //   * proposed timestamp > [current chain time]
 //   * proposed timestamp <= [time for next staker set change]
-type UnsignedAdvanceTimeTx struct {
-	avax.Metadata
-
-	// Unix time this block proposes increasing the timestamp to
-	Time uint64 `serialize:"true" json:"time"`
-}
-
-func (tx *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
-
-// Timestamp returns the time this block is proposing the chain should be set to
-func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
-	return time.Unix(int64(tx.Time), 0)
-}
-
-func (tx *UnsignedAdvanceTimeTx) InputIDs() ids.Set {
-	return nil
-}
-
-func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(*snow.Context) error {
-	return nil
+type StatefulAdvanceTimeTx struct {
+	*unsigned.AdvanceTimeTx `serialize:"true"`
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *UnsignedAdvanceTimeTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (tx *StatefulAdvanceTimeTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
 	_, _, err := tx.Execute(vm, parentState, stx)
 	return err
 }
 
 // Execute this transaction.
-func (tx *UnsignedAdvanceTimeTx) Execute(
+func (tx *StatefulAdvanceTimeTx) Execute(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -106,7 +87,7 @@ func (tx *UnsignedAdvanceTimeTx) Execute(
 	pendingStakers := parentState.PendingStakerChainState()
 	toAddValidatorsWithRewardToCurrent := []*validatorReward(nil)
 	toAddDelegatorsWithRewardToCurrent := []*validatorReward(nil)
-	toAddWithoutRewardToCurrent := []*Tx(nil)
+	toAddWithoutRewardToCurrent := []*signed.Tx(nil)
 	numToRemoveFromPending := 0
 
 	// Add to the staker set any pending stakers whose start time is at or
@@ -114,8 +95,8 @@ func (tx *UnsignedAdvanceTimeTx) Execute(
 	// of increasing startTime
 pendingStakerLoop:
 	for _, tx := range pendingStakers.Stakers() {
-		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
+		switch staker := tx.Unsigned.(type) {
+		case *unsigned.AddDelegatorTx:
 			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
@@ -135,7 +116,7 @@ pendingStakerLoop:
 				potentialReward: r,
 			})
 			numToRemoveFromPending++
-		case *UnsignedAddValidatorTx:
+		case *unsigned.AddValidatorTx:
 			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
@@ -155,7 +136,7 @@ pendingStakerLoop:
 				potentialReward: r,
 			})
 			numToRemoveFromPending++
-		case *UnsignedAddSubnetValidatorTx:
+		case *unsigned.AddSubnetValidatorTx:
 			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
@@ -167,7 +148,7 @@ pendingStakerLoop:
 			}
 			numToRemoveFromPending++
 		default:
-			return nil, nil, fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
+			return nil, nil, fmt.Errorf("expected validator but got %T", tx.Unsigned)
 		}
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
@@ -179,14 +160,14 @@ pendingStakerLoop:
 	// before the new timestamp
 currentStakerLoop:
 	for _, tx := range currentStakers.Stakers() {
-		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddSubnetValidatorTx:
+		switch staker := tx.Unsigned.(type) {
+		case *unsigned.AddSubnetValidatorTx:
 			if staker.EndTime().After(txTimestamp) {
 				break currentStakerLoop
 			}
 
 			numToRemoveFromCurrent++
-		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
+		case *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
 		default:
@@ -215,7 +196,7 @@ currentStakerLoop:
 
 // InitiallyPrefersCommit returns true if the proposed time is at
 // or before the current time plus the synchrony bound
-func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx *StatefulAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 	txTimestamp := tx.Timestamp()
 	localTimestamp := vm.clock.Time()
 	localTimestampPlusSync := localTimestamp.Add(syncBound)
@@ -224,9 +205,11 @@ func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
-func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*Tx, error) {
-	tx := &Tx{UnsignedTx: &UnsignedAdvanceTimeTx{
-		Time: uint64(timestamp.Unix()),
-	}}
+func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*signed.Tx, error) {
+	tx := &signed.Tx{
+		Unsigned: &unsigned.AdvanceTimeTx{
+			Time: uint64(timestamp.Unix()),
+		},
+	}
 	return tx, tx.Sign(Codec, nil)
 }

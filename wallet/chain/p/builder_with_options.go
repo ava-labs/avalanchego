@@ -56,7 +56,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
-) (*platformvm.UnsignedAddValidatorTx, error) {
+) (*platformvm.StatefulAddValidatorTx, error) {
 	return b.Builder.NewAddValidatorTx(
 		validator,
 		rewardsOwner,
@@ -68,7 +68,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 func (b *builderWithOptions) NewAddSubnetValidatorTx(
 	validator *validators.SubnetValidator,
 	options ...common.Option,
-) (*platformvm.UnsignedAddSubnetValidatorTx, error) {
+) (*platformvm.StatefulAddSubnetValidatorTx, error) {
 	return b.Builder.NewAddSubnetValidatorTx(
 		validator,
 		common.UnionOptions(b.options, options)...,
@@ -79,7 +79,7 @@ func (b *builderWithOptions) NewAddDelegatorTx(
 	validator *validators.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*platformvm.UnsignedAddDelegatorTx, error) {
+) (*platformvm.StatefulAddDelegatorTx, error) {
 	return b.Builder.NewAddDelegatorTx(
 		validator,
 		rewardsOwner,
@@ -94,7 +94,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 	fxIDs []ids.ID,
 	chainName string,
 	options ...common.Option,
-) (*platformvm.UnsignedCreateChainTx, error) {
+) (*platformvm.StatefulCreateChainTx, error) {
 	return b.Builder.NewCreateChainTx(
 		subnetID,
 		genesis,
@@ -108,7 +108,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 func (b *builderWithOptions) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*platformvm.UnsignedCreateSubnetTx, error) {
+) (*platformvm.StatefulCreateSubnetTx, error) {
 	return b.Builder.NewCreateSubnetTx(
 		owner,
 		common.UnionOptions(b.options, options)...,
@@ -119,7 +119,7 @@ func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*platformvm.UnsignedImportTx, error) {
+) (*platformvm.StatefulImportTx, error) {
 	return b.Builder.NewImportTx(
 		sourceChainID,
 		to,
@@ -131,7 +131,7 @@ func (b *builderWithOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (*platformvm.UnsignedExportTx, error) {
+) (*platformvm.StatefulExportTx, error) {
 	return b.Builder.NewExportTx(
 		chainID,
 		outputs,

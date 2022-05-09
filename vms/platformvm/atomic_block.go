@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
 var (
@@ -24,7 +25,7 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx signed.Tx `serialize:"true" json:"tx"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
@@ -35,7 +36,7 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
@@ -43,8 +44,8 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
-	ab.Tx.Initialize(unsignedBytes, signedBytes)
-	ab.Tx.InitCtx(vm.ctx)
+	ab.Tx.Unsigned.Initialize(unsignedBytes, signedBytes)
+	ab.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
 
@@ -76,11 +77,15 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	statefulTx, err := MakeStatefulTx(&ab.Tx)
+	if err != nil {
+		return err
+	}
+	atomicTx, ok := statefulTx.(UnsignedAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}
-	ab.inputs = tx.InputUTXOs()
+	ab.inputs = atomicTx.InputUTXOs()
 
 	parentIntf, err := ab.parentBlock()
 	if err != nil {
@@ -115,9 +120,9 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept, err := tx.AtomicExecute(ab.vm, parentState, &ab.Tx)
+	onAccept, err := atomicTx.AtomicExecute(ab.vm, parentState, &ab.Tx)
 	if err != nil {
-		txID := tx.ID()
+		txID := atomicTx.ID()
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
@@ -126,7 +131,7 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptState = onAccept
 	ab.timestamp = onAccept.GetTimestamp()
 
-	ab.vm.blockBuilder.RemoveDecisionTxs([]*Tx{&ab.Tx})
+	ab.vm.blockBuilder.RemoveDecisionTxs([]*signed.Tx{&ab.Tx})
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
@@ -145,7 +150,11 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
 	}
 
-	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	statefulTx, err := MakeStatefulTx(&ab.Tx)
+	if err != nil {
+		return err
+	}
+	atomicTx, ok := statefulTx.(UnsignedAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -163,10 +172,10 @@ func (ab *AtomicBlock) Accept() error {
 		)
 	}
 
-	if err := tx.AtomicAccept(ab.vm.ctx, batch); err != nil {
+	if err := atomicTx.AtomicAccept(ab.vm.ctx, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
-			tx.ID(),
+			atomicTx.ID(),
 			blkID,
 			err,
 		)
@@ -200,7 +209,7 @@ func (ab *AtomicBlock) Reject() error {
 	if err := ab.vm.blockBuilder.AddVerifiedTx(&ab.Tx); err != nil {
 		ab.vm.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
-			ab.Tx.ID(),
+			ab.Tx.Unsigned.ID(),
 			err,
 		)
 	}
@@ -209,7 +218,7 @@ func (ab *AtomicBlock) Reject() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{

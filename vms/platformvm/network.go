@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
 const (
@@ -88,19 +89,19 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		return nil
 	}
 
-	tx := &Tx{}
+	tx := &signed.Tx{}
 	if _, err := Codec.Unmarshal(msg.Tx, tx); err != nil {
 		n.log.Verbo("AppGossip provided invalid tx: %s", err)
 		return nil
 	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		n.log.Warn("AppGossip failed to marshal unsigned tx: %s", err)
 		return nil
 	}
-	tx.Initialize(unsignedBytes, msg.Tx)
+	tx.Unsigned.Initialize(unsignedBytes, msg.Tx)
 
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
@@ -123,8 +124,8 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	return nil
 }
 
-func (n *network) GossipTx(tx *Tx) error {
-	txID := tx.ID()
+func (n *network) GossipTx(tx *signed.Tx) error {
+	txID := tx.Unsigned.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := n.recentTxs.Get(txID); has {
 		return nil
@@ -134,7 +135,7 @@ func (n *network) GossipTx(tx *Tx) error {
 	n.log.Debug("gossiping tx %s", txID)
 
 	msg := &message.Tx{
-		Tx: tx.Bytes(),
+		Tx: tx.Unsigned.Bytes(),
 	}
 	msgBytes, err := message.Build(msg)
 	if err != nil {

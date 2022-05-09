@@ -27,7 +27,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 
 	// add a tx to it
 	tx := getValidTx(vm, t)
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 
 	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
@@ -42,7 +42,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blk, ok := blkIntf.(*StandardBlock)
 	assert.True(ok, "expected standard block")
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
-	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
+	assert.Equal(txID, blk.Txs[0].Unsigned.ID(), "standard block does not include expected transaction")
 
 	has = mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
@@ -68,13 +68,13 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	tx := getValidTx(vm, t)
 
 	// shortcut to simulated almost filled mempool
-	mempool.bytesAvailable = len(tx.Bytes()) - 1
+	mempool.bytesAvailable = len(tx.Unsigned.Bytes()) - 1
 
 	err := blockBuilder.AddVerifiedTx(tx)
 	assert.Equal(errMempoolFull, err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
-	mempool.bytesAvailable = len(tx.Bytes())
+	mempool.bytesAvailable = len(tx.Unsigned.Bytes())
 
 	err = blockBuilder.AddVerifiedTx(tx)
 	assert.NoError(err, "should have added tx to mempool")
@@ -96,7 +96,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 
 	// create candidate tx
 	tx := getValidTx(vm, t)
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 
 	mempool.MarkDropped(txID)
 	assert.True(mempool.WasDropped(txID))

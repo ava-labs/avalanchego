@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -245,8 +246,8 @@ func TestGetTxStatus(t *testing.T) {
 	}
 	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
 
-	arg := &GetTxStatusArgs{TxID: tx.ID()}
-	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
+	arg := &GetTxStatusArgs{TxID: tx.Unsigned.ID()}
+	argIncludeReason := &GetTxStatusArgs{TxID: tx.Unsigned.ID(), IncludeReason: true}
 
 	var resp GetTxStatusResponse
 	err = service.GetTxStatus(nil, arg, &resp)
@@ -307,13 +308,13 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service) (*Tx, error)
+		createTx    func(service *Service) (*signed.Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(service *Service) (*Tx, error) {
+			func(service *Service) (*signed.Tx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
@@ -327,7 +328,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func(service *Service) (*Tx, error) {
+			func(service *Service) (*signed.Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
@@ -342,7 +343,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func(service *Service) (*Tx, error) {
+			func(service *Service) (*signed.Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,
@@ -365,7 +366,7 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 			arg := &api.GetTxArgs{
-				TxID:     tx.ID(),
+				TxID:     tx.Unsigned.ID(),
 				Encoding: encoding,
 			}
 			var response api.GetTxReply
@@ -399,7 +400,7 @@ func TestGetTx(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
-					if !bytes.Equal(responseTxBytes, tx.Bytes()) {
+					if !bytes.Equal(responseTxBytes, tx.Unsigned.Bytes()) {
 						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
 					}
 				case formatting.JSON:

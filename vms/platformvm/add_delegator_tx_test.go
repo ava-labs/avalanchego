@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
@@ -32,7 +33,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	nodeID := ids.NodeID(rewardAddress)
 
 	// Case : tx is nil
-	var unsignedTx *UnsignedAddDelegatorTx
+	var unsignedTx *unsigned.AddDelegatorTx
 	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
@@ -50,10 +51,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).NetworkID++
+	tx.Unsigned.(*unsigned.AddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddDelegatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -68,7 +69,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(vm.ctx); err != nil {
+	} else if err := tx.Unsigned.SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -331,7 +332,11 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(vm)
 			}
-			if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
+			statefulTx, err := MakeStatefulTx(tx)
+			if err != nil {
+				t.Fatalf("couldn't make stateful tx: %s", err)
+			}
+			if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {
 				t.Fatalf("expected test to error but got none")

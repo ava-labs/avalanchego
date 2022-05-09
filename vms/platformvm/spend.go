@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -295,7 +296,7 @@ func (vm *VM) authorize(
 			err,
 		)
 	}
-	subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
 	if !ok {
 		return nil, nil, errWrongTxType
 	}
@@ -328,7 +329,7 @@ func (vm *VM) authorize(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	utxoDB UTXOGetter,
-	tx UnsignedTx,
+	tx StatefulTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -358,7 +359,7 @@ func (vm *VM) semanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx UnsignedTx,
+	tx StatefulTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,

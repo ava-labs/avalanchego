@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -33,7 +34,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	nodeID := key.PublicKey().Address()
 
 	// Case: tx is nil
-	var unsignedTx *UnsignedAddValidatorTx
+	var unsignedTx *unsigned.AddValidatorTx
 	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
@@ -53,10 +54,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).NetworkID++
+	tx.Unsigned.(*unsigned.AddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -75,7 +76,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake = []*avax.TransferableOutput{{
+	tx.Unsigned.(*unsigned.AddValidatorTx).Stake = []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: vm.MinValidatorStake,
@@ -87,8 +88,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		},
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
 
@@ -107,14 +108,14 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).RewardsOwner = &secp256k1fx.OutputOwners{
+	tx.Unsigned.(*unsigned.AddValidatorTx).RewardsOwner = &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
 		Addrs:     nil,
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
 	}
 
@@ -133,10 +134,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Shares++ // 1 more than max amount
+	tx.Unsigned.(*unsigned.AddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
 
@@ -153,7 +154,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticVerify(vm.ctx); err != nil {
+	} else if err := tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -187,7 +188,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too early")
 	}
 
@@ -203,7 +206,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too far in the future")
 	}
 
@@ -219,7 +224,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because validator already validating")
 	}
 
@@ -252,7 +259,11 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	statefulTx, err := MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
 	}
 
@@ -278,7 +289,11 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.internalState.DeleteUTXO(utxoID)
 	}
 	// Now keys[0] has no funds
-	if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	statefulTx, err = MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because tx fee paying key has no funds")
 	}
 }
