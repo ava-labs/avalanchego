@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	_ UnsignedAtomicTx = &StatefulImportTx{}
+	_ StatefulAtomicTx = &StatefulImportTx{}
 
 	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")

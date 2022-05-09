@@ -20,10 +20,10 @@ import (
 )
 
 var (
+	_ StatefulProposalTx = &StatefulRewardValidatorTx{}
+
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 	errWrongTxType         = errors.New("wrong transaction type")
-
-	_ StatefulProposalTx = &StatefulRewardValidatorTx{}
 )
 
 // StatefulRewardValidatorTx is a transaction that represents a proposal to

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -134,7 +135,7 @@ type Wallet interface {
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
-		utx platformvm.StatefulTx,
+		utx unsigned.Tx,
 		options ...common.Option,
 	) (ids.ID, error)
 
@@ -268,7 +269,7 @@ func (w *wallet) IssueExportTx(
 }
 
 func (w *wallet) IssueUnsignedTx(
-	utx platformvm.StatefulTx,
+	utx unsigned.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)

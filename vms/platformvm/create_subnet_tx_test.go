@@ -84,7 +84,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			statefulTx, err := MakeStatefulTx(tx)
 			assert.NoError(err)
-			decisionTx, ok := statefulTx.(UnsignedDecisionTx)
+			decisionTx, ok := statefulTx.(StatefulDecisionTx)
 			assert.True(ok)
 			_, err = decisionTx.Execute(vm, vs, tx)
 			assert.Equal(test.expectsError, err != nil)

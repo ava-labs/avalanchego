@@ -336,7 +336,11 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			if err != nil {
 				t.Fatalf("couldn't make stateful tx: %s", err)
 			}
-			if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
+			proposalTx, ok := statefulTx.(StatefulProposalTx)
+			if !ok {
+				t.Fatalf("stateful tx isn't proposal one")
+			}
+			if _, _, err := proposalTx.Execute(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {
 				t.Fatalf("expected test to error but got none")

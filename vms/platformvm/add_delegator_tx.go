@@ -22,12 +22,12 @@ import (
 )
 
 var (
+	_ StatefulProposalTx = &StatefulAddDelegatorTx{}
+	_ timed.Tx           = &StatefulAddDelegatorTx{}
+
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
 	errOverDelegated   = errors.New("validator would be over delegated")
-
-	_ StatefulProposalTx = &StatefulAddDelegatorTx{}
-	_ timed.Tx           = &StatefulAddDelegatorTx{}
 )
 
 // StatefulAddDelegatorTx is an unsigned addDelegatorTx
@@ -174,7 +174,15 @@ func (tx *StatefulAddDelegatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.AddStakerTxFee, vm.ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(
+			parentState,
+			tx.AddDelegatorTx,
+			tx.Ins,
+			outs,
+			stx.Creds,
+			vm.AddStakerTxFee,
+			vm.ctx.AVAXAssetID,
+		); err != nil {
 			return nil, nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}
 

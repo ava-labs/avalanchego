@@ -20,8 +20,8 @@ type StatefulTx interface {
 	SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error
 }
 
-// UnsignedDecisionTx is an unsigned operation that can be immediately decided
-type UnsignedDecisionTx interface {
+// StatefulDecisionTx is an unsigned operation that can be immediately decided
+type StatefulDecisionTx interface {
 	StatefulTx
 
 	// Execute this transaction with the provided state.
@@ -50,9 +50,9 @@ type StatefulProposalTx interface {
 	InitiallyPrefersCommit(vm *VM) bool
 }
 
-// UnsignedAtomicTx is an unsigned operation that can be atomically accepted
-type UnsignedAtomicTx interface {
-	UnsignedDecisionTx
+// StatefulAtomicTx is an unsigned operation that can be atomically accepted
+type StatefulAtomicTx interface {
+	StatefulDecisionTx
 
 	// Execute this transaction with the provided state.
 	AtomicExecute(vm *VM, parentState MutableState, stx *signed.Tx) (VersionedState, error)

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var _ UnsignedDecisionTx = &StatefulCreateChainTx{}
+var _ StatefulDecisionTx = &StatefulCreateChainTx{}
 
 const (
 	maxNameLen    = 128
@@ -72,7 +72,15 @@ func (tx *StatefulCreateChainTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, createBlockchainTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(
+		vs,
+		tx.CreateChainTx,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		createBlockchainTxFee,
+		vm.ctx.AVAXAssetID,
+	); err != nil {
 		return nil, err
 	}
 

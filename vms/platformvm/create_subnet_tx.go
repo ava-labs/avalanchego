@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedDecisionTx = &StatefulCreateSubnetTx{}
+var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
 
 // StatefulCreateSubnetTx is an unsigned proposal to create a new subnet
 type StatefulCreateSubnetTx struct {
@@ -58,7 +58,15 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(
+		vs,
+		tx.CreateSubnetTx,
+		tx.Ins,
+		tx.Outs,
+		stx.Creds,
+		createSubnetTxFee,
+		vm.ctx.AVAXAssetID,
+	); err != nil {
 		return nil, err
 	}
 

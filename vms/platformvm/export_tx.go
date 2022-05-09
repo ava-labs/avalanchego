@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	_ UnsignedAtomicTx = &StatefulExportTx{}
+	_ StatefulAtomicTx = &StatefulExportTx{}
 
 	errOverflowExport = errors.New("overflow when computing export amount + txFee")
 )
@@ -61,7 +61,15 @@ func (tx *StatefulExportTx) Execute(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(
+		vs,
+		tx.ExportTx,
+		tx.Ins,
+		outs,
+		stx.Creds,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
+	); err != nil {
 		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 	}
 

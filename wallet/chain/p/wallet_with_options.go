@@ -6,8 +6,8 @@ package p
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -136,7 +136,7 @@ func (w *walletWithOptions) IssueExportTx(
 }
 
 func (w *walletWithOptions) IssueUnsignedTx(
-	utx platformvm.StatefulTx,
+	utx unsigned.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueUnsignedTx(

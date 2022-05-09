@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
-
 	_ StatefulProposalTx = &StatefulAddSubnetValidatorTx{}
 	_ timed.Tx           = &StatefulAddSubnetValidatorTx{}
+
+	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
 )
 
 // StatefulAddSubnetValidatorTx is an unsigned addSubnetValidatorTx
@@ -170,7 +170,15 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, tx.Outs, baseTxCreds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(
+			parentState,
+			tx.AddSubnetValidatorTx,
+			tx.Ins,
+			tx.Outs,
+			baseTxCreds,
+			vm.TxFee,
+			vm.ctx.AVAXAssetID,
+		); err != nil {
 			return nil, nil, err
 		}
 

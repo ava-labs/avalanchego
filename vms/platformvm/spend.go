@@ -329,7 +329,7 @@ func (vm *VM) authorize(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	utxoDB UTXOGetter,
-	tx StatefulTx,
+	utx unsigned.Tx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -349,7 +349,7 @@ func (vm *VM) semanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return vm.semanticVerifySpendUTXOs(utx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
 // Verify that [tx] is semantically valid.
@@ -359,7 +359,7 @@ func (vm *VM) semanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx StatefulTx,
+	utx unsigned.Tx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -432,7 +432,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := vm.fx.VerifyTransfer(utx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 

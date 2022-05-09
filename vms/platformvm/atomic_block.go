@@ -81,7 +81,7 @@ func (ab *AtomicBlock) Verify() error {
 	if err != nil {
 		return err
 	}
-	atomicTx, ok := statefulTx.(UnsignedAtomicTx)
+	atomicTx, ok := statefulTx.(StatefulAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -154,7 +154,7 @@ func (ab *AtomicBlock) Accept() error {
 	if err != nil {
 		return err
 	}
-	atomicTx, ok := statefulTx.(UnsignedAtomicTx)
+	atomicTx, ok := statefulTx.(StatefulAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}

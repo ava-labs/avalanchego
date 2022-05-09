@@ -104,7 +104,7 @@ func (sb *StandardBlock) Verify() error {
 		if err != nil {
 			return err
 		}
-		decisionTx, ok := statefulTx.(UnsignedDecisionTx)
+		decisionTx, ok := statefulTx.(StatefulDecisionTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -172,7 +172,7 @@ func (sb *StandardBlock) Accept() error {
 		if err != nil {
 			return err
 		}
-		decisionTx, ok := statefulTx.(UnsignedDecisionTx)
+		decisionTx, ok := statefulTx.(StatefulDecisionTx)
 		if !ok {
 			return errWrongTxType
 		}
