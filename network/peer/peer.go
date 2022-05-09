@@ -792,7 +792,9 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 
 	ips := msg.Get(message.Peers).([]utils.IPCertDesc)
 	for _, ip := range ips {
-		p.Network.Track(ip)
+		if !p.Network.Track(ip) {
+			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
+		}
 	}
 }
 

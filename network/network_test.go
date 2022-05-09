@@ -298,7 +298,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
 	assert.NoError(err)
 
-	network.Track(utils.IPCertDesc{
+	useful := network.Track(utils.IPCertDesc{
 		Cert: tlsCert.Leaf,
 		IPDesc: utils.IPDesc{
 			IP:   net.IPv4(123, 132, 123, 123),
@@ -307,6 +307,8 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 		Time:      1000,
 		Signature: nil,
 	})
+	// The signature is wrong so this peer tracking info isn't useful.
+	assert.False(useful)
 
 	network.peersLock.RLock()
 	assert.Empty(network.trackedIPs)

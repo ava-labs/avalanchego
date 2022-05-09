@@ -366,7 +366,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(ip utils.IPCertDesc) {
+func (n *network) Track(ip utils.IPCertDesc) bool {
 	nodeID := ids.NodeIDFromCert(ip.Cert)
 
 	// Verify that we do want to attempt to make a connection to this peer
@@ -375,7 +375,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 	// This check only improves performance, as the values are recalculated once
 	// the lock is grabbed before actually attempting to connect to the peer.
 	if !n.shouldTrack(nodeID, ip) {
-		return
+		return false
 	}
 
 	signedIP := peer.SignedIP{
@@ -388,38 +388,44 @@ func (n *network) Track(ip utils.IPCertDesc) {
 
 	if err := signedIP.Verify(ip.Cert); err != nil {
 		n.peerConfig.Log.Debug("signature verification failed for %s: %s", nodeID, err)
-		return
+		return false
 	}
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	_, connected := n.connectedPeers.GetByID(nodeID)
-	if connected {
+	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
 		// If I'm currently connected to [nodeID] then they will have told me
 		// how to connect to them in the future, and I don't need to attempt to
 		// connect to them now.
-		return
+		return false
 	}
 
 	tracked, isTracked := n.trackedIPs[nodeID]
-	if isTracked {
-		if tracked.ip.Timestamp < ip.Time {
-			// Stop tracking the old IP and instead start tracking new one.
-			tracked := tracked.trackNewIP(&peer.UnsignedIP{
-				IP:        ip.IPDesc,
-				Timestamp: ip.Time,
-			})
-			n.trackedIPs[nodeID] = tracked
-			n.dial(n.onCloseCtx, nodeID, tracked)
+	switch {
+	case isTracked:
+		if tracked.ip.Timestamp >= ip.Time {
+			return false
 		}
-	} else if n.wantsConnection(nodeID) {
+		// Stop tracking the old IP and instead start tracking new one.
+		tracked := tracked.trackNewIP(&peer.UnsignedIP{
+			IP:        ip.IPDesc,
+			Timestamp: ip.Time,
+		})
+		n.trackedIPs[nodeID] = tracked
+		n.dial(n.onCloseCtx, nodeID, tracked)
+		return true
+	case n.wantsConnection(nodeID):
 		tracked := newTrackedIP(&peer.UnsignedIP{
 			IP:        ip.IPDesc,
 			Timestamp: ip.Time,
 		})
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
+		return true
+	default:
+		// This node isn't tracked and we don't want to connect to it.
+		return false
 	}
 }
 
