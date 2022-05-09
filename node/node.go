@@ -672,6 +672,7 @@ func (n *Node) initVMs() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
+			SubnetTracker:          n.Net,
 			Chains:                 n.chainManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: n.uptimeCalculator,

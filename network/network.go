@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -57,6 +58,7 @@ type Network interface {
 	health.Checker
 
 	peer.Network
+	common.SubnetTracker
 
 	// StartClose this network and all existing connections it has. Calling
 	// StartClose multiple times is handled gracefully.
@@ -571,6 +573,18 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc) {
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
+}
+
+func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
+
+	peer, connected := n.connectedPeers.GetByID(nodeID)
+	if !connected {
+		return false
+	}
+	trackedSubnets := peer.TrackedSubnets()
+	return trackedSubnets.Contains(subnetID)
 }
 
 func (n *network) sampleValidatorIPs() []utils.IPCertDesc {

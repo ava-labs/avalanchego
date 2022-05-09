@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -21,6 +22,9 @@ type Factory struct {
 
 	// Node's validator set maps subnetID -> validators of the subnet
 	Validators validators.Manager
+
+	// Provides access to subnet tracking
+	SubnetTracker common.SubnetTracker
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator

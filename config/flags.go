@@ -290,7 +290,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Int(SnowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(SnowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(SnowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
-	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
+	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing containers in consensus")
 	fs.Int(SnowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, 2*time.Minute, "Maximum amount of time an item should be processing and still be healthy")
 	fs.Uint(SnowMixedQueryNumPushKey, 10, fmt.Sprintf("When a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushKey))

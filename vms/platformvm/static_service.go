@@ -42,6 +42,8 @@ type APIUTXO struct {
 	Message  string      `json:"message"`
 }
 
+// TODO: refactor APIStaker, APIValidators and merge them together for SubnetValidators + PrimaryValidators
+
 // APIStaker is the representation of a staker sent via APIs.
 // [TxID] is the txID of the transaction that added this staker.
 // [Amount] is the amount of tokens being staked.
@@ -72,11 +74,18 @@ type APIPrimaryValidator struct {
 	PotentialReward    *json.Uint64  `json:"potentialReward,omitempty"`
 	DelegationFee      json.Float32  `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
-	Uptime             *json.Float32 `json:"uptime,omitempty"`
-	Connected          *bool         `json:"connected,omitempty"`
+	Uptime             *json.Float32 `json:"uptime"`
+	Connected          bool          `json:"connected"`
 	Staked             []APIUTXO     `json:"staked,omitempty"`
 	// The delegators delegating to this validator
 	Delegators []APIPrimaryDelegator `json:"delegators"`
+}
+
+// APISubnetValidator is the repr. of a subnet validator sent over APIs.
+type APISubnetValidator struct {
+	APIStaker
+	// The owner the staking reward, if applicable, will go to
+	Connected bool `json:"connected"`
 }
 
 // APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
