@@ -41,7 +41,6 @@ func newZapLogger(prefix string, wrappedCores ...WrappedCore) *zap.Logger {
 	core := zapcore.NewTee(cores...)
 	logger := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(2))
 	if prefix != "" {
-		prefix := fmt.Sprintf("<%s>", prefix)
 		logger = logger.Named(prefix)
 	}
 

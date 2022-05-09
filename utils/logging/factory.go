@@ -87,8 +87,9 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 		Compress:   config.Compress,
 	}
 	fileCore := NewWrappedCore(config.LogLevel, rw, fileEnc)
+	prefix := config.LogFormat.WrapPrefix(config.MsgPrefix)
 
-	l := NewLogger(config.Assertions, config.MsgPrefix, consoleCore, fileCore)
+	l := NewLogger(config.Assertions, prefix, consoleCore, fileCore)
 	f.loggers[config.LoggerName] = logWrapper{
 		logger:       l,
 		displayLevel: consoleCore.AtomicLevel,
