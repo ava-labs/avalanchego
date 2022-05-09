@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 )
 
 const (
@@ -19,6 +20,8 @@ const (
 )
 
 var (
+	_ featurextension.Fx = &Fx{}
+
 	errWrongVMType                    = errors.New("wrong vm type")
 	errWrongTxType                    = errors.New("wrong tx type")
 	errWrongOpType                    = errors.New("wrong operation type")

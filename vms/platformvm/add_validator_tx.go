@@ -14,7 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -39,11 +41,11 @@ type UnsignedAddValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator Validator `serialize:"true" json:"validator"`
+	Validator validators.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner Owner `serialize:"true" json:"rewardsOwner"`
+	RewardsOwner featurextension.Owner `serialize:"true" json:"rewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
 	Shares uint32 `serialize:"true" json:"shares"`
@@ -281,7 +283,7 @@ func (vm *VM) newAddValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: Validator{
+		Validator: validators.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,

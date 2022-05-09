@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 func TestPrimaryValidatorSet(t *testing.T) {
@@ -18,7 +19,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
 		addValidatorTx: &UnsignedAddValidatorTx{
-			Validator: Validator{
+			Validator: validators.Validator{
 				Wght: node0Weight,
 			},
 		},
@@ -28,7 +29,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
 		addValidatorTx: &UnsignedAddValidatorTx{
-			Validator: Validator{
+			Validator: validators.Validator{
 				Wght: node1Weight,
 			},
 		},
@@ -38,7 +39,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
 		addValidatorTx: &UnsignedAddValidatorTx{
-			Validator: Validator{
+			Validator: validators.Validator{
 				Wght: node2Weight,
 			},
 		},
@@ -104,8 +105,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
 				subnetID: {
-					Validator: SubnetValidator{
-						Validator: Validator{
+					Validator: validators.SubnetValidator{
+						Validator: validators.Validator{
 							Wght: node0Weight,
 						},
 					},
@@ -120,8 +121,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
 				subnetID: {
-					Validator: SubnetValidator{
-						Validator: Validator{
+					Validator: validators.SubnetValidator{
+						Validator: validators.Validator{
 							Wght: node1Weight,
 						},
 					},
@@ -136,8 +137,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
 				subnetID: {
-					Validator: SubnetValidator{
-						Validator: Validator{
+					Validator: validators.SubnetValidator{
+						Validator: validators.Validator{
 							Wght: node2Weight,
 						},
 					},

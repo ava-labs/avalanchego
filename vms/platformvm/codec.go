@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -62,8 +63,8 @@ func init() {
 			c.RegisterType(&UnsignedAdvanceTimeTx{}),
 			c.RegisterType(&UnsignedRewardValidatorTx{}),
 
-			c.RegisterType(&StakeableLockIn{}),
-			c.RegisterType(&StakeableLockOut{}),
+			c.RegisterType(&stakeables.LockIn{}),
+			c.RegisterType(&stakeables.LockOut{}),
 		)
 	}
 	errs.Add(
