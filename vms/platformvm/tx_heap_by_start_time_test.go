@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 func TestTxHeapByStartTime(t *testing.T) {
@@ -35,11 +36,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statefulVdr0Tx, err := MakeStatefulTx(validator0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vdr0Tx := statefulVdr0Tx.(*StatefulAddValidatorTx)
+	vdr0Tx := validator0.Unsigned.(*unsigned.AddValidatorTx)
 
 	validator1, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -54,11 +51,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statefulVdr1Tx, err := MakeStatefulTx(validator1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vdr1Tx := statefulVdr1Tx.(*StatefulAddValidatorTx)
+	vdr1Tx := validator1.Unsigned.(*unsigned.AddValidatorTx)
 
 	validator2, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -73,11 +66,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statefulVdr2Tx, err := MakeStatefulTx(validator2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vdr2Tx := statefulVdr2Tx.(*StatefulAddValidatorTx)
+	vdr2Tx := validator2.Unsigned.(*unsigned.AddValidatorTx)
 
 	txHeap.Add(validator2)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.StartTime()) {
