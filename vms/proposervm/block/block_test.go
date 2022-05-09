@@ -43,7 +43,7 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 
 	assert := assert.New(t)
 
-	builtBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, ids.ShortID{})
 	assert.NoError(err)
 
 	builtBlock := builtBlockIntf.(*statelessBlock)

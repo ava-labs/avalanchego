@@ -71,7 +71,7 @@ func TestBuildUnsigned(t *testing.T) {
 
 	assert := assert.New(t)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, ids.ShortID{})
 	assert.NoError(err)
 
 	assert.Equal(parentID, builtBlock.ParentID())

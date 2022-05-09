@@ -186,6 +186,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		prntProBlk.Timestamp().Add(proposer.MaxDelay),
 		pChainHeight,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -364,6 +365,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		AtSubWindowEnd,
 		pChainHeight,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -490,6 +492,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -508,6 +511,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -524,6 +528,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -539,6 +544,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		childCoreBlk.Timestamp(),
 		currPChainHeight*2,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -692,6 +698,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -710,6 +717,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -726,6 +734,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -741,6 +750,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		childCoreBlk.Timestamp(),
 		currPChainHeight*2,
 		childCoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -1126,6 +1136,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		coreGenBlk.Timestamp(),
 		4,
 		coreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("failed to build new child block")

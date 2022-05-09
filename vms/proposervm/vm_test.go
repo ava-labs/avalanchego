@@ -623,6 +623,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		netcoreBlk.Timestamp(),
 		pChainHeight,
 		netcoreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -924,6 +925,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1029,6 +1031,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1038,6 +1041,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		1,
 		coreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1208,6 +1212,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1320,6 +1325,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		coreBlk0.Timestamp(),
 		0,
 		coreBlk0.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1441,6 +1447,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		gBlock.Timestamp(),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatalf("fail to manually build a block due to %s", err)
@@ -1552,6 +1559,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatalf("fail to manually build a block due to %s", err)
@@ -1575,6 +1583,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(proposer.MaxDelay),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		ids.ShortID{},
 	)
 
 	if err != nil {

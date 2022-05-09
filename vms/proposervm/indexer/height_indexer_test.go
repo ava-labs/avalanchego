@@ -57,6 +57,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			dummyTS,
 			dummyPCH,
 			blockBytes[:],
+			ids.ShortID{},
 		)
 		assert.NoError(err)
 		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
@@ -135,6 +136,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			dummyTS,
 			dummyPCH,
 			blockBytes[:],
+			ids.ShortID{},
 		)
 		assert.NoError(err)
 		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
@@ -217,6 +219,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			dummyTS,
 			dummyPCH,
 			blockBytes[:],
+			ids.ShortID{},
 		)
 		assert.NoError(err)
 		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))

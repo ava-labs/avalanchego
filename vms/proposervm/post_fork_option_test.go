@@ -654,6 +654,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		coreGenBlk.Timestamp(),
 		0,
 		coreOracleBlk.Bytes(),
+		ids.ShortID{},
 	)
 	if err != nil {
 		t.Fatal(err)

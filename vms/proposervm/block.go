@@ -209,6 +209,7 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
+			p.vm.ctx.NodeID,
 		)
 		if err != nil {
 			return nil, err

@@ -190,6 +190,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 		newTimestamp,
 		pChainHeight,
 		innerBlock.Bytes(),
+		b.vm.ctx.NodeID,
 	)
 	if err != nil {
 		return nil, err
