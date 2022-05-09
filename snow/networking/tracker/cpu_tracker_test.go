@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 )
@@ -55,4 +57,34 @@ func TestCPUTracker(t *testing.T) {
 	if len != 0 {
 		t.Fatalf("Expected length to be 0 after pruning, but found length: %d", len)
 	}
+}
+
+func TestCPUTrackerTimeUntilUtilization(t *testing.T) {
+	halflife := 5 * time.Second
+	cpuTracker := NewCPUTracker(uptime.ContinuousFactory{}, halflife)
+	now := time.Now()
+	nodeID := ids.GenerateTestNodeID()
+	// Start the meter
+	cpuTracker.StartCPU(nodeID, now)
+	// One halflife passes; stop the meter
+	now = now.Add(halflife)
+	cpuTracker.StopCPU(nodeID, now)
+	// Read the current value
+	currentVal := cpuTracker.Utilization(nodeID, now)
+	// Suppose we want to wait for the value to be
+	// a third of its current value
+	desiredVal := currentVal / 3
+	// See when that should happen
+	timeUntilDesiredVal := cpuTracker.TimeUntilUtilization(nodeID, now, desiredVal)
+	// Get the actual value at that time
+	now = now.Add(timeUntilDesiredVal)
+	actualVal := cpuTracker.Utilization(nodeID, now)
+	// Make sure the actual/expected are close
+	assert.InDelta(t, desiredVal, actualVal, .00001)
+	// Make sure TimeUntilUtilization returns the zero duration if
+	// the value provided >= the current value
+	assert.Zero(t, cpuTracker.TimeUntilUtilization(nodeID, now, actualVal))
+	assert.Zero(t, cpuTracker.TimeUntilUtilization(nodeID, now, actualVal+.1))
+	// Make sure it returns the zero duration if the node isn't known
+	assert.Zero(t, cpuTracker.TimeUntilUtilization(ids.GenerateTestNodeID(), now, 0.0001))
 }
