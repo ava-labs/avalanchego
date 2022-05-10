@@ -9,8 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const defaultWeight = 10000
@@ -23,21 +21,7 @@ var (
 )
 
 func init() {
-	log := logging.NoLog{}
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		log.AssertNoError(err)
-		pk, err := factory.ToPrivateKey(privKeyBytes)
-		log.AssertNoError(err)
-		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
-	}
+	keys = crypto.BuildTestKeys()
 }
 
 func TestValidatorBoundedBy(t *testing.T) {

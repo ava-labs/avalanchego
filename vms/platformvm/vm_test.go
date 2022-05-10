@@ -87,7 +87,7 @@ var (
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
-	keys []*crypto.PrivateKeySECP256K1R
+	keys = crypto.BuildTestKeys()
 
 	defaultMinValidatorStake = 5 * units.MilliAvax
 	defaultMaxValidatorStake = 500 * units.MilliAvax
@@ -100,7 +100,7 @@ var (
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	// Its threshold is 2
 	testSubnet1            *unsigned.CreateSubnetTx
-	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
+	testSubnet1ControlKeys = keys[0:3]
 
 	xChainID = ids.Empty.Prefix(0)
 	cChainID = ids.Empty.Prefix(1)
@@ -115,25 +115,6 @@ const (
 	testNetworkID = 10 // To be used in tests
 	defaultWeight = 10000
 )
-
-func init() {
-	ctx := defaultContext()
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		ctx.Log.AssertNoError(err)
-		pk, err := factory.ToPrivateKey(privKeyBytes)
-		ctx.Log.AssertNoError(err)
-		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
-	}
-	testSubnet1ControlKeys = keys[0:3]
-}
 
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
