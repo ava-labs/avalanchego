@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -115,7 +115,7 @@ func NewHandler(
 	ctx *snow.Context,
 	clk mockable.Clock,
 	utxoReader avax.UTXOReader,
-	fx featurextension.Fx,
+	fx fx.Fx,
 ) SpendHandler {
 	return &handler{
 		ctx:         ctx,
@@ -129,7 +129,7 @@ type handler struct {
 	ctx         *snow.Context
 	clk         mockable.Clock
 	utxosReader avax.UTXOReader
-	fx          featurextension.Fx
+	fx          fx.Fx
 }
 
 // stake the provided amount while deducting the provided fee.
@@ -553,7 +553,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 			continue
 		}
 
-		owned, ok := out.(featurextension.Owned)
+		owned, ok := out.(fx.Owned)
 		if !ok {
 			return ErrUnknownOwners
 		}
@@ -599,7 +599,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 			continue
 		}
 
-		owned, ok := output.(featurextension.Owned)
+		owned, ok := output.(fx.Owned)
 		if !ok {
 			return ErrUnknownOwners
 		}

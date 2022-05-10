@@ -162,3 +162,31 @@ func StandardUsageTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
 	}
 }
+
+func TestTimeUntil(t *testing.T) {
+	halflife := 5 * time.Second
+	f := ContinuousFactory{}
+	m := f.New(halflife)
+	now := time.Now()
+	// Start the meter
+	m.Start(now)
+	// One halflife passes; stop the meter
+	now = now.Add(halflife)
+	m.Stop(now)
+	// Read the current value
+	currentVal := m.Read(now)
+	// Suppose we want to wait for the value to be
+	// a third of its current value
+	desiredVal := currentVal / 3
+	// See when that should happen
+	timeUntilDesiredVal := m.TimeUntil(now, desiredVal)
+	// Get the actual value at that time
+	now = now.Add(timeUntilDesiredVal)
+	actualVal := m.Read(now)
+	// Make sure the actual/expected are close
+	assert.InDelta(t, desiredVal, actualVal, .00001)
+	// Make sure TimeUntil returns the zero duration if
+	// the value provided >= the current value
+	assert.Zero(t, m.TimeUntil(now, actualVal))
+	assert.Zero(t, m.TimeUntil(now, actualVal+.1))
+}

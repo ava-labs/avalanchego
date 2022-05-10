@@ -60,3 +60,20 @@ func (a *continuousMeter) Read(currentTime time.Time) float64 {
 	a.value += float64(a.numCoresRunning) * (1 - factor)
 	return a.value
 }
+
+func (a *continuousMeter) TimeUntil(now time.Time, value float64) time.Duration {
+	currentValue := a.Read(now)
+	if currentValue <= value {
+		return time.Duration(0)
+	}
+	// Note that [factor] >= 1
+	factor := currentValue / value
+	// Note that [numHalfLives] >= 0
+	numHalflives := math.Log(factor)
+	duration := numHalflives * a.halflife
+	// Overflow protection
+	if duration > math.MaxInt64 {
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(duration)
+}

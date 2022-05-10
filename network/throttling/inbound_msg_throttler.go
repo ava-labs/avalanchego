@@ -4,7 +4,10 @@
 package throttling
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,13 +17,7 @@ var _ InboundMsgThrottler = &inboundMsgThrottler{}
 
 // InboundMsgThrottler rate-limits inbound messages from the network.
 type InboundMsgThrottler interface {
-	BandwidthThrottler
-
-	// Blocks until we can read a message of size [msgSize] from [nodeID].
-	// For every call to Acquire([msgSize], [nodeID]), we must (!) call
-	// Release([msgSize], [nodeID]) when done processing the message
-	// (or when we give up trying to read the message.)
-	Acquire(msgSize uint64, nodeID ids.NodeID)
+	bandwidthThrottler
 
 	// Mark that we're done processing a message of size [msgSize]
 	// from [nodeID].
@@ -30,6 +27,7 @@ type InboundMsgThrottler interface {
 type InboundMsgThrottlerConfig struct {
 	MsgByteThrottlerConfig
 	BandwidthThrottlerConfig
+	CPUThrottlerConfig
 	MaxProcessingMsgsPerNode uint64 `json:"maxProcessingMsgsPerNode"`
 }
 
@@ -39,14 +37,16 @@ func NewInboundMsgThrottler(
 	namespace string,
 	registerer prometheus.Registerer,
 	vdrs validators.Set,
-	config InboundMsgThrottlerConfig,
+	throttlerConfig InboundMsgThrottlerConfig,
+	cpuTracker tracker.TimeTracker,
+	cpuTargeter tracker.CPUTargeter,
 ) (InboundMsgThrottler, error) {
 	byteThrottler, err := newInboundMsgByteThrottler(
 		log,
 		namespace,
 		registerer,
 		vdrs,
-		config.MsgByteThrottlerConfig,
+		throttlerConfig.MsgByteThrottlerConfig,
 	)
 	if err != nil {
 		return nil, err
@@ -54,16 +54,27 @@ func NewInboundMsgThrottler(
 	bufferThrottler, err := newInboundMsgBufferThrottler(
 		namespace,
 		registerer,
-		config.MaxProcessingMsgsPerNode,
+		throttlerConfig.MaxProcessingMsgsPerNode,
 	)
 	if err != nil {
 		return nil, err
 	}
-	bandwidthThrottler, err := NewBandwidthThrottler(
+	bandwidthThrottler, err := newBandwidthThrottler(
 		log,
 		namespace,
 		registerer,
-		config.BandwidthThrottlerConfig,
+		throttlerConfig.BandwidthThrottlerConfig,
+	)
+	if err != nil {
+		return nil, err
+	}
+	cpuThrottler, err := NewCPUThrottler(
+		namespace,
+		registerer,
+		throttlerConfig.CPUThrottlerConfig,
+		vdrs,
+		cpuTracker,
+		cpuTargeter,
 	)
 	if err != nil {
 		return nil, err
@@ -72,6 +83,7 @@ func NewInboundMsgThrottler(
 		byteThrottler:      byteThrottler,
 		bufferThrottler:    bufferThrottler,
 		bandwidthThrottler: bandwidthThrottler,
+		cpuThrottler:       cpuThrottler,
 	}, nil
 }
 
@@ -92,20 +104,25 @@ type inboundMsgThrottler struct {
 	// node that we're currently processing.
 	bufferThrottler *inboundMsgBufferThrottler
 	// Rate-limits based on recent bandwidth usage
-	bandwidthThrottler BandwidthThrottler
+	bandwidthThrottler bandwidthThrottler
 	// Rate-limits based on size of all messages from a given
 	// node that we're currently processing.
 	byteThrottler *inboundMsgByteThrottler
+	// Rate-limits based on CPU usage caused by a given node.
+	cpuThrottler CPUThrottler
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *inboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
+// Even if [ctx] is canceled, [Release] must be called.
+func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) {
 	// Acquire space on the inbound message buffer
 	t.bufferThrottler.Acquire(nodeID)
 	// Acquire bandwidth
-	t.bandwidthThrottler.Acquire(msgSize, nodeID)
+	t.bandwidthThrottler.Acquire(ctx, msgSize, nodeID)
+	// Wait until our CPU usage drops to an acceptable level.
+	t.cpuThrottler.Acquire(ctx, nodeID)
 	// Acquire space on the inbound message byte buffer
 	t.byteThrottler.Acquire(msgSize, nodeID)
 }

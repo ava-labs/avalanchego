@@ -53,7 +53,7 @@ func (n *testNetwork) Connected(ids.NodeID) {}
 
 func (n *testNetwork) AllowConnection(ids.NodeID) bool { return true }
 
-func (n *testNetwork) Track(utils.IPCertDesc) {}
+func (n *testNetwork) Track(utils.IPCertDesc) bool { return true }
 
 func (n *testNetwork) Disconnected(ids.NodeID) {}
 

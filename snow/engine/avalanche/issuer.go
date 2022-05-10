@@ -121,10 +121,14 @@ func (i *issuer) Update() {
 
 	i.t.RequestID++
 	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
+		numPushTo := i.t.Params.MixedQueryNumPushVdr
+		if !i.t.Validators.Contains(i.t.Ctx.NodeID) {
+			numPushTo = i.t.Params.MixedQueryNumPushNonVdr
+		}
 		common.SendMixedQuery(
 			i.t.Sender,
-			vdrBag.List(),
-			i.t.Params.MixedQueryNumPush,
+			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
+			numPushTo,
 			i.t.RequestID,
 			vtxID,
 			i.vtx.Bytes(),

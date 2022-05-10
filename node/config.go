@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -203,4 +204,10 @@ type Config struct {
 
 	// VM management
 	VMManager vms.Manager `json:"-"`
+
+	// Halflife to use for the CPU tracker.
+	// Larger halflife --> CPU usage metrics change more slowly.
+	CPUTrackerHalflife time.Duration `json:"cpuTrackerHalflife"`
+
+	CPUTargeterConfig tracker.CPUTargeterConfig `json:"cpuTargeterConfig"`
 }
