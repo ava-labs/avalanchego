@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"errors"
@@ -15,35 +15,28 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var (
-	_ StatefulProposalTx = &StatefulRewardValidatorTx{}
+	_ ProposalTx = &RewardValidatorTx{}
 
-	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
-	errWrongTxType         = errors.New("wrong transaction type")
+	ErrInvalidID           = errors.New("invalid ID")
+	ErrShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 )
 
-// StatefulRewardValidatorTx is a transaction that represents a proposal to
-// remove a validator that is currently validating from the validator set.
-//
-// If this transaction is accepted and the next block accepted is a Commit
-// block, the validator is removed and the address that the validator specified
-// receives the staked AVAX as well as a validating reward.
-//
-// If this transaction is accepted and the next block accepted is an Abort
-// block, the validator is removed and the address that the validator specified
-// receives the staked AVAX but no reward.
-type StatefulRewardValidatorTx struct {
-	*unsigned.RewardValidatorTx `serialize:"true"`
+type RewardValidatorTx struct {
+	*unsigned.RewardValidatorTx
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulRewardValidatorTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
-	_, _, err := tx.Execute(vm, parentState, stx)
+func (tx *RewardValidatorTx) SemanticVerify(
+	verifier TxVerifier,
+	parentState state.Mutable,
+	creds []verify.Verifiable,
+) error {
+	_, _, err := tx.Execute(verifier, parentState, creds)
 	return err
 }
 
@@ -53,22 +46,27 @@ func (tx *StatefulRewardValidatorTx) SemanticVerify(vm *VM, parentState state.Mu
 // The next validator to be removed must be the validator specified in this block.
 // The next validator to be removed must be have an end time equal to the current
 //   chain timestamp.
-func (tx *StatefulRewardValidatorTx) Execute(
-	vm *VM,
+func (tx *RewardValidatorTx) Execute(
+	verifier TxVerifier,
 	parentState state.Mutable,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
 	error,
 ) {
+	var (
+		ctx = verifier.Ctx()
+		fx  = verifier.FeatureExtension()
+	)
+
 	switch {
 	case tx == nil:
-		return nil, nil, errNilTx
+		return nil, nil, unsigned.ErrNilTx
 	case tx.TxID == ids.Empty:
-		return nil, nil, errInvalidID
-	case len(stx.Creds) != 0:
-		return nil, nil, errWrongNumberOfCredentials
+		return nil, nil, ErrInvalidID
+	case len(creds) != 0:
+		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()
@@ -93,7 +91,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 	currentTime := parentState.GetTimestamp()
 	staker, ok := stakerTx.Unsigned.(timed.Tx)
 	if !ok {
-		return nil, nil, errWrongTxType
+		return nil, nil, unsigned.ErrWrongTxType
 	}
 	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
 		return nil, nil, fmt.Errorf(
@@ -133,7 +131,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
 			onCommitState.AddUTXO(utxo)
@@ -142,13 +140,13 @@ func (tx *StatefulRewardValidatorTx) Execute(
 
 		// Provide the reward here
 		if stakerReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(stakerReward, uStakerTx.RewardsOwner)
+			outIntf, err := fx.CreateOutput(stakerReward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create output: %w", err)
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, errInvalidState
+				return nil, nil, ErrInvalidState
 			}
 
 			utxo := &avax.UTXO{
@@ -156,7 +154,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
 				Out:   out,
 			}
 
@@ -175,7 +173,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
 			onCommitState.AddUTXO(utxo)
@@ -208,20 +206,20 @@ func (tx *StatefulRewardValidatorTx) Execute(
 
 		// Reward the delegator here
 		if delegatorReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
+			outIntf, err := fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create output: %w", err)
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, errInvalidState
+				return nil, nil, ErrInvalidState
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
 				Out:   out,
 			}
 
@@ -233,20 +231,20 @@ func (tx *StatefulRewardValidatorTx) Execute(
 
 		// Reward the delegatee here
 		if delegateeReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(delegateeReward, vdrTx.RewardsOwner)
+			outIntf, err := fx.CreateOutput(delegateeReward, vdrTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create output: %w", err)
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, errInvalidState
+				return nil, nil, ErrInvalidState
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
 				Out:   out,
 			}
 
@@ -257,14 +255,14 @@ func (tx *StatefulRewardValidatorTx) Execute(
 		nodeID = uStakerTx.Validator.ID()
 		startTime = vdrTx.StartTime()
 	default:
-		return nil, nil, errShouldBeDSValidator
+		return nil, nil, ErrShouldBeDSValidator
 	}
 
-	uptime, err := vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
+	uptime, err := verifier.CalculateUptimePercentFrom(nodeID, startTime)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate uptime: %w", err)
 	}
-	tx.ShouldPreferCommit = uptime >= vm.UptimePercentage
+	tx.ShouldPreferCommit = uptime >= verifier.PlatformConfig().UptimePercentage
 
 	return onCommitState, onAbortState, nil
 }
@@ -276,6 +274,6 @@ func (tx *StatefulRewardValidatorTx) Execute(
 // responsive and correct during the time they are validating.
 // Right now they receive a reward if they're up (but not necessarily
 // correct and responsive) for a sufficient amount of time
-func (tx *StatefulRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
+func (tx *RewardValidatorTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
 	return tx.ShouldPreferCommit
 }

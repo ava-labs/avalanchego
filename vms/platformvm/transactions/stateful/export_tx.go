@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"fmt"
@@ -13,34 +13,38 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var _ StatefulAtomicTx = &StatefulExportTx{}
+var _ AtomicTx = &ExportTx{}
 
-// StatefulExportTx is an unsigned ExportTx
-type StatefulExportTx struct {
-	*unsigned.ExportTx `serialize:"true"`
+type ExportTx struct {
+	*unsigned.ExportTx
 }
 
 // InputUTXOs returns an empty set
-func (tx *StatefulExportTx) InputUTXOs() ids.Set { return nil }
+func (tx *ExportTx) InputUTXOs() ids.Set { return nil }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulExportTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
-	_, err := tx.AtomicExecute(vm, parentState, stx)
+func (tx *ExportTx) SemanticVerify(
+	verifier TxVerifier,
+	parentState state.Mutable,
+	creds []verify.Verifiable,
+) error {
+	_, err := tx.AtomicExecute(verifier, parentState, creds)
 	return err
 }
 
 // Execute this transaction.
-func (tx *StatefulExportTx) Execute(
-	vm *VM,
+func (tx *ExportTx) Execute(
+	verifier TxVerifier,
 	vs state.Versioned,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (func() error, error) {
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	ctx := verifier.Ctx()
+
+	if err := tx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
@@ -48,35 +52,35 @@ func (tx *StatefulExportTx) Execute(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	if vm.bootstrapped.GetValue() {
-		if err := verify.SameSubnet(vm.ctx, tx.DestinationChain); err != nil {
+	if verifier.Bootstrapped() {
+		if err := verify.SameSubnet(ctx, tx.DestinationChain); err != nil {
 			return nil, err
 		}
 	}
 
 	// Verify the flowcheck
-	if err := vm.spendOps.SemanticVerifySpend(
+	if err := verifier.SemanticVerifySpend(
 		vs,
-		tx.ExportTx,
+		tx,
 		tx.Ins,
 		outs,
-		stx.Creds,
-		vm.TxFee,
-		vm.ctx.AVAXAssetID,
+		creds,
+		verifier.PlatformConfig().TxFee,
+		ctx.AVAXAssetID,
 	); err != nil {
-		return nil, fmt.Errorf("failed SemanticVerifySpend: %w", err)
+		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 	}
 
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 
 // AtomicOperations returns the shared memory requests
-func (tx *StatefulExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+func (tx *ExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -90,7 +94,7 @@ func (tx *StatefulExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error)
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := unsigned.Codec.Marshal(unsigned.Version, utxo)
 		if err != nil {
 			return ids.ID{}, nil, fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -109,10 +113,10 @@ func (tx *StatefulExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error)
 }
 
 // Execute this transaction and return the versioned state.
-func (tx *StatefulExportTx) AtomicExecute(
-	vm *VM,
+func (tx *ExportTx) AtomicExecute(
+	verifier TxVerifier,
 	parentState state.Mutable,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (state.Versioned, error) {
 	// Set up the state if this tx is committed
 	newState := state.NewVersioned(
@@ -120,12 +124,12 @@ func (tx *StatefulExportTx) AtomicExecute(
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(vm, newState, stx)
+	_, err := tx.Execute(verifier, newState, creds)
 	return newState, err
 }
 
 // Accept this transaction.
-func (tx *StatefulExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
+func (tx *ExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
 	chainID, requests, err := tx.AtomicOperations()
 	if err != nil {
 		return err

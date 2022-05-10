@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 )
 
@@ -113,11 +114,11 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	statefulTx, err := MakeStatefulTx(tx)
+	statefulTx, err := stateful.MakeStatefulTx(tx)
 	if err != nil {
 		return fmt.Errorf("unsopported stateful tx, err %s", err)
 	}
-	if err := statefulTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
+	if err := statefulTx.SemanticVerify(m.vm.txVerifier, preferredState, tx.Creds); err != nil {
 		m.MarkDropped(txID)
 		return err
 	}

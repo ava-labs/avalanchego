@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"fmt"
@@ -10,44 +10,44 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-func MakeStatefulTx(tx *signed.Tx) (StatefulTx, error) {
+func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 	switch utx := tx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx:
-		return &StatefulAddDelegatorTx{
+		return &AddDelegatorTx{
 			AddDelegatorTx: utx,
 		}, nil
 
 	case *unsigned.AddSubnetValidatorTx:
-		return &StatefulAddSubnetValidatorTx{
+		return &AddSubnetValidatorTx{
 			AddSubnetValidatorTx: utx,
 		}, nil
 
 	case *unsigned.AddValidatorTx:
-		return &StatefulAddValidatorTx{
+		return &AddValidatorTx{
 			AddValidatorTx: utx,
 		}, nil
 	case *unsigned.AdvanceTimeTx:
-		return &StatefulAdvanceTimeTx{
+		return &AdvanceTimeTx{
 			AdvanceTimeTx: utx,
 		}, nil
 	case *unsigned.RewardValidatorTx:
-		return &StatefulRewardValidatorTx{
+		return &RewardValidatorTx{
 			RewardValidatorTx: utx,
 		}, nil
 	case *unsigned.CreateChainTx:
-		return &StatefulCreateChainTx{
+		return &CreateChainTx{
 			CreateChainTx: utx,
 		}, nil
 	case *unsigned.CreateSubnetTx:
-		return &StatefulCreateSubnetTx{
+		return &CreateSubnetTx{
 			CreateSubnetTx: utx,
 		}, nil
 	case *unsigned.ImportTx:
-		return &StatefulImportTx{
+		return &ImportTx{
 			ImportTx: utx,
 		}, nil
 	case *unsigned.ExportTx:
-		return &StatefulExportTx{
+		return &ExportTx{
 			ExportTx: utx,
 		}, nil
 

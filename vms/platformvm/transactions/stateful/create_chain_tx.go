@@ -1,86 +1,93 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var _ StatefulDecisionTx = &StatefulCreateChainTx{}
+var _ DecisionTx = &CreateChainTx{}
 
 const (
-	maxNameLen    = 128
-	maxGenesisLen = units.MiB
+	MaxNameLen    = 128
+	MaxGenesisLen = units.MiB
 )
 
-// StatefulCreateChainTx is an unsigned CreateChainTx
-type StatefulCreateChainTx struct {
-	*unsigned.CreateChainTx `serialize:"true"`
+type CreateChainTx struct {
+	*unsigned.CreateChainTx
 }
 
-func (tx *StatefulCreateChainTx) InputUTXOs() ids.Set { return nil }
+func (tx *CreateChainTx) InputUTXOs() ids.Set { return nil }
 
-func (tx *StatefulCreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+func (tx *CreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	return ids.ID{}, nil, nil
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulCreateChainTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
+func (tx *CreateChainTx) SemanticVerify(
+	verifier TxVerifier,
+	parentState state.Mutable,
+	creds []verify.Verifiable,
+) error {
 	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(vm, vs, stx)
+	_, err := tx.Execute(verifier, vs, creds)
 	return err
 }
 
 // Execute this transaction.
-func (tx *StatefulCreateChainTx) Execute(
-	vm *VM,
+func (tx *CreateChainTx) Execute(
+	verifier TxVerifier,
 	vs state.Versioned,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (
 	func() error,
 	error,
 ) {
+	var (
+		ctx = verifier.Ctx()
+		cfg = *verifier.PlatformConfig()
+	)
+
 	// Make sure this transaction is well formed.
-	if len(stx.Creds) == 0 {
-		return nil, errWrongNumberOfCredentials
+	if len(creds) == 0 {
+		return nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := tx.SyntacticVerify(verifier.Ctx()); err != nil {
 		return nil, err
 	}
 
 	// Select the credentials for each purpose
-	baseTxCredsLen := len(stx.Creds) - 1
-	baseTxCreds := stx.Creds[:baseTxCredsLen]
-	subnetCred := stx.Creds[baseTxCredsLen]
+	baseTxCredsLen := len(creds) - 1
+	baseTxCreds := creds[:baseTxCredsLen]
+	subnetCred := creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	timestamp := vs.GetTimestamp()
-	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
-	if err := vm.spendOps.SemanticVerifySpend(
+	createBlockchainTxFee := builder.GetCreateBlockchainTxFee(cfg, vs.GetTimestamp())
+	if err := verifier.SemanticVerifySpend(
 		vs,
-		tx.CreateChainTx,
+		tx,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
 		createBlockchainTxFee,
-		vm.ctx.AVAXAssetID,
+		ctx.AVAXAssetID,
 	); err != nil {
 		return nil, err
 	}
@@ -99,7 +106,7 @@ func (tx *StatefulCreateChainTx) Execute(
 	}
 
 	// Verify that this chain is authorized by the subnet
-	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+	if err := verifier.FeatureExtension().VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return nil, err
 	}
 
@@ -107,19 +114,16 @@ func (tx *StatefulCreateChainTx) Execute(
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
+	stx := &signed.Tx{
+		Unsigned: tx.CreateChainTx,
+		Creds:    creds,
+	}
 	vs.AddChain(stx)
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { return platformutils.CreateChain(vm.Config, tx.CreateChainTx) }
+	onAccept := func() error { return verifier.CreateChain(tx.CreateChainTx) }
 	return onAccept, nil
-}
-
-func (vm *VM) getCreateBlockchainTxFee(t time.Time) uint64 {
-	if t.Before(vm.ApricotPhase3Time) {
-		return vm.CreateAssetTxFee
-	}
-	return vm.CreateBlockchainTxFee
 }

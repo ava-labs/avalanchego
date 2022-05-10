@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -103,10 +104,7 @@ var (
 	cChainID = ids.Empty.Prefix(1)
 )
 
-var (
-	errShouldPrefCommit = errors.New("should prefer to commit proposal")
-	errShouldPrefAbort  = errors.New("should prefer to abort proposal")
-)
+var errShouldPrefCommit = errors.New("should prefer to commit proposal")
 
 const (
 	testNetworkID = 10 // To be used in tests
@@ -568,7 +566,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
@@ -648,7 +646,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-syncBound).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-stateful.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -704,7 +702,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -782,7 +780,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -817,7 +815,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -900,7 +898,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -1371,7 +1369,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
@@ -2387,7 +2385,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			amount, err := vm.maxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
+			amount, err := vm.internalState.MaxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2443,15 +2441,32 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	addr0 := key0.PublicKey().Address()
 	addr1 := key1.PublicKey().Address()
 
-	addSubnetTx0, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr0}, []*crypto.PrivateKeySECP256K1R{key0}, addr0)
+	addSubnetTx0, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{addr0},
+		[]*crypto.PrivateKeySECP256K1R{key0},
+		addr0,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetTx1, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr1)
+
+	addSubnetTx1, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{addr1},
+		[]*crypto.PrivateKeySECP256K1R{key1},
+		addr1,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetTx2, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr0)
+
+	addSubnetTx2, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{addr1},
+		[]*crypto.PrivateKeySECP256K1R{key1},
+		addr0,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2508,7 +2523,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	newValidatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	newValidatorStartTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	key, err := vm.factory.NewPrivateKey()
@@ -2624,6 +2639,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.txBuilder.ResetAtomicUTXOManager(vm.AtomicUTXOManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
@@ -2738,7 +2754,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.internalState.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
@@ -2896,6 +2912,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.txBuilder.ResetAtomicUTXOManager(vm.AtomicUTXOManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
@@ -2925,7 +2942,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlkStatus = importBlk.Status()
 	assert.Equal(choices.Processing, importBlkStatus)
 
-	newValidatorStartTime1 := newValidatorStartTime0.Add(syncBound).Add(1 * time.Second)
+	newValidatorStartTime1 := newValidatorStartTime0.Add(stateful.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
 
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())

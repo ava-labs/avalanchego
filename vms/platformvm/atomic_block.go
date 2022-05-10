@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var (
@@ -77,13 +79,13 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	statefulTx, err := MakeStatefulTx(&ab.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx)
 	if err != nil {
 		return err
 	}
-	atomicTx, ok := statefulTx.(StatefulAtomicTx)
+	atomicTx, ok := statefulTx.(stateful.AtomicTx)
 	if !ok {
-		return errWrongTxType
+		return unsigned.ErrWrongTxType
 	}
 	ab.inputs = atomicTx.InputUTXOs()
 
@@ -120,7 +122,7 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept, err := atomicTx.AtomicExecute(ab.vm, parentState, &ab.Tx)
+	onAccept, err := atomicTx.AtomicExecute(ab.vm.txVerifier, parentState, ab.Tx.Creds)
 	if err != nil {
 		txID := atomicTx.ID()
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
@@ -150,13 +152,13 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
 	}
 
-	statefulTx, err := MakeStatefulTx(&ab.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx)
 	if err != nil {
 		return err
 	}
-	atomicTx, ok := statefulTx.(StatefulAtomicTx)
+	atomicTx, ok := statefulTx.(stateful.AtomicTx)
 	if !ok {
-		return errWrongTxType
+		return unsigned.ErrWrongTxType
 	}
 
 	// Update the state of the chain in the database

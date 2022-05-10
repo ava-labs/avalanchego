@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"math/rand"
@@ -22,13 +22,11 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	vm, baseDB, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	h := newTestHelpersCollection()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -55,12 +53,12 @@ func TestNewImportTx(t *testing.T) {
 	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
 		*cnt++
 		m := &atomic.Memory{}
-		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, baseDB))
+		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, h.baseDB))
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		sm := m.NewSharedMemory(vm.ctx.ChainID)
+		sm := m.NewSharedMemory(h.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(peerChain)
 
 		// #nosec G404
@@ -69,7 +67,7 @@ func TestNewImportTx(t *testing.T) {
 				TxID:        ids.GenerateTestID(),
 				OutputIndex: rand.Uint32(),
 			},
-			Asset: avax.Asset{ID: avaxAssetID},
+			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amt,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -79,12 +77,12 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := unsigned.Codec.Marshal(unsigned.Version, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
 		inputID := utxo.InputID()
-		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{h.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
@@ -100,15 +98,15 @@ func TestNewImportTx(t *testing.T) {
 	tests := []test{
 		{
 			description:   "can't pay fee",
-			sourceChainID: xChainID,
-			sharedMemory:  fundedSharedMemory(xChainID, vm.TxFee-1),
+			sourceChainID: h.ctx.XChainID,
+			sharedMemory:  fundedSharedMemory(h.ctx.XChainID, h.cfg.TxFee-1),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
 			shouldErr:     true,
 		},
 		{
 			description:   "can barely pay fee",
-			sourceChainID: xChainID,
-			sharedMemory:  fundedSharedMemory(xChainID, vm.TxFee),
+			sourceChainID: h.ctx.XChainID,
+			sharedMemory:  fundedSharedMemory(h.ctx.XChainID, h.cfg.TxFee),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
 			shouldErr:     false,
 			shouldVerify:  true,
@@ -116,9 +114,9 @@ func TestNewImportTx(t *testing.T) {
 		{
 			description:   "attempting to import from C-chain",
 			sourceChainID: cChainID,
-			sharedMemory:  fundedSharedMemory(cChainID, vm.TxFee),
+			sharedMemory:  fundedSharedMemory(cChainID, h.cfg.TxFee),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:     vm.ApricotPhase5Time,
+			timestamp:     h.cfg.ApricotPhase5Time,
 			shouldErr:     false,
 			shouldVerify:  true,
 		},
@@ -129,10 +127,15 @@ func TestNewImportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm.ctx.SharedMemory = tt.sharedMemory
-			vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
-			vm.txBuilder.ResetAtomicUTXOManager(vm.AtomicUTXOManager)
-			tx, err := vm.txBuilder.NewImportTx(tt.sourceChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			h.ctx.SharedMemory = tt.sharedMemory
+			h.atomicUtxosMan = avax.NewAtomicUTXOManager(tt.sharedMemory, unsigned.Codec)
+			h.txBuilder.ResetAtomicUTXOManager(h.atomicUtxosMan)
+			tx, err := h.txBuilder.NewImportTx(
+				tt.sourceChainID,
+				to,
+				tt.sourceKeys,
+				ids.ShortEmpty,
+			)
 			if tt.shouldErr {
 				assert.Error(err)
 				return
@@ -155,16 +158,9 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			assert.Equal(vm.TxFee, totalIn-totalOut, "burned too much")
+			assert.Equal(h.cfg.TxFee, totalIn-totalOut, "burned too much")
 
-			// Get the preferred block (which we want to build off)
-			preferred, err := vm.Preferred()
-			assert.NoError(err)
-
-			preferredDecision, ok := preferred.(decision)
-			assert.True(ok)
-
-			preferredState := preferredDecision.onAccept()
+			preferredState := h.tState
 			fakedState := state.NewVersioned(
 				preferredState,
 				preferredState.CurrentStakerChainState(),
@@ -172,9 +168,10 @@ func TestNewImportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			statefulTx, err := MakeStatefulTx(tx)
-			assert.NoError(err)
-			err = statefulTx.SemanticVerify(vm, fakedState, tx)
+			verifiableTx := ImportTx{
+				ImportTx: unsignedTx,
+			}
+			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState, tx.Creds)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

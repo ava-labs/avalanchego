@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"testing"
@@ -49,46 +49,50 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _ := defaultVM()
-			vm.ApricotPhase3Time = ap3Time
-
-			vm.ctx.Lock.Lock()
+			h := newTestHelpersCollection()
+			h.cfg.ApricotPhase3Time = ap3Time
 			defer func() {
-				err := vm.Shutdown()
-				assert.NoError(err)
-				vm.ctx.Lock.Unlock()
+				if err := internalStateShutdown(h); err != nil {
+					t.Fatal(err)
+				}
 			}()
 
-			ins, outs, _, signers, err := vm.spendOps.Stake(keys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := h.utxosMan.Stake(preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
 			// Create the tx
 			utx := &unsigned.CreateSubnetTx{
 				BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    vm.ctx.NetworkID,
-					BlockchainID: vm.ctx.ChainID,
+					NetworkID:    h.ctx.NetworkID,
+					BlockchainID: h.ctx.ChainID,
 					Ins:          ins,
 					Outs:         outs,
 				}},
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &signed.Tx{Unsigned: utx}
-			err = tx.Sign(Codec, signers)
+			err = tx.Sign(unsigned.Codec, signers)
 			assert.NoError(err)
 
 			vs := state.NewVersioned(
-				vm.internalState,
-				vm.internalState.CurrentStakerChainState(),
-				vm.internalState.PendingStakerChainState(),
+				h.tState,
+				h.tState.CurrentStakerChainState(),
+				h.tState.PendingStakerChainState(),
 			)
 			vs.SetTimestamp(test.time)
 
-			statefulTx, err := MakeStatefulTx(tx)
-			assert.NoError(err)
-			decisionTx, ok := statefulTx.(StatefulDecisionTx)
-			assert.True(ok)
-			_, err = decisionTx.Execute(vm, vs, tx)
-			assert.Equal(test.expectsError, err != nil)
+			{ // test execute
+				verifiableTx, err := MakeStatefulTx(tx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				vDecisionTx, ok := verifiableTx.(DecisionTx)
+				if !ok {
+					t.Fatal("unexpected tx type")
+				}
+				_, err = vDecisionTx.Execute(h.txVerifier, vs, tx.Creds)
+				assert.Equal(test.expectsError, err != nil)
+			}
 		})
 	}
 }

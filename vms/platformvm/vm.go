@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -52,11 +53,8 @@ var (
 	_ secp256k1fx.VM       = &VM{}
 	_ validators.State     = &VM{}
 
-	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooEarly = errors.New("start time is before the current chain time")
-	errStartAfterEndTime = errors.New("start time is after the end time")
-	errWrongCacheType    = errors.New("unexpectedly cached type")
+	errDSCantValidate = errors.New("new blockchain can't be validated by primary network")
+	errWrongCacheType = errors.New("unexpectedly cached type")
 )
 
 const (
@@ -132,8 +130,8 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder builder.TxBuilder
-	// txVerifier verifiable.TxVerifier
+	txBuilder  builder.TxBuilder
+	txVerifier stateful.TxVerifier
 }
 
 // Initialize this blockchain.
@@ -235,17 +233,17 @@ func (vm *VM) Initialize(
 		vm.rewards,
 	)
 
-	// vm.txVerifier = verifiable.NewVerifier(
-	// 	vm.ctx,
-	// 	&vm.bootstrapped,
-	// 	&vm.Config,
-	// 	&vm.clock,
-	// 	vm.fx,
-	// 	vm.internalState,
-	// 	vm.uptimeManager,
-	// 	vm.spendOps,
-	// 	vm.rewards,
-	// )
+	vm.txVerifier = stateful.NewVerifier(
+		vm.ctx,
+		&vm.bootstrapped,
+		&vm.Config,
+		&vm.clock,
+		vm.fx,
+		vm.internalState,
+		vm.uptimeManager,
+		vm.spendOps,
+		vm.rewards,
+	)
 
 	vm.lastAcceptedID = is.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)

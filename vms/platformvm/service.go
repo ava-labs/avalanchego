@@ -581,7 +581,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
 		if !ok {
-			return errWrongTxType
+			return unsigned.ErrWrongTxType
 		}
 		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 		if !ok {
@@ -1843,7 +1843,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		for _, chainTx := range chains {
 			chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
 			if !ok {
-				return errWrongTxType
+				return unsigned.ErrWrongTxType
 			}
 			response.Blockchains = append(response.Blockchains, APIBlockchain{
 				ID:       chain.ID(),
@@ -1861,7 +1861,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	for _, chainTx := range chains {
 		chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
 		if !ok {
-			return errWrongTxType
+			return unsigned.ErrWrongTxType
 		}
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chain.ID(),
@@ -2210,7 +2210,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	startTime := time.Unix(int64(args.StartTime), 0)
 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	maxStakeAmount, err := service.vm.maxStakeAmount(
+	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
 		args.SubnetID,
 		args.NodeID,
 		startTime,

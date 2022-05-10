@@ -1,11 +1,13 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -14,44 +16,47 @@ import (
 	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 )
 
-var _ StatefulProposalTx = &StatefulAdvanceTimeTx{}
+var _ ProposalTx = &AdvanceTimeTx{}
 
-// StatefulAdvanceTimeTx is a transaction to increase the chain's timestamp.
-// When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
-// followed by a commit block) the staker set is also updated accordingly.
-// It must be that:
-//   * proposed timestamp > [current chain time]
-//   * proposed timestamp <= [time for next staker set change]
-type StatefulAdvanceTimeTx struct {
-	*unsigned.AdvanceTimeTx `serialize:"true"`
+// SyncBound is the synchrony bound used for safe decision making
+const SyncBound = 10 * time.Second
+
+type AdvanceTimeTx struct {
+	*unsigned.AdvanceTimeTx
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulAdvanceTimeTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
-	_, _, err := tx.Execute(vm, parentState, stx)
+func (tx *AdvanceTimeTx) SemanticVerify(
+	verifier TxVerifier,
+	parentState state.Mutable,
+	creds []verify.Verifiable,
+) error {
+	_, _, err := tx.Execute(verifier, parentState, creds)
 	return err
 }
 
 // Execute this transaction.
-func (tx *StatefulAdvanceTimeTx) Execute(
-	vm *VM,
+func (tx *AdvanceTimeTx) Execute(
+	verifier TxVerifier,
 	parentState state.Mutable,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
 	error,
 ) {
+	clock := verifier.Clock()
+
 	switch {
 	case tx == nil:
-		return nil, nil, errNilTx
-	case len(stx.Creds) != 0:
-		return nil, nil, errWrongNumberOfCredentials
+		return nil, nil, unsigned.ErrNilTx
+	case len(creds) != 0:
+		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	txTimestamp := tx.Timestamp()
-	localTimestamp := vm.clock.Time()
-	localTimestampPlusSync := localTimestamp.Add(syncBound)
+	localTimestamp := clock.Time()
+	localTimestampPlusSync := localTimestamp.Add(SyncBound)
 	if localTimestampPlusSync.Before(txTimestamp) {
 		return nil, nil, fmt.Errorf(
 			"proposed time (%s) is too far in the future relative to local time (%s)",
@@ -102,7 +107,7 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := vm.rewards.Calculate(
+			r := verifier.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
@@ -122,7 +127,7 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := vm.rewards.Calculate(
+			r := verifier.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
@@ -172,7 +177,7 @@ currentStakerLoop:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
 		default:
-			return nil, nil, errWrongTxType
+			return nil, nil, unsigned.ErrWrongTxType
 		}
 	}
 	newlyCurrentStakers, err := currentStakers.UpdateStakers(
@@ -197,9 +202,10 @@ currentStakerLoop:
 
 // InitiallyPrefersCommit returns true if the proposed time is at
 // or before the current time plus the synchrony bound
-func (tx *StatefulAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx *AdvanceTimeTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
+	clock := verifier.Clock()
 	txTimestamp := tx.Timestamp()
-	localTimestamp := vm.clock.Time()
-	localTimestampPlusSync := localTimestamp.Add(syncBound)
+	localTimestamp := clock.Time()
+	localTimestampPlusSync := localTimestamp.Add(SyncBound)
 	return !txTimestamp.After(localTimestampPlusSync)
 }

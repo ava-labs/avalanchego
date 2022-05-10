@@ -1,69 +1,76 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
+var _ DecisionTx = &CreateSubnetTx{}
 
-// StatefulCreateSubnetTx is an unsigned proposal to create a new subnet
-type StatefulCreateSubnetTx struct {
-	*unsigned.CreateSubnetTx `serialize:"true"`
+type CreateSubnetTx struct {
+	*unsigned.CreateSubnetTx
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
-func (tx *StatefulCreateSubnetTx) InputUTXOs() ids.Set { return nil }
+func (tx *CreateSubnetTx) InputUTXOs() ids.Set { return nil }
 
-func (tx *StatefulCreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+func (tx *CreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	return ids.ID{}, nil, nil
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulCreateSubnetTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
+func (tx *CreateSubnetTx) SemanticVerify(
+	verifier TxVerifier,
+	parentState state.Mutable,
+	creds []verify.Verifiable,
+) error {
 	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(vm, vs, stx)
+	_, err := tx.Execute(verifier, vs, creds)
 	return err
 }
 
 // Execute this transaction.
-func (tx *StatefulCreateSubnetTx) Execute(
-	vm *VM,
+func (tx *CreateSubnetTx) Execute(
+	verifier TxVerifier,
 	vs state.Versioned,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (
 	func() error,
 	error,
 ) {
+	var (
+		ctx = verifier.Ctx()
+		cfg = *verifier.PlatformConfig()
+	)
+
 	// Make sure this transaction is well formed.
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := tx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
 	// Verify the flowcheck
-	timestamp := vs.GetTimestamp()
-	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	if err := vm.spendOps.SemanticVerifySpend(
+	createSubnetTxFee := builder.GetCreateSubnetTxFee(cfg, vs.GetTimestamp())
+	if err := verifier.SemanticVerifySpend(
 		vs,
-		tx.CreateSubnetTx,
+		tx,
 		tx.Ins,
 		tx.Outs,
-		stx.Creds,
+		creds,
 		createSubnetTxFee,
-		vm.ctx.AVAXAssetID,
+		ctx.AVAXAssetID,
 	); err != nil {
 		return nil, err
 	}
@@ -72,16 +79,13 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
+	stx := &signed.Tx{
+		Unsigned: tx,
+		Creds:    creds,
+	}
 	vs.AddSubnet(stx)
 
 	return nil, nil
-}
-
-func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {
-	if t.Before(vm.ApricotPhase3Time) {
-		return vm.CreateAssetTxFee
-	}
-	return vm.CreateSubnetTxFee
 }

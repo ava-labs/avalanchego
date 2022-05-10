@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var (
@@ -101,13 +103,13 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		txID := tx.Unsigned.ID()
 
-		statefulTx, err := MakeStatefulTx(tx)
+		statefulTx, err := stateful.MakeStatefulTx(tx)
 		if err != nil {
 			return err
 		}
-		decisionTx, ok := statefulTx.(StatefulDecisionTx)
+		decisionTx, ok := statefulTx.(stateful.DecisionTx)
 		if !ok {
-			return errWrongTxType
+			return unsigned.ErrWrongTxType
 		}
 
 		inputUTXOs := decisionTx.InputUTXOs()
@@ -118,7 +120,7 @@ func (sb *StandardBlock) Verify() error {
 		// Add UTXOs to batch
 		sb.inputs.Union(inputUTXOs)
 
-		onAccept, err := decisionTx.Execute(sb.vm, sb.onAcceptState, tx)
+		onAccept, err := decisionTx.Execute(sb.vm.txVerifier, sb.onAcceptState, tx.Creds)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			return err
@@ -169,13 +171,13 @@ func (sb *StandardBlock) Accept() error {
 	// Set up the shared memory operations
 	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range sb.Txs {
-		statefulTx, err := MakeStatefulTx(tx)
+		statefulTx, err := stateful.MakeStatefulTx(tx)
 		if err != nil {
 			return err
 		}
-		decisionTx, ok := statefulTx.(StatefulDecisionTx)
+		decisionTx, ok := statefulTx.(stateful.DecisionTx)
 		if !ok {
-			return errWrongTxType
+			return unsigned.ErrWrongTxType
 		}
 
 		// Get the shared memory operations this transaction is performing

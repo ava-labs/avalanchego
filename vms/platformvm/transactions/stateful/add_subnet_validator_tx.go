@@ -1,78 +1,79 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var (
-	_ StatefulProposalTx = &StatefulAddSubnetValidatorTx{}
-	_ timed.Tx           = &StatefulAddSubnetValidatorTx{}
+var _ ProposalTx = &AddSubnetValidatorTx{}
 
-	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
-)
-
-// StatefulAddSubnetValidatorTx is an unsigned addSubnetValidatorTx
-type StatefulAddSubnetValidatorTx struct {
-	*unsigned.AddSubnetValidatorTx `serialize:"true"`
+type AddSubnetValidatorTx struct {
+	*unsigned.AddSubnetValidatorTx
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
+func (tx *AddSubnetValidatorTx) SemanticVerify(
+	verifier TxVerifier,
+	parentState state.Mutable,
+	creds []verify.Verifiable,
+) error {
+	clock := verifier.Clock()
 	startTime := tx.StartTime()
-	maxLocalStartTime := vm.clock.Time().Add(maxFutureStartTime)
+	maxLocalStartTime := clock.Time().Add(MaxFutureStartTime)
 	if startTime.After(maxLocalStartTime) {
-		return errFutureStakeTime
+		return ErrFutureStakeTime
 	}
 
-	_, _, err := tx.Execute(vm, parentState, stx)
+	_, _, err := tx.Execute(verifier, parentState, creds)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
-	if errors.Is(err, errFutureStakeTime) {
+	if errors.Is(err, ErrFutureStakeTime) {
 		return nil
 	}
 	return err
 }
 
 // Execute this transaction.
-func (tx *StatefulAddSubnetValidatorTx) Execute(
-	vm *VM,
+func (tx *AddSubnetValidatorTx) Execute(
+	verifier TxVerifier,
 	parentState state.Mutable,
-	stx *signed.Tx,
+	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
 	error,
 ) {
+	ctx := verifier.Ctx()
+
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := tx.SyntacticVerify(verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
-		return nil, nil, errStakeTooShort
-	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
-		return nil, nil, errStakeTooLong
-	case len(stx.Creds) == 0:
-		return nil, nil, errWrongNumberOfCredentials
+	case duration < verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
+		return nil, nil, ErrStakeTooShort
+	case duration > verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
+		return nil, nil, ErrStakeTooLong
+	case len(creds) == 0:
+		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()
 	pendingStakers := parentState.PendingStakerChainState()
 
-	if vm.bootstrapped.GetValue() {
+	if verifier.Bootstrapped() {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
@@ -113,7 +114,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
-					return nil, nil, errDSValidatorSubset
+					return nil, nil, unsigned.ErrDSValidatorSubset
 				}
 				return nil, nil, fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
@@ -126,7 +127,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 		// Ensure that the period this validator validates the specified subnet
 		// is a subset of the time they validate the primary network.
 		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-			return nil, nil, errDSValidatorSubset
+			return nil, nil, unsigned.ErrDSValidatorSubset
 		}
 
 		// Ensure that this transaction isn't a duplicate add validator tx.
@@ -139,14 +140,14 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 			)
 		}
 
-		baseTxCredsLen := len(stx.Creds) - 1
-		baseTxCreds := stx.Creds[:baseTxCredsLen]
-		subnetCred := stx.Creds[baseTxCredsLen]
+		baseTxCredsLen := len(creds) - 1
+		baseTxCreds := creds[:baseTxCredsLen]
+		subnetCred := creds[baseTxCredsLen]
 
 		subnetIntf, _, err := parentState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			if err == database.ErrNotFound {
-				return nil, nil, errDSValidatorSubset
+				return nil, nil, unsigned.ErrDSValidatorSubset
 			}
 			return nil, nil, fmt.Errorf(
 				"couldn't find subnet %s with %w",
@@ -163,19 +164,18 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 			)
 		}
 
-		if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+		if err := verifier.FeatureExtension().VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 			return nil, nil, err
 		}
 
 		// Verify the flowcheck
-		if err := vm.spendOps.SemanticVerifySpend(
-			parentState,
-			tx.AddSubnetValidatorTx,
+		if err := verifier.SemanticVerifySpend(parentState,
+			tx,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
-			vm.TxFee,
-			vm.ctx.AVAXAssetID,
+			verifier.PlatformConfig().TxFee,
+			ctx.AVAXAssetID,
 		); err != nil {
 			return nil, nil, err
 		}
@@ -183,13 +183,17 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 		// Make sure the tx doesn't start too far in the future. This is done
 		// last to allow SemanticVerification to explicitly check for this
 		// error.
-		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {
-			return nil, nil, errFutureStakeTime
+			return nil, nil, ErrFutureStakeTime
 		}
 	}
 
 	// Set up the state if this tx is committed
+	stx := &signed.Tx{
+		Unsigned: tx.AddSubnetValidatorTx,
+		Creds:    creds,
+	}
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
 	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 
@@ -197,20 +201,21 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 	utxos.ConsumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	utxos.ProduceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onCommitState, txID, ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onAbortState, txID, ctx.AVAXAssetID, tx.Outs)
 
 	return onCommitState, onAbortState, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *StatefulAddSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
-	return tx.StartTime().After(vm.clock.Time())
+func (tx *AddSubnetValidatorTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
+	clock := verifier.Clock()
+	return tx.StartTime().After(clock.Time())
 }

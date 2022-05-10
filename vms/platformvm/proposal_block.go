@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var _ Block = &ProposalBlock{}
@@ -113,13 +115,13 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	statefulTx, err := MakeStatefulTx(&pb.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx)
 	if err != nil {
 		return err
 	}
-	tx, ok := statefulTx.(StatefulProposalTx)
+	tx, ok := statefulTx.(stateful.ProposalTx)
 	if !ok {
-		return errWrongTxType
+		return unsigned.ErrWrongTxType
 	}
 
 	parentIntf, parentErr := pb.parentBlock()
@@ -136,7 +138,7 @@ func (pb *ProposalBlock) Verify() error {
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
 
-	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
+	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm.txVerifier, parentState, pb.Tx.Creds)
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
@@ -155,22 +157,22 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	statefulTx, err := MakeStatefulTx(&pb.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx)
 	if err != nil {
 		return [2]snowman.Block{}, err
 	}
-	proposalTx, ok := statefulTx.(StatefulProposalTx)
+	proposalTx, ok := statefulTx.(stateful.ProposalTx)
 	if !ok {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"%w, expected UnsignedProposalTx but got %T",
-			errWrongTxType,
+			unsigned.ErrWrongTxType,
 			pb.Tx.Unsigned,
 		)
 	}
 
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit := proposalTx.InitiallyPrefersCommit(pb.vm)
+	prefersCommit := proposalTx.InitiallyPrefersCommit(pb.vm.txVerifier)
 
 	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
 	if err != nil {

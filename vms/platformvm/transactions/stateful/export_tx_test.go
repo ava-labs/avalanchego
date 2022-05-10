@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"testing"
@@ -12,16 +12,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 func TestNewExportTx(t *testing.T) {
-	vm, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	h := newTestHelpersCollection()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -33,7 +32,7 @@ func TestNewExportTx(t *testing.T) {
 		shouldVerify       bool
 	}
 
-	sourceKey := keys[0]
+	sourceKey := preFundedKeys[0]
 
 	tests := []test{
 		{
@@ -48,7 +47,7 @@ func TestNewExportTx(t *testing.T) {
 			description:        "P->C export",
 			destinationChainID: cChainID,
 			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:          vm.ApricotPhase5Time,
+			timestamp:          h.cfg.ApricotPhase5Time,
 			shouldErr:          false,
 			shouldVerify:       true,
 		},
@@ -58,21 +57,20 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
-			tx, err := vm.txBuilder.NewExportTx(defaultBalance-defaultTxFee, tt.destinationChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			tx, err := h.txBuilder.NewExportTx(
+				defaultBalance-defaultTxFee, // Amount of tokens to export
+				tt.destinationChainID,
+				to,
+				tt.sourceKeys,
+				ids.ShortEmpty, // Change address
+			)
 			if tt.shouldErr {
 				assert.Error(err)
 				return
 			}
 			assert.NoError(err)
 
-			// Get the preferred block (which we want to build off)
-			preferred, err := vm.Preferred()
-			assert.NoError(err)
-
-			preferredDecision, ok := preferred.(decision)
-			assert.True(ok)
-
-			preferredState := preferredDecision.onAccept()
+			preferredState := h.tState
 			fakedState := state.NewVersioned(
 				preferredState,
 				preferredState.CurrentStakerChainState(),
@@ -80,9 +78,12 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			statefulTx, err := MakeStatefulTx(tx)
-			assert.NoError(err)
-			err = statefulTx.SemanticVerify(vm, fakedState, tx)
+			uTx, ok := tx.Unsigned.(*unsigned.ExportTx)
+			assert.True(ok)
+			verifiableTx := ExportTx{
+				ExportTx: uTx,
+			}
+			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState, tx.Creds)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {
