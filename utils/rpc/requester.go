@@ -13,6 +13,11 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
+var (
+	_ requester         = &jsonRPCRequester{}
+	_ EndpointRequester = &avalancheEndpointRequester{}
+)
+
 type requester interface {
 	sendJSONRPCRequest(
 		ctx context.Context,
@@ -69,16 +74,17 @@ func (requester jsonRPCRequester) sendJSONRPCRequest(
 	if err != nil {
 		return fmt.Errorf("problem while making JSON RPC POST request to %s: %w", url, err)
 	}
-	statusCode := resp.StatusCode
 
 	// Return an error for any non successful status code
-	if statusCode < 200 || statusCode > 299 {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Drop any error during close to report the original error
 		_ = resp.Body.Close()
-		return fmt.Errorf("received status code '%v'", statusCode)
+		return fmt.Errorf("received status code %d", resp.StatusCode)
 	}
 
 	if err := rpc.DecodeClientResponse(resp.Body, reply); err != nil {
+		// Drop any error during close to report the original error
+		_ = resp.Body.Close()
 		return err
 	}
 	return resp.Body.Close()

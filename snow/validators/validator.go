@@ -11,6 +11,8 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var _ Validator = &validator{}
+
 // Validator is the minimal description of someone that can be sampled.
 type Validator interface {
 	// ID returns the node ID of this validator
@@ -61,9 +63,8 @@ func NewValidator(
 
 // GenerateRandomValidator creates a random validator with the provided weight
 func GenerateRandomValidator(weight uint64) Validator {
-	nodeID := ids.GenerateTestNodeID()
 	return NewValidator(
-		nodeID,
+		ids.GenerateTestNodeID(),
 		weight,
 	)
 }

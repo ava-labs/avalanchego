@@ -49,6 +49,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	uptime_utils "github.com/ava-labs/avalanchego/utils/uptime"
+
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -2101,6 +2104,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
+	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), uptime_utils.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
@@ -2108,6 +2113,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		time.Hour,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 

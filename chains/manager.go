@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
@@ -185,6 +186,9 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+
+	// Tracks CPU usage caused by each peer.
+	CPUTracker timetracker.TimeTracker
 
 	StateSyncBeacons         []ids.NodeID
 	StateSyncDisableRequests bool
@@ -612,6 +616,7 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
+		m.CPUTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -806,6 +811,7 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
+		m.CPUTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)

@@ -45,7 +45,6 @@ const (
 var (
 	errCompressed = errors.New("wasn't expecting a compressed key")
 
-	// Interface compliance
 	_ RecoverableFactory = &FactorySECP256K1R{}
 	_ PublicKey          = &PublicKeySECP256K1R{}
 	_ PrivateKey         = &PrivateKeySECP256K1R{}

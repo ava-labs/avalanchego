@@ -84,7 +84,7 @@ func (inMsg *inboundMessage) String() string {
 	case Notify:
 		sb.WriteString(fmt.Sprintf(", Notification: %d)", inMsg.fields[VMMessage].(uint32)))
 	case AppRequest, AppResponse, AppGossip:
-		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", inMsg.fields[AppBytes].([]byte)))
+		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", len(inMsg.fields[AppBytes].([]byte))))
 	default:
 		sb.WriteString(")")
 	}

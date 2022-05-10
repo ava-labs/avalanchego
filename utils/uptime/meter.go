@@ -22,4 +22,9 @@ type Meter interface {
 	// percent of time the meter has been running recently. The definition of
 	// recently depends on the halflife of the decay function.
 	Read(time.Time) float64
+
+	// Returns the duration between [now] and when the value of this meter
+	// reaches [value], assuming that the number of cores running is always 0.
+	// If the value of this meter is already <= [value], returns the zero duration.
+	TimeUntil(now time.Time, value float64) time.Duration
 }
