@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto"
+	"math"
 	"net"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -27,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
+
+	uptime_utils "github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 var (
@@ -68,6 +72,9 @@ var (
 				RefillRate:   units.MiB,
 				MaxBurstSize: constants.DefaultMaxMessageSize,
 			},
+			CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+				MaxRecheckDelay: 50 * time.Millisecond,
+			},
 			MaxProcessingMsgsPerNode: 100,
 		},
 		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
@@ -81,6 +88,7 @@ var (
 		ThrottleRps:       100,
 		ConnectionTimeout: time.Second,
 	}
+
 	defaultConfig = Config{
 		HealthConfig:         defaultHealthConfig,
 		PeerListGossipConfig: defaultPeerListGossipConfig,
@@ -105,8 +113,40 @@ var (
 		RequireValidatorToConnect: false,
 
 		MaximumInboundMessageTimeout: 30 * time.Second,
+		CPUTracker:                   newDefaultCPUTracker(),
+		CPUTargeter:                  nil, // Set in init
 	}
 )
+
+func init() {
+	defaultConfig.CPUTargeter = newDefaultCPUTargeter(defaultConfig.CPUTracker)
+}
+
+func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			CPUTarget:                    math.MaxFloat64,
+			VdrCPUPercentage:             0.5,
+			SinglePeerMaxUsagePercentage: 0.5,
+			MaxScaling:                   20,
+		},
+		validators.NewSet(),
+		cpuTracker,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return cpuTargeter
+}
+
+func newDefaultCPUTracker() tracker.TimeTracker {
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime_utils.ContinuousFactory{}, 10*time.Second, validators.NewSet())
+	if err != nil {
+		panic(err)
+	}
+	return cpuTracker
+}
 
 func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
@@ -298,7 +338,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
 	assert.NoError(err)
 
-	network.Track(utils.IPCertDesc{
+	useful := network.Track(utils.IPCertDesc{
 		Cert: tlsCert.Leaf,
 		IPDesc: utils.IPDesc{
 			IP:   net.IPv4(123, 132, 123, 123),
@@ -307,6 +347,8 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 		Time:      1000,
 		Signature: nil,
 	})
+	// The signature is wrong so this peer tracking info isn't useful.
+	assert.False(useful)
 
 	network.peersLock.RLock()
 	assert.Empty(network.trackedIPs)

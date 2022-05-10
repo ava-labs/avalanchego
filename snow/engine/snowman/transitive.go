@@ -618,11 +618,14 @@ func (t *Transitive) sendMixedQuery(blk snowman.Block) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		// Send a push query to some of the validators, and a pull query to the rest.
-		// Note that [vdrList] doesn't contain duplicates so its length may be < k.
+		numPushTo := t.Params.MixedQueryNumPushVdr
+		if !t.Validators.Contains(t.Ctx.NodeID) {
+			numPushTo = t.Params.MixedQueryNumPushNonVdr
+		}
 		common.SendMixedQuery(
 			t.Sender,
-			vdrBag.List(),
-			t.Params.MixedQueryNumPush,
+			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
+			numPushTo,
 			t.RequestID,
 			blk.ID(),
 			blk.Bytes(),

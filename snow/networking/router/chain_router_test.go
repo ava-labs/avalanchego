@@ -18,9 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -57,6 +59,8 @@ func TestShutdown(t *testing.T) {
 	shutdownCalled := make(chan struct{}, 1)
 
 	ctx := snow.DefaultConsensusContextTest()
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -64,6 +68,7 @@ func TestShutdown(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 
@@ -158,6 +163,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -165,6 +172,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 
@@ -267,6 +275,8 @@ func TestRouterTimeout(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -274,6 +284,7 @@ func TestRouterTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 
@@ -381,6 +392,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -388,6 +401,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 
@@ -494,7 +508,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	vID := ids.GenerateTestNodeID()
 	err = vdrs.AddWeight(vID, 1)
 	assert.NoError(t, err)
-
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -502,6 +517,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 

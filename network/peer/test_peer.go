@@ -15,11 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -85,6 +87,10 @@ func StartTestPeer(
 		IP:   net.IPv6zero,
 		Port: 0,
 	}
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second, validators.NewSet())
+	if err != nil {
+		return nil, err
+	}
 	peer := Start(
 		&Config{
 			Metrics:              metrics,
@@ -110,6 +116,7 @@ func StartTestPeer(
 			PingFrequency:        constants.DefaultPingFrequency,
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
+			CPUTracker:           cpuTracker,
 		},
 		conn,
 		cert,

@@ -5,7 +5,7 @@ package unsigned
 
 import (
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 )
 
 var _ Tx = &CreateSubnetTx{}
@@ -15,7 +15,7 @@ type CreateSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Who is authorized to manage this subnet
-	Owner featurextension.Owner `serialize:"true" json:"owner"`
+	Owner fx.Owner `serialize:"true" json:"owner"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
