@@ -13,21 +13,11 @@ const (
 )
 
 var (
-	errDifferentApps             = errors.New("different applications")
-	_                Application = &application{}
+	errDifferentApps = errors.New("different applications")
 )
 
-// Application defines what is needed to describe a versioned
-// Application.
-type Application interface {
-	Version
-	App() string
-	Compatible(Application) error
-	Before(Application) bool
-}
-
-type application struct {
-	Version
+type Application struct {
+	Semantic
 	app string
 	str string
 }
@@ -58,10 +48,10 @@ func NewApplication(
 	minor int,
 	patch int,
 ) Application {
-	v := NewVersion(major, minor, patch, "", versionSeparator)
-	return &application{
-		Version: v,
-		app:     app,
+	v := NewSemantic(major, minor, patch, "", versionSeparator)
+	return Application{
+		Semantic: v,
+		app:      app,
 		str: fmt.Sprintf("%s%s%s",
 			app,
 			appSeparator,
@@ -70,24 +60,24 @@ func NewApplication(
 	}
 }
 
-func (v *application) App() string    { return v.app }
-func (v *application) String() string { return v.str }
+func (a Application) App() string    { return a.app }
+func (a Application) String() string { return a.str }
 
-func (v *application) Compatible(o Application) error {
+func (a Application) Compatible(other Application) error {
 	switch {
-	case v.App() != o.App():
+	case a.App() != other.App():
 		return errDifferentApps
-	case v.Major() > o.Major():
+	case a.Major > other.Major:
 		return errDifferentMajor
 	default:
 		return nil
 	}
 }
 
-func (v *application) Before(o Application) bool {
-	if v.App() != o.App() {
+func (a Application) Before(other Application) bool {
+	if a.App() != other.App() {
 		return false
 	}
 
-	return v.Compare(o) < 0
+	return a.Compare(other.Semantic) < 0
 }

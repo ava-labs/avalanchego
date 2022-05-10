@@ -16,8 +16,8 @@ func TestDefaultVersionParser(t *testing.T) {
 	assert.NotNil(t, v)
 	assert.Equal(t, "v1.2.3", v.String())
 	assert.Equal(t, 1, v.Major())
-	assert.Equal(t, 2, v.Minor())
-	assert.Equal(t, 3, v.Patch())
+	assert.Equal(t, 2, v.Minor)
+	assert.Equal(t, 3, v.Patch)
 
 	badVersions := []string{
 		"",
@@ -40,8 +40,8 @@ func TestDefaultApplicationParser(t *testing.T) {
 	assert.Equal(t, "avalanche/1.2.3", v.String())
 	assert.Equal(t, "avalanche", v.App())
 	assert.Equal(t, 1, v.Major())
-	assert.Equal(t, 2, v.Minor())
-	assert.Equal(t, 3, v.Patch())
+	assert.Equal(t, 2, v.Minor)
+	assert.Equal(t, 3, v.Patch)
 	assert.NoError(t, v.Compatible(v))
 	assert.False(t, v.Before(v))
 
@@ -68,8 +68,8 @@ func TestNewApplicationParser(t *testing.T) {
 	assert.Equal(t, "avalanche:1,2,3", v.String())
 	assert.Equal(t, "avalanche", v.App())
 	assert.Equal(t, 1, v.Major())
-	assert.Equal(t, 2, v.Minor())
-	assert.Equal(t, 3, v.Patch())
+	assert.Equal(t, 2, v.Minor)
+	assert.Equal(t, 3, v.Patch)
 	assert.NoError(t, v.Compatible(v))
 	assert.False(t, v.Before(v))
 }

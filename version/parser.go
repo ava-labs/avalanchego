@@ -16,7 +16,7 @@ var (
 
 // Parser defines the interface of a Version parser
 type Parser interface {
-	Parse(string) (Version, error)
+	Parse(string) (Semantic, error)
 }
 
 type parser struct {
@@ -31,32 +31,32 @@ func NewParser(prefix, separator string) Parser {
 	}
 }
 
-func (p *parser) Parse(s string) (Version, error) {
+func (p *parser) Parse(s string) (Semantic, error) {
 	if !strings.HasPrefix(s, p.prefix) {
-		return nil, fmt.Errorf("version string: %s missing required prefix: %s", s, p.prefix)
+		return Semantic{}, fmt.Errorf("version string: %s missing required prefix: %s", s, p.prefix)
 	}
 
 	splitVersion := strings.SplitN(strings.TrimPrefix(s, p.prefix), p.separator, 3)
 	if len(splitVersion) != 3 {
-		return nil, fmt.Errorf("failed to parse %s as a version", s)
+		return Semantic{}, fmt.Errorf("failed to parse %s as a version", s)
 	}
 
 	major, err := strconv.Atoi(splitVersion[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse %s as a version due to %w", s, err)
+		return Semantic{}, fmt.Errorf("failed to parse %s as a version due to %w", s, err)
 	}
 
 	minor, err := strconv.Atoi(splitVersion[1])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse %s as a version due to %w", s, err)
+		return Semantic{}, fmt.Errorf("failed to parse %s as a version due to %w", s, err)
 	}
 
 	patch, err := strconv.Atoi(splitVersion[2])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse %s as a version due to %w", s, err)
+		return Semantic{}, fmt.Errorf("failed to parse %s as a version due to %w", s, err)
 	}
 
-	return NewVersion(
+	return NewSemantic(
 		major,
 		minor,
 		patch,
@@ -66,43 +66,39 @@ func (p *parser) Parse(s string) (Version, error) {
 }
 
 // ApplicationParser defines the interface of an ApplicationVersion parser
-type ApplicationParser interface {
-	Parse(string) (Application, error)
-}
-
-type applicationParser struct {
+type ApplicationParser struct {
 	appSeparator  string
-	versionParser *parser
+	versionParser parser
 }
 
 // NewApplicationParser returns a new parser
 func NewApplicationParser(appSeparator string, versionSeparator string) ApplicationParser {
-	return &applicationParser{
+	return ApplicationParser{
 		appSeparator: appSeparator,
-		versionParser: &parser{
+		versionParser: parser{
 			prefix:    "",
 			separator: versionSeparator,
 		},
 	}
 }
 
-func (p *applicationParser) Parse(s string) (Application, error) {
+func (p ApplicationParser) Parse(s string) (Application, error) {
 	splitApp := strings.SplitN(s, p.appSeparator, 2)
 	if len(splitApp) != 2 {
-		return nil, fmt.Errorf("failed to parse %s as a version", s)
+		return Application{}, fmt.Errorf("failed to parse %s as a version", s)
 	}
 
 	version, err := p.versionParser.Parse(splitApp[1])
 	if err != nil {
-		return nil, err
+		return Application{}, err
 	}
 
 	return NewApplication(
 		splitApp[0],
 		p.appSeparator,
 		p.versionParser.separator,
-		version.Major(),
-		version.Minor(),
-		version.Patch(),
+		version.Major,
+		version.Minor,
+		version.Patch,
 	), nil
 }

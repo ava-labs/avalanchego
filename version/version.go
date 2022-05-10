@@ -15,37 +15,29 @@ const (
 
 var (
 	// DefaultVersion1_0_0 is a useful version to use in tests
-	DefaultVersion1_0_0 = NewDefaultVersion(1, 0, 0)
+	DefaultVersion1_0_0 = NewDefaultSemantic(1, 0, 0)
 
 	errDifferentMajor = errors.New("different major version")
+
+	_ fmt.Stringer = &Semantic{}
 )
 
-type Version interface {
-	fmt.Stringer
-
-	Major() int
-	Minor() int
-	Patch() int
-	// Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
-	Compare(o Version) int
+type Semantic struct {
+	Major int    `json:"major" yaml:"major"`
+	Minor int    `json:"minor" yaml:"minor"`
+	Patch int    `json:"patch" yaml:"patch"`
+	Str   string `json:"string" yaml:"string"`
 }
 
-type SemanticVersion struct {
-	MajorVersion int    `yaml:"major"`
-	MinorVersion int    `yaml:"minor"`
-	PatchVersion int    `yaml:"patch"`
-	Str          string `yaml:"string"`
+func NewDefaultSemantic(major, minor, patch int) Semantic {
+	return NewSemantic(major, minor, patch, defaultVersionPrefix, defaultVersionSeparator)
 }
 
-func NewDefaultVersion(major, minor, patch int) Version {
-	return NewVersion(major, minor, patch, defaultVersionPrefix, defaultVersionSeparator)
-}
-
-func NewVersion(major, minor, patch int, prefix, versionSeparator string) *SemanticVersion {
-	return &SemanticVersion{
-		MajorVersion: major,
-		MinorVersion: minor,
-		PatchVersion: patch,
+func NewSemantic(major, minor, patch int, prefix, versionSeparator string) Semantic {
+	return Semantic{
+		Major: major,
+		Minor: minor,
+		Patch: patch,
 		Str: fmt.Sprintf(
 			"%s%d%s%d%s%d",
 			prefix,
@@ -58,16 +50,13 @@ func NewVersion(major, minor, patch int, prefix, versionSeparator string) *Seman
 	}
 }
 
-func (v *SemanticVersion) String() string { return v.Str }
-func (v *SemanticVersion) Major() int     { return v.MajorVersion }
-func (v *SemanticVersion) Minor() int     { return v.MinorVersion }
-func (v *SemanticVersion) Patch() int     { return v.PatchVersion }
+func (s Semantic) String() string { return s.Str }
 
 // Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
-func (v *SemanticVersion) Compare(o Version) int {
+func (s Semantic) Compare(other Semantic) int {
 	{
-		vm := v.Major()
-		om := o.Major()
+		vm := s.Major
+		om := other.Major
 
 		if vm != om {
 			return vm - om
@@ -75,8 +64,8 @@ func (v *SemanticVersion) Compare(o Version) int {
 	}
 
 	{
-		vm := v.Minor()
-		om := o.Minor()
+		vm := s.Minor
+		om := other.Minor
 
 		if vm != om {
 			return vm - om
@@ -84,8 +73,8 @@ func (v *SemanticVersion) Compare(o Version) int {
 	}
 
 	{
-		vp := v.Patch()
-		op := o.Patch()
+		vp := s.Patch
+		op := other.Patch
 
 		return vp - op
 	}

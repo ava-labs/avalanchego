@@ -21,8 +21,8 @@ var (
 	CurrentDatabase = DatabaseVersion1_4_5
 	PrevDatabase    = DatabaseVersion1_0_0
 
-	DatabaseVersion1_4_5 = NewDefaultVersion(1, 4, 5)
-	DatabaseVersion1_0_0 = NewDefaultVersion(1, 0, 0)
+	DatabaseVersion1_4_5 = NewDefaultSemantic(1, 4, 5)
+	DatabaseVersion1_0_0 = NewDefaultSemantic(1, 0, 0)
 
 	ApricotPhase0Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2020, time.December, 8, 3, 0, 0, 0, time.UTC),

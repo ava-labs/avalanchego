@@ -44,7 +44,7 @@ func TestBuildVersion(t *testing.T) {
 		IP: net.IPv4(1, 2, 3, 4),
 	}
 
-	myVersion := version.NewDefaultVersion(1, 2, 3).String()
+	myVersion := version.NewDefaultSemantic(1, 2, 3).String()
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
