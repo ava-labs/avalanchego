@@ -279,13 +279,3 @@ func (tx *StatefulRewardValidatorTx) Execute(
 func (tx *StatefulRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 	return tx.ShouldPreferCommit
 }
-
-// RewardStakerTx creates a new transaction that proposes to remove the staker
-// [validatorID] from the default validator set.
-func (vm *VM) newRewardValidatorTx(txID ids.ID) (*signed.Tx, error) {
-	utx := &unsigned.RewardValidatorTx{
-		TxID: txID,
-	}
-	tx := &signed.Tx{Unsigned: utx}
-	return tx, tx.Sign(Codec, nil)
-}

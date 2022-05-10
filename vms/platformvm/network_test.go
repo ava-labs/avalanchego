@@ -16,7 +16,7 @@ import (
 )
 
 func getValidTx(vm *VM, t *testing.T) *signed.Tx {
-	res, err := vm.newCreateChainTx(
+	res, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,

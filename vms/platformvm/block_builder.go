@@ -182,7 +182,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldReward {
-		rewardValidatorTx, err := m.vm.newRewardValidatorTx(stakerTxID)
+		rewardValidatorTx, err := m.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
 			return nil, err
 		}
@@ -195,7 +195,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldAdvanceTime {
-		advanceTimeTx, err := m.vm.newAdvanceTimeTx(nextChainTime)
+		advanceTimeTx, err := m.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +219,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if startTime.After(maxChainStartTime) {
 		m.AddProposalTx(tx)
 
-		advanceTimeTx, err := m.vm.newAdvanceTimeTx(m.vm.clock.Time())
+		advanceTimeTx, err := m.vm.txBuilder.NewAdvanceTimeTx(m.vm.clock.Time())
 		if err != nil {
 			return nil, err
 		}

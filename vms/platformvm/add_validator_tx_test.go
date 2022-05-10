@@ -40,7 +40,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case 3: Wrong Network ID
-	tx, err := vm.newAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -62,7 +62,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: Stake owner has no addresses
-	tx, err = vm.newAddValidatorTx(
+	tx, err = vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -94,7 +94,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: Rewards owner has no addresses
-	tx, err = vm.newAddValidatorTx(
+	tx, err = vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -120,7 +120,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: Too many shares
-	tx, err = vm.newAddValidatorTx(
+	tx, err = vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -142,7 +142,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: Valid
-	if tx, err := vm.newAddValidatorTx(
+	if tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -177,7 +177,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	nodeID := key.PublicKey().Address()
 
 	// Case: Validator's start time too early
-	if tx, err := vm.newAddValidatorTx(
+	if tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix())-1,
 		uint64(defaultValidateEndTime.Unix()),
@@ -195,7 +195,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	}
 
 	// Case: Validator's start time too far in the future
-	if tx, err := vm.newAddValidatorTx(
+	if tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
@@ -213,7 +213,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	}
 
 	// Case: Validator already validating primary network
-	if tx, err := vm.newAddValidatorTx(
+	if tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -236,7 +236,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
-	tx, err := vm.newAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,     // stake amount
 		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
@@ -268,7 +268,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	}
 
 	// Case: Validator doesn't have enough tokens to cover stake amount
-	if _, err := vm.newAddValidatorTx( // create the tx
+	if _, err := vm.txBuilder.NewAddValidatorTx( // create the tx
 		vm.MinValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),

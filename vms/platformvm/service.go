@@ -1040,7 +1040,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddValidatorTx(
+	tx, err := service.vm.txBuilder.NewAddValidatorTx(
 		args.GetWeight(),                     // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
@@ -1142,7 +1142,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddDelegatorTx(
+	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		args.GetWeight(),       // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
@@ -1239,7 +1239,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddSubnetValidatorTx(
+	tx, err := service.vm.txBuilder.NewAddSubnetValidatorTx(
 		args.GetWeight(),       // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
@@ -1314,7 +1314,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newCreateSubnetTx(
+	tx, err := service.vm.txBuilder.NewCreateSubnetTx(
 		uint32(args.Threshold), // Threshold
 		controlKeys.List(),     // Control Addresses
 		privKeys.Keys,          // Private keys
@@ -1395,7 +1395,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newExportTx(
+	tx, err := service.vm.txBuilder.NewExportTx(
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
@@ -1477,7 +1477,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 		}
 	}
 
-	tx, err := service.vm.newImportTx(chainID, to, privKeys.Keys, changeAddr)
+	tx, err := service.vm.txBuilder.NewImportTx(chainID, to, privKeys.Keys, changeAddr)
 	if err != nil {
 		return err
 	}
@@ -1590,7 +1590,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newCreateChainTx(
+	tx, err := service.vm.txBuilder.NewCreateChainTx(
 		args.SubnetID,
 		genesisBytes,
 		vmID,

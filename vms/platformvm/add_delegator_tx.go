@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -221,48 +219,6 @@ func (tx *StatefulAddDelegatorTx) Execute(
 // after the current wall clock time,
 func (tx *StatefulAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
-}
-
-// Creates a new transaction
-func (vm *VM) newAddDelegatorTx(
-	stakeAmt, // Amount the delegator stakes
-	startTime, // Unix time they start delegating
-	endTime uint64, // Unix time they stop delegating
-	nodeID ids.NodeID, // ID of the node we are delegating to
-	rewardAddress ids.ShortID, // Address to send reward to, if applicable
-	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
-	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*signed.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-	// Create the tx
-	utx := &unsigned.AddDelegatorTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unlockedOuts,
-		}},
-		Validator: validators.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmt,
-		},
-		Stake: lockedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
-		},
-	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
-		return nil, err
-	}
-	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 // CanDelegate returns if the [new] delegator can be added to a validator who

@@ -71,7 +71,7 @@ func TestAtomicTxImports(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.newImportTx(
+	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},

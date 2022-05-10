@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -116,54 +114,6 @@ func (tx *StatefulCreateChainTx) Execute(
 	// subnet that validates the blockchain, create the blockchain
 	onAccept := func() error { return platformutils.CreateChain(vm.Config, tx.CreateChainTx) }
 	return onAccept, nil
-}
-
-// Create a new transaction
-func (vm *VM) newCreateChainTx(
-	subnetID ids.ID, // ID of the subnet that validates the new chain
-	genesisData []byte, // Byte repr. of genesis state of the new chain
-	vmID ids.ID, // VM this chain runs
-	fxIDs []ids.ID, // fxs this chain supports
-	chainName string, // Name of the chain
-	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
-	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*signed.Tx, error) {
-	timestamp := vm.internalState.GetTimestamp()
-	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
-	ins, outs, _, signers, err := vm.stake(keys, 0, createBlockchainTxFee, changeAddr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	subnetAuth, subnetSigners, err := vm.authorize(vm.internalState, subnetID, keys)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
-	}
-	signers = append(signers, subnetSigners)
-
-	// Sort the provided fxIDs
-	ids.SortIDs(fxIDs)
-
-	// Create the tx
-	utx := &unsigned.CreateChainTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-		}},
-		SubnetID:    subnetID,
-		ChainName:   chainName,
-		VMID:        vmID,
-		FxIDs:       fxIDs,
-		GenesisData: genesisData,
-		SubnetAuth:  subnetAuth,
-	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
-		return nil, err
-	}
-	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateBlockchainTxFee(t time.Time) uint64 {

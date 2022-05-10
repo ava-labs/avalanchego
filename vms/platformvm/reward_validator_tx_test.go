@@ -50,7 +50,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	toRemove := statefulTx.(*StatefulAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
+	if tx, err := vm.txBuilder.NewRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
 	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
@@ -60,14 +60,14 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	vm.internalState.SetTimestamp(toRemove.EndTime())
 
 	// Case 2: Wrong validator
-	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
+	if tx, err := vm.txBuilder.NewRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
 	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
 	// Case 3: Happy path
-	tx, err := vm.newRewardValidatorTx(toRemove.ID())
+	tx, err := vm.txBuilder.NewRewardValidatorTx(toRemove.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	toRemove := toRemoveTx.Unsigned.(*unsigned.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
+	if tx, err := vm.txBuilder.NewRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
 	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
 		t.Fatalf("couldn't make stateful tx: %s", err)
@@ -145,7 +145,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	vm.internalState.SetTimestamp(toRemove.EndTime())
 
 	// Case 2: Wrong validator
-	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
+	if tx, err := vm.txBuilder.NewRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
 	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
 		t.Fatalf("couldn't make stateful tx: %s", err)
@@ -154,7 +154,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	}
 
 	// Case 3: Happy path
-	tx, err := vm.newRewardValidatorTx(toRemove.ID())
+	tx, err := vm.txBuilder.NewRewardValidatorTx(toRemove.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
-	vdrTx, err := vm.newAddValidatorTx(
+	vdrTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -234,7 +234,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
-	delTx, err := vm.newAddDelegatorTx(
+	delTx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake, // stakeAmt
 		delStartTime,
 		delEndTime,
@@ -261,7 +261,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.True(ok)
 	assert.Equal(vm.MinValidatorStake+vm.MinDelegatorStake, stake)
 
-	tx, err := vm.newRewardValidatorTx(delTx.Unsigned.ID())
+	tx, err := vm.txBuilder.NewRewardValidatorTx(delTx.Unsigned.ID())
 	assert.NoError(err)
 
 	statefulTx, err := MakeStatefulTx(tx)
@@ -329,7 +329,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
-	vdrTx, err := vm.newAddValidatorTx(
+	vdrTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -343,7 +343,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
-	delTx, err := vm.newAddDelegatorTx(
+	delTx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake, // stakeAmt
 		delStartTime,
 		delEndTime,
@@ -364,7 +364,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	err = vm.internalState.(*internalStateImpl).Load()
 	assert.NoError(err)
 
-	tx, err := vm.newRewardValidatorTx(delTx.Unsigned.ID())
+	tx, err := vm.txBuilder.NewRewardValidatorTx(delTx.Unsigned.ID())
 	assert.NoError(err)
 
 	statefulTx, err := MakeStatefulTx(tx)

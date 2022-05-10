@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -131,7 +132,7 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	// txBuilder  builder.TxBuilder
+	txBuilder builder.TxBuilder
 	// txVerifier verifiable.TxVerifier
 }
 
@@ -222,17 +223,17 @@ func (vm *VM) Initialize(
 		},
 	)
 
-	// vm.txBuilder = builder.NewTxBuilder(
-	// 	vm.ctx,
-	// 	vm.Config,
-	// 	vm.clock,
-	// 	vm.fx,
-	// 	vm.internalState,
-	// 	vm.AtomicUTXOManager,
-	// 	vm.uptimeManager,
-	// 	vm.spendOps,
-	// 	vm.rewards,
-	// )
+	vm.txBuilder = builder.NewTxBuilder(
+		vm.ctx,
+		vm.Config,
+		vm.clock,
+		vm.fx,
+		vm.internalState,
+		vm.AtomicUTXOManager,
+		vm.uptimeManager,
+		vm.spendOps,
+		vm.rewards,
+	)
 
 	// vm.txVerifier = verifiable.NewVerifier(
 	// 	vm.ctx,

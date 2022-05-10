@@ -373,7 +373,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	}
 
 	// Create a subnet and store it in testSubnet1
-	if tx, err := vm.newCreateSubnetTx(
+	if tx, err := vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
@@ -449,7 +449,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	}
 
 	// Create a subnet and store it in testSubnet1
-	if tx, err := vm.newCreateSubnetTx(
+	if tx, err := vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
@@ -577,7 +577,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create valid tx
-	tx, err := vm.newAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -654,7 +654,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
-	tx, err := vm.newAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -710,7 +710,7 @@ func TestAddValidatorReject(t *testing.T) {
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create valid tx
-	tx, err := vm.newAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -786,7 +786,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
-	tx, err := vm.newAddValidatorTx(
+	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -824,7 +824,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
-	tx, err := vm.newAddSubnetValidatorTx(
+	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -907,7 +907,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
-	tx, err := vm.newAddSubnetValidatorTx(
+	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -1271,7 +1271,7 @@ func TestCreateChain(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
@@ -1329,7 +1329,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	createSubnetTx, err := vm.newCreateSubnetTx(
+	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
 		1, // threshold
 		[]ids.ShortID{ // control keys
 			keys[0].PublicKey().Address(),
@@ -1374,7 +1374,7 @@ func TestCreateSubnet(t *testing.T) {
 	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
-	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
+	if addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -1574,7 +1574,7 @@ func TestAtomicImport(t *testing.T) {
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	if _, err := vm.newImportTx(
+	if _, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -1611,7 +1611,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.newImportTx(
+	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
@@ -1746,7 +1746,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	firstAdvanceTimeTx, err := firstVM.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1868,7 +1868,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	firstAdvanceTimeTx, err := firstVM.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2005,7 +2005,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	advanceTimeTx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	advanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2272,7 +2272,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstAdvanceTimeTx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	firstAdvanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2301,7 +2301,7 @@ func TestUnverifiedParent(t *testing.T) {
 	firstOption := options[0]
 	secondOption := options[1]
 
-	secondAdvanceTimeTx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
+	secondAdvanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2440,15 +2440,15 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	addr0 := key0.PublicKey().Address()
 	addr1 := key1.PublicKey().Address()
 
-	addSubnetTx0, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr0}, []*crypto.PrivateKeySECP256K1R{key0}, addr0)
+	addSubnetTx0, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr0}, []*crypto.PrivateKeySECP256K1R{key0}, addr0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetTx1, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr1)
+	addSubnetTx1, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetTx2, err := vm.newCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr0)
+	addSubnetTx2, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2514,7 +2514,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// Create the tx to add a new validator
-	addValidatorTx, err := vm.newAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(newValidatorStartTime.Unix()),
 		uint64(newValidatorEndTime.Unix()),
@@ -2653,7 +2653,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Create the tx that would have moved the new validator from the pending
 	// validator set into the current validator set.
 	vm.clock.Set(newValidatorStartTime)
-	advanceTimeTx, err := vm.newAdvanceTimeTx(newValidatorStartTime)
+	advanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime)
 	assert.NoError(err)
 
 	// Create the proposal block that should have moved the new validator from
@@ -2741,7 +2741,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
 
 	// Create the tx to add the first new validator
-	addValidatorTx0, err := vm.newAddValidatorTx(
+	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
@@ -2789,7 +2789,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Create the tx that moves the first new validator from the pending
 	// validator set into the current validator set.
 	vm.clock.Set(newValidatorStartTime0)
-	advanceTimeTx0, err := vm.newAdvanceTimeTx(newValidatorStartTime0)
+	advanceTimeTx0, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime0)
 	assert.NoError(err)
 
 	// Create the proposal block that moves the first new validator from the
@@ -2928,7 +2928,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
 
 	// Create the tx to add the second new validator
-	addValidatorTx1, err := vm.newAddValidatorTx(
+	addValidatorTx1, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime1.Unix()),
 		uint64(newValidatorEndTime1.Unix()),
@@ -2973,7 +2973,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Create the tx that moves the second new validator from the pending
 	// validator set into the current validator set.
 	vm.clock.Set(newValidatorStartTime1)
-	advanceTimeTx1, err := vm.newAdvanceTimeTx(newValidatorStartTime1)
+	advanceTimeTx1, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime1)
 	assert.NoError(err)
 
 	// Create the proposal block that moves the second new validator from the

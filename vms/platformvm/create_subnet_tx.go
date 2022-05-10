@@ -4,17 +4,13 @@
 package platformvm
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
@@ -80,45 +76,6 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	vs.AddSubnet(stx)
 
 	return nil, nil
-}
-
-// [controlKeys] must be unique. They will be sorted by this method.
-// If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
-func (vm *VM) newCreateSubnetTx(
-	threshold uint32, // [threshold] of [ownerAddrs] needed to manage this subnet
-	ownerAddrs []ids.ShortID, // control addresses for the new subnet
-	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
-	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*signed.Tx, error) {
-	timestamp := vm.internalState.GetTimestamp()
-	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	ins, outs, _, signers, err := vm.stake(keys, 0, createSubnetTxFee, changeAddr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	// Sort control addresses
-	ids.SortShortIDs(ownerAddrs)
-
-	// Create the tx
-	utx := &unsigned.CreateSubnetTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-		}},
-		Owner: &secp256k1fx.OutputOwners{
-			Threshold: threshold,
-			Addrs:     ownerAddrs,
-		},
-	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
-		return nil, err
-	}
-
-	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {

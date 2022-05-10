@@ -8,15 +8,11 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -183,48 +179,4 @@ func (tx *StatefulAddValidatorTx) Execute(
 // after the current wall clock time,
 func (tx *StatefulAddValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
-}
-
-// NewAddValidatorTx returns a new NewAddValidatorTx
-func (vm *VM) newAddValidatorTx(
-	stakeAmt, // Amount the validator stakes
-	startTime, // Unix time they start validating
-	endTime uint64, // Unix time they stop validating
-	nodeID ids.NodeID, // ID of the node we want to validate with
-	rewardAddress ids.ShortID, // Address to send reward to, if applicable
-	shares uint32, // 10,000 times percentage of reward taken from delegators
-	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
-	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*signed.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-	// Create the tx
-	utx := &unsigned.AddValidatorTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unlockedOuts,
-		}},
-		Validator: validators.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmt,
-		},
-		Stake: lockedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
-		},
-		Shares: shares,
-	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
-		return nil, err
-	}
-	return tx, utx.SyntacticVerify(vm.ctx)
 }

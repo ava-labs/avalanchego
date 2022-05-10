@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -203,15 +202,4 @@ func (tx *StatefulAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 	localTimestamp := vm.clock.Time()
 	localTimestampPlusSync := localTimestamp.Add(syncBound)
 	return !txTimestamp.After(localTimestampPlusSync)
-}
-
-// newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
-// Commit block, will set the chain's timestamp to [timestamp].
-func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*signed.Tx, error) {
-	tx := &signed.Tx{
-		Unsigned: &unsigned.AdvanceTimeTx{
-			Time: uint64(timestamp.Unix()),
-		},
-	}
-	return tx, tx.Sign(Codec, nil)
 }

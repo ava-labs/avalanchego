@@ -133,7 +133,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tx, err := vm.newCreateChainTx(
+		tx, err := vm.txBuilder.NewCreateChainTx(
 			test.subnetID,
 			test.genesisData,
 			test.vmID,
@@ -166,7 +166,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -207,7 +207,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx( // create a tx
+	tx, err := vm.txBuilder.NewCreateChainTx( // create a tx
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -260,7 +260,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -301,7 +301,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	}()
 
 	// create a valid tx
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
