@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -978,7 +979,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerTime := now.Add(stateful.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1082,7 +1083,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerTime := now.Add(stateful.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1184,7 +1185,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerTime := now.Add(stateful.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
