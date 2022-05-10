@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -102,7 +102,7 @@ type VM struct {
 	// ID of the last accepted block
 	lastAcceptedID ids.ID
 
-	fx            featurextension.Fx
+	fx            fx.Fx
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not

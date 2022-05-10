@@ -222,7 +222,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		})
 	}
 
-	// Specify the vdrs that are validating the primary network at genesis.
+	// Specify the validators that are validating the primary network at genesis.
 	vdrs := newTxHeapByEndTime()
 	for _, validator := range args.Validators {
 		weight := uint64(0)
