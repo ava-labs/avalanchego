@@ -58,6 +58,7 @@ type inboundMsgBufferThrottler struct {
 // buffer so that we can read a message from [nodeID].
 // Release([nodeID]) must be called (!) when done processing the message
 // (or when we give up trying to read the message.)
+// TODO pass in a context here to allow early cancellation.
 func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.NodeID) {
 	startTime := time.Now()
 	defer func() {

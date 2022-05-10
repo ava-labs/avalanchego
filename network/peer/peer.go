@@ -140,8 +140,10 @@ type peer struct {
 	// numExecuting is the number of goroutines this peer is currently using
 	numExecuting     int64
 	startClosingOnce sync.Once
-	// onClosing is closed when the peer starts closing
-	onClosing chan struct{}
+	// onClosingCtx is canceled when the peer starts closing
+	onClosingCtx context.Context
+	// onClosingCtxCancel cancels onClosingCtx
+	onClosingCtxCancel func()
 
 	// onClosed is closed when the peer is closed
 	onClosed chan struct{}
@@ -173,17 +175,19 @@ func Start(
 	cert *x509.Certificate,
 	id ids.NodeID,
 ) Peer {
+	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
-		Config:            config,
-		conn:              conn,
-		cert:              cert,
-		id:                id,
-		onFinishHandshake: make(chan struct{}),
-		numExecuting:      3,
-		onClosing:         make(chan struct{}),
-		onClosed:          make(chan struct{}),
-		sendQueueCond:     sync.NewCond(&sync.Mutex{}),
-		canSend:           true,
+		Config:             config,
+		conn:               conn,
+		cert:               cert,
+		id:                 id,
+		onFinishHandshake:  make(chan struct{}),
+		numExecuting:       3,
+		onClosingCtx:       onClosingCtx,
+		onClosingCtxCancel: onClosingCtxCancel,
+		onClosed:           make(chan struct{}),
+		sendQueueCond:      sync.NewCond(&sync.Mutex{}),
+		canSend:            true,
 	}
 
 	p.trackedSubnets.Add(constants.PrimaryNetworkID)
@@ -311,7 +315,7 @@ func (p *peer) StartClose() {
 		p.sendQueueCond.Broadcast()
 		p.sendQueueCond.L.Unlock()
 
-		close(p.onClosing)
+		p.onClosingCtxCancel()
 	})
 }
 
@@ -386,13 +390,11 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		// TODO: allow cancelation here to avoid blocking when the connection is
-		//       shutting down.
 		// Wait until the throttler says we can proceed to read the message.
 		// Note that when we are done handling this message, or give up
 		// trying to read it, we must call [p.InboundMsgThrottler.Release]
 		// to give back the bytes used by this message.
-		p.InboundMsgThrottler.Acquire(uint64(msgLen), p.id)
+		p.InboundMsgThrottler.Acquire(p.onClosingCtx, uint64(msgLen), p.id)
 
 		// Invariant: When done processing this message, onFinishedHandling() is
 		// called exactly once. If this is not honored, the message throttler
@@ -421,6 +423,15 @@ func (p *peer) readMessages() {
 			return
 		}
 
+		// Track the time it takes from now until the time
+		// the message is handled (in the event this message
+		// is handled at the network level) or the time the
+		// message is handed to the router (in the event
+		// this message is not handled at the network level.)
+		// [p.CPUTracker.StopCPU] must be called when this
+		// loop iteration is finished.
+		p.CPUTracker.StartCPU(p.id, p.Clock.Time())
+
 		p.Log.Verbo(
 			"parsing message from %s:\n%s",
 			p.id, formatting.DumpBytes(msgBytes),
@@ -438,6 +449,7 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
+			p.CPUTracker.StopCPU(p.id, p.Clock.Time())
 			continue
 		}
 
@@ -449,6 +461,7 @@ func (p *peer) readMessages() {
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
 		p.handle(msg)
+		p.CPUTracker.StopCPU(p.id, p.Clock.Time())
 	}
 }
 
@@ -601,7 +614,7 @@ func (p *peer) sendPings() {
 			msg, err := p.MessageCreator.Ping()
 			p.Log.AssertNoError(err)
 			p.Send(msg)
-		case <-p.onClosing:
+		case <-p.onClosingCtx.Done():
 			return
 		}
 	}

@@ -17,12 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
-	cpuHalflife           = 15 * time.Second
 	threadPoolSize        = 2
 	numDispatchersToClose = 3
 )
@@ -75,7 +73,7 @@ type handler struct {
 	// down. If it is nil then it is skipped.
 	onStopped func()
 
-	// Tracks CPU time spent processing messages from each node
+	// Tracks CPU usage caused by each peer.
 	cpuTracker tracker.TimeTracker
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
@@ -103,6 +101,7 @@ func New(
 	msgFromVMChan <-chan common.Message,
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
+	cpuTracker tracker.TimeTracker,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -113,17 +112,12 @@ func New(
 		gossipFrequency:  gossipFrequency,
 		asyncMessagePool: worker.NewPool(threadPoolSize),
 		timeouts:         make(chan struct{}, 1),
-
-		closingChan: make(chan struct{}),
-		closed:      make(chan struct{}),
+		closingChan:      make(chan struct{}),
+		closed:           make(chan struct{}),
+		cpuTracker:       cpuTracker,
 	}
 
 	var err error
-
-	h.cpuTracker, err = tracker.NewCPUTracker(h.ctx.Registerer, uptime.ContinuousFactory{}, cpuHalflife, validators)
-	if err != nil {
-		return nil, fmt.Errorf("initializing cpuTracker errored with: %w", err)
-	}
 
 	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
 	if err != nil {

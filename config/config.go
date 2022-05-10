@@ -348,6 +348,9 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 					MaxBurstSize: v.GetUint64(InboundThrottlerBandwidthMaxBurstSizeKey),
 				},
 				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
+				CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+					MaxRecheckDelay: v.GetDuration(InboundThrottlerCPUMaxRecheckDelayKey),
+				},
 			},
 
 			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
@@ -431,7 +434,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	case config.MaxClockDifference < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
-
 	return config, nil
 }
 
@@ -1235,6 +1237,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
+
+	nodeConfig.CPUTrackerHalflife = v.GetDuration(CPUTrackerHalflifeKey)
 
 	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	return nodeConfig, err

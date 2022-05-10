@@ -194,6 +194,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint64(InboundThrottlerMaxProcessingMsgsPerNodeKey, 1024, "Max number of messages currently processing from a given node")
 	fs.Uint64(InboundThrottlerBandwidthRefillRateKey, 512*units.KiB, "Max average inbound bandwidth usage of a peer, in bytes per second. See BandwidthThrottler")
 	fs.Uint64(InboundThrottlerBandwidthMaxBurstSizeKey, uint64(constants.DefaultMaxMessageSize), "Max inbound bandwidth a node can use at once. Must be at least the max message size. See BandwidthThrottler")
+	fs.Duration(InboundThrottlerCPUMaxRecheckDelayKey, 5*time.Second, "In the CPU-based network throttler, check at least this often whether the node's CPU usage has fallen to an acceptable level")
 
 	// Outbound Throttling
 	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler")
@@ -328,6 +329,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer")
 	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer")
 
+	fs.Duration(CPUTrackerHalflifeKey, 15*time.Second, "Halflife to use for the CPU tracker. Larger halflife --> CPU usage metrics change more slowly.")
 	// Target CPU Utilization
 	fs.Float64(CPUTargetKey, math.Max(float64(runtime.NumCPU()-1), 1), "Target usage of this many CPU cores. Value should be in range (0, total core count]")
 	fs.Float64(CPUValidatorAllocationKey, 0.5, fmt.Sprintf("Of the targeted CPU cores in %q, reserve this portion of the CPU for usage by validators. Must be in [0,1]", CPUTargetKey))

@@ -205,5 +205,9 @@ type Config struct {
 	// VM management
 	VMManager vms.Manager `json:"-"`
 
-	CPUTargeterConfig tracker.CPUTargeterConfig `json:"cpuTargetingConfigs"`
+	// Halflife to use for the CPU tracker.
+	// Larger halflife --> CPU usage metrics change more slowly.
+	CPUTrackerHalflife time.Duration `json:"cpuTrackerHalflife"`
+
+	CPUTargeterConfig tracker.CPUTargeterConfig `json:"cpuTargeterConfig"`
 }

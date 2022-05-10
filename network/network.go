@@ -168,6 +168,8 @@ func NewNetwork(
 		metricsRegisterer,
 		primaryNetworkValidators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
+		config.CPUTracker,
+		config.CPUTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
@@ -212,6 +214,7 @@ func NewNetwork(
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
+		CPUTracker:           config.CPUTracker,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
