@@ -137,7 +137,6 @@ func (pb *ProposalBlock) Verify() error {
 
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
-
 	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm.txVerifier, parentState, pb.Tx.Creds)
 	if err != nil {
 		txID := tx.ID()

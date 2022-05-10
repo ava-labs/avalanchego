@@ -104,7 +104,10 @@ var (
 	cChainID = ids.Empty.Prefix(1)
 )
 
-var errShouldPrefCommit = errors.New("should prefer to commit proposal")
+var (
+	errShouldPrefCommit = errors.New("should prefer to commit proposal")
+	errShouldPrefAbort  = errors.New("should prefer to abort proposal")
+)
 
 const (
 	testNetworkID = 10 // To be used in tests

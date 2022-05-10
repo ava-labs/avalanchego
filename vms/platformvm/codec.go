@@ -37,7 +37,6 @@ func init() {
 			c.RegisterType(&CommitBlock{}),
 			c.RegisterType(&StandardBlock{}),
 			c.RegisterType(&AtomicBlock{}),
-
 			unsigned.RegisterUnsignedTxsTypes(c),
 		)
 	}

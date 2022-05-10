@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -42,10 +43,7 @@ const (
 
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
-	minAddStakerDelay = 2 * syncBound
-
-	// Max number of items allowed in a page
-	maxPageSize = 1024
+	minAddStakerDelay = 2 * stateful.SyncBound
 )
 
 var (
@@ -435,8 +433,8 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		err       error
 	)
 	limit := int(args.Limit)
-	if limit <= 0 || maxPageSize < limit {
-		limit = maxPageSize
+	if limit <= 0 || builder.MaxPageSize < limit {
+		limit = builder.MaxPageSize
 	}
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
@@ -1883,9 +1881,11 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx := &signed.Tx{}
-	if _, err := Codec.Unmarshal(txBytes, tx); err != nil {
-		return fmt.Errorf("couldn't parse tx: %w", err)
+
+	// Initialize the transactions
+	tx, err := signed.FromBytes(Codec, txBytes)
+	if err != nil {
+		return fmt.Errorf("failed building signed tx from bytes: %s", err)
 	}
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)

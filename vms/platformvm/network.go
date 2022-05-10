@@ -89,18 +89,11 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		return nil
 	}
 
-	tx := &signed.Tx{}
-	if _, err := Codec.Unmarshal(msg.Tx, tx); err != nil {
-		n.log.Verbo("AppGossip provided invalid tx: %s", err)
-		return nil
-	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.Unsigned)
+	tx, err := signed.FromBytes(Codec, msg.Tx)
 	if err != nil {
-		n.log.Warn("AppGossip failed to marshal unsigned tx: %s", err)
+		n.log.Warn("failed building signed tx from bytes: %s", err)
 		return nil
 	}
-	tx.Unsigned.Initialize(unsignedBytes, msg.Tx)
-
 	txID := tx.Unsigned.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with

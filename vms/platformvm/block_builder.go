@@ -23,9 +23,6 @@ import (
 )
 
 const (
-	// syncBound is the synchrony bound used for safe decision making
-	syncBound = 10 * time.Second
-
 	// TargetTxSize is the maximum number of bytes a transaction can use to be
 	// allowed into the mempool.
 	TargetTxSize = 64 * units.KiB
@@ -89,9 +86,9 @@ func (m *blockBuilder) Initialize(
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
-	// Initialize the transaction
-	if err := tx.Sign(Codec, nil); err != nil {
-		return err
+	statefulTx, err := stateful.MakeStatefulTx(tx)
+	if err != nil {
+		return fmt.Errorf("unsopported stateful tx, err %s", err)
 	}
 
 	txID := tx.Unsigned.ID()
@@ -114,10 +111,6 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	statefulTx, err := stateful.MakeStatefulTx(tx)
-	if err != nil {
-		return fmt.Errorf("unsopported stateful tx, err %s", err)
-	}
 	if err := statefulTx.SemanticVerify(m.vm.txVerifier, preferredState, tx.Creds); err != nil {
 		m.MarkDropped(txID)
 		return err
@@ -344,7 +337,7 @@ func (m *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	now := m.vm.clock.Time()
-	syncTime := now.Add(syncBound)
+	syncTime := now.Add(stateful.SyncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
 		startTime := tx.Unsigned.(timed.Tx).StartTime()
