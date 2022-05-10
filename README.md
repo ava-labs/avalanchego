@@ -31,11 +31,11 @@ The Subnet EVM supports the following API namespaces:
 - `debug`
 
 Only the `eth` namespace is enabled by default.
-Full documentation for the C-Chain's API can be found [here.](https://docs.avax.network/build/avalanchego-apis/contract-chain-c-chain-api)
+Full documentation for the C-Chain's API can be found [here.](https://docs.avax.network/apis/avalanchego/apis/c-chain)
 
 ## Compatibility
 
-The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,](https://docs.avax.network/build/tutorials/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask) [Metamask](https://docs.avax.network/build/tutorials/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask) and [Truffle.](https://docs.avax.network/build/tutorials/smart-contracts/using-truffle-with-the-avalanche-c-chain)
+The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,](https://docs.avax.network/dapps/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask/) [Metamask](https://docs.avax.network/dapps/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask/) and [Truffle.](https://docs.avax.network/dapps/smart-contracts/using-truffle-with-the-avalanche-c-chain/)
 
 ## Differences Between Subnet EVM and Coreth
 
@@ -74,7 +74,7 @@ The above example yields the following genesis allocations (denominated in whole
 
 ```
 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC: 100000000 (0x52B7D2DCC80CD2E4000000=100000000000000000000000000 Wei)
-0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B: 49463
+0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B: 49463 (0xa796504b1cb5a7c0000=49463000000000000000000 Wei)
 ```
 
 A fully populated genesis JSON with the above allocation would look like (note the `alloc` field):
@@ -468,7 +468,11 @@ Subnet-EVM contains example contracts for precompiles under `/contract-examples`
 ## Run Local Network
 
 [`scripts/run.sh`](scripts/run.sh) automatically installs [avalanchego], sets up a local network,
-and creates a `subnet-evm` genesis file.
+and creates a `subnet-evm` genesis file. The usage of this script is
+
+```bash
+./scripts/run.sh [AVALANCHEGO VERSION] [GENESIS_ADDRESS]
+```
 
 ```bash
 # to startup a local cluster (good for development)
@@ -476,8 +480,11 @@ cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 ./scripts/run.sh 1.7.10 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 ```
 
-_The private key for the ewoq address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`) is
+_This address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`) is a prefunded address on the local network, see [here](https://docs.avax.network/quickstart/fund-a-local-test-network) for more info. The private key for this address is
 `0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027`._
+
+
+With this command, `avalanchego`, `avalanche-network-runner` and GoLang packages will be downloaded and installed on a `/tmp` directory. Note: please make sure that your have fast internet connection to download these packages, otherwise, it will take a long time.
 
 Once the the network is started up, the following info will be printed to the
 console:
@@ -513,7 +520,7 @@ Curreny Symbol: LEVM
 You can then ping the local cluster or add the network to MetaMask:
 
 ```bash
-curl --location --request POST 'http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGWzfZUfXNr7w1SjzmDQ78YxfTVNAkDq3nZ/rpc' \
+curl --location --request POST 'http://localhost:53423/ext/bc/AHdWCyWDaudRX4JkHNgpzyMFdhHK7iEgB4HHMTuarzWghkAdg/rpc' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "jsonrpc": "2.0",
@@ -521,19 +528,22 @@ curl --location --request POST 'http://localhost:61278/ext/bc/2Z36RnQuk1hvsnFeGW
     "params":[],
     "id": 1
 }'
-<<COMMENT
+```
+
+Response:
+
+```json
 {
     "jsonrpc": "2.0",
     "id": 1,
     "result": "0x0"
 }
-COMMENT
 ```
 
 To terminate the cluster, kill the PID:
 
 ```bash
-kill -2 55547
+kill -2 90118
 ```
 
 ## Load Simulator
