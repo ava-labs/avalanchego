@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -1050,6 +1051,30 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	}
 }
 
+func getCPUTargeterConfig(v *viper.Viper) (tracker.CPUTargeterConfig, error) {
+	cpuTarget := v.GetFloat64(CPUTargetKey)
+	cpuValidatorAlloc := v.GetFloat64(CPUValidatorAllocationKey)
+	cpuTargetMaxPerNonValidator := v.GetFloat64(CPUTargetMaxPerNonValidatorKey)
+	maxScaling := v.GetFloat64(CPUTargetMaxScalingKey)
+	switch {
+	case cpuTarget <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUTargetKey, cpuTarget)
+	case maxScaling <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUTargetMaxScalingKey, maxScaling)
+	case cpuTargetMaxPerNonValidator < 0 || cpuTargetMaxPerNonValidator > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUTargetMaxPerNonValidatorKey, cpuTargetMaxPerNonValidator)
+	case cpuValidatorAlloc < 0 || cpuValidatorAlloc > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUValidatorAllocationKey, cpuValidatorAlloc)
+	default:
+		return tracker.CPUTargeterConfig{
+			CPUTarget:                    cpuTarget,
+			VdrCPUPercentage:             cpuValidatorAlloc,
+			MaxScaling:                   maxScaling,
+			SinglePeerMaxUsagePercentage: cpuTargetMaxPerNonValidator,
+		}, nil
+	}
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -1207,5 +1232,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// VM Aliases
 	nodeConfig.VMManager, err = getVMManager(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	return nodeConfig, err
 }

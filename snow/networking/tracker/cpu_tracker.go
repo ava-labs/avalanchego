@@ -4,17 +4,25 @@
 package tracker
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const epsilon = 1e-9
 
-var _ TimeTracker = &cpuTracker{}
+var (
+	_ TimeTracker                    = &cpuTracker{}
+	_ validators.SetCallbackListener = &cpuTracker{}
+)
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
@@ -35,10 +43,12 @@ type TimeTracker interface {
 	TimeUntilUtilization(nodeID ids.NodeID, now time.Time, value float64) time.Duration
 	// Returns the number of nodes that have recently used CPU time.
 	Len() int
+	// Returns the total weight of CPU spenders that have recently used CPU.
+	ActiveWeight() uint64
 }
 
 type cpuTracker struct {
-	lock sync.Mutex
+	lock sync.RWMutex
 
 	factory         uptime.Factory
 	cumulativeMeter uptime.Meter
@@ -48,15 +58,60 @@ type cpuTracker struct {
 	// current utilization. However, in practice the nodes that are not being
 	// utilized will move towards the oldest elements where they can be deleted.
 	cpuSpenders linkedhashmap.LinkedHashmap
+	// A validator's weight is included in [activeWeight] if and only if
+	// the validator is in [cpuSpenders].
+	activeWeight uint64
+	metrics      *trackerMetrics
+	weights      map[ids.NodeID]uint64
 }
 
-// NewCPUTracker returns a new TimeTracker that is safe for concurrent access by multiple goroutines.
-func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
-	return &cpuTracker{
+func NewCPUTracker(reg prometheus.Registerer, factory uptime.Factory, halflife time.Duration, vdrs validators.Set) (TimeTracker, error) {
+	t := &cpuTracker{
 		factory:         factory,
 		cumulativeMeter: factory.New(halflife),
 		halflife:        halflife,
 		cpuSpenders:     linkedhashmap.New(),
+		weights:         map[ids.NodeID]uint64{},
+	}
+	var err error
+	t.metrics, err = newCPUTrackerMetrics("cpuTracker", reg)
+	if err != nil {
+		return nil, fmt.Errorf("initializing cpuTracker metrics errored with: %w", err)
+	}
+	vdrs.RegisterCallbackListener(t)
+	return t, nil
+}
+
+func (ct *cpuTracker) OnValidatorAdded(validatorID ids.NodeID, weight uint64) {
+	ct.lock.Lock()
+	defer ct.lock.Unlock()
+	ct.weights[validatorID] = weight
+	if _, exists := ct.cpuSpenders.Get(validatorID); exists {
+		ct.activeWeight += weight
+		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
+	}
+}
+
+func (ct *cpuTracker) OnValidatorRemoved(validatorID ids.NodeID, weight uint64) {
+	ct.lock.Lock()
+	defer ct.lock.Unlock()
+
+	delete(ct.weights, validatorID)
+	if _, exists := ct.cpuSpenders.Get(validatorID); exists {
+		ct.activeWeight -= weight
+		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
+	}
+}
+
+func (ct *cpuTracker) OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64) {
+	ct.lock.Lock()
+	defer ct.lock.Unlock()
+
+	ct.weights[validatorID] = newWeight
+	if _, exists := ct.cpuSpenders.Get(validatorID); exists {
+		ct.activeWeight -= oldWeight
+		ct.activeWeight += newWeight
+		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
 	}
 }
 
@@ -71,6 +126,13 @@ func (ct *cpuTracker) getMeter(nodeID ids.NodeID) uptime.Meter {
 
 	newMeter := ct.factory.New(ct.halflife)
 	ct.cpuSpenders.Put(nodeID, newMeter)
+
+	if weight, ok := ct.weights[nodeID]; ok {
+		ct.activeWeight += weight
+		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
+	}
+
+	ct.metrics.activeLenMetric.Set(float64(ct.cpuSpenders.Len()))
 	return newMeter
 }
 
@@ -110,13 +172,14 @@ func (ct *cpuTracker) CumulativeUtilization(now time.Time) float64 {
 	defer ct.lock.Unlock()
 
 	ct.prune(now)
-
-	return ct.cumulativeMeter.Read(now)
+	currentUtilization := ct.cumulativeMeter.Read(now)
+	ct.metrics.cumulativeMetric.Set(currentUtilization)
+	return currentUtilization
 }
 
 func (ct *cpuTracker) Len() int {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
+	ct.lock.RLock()
+	defer ct.lock.RUnlock()
 
 	return ct.cpuSpenders.Len()
 }
@@ -154,5 +217,51 @@ func (ct *cpuTracker) prune(now time.Time) {
 			return
 		}
 		ct.cpuSpenders.Delete(oldest)
+		validatorID := oldest.(ids.NodeID)
+		if weight, ok := ct.weights[validatorID]; ok {
+			ct.activeWeight -= weight
+			ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
+		}
+		ct.metrics.activeLenMetric.Set(float64(ct.cpuSpenders.Len()))
 	}
+}
+
+func (ct *cpuTracker) ActiveWeight() uint64 {
+	ct.lock.RLock()
+	defer ct.lock.RUnlock()
+
+	return ct.activeWeight
+}
+
+type trackerMetrics struct {
+	activeWeightMetric prometheus.Gauge
+	activeLenMetric    prometheus.Gauge
+	cumulativeMetric   prometheus.Gauge
+}
+
+func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*trackerMetrics, error) {
+	m := &trackerMetrics{
+		activeWeightMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "weight_active_nodes",
+			Help:      "the sum of weight for all nodes considered active by the cpu tracker",
+		}),
+		activeLenMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "active_nodes",
+			Help:      "the count of all nodes considered active by the cpu tracker",
+		}),
+		cumulativeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "cumulative_utilization",
+			Help:      "an estimation of CPU utilization over all nodes considered active by the cpu tracker. range roughly [0, number of CPU cores], but can go higher due to over estimation",
+		}),
+	}
+	errs := wrappers.Errs{}
+	errs.Add(
+		reg.Register(m.activeWeightMetric),
+		reg.Register(m.activeLenMetric),
+		reg.Register(m.cumulativeMetric),
+	)
+	return m, errs.Err
 }

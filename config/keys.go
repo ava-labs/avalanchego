@@ -174,4 +174,8 @@ const (
 	UptimeMetricFreqKey                                = "uptime-metric-freq"
 	VMAliasesFileKey                                   = "vm-aliases-file"
 	VMAliasesContentKey                                = "vm-aliases-file-content"
+	CPUTargetKey                                       = "cpu-target"
+	CPUValidatorAllocationKey                          = "cpu-validator-alloc-portion"
+	CPUTargetMaxPerNonValidatorKey                     = "cpu-target-per-non-validator-max-fraction"
+	CPUTargetMaxScalingKey                             = "cpu-target-max-scaling"
 )

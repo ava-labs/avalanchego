@@ -62,6 +62,20 @@ func (mr *MockTimeTrackerMockRecorder) Len() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Len", reflect.TypeOf((*MockTimeTracker)(nil).Len))
 }
 
+// ActiveWeight mocks base method
+func (m *MockTimeTracker) ActiveWeight() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ActiveWeight")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// ActiveWeight indicates an expected call of ActiveWeight
+func (mr *MockTimeTrackerMockRecorder) ActiveWeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ActiveWeight", reflect.TypeOf((*MockTimeTracker)(nil).ActiveWeight))
+}
+
 // StartCPU mocks base method
 func (m *MockTimeTracker) StartCPU(arg0 ids.NodeID, arg1 time.Time) {
 	m.ctrl.T.Helper()

@@ -7,15 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCPUTracker(t *testing.T) {
 	halflife := time.Second
-	cpuTracker := NewCPUTracker(uptime.ContinuousFactory{}, halflife)
+	validators := validators.NewSet()
+
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators)
+	assert.NoError(t, err)
+
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2}
 
@@ -59,9 +64,66 @@ func TestCPUTracker(t *testing.T) {
 	}
 }
 
+func TestCPUTrackerCallbacks(t *testing.T) {
+	halflife := time.Second
+	validators := validators.NewSet()
+	nodeID1, nodeID2, nodeID3 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
+	if err := validators.AddWeight(nodeID1, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := validators.AddWeight(nodeID2, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators)
+	assert.NoError(t, err)
+
+	cpuTracker := val.(*cpuTracker)
+	startTime1 := time.Now()
+	endTime1 := startTime1.Add(halflife)
+
+	cpuTracker.StartCPU(nodeID1, startTime1)
+	assert.Equal(t, uint64(1), cpuTracker.ActiveWeight())
+	cpuTracker.StopCPU(nodeID1, endTime1)
+
+	startTime2 := endTime1
+	endTime2 := startTime2.Add(halflife)
+	cpuTracker.StartCPU(nodeID2, startTime2)
+	assert.Equal(t, uint64(3), cpuTracker.ActiveWeight())
+	cpuTracker.StopCPU(nodeID2, endTime2)
+
+	// change the weight while nodeID1 is active and nodeID2 is not
+	startTime := time.Now()
+	endTime := startTime1.Add(halflife)
+	cpuTracker.StartCPU(nodeID1, startTime)
+	if err := validators.AddWeight(nodeID1, 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := validators.AddWeight(nodeID3, 5); err != nil {
+		t.Fatal(err)
+	}
+	// only nodeID1's weight should be reflected, but nodeID3 shouldn't since it isn't active
+	assert.Equal(t, uint64(6), cpuTracker.ActiveWeight())
+	cpuTracker.StopCPU(nodeID1, endTime)
+
+	// reduce the node's weight
+	if err := validators.RemoveWeight(nodeID1, 1); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, uint64(5), cpuTracker.ActiveWeight())
+
+	// remove the node completely
+	if err := validators.RemoveWeight(nodeID1, 3); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, uint64(2), cpuTracker.ActiveWeight())
+}
+
 func TestCPUTrackerTimeUntilUtilization(t *testing.T) {
 	halflife := 5 * time.Second
-	cpuTracker := NewCPUTracker(uptime.ContinuousFactory{}, halflife)
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators.NewSet())
+	assert.NoError(t, err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()
 	// Start the meter

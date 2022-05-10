@@ -548,6 +548,9 @@ func (s *set) RegisterCallbackListener(callbackListener SetCallbackListener) {
 	defer s.lock.Unlock()
 
 	s.callbackListeners = append(s.callbackListeners, callbackListener)
+	for node, index := range s.vdrMap {
+		callbackListener.OnValidatorAdded(node, s.vdrWeights[index])
+	}
 }
 
 // Assumes [s.lock] is held

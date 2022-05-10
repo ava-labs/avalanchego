@@ -105,14 +105,12 @@ func New(
 	gossipFrequency time.Duration,
 ) (Handler, error) {
 	h := &handler{
-		ctx:             ctx,
-		mc:              mc,
-		validators:      validators,
-		msgFromVMChan:   msgFromVMChan,
-		preemptTimeouts: preemptTimeouts,
-		gossipFrequency: gossipFrequency,
-
-		cpuTracker:       tracker.NewCPUTracker(uptime.ContinuousFactory{}, cpuHalflife),
+		ctx:              ctx,
+		mc:               mc,
+		validators:       validators,
+		msgFromVMChan:    msgFromVMChan,
+		preemptTimeouts:  preemptTimeouts,
+		gossipFrequency:  gossipFrequency,
 		asyncMessagePool: worker.NewPool(threadPoolSize),
 		timeouts:         make(chan struct{}, 1),
 
@@ -121,6 +119,12 @@ func New(
 	}
 
 	var err error
+
+	h.cpuTracker, err = tracker.NewCPUTracker(h.ctx.Registerer, uptime.ContinuousFactory{}, cpuHalflife, validators)
+	if err != nil {
+		return nil, fmt.Errorf("initializing cpuTracker errored with: %w", err)
+	}
+
 	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
