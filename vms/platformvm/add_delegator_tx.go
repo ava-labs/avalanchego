@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -152,7 +153,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 
 		maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, vdrWeight)
 		if err != nil {
-			return nil, nil, errStakeOverflow
+			return nil, nil, api.ErrStakeOverflow
 		}
 
 		if !currentTimestamp.Before(vm.ApricotPhase3Time) {

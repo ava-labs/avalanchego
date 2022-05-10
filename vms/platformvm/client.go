@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
@@ -383,7 +384,7 @@ func (c *client) AddValidator(
 			UserPass:      user,
 			JSONFromAddrs: api.JSONFromAddrs{From: from},
 		},
-		APIStaker: APIStaker{
+		Staker: pChainApi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -414,7 +415,8 @@ func (c *client) AddDelegator(
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
-		}, APIStaker: APIStaker{
+		},
+		Staker: pChainApi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -445,7 +447,7 @@ func (c *client) AddSubnetValidator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
-		APIStaker: APIStaker{
+		Staker: pChainApi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),

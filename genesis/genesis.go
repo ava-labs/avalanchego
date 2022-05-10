@@ -21,7 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	pvmGenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -329,7 +330,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
-	platformvmArgs := platformvm.BuildGenesisArgs{
+	platformvmArgs := pChainApi.BuildGenesisArgs{
 		AvaxAssetID:   avaxAssetID,
 		NetworkID:     json.Uint32(config.NetworkID),
 		Time:          json.Uint64(config.StartTime),
@@ -353,7 +354,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
-					platformvm.APIUTXO{
+					pChainApi.UTXO{
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
 						Address:  addr,
@@ -378,7 +379,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.ID{}, err
 		}
 
-		utxos := []platformvm.APIUTXO(nil)
+		utxos := []pChainApi.UTXO(nil)
 		for _, allocation := range nodeAllocations {
 			addr, err := formatting.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
@@ -389,7 +390,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
-				utxos = append(utxos, platformvm.APIUTXO{
+				utxos = append(utxos, pChainApi.UTXO{
 					Locktime: json.Uint64(unlock.Locktime),
 					Amount:   json.Uint64(unlock.Amount),
 					Address:  addr,
@@ -402,13 +403,13 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		delegationFee := json.Uint32(staker.DelegationFee)
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.APIPrimaryValidator{
-				APIStaker: platformvm.APIStaker{
+			pChainApi.PrimaryValidator{
+				Staker: pChainApi.Staker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,
 				},
-				RewardOwner: &platformvm.APIOwner{
+				RewardOwner: &pChainApi.Owner{
 					Threshold: 1,
 					Addresses: []string{destAddrStr},
 				},
@@ -423,7 +424,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
-	platformvmArgs.Chains = []platformvm.APIChain{
+	platformvmArgs.Chains = []pChainApi.Chain{
 		{
 			GenesisData: avmReply.Bytes,
 			SubnetID:    constants.PrimaryNetworkID,
@@ -443,8 +444,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	platformvmReply := platformvm.BuildGenesisReply{}
-	platformvmSS := platformvm.StaticService{}
+	platformvmReply := pChainApi.BuildGenesisReply{}
+	platformvmSS := pChainApi.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
@@ -521,7 +522,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*signed.Tx, error) {
-	genesis := pvmGenesis.Genesis{}
+	genesis := pChainGen.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
 	}

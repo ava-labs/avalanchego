@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 const (
@@ -661,7 +663,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = []interface{}{}
 
 	// Validator's node ID as string --> Delegators to them
-	vdrToDelegators := map[ids.NodeID][]APIPrimaryDelegator{}
+	vdrToDelegators := map[ids.NodeID][]pChainApi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
 	nodeIDs := ids.NodeIDSet{}
@@ -686,10 +688,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			weight := json.Uint64(staker.Validator.Weight())
 
-			var rewardOwner *APIOwner
+			var rewardOwner *pChainApi.Owner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
-				rewardOwner = &APIOwner{
+				rewardOwner = &pChainApi.Owner{
 					Locktime:  json.Uint64(owner.Locktime),
 					Threshold: json.Uint32(owner.Threshold),
 				}
@@ -703,8 +705,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			potentialReward := json.Uint64(rewardAmount)
-			delegator := APIPrimaryDelegator{
-				APIStaker: APIStaker{
+			delegator := pChainApi.PrimaryDelegator{
+				Staker: pChainApi.Staker{
 					TxID:        tx.Unsigned.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -736,10 +738,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 
-			var rewardOwner *APIOwner
+			var rewardOwner *pChainApi.Owner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
-				rewardOwner = &APIOwner{
+				rewardOwner = &pChainApi.Owner{
 					Locktime:  json.Uint64(owner.Locktime),
 					Threshold: json.Uint32(owner.Threshold),
 				}
@@ -752,8 +754,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			reply.Validators = append(reply.Validators, APIPrimaryValidator{
-				APIStaker: APIStaker{
+			reply.Validators = append(reply.Validators, pChainApi.PrimaryValidator{
+				Staker: pChainApi.Staker{
 					TxID:        tx.Unsigned.ID(),
 					NodeID:      nodeID,
 					StartTime:   json.Uint64(startTime.Unix()),
@@ -775,7 +777,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, APIStaker{
+			reply.Validators = append(reply.Validators, pChainApi.Staker{
 				TxID:      tx.Unsigned.ID(),
 				NodeID:    staker.Validator.ID(),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
@@ -788,7 +790,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	for i, vdrIntf := range reply.Validators {
-		vdr, ok := vdrIntf.(APIPrimaryValidator)
+		vdr, ok := vdrIntf.(pChainApi.PrimaryValidator)
 		if !ok {
 			continue
 		}
@@ -845,7 +847,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			}
 
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Delegators = append(reply.Delegators, APIStaker{
+			reply.Delegators = append(reply.Delegators, pChainApi.Staker{
 				TxID:        tx.Unsigned.ID(),
 				NodeID:      staker.Validator.ID(),
 				StartTime:   json.Uint64(staker.StartTime().Unix()),
@@ -865,8 +867,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
-			reply.Validators = append(reply.Validators, APIPrimaryValidator{
-				APIStaker: APIStaker{
+			reply.Validators = append(reply.Validators, pChainApi.PrimaryValidator{
+				Staker: pChainApi.Staker{
 					TxID:        tx.Unsigned.ID(),
 					NodeID:      staker.Validator.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
@@ -885,7 +887,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			}
 
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, APIStaker{
+			reply.Validators = append(reply.Validators, pChainApi.Staker{
 				TxID:      tx.Unsigned.ID(),
 				NodeID:    staker.Validator.ID(),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
@@ -962,7 +964,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 type AddValidatorArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
-	APIStaker
+	pChainApi.Staker
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
@@ -1039,7 +1041,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddValidatorTx(
-		args.weight(),                        // Stake amount
+		args.GetWeight(),                     // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
@@ -1068,7 +1070,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 type AddDelegatorArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
-	APIStaker
+	pChainApi.Staker
 	RewardAddress string `json:"rewardAddress"`
 }
 
@@ -1141,7 +1143,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
-		args.weight(),          // Stake amount
+		args.GetWeight(),       // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1169,7 +1171,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 type AddSubnetValidatorArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
-	APIStaker
+	pChainApi.Staker
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
 }
@@ -1238,7 +1240,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
-		args.weight(),          // Stake amount
+		args.GetWeight(),       // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		args.NodeID,            // Node ID

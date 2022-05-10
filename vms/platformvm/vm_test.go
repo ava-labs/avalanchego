@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -177,8 +178,8 @@ func defaultContext() *snow.Context {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func defaultGenesis() (*BuildGenesisArgs, []byte) {
-	genesisUTXOs := make([]APIUTXO, len(keys))
+func defaultGenesis() (*api.BuildGenesisArgs, []byte) {
+	genesisUTXOs := make([]api.UTXO, len(keys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
@@ -186,30 +187,30 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		genesisUTXOs[i] = APIUTXO{
+		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]APIPrimaryValidator, len(keys))
+	genesisValidators := make([]api.PrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = APIPrimaryValidator{
-			APIStaker: APIStaker{
+		genesisValidators[i] = api.PrimaryValidator{
+			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
-			RewardOwner: &APIOwner{
+			RewardOwner: &api.Owner{
 				Threshold: 1,
 				Addresses: []string{addr},
 			},
-			Staked: []APIUTXO{{
+			Staked: []api.UTXO{{
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
@@ -217,7 +218,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		}
 	}
 
-	buildGenesisArgs := BuildGenesisArgs{
+	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   avaxAssetID,
@@ -228,8 +229,8 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 
-	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS := StaticService{}
+	buildGenesisResponse := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
@@ -245,15 +246,15 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func BuildGenesisTest(t *testing.T) (*BuildGenesisArgs, []byte) {
+func BuildGenesisTest(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	return BuildGenesisTestWithArgs(t, nil)
 }
 
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenesisArgs, []byte) {
-	genesisUTXOs := make([]APIUTXO, len(keys))
+func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.BuildGenesisArgs, []byte) {
+	genesisUTXOs := make([]api.UTXO, len(keys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
@@ -261,30 +262,30 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		if err != nil {
 			t.Fatal(err)
 		}
-		genesisUTXOs[i] = APIUTXO{
+		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]APIPrimaryValidator, len(keys))
+	genesisValidators := make([]api.PrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = APIPrimaryValidator{
-			APIStaker: APIStaker{
+		genesisValidators[i] = api.PrimaryValidator{
+			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
-			RewardOwner: &APIOwner{
+			RewardOwner: &api.Owner{
 				Threshold: 1,
 				Addresses: []string{addr},
 			},
-			Staked: []APIUTXO{{
+			Staked: []api.UTXO{{
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
@@ -292,7 +293,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		}
 	}
 
-	buildGenesisArgs := BuildGenesisArgs{
+	buildGenesisArgs := api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
@@ -307,8 +308,8 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 		buildGenesisArgs = *args
 	}
 
-	buildGenesisResponse := BuildGenesisReply{}
-	platformvmSS := StaticService{}
+	buildGenesisResponse := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		t.Fatalf("problem while building platform chain's genesis state: %v", err)
 	}
@@ -395,7 +396,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	return vm, baseDBManager.Current().Database, appSender
 }
 
-func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
 	if args != nil {

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	pvmGenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -312,7 +312,7 @@ func TestGenesisFromFile(t *testing.T) {
 			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
 			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
 
-			genesis := pvmGenesis.Genesis{}
+			genesis := pChainGen.Genesis{}
 			_, err = platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis)
 			assert.NoError(err)
 		})
@@ -402,7 +402,7 @@ func TestGenesisFromFlag(t *testing.T) {
 			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
 			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
 
-			genesis := pvmGenesis.Genesis{}
+			genesis := pChainGen.Genesis{}
 			_, err = platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis)
 			assert.NoError(err)
 		})
