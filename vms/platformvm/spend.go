@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -447,7 +447,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			continue
 		}
 
-		owned, ok := out.(featurextension.Owned)
+		owned, ok := out.(fx.Owned)
 		if !ok {
 			return errUnknownOwners
 		}
@@ -493,7 +493,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			continue
 		}
 
-		owned, ok := output.(featurextension.Owned)
+		owned, ok := output.(fx.Owned)
 		if !ok {
 			return errUnknownOwners
 		}

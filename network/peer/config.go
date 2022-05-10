@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -41,4 +42,7 @@ type Config struct {
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	LastSent, LastReceived int64
+
+	// Tracks CPU usage caused by each peer.
+	CPUTracker tracker.TimeTracker
 }

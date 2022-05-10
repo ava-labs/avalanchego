@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -117,15 +118,16 @@ func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			K:                     v.GetInt(SnowSampleSizeKey),
-			Alpha:                 v.GetInt(SnowQuorumSizeKey),
-			BetaVirtuous:          v.GetInt(SnowVirtuousCommitThresholdKey),
-			BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
-			ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
-			OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
-			MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
-			MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
-			MixedQueryNumPush:     int(v.GetUint(SnowMixedQueryNumPushKey)),
+			K:                       v.GetInt(SnowSampleSizeKey),
+			Alpha:                   v.GetInt(SnowQuorumSizeKey),
+			BetaVirtuous:            v.GetInt(SnowVirtuousCommitThresholdKey),
+			BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
+			ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
+			OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
+			MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
+			MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
+			MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
+			MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
 		},
 		BatchSize: v.GetInt(SnowAvalancheBatchSizeKey),
 		Parents:   v.GetInt(SnowAvalancheNumParentsKey),
@@ -346,6 +348,9 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 					MaxBurstSize: v.GetUint64(InboundThrottlerBandwidthMaxBurstSizeKey),
 				},
 				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
+				CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+					MaxRecheckDelay: v.GetDuration(InboundThrottlerCPUMaxRecheckDelayKey),
+				},
 			},
 
 			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
@@ -429,7 +434,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	case config.MaxClockDifference < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
-
 	return config, nil
 }
 
@@ -1049,6 +1053,30 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	}
 }
 
+func getCPUTargeterConfig(v *viper.Viper) (tracker.CPUTargeterConfig, error) {
+	cpuTarget := v.GetFloat64(CPUTargetKey)
+	cpuValidatorAlloc := v.GetFloat64(CPUValidatorAllocationKey)
+	cpuTargetMaxPerNonValidator := v.GetFloat64(CPUTargetMaxPerNonValidatorKey)
+	maxScaling := v.GetFloat64(CPUTargetMaxScalingKey)
+	switch {
+	case cpuTarget <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUTargetKey, cpuTarget)
+	case maxScaling <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUTargetMaxScalingKey, maxScaling)
+	case cpuTargetMaxPerNonValidator < 0 || cpuTargetMaxPerNonValidator > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUTargetMaxPerNonValidatorKey, cpuTargetMaxPerNonValidator)
+	case cpuValidatorAlloc < 0 || cpuValidatorAlloc > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUValidatorAllocationKey, cpuValidatorAlloc)
+	default:
+		return tracker.CPUTargeterConfig{
+			CPUTarget:                    cpuTarget,
+			VdrCPUPercentage:             cpuValidatorAlloc,
+			MaxScaling:                   maxScaling,
+			SinglePeerMaxUsagePercentage: cpuTargetMaxPerNonValidator,
+		}, nil
+	}
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -1206,5 +1234,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// VM Aliases
 	nodeConfig.VMManager, err = getVMManager(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.CPUTrackerHalflife = v.GetDuration(CPUTrackerHalflifeKey)
+
+	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	return nodeConfig, err
 }

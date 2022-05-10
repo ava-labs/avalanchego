@@ -3,7 +3,11 @@
 
 package throttling
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 var _ InboundMsgThrottler = &noInboundMsgThrottler{}
 
@@ -15,7 +19,7 @@ func NewNoInboundThrottler() InboundMsgThrottler {
 // [Acquire] always returns immediately.
 type noInboundMsgThrottler struct{}
 
-func (*noInboundMsgThrottler) Acquire(uint64, ids.NodeID) {}
+func (*noInboundMsgThrottler) Acquire(context.Context, uint64, ids.NodeID) {}
 
 func (*noInboundMsgThrottler) Release(uint64, ids.NodeID) {}
 
