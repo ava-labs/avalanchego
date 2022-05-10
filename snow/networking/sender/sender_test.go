@@ -21,9 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -74,6 +76,8 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
 	ctx := snow.DefaultConsensusContextTest()
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -81,6 +85,7 @@ func TestTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Hour,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 
@@ -160,7 +165,8 @@ func TestReliableMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -168,6 +174,7 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		nil,
 		1,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 
@@ -254,6 +261,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, time.Second, vdrs)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -261,6 +270,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		cpuTracker,
 	)
 	assert.NoError(t, err)
 

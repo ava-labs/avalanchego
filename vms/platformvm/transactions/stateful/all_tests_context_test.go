@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -74,7 +74,7 @@ type testHelpersCollection struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	fx             featurextension.Fx
+	fx             fx.Fx
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	uptimeMan      uptime.Manager
@@ -293,7 +293,7 @@ func (fvi *fxVMInt) CodecRegistry() codec.Registry { return fvi.registry }
 func (fvi *fxVMInt) Clock() *mockable.Clock        { return fvi.clk }
 func (fvi *fxVMInt) Logger() logging.Logger        { return fvi.log }
 
-func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) featurextension.Fx {
+func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
 		registry: linearcodec.NewDefault(),
 		clk:      clk,

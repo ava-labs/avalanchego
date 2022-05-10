@@ -9,12 +9,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+
+	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
+	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var _ TxVerifier = &verifier{}
@@ -29,7 +30,7 @@ type TxVerifier interface {
 	Ctx() *snow.Context
 	PlatformConfig() *config.Config
 	Bootstrapped() bool
-	FeatureExtension() featurextension.Fx
+	FeatureExtension() fx.Fx
 	CreateChain(tx unsigned.Tx) error
 }
 
@@ -38,7 +39,7 @@ func NewVerifier(
 	bootstrapped *utils.AtomicBool,
 	cfg *config.Config,
 	clk *mockable.Clock,
-	fx featurextension.Fx,
+	fx fx.Fx,
 	state txstate.Mutable,
 	timeMan uptime.Manager,
 	utxosMan utxos.SpendHandler,
@@ -66,16 +67,16 @@ type verifier struct {
 	ctx          *snow.Context
 	cfg          *config.Config
 	bootstrapped *utils.AtomicBool
-	fx           featurextension.Fx
+	fx           fx.Fx
 
 	state txstate.Mutable
 }
 
-func (v *verifier) Clock() *mockable.Clock               { return v.clk }
-func (v *verifier) Ctx() *snow.Context                   { return v.ctx }
-func (v *verifier) PlatformConfig() *config.Config       { return v.cfg }
-func (v *verifier) Bootstrapped() bool                   { return v.bootstrapped.GetValue() }
-func (v *verifier) FeatureExtension() featurextension.Fx { return v.fx }
+func (v *verifier) Clock() *mockable.Clock         { return v.clk }
+func (v *verifier) Ctx() *snow.Context             { return v.ctx }
+func (v *verifier) PlatformConfig() *config.Config { return v.cfg }
+func (v *verifier) Bootstrapped() bool             { return v.bootstrapped.GetValue() }
+func (v *verifier) FeatureExtension() fx.Fx        { return v.fx }
 
 func (v *verifier) CreateChain(tx unsigned.Tx) error {
 	return platformutils.CreateChain(*v.cfg, tx)

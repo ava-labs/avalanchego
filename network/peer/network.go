@@ -21,7 +21,11 @@ type Network interface {
 
 	// Track allows the peer to notify the network of a potential new peer to
 	// connect to.
-	Track(utils.IPCertDesc)
+	//
+	// Returns false if this call was not "useful". That is, we were already
+	// connected to this node, we already had this tracking information, the
+	// signature is invalid or we don't want to connect.
+	Track(utils.IPCertDesc) bool
 
 	// Disconnected is called when the peer finishes shutting down. It is not
 	// guaranteed that [Connected] was called for the provided peer. However, it

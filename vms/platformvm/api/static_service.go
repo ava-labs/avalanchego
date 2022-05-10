@@ -48,7 +48,9 @@ type UTXO struct {
 	Message  string      `json:"message"`
 }
 
-// Staker is the representation of a staker sent via APIs.
+// TODO: refactor APIStaker, APIValidators and merge them together for SubnetValidators + PrimaryValidators
+
+// APIStaker is the representation of a staker sent via APIs.
 // [TxID] is the txID of the transaction that added this staker.
 // [Amount] is the amount of tokens being staked.
 // [StartTime] is the Unix time when they start staking
@@ -79,10 +81,17 @@ type PrimaryValidator struct {
 	DelegationFee      json.Float32  `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
 	Uptime             *json.Float32 `json:"uptime,omitempty"`
-	Connected          *bool         `json:"connected,omitempty"`
+	Connected          bool          `json:"connected,omitempty"`
 	Staked             []UTXO        `json:"staked,omitempty"`
 	// The delegators delegating to this validator
 	Delegators []PrimaryDelegator `json:"delegators"`
+}
+
+// APISubnetValidator is the repr. of a subnet validator sent over APIs.
+type SubnetValidator struct {
+	Staker
+	// The owner the staking reward, if applicable, will go to
+	Connected bool `json:"connected"`
 }
 
 // PrimaryDelegator is the repr. of a primary network delegator sent over APIs.
@@ -196,7 +205,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		})
 	}
 
-	// Specify the vdrs that are validating the primary network at genesis.
+	// Specify the validators that are validating the primary network at genesis.
 	vdrs := txheap.NewTxHeapByEndTime()
 	for _, vdr := range args.Validators {
 		weight := uint64(0)

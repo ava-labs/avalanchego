@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
@@ -29,7 +29,7 @@ func NewTxBuilder(
 	ctx *snow.Context,
 	cfg config.Config,
 	clk mockable.Clock,
-	fx featurextension.Fx,
+	fx fx.Fx,
 	state state.Mutable,
 	atoUtxosMan avax.AtomicUTXOManager,
 	timeMan uptime.Manager,
@@ -58,7 +58,7 @@ type builder struct {
 	cfg     config.Config
 	ctx     *snow.Context
 	clk     mockable.Clock
-	fx      featurextension.Fx
+	fx      fx.Fx
 	rewards reward.Calculator
 }
 
