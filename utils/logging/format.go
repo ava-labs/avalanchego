@@ -80,6 +80,13 @@ func (f Format) MarshalJSON() ([]byte, error) {
 	}
 }
 
+func (f Format) WrapPrefix(prefix string) string {
+	if prefix == "" || f == JSON {
+		return prefix
+	}
+	return fmt.Sprintf("<%s>", prefix)
+}
+
 func (f Format) ConsoleEncoder() zapcore.Encoder {
 	switch f {
 	case Colors:
