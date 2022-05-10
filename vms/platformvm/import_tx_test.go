@@ -131,6 +131,7 @@ func TestNewImportTx(t *testing.T) {
 
 			vm.ctx.SharedMemory = tt.sharedMemory
 			vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
+			vm.txBuilder.ResetAtomicUTXOManager(vm.AtomicUTXOManager)
 			tx, err := vm.txBuilder.NewImportTx(tt.sourceChainID, to, tt.sourceKeys, ids.ShortEmpty)
 			if tt.shouldErr {
 				assert.Error(err)

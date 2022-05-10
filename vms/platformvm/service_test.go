@@ -28,13 +28,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
+	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -241,6 +241,8 @@ func TestGetTxStatus(t *testing.T) {
 	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
 
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager
+	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.AtomicUTXOManager)
+
 	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
 	if err != nil {
 		t.Fatal(err)
