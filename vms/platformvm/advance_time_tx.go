@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 )
 
 var _ StatefulProposalTx = &StatefulAdvanceTimeTx{}
@@ -26,7 +28,7 @@ type StatefulAdvanceTimeTx struct {
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulAdvanceTimeTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
+func (tx *StatefulAdvanceTimeTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
 	_, _, err := tx.Execute(vm, parentState, stx)
 	return err
 }
@@ -34,11 +36,11 @@ func (tx *StatefulAdvanceTimeTx) SemanticVerify(vm *VM, parentState MutableState
 // Execute this transaction.
 func (tx *StatefulAdvanceTimeTx) Execute(
 	vm *VM,
-	parentState MutableState,
+	parentState state.Mutable,
 	stx *signed.Tx,
 ) (
-	VersionedState,
-	VersionedState,
+	state.Versioned,
+	state.Versioned,
 	error,
 ) {
 	switch {
@@ -69,7 +71,7 @@ func (tx *StatefulAdvanceTimeTx) Execute(
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := getNextStakerChangeTime(parentState)
+	nextStakerChangeTime, err := parentState.GetNextStakerChangeTime()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,8 +87,8 @@ func (tx *StatefulAdvanceTimeTx) Execute(
 	currentSupply := parentState.GetCurrentSupply()
 
 	pendingStakers := parentState.PendingStakerChainState()
-	toAddValidatorsWithRewardToCurrent := []*validatorReward(nil)
-	toAddDelegatorsWithRewardToCurrent := []*validatorReward(nil)
+	toAddValidatorsWithRewardToCurrent := []*txstate.ValidatorReward(nil)
+	toAddDelegatorsWithRewardToCurrent := []*txstate.ValidatorReward(nil)
 	toAddWithoutRewardToCurrent := []*signed.Tx(nil)
 	numToRemoveFromPending := 0
 
@@ -111,9 +113,9 @@ pendingStakerLoop:
 				return nil, nil, err
 			}
 
-			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &validatorReward{
-				addStakerTx:     tx,
-				potentialReward: r,
+			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &txstate.ValidatorReward{
+				AddStakerTx:     tx,
+				PotentialReward: r,
 			})
 			numToRemoveFromPending++
 		case *unsigned.AddValidatorTx:
@@ -131,9 +133,9 @@ pendingStakerLoop:
 				return nil, nil, err
 			}
 
-			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &validatorReward{
-				addStakerTx:     tx,
-				potentialReward: r,
+			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &txstate.ValidatorReward{
+				AddStakerTx:     tx,
+				PotentialReward: r,
 			})
 			numToRemoveFromPending++
 		case *unsigned.AddSubnetValidatorTx:
@@ -184,12 +186,12 @@ currentStakerLoop:
 		return nil, nil, err
 	}
 
-	onCommitState := newVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)
+	onCommitState := state.NewVersioned(parentState, newlyCurrentStakers, newlyPendingStakers)
 	onCommitState.SetTimestamp(txTimestamp)
 	onCommitState.SetCurrentSupply(currentSupply)
 
 	// State doesn't change if this proposal is aborted
-	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
+	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 
 	return onCommitState, onAbortState, nil
 }

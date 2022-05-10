@@ -255,7 +255,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+	if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
 		t.Fatal(err)
 	}
 

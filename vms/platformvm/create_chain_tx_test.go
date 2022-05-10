@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -178,7 +179,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := newVersionedState(
+	vs := state.NewVersioned(
 		vm.internalState,
 		vm.internalState.CurrentStakerChainState(),
 		vm.internalState.PendingStakerChainState(),
@@ -226,7 +227,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := newVersionedState(
+	vs := state.NewVersioned(
 		vm.internalState,
 		vm.internalState.CurrentStakerChainState(),
 		vm.internalState.PendingStakerChainState(),
@@ -272,7 +273,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := newVersionedState(
+	vs := state.NewVersioned(
 		vm.internalState,
 		vm.internalState.CurrentStakerChainState(),
 		vm.internalState.PendingStakerChainState(),
@@ -313,7 +314,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := newVersionedState(
+	vs := state.NewVersioned(
 		vm.internalState,
 		vm.internalState.CurrentStakerChainState(),
 		vm.internalState.PendingStakerChainState(),
@@ -395,7 +396,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			vs := newVersionedState(
+			vs := state.NewVersioned(
 				vm.internalState,
 				vm.internalState.CurrentStakerChainState(),
 				vm.internalState.PendingStakerChainState(),

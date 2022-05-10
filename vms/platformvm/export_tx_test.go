@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 func TestNewExportTx(t *testing.T) {
@@ -72,7 +73,7 @@ func TestNewExportTx(t *testing.T) {
 			assert.True(ok)
 
 			preferredState := preferredDecision.onAccept()
-			fakedState := newVersionedState(
+			fakedState := state.NewVersioned(
 				preferredState,
 				preferredState.CurrentStakerChainState(),
 				preferredState.PendingStakerChainState(),

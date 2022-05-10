@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -511,7 +512,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, errNotEnoughValidators
+		return nil, transactions.ErrNotEnoughValidators
 	}
 	currentValidatorList := currentValidators.List()
 

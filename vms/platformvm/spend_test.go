@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -20,7 +21,7 @@ type dummyUnsignedTx struct {
 	unsigned.BaseTx
 }
 
-func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
 	return nil
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 )
@@ -276,7 +277,7 @@ func (m *blockBuilder) ResetTimer() {
 	}
 
 	now := m.vm.clock.Time()
-	nextStakerChangeTime, err := getNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
@@ -303,7 +304,7 @@ func (m *blockBuilder) Shutdown() {
 
 // getStakerToReward return the staker txID to remove from the primary network
 // staking set, if one exists.
-func (m *blockBuilder) getStakerToReward(preferredState MutableState) (ids.ID, bool, error) {
+func (m *blockBuilder) getStakerToReward(preferredState state.Mutable) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
@@ -324,8 +325,8 @@ func (m *blockBuilder) getStakerToReward(preferredState MutableState) (ids.ID, b
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
-func (m *blockBuilder) getNextChainTime(preferredState MutableState) (time.Time, bool, error) {
-	nextStakerChangeTime, err := getNextStakerChangeTime(preferredState)
+func (m *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time, bool, error) {
+	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		return time.Time{}, false, err
 	}

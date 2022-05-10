@@ -331,7 +331,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			if err := vm.internalState.Commit(); err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+			if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
 				t.Fatal(err)
 			}
 
@@ -419,7 +419,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+	if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -445,7 +445,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+	if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -523,7 +523,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if err := vm.internalState.Commit(); err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+			if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
 				t.Fatal(err)
 			}
 
@@ -599,7 +599,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	vm.internalState.AddPendingStaker(addDelegatorTx)
 	vm.internalState.AddTx(addDelegatorTx, status.Committed)
 	assert.NoError(t, vm.internalState.Commit())
-	assert.NoError(t, vm.internalState.(*internalStateImpl).loadPendingValidators())
+	assert.NoError(t, vm.internalState.(*internalStateImpl).Load())
 
 	// Advance Time
 	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
@@ -666,7 +666,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	vm.internalState.AddPendingStaker(addDelegatorTx)
 	vm.internalState.AddTx(addDelegatorTx, status.Committed)
 	assert.NoError(t, vm.internalState.Commit())
-	assert.NoError(t, vm.internalState.(*internalStateImpl).loadPendingValidators())
+	assert.NoError(t, vm.internalState.(*internalStateImpl).Load())
 
 	// Advance Time
 	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
@@ -769,7 +769,7 @@ func addPendingValidator(
 	if err := vm.internalState.Commit(); err != nil {
 		return nil, err
 	}
-	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+	if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
 		return nil, err
 	}
 	return addPendingValidatorTx, err

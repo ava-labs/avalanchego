@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
@@ -31,9 +32,9 @@ type ProposalBlock struct {
 	Tx signed.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState VersionedState
+	onCommitState state.Versioned
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState VersionedState
+	onAbortState state.Versioned
 }
 
 func (pb *ProposalBlock) free() {

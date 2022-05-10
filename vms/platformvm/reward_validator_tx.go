@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -41,7 +42,7 @@ type StatefulRewardValidatorTx struct {
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
+func (tx *StatefulRewardValidatorTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
 	_, _, err := tx.Execute(vm, parentState, stx)
 	return err
 }
@@ -54,11 +55,11 @@ func (tx *StatefulRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableS
 //   chain timestamp.
 func (tx *StatefulRewardValidatorTx) Execute(
 	vm *VM,
-	parentState MutableState,
+	parentState state.Mutable,
 	stx *signed.Tx,
 ) (
-	VersionedState,
-	VersionedState,
+	state.Versioned,
+	state.Versioned,
 	error,
 ) {
 	switch {
@@ -108,8 +109,8 @@ func (tx *StatefulRewardValidatorTx) Execute(
 	}
 
 	pendingStakers := parentState.PendingStakerChainState()
-	onCommitState := newVersionedState(parentState, newlyCurrentStakers, pendingStakers)
-	onAbortState := newVersionedState(parentState, newlyCurrentStakers, pendingStakers)
+	onCommitState := state.NewVersioned(parentState, newlyCurrentStakers, pendingStakers)
+	onAbortState := state.NewVersioned(parentState, newlyCurrentStakers, pendingStakers)
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := onAbortState.GetCurrentSupply()

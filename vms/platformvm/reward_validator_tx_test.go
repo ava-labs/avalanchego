@@ -252,7 +252,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
-	err = vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	err = vm.internalState.(*internalStateImpl).Load()
 	assert.NoError(err)
 	// test validator stake
 	set, ok := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -361,7 +361,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
-	err = vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	err = vm.internalState.(*internalStateImpl).Load()
 	assert.NoError(err)
 
 	tx, err := vm.newRewardValidatorTx(delTx.Unsigned.ID())

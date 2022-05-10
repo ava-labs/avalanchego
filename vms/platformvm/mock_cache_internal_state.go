@@ -11,6 +11,7 @@ import (
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	signed "github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	gomock "github.com/golang/mock/gomock"
@@ -191,10 +192,10 @@ func (mr *MockInternalStateMockRecorder) CommitBatch() *gomock.Call {
 }
 
 // CurrentStakerChainState mocks base method.
-func (m *MockInternalState) CurrentStakerChainState() currentStakerChainState {
+func (m *MockInternalState) CurrentStakerChainState() transactions.CurrentStaker {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CurrentStakerChainState")
-	ret0, _ := ret[0].(currentStakerChainState)
+	ret0, _ := ret[0].(transactions.CurrentStaker)
 	return ret0
 }
 
@@ -238,6 +239,20 @@ func (m *MockInternalState) DeleteUTXO(utxoID ids.ID) {
 func (mr *MockInternalStateMockRecorder) DeleteUTXO(utxoID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockInternalState)(nil).DeleteUTXO), utxoID)
+}
+
+// DoneInit mocks base method.
+func (m *MockInternalState) DoneInit() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DoneInit")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DoneInit indicates an expected call of DoneInit.
+func (mr *MockInternalStateMockRecorder) DoneInit() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DoneInit", reflect.TypeOf((*MockInternalState)(nil).DoneInit))
 }
 
 // GetBlock mocks base method.
@@ -284,6 +299,20 @@ func (mr *MockInternalStateMockRecorder) GetCurrentSupply() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentSupply", reflect.TypeOf((*MockInternalState)(nil).GetCurrentSupply))
 }
 
+// GetHeight mocks base method.
+func (m *MockInternalState) GetHeight() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHeight")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetHeight indicates an expected call of GetHeight.
+func (mr *MockInternalStateMockRecorder) GetHeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeight", reflect.TypeOf((*MockInternalState)(nil).GetHeight))
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockInternalState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -296,6 +325,21 @@ func (m *MockInternalState) GetLastAccepted() ids.ID {
 func (mr *MockInternalStateMockRecorder) GetLastAccepted() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockInternalState)(nil).GetLastAccepted))
+}
+
+// GetNextStakerChangeTime mocks base method.
+func (m *MockInternalState) GetNextStakerChangeTime() (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextStakerChangeTime")
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNextStakerChangeTime indicates an expected call of GetNextStakerChangeTime.
+func (mr *MockInternalStateMockRecorder) GetNextStakerChangeTime() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextStakerChangeTime", reflect.TypeOf((*MockInternalState)(nil).GetNextStakerChangeTime))
 }
 
 // GetRewardUTXOs mocks base method.
@@ -405,10 +449,10 @@ func (mr *MockInternalStateMockRecorder) GetUptime(nodeID interface{}) *gomock.C
 }
 
 // GetValidatorWeightDiffs mocks base method.
-func (m *MockInternalState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
+func (m *MockInternalState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*transactions.ValidatorWeightDiff, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetValidatorWeightDiffs", height, subnetID)
-	ret0, _ := ret[0].(map[ids.NodeID]*ValidatorWeightDiff)
+	ret0, _ := ret[0].(map[ids.NodeID]*transactions.ValidatorWeightDiff)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -419,11 +463,26 @@ func (mr *MockInternalStateMockRecorder) GetValidatorWeightDiffs(height, subnetI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorWeightDiffs", reflect.TypeOf((*MockInternalState)(nil).GetValidatorWeightDiffs), height, subnetID)
 }
 
+// MaxStakeAmount mocks base method.
+func (m *MockInternalState) MaxStakeAmount(subnetID ids.ID, nodeID ids.NodeID, startTime, endTime time.Time) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MaxStakeAmount", subnetID, nodeID, startTime, endTime)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MaxStakeAmount indicates an expected call of MaxStakeAmount.
+func (mr *MockInternalStateMockRecorder) MaxStakeAmount(subnetID, nodeID, startTime, endTime interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxStakeAmount", reflect.TypeOf((*MockInternalState)(nil).MaxStakeAmount), subnetID, nodeID, startTime, endTime)
+}
+
 // PendingStakerChainState mocks base method.
-func (m *MockInternalState) PendingStakerChainState() pendingStakerChainState {
+func (m *MockInternalState) PendingStakerChainState() transactions.PendingStaker {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PendingStakerChainState")
-	ret0, _ := ret[0].(pendingStakerChainState)
+	ret0, _ := ret[0].(transactions.PendingStaker)
 	return ret0
 }
 
@@ -434,27 +493,27 @@ func (mr *MockInternalStateMockRecorder) PendingStakerChainState() *gomock.Call 
 }
 
 // SetCurrentStakerChainState mocks base method.
-func (m *MockInternalState) SetCurrentStakerChainState(arg0 currentStakerChainState) {
+func (m *MockInternalState) SetCurrentStakerChainState(cs transactions.CurrentStaker) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetCurrentStakerChainState", arg0)
+	m.ctrl.Call(m, "SetCurrentStakerChainState", cs)
 }
 
 // SetCurrentStakerChainState indicates an expected call of SetCurrentStakerChainState.
-func (mr *MockInternalStateMockRecorder) SetCurrentStakerChainState(arg0 interface{}) *gomock.Call {
+func (mr *MockInternalStateMockRecorder) SetCurrentStakerChainState(cs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentStakerChainState", reflect.TypeOf((*MockInternalState)(nil).SetCurrentStakerChainState), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentStakerChainState", reflect.TypeOf((*MockInternalState)(nil).SetCurrentStakerChainState), cs)
 }
 
 // SetCurrentSupply mocks base method.
-func (m *MockInternalState) SetCurrentSupply(arg0 uint64) {
+func (m *MockInternalState) SetCurrentSupply(cs uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetCurrentSupply", arg0)
+	m.ctrl.Call(m, "SetCurrentSupply", cs)
 }
 
 // SetCurrentSupply indicates an expected call of SetCurrentSupply.
-func (mr *MockInternalStateMockRecorder) SetCurrentSupply(arg0 interface{}) *gomock.Call {
+func (mr *MockInternalStateMockRecorder) SetCurrentSupply(cs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockInternalState)(nil).SetCurrentSupply), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockInternalState)(nil).SetCurrentSupply), cs)
 }
 
 // SetHeight mocks base method.
@@ -482,27 +541,27 @@ func (mr *MockInternalStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomo
 }
 
 // SetPendingStakerChainState mocks base method.
-func (m *MockInternalState) SetPendingStakerChainState(arg0 pendingStakerChainState) {
+func (m *MockInternalState) SetPendingStakerChainState(ps transactions.PendingStaker) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetPendingStakerChainState", arg0)
+	m.ctrl.Call(m, "SetPendingStakerChainState", ps)
 }
 
 // SetPendingStakerChainState indicates an expected call of SetPendingStakerChainState.
-func (mr *MockInternalStateMockRecorder) SetPendingStakerChainState(arg0 interface{}) *gomock.Call {
+func (mr *MockInternalStateMockRecorder) SetPendingStakerChainState(ps interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPendingStakerChainState", reflect.TypeOf((*MockInternalState)(nil).SetPendingStakerChainState), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPendingStakerChainState", reflect.TypeOf((*MockInternalState)(nil).SetPendingStakerChainState), ps)
 }
 
 // SetTimestamp mocks base method.
-func (m *MockInternalState) SetTimestamp(arg0 time.Time) {
+func (m *MockInternalState) SetTimestamp(tm time.Time) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetTimestamp", arg0)
+	m.ctrl.Call(m, "SetTimestamp", tm)
 }
 
 // SetTimestamp indicates an expected call of SetTimestamp.
-func (mr *MockInternalStateMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
+func (mr *MockInternalStateMockRecorder) SetTimestamp(tm interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockInternalState)(nil).SetTimestamp), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockInternalState)(nil).SetTimestamp), tm)
 }
 
 // SetUptime mocks base method.
@@ -517,6 +576,21 @@ func (m *MockInternalState) SetUptime(nodeID ids.NodeID, upDuration time.Duratio
 func (mr *MockInternalStateMockRecorder) SetUptime(nodeID, upDuration, lastUpdated interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockInternalState)(nil).SetUptime), nodeID, upDuration, lastUpdated)
+}
+
+// ShouldInit mocks base method.
+func (m *MockInternalState) ShouldInit() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShouldInit")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ShouldInit indicates an expected call of ShouldInit.
+func (mr *MockInternalStateMockRecorder) ShouldInit() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldInit", reflect.TypeOf((*MockInternalState)(nil).ShouldInit))
 }
 
 // UTXOIDs mocks base method.

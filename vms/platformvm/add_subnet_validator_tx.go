@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -30,7 +31,7 @@ type StatefulAddSubnetValidatorTx struct {
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
+func (tx *StatefulAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
 	startTime := tx.StartTime()
 	maxLocalStartTime := vm.clock.Time().Add(maxFutureStartTime)
 	if startTime.After(maxLocalStartTime) {
@@ -49,11 +50,11 @@ func (tx *StatefulAddSubnetValidatorTx) SemanticVerify(vm *VM, parentState Mutab
 // Execute this transaction.
 func (tx *StatefulAddSubnetValidatorTx) Execute(
 	vm *VM,
-	parentState MutableState,
+	parentState state.Mutable,
 	stx *signed.Tx,
 ) (
-	VersionedState,
-	VersionedState,
+	state.Versioned,
+	state.Versioned,
 	error,
 ) {
 	// Verify the tx is well-formed
@@ -193,7 +194,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
-	onCommitState := newVersionedState(parentState, currentStakers, newlyPendingStakers)
+	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	consumeInputs(onCommitState, tx.Ins)
@@ -202,7 +203,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
+	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS

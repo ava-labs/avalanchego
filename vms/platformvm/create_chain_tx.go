@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
@@ -36,8 +37,8 @@ func (tx *StatefulCreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, e
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulCreateChainTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
-	vs := newVersionedState(
+func (tx *StatefulCreateChainTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
+	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
@@ -49,7 +50,7 @@ func (tx *StatefulCreateChainTx) SemanticVerify(vm *VM, parentState MutableState
 // Execute this transaction.
 func (tx *StatefulCreateChainTx) Execute(
 	vm *VM,
-	vs VersionedState,
+	vs state.Versioned,
 	stx *signed.Tx,
 ) (
 	func() error,

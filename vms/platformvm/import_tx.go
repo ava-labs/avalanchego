@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -49,7 +50,7 @@ func (tx *StatefulImportTx) InputIDs() ids.Set {
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *StatefulImportTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
+func (tx *StatefulImportTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error {
 	_, err := tx.AtomicExecute(vm, parentState, stx)
 	return err
 }
@@ -57,7 +58,7 @@ func (tx *StatefulImportTx) SemanticVerify(vm *VM, parentState MutableState, stx
 // Execute this transaction.
 func (tx *StatefulImportTx) Execute(
 	vm *VM,
-	vs VersionedState,
+	vs state.Versioned,
 	stx *signed.Tx,
 ) (func() error, error) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
@@ -126,11 +127,11 @@ func (tx *StatefulImportTx) AtomicOperations() (ids.ID, *atomic.Requests, error)
 // [AtomicExecute] to maintain consistency for the standard block.
 func (tx *StatefulImportTx) AtomicExecute(
 	vm *VM,
-	parentState MutableState,
+	parentState state.Mutable,
 	stx *signed.Tx,
-) (VersionedState, error) {
+) (state.Versioned, error) {
 	// Set up the state if this tx is committed
-	newState := newVersionedState(
+	newState := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),

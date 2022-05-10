@@ -15,8 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 )
 
 var (
@@ -280,7 +283,7 @@ func (vm *VM) stake(
 
 // authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
-	vs MutableState,
+	vs state.Mutable,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -328,7 +331,7 @@ func (vm *VM) authorize(
 // [creds] are the credentials of [tx], which allow [ins] to be spent.
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
-	utxoDB UTXOGetter,
+	utxoDB txstate.UTXOGetter,
 	utx unsigned.Tx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -550,7 +553,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func consumeInputs(
-	utxoDB UTXODeleter,
+	utxoDB txstate.UTXODeleter,
 	ins []*avax.TransferableInput,
 ) {
 	for _, input := range ins {
@@ -561,7 +564,7 @@ func consumeInputs(
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
 func produceOutputs(
-	utxoDB UTXOAdder,
+	utxoDB txstate.UTXOAdder,
 	txID ids.ID,
 	assetID ids.ID,
 	outs []*avax.TransferableOutput,

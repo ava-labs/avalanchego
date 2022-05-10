@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
@@ -17,7 +18,7 @@ type StatefulTx interface {
 	unsigned.Tx
 
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error
+	SemanticVerify(vm *VM, parentState state.Mutable, stx *signed.Tx) error
 }
 
 // StatefulDecisionTx is an unsigned operation that can be immediately decided
@@ -25,7 +26,7 @@ type StatefulDecisionTx interface {
 	StatefulTx
 
 	// Execute this transaction with the provided state.
-	Execute(vm *VM, vs VersionedState, stx *signed.Tx) (
+	Execute(vm *VM, vs state.Versioned, stx *signed.Tx) (
 		onAcceptFunc func() error,
 		err error,
 	)
@@ -42,9 +43,9 @@ type StatefulProposalTx interface {
 	StatefulTx
 
 	// Attempts to verify this transaction with the provided state.
-	Execute(vm *VM, state MutableState, stx *signed.Tx) (
-		onCommitState VersionedState,
-		onAbortState VersionedState,
+	Execute(vm *VM, state state.Mutable, stx *signed.Tx) (
+		onCommitState state.Versioned,
+		onAbortState state.Versioned,
 		err error,
 	)
 	InitiallyPrefersCommit(vm *VM) bool
@@ -55,7 +56,7 @@ type StatefulAtomicTx interface {
 	StatefulDecisionTx
 
 	// Execute this transaction with the provided state.
-	AtomicExecute(vm *VM, parentState MutableState, stx *signed.Tx) (VersionedState, error)
+	AtomicExecute(vm *VM, parentState state.Mutable, stx *signed.Tx) (state.Versioned, error)
 
 	// Accept this transaction with the additionally provided state transitions.
 	AtomicAccept(ctx *snow.Context, batch database.Batch) error
