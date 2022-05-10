@@ -16,12 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var (
 	_ StatefulAtomicTx = &StatefulImportTx{}
 
-	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
 )
 
@@ -62,13 +62,13 @@ func (tx *StatefulImportTx) Execute(
 		return nil, err
 	}
 
-	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
+	utxosList := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
 		utxo, err := vs.GetUTXO(input.InputID())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
 		}
-		utxos[index] = utxo
+		utxosList[index] = utxo
 	}
 
 	if vm.bootstrapped.GetValue() {
@@ -91,23 +91,23 @@ func (tx *StatefulImportTx) Execute(
 			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal UTXO: %w", err)
 			}
-			utxos[i+len(tx.Ins)] = utxo
+			utxosList[i+len(tx.Ins)] = utxo
 		}
 
 		ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+		if err := vm.spendOps.SemanticVerifySpendUTXOs(tx, utxosList, ins, tx.Outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 			return nil, err
 		}
 	}
 
 	// Consume the UTXOS
-	consumeInputs(vs, tx.Ins)
+	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 

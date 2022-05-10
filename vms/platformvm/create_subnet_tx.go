@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
@@ -55,7 +56,7 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	if err := vm.semanticVerifySpend(
+	if err := vm.spendOps.SemanticVerifySpend(
 		vs,
 		tx.CreateSubnetTx,
 		tx.Ins,
@@ -68,10 +69,10 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	}
 
 	// Consume the UTXOS
-	consumeInputs(vs, tx.Ins)
+	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddSubnet(stx)
 

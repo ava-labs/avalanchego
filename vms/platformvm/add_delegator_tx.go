@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
@@ -174,7 +175,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(
+		if err := vm.spendOps.SemanticVerifySpend(
 			parentState,
 			tx.AddDelegatorTx,
 			tx.Ins,
@@ -183,7 +184,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 			vm.AddStakerTxFee,
 			vm.ctx.AVAXAssetID,
 		); err != nil {
-			return nil, nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
+			return nil, nil, fmt.Errorf("failed SemanticVerifySpend: %w", err)
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
@@ -200,17 +201,17 @@ func (tx *StatefulAddDelegatorTx) Execute(
 	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	consumeInputs(onCommitState, tx.Ins)
+	utxos.ConsumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	consumeInputs(onAbortState, tx.Ins)
+	utxos.ConsumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, outs)
 
 	return onCommitState, onAbortState, nil
 }

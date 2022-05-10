@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -48,7 +49,6 @@ const (
 
 var (
 	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
-	errNoFunds                    = errors.New("no spendable funds were found")
 	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
 	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
 	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
@@ -585,7 +585,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		}
 		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 		if !ok {
-			return errUnknownOwners
+			return utxos.ErrUnknownOwners
 		}
 
 		controlAddrs := make([]string, len(owner.Addrs))

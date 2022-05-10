@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var _ StatefulDecisionTx = &StatefulCreateChainTx{}
@@ -72,7 +73,7 @@ func (tx *StatefulCreateChainTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
-	if err := vm.semanticVerifySpend(
+	if err := vm.spendOps.SemanticVerifySpend(
 		vs,
 		tx.CreateChainTx,
 		tx.Ins,
@@ -103,10 +104,10 @@ func (tx *StatefulCreateChainTx) Execute(
 	}
 
 	// Consume the UTXOS
-	consumeInputs(vs, tx.Ins)
+	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddChain(stx)
 

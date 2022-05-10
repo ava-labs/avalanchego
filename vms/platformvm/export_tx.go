@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -16,13 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var (
-	_ StatefulAtomicTx = &StatefulExportTx{}
-
-	errOverflowExport = errors.New("overflow when computing export amount + txFee")
-)
+var _ StatefulAtomicTx = &StatefulExportTx{}
 
 // StatefulExportTx is an unsigned ExportTx
 type StatefulExportTx struct {
@@ -59,7 +55,7 @@ func (tx *StatefulExportTx) Execute(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(
+	if err := vm.spendOps.SemanticVerifySpend(
 		vs,
 		tx.ExportTx,
 		tx.Ins,
@@ -68,14 +64,14 @@ func (tx *StatefulExportTx) Execute(
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 	); err != nil {
-		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
+		return nil, fmt.Errorf("failed SemanticVerifySpend: %w", err)
 	}
 
 	// Consume the UTXOS
-	consumeInputs(vs, tx.Ins)
+	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	txID := tx.ID()
-	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 
