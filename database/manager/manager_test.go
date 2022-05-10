@@ -124,7 +124,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 func TestNewSortsDatabases(t *testing.T) {
 	dir := t.TempDir()
 
-	vers := []version.Version{
+	vers := []version.Semantic{
 		version.NewDefaultSemantic(2, 1, 2),
 		version.NewDefaultSemantic(2, 0, 2),
 		version.NewDefaultSemantic(1, 3, 2),
@@ -332,7 +332,7 @@ func TestCompleteMeterDBManager(t *testing.T) {
 }
 
 func TestNewManagerFromDBs(t *testing.T) {
-	versions := []version.Version{
+	versions := []version.Semantic{
 		version.NewDefaultSemantic(3, 2, 0),
 		version.NewDefaultSemantic(1, 2, 0),
 		version.NewDefaultSemantic(1, 1, 1),
