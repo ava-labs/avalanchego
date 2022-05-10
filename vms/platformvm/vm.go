@@ -9,11 +9,9 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -36,15 +34,28 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/featurextension"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	transactions "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
+	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
+)
+
+var (
+	_ block.ChainVM        = &VM{}
+	_ validators.Connector = &VM{}
+	_ secp256k1fx.VM       = &VM{}
+	_ validators.State     = &VM{}
+
+	errInvalidID         = errors.New("invalid ID")
+	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
+	errStartTimeTooEarly = errors.New("start time is before the current chain time")
+	errStartAfterEndTime = errors.New("start time is after the end time")
+	errWrongCacheType    = errors.New("unexpectedly cached type")
 )
 
 const (
@@ -60,19 +71,6 @@ const (
 
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
-)
-
-var (
-	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooEarly = errors.New("start time is before the current chain time")
-	errStartAfterEndTime = errors.New("start time is after the end time")
-	errWrongCacheType    = errors.New("unexpectedly cached type")
-
-	_ block.ChainVM        = &VM{}
-	_ validators.Connector = &VM{}
-	_ secp256k1fx.VM       = &VM{}
-	_ validators.State     = &VM{}
 )
 
 type VM struct {
@@ -99,6 +97,7 @@ type VM struct {
 	dbManager manager.Manager
 
 	internalState InternalState
+	spendOps      utxos.SpendHandler
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -131,6 +130,9 @@ type VM struct {
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
+
+	// txBuilder  builder.TxBuilder
+	// txVerifier verifiable.TxVerifier
 }
 
 // Initialize this blockchain.
@@ -191,6 +193,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.internalState = is
+	vm.spendOps = utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
 
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)
@@ -218,6 +221,31 @@ func (vm *VM) Initialize(
 			TTL:     recentlyAcceptedWindowTTL,
 		},
 	)
+
+	// vm.txBuilder = builder.NewTxBuilder(
+	// 	vm.ctx,
+	// 	vm.Config,
+	// 	vm.clock,
+	// 	vm.fx,
+	// 	vm.internalState,
+	// 	vm.AtomicUTXOManager,
+	// 	vm.uptimeManager,
+	// 	vm.spendOps,
+	// 	vm.rewards,
+	// )
+
+	// vm.txVerifier = verifiable.NewVerifier(
+	// 	vm.ctx,
+	// 	&vm.bootstrapped,
+	// 	&vm.Config,
+	// 	&vm.clock,
+	// 	vm.fx,
+	// 	vm.internalState,
+	// 	vm.uptimeManager,
+	// 	vm.spendOps,
+	// 	vm.rewards,
+	// )
+
 	vm.lastAcceptedID = is.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
 
@@ -258,37 +286,10 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		return err
 	}
 	for _, chain := range chains {
-		if err := vm.createChain(chain); err != nil {
+		if err := platformutils.CreateChain(vm.Config, chain.Unsigned); err != nil {
 			return err
 		}
 	}
-	return nil
-}
-
-// Create the blockchain described in [tx], but only if this node is a member of
-// the subnet that validates the chain
-func (vm *VM) createChain(tx *signed.Tx) error {
-	unsignedTx, ok := tx.Unsigned.(*unsigned.CreateChainTx)
-	if !ok {
-		return errWrongTxType
-	}
-
-	if vm.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
-		constants.PrimaryNetworkID != unsignedTx.SubnetID && // All nodes must validate the primary network
-		!vm.WhitelistedSubnets.Contains(unsignedTx.SubnetID) { // This node doesn't validate this blockchain
-		return nil
-	}
-
-	chainParams := chains.ChainParameters{
-		ID:          tx.Unsigned.ID(),
-		SubnetID:    unsignedTx.SubnetID,
-		GenesisData: unsignedTx.GenesisData,
-		VMAlias:     unsignedTx.VMID.String(),
-	}
-	for _, fxID := range unsignedTx.FxIDs {
-		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-	}
-	vm.Chains.CreateChain(chainParams)
 	return nil
 }
 
@@ -455,7 +456,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	if err := server.RegisterService(&api.StaticService{}, "platform"); err != nil {
+	if err := server.RegisterService(&pChainApi.StaticService{}, "platform"); err != nil {
 		return nil, err
 	}
 
@@ -512,7 +513,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, transactions.ErrNotEnoughValidators
+		return nil, txstate.ErrNotEnoughValidators
 	}
 	currentValidatorList := currentValidators.List()
 

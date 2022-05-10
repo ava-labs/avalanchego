@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var _ StatefulDecisionTx = &StatefulCreateChainTx{}
@@ -113,7 +114,7 @@ func (tx *StatefulCreateChainTx) Execute(
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { return vm.createChain(stx) }
+	onAccept := func() error { return platformutils.CreateChain(vm.Config, tx.CreateChainTx) }
 	return onAccept, nil
 }
 
