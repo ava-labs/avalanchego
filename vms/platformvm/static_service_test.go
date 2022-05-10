@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
@@ -237,7 +238,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
 	}
 
-	genesis := &Genesis{}
+	genesis := &genesis.Genesis{}
 	if _, err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
 		t.Fatal(err)
 	}

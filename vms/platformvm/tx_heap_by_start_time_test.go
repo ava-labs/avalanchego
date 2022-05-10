@@ -8,8 +8,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
+
+// TODO: while heap has been moved to a different package, these UTs are still here since
+// tx factory is still in platformvm package. Will be cleaned up in a subsequent PR
 
 func TestTxHeapByStartTime(t *testing.T) {
 	vm, _, _ := defaultVM()
@@ -21,7 +25,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	txHeap := NewTxHeapByStartTime()
+	txHeap := txheap.NewTxHeapByStartTime()
 
 	validator0, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount

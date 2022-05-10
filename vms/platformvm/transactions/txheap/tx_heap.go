@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package txheap
 
 import (
 	"container/heap"
@@ -10,11 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
-var _ TxHeap = &txHeap{}
+var _ Heap = &txHeap{}
 
-type TxHeap interface {
+type Heap interface {
 	Add(tx *signed.Tx)
 	Get(txID ids.ID) *signed.Tx
+	GetAll() []*signed.Tx
 	Remove(txID ids.ID) *signed.Tx
 	Peek() *signed.Tx
 	RemoveTop() *signed.Tx
@@ -48,6 +49,14 @@ func (h *txHeap) Get(txID ids.ID) *signed.Tx {
 		return nil
 	}
 	return h.txs[index].tx
+}
+
+func (h *txHeap) GetAll() []*signed.Tx {
+	res := make([]*signed.Tx, 0, len(h.txs))
+	for _, ht := range h.txs {
+		res = append(res, ht.tx)
+	}
+	return res
 }
 
 func (h *txHeap) Remove(txID ids.ID) *signed.Tx {

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package txheap
 
 import (
 	"time"
@@ -15,7 +15,7 @@ type txHeapByEndTime struct {
 	txHeap
 }
 
-func newTxHeapByEndTime() *txHeapByEndTime {
+func NewTxHeapByEndTime() TimedTxHeap {
 	h := &txHeapByEndTime{}
 	h.initialize(h)
 	return h

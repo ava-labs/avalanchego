@@ -14,8 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -141,36 +143,6 @@ type BuildGenesisReply struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GenesisUTXO adds messages to UTXOs
-type GenesisUTXO struct {
-	avax.UTXO `serialize:"true"`
-	Message   []byte `serialize:"true" json:"message"`
-}
-
-// Genesis represents a genesis state of the platform chain
-type Genesis struct {
-	UTXOs         []*GenesisUTXO `serialize:"true"`
-	Validators    []*signed.Tx   `serialize:"true"`
-	Chains        []*signed.Tx   `serialize:"true"`
-	Timestamp     uint64         `serialize:"true"`
-	InitialSupply uint64         `serialize:"true"`
-	Message       string         `serialize:"true"`
-}
-
-func (g *Genesis) Initialize() error {
-	for _, tx := range g.Validators {
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
-			return err
-		}
-	}
-	for _, tx := range g.Chains {
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // beck32ToID takes bech32 address and produces a shortID
 func bech32ToID(address string) (ids.ShortID, error) {
 	_, addr, err := formatting.ParseBech32(address)
@@ -183,7 +155,7 @@ func bech32ToID(address string) (ids.ShortID, error) {
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
-	utxos := make([]*GenesisUTXO, 0, len(args.UTXOs))
+	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
 		if apiUTXO.Amount == 0 {
 			return errUTXOHasNoValue
@@ -218,14 +190,14 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if err != nil {
 			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
-		utxos = append(utxos, &GenesisUTXO{
+		utxos = append(utxos, &genesis.UTXO{
 			UTXO:    utxo,
 			Message: messageBytes,
 		})
 	}
 
 	// Specify the vdrs that are validating the primary network at genesis.
-	vdrs := newTxHeapByEndTime()
+	vdrs := txheap.NewTxHeapByEndTime()
 	for _, validator := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(validator.Staked))
@@ -340,12 +312,12 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	validatorTxs := make([]*signed.Tx, vdrs.Len())
-	for i, tx := range vdrs.txs {
-		validatorTxs[i] = tx.tx
+	for i, tx := range vdrs.GetAll() {
+		validatorTxs[i] = tx
 	}
 
 	// genesis holds the genesis state
-	genesis := Genesis{
+	genesis := genesis.Genesis{
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,

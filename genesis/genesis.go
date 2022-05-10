@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	pvmGenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -520,7 +521,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*signed.Tx, error) {
-	genesis := platformvm.Genesis{}
+	genesis := pvmGenesis.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
 	}

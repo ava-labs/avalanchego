@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
@@ -21,7 +22,7 @@ func TestTxHeapStop(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	txHeap := newTxHeapByEndTime()
+	txHeap := txheap.NewTxHeapByEndTime()
 
 	validator0, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -81,7 +82,7 @@ func TestTxHeapStop(t *testing.T) {
 	txHeap.Add(validator0)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.EndTime()) {
 		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.EndTime())
-	} else if top := txHeap.txs[0].tx; top.Unsigned.ID() != validator0.Unsigned.ID() {
+	} else if top := txHeap.GetAll()[0]; top.Unsigned.ID() != validator0.Unsigned.ID() {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.Unsigned.ID(), validator0.Unsigned.ID())
 	}
 }
