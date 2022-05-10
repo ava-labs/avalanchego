@@ -7,8 +7,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/kardianos/osext"
@@ -113,7 +115,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(LogFormatKey, "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
 	fs.Uint(LogRotaterMaxSizeKey, 8, "The maximum file size in megabytes of the log file before it gets rotated.")
 	fs.Uint(LogRotaterMaxFilesKey, 7, "The maximum number of old log files to retain. 0 means retain all old log files.")
-	fs.Uint(LogRotaterMaxAgeKey, 7, "The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files.")
+	fs.Uint(LogRotaterMaxAgeKey, 0, "The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files.")
 	fs.Bool(LogRotaterCompressEnabledKey, false, "Enables the compression of rotated log files through gzip.")
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
@@ -192,6 +194,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint64(InboundThrottlerMaxProcessingMsgsPerNodeKey, 1024, "Max number of messages currently processing from a given node")
 	fs.Uint64(InboundThrottlerBandwidthRefillRateKey, 512*units.KiB, "Max average inbound bandwidth usage of a peer, in bytes per second. See BandwidthThrottler")
 	fs.Uint64(InboundThrottlerBandwidthMaxBurstSizeKey, uint64(constants.DefaultMaxMessageSize), "Max inbound bandwidth a node can use at once. Must be at least the max message size. See BandwidthThrottler")
+	fs.Duration(InboundThrottlerCPUMaxRecheckDelayKey, 5*time.Second, "In the CPU-based network throttler, check at least this often whether the node's CPU usage has fallen to an acceptable level")
 
 	// Outbound Throttling
 	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler")
@@ -290,10 +293,11 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Int(SnowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(SnowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(SnowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
-	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
+	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing containers in consensus")
 	fs.Int(SnowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, 2*time.Minute, "Maximum amount of time an item should be processing and still be healthy")
-	fs.Uint(SnowMixedQueryNumPushKey, 10, fmt.Sprintf("When a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushKey))
+	fs.Uint(SnowMixedQueryNumPushVdrKey, 10, fmt.Sprintf("If this node is a validator, when a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushVdrKey))
+	fs.Uint(SnowMixedQueryNumPushNonVdrKey, 0, fmt.Sprintf("If this node is not a validator, when a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushNonVdrKey))
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
@@ -324,6 +328,13 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Delays
 	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer")
 	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer")
+
+	fs.Duration(CPUTrackerHalflifeKey, 15*time.Second, "Halflife to use for the CPU tracker. Larger halflife --> CPU usage metrics change more slowly.")
+	// Target CPU Utilization
+	fs.Float64(CPUTargetKey, math.Max(float64(runtime.NumCPU()-1), 1), "Target usage of this many CPU cores. Value should be in range (0, total core count]")
+	fs.Float64(CPUValidatorAllocationKey, 0.5, fmt.Sprintf("Of the targeted CPU cores in %q, reserve this portion of the CPU for usage by validators. Must be in [0,1]", CPUTargetKey))
+	fs.Float64(CPUTargetMaxPerNonValidatorKey, 1.0/3.0, "Max CPU usage of any single non validator can use as a percentage of the CPU target allocated to peers. Must be in [0,1]")
+	fs.Float64(CPUTargetMaxScalingKey, 20, "The maximum allowed scaling of the current CPU target based on the current actual usage. Must be greater than 0")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

@@ -16,17 +16,18 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var _ BandwidthThrottler = &bandwidthThrottler{}
+var _ bandwidthThrottler = &bandwidthThrottlerImpl{}
 
 // Returns a bandwidth throttler that uses a token bucket
 // model, where each token is 1 byte, to rate-limit bandwidth usage.
 // See https://pkg.go.dev/golang.org/x/time/rate#Limiter
-type BandwidthThrottler interface {
+type bandwidthThrottler interface {
 	// Blocks until [nodeID] can read a message of size [msgSize].
 	// AddNode([nodeID], ...) must have been called since
 	// the last time RemoveNode([nodeID]) was called, if any.
 	// It's safe for multiple goroutines to concurrently call Acquire.
-	Acquire(msgSize uint64, nodeID ids.NodeID)
+	// Returns immediately if [ctx] is canceled.
+	Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID)
 
 	// Add a new node to this throttler.
 	// Must be called before Acquire(..., [nodeID]) is called.
@@ -53,14 +54,14 @@ type BandwidthThrottlerConfig struct {
 	MaxBurstSize uint64 `json:"bandwidthMaxBurstRate"`
 }
 
-func NewBandwidthThrottler(
+func newBandwidthThrottler(
 	log logging.Logger,
 	namespace string,
 	registerer prometheus.Registerer,
 	config BandwidthThrottlerConfig,
-) (BandwidthThrottler, error) {
+) (bandwidthThrottler, error) {
 	errs := wrappers.Errs{}
-	t := &bandwidthThrottler{
+	t := &bandwidthThrottlerImpl{
 		BandwidthThrottlerConfig: config,
 		log:                      log,
 		limiters:                 make(map[ids.NodeID]*rate.Limiter),
@@ -88,7 +89,7 @@ type bandwidthThrottlerMetrics struct {
 	awaitingAcquire prometheus.Gauge
 }
 
-type bandwidthThrottler struct {
+type bandwidthThrottlerImpl struct {
 	BandwidthThrottlerConfig
 	metrics bandwidthThrottlerMetrics
 	log     logging.Logger
@@ -99,14 +100,18 @@ type bandwidthThrottler struct {
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
+func (t *bandwidthThrottlerImpl) Acquire(
+	ctx context.Context,
+	msgSize uint64,
+	nodeID ids.NodeID,
+) {
 	startTime := time.Now()
+	t.metrics.awaitingAcquire.Inc()
 	defer func() {
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 		t.metrics.awaitingAcquire.Dec()
 	}()
 
-	t.metrics.awaitingAcquire.Inc()
 	t.lock.RLock()
 	limiter, ok := t.limiters[nodeID]
 	t.lock.RUnlock()
@@ -115,31 +120,32 @@ func (t *bandwidthThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 		t.log.Debug("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID)
 		return
 	}
-	// TODO Allow cancellation using context?
-	if err := limiter.WaitN(context.TODO(), int(msgSize)); err != nil {
-		// This should never happen.
-		t.log.Warn("error while awaiting %d bytes for %s: %s", msgSize, nodeID, err)
+	if err := limiter.WaitN(ctx, int(msgSize)); err != nil {
+		// This should only happen on shutdown.
+		t.log.Debug("error while awaiting %d bytes for %s: %s", msgSize, nodeID, err)
 	}
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) AddNode(nodeID ids.NodeID) {
+func (t *bandwidthThrottlerImpl) AddNode(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; ok {
 		t.log.Debug("tried to add %s but it's already registered", nodeID)
+		return
 	}
 	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(t.RefillRate), int(t.MaxBurstSize))
 }
 
 // See BandwidthThrottler.
-func (t *bandwidthThrottler) RemoveNode(nodeID ids.NodeID) {
+func (t *bandwidthThrottlerImpl) RemoveNode(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; !ok {
 		t.log.Debug("tried to remove %s but it isn't registered", nodeID)
+		return
 	}
 	delete(t.limiters, nodeID)
 }

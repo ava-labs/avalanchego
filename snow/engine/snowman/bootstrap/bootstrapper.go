@@ -379,6 +379,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 
 		pushed, err := b.Blocked.Push(&blockJob{
 			parser:      b.parser,
+			log:         b.Ctx.Log,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,

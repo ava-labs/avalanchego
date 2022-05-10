@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -180,7 +181,7 @@ type Client interface {
 	// and delegators respectively
 	GetMinStake(ctx context.Context, options ...rpc.Option) (uint64, uint64, error)
 	// GetTotalStake returns the total amount (in nAVAX) staked on the network
-	GetTotalStake(ctx context.Context, options ...rpc.Option) (uint64, error)
+	GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error)
 	// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 	// node during the time period.
 	GetMaxStakeAmount(
@@ -673,10 +674,18 @@ func (c *client) GetMinStake(ctx context.Context, options ...rpc.Option) (uint64
 	return uint64(res.MinValidatorStake), uint64(res.MinDelegatorStake), err
 }
 
-func (c *client) GetTotalStake(ctx context.Context, options ...rpc.Option) (uint64, error) {
+func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error) {
 	res := new(GetTotalStakeReply)
-	err := c.requester.SendRequest(ctx, "getTotalStake", struct{}{}, res, options...)
-	return uint64(res.Stake), err
+	err := c.requester.SendRequest(ctx, "getTotalStake", &GetTotalStakeArgs{
+		SubnetID: subnetID,
+	}, res, options...)
+	var amount json.Uint64
+	if subnetID == constants.PrimaryNetworkID {
+		amount = res.Stake
+	} else {
+		amount = res.Weight
+	}
+	return uint64(amount), err
 }
 
 func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
