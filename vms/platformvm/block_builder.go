@@ -114,7 +114,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	preferredState := preferredDecision.onAccept()
 	statefulTx, err := MakeStatefulTx(tx)
 	if err != nil {
-		return fmt.Errorf("unsopported stateful tx, err %s", err)
+		return fmt.Errorf("unsopported stateful tx, err %w", err)
 	}
 	if err := statefulTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
 		m.MarkDropped(txID)
@@ -251,7 +251,7 @@ func (m *blockBuilder) ResetTimer() {
 
 	_, shouldReward, err := m.getStakerToReward(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
+		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %w", err)
 		return
 	}
 	if shouldReward {
@@ -261,7 +261,7 @@ func (m *blockBuilder) ResetTimer() {
 
 	_, shouldAdvanceTime, err := m.getNextChainTime(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("failed to fetch next chain time with %s", err)
+		m.vm.ctx.Log.Error("failed to fetch next chain time with %w", err)
 		return
 	}
 	if shouldAdvanceTime {
@@ -278,7 +278,7 @@ func (m *blockBuilder) ResetTimer() {
 	now := m.vm.clock.Time()
 	nextStakerChangeTime, err := getNextStakerChangeTime(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
+		m.vm.ctx.Log.Error("couldn't get next staker change time: %w", err)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)

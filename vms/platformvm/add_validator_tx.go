@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -20,7 +19,6 @@ import (
 
 var (
 	_ StatefulProposalTx = &StatefulAddValidatorTx{}
-	_ timed.Tx           = &StatefulAddValidatorTx{}
 
 	errNilTx                     = errors.New("tx is nil")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
