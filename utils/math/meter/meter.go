@@ -10,13 +10,13 @@ import (
 // Meter tracks a continuous exponential moving average of the % of time this
 // meter has been running.
 type Meter interface {
-	// Start the meter, the read value will be monotonically increasing while
+	// Inc the meter, the read value will be monotonically increasing while
 	// the meter is running.
-	Start(time.Time, float64)
+	Inc(time.Time, float64)
 
-	// Stop the meter, the read value will be exponentially decreasing while the
+	// Dec the meter, the read value will be exponentially decreasing while the
 	// meter is off.
-	Stop(time.Time, float64)
+	Dec(time.Time, float64)
 
 	// Read the current value of the meter, this can be used to approximate the
 	// percent of time the meter has been running recently. The definition of

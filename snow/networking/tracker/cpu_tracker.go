@@ -112,9 +112,9 @@ func (ct *cpuTracker) IncCPU(
 	}()
 
 	meter := ct.getMeter(nodeID)
-	meter.Start(startTime, 1)
-	ct.cumulativeMeter.Start(startTime, 1)
-	ct.cumulativeAtLargeMeter.Start(startTime, 1-vdrPortion)
+	meter.Inc(startTime, 1)
+	ct.cumulativeMeter.Inc(startTime, 1)
+	ct.cumulativeAtLargeMeter.Inc(startTime, 1-vdrPortion)
 
 }
 
@@ -131,9 +131,9 @@ func (ct *cpuTracker) DecCPU(
 	}()
 
 	meter := ct.getMeter(nodeID)
-	meter.Stop(endTime, 1)
-	ct.cumulativeMeter.Stop(endTime, 1)
-	ct.cumulativeAtLargeMeter.Stop(endTime, 1-vdrPortion)
+	meter.Dec(endTime, 1)
+	ct.cumulativeMeter.Dec(endTime, 1)
+	ct.cumulativeAtLargeMeter.Dec(endTime, 1-vdrPortion)
 }
 
 func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {

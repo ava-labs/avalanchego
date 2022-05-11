@@ -29,7 +29,7 @@ func BenchmarkMeters(b *testing.B) {
 
 func MeterBenchmark(b *testing.B, m Meter, period time.Duration) {
 	currentTime := time.Now()
-	m.Start(currentTime, 1)
+	m.Inc(currentTime, 1)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

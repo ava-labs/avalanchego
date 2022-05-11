@@ -38,12 +38,12 @@ func NewMeter(halflife time.Duration) Meter {
 	}
 }
 
-func (a *continuousMeter) Start(now time.Time, numCores float64) {
+func (a *continuousMeter) Inc(now time.Time, numCores float64) {
 	a.Read(now)
 	a.numCoresRunning += numCores
 }
 
-func (a *continuousMeter) Stop(now time.Time, numCores float64) {
+func (a *continuousMeter) Dec(now time.Time, numCores float64) {
 	a.Read(now)
 	a.numCoresRunning -= numCores
 }
