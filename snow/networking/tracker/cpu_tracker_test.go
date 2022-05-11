@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func TestCPUTracker(t *testing.T) {
 	halflife := time.Second
 	validators := validators.NewSet()
 
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators)
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, halflife, validators)
 	assert.NoError(t, err)
 
 	vdr1 := ids.NodeID{1}
@@ -75,7 +75,7 @@ func TestCPUTrackerCallbacks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	val, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators)
+	val, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, halflife, validators)
 	assert.NoError(t, err)
 
 	cpuTracker := val.(*cpuTracker)
@@ -122,7 +122,7 @@ func TestCPUTrackerCallbacks(t *testing.T) {
 
 func TestCPUTrackerTimeUntilUtilization(t *testing.T) {
 	halflife := 5 * time.Second
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators.NewSet())
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, halflife, validators.NewSet())
 	assert.NoError(t, err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()

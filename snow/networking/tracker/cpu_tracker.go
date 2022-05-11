@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
-	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -47,12 +47,12 @@ type TimeTracker interface {
 type cpuTracker struct {
 	lock sync.RWMutex
 
-	factory uptime.Factory
+	factory meter.Factory
 	// Tracks total CPU usage by all nodes.
-	cumulativeMeter uptime.Meter
+	cumulativeMeter meter.Meter
 	// Tracks CPU usage by all nodes attributed
 	// to the at-large CPU allocation.
-	cumulativeAtLargeMeter uptime.Meter
+	cumulativeAtLargeMeter meter.Meter
 	halflife               time.Duration
 	// Each element is a meters that tracks total CPU usage by a node.
 	// meters is ordered by the last time that a meters was utilized. This
@@ -66,7 +66,7 @@ type cpuTracker struct {
 
 func NewCPUTracker(
 	reg prometheus.Registerer,
-	factory uptime.Factory,
+	factory meter.Factory,
 	halflife time.Duration,
 ) (TimeTracker, error) {
 	t := &cpuTracker{
@@ -88,10 +88,10 @@ func NewCPUTracker(
 // getMeter returns the meter used to measure CPU time spent processing
 // messages from [nodeID].
 // assumes [ct.lock] is held.
-func (ct *cpuTracker) getMeter(nodeID ids.NodeID) uptime.Meter {
-	meter, exists := ct.meters.Get(nodeID)
+func (ct *cpuTracker) getMeter(nodeID ids.NodeID) meter.Meter {
+	m, exists := ct.meters.Get(nodeID)
 	if exists {
-		return meter.(uptime.Meter)
+		return m.(meter.Meter)
 	}
 
 	newMeter := ct.factory.New(ct.halflife)
@@ -142,11 +142,11 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 
 	ct.prune(now)
 
-	meter, exists := ct.meters.Get(nodeID)
+	m, exists := ct.meters.Get(nodeID)
 	if !exists {
 		return 0
 	}
-	return meter.(uptime.Meter).Read(now)
+	return m.(meter.Meter).Read(now)
 }
 
 func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
@@ -167,11 +167,11 @@ func (ct *cpuTracker) TimeUntilUtilization(
 
 	ct.prune(now)
 
-	meter, exists := ct.meters.Get(nodeID)
+	m, exists := ct.meters.Get(nodeID)
 	if !exists {
 		return 0
 	}
-	return meter.(uptime.Meter).TimeUntil(now, value)
+	return m.(meter.Meter).TimeUntil(now, value)
 }
 
 // prune attempts to remove cpu meters that currently show a value less than
@@ -185,7 +185,7 @@ func (ct *cpuTracker) prune(now time.Time) {
 		if !exists {
 			return
 		}
-		meter := meterIntf.(uptime.Meter)
+		meter := meterIntf.(meter.Meter)
 		if meter.Read(now) > epsilon {
 			return
 		}

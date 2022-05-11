@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -78,7 +78,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	assert.NoError(err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, 10*time.Second)
 	assert.NoError(err)
 	sharedConfig := Config{
 		CPUTracker:           cpuTracker,

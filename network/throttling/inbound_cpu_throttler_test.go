@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 func TestNewCPUThrottler(t *testing.T) {
@@ -30,7 +30,7 @@ func TestNewCPUThrottler(t *testing.T) {
 	clock := mockable.Clock{}
 	clock.Set(time.Now())
 	vdrs := validators.NewSet()
-	cpuTracker, err := tracker.NewCPUTracker(reg, uptime.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(reg, meter.ContinuousFactory{}, time.Second, vdrs)
 	assert.NoError(err)
 	config := CPUThrottlerConfig{
 		Clock:           clock,

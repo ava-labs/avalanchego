@@ -67,7 +67,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
-	uptime_utils "github.com/ava-labs/avalanchego/utils/uptime"
+	uptime_utils "github.com/ava-labs/avalanchego/utils/math/meter"
 )
 
 var (
