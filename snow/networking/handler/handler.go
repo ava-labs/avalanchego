@@ -75,6 +75,10 @@ type handler struct {
 
 	// Tracks CPU usage caused by each peer.
 	cpuTracker tracker.TimeTracker
+
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	cpuTargeter tracker.CPUTargeter
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
 	syncMessageQueue MessageQueue
@@ -102,6 +106,7 @@ func New(
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
 	cpuTracker tracker.TimeTracker,
+	cpuTargeter tracker.CPUTargeter,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -115,6 +120,7 @@ func New(
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
 		cpuTracker:       cpuTracker,
+		cpuTargeter:      cpuTargeter,
 	}
 
 	var err error
@@ -361,7 +367,21 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime, 0 /*TODO*/)
+	// Note that [vdrCPUPortion] is in [0,1]
+	// Determine what portion of CPU usage should be attributed
+	// to the validator CPU allocation and at-large CPU allocation.
+	vdrCPUAlloc, atLargeCPUAlloc := h.cpuTargeter.TargetCPUUsage(nodeID)
+	totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
+	var vdrCPUPortion float64
+	if totalAlloc == 0 {
+		// If the total CPU allocation is 0, there's no way to meaningfully
+		// attribute CPU usage to the validator / at-large CPU allocations,
+		// so just use 0.5
+		vdrCPUPortion = 0.5
+	} else {
+		vdrCPUPortion = vdrCPUAlloc / totalAlloc
+	}
+	h.cpuTracker.IncCPU(nodeID, startTime, vdrCPUPortion)
 	h.ctx.Lock.Lock()
 	defer func() {
 		h.ctx.Lock.Unlock()
@@ -370,7 +390,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime, 0 /*TODO*/)
+		h.cpuTracker.DecCPU(nodeID, endTime, vdrCPUPortion)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling sync message: %s", op)
@@ -569,13 +589,27 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime, 0 /*TODO*/)
+	// Note that [vdrCPUPortion] is in [0,1]
+	// Determine what portion of CPU usage should be attributed
+	// to the validator CPU allocation and at-large CPU allocation.
+	vdrCPUAlloc, atLargeCPUAlloc := h.cpuTargeter.TargetCPUUsage(nodeID)
+	totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
+	var vdrCPUPortion float64
+	if totalAlloc == 0 {
+		// If the total CPU allocation is 0, there's no way to meaningfully
+		// attribute CPU usage to the validator / at-large CPU allocations,
+		// so just use 0.5
+		vdrCPUPortion = 0.5
+	} else {
+		vdrCPUPortion = vdrCPUAlloc / totalAlloc
+	}
+	h.cpuTracker.IncCPU(nodeID, startTime, vdrCPUPortion)
 	defer func() {
 		var (
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime, 0 /*TODO*/)
+		h.cpuTracker.DecCPU(nodeID, endTime, vdrCPUPortion)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling async message: %s", op)

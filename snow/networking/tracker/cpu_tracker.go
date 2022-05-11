@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -20,23 +19,23 @@ import (
 const epsilon = 1e-9
 
 var (
-	_ TimeTracker                    = &cpuTracker{}
-	_ validators.SetCallbackListener = &cpuTracker{}
+	_ TimeTracker = &cpuTracker{}
 )
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
 	// Registers that the given node started using a CPU
-	// core at the given time.
-	StartCPU(ids.NodeID, time.Time, float64)
+	// at the given time, and that the given portion of the CPU
+	// usage should be attributed to the validator CPU allocation.
+	IncCPU(ids.NodeID, time.Time, float64)
 	// Registers that the given node stopped using a CPU
-	// core at the given time.
-	StopCPU(ids.NodeID, time.Time, float64)
+	// at the given time, and that the given portion of the CPU
+	// usage should be attributed to the validator CPU allocation.
+	DecCPU(ids.NodeID, time.Time, float64)
 	// Returns the current EWMA of CPU utilization for the given node.
 	Utilization(ids.NodeID, time.Time) float64
-	// Returns the current EWMA of CPU utilization for all nodes.
-	CumulativeUtilization(time.Time) float64
-	// TODO add comment.
+	// Returns the current EWMA of CPU utilization by all nodes
+	// attributed to the at-large CPU allocation.
 	CumulativeAtLargeUtilization(time.Time) float64
 	// Returns the duration between [now] and when the CPU utilization of
 	// [nodeID] reaches [value], assuming that the node uses no more CPU.
@@ -48,115 +47,59 @@ type TimeTracker interface {
 type cpuTracker struct {
 	lock sync.RWMutex
 
-	factory                uptime.Factory
-	cumulativeVdrMeter     uptime.Meter
+	factory uptime.Factory
+	// Tracks total CPU usage by all nodes.
+	cumulativeMeter uptime.Meter
+	// Tracks CPU usage by all nodes attributed
+	// to the at-large CPU allocation.
 	cumulativeAtLargeMeter uptime.Meter
 	halflife               time.Duration
-	// vdrCPUSpenders is ordered by the last time that a meter was utilized. This
+	// Each element is a meters that tracks total CPU usage by a node.
+	// meters is ordered by the last time that a meters was utilized. This
 	// doesn't necessarily result in the meters being sorted based on their
 	// current utilization. However, in practice the nodes that are not being
 	// utilized will move towards the oldest elements where they can be deleted.
-	vdrCPUSpenders     linkedhashmap.LinkedHashmap
-	AtLargeCPUSpenders linkedhashmap.LinkedHashmap
-	// A validator's weight is included in [activeWeight] if and only if
-	// the validator is in [cpuSpenders].
-	activeWeight uint64
-	metrics      *trackerMetrics
-	weights      map[ids.NodeID]uint64
+	meters  linkedhashmap.LinkedHashmap
+	metrics *trackerMetrics
+	weights map[ids.NodeID]uint64
 }
 
 func NewCPUTracker(
 	reg prometheus.Registerer,
 	factory uptime.Factory,
 	halflife time.Duration,
-	vdrs validators.Set,
 ) (TimeTracker, error) {
 	t := &cpuTracker{
-		factory:            factory,
-		cumulativeVdrMeter: factory.New(halflife),
-		halflife:           halflife,
-		vdrCPUSpenders:     linkedhashmap.New(),
-		AtLargeCPUSpenders: linkedhashmap.New(),
-		weights:            map[ids.NodeID]uint64{},
+		factory:                factory,
+		cumulativeMeter:        factory.New(halflife),
+		cumulativeAtLargeMeter: factory.New(halflife),
+		halflife:               halflife,
+		meters:                 linkedhashmap.New(),
+		weights:                map[ids.NodeID]uint64{},
 	}
 	var err error
 	t.metrics, err = newCPUTrackerMetrics("cpuTracker", reg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing cpuTracker metrics errored with: %w", err)
 	}
-	vdrs.RegisterCallbackListener(t)
 	return t, nil
-}
-
-func (ct *cpuTracker) OnValidatorAdded(validatorID ids.NodeID, weight uint64) {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	ct.weights[validatorID] = weight
-	if _, exists := ct.vdrCPUSpenders.Get(validatorID); exists {
-		ct.activeWeight += weight
-		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
-	}
-}
-
-func (ct *cpuTracker) OnValidatorRemoved(validatorID ids.NodeID, weight uint64) {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	delete(ct.weights, validatorID)
-	if _, exists := ct.vdrCPUSpenders.Get(validatorID); exists {
-		ct.activeWeight -= weight
-		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
-	}
-}
-
-func (ct *cpuTracker) OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64) {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	ct.weights[validatorID] = newWeight
-	if _, exists := ct.vdrCPUSpenders.Get(validatorID); exists {
-		ct.activeWeight -= oldWeight
-		ct.activeWeight += newWeight
-		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
-	}
 }
 
 // getMeter returns the meter used to measure CPU time spent processing
 // messages from [nodeID].
 // assumes [ct.lock] is held.
-func (ct *cpuTracker) getMeter(nodeID ids.NodeID, vdr bool) uptime.Meter {
-	var (
-		meter  interface{}
-		exists bool
-	)
-	if vdr {
-		meter, exists = ct.vdrCPUSpenders.Get(nodeID)
-	} else {
-		meter, exists = ct.AtLargeCPUSpenders.Get(nodeID)
-	}
+func (ct *cpuTracker) getMeter(nodeID ids.NodeID) uptime.Meter {
+	meter, exists := ct.meters.Get(nodeID)
 	if exists {
 		return meter.(uptime.Meter)
 	}
 
 	newMeter := ct.factory.New(ct.halflife)
-	if vdr {
-		ct.vdrCPUSpenders.Put(nodeID, newMeter)
-	} else {
-		ct.AtLargeCPUSpenders.Put(nodeID, newMeter)
-	}
-
-	// TODO handle active weight
-	if weight, ok := ct.weights[nodeID]; ok {
-		ct.activeWeight += weight
-		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
-	}
-
-	ct.metrics.activeLenMetric.Set(float64(ct.vdrCPUSpenders.Len()))
+	ct.meters.Put(nodeID, newMeter)
 	return newMeter
 }
 
-func (ct *cpuTracker) StartCPU(
+func (ct *cpuTracker) IncCPU(
 	nodeID ids.NodeID,
 	startTime time.Time,
 	vdrPortion float64,
@@ -164,15 +107,16 @@ func (ct *cpuTracker) StartCPU(
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	vdrMeter := ct.getMeter(nodeID, true)
-	vdrMeter.Start(startTime, vdrPortion)
-	atLargeMeter := ct.getMeter(nodeID, true)
-	atLargeMeter.Start(startTime, 1-vdrPortion)
-	ct.cumulativeVdrMeter.Start(startTime, 1)
+	meter := ct.getMeter(nodeID)
+	meter.Start(startTime, 1)
+	ct.cumulativeMeter.Start(startTime, 1)
 	ct.cumulativeAtLargeMeter.Start(startTime, 1-vdrPortion)
+
+	ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime))
+	ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime))
 }
 
-func (ct *cpuTracker) StopCPU(
+func (ct *cpuTracker) DecCPU(
 	nodeID ids.NodeID,
 	endTime time.Time,
 	vdrPortion float64,
@@ -180,73 +124,34 @@ func (ct *cpuTracker) StopCPU(
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	vdrMeter := ct.getMeter(nodeID, true)
-	vdrMeter.Stop(endTime, vdrPortion)
-	atLargeMeter := ct.getMeter(nodeID, true)
-	atLargeMeter.Start(endTime, 1-vdrPortion)
-	ct.cumulativeVdrMeter.Stop(endTime, 1)
+	meter := ct.getMeter(nodeID)
+	meter.Stop(endTime, vdrPortion)
+	ct.cumulativeMeter.Stop(endTime, 1)
 	ct.cumulativeAtLargeMeter.Start(endTime, 1-vdrPortion)
+
+	ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime))
+	ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime))
 }
 
 func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	return ct.vdrUtilization(nodeID, now) + ct.atLargeUtilization(nodeID, now)
-}
-
-// Assumes [ct.lock] is held.
-func (ct *cpuTracker) vdrUtilization(nodeID ids.NodeID, now time.Time) float64 {
 	ct.prune(now)
 
-	meter, exists := ct.vdrCPUSpenders.Get(nodeID)
+	meter, exists := ct.meters.Get(nodeID)
 	if !exists {
 		return 0
 	}
 	return meter.(uptime.Meter).Read(now)
-}
-
-// Assumes [ct.lock] is held.
-func (ct *cpuTracker) atLargeUtilization(nodeID ids.NodeID, now time.Time) float64 {
-	ct.prune(now)
-
-	meter, exists := ct.AtLargeCPUSpenders.Get(nodeID)
-	if !exists {
-		return 0
-	}
-	return meter.(uptime.Meter).Read(now)
-}
-
-func (ct *cpuTracker) CumulativeUtilization(now time.Time) float64 {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	return ct.cumulativeVdrUtilization(now) + ct.cumulativeAtLargeUtilization(now)
-}
-
-// Assumes [ct.lock] is held.
-func (ct *cpuTracker) cumulativeVdrUtilization(now time.Time) float64 {
-	ct.prune(now)
-	currentUtilization := ct.cumulativeVdrMeter.Read(now)
-	// TODO fix metric
-	ct.metrics.cumulativeMetric.Set(currentUtilization)
-	return currentUtilization
 }
 
 func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	return ct.cumulativeAtLargeUtilization(now)
-}
-
-// Assumes [ct.lock] is held.
-func (ct *cpuTracker) cumulativeAtLargeUtilization(now time.Time) float64 {
 	ct.prune(now)
-	currentUtilization := ct.cumulativeAtLargeMeter.Read(now)
-	// TODO fix metric
-	ct.metrics.cumulativeMetric.Set(currentUtilization)
-	return currentUtilization
+	return ct.cumulativeAtLargeMeter.Read(now)
 }
 
 func (ct *cpuTracker) TimeUntilUtilization(
@@ -259,7 +164,7 @@ func (ct *cpuTracker) TimeUntilUtilization(
 
 	ct.prune(now)
 
-	meter, exists := ct.vdrCPUSpenders.Get(nodeID)
+	meter, exists := ct.meters.Get(nodeID)
 	if !exists {
 		return 0
 	}
@@ -269,11 +174,11 @@ func (ct *cpuTracker) TimeUntilUtilization(
 // prune attempts to remove cpu meters that currently show a value less than
 // [epsilon].
 //
-// Because [cpuSpenders] isn't guaranteed to be sorted by their values, this
+// Because [ct.meters] isn't guaranteed to be sorted by their values, this
 // doesn't guarantee that all meters showing less than [epsilon] are removed.
 func (ct *cpuTracker) prune(now time.Time) {
 	for {
-		oldest, meterIntf, exists := ct.vdrCPUSpenders.Oldest()
+		oldest, meterIntf, exists := ct.meters.Oldest()
 		if !exists {
 			return
 		}
@@ -281,52 +186,32 @@ func (ct *cpuTracker) prune(now time.Time) {
 		if meter.Read(now) > epsilon {
 			return
 		}
-		ct.vdrCPUSpenders.Delete(oldest)
-		validatorID := oldest.(ids.NodeID)
-		if weight, ok := ct.weights[validatorID]; ok {
-			ct.activeWeight -= weight
-			ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
-		}
-		ct.metrics.activeLenMetric.Set(float64(ct.vdrCPUSpenders.Len()))
+		ct.meters.Delete(oldest)
 	}
 }
 
-func (ct *cpuTracker) ActiveWeight() uint64 {
-	ct.lock.RLock()
-	defer ct.lock.RUnlock()
-
-	return ct.activeWeight
-}
-
 type trackerMetrics struct {
-	activeWeightMetric prometheus.Gauge
-	activeLenMetric    prometheus.Gauge
-	cumulativeMetric   prometheus.Gauge
+	cumulativeMetric        prometheus.Gauge
+	cumulativeAtLargeMetric prometheus.Gauge
 }
 
 func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*trackerMetrics, error) {
 	m := &trackerMetrics{
-		activeWeightMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "weight_active_nodes",
-			Help:      "the sum of weight for all nodes considered active by the cpu tracker",
-		}),
-		activeLenMetric: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "active_nodes",
-			Help:      "the count of all nodes considered active by the cpu tracker",
-		}),
 		cumulativeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "cumulative_utilization",
-			Help:      "an estimation of CPU utilization over all nodes considered active by the cpu tracker. range roughly [0, number of CPU cores], but can go higher due to over estimation",
+			Help:      "Estimated CPU utilization over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
+		}),
+		cumulativeAtLargeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "cumulative_at_largeutilization",
+			Help:      "Estimated CPU utilization attributed to the at-large CPU allocation over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
 		}),
 	}
 	errs := wrappers.Errs{}
 	errs.Add(
-		reg.Register(m.activeWeightMetric),
-		reg.Register(m.activeLenMetric),
 		reg.Register(m.cumulativeMetric),
+		reg.Register(m.cumulativeAtLargeMetric),
 	)
 	return m, errs.Err
 }

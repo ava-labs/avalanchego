@@ -139,7 +139,7 @@ func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
 }
 
 func newDefaultCPUTracker() tracker.TimeTracker {
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime_utils.ContinuousFactory{}, 10*time.Second, validators.NewSet())
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime_utils.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		panic(err)
 	}

@@ -87,7 +87,7 @@ func StartTestPeer(
 		IP:   net.IPv6zero,
 		Port: 0,
 	}
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second, validators.NewSet())
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}

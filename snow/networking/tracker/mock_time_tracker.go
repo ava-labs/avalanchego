@@ -77,25 +77,25 @@ func (mr *MockTimeTrackerMockRecorder) ActiveWeight() *gomock.Call {
 }
 
 // StartCPU mocks base method
-func (m *MockTimeTracker) StartCPU(arg0 ids.NodeID, arg1 time.Time) {
+func (m *MockTimeTracker) IncCPU(arg0 ids.NodeID, arg1 time.Time) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "StartCPU", arg0, arg1)
 }
 
 // StartCPU indicates an expected call of StartCPU
-func (mr *MockTimeTrackerMockRecorder) StartCPU(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockTimeTrackerMockRecorder) IncCPU(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartCPU", reflect.TypeOf((*MockTimeTracker)(nil).StartCPU), arg0, arg1)
 }
 
 // StopCPU mocks base method
-func (m *MockTimeTracker) StopCPU(arg0 ids.NodeID, arg1 time.Time) {
+func (m *MockTimeTracker) DecCPU(arg0 ids.NodeID, arg1 time.Time) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "StopCPU", arg0, arg1)
 }
 
 // StopCPU indicates an expected call of StopCPU
-func (mr *MockTimeTrackerMockRecorder) StopCPU(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockTimeTrackerMockRecorder) DecCPU(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopCPU", reflect.TypeOf((*MockTimeTracker)(nil).StopCPU), arg0, arg1)
 }

@@ -78,7 +78,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	assert.NoError(err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second, validators.NewSet())
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second)
 	assert.NoError(err)
 	sharedConfig := Config{
 		CPUTracker:           cpuTracker,

@@ -426,8 +426,17 @@ func (p *peer) readMessages() {
 		// Determine what portion of CPU usage should be attributed
 		// to the validator CPU allocation and at-large CPU allocation.
 		vdrCPUAlloc, atLargeCPUAlloc := p.CPUTargeter.TargetCPUUsage(p.id)
+		totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
 		// Note that [vdrCPUPortion] is in [0,1]
-		vdrCPUPortion := vdrCPUAlloc / math.Max(atLargeCPUAlloc+vdrCPUAlloc, 1)
+		var vdrCPUPortion float64
+		if totalAlloc == 0 {
+			// If the total CPU allocation is 0, there's no way to meaningfully
+			// attribute CPU usage to the validator / at-large CPU allocations,
+			// so just use 0.5
+			vdrCPUPortion = 0.5
+		} else {
+			vdrCPUPortion = vdrCPUAlloc / totalAlloc
+		}
 
 		// Track the time it takes from now until the time
 		// the message is handled (in the event this message
@@ -436,7 +445,7 @@ func (p *peer) readMessages() {
 		// this message is not handled at the network level.)
 		// [p.CPUTracker.StopCPU] must be called when this
 		// loop iteration is finished.
-		p.CPUTracker.StartCPU(p.id, p.Clock.Time(), vdrCPUPortion)
+		p.CPUTracker.IncCPU(p.id, p.Clock.Time(), vdrCPUPortion)
 
 		p.Log.Verbo(
 			"parsing message from %s:\n%s",
@@ -455,7 +464,7 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
-			p.CPUTracker.StopCPU(p.id, p.Clock.Time(), vdrCPUPortion)
+			p.CPUTracker.DecCPU(p.id, p.Clock.Time(), vdrCPUPortion)
 			continue
 		}
 
@@ -467,7 +476,7 @@ func (p *peer) readMessages() {
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
 		p.handle(msg)
-		p.CPUTracker.StopCPU(p.id, p.Clock.Time(), vdrCPUPortion)
+		p.CPUTracker.DecCPU(p.id, p.Clock.Time(), vdrCPUPortion)
 	}
 }
 

@@ -648,6 +648,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		CPUTracker:                              n.cpuTracker,
+		CPUTargeter:                             n.cpuTargeter,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		StateSyncDisableRequests:                n.Config.StateSyncDisableRequests,
 	})
@@ -1028,9 +1029,9 @@ func (n *Node) initVdrs() (validators.Set, error) {
 }
 
 // Initialize [n.CPUTracker].
-func (n *Node) initCPUTracker(reg prometheus.Registerer, vdrs validators.Set) error {
+func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
 	var err error
-	n.cpuTracker, err = tracker.NewCPUTracker(reg, &uptime_utils.ContinuousFactory{}, n.Config.CPUTrackerHalflife, vdrs)
+	n.cpuTracker, err = tracker.NewCPUTracker(reg, &uptime_utils.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
 	return err
 }
 
@@ -1109,7 +1110,7 @@ func (n *Node) Initialize(
 	if err != nil {
 		return fmt.Errorf("problem initializing validators: %w", err)
 	}
-	if err := n.initCPUTracker(n.MetricsRegisterer, primaryNetVdrs); err != nil {
+	if err := n.initCPUTracker(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing CPU tracker: %w", err)
 	}
 	if err := n.initCPUTargeter(n.MetricsRegisterer, &config.CPUTargeterConfig, primaryNetVdrs); err != nil {
