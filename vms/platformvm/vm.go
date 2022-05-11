@@ -133,7 +133,6 @@ type VM struct {
 	recentlyAccepted *window.Window
 
 	txBuilder builder.TxBuilder
-	// txVerifier verifiable.TxVerifier
 }
 
 // Initialize this blockchain.
@@ -230,22 +229,9 @@ func (vm *VM) Initialize(
 		vm.fx,
 		vm.internalState,
 		vm.AtomicUTXOManager,
-		vm.uptimeManager,
 		vm.spendOps,
 		vm.rewards,
 	)
-
-	// vm.txVerifier = verifiable.NewVerifier(
-	// 	vm.ctx,
-	// 	&vm.bootstrapped,
-	// 	&vm.Config,
-	// 	&vm.clock,
-	// 	vm.fx,
-	// 	vm.internalState,
-	// 	vm.uptimeManager,
-	// 	vm.spendOps,
-	// 	vm.rewards,
-	// )
 
 	vm.lastAcceptedID = is.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)

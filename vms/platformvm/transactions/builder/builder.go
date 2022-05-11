@@ -5,7 +5,6 @@ package builder
 
 import (
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -32,14 +31,12 @@ func NewTxBuilder(
 	fx fx.Fx,
 	state state.Mutable,
 	atoUtxosMan avax.AtomicUTXOManager,
-	timeMan uptime.Manager,
-	utxosMan utxos.SpendHandler,
+	spendingOps utxos.SpendingOps,
 	rewards reward.Calculator,
 ) TxBuilder {
 	return &builder{
 		AtomicUTXOManager: atoUtxosMan,
-		Manager:           timeMan,
-		SpendHandler:      utxosMan,
+		SpendingOps:       spendingOps,
 		state:             state,
 		cfg:               cfg,
 		ctx:               ctx,
@@ -51,8 +48,7 @@ func NewTxBuilder(
 
 type builder struct {
 	avax.AtomicUTXOManager
-	uptime.Manager
-	utxos.SpendHandler
+	utxos.SpendingOps
 	state state.Mutable
 
 	cfg     config.Config
