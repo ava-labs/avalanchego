@@ -28,10 +28,10 @@ var (
 type TimeTracker interface {
 	// Registers that the given node started using a CPU
 	// core at the given time.
-	StartCPU(ids.NodeID, time.Time)
+	StartCPU(ids.NodeID, time.Time, float64)
 	// Registers that the given node stopped using a CPU
 	// core at the given time.
-	StopCPU(ids.NodeID, time.Time)
+	StopCPU(ids.NodeID, time.Time, float64)
 	// Returns the current EWMA of CPU utilization for the given node.
 	Utilization(ids.NodeID, time.Time) float64
 	// Returns the current EWMA of CPU utilization for all nodes.
@@ -53,11 +53,12 @@ type cpuTracker struct {
 	factory         uptime.Factory
 	cumulativeMeter uptime.Meter
 	halflife        time.Duration
-	// cpuSpenders is ordered by the last time that a meter was utilized. This
+	// vdrCPUSpenders is ordered by the last time that a meter was utilized. This
 	// doesn't necessarily result in the meters being sorted based on their
 	// current utilization. However, in practice the nodes that are not being
 	// utilized will move towards the oldest elements where they can be deleted.
-	cpuSpenders linkedhashmap.LinkedHashmap
+	vdrCPUSpenders    linkedhashmap.LinkedHashmap
+	nonVdrCPUSpenders linkedhashmap.LinkedHashmap
 	// A validator's weight is included in [activeWeight] if and only if
 	// the validator is in [cpuSpenders].
 	activeWeight uint64
@@ -65,13 +66,19 @@ type cpuTracker struct {
 	weights      map[ids.NodeID]uint64
 }
 
-func NewCPUTracker(reg prometheus.Registerer, factory uptime.Factory, halflife time.Duration, vdrs validators.Set) (TimeTracker, error) {
+func NewCPUTracker(
+	reg prometheus.Registerer,
+	factory uptime.Factory,
+	halflife time.Duration,
+	vdrs validators.Set,
+) (TimeTracker, error) {
 	t := &cpuTracker{
-		factory:         factory,
-		cumulativeMeter: factory.New(halflife),
-		halflife:        halflife,
-		cpuSpenders:     linkedhashmap.New(),
-		weights:         map[ids.NodeID]uint64{},
+		factory:           factory,
+		cumulativeMeter:   factory.New(halflife),
+		halflife:          halflife,
+		vdrCPUSpenders:    linkedhashmap.New(),
+		nonVdrCPUSpenders: linkedhashmap.New(),
+		weights:           map[ids.NodeID]uint64{},
 	}
 	var err error
 	t.metrics, err = newCPUTrackerMetrics("cpuTracker", reg)
@@ -86,7 +93,7 @@ func (ct *cpuTracker) OnValidatorAdded(validatorID ids.NodeID, weight uint64) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 	ct.weights[validatorID] = weight
-	if _, exists := ct.cpuSpenders.Get(validatorID); exists {
+	if _, exists := ct.vdrCPUSpenders.Get(validatorID); exists {
 		ct.activeWeight += weight
 		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
 	}
@@ -97,7 +104,7 @@ func (ct *cpuTracker) OnValidatorRemoved(validatorID ids.NodeID, weight uint64) 
 	defer ct.lock.Unlock()
 
 	delete(ct.weights, validatorID)
-	if _, exists := ct.cpuSpenders.Get(validatorID); exists {
+	if _, exists := ct.vdrCPUSpenders.Get(validatorID); exists {
 		ct.activeWeight -= weight
 		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
 	}
@@ -108,7 +115,7 @@ func (ct *cpuTracker) OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight
 	defer ct.lock.Unlock()
 
 	ct.weights[validatorID] = newWeight
-	if _, exists := ct.cpuSpenders.Get(validatorID); exists {
+	if _, exists := ct.vdrCPUSpenders.Get(validatorID); exists {
 		ct.activeWeight -= oldWeight
 		ct.activeWeight += newWeight
 		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
@@ -116,23 +123,36 @@ func (ct *cpuTracker) OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight
 }
 
 // getMeter returns the meter used to measure CPU time spent processing
-// messages from [nodeID]
-// assumes the lock is held
-func (ct *cpuTracker) getMeter(nodeID ids.NodeID) uptime.Meter {
-	meter, exists := ct.cpuSpenders.Get(nodeID)
+// messages from [nodeID].
+// assumes [ct.lock] is held.
+func (ct *cpuTracker) getMeter(nodeID ids.NodeID, vdr bool) uptime.Meter {
+	var (
+		meter  interface{}
+		exists bool
+	)
+	if vdr {
+		meter, exists = ct.vdrCPUSpenders.Get(nodeID)
+	} else {
+		meter, exists = ct.nonVdrCPUSpenders.Get(nodeID)
+	}
 	if exists {
 		return meter.(uptime.Meter)
 	}
 
 	newMeter := ct.factory.New(ct.halflife)
-	ct.cpuSpenders.Put(nodeID, newMeter)
+	if vdr {
+		ct.vdrCPUSpenders.Put(nodeID, newMeter)
+	} else {
+		ct.nonVdrCPUSpenders.Put(nodeID, newMeter)
+	}
 
+	// TODO handle active weight
 	if weight, ok := ct.weights[nodeID]; ok {
 		ct.activeWeight += weight
 		ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
 	}
 
-	ct.metrics.activeLenMetric.Set(float64(ct.cpuSpenders.Len()))
+	ct.metrics.activeLenMetric.Set(float64(ct.vdrCPUSpenders.Len()))
 	return newMeter
 }
 
@@ -144,18 +164,26 @@ func (ct *cpuTracker) StartCPU(
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	meter := ct.getMeter(nodeID)
+	vdrMeter := ct.getMeter(nodeID, true)
+	vdrMeter.Start(startTime, vdrPortion)
+	nonVdrMeter := ct.getMeter(nodeID, true)
+	nonVdrMeter.Start(startTime, 1-vdrPortion)
 	ct.cumulativeMeter.Start(startTime, 1)
-	meter.Start(startTime)
 }
 
-func (ct *cpuTracker) StopCPU(nodeID ids.NodeID, endTime time.Time) {
+func (ct *cpuTracker) StopCPU(
+	nodeID ids.NodeID,
+	endTime time.Time,
+	vdrPortion float64,
+) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	meter := ct.getMeter(nodeID)
+	vdrMeter := ct.getMeter(nodeID, true)
+	vdrMeter.Stop(endTime, vdrPortion)
+	nonVdrMeter := ct.getMeter(nodeID, true)
+	nonVdrMeter.Start(endTime, 1-vdrPortion)
 	ct.cumulativeMeter.Stop(endTime, 1)
-	meter.Stop(endTime)
 }
 
 func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
@@ -164,7 +192,7 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 
 	ct.prune(now)
 
-	meter, exists := ct.cpuSpenders.Get(nodeID)
+	meter, exists := ct.vdrCPUSpenders.Get(nodeID)
 	if !exists {
 		return 0
 	}
@@ -185,7 +213,7 @@ func (ct *cpuTracker) Len() int {
 	ct.lock.RLock()
 	defer ct.lock.RUnlock()
 
-	return ct.cpuSpenders.Len()
+	return ct.vdrCPUSpenders.Len()
 }
 
 func (ct *cpuTracker) TimeUntilUtilization(
@@ -198,7 +226,7 @@ func (ct *cpuTracker) TimeUntilUtilization(
 
 	ct.prune(now)
 
-	meter, exists := ct.cpuSpenders.Get(nodeID)
+	meter, exists := ct.vdrCPUSpenders.Get(nodeID)
 	if !exists {
 		return 0
 	}
@@ -212,7 +240,7 @@ func (ct *cpuTracker) TimeUntilUtilization(
 // doesn't guarantee that all meters showing less than [epsilon] are removed.
 func (ct *cpuTracker) prune(now time.Time) {
 	for {
-		oldest, meterIntf, exists := ct.cpuSpenders.Oldest()
+		oldest, meterIntf, exists := ct.vdrCPUSpenders.Oldest()
 		if !exists {
 			return
 		}
@@ -220,13 +248,13 @@ func (ct *cpuTracker) prune(now time.Time) {
 		if meter.Read(now) > epsilon {
 			return
 		}
-		ct.cpuSpenders.Delete(oldest)
+		ct.vdrCPUSpenders.Delete(oldest)
 		validatorID := oldest.(ids.NodeID)
 		if weight, ok := ct.weights[validatorID]; ok {
 			ct.activeWeight -= weight
 			ct.metrics.activeWeightMetric.Set(float64(ct.activeWeight))
 		}
-		ct.metrics.activeLenMetric.Set(float64(ct.cpuSpenders.Len()))
+		ct.metrics.activeLenMetric.Set(float64(ct.vdrCPUSpenders.Len()))
 	}
 }
 
