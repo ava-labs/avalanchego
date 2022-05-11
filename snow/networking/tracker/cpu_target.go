@@ -67,6 +67,9 @@ func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) (float64, float64) {
 
 	// This node gets a stake-weighted portion of the validator allocation.
 	weight, _ := ct.vdrs.GetWeight(nodeID)
+	if weight == 0 {
+		return 0, atLargeCPUAlloc
+	}
 	vdrCPUAlloc := ct.vdrCPUAlloc * float64(weight) / float64(ct.vdrs.Weight())
 	return vdrCPUAlloc, atLargeCPUAlloc
 }

@@ -1056,19 +1056,19 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 func getCPUTargeterConfig(v *viper.Viper) (tracker.CPUTargeterConfig, error) {
 	vdrCPUAlloc := v.GetFloat64(CPUVdrAllocKey)
 	atLargeCPUAlloc := v.GetFloat64(CPUAtLargeAllocKey)
-	maxAtLargePerNode := v.GetFloat64(CPUNodeMaxAtLargeKey)
+	maxAtLargePortionPerNode := v.GetFloat64(CPUNodeMaxAtLargeKey)
 	switch {
 	case vdrCPUAlloc <= 0:
 		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUVdrAllocKey, vdrCPUAlloc)
 	case atLargeCPUAlloc <= 0:
 		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUAtLargeAllocKey, atLargeCPUAlloc)
-	case maxAtLargePerNode < 0 || maxAtLargePerNode > 1:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUNodeMaxAtLargeKey, maxAtLargePerNode)
+	case maxAtLargePortionPerNode < 0 || maxAtLargePortionPerNode > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUNodeMaxAtLargeKey, maxAtLargePortionPerNode)
 	default:
 		return tracker.CPUTargeterConfig{
 			VdrCPUAlloc:           vdrCPUAlloc,
 			AtLargeCPUAlloc:       atLargeCPUAlloc,
-			PeerMaxAtLargePortion: maxAtLargePerNode,
+			PeerMaxAtLargePortion: maxAtLargePortionPerNode,
 		}, nil
 	}
 }

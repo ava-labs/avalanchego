@@ -34,10 +34,6 @@ type TimeTracker interface {
 	StopCPU(ids.NodeID, time.Time, float64)
 	// Returns the current EWMA of CPU utilization for the given node.
 	Utilization(ids.NodeID, time.Time) float64
-	// TODO comment
-	VdrUtilization(ids.NodeID, time.Time) float64
-	// TODO comment
-	AtLargeUtilization(ids.NodeID, time.Time) float64
 	// Returns the current EWMA of CPU utilization for all nodes.
 	CumulativeUtilization(time.Time) float64
 	// TODO add comment.
@@ -47,10 +43,6 @@ type TimeTracker interface {
 	// If the node's CPU utilization isn't known, or is already <= [value],
 	// returns the zero duration.
 	TimeUntilUtilization(nodeID ids.NodeID, now time.Time, value float64) time.Duration
-	// Returns the number of nodes that have recently used CPU time.
-	Len() int
-	// Returns the total weight of CPU spenders that have recently used CPU.
-	ActiveWeight() uint64
 }
 
 type cpuTracker struct {
@@ -200,14 +192,7 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
-	return ct.vdrUtilization(nodeID, now) + ct.AtLargeUtilization(nodeID, now)
-}
-
-func (ct *cpuTracker) VdrUtilization(nodeID ids.NodeID, now time.Time) float64 {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	return ct.vdrUtilization(nodeID, now)
+	return ct.vdrUtilization(nodeID, now) + ct.atLargeUtilization(nodeID, now)
 }
 
 // Assumes [ct.lock] is held.
@@ -219,13 +204,6 @@ func (ct *cpuTracker) vdrUtilization(nodeID ids.NodeID, now time.Time) float64 {
 		return 0
 	}
 	return meter.(uptime.Meter).Read(now)
-}
-
-func (ct *cpuTracker) AtLargeUtilization(nodeID ids.NodeID, now time.Time) float64 {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	return ct.atLargeUtilization(nodeID, now)
 }
 
 // Assumes [ct.lock] is held.
@@ -244,13 +222,6 @@ func (ct *cpuTracker) CumulativeUtilization(now time.Time) float64 {
 	defer ct.lock.Unlock()
 
 	return ct.cumulativeVdrUtilization(now) + ct.cumulativeAtLargeUtilization(now)
-}
-
-func (ct *cpuTracker) CumulativeVdrUtilization(now time.Time) float64 {
-	ct.lock.Lock()
-	defer ct.lock.Unlock()
-
-	return ct.cumulativeVdrUtilization(now)
 }
 
 // Assumes [ct.lock] is held.
@@ -276,13 +247,6 @@ func (ct *cpuTracker) cumulativeAtLargeUtilization(now time.Time) float64 {
 	// TODO fix metric
 	ct.metrics.cumulativeMetric.Set(currentUtilization)
 	return currentUtilization
-}
-
-func (ct *cpuTracker) Len() int {
-	ct.lock.RLock()
-	defer ct.lock.RUnlock()
-
-	return ct.vdrCPUSpenders.Len()
 }
 
 func (ct *cpuTracker) TimeUntilUtilization(
