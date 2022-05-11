@@ -113,7 +113,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
@@ -184,7 +184,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
@@ -247,7 +247,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := New(
 		mc,
