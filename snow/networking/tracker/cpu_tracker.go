@@ -24,18 +24,18 @@ var (
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
-	// Registers that the given node started using a CPU
-	// at the given time, and that the given portion of the CPU
-	// usage should be attributed to the validator CPU allocation.
+	// Registers that the given node started using a CPU at the given time, and
+	// that the given portion of the CPU usage should be attributed to the
+	// at-large CPU allocation.
 	IncCPU(ids.NodeID, time.Time, float64)
-	// Registers that the given node stopped using a CPU
-	// at the given time, and that the given portion of the CPU
-	// usage should be attributed to the validator CPU allocation.
+	// Registers that the given node stopped using a CPU at the given time, and
+	// that the given portion of the CPU usage should be attributed to the
+	// at-large CPU allocation.
 	DecCPU(ids.NodeID, time.Time, float64)
 	// Returns the current EWMA of CPU utilization for the given node.
 	Utilization(ids.NodeID, time.Time) float64
-	// Returns the current EWMA of CPU utilization by all nodes
-	// attributed to the at-large CPU allocation.
+	// Returns the current EWMA of CPU utilization by all nodes attributed to
+	// the at-large CPU allocation.
 	CumulativeAtLargeUtilization(time.Time) float64
 	// Returns the duration between [now] and when the CPU utilization of
 	// [nodeID] reaches [value], assuming that the node uses no more CPU.
@@ -102,7 +102,7 @@ func (ct *cpuTracker) getMeter(nodeID ids.NodeID) meter.Meter {
 func (ct *cpuTracker) IncCPU(
 	nodeID ids.NodeID,
 	startTime time.Time,
-	vdrPortion float64,
+	atLargePortion float64,
 ) {
 	ct.lock.Lock()
 	defer func() {
@@ -114,14 +114,14 @@ func (ct *cpuTracker) IncCPU(
 	meter := ct.getMeter(nodeID)
 	meter.Inc(startTime, 1)
 	ct.cumulativeMeter.Inc(startTime, 1)
-	ct.cumulativeAtLargeMeter.Inc(startTime, 1-vdrPortion)
+	ct.cumulativeAtLargeMeter.Inc(startTime, atLargePortion)
 
 }
 
 func (ct *cpuTracker) DecCPU(
 	nodeID ids.NodeID,
 	endTime time.Time,
-	vdrPortion float64,
+	atLargePortion float64,
 ) {
 	ct.lock.Lock()
 	defer func() {
@@ -133,7 +133,7 @@ func (ct *cpuTracker) DecCPU(
 	meter := ct.getMeter(nodeID)
 	meter.Dec(endTime, 1)
 	ct.cumulativeMeter.Dec(endTime, 1)
-	ct.cumulativeAtLargeMeter.Dec(endTime, 1-vdrPortion)
+	ct.cumulativeAtLargeMeter.Dec(endTime, atLargePortion)
 }
 
 func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {

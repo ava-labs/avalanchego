@@ -423,31 +423,30 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		// TODO this logic is also used in the handler so we should
-		// factor it out, but where should it go?
-		// Determine what portion of CPU usage should be attributed
-		// to the validator CPU allocation and at-large CPU allocation.
+		// TODO this logic is also used in the handler so we should factor it
+		// out, but where should it go?
+		// Determine what portion of CPU usage should be attributed to the
+		// validator CPU allocation and at-large CPU allocation.
 		vdrCPUAlloc, atLargeCPUAlloc := p.CPUTargeter.TargetCPUUsage(p.id)
 		totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
-		// Note that [vdrCPUPortion] is in [0,1]
-		var vdrCPUPortion float64
+		// Note that [atLargeCPUPortion] is in [0,1]
+		var atLargeCPUPortion float64
 		if totalAlloc == 0 {
 			// If the total CPU allocation is 0, there's no way to meaningfully
 			// attribute CPU usage to the validator / at-large CPU allocations,
 			// so just use 0.5
-			vdrCPUPortion = 0.5
+			atLargeCPUPortion = 0.5
 		} else {
-			vdrCPUPortion = vdrCPUAlloc / totalAlloc
+			atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
 		}
 
-		// Track the time it takes from now until the time
-		// the message is handled (in the event this message
-		// is handled at the network level) or the time the
-		// message is handed to the router (in the event
-		// this message is not handled at the network level.)
-		// [p.CPUTracker.StopCPU] must be called when this
-		// loop iteration is finished.
-		p.CPUTracker.IncCPU(p.id, p.Clock.Time(), vdrCPUPortion)
+		// Track the time it takes from now until the time the message is
+		// handled (in the event this message is handled at the network level)
+		// or the time the message is handed to the router (in the event this
+		// message is not handled at the network level.)
+		// [p.CPUTracker.StopCPU] must be called when this loop iteration is
+		// finished.
+		p.CPUTracker.IncCPU(p.id, p.Clock.Time(), atLargeCPUPortion)
 
 		p.Log.Verbo(
 			"parsing message from %s:\n%s",
@@ -466,7 +465,7 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
-			p.CPUTracker.DecCPU(p.id, p.Clock.Time(), vdrCPUPortion)
+			p.CPUTracker.DecCPU(p.id, p.Clock.Time(), atLargeCPUPortion)
 			continue
 		}
 
@@ -478,7 +477,7 @@ func (p *peer) readMessages() {
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
 		p.handle(msg)
-		p.CPUTracker.DecCPU(p.id, p.Clock.Time(), vdrCPUPortion)
+		p.CPUTracker.DecCPU(p.id, p.Clock.Time(), atLargeCPUPortion)
 	}
 }
 
