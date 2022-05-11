@@ -142,7 +142,7 @@ func (t *cpuThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 		targetCPU := targetVdrCPU + targetAtLargeCPU
 		// Get actual CPU usage for this node.
 		actualCPU := t.cpuTracker.Utilization(nodeID, now)
-		if actualCPU <= targetVdrCPU+targetAtLargeCPU {
+		if actualCPU <= targetCPU {
 			return
 		}
 		// See how long it will take for actual CPU usage to drop to target,

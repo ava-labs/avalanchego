@@ -17,7 +17,10 @@ import (
 var _ CPUTargeter = &cpuTargeter{}
 
 type CPUTargeter interface {
-	// Return the target CPU usage of the given node.
+	// Returns the target CPU usage of the given node from:
+	// 1. The validator CPU allocation.
+	// 2. The at-large CPU allocation.
+	// Both returned values are >= 0.
 	TargetCPUUsage(nodeID ids.NodeID) (float64, float64)
 }
 

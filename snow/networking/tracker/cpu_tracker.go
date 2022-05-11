@@ -78,7 +78,7 @@ func NewCPUTracker(
 		weights:                map[ids.NodeID]uint64{},
 	}
 	var err error
-	t.metrics, err = newCPUTrackerMetrics("cpuTracker", reg)
+	t.metrics, err = newCPUTrackerMetrics("cpu_tracker", reg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing cpuTracker metrics errored with: %w", err)
 	}
@@ -105,15 +105,17 @@ func (ct *cpuTracker) IncCPU(
 	vdrPortion float64,
 ) {
 	ct.lock.Lock()
-	defer ct.lock.Unlock()
+	defer func() {
+		ct.lock.Unlock()
+		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime))
+		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime))
+	}()
 
 	meter := ct.getMeter(nodeID)
 	meter.Start(startTime, 1)
 	ct.cumulativeMeter.Start(startTime, 1)
 	ct.cumulativeAtLargeMeter.Start(startTime, 1-vdrPortion)
 
-	ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime))
-	ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime))
 }
 
 func (ct *cpuTracker) DecCPU(
@@ -122,15 +124,16 @@ func (ct *cpuTracker) DecCPU(
 	vdrPortion float64,
 ) {
 	ct.lock.Lock()
-	defer ct.lock.Unlock()
+	defer func() {
+		ct.lock.Unlock()
+		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime))
+		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime))
+	}()
 
 	meter := ct.getMeter(nodeID)
-	meter.Stop(endTime, vdrPortion)
+	meter.Stop(endTime, 1)
 	ct.cumulativeMeter.Stop(endTime, 1)
-	ct.cumulativeAtLargeMeter.Start(endTime, 1-vdrPortion)
-
-	ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime))
-	ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime))
+	ct.cumulativeAtLargeMeter.Stop(endTime, 1-vdrPortion)
 }
 
 func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
@@ -204,7 +207,7 @@ func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*tracker
 		}),
 		cumulativeAtLargeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "cumulative_at_largeutilization",
+			Name:      "cumulative_at_large_utilization",
 			Help:      "Estimated CPU utilization attributed to the at-large CPU allocation over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
 		}),
 	}

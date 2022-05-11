@@ -172,11 +172,11 @@ const (
 	CPUVdrAllocKey                                     = "throttler-inbound-cpu-validator-alloc"
 	CPUAtLargeAllocKey                                 = "throttler-inbound-cpu-at-large-alloc"
 	CPUNodeMaxAtLargeKey                               = "throttler-inbound-cpu-node-max-at-large-portion"
+	CPUTrackerHalflifeKey                              = "cpu-tracker-halflife"
 	OutboundThrottlerAtLargeAllocSizeKey               = "throttler-outbound-at-large-alloc-size"
 	OutboundThrottlerVdrAllocSizeKey                   = "throttler-outbound-validator-alloc-size"
 	OutboundThrottlerNodeMaxAtLargeBytesKey            = "throttler-outbound-node-max-at-large-bytes"
 	UptimeMetricFreqKey                                = "uptime-metric-freq"
 	VMAliasesFileKey                                   = "vm-aliases-file"
 	VMAliasesContentKey                                = "vm-aliases-file-content"
-	CPUTrackerHalflifeKey                              = "cpu-tracker-halflife"
 )

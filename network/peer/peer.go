@@ -423,6 +423,8 @@ func (p *peer) readMessages() {
 			return
 		}
 
+		// TODO this logic is also used in the handler so we should
+		// factor it out, but where should it go?
 		// Determine what portion of CPU usage should be attributed
 		// to the validator CPU allocation and at-large CPU allocation.
 		vdrCPUAlloc, atLargeCPUAlloc := p.CPUTargeter.TargetCPUUsage(p.id)
