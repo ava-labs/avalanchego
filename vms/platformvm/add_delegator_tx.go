@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -24,7 +23,6 @@ import (
 
 var (
 	_ StatefulProposalTx = &StatefulAddDelegatorTx{}
-	_ timed.Tx           = &StatefulAddDelegatorTx{}
 
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")

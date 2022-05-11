@@ -10,14 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var (
 	_ StatefulProposalTx = &StatefulAddSubnetValidatorTx{}
-	_ timed.Tx           = &StatefulAddSubnetValidatorTx{}
 
 	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
 )
