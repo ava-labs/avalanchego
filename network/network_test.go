@@ -5,7 +5,6 @@ package network
 
 import (
 	"crypto"
-	"math"
 	"net"
 	"sync"
 	"testing"
@@ -126,10 +125,9 @@ func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
 		&tracker.CPUTargeterConfig{
-			CPUTarget:                    math.MaxFloat64,
-			VdrCPUPercentage:             0.5,
-			SinglePeerMaxUsagePercentage: 0.5,
-			MaxScaling:                   20,
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: 0.5,
 		},
 		validators.NewSet(),
 		cpuTracker,

@@ -215,6 +215,7 @@ func NewNetwork(
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
 		CPUTracker:           config.CPUTracker,
+		CPUTargeter:          config.CPUTargeter,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{

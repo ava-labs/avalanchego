@@ -361,7 +361,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime)
+	h.cpuTracker.StartCPU(nodeID, startTime, 0 /*TODO*/)
 	h.ctx.Lock.Lock()
 	defer func() {
 		h.ctx.Lock.Unlock()
@@ -370,7 +370,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime)
+		h.cpuTracker.StopCPU(nodeID, endTime, 0 /*TODO*/)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling sync message: %s", op)
@@ -569,13 +569,13 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime)
+	h.cpuTracker.StartCPU(nodeID, startTime, 0 /*TODO*/)
 	defer func() {
 		var (
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime)
+		h.cpuTracker.StopCPU(nodeID, endTime, 0 /*TODO*/)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling async message: %s", op)

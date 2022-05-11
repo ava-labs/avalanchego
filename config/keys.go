@@ -169,6 +169,9 @@ const (
 	InboundThrottlerBandwidthRefillRateKey             = "throttler-inbound-bandwidth-refill-rate"
 	InboundThrottlerBandwidthMaxBurstSizeKey           = "throttler-inbound-bandwidth-max-burst-size"
 	InboundThrottlerCPUMaxRecheckDelayKey              = "throttler-inbound-cpu-max-recheck-delay"
+	CPUVdrAllocKey                                     = "throttler-inbound-cpu-vdr-alloc"
+	CPUAtLargeAllocKey                                 = "throttler-inbound-cpu-at-large-alloc"
+	CPUNodeMaxAtLargeKey                               = "throttler-inbound-cpu-node-max-at-large"
 	OutboundThrottlerAtLargeAllocSizeKey               = "throttler-outbound-at-large-alloc-size"
 	OutboundThrottlerVdrAllocSizeKey                   = "throttler-outbound-validator-alloc-size"
 	OutboundThrottlerNodeMaxAtLargeBytesKey            = "throttler-outbound-node-max-at-large-bytes"
@@ -176,8 +179,4 @@ const (
 	VMAliasesFileKey                                   = "vm-aliases-file"
 	VMAliasesContentKey                                = "vm-aliases-file-content"
 	CPUTrackerHalflifeKey                              = "cpu-tracker-halflife"
-	CPUTargetKey                                       = "cpu-target"
-	CPUValidatorAllocationKey                          = "cpu-validator-alloc-portion"
-	CPUTargetMaxPerNonValidatorKey                     = "cpu-target-per-non-validator-max-fraction"
-	CPUTargetMaxScalingKey                             = "cpu-target-max-scaling"
 )
