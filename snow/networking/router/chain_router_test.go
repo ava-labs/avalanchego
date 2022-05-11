@@ -59,7 +59,7 @@ func TestShutdown(t *testing.T) {
 	shutdownCalled := make(chan struct{}, 1)
 
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -163,7 +163,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -275,7 +275,7 @@ func TestRouterTimeout(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -392,7 +392,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -508,7 +508,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	vID := ids.GenerateTestNodeID()
 	err = vdrs.AddWeight(vID, 1)
 	assert.NoError(t, err)
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,

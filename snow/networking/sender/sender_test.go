@@ -76,7 +76,7 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -165,7 +165,7 @@ func TestReliableMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -261,7 +261,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,

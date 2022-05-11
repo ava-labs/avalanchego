@@ -30,7 +30,7 @@ func TestNewCPUThrottler(t *testing.T) {
 	clock := mockable.Clock{}
 	clock.Set(time.Now())
 	vdrs := validators.NewSet()
-	cpuTracker, err := tracker.NewCPUTracker(reg, meter.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(reg, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(err)
 	config := CPUThrottlerConfig{
 		Clock:           clock,
