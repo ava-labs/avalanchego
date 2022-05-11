@@ -234,9 +234,12 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 
 	// We've received the filtered accepted frontier from every state sync validator
 	// Drop all summaries without a sufficient weight behind them
-	for key, ws := range ss.weightedSummaries {
+	for summaryID, ws := range ss.weightedSummaries {
 		if ws.weight < ss.Alpha {
-			delete(ss.weightedSummaries, key)
+			ss.Ctx.Log.Debug("Removing summary %s due to an insufficient weight %d - needed %d",
+				summaryID, ws.weight, ss.Alpha,
+			)
+			delete(ss.weightedSummaries, summaryID)
 		}
 	}
 
@@ -260,6 +263,8 @@ func (ss *stateSyncer) AcceptedStateSummary(validatorID ids.NodeID, requestID ui
 				"- state sync attempt: %d", ss.StateSyncBeacons.Len(), ss.failedVoters.Len(), ss.attempts)
 			return ss.restart()
 		}
+
+		ss.Ctx.Log.Info("No acceptable summaries found, skipping state sync")
 
 		// if we do not restart state sync, move on to bootstrapping.
 		return ss.onDoneStateSyncing(ss.requestID)

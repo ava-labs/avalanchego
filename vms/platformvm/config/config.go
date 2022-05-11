@@ -15,7 +15,6 @@ import (
 )
 
 // Struct collecting all foundational parameters of PlatformVM
-
 type Config struct {
 	// The node's chain manager
 	Chains chains.Manager

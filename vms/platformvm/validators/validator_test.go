@@ -17,12 +17,8 @@ var (
 	errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
-	keys []*crypto.PrivateKeySECP256K1R
-)
-
-func init() {
 	keys = crypto.BuildTestKeys()
-}
+)
 
 func TestValidatorBoundedBy(t *testing.T) {
 	// case 1: a starts, a finishes, b starts, b finishes

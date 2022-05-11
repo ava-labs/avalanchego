@@ -66,7 +66,6 @@ type testHelpersCollection struct {
 	fx             fx.Fx
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
-	uptimeMan      uptime.Manager
 	utxosMan       utxos.SpendHandler
 	txBuilder      builder.TxBuilder
 }
@@ -105,13 +104,12 @@ func newTestHelpersCollection() *testHelpersCollection {
 	tState := defaultState(&cfg, ctx, baseDB, rewardsCalc)
 
 	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, unsigned.Codec)
-	uptimeMan := uptime.NewManager(tState)
 	utxosMan := utxos.NewHandler(ctx, clk, tState, fx)
 
 	txBuilder := builder.NewTxBuilder(
 		ctx, cfg, clk, fx,
 		tState, atomicUtxosMan,
-		uptimeMan, utxosMan, rewardsCalc)
+		utxosMan, rewardsCalc)
 
 	return &testHelpersCollection{
 		isBootstrapped: &isBootstrapped,
@@ -122,7 +120,6 @@ func newTestHelpersCollection() *testHelpersCollection {
 		fx:             fx,
 		tState:         tState,
 		atomicUtxosMan: atomicUtxosMan,
-		uptimeMan:      uptimeMan,
 		utxosMan:       utxosMan,
 		txBuilder:      txBuilder,
 	}
@@ -345,9 +342,6 @@ func internalStateShutdown(t *testHelpersCollection) error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
-			return err
-		}
 		if err := t.tState.Write(); err != nil {
 			return err
 		}

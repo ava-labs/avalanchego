@@ -221,7 +221,6 @@ func (vm *VM) Initialize(
 		vm.fx,
 		vm.internalState,
 		vm.AtomicUTXOManager,
-		vm.uptimeManager,
 		vm.spendOps,
 		vm.rewards,
 	)

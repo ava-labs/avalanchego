@@ -124,7 +124,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 	txBuilder := builder.NewTxBuilder(
 		ctx, cfg, clk, fx,
 		tState, atomicUtxosMan,
-		uptimeMan, utxosMan, rewardsCalc)
+		utxosMan, rewardsCalc)
 
 	txVerifier := NewVerifier(
 		ctx, &isBootstrapped, &cfg, &clk, fx,
