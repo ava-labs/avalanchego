@@ -146,7 +146,6 @@ func (hi *heightIndex) ResetHeightIndex(log logging.Logger, baseDB versiondb.Com
 			log.Info("Deleted %d height entries", deleteCount)
 
 			// every deleteBatchSize ops, sleep to avoid clogging the node on this
-			deleteCount = 0
 			processingDuration := time.Since(processingStart)
 			// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
 			// to ensure the indexing does not bottleneck the node.
