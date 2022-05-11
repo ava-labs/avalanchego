@@ -136,12 +136,16 @@ func (ct *cpuTracker) getMeter(nodeID ids.NodeID) uptime.Meter {
 	return newMeter
 }
 
-func (ct *cpuTracker) StartCPU(nodeID ids.NodeID, startTime time.Time) {
+func (ct *cpuTracker) StartCPU(
+	nodeID ids.NodeID,
+	startTime time.Time,
+	vdrPortion float64,
+) {
 	ct.lock.Lock()
 	defer ct.lock.Unlock()
 
 	meter := ct.getMeter(nodeID)
-	ct.cumulativeMeter.Start(startTime)
+	ct.cumulativeMeter.Start(startTime, 1)
 	meter.Start(startTime)
 }
 
@@ -150,7 +154,7 @@ func (ct *cpuTracker) StopCPU(nodeID ids.NodeID, endTime time.Time) {
 	defer ct.lock.Unlock()
 
 	meter := ct.getMeter(nodeID)
-	ct.cumulativeMeter.Stop(endTime)
+	ct.cumulativeMeter.Stop(endTime, 1)
 	meter.Stop(endTime)
 }
 

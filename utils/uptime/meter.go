@@ -12,11 +12,11 @@ import (
 type Meter interface {
 	// Start the meter, the read value will be monotonically increasing while
 	// the meter is running.
-	Start(time.Time)
+	Start(time.Time, float64)
 
 	// Stop the meter, the read value will be exponentially decreasing while the
 	// meter is off.
-	Stop(time.Time)
+	Stop(time.Time, float64)
 
 	// Read the current value of the meter, this can be used to approximate the
 	// percent of time the meter has been running recently. The definition of
