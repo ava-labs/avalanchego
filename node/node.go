@@ -62,6 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -680,27 +681,29 @@ func (n *Node) initVMs() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
-			SubnetTracker:          n.Net,
-			Chains:                 n.chainManager,
-			Validators:             vdrs,
-			UptimeLockedCalculator: n.uptimeCalculator,
-			StakingEnabled:         n.Config.EnableStaking,
-			WhitelistedSubnets:     n.Config.WhitelistedSubnets,
-			TxFee:                  n.Config.TxFee,
-			CreateAssetTxFee:       n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
-			CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
-			UptimePercentage:       n.Config.UptimeRequirement,
-			MinValidatorStake:      n.Config.MinValidatorStake,
-			MaxValidatorStake:      n.Config.MaxValidatorStake,
-			MinDelegatorStake:      n.Config.MinDelegatorStake,
-			MinDelegationFee:       n.Config.MinDelegationFee,
-			MinStakeDuration:       n.Config.MinStakeDuration,
-			MaxStakeDuration:       n.Config.MaxStakeDuration,
-			RewardConfig:           n.Config.RewardConfig,
-			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
-			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
-			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
+			Config: config.Config{
+				Chains:                 n.chainManager,
+				Validators:             vdrs,
+				SubnetTracker:          n.Net,
+				UptimeLockedCalculator: n.uptimeCalculator,
+				StakingEnabled:         n.Config.EnableStaking,
+				WhitelistedSubnets:     n.Config.WhitelistedSubnets,
+				TxFee:                  n.Config.TxFee,
+				CreateAssetTxFee:       n.Config.CreateAssetTxFee,
+				CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
+				CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
+				UptimePercentage:       n.Config.UptimeRequirement,
+				MinValidatorStake:      n.Config.MinValidatorStake,
+				MaxValidatorStake:      n.Config.MaxValidatorStake,
+				MinDelegatorStake:      n.Config.MinDelegatorStake,
+				MinDelegationFee:       n.Config.MinDelegationFee,
+				MinStakeDuration:       n.Config.MinStakeDuration,
+				MaxStakeDuration:       n.Config.MaxStakeDuration,
+				RewardConfig:           n.Config.RewardConfig,
+				ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
+				ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
+				ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
+			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,

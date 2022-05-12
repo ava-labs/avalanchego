@@ -1,17 +1,19 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package validator
 
 import (
 	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var errBadSubnetID = errors.New("subnet ID can't be primary network ID")
+var (
+	ErrWeightTooSmall = errors.New("weight of this validator is too low")
+	errBadSubnetID    = errors.New("subnet ID can't be primary network ID")
+)
 
 // Validator is a validator.
 type Validator struct {
@@ -47,7 +49,7 @@ func (v *Validator) Weight() uint64 { return v.Wght }
 func (v *Validator) Verify() error {
 	switch {
 	case v.Wght == 0: // Ensure the validator has some weight
-		return errWeightTooSmall
+		return ErrWeightTooSmall
 	default:
 		return nil
 	}
@@ -58,25 +60,4 @@ func (v *Validator) Verify() error {
 // Namely, startTime <= v.StartTime() <= v.EndTime() <= endTime
 func (v *Validator) BoundedBy(startTime, endTime time.Time) bool {
 	return !v.StartTime().Before(startTime) && !v.EndTime().After(endTime)
-}
-
-// SubnetValidator validates a subnet on the Avalanche network.
-type SubnetValidator struct {
-	Validator `serialize:"true"`
-
-	// ID of the subnet this validator is validating
-	Subnet ids.ID `serialize:"true" json:"subnet"`
-}
-
-// SubnetID is the ID of the subnet this validator is validating
-func (v *SubnetValidator) SubnetID() ids.ID { return v.Subnet }
-
-// Verify this validator is valid
-func (v *SubnetValidator) Verify() error {
-	switch v.Subnet {
-	case constants.PrimaryNetworkID:
-		return errBadSubnetID
-	default:
-		return v.Validator.Verify()
-	}
 }
