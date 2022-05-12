@@ -53,7 +53,6 @@ var (
 	_ secp256k1fx.VM       = &VM{}
 	_ validators.State     = &VM{}
 
-	errDSCantValidate = errors.New("new blockchain can't be validated by primary network")
 	errWrongCacheType = errors.New("unexpectedly cached type")
 )
 

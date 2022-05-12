@@ -21,12 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 const (

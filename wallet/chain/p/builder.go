@@ -17,9 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	pChainValidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 var (
@@ -71,7 +72,7 @@ type Builder interface {
 	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	NewAddValidatorTx(
-		validator *validators.Validator,
+		validator *pChainValidators.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
 		options ...common.Option,
@@ -82,7 +83,7 @@ type Builder interface {
 	// - [validator] specifies all the details of the validation period such as
 	//   the startTime, endTime, sampling weight, nodeID, and subnetID.
 	NewAddSubnetValidatorTx(
-		validator *validators.SubnetValidator,
+		validator *pChainValidators.SubnetValidator,
 		options ...common.Option,
 	) (*unsigned.AddSubnetValidatorTx, error)
 
@@ -94,7 +95,7 @@ type Builder interface {
 	// - [rewardsOwner] specifies the owner of all the rewards this delegator
 	//   may accrue at the end of its delegation period.
 	NewAddDelegatorTx(
-		validator *validators.Validator,
+		validator *pChainValidators.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*unsigned.AddDelegatorTx, error)
@@ -227,7 +228,7 @@ func (b *builder) NewBaseTx(
 }
 
 func (b *builder) NewAddValidatorTx(
-	validator *validators.Validator,
+	validator *pChainValidators.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
@@ -259,7 +260,7 @@ func (b *builder) NewAddValidatorTx(
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
-	validator *validators.SubnetValidator,
+	validator *pChainValidators.SubnetValidator,
 	options ...common.Option,
 ) (*unsigned.AddSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
@@ -291,7 +292,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 }
 
 func (b *builder) NewAddDelegatorTx(
-	validator *validators.Validator,
+	validator *pChainValidators.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*unsigned.AddDelegatorTx, error) {

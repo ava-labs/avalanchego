@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	errNoValueOutput              = errors.New("output has no value")
-	_                verify.State = &OutputOwners{}
+	_ verify.State = &OutputOwners{}
+
+	errNoValueOutput = errors.New("output has no value")
 )
 
 type TransferOutput struct {
