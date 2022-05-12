@@ -59,7 +59,6 @@ type cpuTracker struct {
 	// utilized will move towards the oldest elements where they can be deleted.
 	meters  linkedhashmap.LinkedHashmap
 	metrics *trackerMetrics
-	weights map[ids.NodeID]uint64
 }
 
 func NewCPUTracker(
@@ -73,7 +72,6 @@ func NewCPUTracker(
 		cumulativeAtLargeMeter: factory.New(halflife),
 		halflife:               halflife,
 		meters:                 linkedhashmap.New(),
-		weights:                map[ids.NodeID]uint64{},
 	}
 	var err error
 	t.metrics, err = newCPUTrackerMetrics("cpu_tracker", reg)

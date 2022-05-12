@@ -29,7 +29,6 @@ func TestNewCPUTracker(t *testing.T) {
 	assert.NotNil(tracker.cumulativeAtLargeMeter)
 	assert.Equal(halflife, tracker.halflife)
 	assert.NotNil(tracker.meters)
-	assert.NotNil(tracker.weights)
 	assert.NotNil(tracker.metrics)
 }
 
