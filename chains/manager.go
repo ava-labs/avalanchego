@@ -189,6 +189,9 @@ type ManagerConfig struct {
 
 	// Tracks CPU usage caused by each peer.
 	CPUTracker timetracker.TimeTracker
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	CPUTargeter timetracker.CPUTargeter
 
 	StateSyncBeacons         []ids.NodeID
 	StateSyncDisableRequests bool
@@ -617,6 +620,7 @@ func (m *manager) createAvalancheChain(
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
 		m.CPUTracker,
+		m.CPUTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -812,6 +816,7 @@ func (m *manager) createSnowmanChain(
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
 		m.CPUTracker,
+		m.CPUTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)

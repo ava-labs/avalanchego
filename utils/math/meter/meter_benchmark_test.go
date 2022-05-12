@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package uptime
+package meter
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ func BenchmarkMeters(b *testing.B) {
 
 func MeterBenchmark(b *testing.B, m Meter, period time.Duration) {
 	currentTime := time.Now()
-	m.Start(currentTime)
+	m.Inc(currentTime, 1)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
