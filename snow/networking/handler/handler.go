@@ -370,6 +370,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	// Determine what portion of CPU usage should be attributed to the validator
 	// CPU allocation and at-large CPU allocation.
 	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
+	h.ctx.Log.Warn("Tracking CPU of %s with %f at large cpu portion", nodeID, atLargeCPUPortion)
 	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
 	h.ctx.Lock.Lock()
 	defer func() {
@@ -581,6 +582,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	// Determine what portion of CPU usage should be attributed to the validator
 	// CPU allocation and at-large CPU allocation.
 	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
+	h.ctx.Log.Warn("Tracking CPU of %s with %f at large cpu portion", nodeID, atLargeCPUPortion)
 	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
 	defer func() {
 		var (

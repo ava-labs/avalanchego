@@ -425,6 +425,8 @@ func (p *peer) readMessages() {
 
 		_, _, atLargeCPUPortion := p.CPUTargeter.TargetCPUUsage(p.id)
 
+		p.Log.Warn("Tracking CPU of %s with %f at large cpu portion", p.id, atLargeCPUPortion)
+
 		// Track the time it takes from now until the time the message is
 		// handled (in the event this message is handled at the network level)
 		// or the time the message is handed to the router (in the event this
