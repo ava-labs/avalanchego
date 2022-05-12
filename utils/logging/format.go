@@ -111,6 +111,7 @@ func newTermEncoderConfig(lvlEncoder zapcore.LevelEncoder) zapcore.EncoderConfig
 	config := defaultEncoderConfig
 	config.EncodeLevel = lvlEncoder
 	config.EncodeTime = termTimeEncoder
+	config.ConsoleSeparator = " "
 	return config
 }
 
