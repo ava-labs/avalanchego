@@ -80,10 +80,8 @@ func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) (float64, float64, floa
 	// Note that [atLargeCPUPortion] is in [0,1]
 	var atLargeCPUPortion float64
 	if totalAlloc == 0 {
-		// If the total CPU allocation is 0, there's no way to meaningfully
-		// attribute CPU usage to the validator / at-large CPU allocations,
-		// so just use 0.5
-		atLargeCPUPortion = 0.5
+		// Note this can only happen if [ct.vdrCPUAlloc] == 0.
+		atLargeCPUPortion = 1
 	} else {
 		atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
 	}
