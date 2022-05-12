@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -51,7 +52,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-	uptime_utils "github.com/ava-labs/avalanchego/utils/uptime"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -2100,7 +2100,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), uptime_utils.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
+	cpuTargeter, err := timetracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&timetracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -2110,6 +2121,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		nil,
 		time.Hour,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 

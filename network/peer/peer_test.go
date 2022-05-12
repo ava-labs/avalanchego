@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -78,10 +78,20 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	assert.NoError(err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, 10*time.Second, validators.NewSet())
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, 10*time.Second)
+	assert.NoError(err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           10,
+			AtLargeCPUAlloc:       10,
+			PeerMaxAtLargePortion: 0.5,
+		},
+		validators.NewSet(),
+		cpuTracker,
+	)
 	assert.NoError(err)
 	sharedConfig := Config{
-		CPUTracker:           cpuTracker,
 		Metrics:              metrics,
 		MessageCreator:       mc,
 		Log:                  logging.NoLog{},
@@ -95,6 +105,8 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PingFrequency:        constants.DefaultPingFrequency,
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
+		CPUTracker:           cpuTracker,
+		CPUTargeter:          cpuTargeter,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig

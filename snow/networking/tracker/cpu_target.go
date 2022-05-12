@@ -6,35 +6,46 @@ package tracker
 import (
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var _ CPUTargeter = &cpuTargeter{}
 
 type CPUTargeter interface {
-	// Return the target CPU usage of the given node.
-	TargetCPUUsage(nodeID ids.NodeID) float64
+	// Returns the target CPU usage of the given node from:
+	// 1. The validator CPU allocation.
+	// 2. The at-large CPU allocation.
+	// Also returns the portion of CPU usage that should be attributed
+	// to the at-large allocation.
+	// All returned values are >= 0.
+	TargetCPUUsage(nodeID ids.NodeID) (float64, float64, float64)
 }
 
 type CPUTargeterConfig struct {
-	CPUTarget                    float64 `json:"cpuTarget"`
-	VdrCPUPercentage             float64 `json:"vdrCPUPercentage"`
-	SinglePeerMaxUsagePercentage float64 `json:"singlePeerMaxUsagePercentage"`
-	MaxScaling                   float64 `json:"maxScaling"`
+	Clock                 mockable.Clock `json:"-"`
+	VdrCPUAlloc           float64        `json:"vdrCPUAlloc"`
+	AtLargeCPUAlloc       float64        `json:"atLargeCPUAlloc"`
+	PeerMaxAtLargePortion float64        `json:"peerMaxAtLargeAlloc"`
 }
 
-func NewCPUTargeter(reg prometheus.Registerer, config *CPUTargeterConfig, vdrs validators.Set, cpuTracker TimeTracker) (targeter CPUTargeter, err error) {
+func NewCPUTargeter(
+	reg prometheus.Registerer,
+	config *CPUTargeterConfig,
+	vdrs validators.Set,
+	cpuTracker TimeTracker,
+) (targeter CPUTargeter, err error) {
 	t := &cpuTargeter{
-		vdrs:                vdrs,
-		config:              config,
-		cpuTracker:          cpuTracker,
-		nonVdrCPUPercentage: 1 - config.VdrCPUPercentage,
-		minActivePeers:      1 / config.SinglePeerMaxUsagePercentage,
+		clock:           config.Clock,
+		vdrs:            vdrs,
+		cpuTracker:      cpuTracker,
+		vdrCPUAlloc:     config.VdrCPUAlloc,
+		atLargeCPUAlloc: config.AtLargeCPUAlloc,
+		atLargeMaxCPU:   config.AtLargeCPUAlloc * config.PeerMaxAtLargePortion,
 	}
 	t.metrics, err = newCPUTargeterMetrics("cpu_targeter", reg)
 	if err != nil {
@@ -44,41 +55,37 @@ func NewCPUTargeter(reg prometheus.Registerer, config *CPUTargeterConfig, vdrs v
 }
 
 type cpuTargeter struct {
-	config              *CPUTargeterConfig
-	vdrs                validators.Set
-	cpuTracker          TimeTracker
-	metrics             *targeterMetrics
-	nonVdrCPUPercentage float64
-	minActivePeers      float64
+	clock           mockable.Clock
+	vdrs            validators.Set
+	cpuTracker      TimeTracker
+	metrics         *targeterMetrics
+	vdrCPUAlloc     float64
+	atLargeCPUAlloc float64
+	atLargeMaxCPU   float64
 }
 
-func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) float64 {
-	// scale the cpu target based on how far off the current usage is from the
-	// target
-	scalingFactor := ct.config.CPUTarget / ct.cpuTracker.CumulativeUtilization(time.Now())
-	// the scaling factor needs to be capped by [MaxScaling]
-	scalingFactor = math.Min(scalingFactor, ct.config.MaxScaling)
-	scaledCPUTarget := ct.config.CPUTarget * scalingFactor
+func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) (float64, float64, float64) {
+	// This node's at-large allocation is min([remaining at large], [max at large for a given peer])
+	atLargeCPUUsed := ct.cpuTracker.CumulativeAtLargeUtilization(ct.clock.Time())
+	atLargeCPUAlloc := math.Max(0, ct.atLargeCPUAlloc-atLargeCPUUsed)
+	atLargeCPUAlloc = math.Min(atLargeCPUAlloc, ct.atLargeMaxCPU)
 
-	ct.metrics.scaledTargetMetric.Set(scaledCPUTarget)
-
-	// calculate the cpu allocation from the validator portion of the scaled cpu
-	// target
+	// This node gets a stake-weighted portion of the validator allocation.
 	weight, _ := ct.vdrs.GetWeight(nodeID)
-	vdrCPUPortion := scaledCPUTarget * ct.config.VdrCPUPercentage
-	activeWeight := math.Max(float64(ct.cpuTracker.ActiveWeight()), 1)
-	perWeightCPUUsage := vdrCPUPortion / activeWeight
-	vdrCPUUsage := perWeightCPUUsage * float64(weight)
-
-	// calculate the per peer allocation from the non-validator portion of the
-	// scaled cpu target
-	nonVdrCPUPortion := scaledCPUTarget * ct.nonVdrCPUPercentage
-
-	// per peer usage is capped by behaving as if there are always at least a
-	// minimum number of peers.
-	activePeers := math.Max(float64(ct.cpuTracker.Len()), ct.minActivePeers)
-	perPeerCPUUsage := nonVdrCPUPortion / activePeers
-	return vdrCPUUsage + perPeerCPUUsage
+	if weight == 0 {
+		return 0, atLargeCPUAlloc, 1
+	}
+	vdrCPUAlloc := ct.vdrCPUAlloc * float64(weight) / float64(ct.vdrs.Weight())
+	totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
+	// Note that [atLargeCPUPortion] is in [0,1]
+	var atLargeCPUPortion float64
+	if totalAlloc == 0 {
+		// Note this can only happen if [ct.vdrCPUAlloc] == 0.
+		atLargeCPUPortion = 1
+	} else {
+		atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
+	}
+	return vdrCPUAlloc, atLargeCPUAlloc, atLargeCPUPortion
 }
 
 type targeterMetrics struct {

@@ -8,129 +8,99 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/uptime"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCPUTracker(t *testing.T) {
-	halflife := time.Second
-	validators := validators.NewSet()
+func TestNewCPUTracker(t *testing.T) {
+	assert := assert.New(t)
 
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators)
+	reg := prometheus.NewRegistry()
+	halflife := 5 * time.Second
+	factory := &meter.ContinuousFactory{}
+
+	trackerIntf, err := NewCPUTracker(reg, factory, halflife)
+	assert.NoError(err)
+	tracker, ok := trackerIntf.(*cpuTracker)
+	assert.True(ok)
+	assert.Equal(factory, tracker.factory)
+	assert.NotNil(tracker.cumulativeMeter)
+	assert.NotNil(tracker.cumulativeAtLargeMeter)
+	assert.Equal(halflife, tracker.halflife)
+	assert.NotNil(tracker.meters)
+	assert.NotNil(tracker.metrics)
+}
+
+func TestCPUTracker(t *testing.T) {
+	halflife := 5 * time.Second
+
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
+	node1 := ids.NodeID{1}
+	node2 := ids.NodeID{2}
 
+	// Note that all the durations between start and end are [halflife].
 	startTime1 := time.Now()
 	endTime1 := startTime1.Add(halflife)
-
-	cpuTracker.StartCPU(vdr1, startTime1)
-	cpuTracker.StopCPU(vdr1, endTime1)
+	// Note that all CPU usage is attributed to at-large allocation.
+	cpuTracker.IncCPU(node1, startTime1, 1)
+	cpuTracker.DecCPU(node1, endTime1, 1)
 
 	startTime2 := endTime1
 	endTime2 := startTime2.Add(halflife)
-	cpuTracker.StartCPU(vdr2, startTime2)
-	cpuTracker.StopCPU(vdr2, endTime2)
+	// Note that all CPU usage is attributed to at-large allocation.
+	cpuTracker.IncCPU(node2, startTime2, 1)
+	cpuTracker.DecCPU(node2, endTime2, 1)
 
-	utilization1 := cpuTracker.Utilization(vdr1, endTime2)
-	utilization2 := cpuTracker.Utilization(vdr2, endTime2)
-
-	if utilization1 >= utilization2 {
+	node1Utilization := cpuTracker.Utilization(node1, endTime2)
+	node2Utilization := cpuTracker.Utilization(node2, endTime2)
+	if node1Utilization >= node2Utilization {
 		t.Fatalf("Utilization should have been higher for the more recent spender")
 	}
 
-	cumulative := cpuTracker.CumulativeUtilization(endTime2)
-	sum := utilization1 + utilization2
+	cumulative := cpuTracker.CumulativeAtLargeUtilization(endTime2)
+	sum := node1Utilization + node2Utilization
 	if cumulative != sum {
 		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
 	}
 
-	expectedLen := 2
-	len := cpuTracker.Len()
-	if len != expectedLen {
-		t.Fatalf("Expected length to match number of spenders: %d, but found length: %d", expectedLen, len)
+	startTime3 := endTime2
+	endTime3 := startTime3.Add(halflife)
+	newNode1Utilization := cpuTracker.Utilization(node1, endTime3)
+	if newNode1Utilization >= node1Utilization {
+		t.Fatalf("node CPU utilization should decrease over time")
+	}
+	newCumulative := cpuTracker.CumulativeAtLargeUtilization(endTime3)
+	if newCumulative >= cumulative {
+		t.Fatal("at-large CPU utilization should decrease over time ")
 	}
 
-	// Set pruning time to 64 halflifes in the future, to guarantee that
-	// any counts should have gone to 0
-	pruningTime := endTime2.Add(halflife * 64)
-	cpuTracker.CumulativeUtilization(pruningTime)
-	len = cpuTracker.Len()
-	if len != 0 {
-		t.Fatalf("Expected length to be 0 after pruning, but found length: %d", len)
+	startTime4 := endTime3
+	endTime4 := startTime4.Add(halflife)
+	// Note that only half of CPU usage is attributed to at-large allocation.
+	cpuTracker.IncCPU(node1, startTime4, 0.5)
+	cpuTracker.DecCPU(node1, endTime4, 0.5)
+
+	cumulative = cpuTracker.CumulativeAtLargeUtilization(endTime2)
+	sum = node1Utilization + node2Utilization
+	if cumulative >= sum {
+		t.Fatal("Sum of CPU usage should exceed cumulative at-large utilization")
 	}
-}
-
-func TestCPUTrackerCallbacks(t *testing.T) {
-	halflife := time.Second
-	validators := validators.NewSet()
-	nodeID1, nodeID2, nodeID3 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	if err := validators.AddWeight(nodeID1, 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := validators.AddWeight(nodeID2, 2); err != nil {
-		t.Fatal(err)
-	}
-
-	val, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators)
-	assert.NoError(t, err)
-
-	cpuTracker := val.(*cpuTracker)
-	startTime1 := time.Now()
-	endTime1 := startTime1.Add(halflife)
-
-	cpuTracker.StartCPU(nodeID1, startTime1)
-	assert.Equal(t, uint64(1), cpuTracker.ActiveWeight())
-	cpuTracker.StopCPU(nodeID1, endTime1)
-
-	startTime2 := endTime1
-	endTime2 := startTime2.Add(halflife)
-	cpuTracker.StartCPU(nodeID2, startTime2)
-	assert.Equal(t, uint64(3), cpuTracker.ActiveWeight())
-	cpuTracker.StopCPU(nodeID2, endTime2)
-
-	// change the weight while nodeID1 is active and nodeID2 is not
-	startTime := time.Now()
-	endTime := startTime1.Add(halflife)
-	cpuTracker.StartCPU(nodeID1, startTime)
-	if err := validators.AddWeight(nodeID1, 3); err != nil {
-		t.Fatal(err)
-	}
-	if err := validators.AddWeight(nodeID3, 5); err != nil {
-		t.Fatal(err)
-	}
-	// only nodeID1's weight should be reflected, but nodeID3 shouldn't since it isn't active
-	assert.Equal(t, uint64(6), cpuTracker.ActiveWeight())
-	cpuTracker.StopCPU(nodeID1, endTime)
-
-	// reduce the node's weight
-	if err := validators.RemoveWeight(nodeID1, 1); err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, uint64(5), cpuTracker.ActiveWeight())
-
-	// remove the node completely
-	if err := validators.RemoveWeight(nodeID1, 3); err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, uint64(2), cpuTracker.ActiveWeight())
 }
 
 func TestCPUTrackerTimeUntilUtilization(t *testing.T) {
 	halflife := 5 * time.Second
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), uptime.ContinuousFactory{}, halflife, validators.NewSet())
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, halflife)
 	assert.NoError(t, err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()
 	// Start the meter
-	cpuTracker.StartCPU(nodeID, now)
+	cpuTracker.IncCPU(nodeID, now, 1)
 	// One halflife passes; stop the meter
 	now = now.Add(halflife)
-	cpuTracker.StopCPU(nodeID, now)
+	cpuTracker.DecCPU(nodeID, now, 1)
 	// Read the current value
 	currentVal := cpuTracker.Utilization(nodeID, now)
 	// Suppose we want to wait for the value to be
