@@ -30,8 +30,6 @@ func init() {
 			var scaledCPU float64
 			if err == nil {
 				scaledCPU = newPointWeight * info.CPU
-			} else {
-				scaledCPU = 0
 			}
 
 			runningAverageLock.Lock()

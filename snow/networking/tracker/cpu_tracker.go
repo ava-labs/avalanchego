@@ -169,8 +169,7 @@ func (ct *cpuTracker) TimeUntilUtilization(
 	if !exists {
 		return 0
 	}
-	value /= ct.scale(now)
-	return m.(meter.Meter).TimeUntil(now, value)
+	return m.(meter.Meter).TimeUntil(now, value/ct.scale(now))
 }
 
 func (ct *cpuTracker) scale(now time.Time) float64 {
