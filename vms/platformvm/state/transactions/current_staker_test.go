@@ -10,8 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 func TestPrimaryValidatorSet(t *testing.T) {
@@ -20,7 +21,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
 		addValidatorTx: &unsigned.AddValidatorTx{
-			Validator: validators.Validator{
+			Validator: pChainValidator.Validator{
 				Wght: node0Weight,
 			},
 		},
@@ -30,7 +31,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
 		addValidatorTx: &unsigned.AddValidatorTx{
-			Validator: validators.Validator{
+			Validator: pChainValidator.Validator{
 				Wght: node1Weight,
 			},
 		},
@@ -40,7 +41,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
 		addValidatorTx: &unsigned.AddValidatorTx{
-			Validator: validators.Validator{
+			Validator: pChainValidator.Validator{
 				Wght: node2Weight,
 			},
 		},
@@ -106,8 +107,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
 				subnetID: {
-					Validator: validators.SubnetValidator{
-						Validator: validators.Validator{
+					Validator: pChainValidator.SubnetValidator{
+						Validator: pChainValidator.Validator{
 							Wght: node0Weight,
 						},
 					},
@@ -122,8 +123,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
 				subnetID: {
-					Validator: validators.SubnetValidator{
-						Validator: validators.Validator{
+					Validator: pChainValidator.SubnetValidator{
+						Validator: pChainValidator.Validator{
 							Wght: node1Weight,
 						},
 					},
@@ -138,8 +139,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
 				subnetID: {
-					Validator: validators.SubnetValidator{
-						Validator: validators.Validator{
+					Validator: pChainValidator.SubnetValidator{
+						Validator: pChainValidator.Validator{
 							Wght: node2Weight,
 						},
 					},

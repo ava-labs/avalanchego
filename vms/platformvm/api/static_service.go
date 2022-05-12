@@ -14,15 +14,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 // Note that since an Avalanche network has exactly one Platform Chain,
@@ -190,7 +190,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 		}
 		if apiUTXO.Locktime > args.Time {
-			utxo.Out = &stakeables.LockOut{
+			utxo.Out = &stakeable.LockOut{
 				Locktime:        uint64(apiUTXO.Locktime),
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
@@ -229,7 +229,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				},
 			}
 			if apiUTXO.Locktime > args.Time {
-				utxo.Out = &stakeables.LockOut{
+				utxo.Out = &stakeable.LockOut{
 					Locktime:        uint64(apiUTXO.Locktime),
 					TransferableOut: utxo.Out,
 				}
@@ -274,7 +274,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 				}},
-				Validator: validators.Validator{
+				Validator: pChainValidator.Validator{
 					NodeID: vdr.NodeID,
 					Start:  uint64(args.Time),
 					End:    uint64(vdr.EndTime),
