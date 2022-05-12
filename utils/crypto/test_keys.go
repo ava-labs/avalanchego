@@ -5,7 +5,6 @@ package crypto
 
 import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func BuildTestKeys() []*PrivateKeySECP256K1R {
@@ -17,17 +16,22 @@ func BuildTestKeys() []*PrivateKeySECP256K1R {
 			"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 			"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 		}
-		keys    = make([]*PrivateKeySECP256K1R, 0, len(keyStrings))
-		log     = logging.NoLog{}
+		keys    = make([]*PrivateKeySECP256K1R, len(keyStrings))
 		factory = FactorySECP256K1R{}
 	)
 
-	for _, key := range keyStrings {
+	for i, key := range keyStrings {
 		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		log.AssertNoError(err)
+		if err != nil {
+			panic(err)
+		}
+
 		pk, err := factory.ToPrivateKey(privKeyBytes)
-		log.AssertNoError(err)
-		keys = append(keys, pk.(*PrivateKeySECP256K1R))
+		if err != nil {
+			panic(err)
+		}
+
+		keys[i] = pk.(*PrivateKeySECP256K1R)
 	}
 	return keys
 }

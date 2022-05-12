@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -77,8 +77,8 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&AdvanceTimeTx{}),
 		targetCodec.RegisterType(&RewardValidatorTx{}),
 
-		targetCodec.RegisterType(&stakeables.LockIn{}),
-		targetCodec.RegisterType(&stakeables.LockOut{}),
+		targetCodec.RegisterType(&stakeable.LockIn{}),
+		targetCodec.RegisterType(&stakeable.LockOut{}),
 	)
 	return errs.Err
 }
