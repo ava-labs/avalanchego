@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -239,7 +240,7 @@ utxoFor:
 				}
 				lockedNotStakeable = newBalance
 			}
-		case *StakeableLockOut:
+		case *stakeable.LockOut:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
 			switch {
 			case !ok:
@@ -2063,7 +2064,7 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 			continue
 		}
 		out := stake.Out
-		if lockedOut, ok := out.(*StakeableLockOut); ok {
+		if lockedOut, ok := out.(*stakeable.LockOut); ok {
 			// This output can only be used for staking until [stakeOnlyUntil]
 			out = lockedOut.TransferableOut
 		}

@@ -14,9 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 // Note that since an Avalanche network has exactly one Platform Chain,
@@ -214,7 +216,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 		}
 		if apiUTXO.Locktime > args.Time {
-			utxo.Out = &StakeableLockOut{
+			utxo.Out = &stakeable.LockOut{
 				Locktime:        uint64(apiUTXO.Locktime),
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
@@ -230,7 +232,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the validators that are validating the primary network at genesis.
-	validators := newTxHeapByEndTime()
+	vdrs := newTxHeapByEndTime()
 	for _, validator := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(validator.Staked))
@@ -253,7 +255,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				},
 			}
 			if apiUTXO.Locktime > args.Time {
-				utxo.Out = &StakeableLockOut{
+				utxo.Out = &stakeable.LockOut{
 					Locktime:        uint64(apiUTXO.Locktime),
 					TransferableOut: utxo.Out,
 				}
@@ -297,7 +299,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
 			}},
-			Validator: Validator{
+			Validator: pChainValidator.Validator{
 				NodeID: validator.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(validator.EndTime),
@@ -311,7 +313,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			return err
 		}
 
-		validators.Add(tx)
+		vdrs.Add(tx)
 	}
 
 	// Specify the chains that exist at genesis.
@@ -340,8 +342,8 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		chains = append(chains, tx)
 	}
 
-	validatorTxs := make([]*Tx, validators.Len())
-	for i, tx := range validators.txs {
+	validatorTxs := make([]*Tx, vdrs.Len())
+	for i, tx := range vdrs.txs {
 		validatorTxs[i] = tx.tx
 	}
 
