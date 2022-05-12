@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -67,7 +68,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
-	uptime_utils "github.com/ava-labs/avalanchego/utils/math/meter"
 )
 
 var (
@@ -1031,7 +1031,7 @@ func (n *Node) initVdrs() (validators.Set, error) {
 // Initialize [n.CPUTracker].
 func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
 	var err error
-	n.cpuTracker, err = tracker.NewCPUTracker(reg, &uptime_utils.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
+	n.cpuTracker, err = tracker.NewCPUTracker(reg, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
 	return err
 }
 

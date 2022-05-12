@@ -13,52 +13,81 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewCPUTracker(t *testing.T) {
+	assert := assert.New(t)
+
+	reg := prometheus.NewRegistry()
+	halflife := 5 * time.Second
+	factory := &meter.ContinuousFactory{}
+
+	trackerIntf, err := NewCPUTracker(reg, factory, halflife)
+	assert.NoError(err)
+	tracker, ok := trackerIntf.(*cpuTracker)
+	assert.True(ok)
+	assert.Equal(factory, tracker.factory)
+	assert.NotNil(tracker.cumulativeMeter)
+	assert.NotNil(tracker.cumulativeAtLargeMeter)
+	assert.Equal(halflife, tracker.halflife)
+	assert.NotNil(tracker.meters)
+	assert.NotNil(tracker.weights)
+	assert.NotNil(tracker.metrics)
+}
+
 func TestCPUTracker(t *testing.T) {
-	halflife := time.Second
+	halflife := 5 * time.Second
 
 	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 
-	vdr1 := ids.NodeID{1}
-	vdr2 := ids.NodeID{2}
+	node1 := ids.NodeID{1}
+	node2 := ids.NodeID{2}
 
+	// Note that all the durations between start and end are [halflife].
 	startTime1 := time.Now()
 	endTime1 := startTime1.Add(halflife)
-
-	cpuTracker.IncCPU(vdr1, startTime1, 1)
-	cpuTracker.DecCPU(vdr1, endTime1, 1)
+	// Note that all CPU usage is attributed to at-large allocation.
+	cpuTracker.IncCPU(node1, startTime1, 1)
+	cpuTracker.DecCPU(node1, endTime1, 1)
 
 	startTime2 := endTime1
 	endTime2 := startTime2.Add(halflife)
-	cpuTracker.IncCPU(vdr2, startTime2, 1)
-	cpuTracker.DecCPU(vdr2, endTime2, 1)
+	// Note that all CPU usage is attributed to at-large allocation.
+	cpuTracker.IncCPU(node2, startTime2, 1)
+	cpuTracker.DecCPU(node2, endTime2, 1)
 
-	utilization1 := cpuTracker.Utilization(vdr1, endTime2)
-	utilization2 := cpuTracker.Utilization(vdr2, endTime2)
-
-	if utilization1 >= utilization2 {
+	node1Utilization := cpuTracker.Utilization(node1, endTime2)
+	node2Utilization := cpuTracker.Utilization(node2, endTime2)
+	if node1Utilization >= node2Utilization {
 		t.Fatalf("Utilization should have been higher for the more recent spender")
 	}
 
-	cumulative := cpuTracker.CumulativeUtilization(endTime2)
-	sum := utilization1 + utilization2
+	cumulative := cpuTracker.CumulativeAtLargeUtilization(endTime2)
+	sum := node1Utilization + node2Utilization
 	if cumulative != sum {
 		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
 	}
 
-	expectedLen := 2
-	len := cpuTracker.Len()
-	if len != expectedLen {
-		t.Fatalf("Expected length to match number of spenders: %d, but found length: %d", expectedLen, len)
+	startTime3 := endTime2
+	endTime3 := startTime3.Add(halflife)
+	newNode1Utilization := cpuTracker.Utilization(node1, endTime3)
+	if newNode1Utilization >= node1Utilization {
+		t.Fatalf("node CPU utilization should decrease over time")
+	}
+	newCumulative := cpuTracker.CumulativeAtLargeUtilization(endTime3)
+	if newCumulative >= cumulative {
+		t.Fatal("at-large CPU utilization should decrease over time ")
 	}
 
-	// Set pruning time to 64 halflifes in the future, to guarantee that
-	// any counts should have gone to 0
-	pruningTime := endTime2.Add(halflife * 64)
-	cpuTracker.CumulativeUtilization(pruningTime)
-	len = cpuTracker.Len()
-	if len != 0 {
-		t.Fatalf("Expected length to be 0 after pruning, but found length: %d", len)
+	startTime4 := endTime3
+	endTime4 := startTime4.Add(halflife)
+	// Note that only half of CPU usage is attributed to at-large allocation.
+	cpuTracker.IncCPU(node1, startTime4, 0.5)
+	cpuTracker.DecCPU(node1, endTime4, 0.5)
+
+	cumulative = cpuTracker.CumulativeAtLargeUtilization(endTime2)
+	sum = node1Utilization + node2Utilization
+	if cumulative >= sum {
+		t.Fatal("Sum of CPU usage should exceed cumulative at-large utilization")
 	}
 }
 

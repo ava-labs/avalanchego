@@ -18,9 +18,7 @@ import (
 
 const epsilon = 1e-9
 
-var (
-	_ TimeTracker = &cpuTracker{}
-)
+var _ TimeTracker = &cpuTracker{}
 
 // TimeTracker is an interface for tracking peers' usage of CPU Time
 type TimeTracker interface {
@@ -106,16 +104,15 @@ func (ct *cpuTracker) IncCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		ct.lock.Unlock()
 		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime))
 		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime))
+		ct.lock.Unlock()
 	}()
 
 	meter := ct.getMeter(nodeID)
 	meter.Inc(startTime, 1)
 	ct.cumulativeMeter.Inc(startTime, 1)
 	ct.cumulativeAtLargeMeter.Inc(startTime, atLargePortion)
-
 }
 
 func (ct *cpuTracker) DecCPU(
@@ -125,9 +122,9 @@ func (ct *cpuTracker) DecCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		ct.lock.Unlock()
 		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime))
 		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime))
+		ct.lock.Unlock()
 	}()
 
 	meter := ct.getMeter(nodeID)
