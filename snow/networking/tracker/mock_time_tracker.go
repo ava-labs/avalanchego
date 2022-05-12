@@ -34,70 +34,42 @@ func (m *MockTimeTracker) EXPECT() *MockTimeTrackerMockRecorder {
 	return m.recorder
 }
 
-// CumulativeUtilization mocks base method
-func (m *MockTimeTracker) CumulativeUtilization(arg0 time.Time) float64 {
+// CumulativeAtLargeUtilization mocks base method
+func (m *MockTimeTracker) CumulativeAtLargeUtilization(arg0 time.Time) float64 {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CumulativeUtilization", arg0)
+	ret := m.ctrl.Call(m, "CumulativeAtLargeUtilization", arg0)
 	ret0, _ := ret[0].(float64)
 	return ret0
 }
 
-// CumulativeUtilization indicates an expected call of CumulativeUtilization
-func (mr *MockTimeTrackerMockRecorder) CumulativeUtilization(arg0 interface{}) *gomock.Call {
+// CumulativeAtLargeUtilization indicates an expected call of CumulativeAtLargeUtilization
+func (mr *MockTimeTrackerMockRecorder) CumulativeAtLargeUtilization(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CumulativeUtilization", reflect.TypeOf((*MockTimeTracker)(nil).CumulativeUtilization), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CumulativeAtLargeUtilization", reflect.TypeOf((*MockTimeTracker)(nil).CumulativeAtLargeUtilization), arg0)
 }
 
-// Len mocks base method
-func (m *MockTimeTracker) Len() int {
+// DecCPU mocks base method
+func (m *MockTimeTracker) DecCPU(arg0 ids.NodeID, arg1 time.Time, arg2 float64) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Len")
-	ret0, _ := ret[0].(int)
-	return ret0
+	m.ctrl.Call(m, "DecCPU", arg0, arg1, arg2)
 }
 
-// Len indicates an expected call of Len
-func (mr *MockTimeTrackerMockRecorder) Len() *gomock.Call {
+// DecCPU indicates an expected call of DecCPU
+func (mr *MockTimeTrackerMockRecorder) DecCPU(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Len", reflect.TypeOf((*MockTimeTracker)(nil).Len))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecCPU", reflect.TypeOf((*MockTimeTracker)(nil).DecCPU), arg0, arg1, arg2)
 }
 
-// ActiveWeight mocks base method
-func (m *MockTimeTracker) ActiveWeight() uint64 {
+// IncCPU mocks base method
+func (m *MockTimeTracker) IncCPU(arg0 ids.NodeID, arg1 time.Time, arg2 float64) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ActiveWeight")
-	ret0, _ := ret[0].(uint64)
-	return ret0
+	m.ctrl.Call(m, "IncCPU", arg0, arg1, arg2)
 }
 
-// ActiveWeight indicates an expected call of ActiveWeight
-func (mr *MockTimeTrackerMockRecorder) ActiveWeight() *gomock.Call {
+// IncCPU indicates an expected call of IncCPU
+func (mr *MockTimeTrackerMockRecorder) IncCPU(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ActiveWeight", reflect.TypeOf((*MockTimeTracker)(nil).ActiveWeight))
-}
-
-// StartCPU mocks base method
-func (m *MockTimeTracker) StartCPU(arg0 ids.NodeID, arg1 time.Time) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "StartCPU", arg0, arg1)
-}
-
-// StartCPU indicates an expected call of StartCPU
-func (mr *MockTimeTrackerMockRecorder) StartCPU(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartCPU", reflect.TypeOf((*MockTimeTracker)(nil).StartCPU), arg0, arg1)
-}
-
-// StopCPU mocks base method
-func (m *MockTimeTracker) StopCPU(arg0 ids.NodeID, arg1 time.Time) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "StopCPU", arg0, arg1)
-}
-
-// StopCPU indicates an expected call of StopCPU
-func (mr *MockTimeTrackerMockRecorder) StopCPU(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopCPU", reflect.TypeOf((*MockTimeTracker)(nil).StopCPU), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncCPU", reflect.TypeOf((*MockTimeTracker)(nil).IncCPU), arg0, arg1, arg2)
 }
 
 // TimeUntilUtilization mocks base method

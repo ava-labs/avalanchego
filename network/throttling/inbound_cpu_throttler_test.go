@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 func TestNewCPUThrottler(t *testing.T) {
@@ -30,7 +30,7 @@ func TestNewCPUThrottler(t *testing.T) {
 	clock := mockable.Clock{}
 	clock.Set(time.Now())
 	vdrs := validators.NewSet()
-	cpuTracker, err := tracker.NewCPUTracker(reg, uptime.ContinuousFactory{}, time.Second, vdrs)
+	cpuTracker, err := tracker.NewCPUTracker(reg, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(err)
 	config := CPUThrottlerConfig{
 		Clock:           clock,
@@ -68,9 +68,9 @@ func TestCPUThrottler(t *testing.T) {
 
 	// Case: Actual CPU <= target CPU; should return immediately
 	// for both validator and non-validator
-	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(1.0).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(0.5, 0.5, 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(vdrID, gomock.Any()).Return(float64(0.9)).Times(1)
-	cpuTargeter.EXPECT().TargetCPUUsage(nonVdrID).Return(1.0).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(nonVdrID).Return(0.5, 0.5, 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(nonVdrID, gomock.Any()).Return(float64(0.9)).Times(1)
 	onAcquire := make(chan struct{})
 	// Check for validator
@@ -89,9 +89,9 @@ func TestCPUThrottler(t *testing.T) {
 	// Case: Actual CPU usage > target CPU usage; we should wait.
 	// In the first loop iteration inside acquire,
 	// say the actual CPU usage exceeds the target.
-	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(float64(0)).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(float64(0), float64(0), 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(vdrID, gomock.Any()).Return(float64(1)).Times(1)
-	cpuTargeter.EXPECT().TargetCPUUsage(nonVdrID).Return(float64(0)).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(nonVdrID).Return(float64(0), float64(0), 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(nonVdrID, gomock.Any()).Return(float64(1)).Times(1)
 	// Note we'll only actually wait [maxRecheckDelay]. We set [timeUntilAtCPUTarget]
 	// much larger to assert that the min recheck frequency is honored below.
@@ -100,9 +100,9 @@ func TestCPUThrottler(t *testing.T) {
 	cpuTracker.EXPECT().TimeUntilUtilization(nonVdrID, gomock.Any(), gomock.Any()).Return(timeUntilAtCPUTarget).Times(1)
 
 	// The second iteration, say the CPU usage is OK.
-	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(float64(1)).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(float64(0.5), float64(0.5), 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(vdrID, gomock.Any()).Return(float64(0)).Times(1)
-	cpuTargeter.EXPECT().TargetCPUUsage(nonVdrID).Return(float64(1)).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(nonVdrID).Return(float64(0.5), float64(0.5), 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(nonVdrID, gomock.Any()).Return(float64(0)).Times(1)
 
 	// Check for validator
@@ -159,7 +159,7 @@ func TestCPUThrottlerContextCancel(t *testing.T) {
 	// Mock the CPU tracker so that the first loop iteration inside acquire,
 	// it says the actual CPU usage exceeds the target.
 	// There should be no second iteration because we've already returned.
-	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(float64(0)).Times(1)
+	cpuTargeter.EXPECT().TargetCPUUsage(vdrID).Return(float64(0), float64(0), 0.5).Times(1)
 	cpuTracker.EXPECT().Utilization(vdrID, gomock.Any()).Return(float64(1)).Times(1)
 	cpuTracker.EXPECT().TimeUntilUtilization(vdrID, gomock.Any(), gomock.Any()).Return(maxRecheckDelay).Times(1)
 	onAcquire := make(chan struct{})

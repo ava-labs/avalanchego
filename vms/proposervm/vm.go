@@ -321,7 +321,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		if vm.resetHeightIndexOngoing.GetValue() {
 			vm.ctx.Log.Info("block height indexing reset started")
 
-			if err := indexerState.ResetHeightIndex(vm); err != nil {
+			if err := indexerState.ResetHeightIndex(vm.ctx.Log, vm); err != nil {
 				vm.ctx.Log.Error("block height indexing reset failed with: %s", err)
 				return
 			}
