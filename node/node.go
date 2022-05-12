@@ -891,7 +891,7 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
-	healthChecker, err := health.New(n.MetricsRegisterer)
+	healthChecker, err := health.New(n.Log, n.MetricsRegisterer)
 	if err != nil {
 		return err
 	}

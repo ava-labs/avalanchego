@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -59,7 +60,7 @@ func TestDuplicatedRegistations(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	assert.NoError(err)
 
 	err = h.RegisterReadinessCheck("check", check)
@@ -85,7 +86,7 @@ func TestDefaultFailing(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	assert.NoError(err)
 
 	{
@@ -129,7 +130,7 @@ func TestPassingChecks(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	assert.NoError(err)
 
 	err = h.RegisterReadinessCheck("check", check)
@@ -199,7 +200,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		return "", nil
 	})
 
-	h, err := New(prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	assert.NoError(err)
 
 	err = h.RegisterReadinessCheck("check", check)
@@ -249,7 +250,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 func TestDeadlockRegression(t *testing.T) {
 	assert := assert.New(t)
 
-	h, err := New(prometheus.NewRegistry())
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	assert.NoError(err)
 
 	var lock sync.Mutex
