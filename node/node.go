@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -68,7 +69,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
-	uptime_utils "github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 var (
@@ -649,6 +649,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		CPUTracker:                              n.cpuTracker,
+		CPUTargeter:                             n.cpuTargeter,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		StateSyncDisableRequests:                n.Config.StateSyncDisableRequests,
 	})
@@ -1031,9 +1032,9 @@ func (n *Node) initVdrs() (validators.Set, error) {
 }
 
 // Initialize [n.CPUTracker].
-func (n *Node) initCPUTracker(reg prometheus.Registerer, vdrs validators.Set) error {
+func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
 	var err error
-	n.cpuTracker, err = tracker.NewCPUTracker(reg, &uptime_utils.ContinuousFactory{}, n.Config.CPUTrackerHalflife, vdrs)
+	n.cpuTracker, err = tracker.NewCPUTracker(reg, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
 	return err
 }
 
@@ -1112,7 +1113,7 @@ func (n *Node) Initialize(
 	if err != nil {
 		return fmt.Errorf("problem initializing validators: %w", err)
 	}
-	if err := n.initCPUTracker(n.MetricsRegisterer, primaryNetVdrs); err != nil {
+	if err := n.initCPUTracker(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing CPU tracker: %w", err)
 	}
 	if err := n.initCPUTargeter(n.MetricsRegisterer, &config.CPUTargeterConfig, primaryNetVdrs); err != nil {
