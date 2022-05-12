@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -331,10 +330,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	fs.Duration(CPUTrackerHalflifeKey, 15*time.Second, "Halflife to use for the CPU tracker. Larger halflife --> CPU usage metrics change more slowly.")
 	// Target CPU Utilization
-	fs.Float64(CPUTargetKey, math.Max(float64(runtime.NumCPU()-1), 1), "Target usage of this many CPU cores. Value should be in range (0, total core count]")
-	fs.Float64(CPUValidatorAllocationKey, 0.5, fmt.Sprintf("Of the targeted CPU cores in %q, reserve this portion of the CPU for usage by validators. Must be in [0,1]", CPUTargetKey))
-	fs.Float64(CPUTargetMaxPerNonValidatorKey, 1.0/3.0, "Max CPU usage of any single non validator can use as a percentage of the CPU target allocated to peers. Must be in [0,1]")
-	fs.Float64(CPUTargetMaxScalingKey, 20, "The maximum allowed scaling of the current CPU target based on the current actual usage. Must be greater than 0")
+	fs.Float64(CPUVdrAllocKey, float64(runtime.NumCPU())/2, "Number of CPUs allocated for use by validators. Value should be in range (0, total core count]")
+	fs.Float64(CPUAtLargeAllocKey, float64(runtime.NumCPU())/2, "Number of CPUs allocated for use by any peer. Value should be in range (0, total core count]")
+	fs.Float64(CPUNodeMaxAtLargeKey, 1.0/3.0, "A peer can take up to this portion of CPU usage from the at-large CPU allocation. Must be in [0,1]")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

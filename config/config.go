@@ -1054,25 +1054,21 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 }
 
 func getCPUTargeterConfig(v *viper.Viper) (tracker.CPUTargeterConfig, error) {
-	cpuTarget := v.GetFloat64(CPUTargetKey)
-	cpuValidatorAlloc := v.GetFloat64(CPUValidatorAllocationKey)
-	cpuTargetMaxPerNonValidator := v.GetFloat64(CPUTargetMaxPerNonValidatorKey)
-	maxScaling := v.GetFloat64(CPUTargetMaxScalingKey)
+	vdrCPUAlloc := v.GetFloat64(CPUVdrAllocKey)
+	atLargeCPUAlloc := v.GetFloat64(CPUAtLargeAllocKey)
+	maxAtLargePortionPerNode := v.GetFloat64(CPUNodeMaxAtLargeKey)
 	switch {
-	case cpuTarget <= 0:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUTargetKey, cpuTarget)
-	case maxScaling <= 0:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUTargetMaxScalingKey, maxScaling)
-	case cpuTargetMaxPerNonValidator < 0 || cpuTargetMaxPerNonValidator > 1:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUTargetMaxPerNonValidatorKey, cpuTargetMaxPerNonValidator)
-	case cpuValidatorAlloc < 0 || cpuValidatorAlloc > 1:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUValidatorAllocationKey, cpuValidatorAlloc)
+	case vdrCPUAlloc <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUVdrAllocKey, vdrCPUAlloc)
+	case atLargeCPUAlloc <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUAtLargeAllocKey, atLargeCPUAlloc)
+	case maxAtLargePortionPerNode < 0 || maxAtLargePortionPerNode > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUNodeMaxAtLargeKey, maxAtLargePortionPerNode)
 	default:
 		return tracker.CPUTargeterConfig{
-			CPUTarget:                    cpuTarget,
-			VdrCPUPercentage:             cpuValidatorAlloc,
-			MaxScaling:                   maxScaling,
-			SinglePeerMaxUsagePercentage: cpuTargetMaxPerNonValidator,
+			VdrCPUAlloc:           vdrCPUAlloc,
+			AtLargeCPUAlloc:       atLargeCPUAlloc,
+			PeerMaxAtLargePortion: maxAtLargePortionPerNode,
 		}, nil
 	}
 }

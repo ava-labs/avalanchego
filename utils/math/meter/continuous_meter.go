@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package uptime
+package meter
 
 import (
 	"math"
@@ -27,7 +27,7 @@ type continuousMeter struct {
 	halflife float64
 	value    float64
 
-	numCoresRunning uint
+	numCoresRunning float64
 	lastUpdated     time.Time
 }
 
@@ -38,26 +38,26 @@ func NewMeter(halflife time.Duration) Meter {
 	}
 }
 
-func (a *continuousMeter) Start(currentTime time.Time) {
-	a.Read(currentTime)
-	a.numCoresRunning++
+func (a *continuousMeter) Inc(now time.Time, numCores float64) {
+	a.Read(now)
+	a.numCoresRunning += numCores
 }
 
-func (a *continuousMeter) Stop(currentTime time.Time) {
-	a.Read(currentTime)
-	a.numCoresRunning--
+func (a *continuousMeter) Dec(now time.Time, numCores float64) {
+	a.Read(now)
+	a.numCoresRunning -= numCores
 }
 
-func (a *continuousMeter) Read(currentTime time.Time) float64 {
-	timeSincePreviousUpdate := a.lastUpdated.Sub(currentTime)
+func (a *continuousMeter) Read(now time.Time) float64 {
+	timeSincePreviousUpdate := a.lastUpdated.Sub(now)
 	if timeSincePreviousUpdate >= 0 {
 		return a.value
 	}
-	a.lastUpdated = currentTime
+	a.lastUpdated = now
 
 	factor := math.Exp(float64(timeSincePreviousUpdate) / a.halflife)
 	a.value *= factor
-	a.value += float64(a.numCoresRunning) * (1 - factor)
+	a.value += a.numCoresRunning * (1 - factor)
 	return a.value
 }
 

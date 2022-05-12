@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package uptime
+package meter
 
 import (
 	"fmt"
@@ -61,26 +61,26 @@ func NewTest(t *testing.T, factory Factory) {
 func TimeTravelTest(t *testing.T, factory Factory) {
 	m := factory.New(halflife)
 
-	currentTime := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
-	m.Start(currentTime)
+	now := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
+	m.Inc(now, 1)
 
-	currentTime = currentTime.Add(halflife - 1)
+	now = now.Add(halflife - 1)
 	epsilon := 0.0001
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
-	m.Stop(currentTime)
+	m.Dec(now, 1)
 
-	currentTime = currentTime.Add(-halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	now = now.Add(-halflife)
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
-	m.Start(currentTime)
+	m.Inc(now, 1)
 
-	currentTime = currentTime.Add(halflife / 2)
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	now = now.Add(halflife / 2)
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 }
@@ -88,77 +88,77 @@ func TimeTravelTest(t *testing.T, factory Factory) {
 func StandardUsageTest(t *testing.T, factory Factory) {
 	m := factory.New(halflife)
 
-	currentTime := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
-	m.Start(currentTime)
+	now := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
+	m.Inc(now, 1)
 
-	currentTime = currentTime.Add(halflife - 1)
+	now = now.Add(halflife - 1)
 	epsilon := 0.0001
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
-	m.Start(currentTime)
+	m.Inc(now, 1)
 
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
-	m.Stop(currentTime)
+	m.Dec(now, 1)
 
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
-	m.Stop(currentTime)
+	m.Dec(now, 1)
 
-	if uptime := m.Read(currentTime); math.Abs(uptime-.5) > epsilon {
+	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
-	currentTime = currentTime.Add(halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-.25) > epsilon {
+	now = now.Add(halflife)
+	if uptime := m.Read(now); math.Abs(uptime-.25) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .25, uptime)
 	}
 
-	m.Start(currentTime)
+	m.Inc(now, 1)
 
-	currentTime = currentTime.Add(halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-.625) > epsilon {
+	now = now.Add(halflife)
+	if uptime := m.Read(now); math.Abs(uptime-.625) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .625, uptime)
 	}
 
-	currentTime = currentTime.Add(34 * halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-1) > epsilon {
+	now = now.Add(34 * halflife)
+	if uptime := m.Read(now); math.Abs(uptime-1) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
 	}
 
-	m.Stop(currentTime)
+	m.Dec(now, 1)
 
-	currentTime = currentTime.Add(34 * halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-0) > epsilon {
+	now = now.Add(34 * halflife)
+	if uptime := m.Read(now); math.Abs(uptime-0) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 0, uptime)
 	}
 
-	m.Start(currentTime)
+	m.Inc(now, 1)
 
-	currentTime = currentTime.Add(2 * halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-.75) > epsilon {
+	now = now.Add(2 * halflife)
+	if uptime := m.Read(now); math.Abs(uptime-.75) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .75, uptime)
 	}
 
 	// Second start
-	m.Start(currentTime)
+	m.Inc(now, 1)
 
-	currentTime = currentTime.Add(34 * halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-2) > epsilon {
+	now = now.Add(34 * halflife)
+	if uptime := m.Read(now); math.Abs(uptime-2) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 2, uptime)
 	}
 
 	// Stop the second CPU
-	m.Stop(currentTime)
+	m.Dec(now, 1)
 
-	currentTime = currentTime.Add(34 * halflife)
-	if uptime := m.Read(currentTime); math.Abs(uptime-1) > epsilon {
+	now = now.Add(34 * halflife)
+	if uptime := m.Read(now); math.Abs(uptime-1) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
 	}
 }
@@ -169,10 +169,10 @@ func TestTimeUntil(t *testing.T) {
 	m := f.New(halflife)
 	now := time.Now()
 	// Start the meter
-	m.Start(now)
+	m.Inc(now, 1)
 	// One halflife passes; stop the meter
 	now = now.Add(halflife)
-	m.Stop(now)
+	m.Dec(now, 1)
 	// Read the current value
 	currentVal := m.Read(now)
 	// Suppose we want to wait for the value to be

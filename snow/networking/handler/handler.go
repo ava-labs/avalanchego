@@ -75,6 +75,10 @@ type handler struct {
 
 	// Tracks CPU usage caused by each peer.
 	cpuTracker tracker.TimeTracker
+
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	cpuTargeter tracker.CPUTargeter
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
 	syncMessageQueue MessageQueue
@@ -102,6 +106,7 @@ func New(
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
 	cpuTracker tracker.TimeTracker,
+	cpuTargeter tracker.CPUTargeter,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -115,6 +120,7 @@ func New(
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
 		cpuTracker:       cpuTracker,
+		cpuTargeter:      cpuTargeter,
 	}
 
 	var err error
@@ -361,7 +367,10 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime)
+	// Determine what portion of CPU usage should be attributed to the validator
+	// CPU allocation and at-large CPU allocation.
+	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
+	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
 	h.ctx.Lock.Lock()
 	defer func() {
 		h.ctx.Lock.Unlock()
@@ -370,7 +379,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime)
+		h.cpuTracker.DecCPU(nodeID, endTime, atLargeCPUPortion)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling sync message: %s", op)
@@ -569,13 +578,16 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime)
+	// Determine what portion of CPU usage should be attributed to the validator
+	// CPU allocation and at-large CPU allocation.
+	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
+	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
 	defer func() {
 		var (
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime)
+		h.cpuTracker.DecCPU(nodeID, endTime, atLargeCPUPortion)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling async message: %s", op)

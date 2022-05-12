@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+
 	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
