@@ -12,7 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var _ ValidatorState = &validatorStateImpl{}
@@ -225,7 +226,7 @@ func MaxStakeAmount(
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := validators.EndTimeHeap{}
+	toRemoveHeap := pChainValidator.EndTimeHeap{}
 	for _, currentDelegator := range current {
 		toRemoveHeap.Add(&currentDelegator.Validator)
 	}

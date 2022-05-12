@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	pChainValidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var _ Wallet = &walletWithOptions{}
@@ -49,7 +49,7 @@ func (w *walletWithOptions) IssueBaseTx(
 }
 
 func (w *walletWithOptions) IssueAddValidatorTx(
-	validator *pChainValidators.Validator,
+	validator *pChainValidator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
@@ -63,7 +63,7 @@ func (w *walletWithOptions) IssueAddValidatorTx(
 }
 
 func (w *walletWithOptions) IssueAddSubnetValidatorTx(
-	validator *pChainValidators.SubnetValidator,
+	validator *pChainValidator.SubnetValidator,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueAddSubnetValidatorTx(
@@ -73,7 +73,7 @@ func (w *walletWithOptions) IssueAddSubnetValidatorTx(
 }
 
 func (w *walletWithOptions) IssueAddDelegatorTx(
-	validator *pChainValidators.Validator,
+	validator *pChainValidator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (ids.ID, error) {

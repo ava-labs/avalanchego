@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
-	pChainValidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	pChainValidators "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
