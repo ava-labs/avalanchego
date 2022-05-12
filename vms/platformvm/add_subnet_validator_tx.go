@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -28,7 +30,7 @@ type UnsignedAddSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The validator
-	Validator SubnetValidator `serialize:"true" json:"validator"`
+	Validator pChainValidator.SubnetValidator `serialize:"true" json:"validator"`
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
@@ -278,8 +280,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		Validator: SubnetValidator{
-			Validator: Validator{
+		Validator: pChainValidator.SubnetValidator{
+			Validator: pChainValidator.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,

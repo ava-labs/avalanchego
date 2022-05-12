@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -177,7 +178,7 @@ func (s *signer) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []
 		}
 
 		outIntf := utxo.Out
-		if stakeableOut, ok := outIntf.(*platformvm.StakeableLockOut); ok {
+		if stakeableOut, ok := outIntf.(*stakeable.LockOut); ok {
 			outIntf = stakeableOut.TransferableOut
 		}
 

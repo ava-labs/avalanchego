@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"time"
@@ -17,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -34,11 +36,11 @@ type UnsignedAddDelegatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator Validator `serialize:"true" json:"validator"`
+	Validator pChainValidator.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner Owner `serialize:"true" json:"rewardsOwner"`
+	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -308,7 +310,7 @@ func (vm *VM) newAddDelegatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: Validator{
+		Validator: pChainValidator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
@@ -371,7 +373,7 @@ func maxStakeAmount(
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := validatorHeap{}
+	toRemoveHeap := pChainValidator.EndTimeHeap{}
 	for _, currentDelegator := range current {
 		toRemoveHeap.Add(&currentDelegator.Validator)
 	}
@@ -600,20 +602,4 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 	default:
 		return 0, err
 	}
-}
-
-type validatorHeap []*Validator
-
-func (h *validatorHeap) Len() int                 { return len(*h) }
-func (h *validatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
-func (h *validatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
-func (h *validatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
-func (h *validatorHeap) Peek() *Validator         { return (*h)[0] }
-func (h *validatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
-func (h *validatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
-func (h *validatorHeap) Pop() interface{} {
-	newLen := len(*h) - 1
-	val := (*h)[newLen]
-	*h = (*h)[:newLen]
-	return val
 }
