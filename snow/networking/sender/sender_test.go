@@ -78,6 +78,17 @@ func TestTimeout(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -86,6 +97,7 @@ func TestTimeout(t *testing.T) {
 		nil,
 		time.Hour,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -167,6 +179,17 @@ func TestReliableMessages(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -175,6 +198,7 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		1,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -263,6 +287,17 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -271,6 +306,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 

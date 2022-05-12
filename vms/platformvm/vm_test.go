@@ -2106,6 +2106,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Asynchronously passes messages from the network to the consensus engine
 	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := timetracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&timetracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
@@ -2114,6 +2125,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		nil,
 		time.Hour,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 

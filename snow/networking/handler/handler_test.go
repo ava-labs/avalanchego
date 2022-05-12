@@ -37,6 +37,17 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -45,6 +56,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -115,6 +127,17 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -123,6 +146,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -186,6 +210,17 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -194,6 +229,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		nil,
 		1,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -249,6 +285,17 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := New(
 		mc,
 		ctx,
@@ -257,6 +304,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -61,6 +62,17 @@ func TestShutdown(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -69,6 +81,7 @@ func TestShutdown(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -165,6 +178,17 @@ func TestShutdownTimesOut(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -173,6 +197,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -277,6 +302,17 @@ func TestRouterTimeout(t *testing.T) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -285,6 +321,7 @@ func TestRouterTimeout(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -394,6 +431,17 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -402,6 +450,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -510,6 +559,17 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	assert.NoError(t, err)
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -518,6 +578,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		nil,
 		time.Second,
 		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
