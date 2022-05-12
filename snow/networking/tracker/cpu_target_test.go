@@ -142,7 +142,7 @@ func TestCPUTarget(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
-			gotVdrCPUAlloc, gotAtLargeCPUAlloc := cpuTargeter.TargetCPUUsage(tt.nodeID)
+			gotVdrCPUAlloc, gotAtLargeCPUAlloc, _ := cpuTargeter.TargetCPUUsage(tt.nodeID)
 			assert.Equal(t, tt.expectedVdrCPUAlloc, gotVdrCPUAlloc)
 			assert.Equal(t, tt.expectAtLargeCPUAlloc, gotAtLargeCPUAlloc)
 		})

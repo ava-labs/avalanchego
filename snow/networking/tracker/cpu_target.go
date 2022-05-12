@@ -20,8 +20,10 @@ type CPUTargeter interface {
 	// Returns the target CPU usage of the given node from:
 	// 1. The validator CPU allocation.
 	// 2. The at-large CPU allocation.
-	// Both returned values are >= 0.
-	TargetCPUUsage(nodeID ids.NodeID) (float64, float64)
+	// Also returns the portion of CPU usage that should be attributed
+	// to the at-large allocation.
+	// All returned values are >= 0.
+	TargetCPUUsage(nodeID ids.NodeID) (float64, float64, float64)
 }
 
 type CPUTargeterConfig struct {
@@ -62,7 +64,7 @@ type cpuTargeter struct {
 	atLargeMaxCPU   float64
 }
 
-func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) (float64, float64) {
+func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) (float64, float64, float64) {
 	// This node's at-large allocation is min([remaining at large], [max at large for a given peer])
 	atLargeCPUUsed := ct.cpuTracker.CumulativeAtLargeUtilization(ct.clock.Time())
 	atLargeCPUAlloc := math.Max(0, ct.atLargeCPUAlloc-atLargeCPUUsed)
@@ -71,10 +73,21 @@ func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) (float64, float64) {
 	// This node gets a stake-weighted portion of the validator allocation.
 	weight, _ := ct.vdrs.GetWeight(nodeID)
 	if weight == 0 {
-		return 0, atLargeCPUAlloc
+		return 0, atLargeCPUAlloc, 1
 	}
 	vdrCPUAlloc := ct.vdrCPUAlloc * float64(weight) / float64(ct.vdrs.Weight())
-	return vdrCPUAlloc, atLargeCPUAlloc
+	totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
+	// Note that [atLargeCPUPortion] is in [0,1]
+	var atLargeCPUPortion float64
+	if totalAlloc == 0 {
+		// If the total CPU allocation is 0, there's no way to meaningfully
+		// attribute CPU usage to the validator / at-large CPU allocations,
+		// so just use 0.5
+		atLargeCPUPortion = 0.5
+	} else {
+		atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
+	}
+	return vdrCPUAlloc, atLargeCPUAlloc, atLargeCPUPortion
 }
 
 type targeterMetrics struct {

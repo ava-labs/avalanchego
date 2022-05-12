@@ -423,22 +423,7 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		// TODO this logic is also used in the handler so we should factor it
-		// out, but where should it go?
-		// Determine what portion of CPU usage should be attributed to the
-		// validator CPU allocation and at-large CPU allocation.
-		vdrCPUAlloc, atLargeCPUAlloc := p.CPUTargeter.TargetCPUUsage(p.id)
-		totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
-		// Note that [atLargeCPUPortion] is in [0,1]
-		var atLargeCPUPortion float64
-		if totalAlloc == 0 {
-			// If the total CPU allocation is 0, there's no way to meaningfully
-			// attribute CPU usage to the validator / at-large CPU allocations,
-			// so just use 0.5
-			atLargeCPUPortion = 0.5
-		} else {
-			atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
-		}
+		_, _, atLargeCPUPortion := p.CPUTargeter.TargetCPUUsage(p.id)
 
 		// Track the time it takes from now until the time the message is
 		// handled (in the event this message is handled at the network level)

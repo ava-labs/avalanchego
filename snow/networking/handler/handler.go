@@ -367,20 +367,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	// Note that [vdrCPUPortion] is in [0,1]
 	// Determine what portion of CPU usage should be attributed to the validator
 	// CPU allocation and at-large CPU allocation.
-	vdrCPUAlloc, atLargeCPUAlloc := h.cpuTargeter.TargetCPUUsage(nodeID)
-	totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
-	var atLargeCPUPortion float64
-	if totalAlloc == 0 {
-		// If the total CPU allocation is 0, there's no way to meaningfully
-		// attribute CPU usage to the validator / at-large CPU allocations, so
-		// just use 0.5
-		atLargeCPUPortion = 0.5
-	} else {
-		atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
-	}
+	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
 	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
 	h.ctx.Lock.Lock()
 	defer func() {
@@ -589,20 +578,9 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	// Note that [vdrCPUPortion] is in [0,1]
 	// Determine what portion of CPU usage should be attributed to the validator
 	// CPU allocation and at-large CPU allocation.
-	vdrCPUAlloc, atLargeCPUAlloc := h.cpuTargeter.TargetCPUUsage(nodeID)
-	totalAlloc := vdrCPUAlloc + atLargeCPUAlloc
-	var atLargeCPUPortion float64
-	if totalAlloc == 0 {
-		// If the total CPU allocation is 0, there's no way to meaningfully
-		// attribute CPU usage to the validator / at-large CPU allocations, so
-		// just use 0.5
-		atLargeCPUPortion = 0.5
-	} else {
-		atLargeCPUPortion = atLargeCPUAlloc / totalAlloc
-	}
+	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
 	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
 	defer func() {
 		var (
