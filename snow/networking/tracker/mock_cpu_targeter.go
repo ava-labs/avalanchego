@@ -34,11 +34,13 @@ func (m *MockCPUTargeter) EXPECT() *MockCPUTargeterMockRecorder {
 }
 
 // TargetCPUUsage mocks base method
-func (m *MockCPUTargeter) TargetCPUUsage(arg0 ids.NodeID) float64 {
+func (m *MockCPUTargeter) TargetCPUUsage(arg0 ids.NodeID) (float64, float64, float64) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TargetCPUUsage", arg0)
 	ret0, _ := ret[0].(float64)
-	return ret0
+	ret1, _ := ret[1].(float64)
+	ret2, _ := ret[2].(float64)
+	return ret0, ret1, ret2
 }
 
 // TargetCPUUsage indicates an expected call of TargetCPUUsage

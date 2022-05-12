@@ -45,4 +45,8 @@ type Config struct {
 
 	// Tracks CPU usage caused by each peer.
 	CPUTracker tracker.TimeTracker
+
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	CPUTargeter tracker.CPUTargeter
 }
