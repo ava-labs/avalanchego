@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -84,7 +84,7 @@ func (vm *VM) stake(
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
-		out, ok := utxo.Out.(*stakeables.LockOut)
+		out, ok := utxo.Out.(*stakeable.LockOut)
 		if !ok {
 			// This output isn't locked, so it will be handled during the next
 			// iteration of the UTXO set
@@ -128,7 +128,7 @@ func (vm *VM) stake(
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
-			In: &stakeables.LockIn{
+			In: &stakeable.LockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
 			},
@@ -137,7 +137,7 @@ func (vm *VM) stake(
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-			Out: &stakeables.LockOut{
+			Out: &stakeable.LockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
 					Amt:          amountToStake,
@@ -151,7 +151,7 @@ func (vm *VM) stake(
 			// Some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				Out: &stakeables.LockOut{
+				Out: &stakeable.LockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt:          remainingValue,
@@ -181,7 +181,7 @@ func (vm *VM) stake(
 		}
 
 		out := utxo.Out
-		inner, ok := out.(*stakeables.LockOut)
+		inner, ok := out.(*stakeable.LockOut)
 		if ok {
 			if inner.Locktime > now {
 				// This output is currently locked, so this output can't be
@@ -411,7 +411,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		out := utxo.Out
 		locktime := uint64(0)
 		// Set [locktime] to this UTXO's locktime, if applicable
-		if inner, ok := out.(*stakeables.LockOut); ok {
+		if inner, ok := out.(*stakeable.LockOut); ok {
 			out = inner.TransferableOut
 			locktime = inner.Locktime
 		}
@@ -420,7 +420,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		// The UTXO says it's locked until [locktime], but this input, which
 		// consumes it, is not locked even though [locktime] hasn't passed. This
 		// is invalid.
-		if inner, ok := in.(*stakeables.LockIn); now < locktime && !ok {
+		if inner, ok := in.(*stakeable.LockIn); now < locktime && !ok {
 			return errLockedFundsNotMarkedAsLocked
 		} else if ok {
 			if inner.Locktime != locktime {
@@ -476,7 +476,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		output := out.Output()
 		locktime := uint64(0)
 		// Set [locktime] to this output's locktime, if applicable
-		if inner, ok := output.(*stakeables.LockOut); ok {
+		if inner, ok := output.(*stakeable.LockOut); ok {
 			output = inner.TransferableOut
 			locktime = inner.Locktime
 		}

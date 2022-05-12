@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeables"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -71,7 +71,7 @@ func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("output failed verification: %w", err)
 		}
-		if _, ok := out.Output().(*stakeables.LockOut); ok {
+		if _, ok := out.Output().(*stakeable.LockOut); ok {
 			return errWrongLocktime
 		}
 	}
