@@ -11,13 +11,14 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
 	cacheSize = 8192 // max cache entries
 
-	deleteBatchSize = 4096
+	deleteBatchSize = 8192
 
 	// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
 	// to ensure the async indexing does not bottleneck the node.
@@ -70,7 +71,7 @@ type HeightIndex interface {
 	HeightIndexBatchSupport
 
 	// ResetHeightIndex deletes all index DB entries
-	ResetHeightIndex(versiondb.Commitable) error
+	ResetHeightIndex(logging.Logger, versiondb.Commitable) error
 }
 
 type heightIndex struct {
@@ -112,7 +113,7 @@ func (hi *heightIndex) SetIndexHasReset() error {
 	return hi.metadataDB.Put(resetOccurredKey, nil)
 }
 
-func (hi *heightIndex) ResetHeightIndex(baseDB versiondb.Commitable) error {
+func (hi *heightIndex) ResetHeightIndex(log logging.Logger, baseDB versiondb.Commitable) error {
 	var (
 		itHeight   = hi.heightDB.NewIterator()
 		itMetadata = hi.metadataDB.NewIterator()
@@ -134,7 +135,7 @@ func (hi *heightIndex) ResetHeightIndex(baseDB versiondb.Commitable) error {
 		}
 
 		deleteCount++
-		if deleteCount > deleteBatchSize {
+		if deleteCount%deleteBatchSize == 0 {
 			if err := hi.Commit(); err != nil {
 				return err
 			}
@@ -142,8 +143,9 @@ func (hi *heightIndex) ResetHeightIndex(baseDB versiondb.Commitable) error {
 				return err
 			}
 
+			log.Info("Deleted %d height entries", deleteCount)
+
 			// every deleteBatchSize ops, sleep to avoid clogging the node on this
-			deleteCount = 0
 			processingDuration := time.Since(processingStart)
 			// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
 			// to ensure the indexing does not bottleneck the node.
