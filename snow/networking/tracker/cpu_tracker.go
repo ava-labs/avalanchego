@@ -52,7 +52,7 @@ type cpuTracker struct {
 	// to the at-large CPU allocation.
 	cumulativeAtLargeMeter meter.Meter
 	halflife               time.Duration
-	// Each element is a meters that tracks total CPU usage by a node.
+	// Each element is a meter that tracks total CPU usage by a node.
 	// meters is ordered by the last time that a meters was utilized. This
 	// doesn't necessarily result in the meters being sorted based on their
 	// current utilization. However, in practice the nodes that are not being
