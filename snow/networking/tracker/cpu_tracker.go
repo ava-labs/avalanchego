@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -102,8 +103,9 @@ func (ct *cpuTracker) IncCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime))
-		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime))
+		scale := ct.scale(startTime)
+		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime) * scale)
+		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime) * scale)
 		ct.lock.Unlock()
 	}()
 
@@ -120,8 +122,9 @@ func (ct *cpuTracker) DecCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime))
-		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime))
+		scale := ct.scale(endTime)
+		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime) * scale)
+		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime) * scale)
 		ct.lock.Unlock()
 	}()
 
@@ -141,7 +144,7 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	if !exists {
 		return 0
 	}
-	return m.(meter.Meter).Read(now)
+	return m.(meter.Meter).Read(now) * ct.scale(now)
 }
 
 func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
@@ -149,7 +152,7 @@ func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
 	defer ct.lock.Unlock()
 
 	ct.prune(now)
-	return ct.cumulativeAtLargeMeter.Read(now)
+	return ct.cumulativeAtLargeMeter.Read(now) * ct.scale(now)
 }
 
 func (ct *cpuTracker) TimeUntilUtilization(
@@ -166,7 +169,14 @@ func (ct *cpuTracker) TimeUntilUtilization(
 	if !exists {
 		return 0
 	}
+	value /= ct.scale(now)
 	return m.(meter.Meter).TimeUntil(now, value)
+}
+
+func (ct *cpuTracker) scale(now time.Time) float64 {
+	trackedAmount := ct.cumulativeMeter.Read(now)
+	realUsage := cpu.Usage()
+	return realUsage / trackedAmount
 }
 
 // prune attempts to remove cpu meters that currently show a value less than
