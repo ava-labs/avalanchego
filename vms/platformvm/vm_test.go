@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -2100,7 +2101,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := timetracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
