@@ -176,9 +176,9 @@ You can override these defaults with the following config:
 ```json
 {
   "priority-regossip-frequency": "1s",
-  "priority-regossip-max-size": 32,
+  "priority-regossip-max-txs": 32,
   "priority-regossip-addresses": ["<YOUR 0x-ADDRESS>"],
-  "priority-regossip-address-txs": 16
+  "regossip-txs-per-address": 16
 }
 ```
 
