@@ -1038,8 +1038,7 @@ func (n *Node) initVdrs() (validators.Set, error) {
 
 // Initialize [n.CPUTracker].
 func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
-	// TODO: add the polling frequency as a config
-	n.cpuManager = cpu.NewManager(500*time.Millisecond, n.Config.CPUTrackerHalflife)
+	n.cpuManager = cpu.NewManager(n.Config.CPUTrackerFrequency, n.Config.CPUTrackerHalflife)
 	n.cpuManager.TrackProcess(os.Getpid())
 	var err error
 	n.cpuTracker, err = tracker.NewCPUTracker(reg, n.cpuManager, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
