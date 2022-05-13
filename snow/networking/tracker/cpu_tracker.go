@@ -106,13 +106,13 @@ func (ct *cpuTracker) IncCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		usage := ct.cpu.Usage()
-		ct.metrics.cumulativeMetric.Set(usage)
-		trackedAmount := ct.cumulativeMeter.Read(now)
-		if trackedAmount == 0 {
+		realCPUUsage := ct.cpu.Usage()
+		ct.metrics.cumulativeMetric.Set(realCPUUsage)
+		measuredCPUUsage := ct.cumulativeMeter.Read(now)
+		if measuredCPUUsage == 0 {
 			ct.metrics.cumulativeAtLargeMetric.Set(0)
 		} else {
-			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * usage / trackedAmount)
+			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * realCPUUsage / measuredCPUUsage)
 		}
 		ct.lock.Unlock()
 	}()
@@ -130,13 +130,13 @@ func (ct *cpuTracker) DecCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		usage := ct.cpu.Usage()
-		ct.metrics.cumulativeMetric.Set(usage)
-		trackedAmount := ct.cumulativeMeter.Read(now)
-		if trackedAmount == 0 {
+		realCPUUsage := ct.cpu.Usage()
+		ct.metrics.cumulativeMetric.Set(realCPUUsage)
+		measuredCPUUsage := ct.cumulativeMeter.Read(now)
+		if measuredCPUUsage == 0 {
 			ct.metrics.cumulativeAtLargeMetric.Set(0)
 		} else {
-			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * usage / trackedAmount)
+			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * realCPUUsage / measuredCPUUsage)
 		}
 		ct.lock.Unlock()
 	}()
@@ -157,11 +157,11 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	if !exists {
 		return 0
 	}
-	trackedAmount := ct.cumulativeMeter.Read(now)
-	if trackedAmount == 0 {
+	measuredCPUUsage := ct.cumulativeMeter.Read(now)
+	if measuredCPUUsage == 0 {
 		return 0
 	}
-	scale := ct.cpu.Usage() / trackedAmount
+	scale := ct.cpu.Usage() / measuredCPUUsage
 	return m.(meter.Meter).Read(now) * scale
 }
 
@@ -171,11 +171,11 @@ func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
 
 	ct.prune(now)
 
-	trackedAmount := ct.cumulativeMeter.Read(now)
-	if trackedAmount == 0 {
+	measuredCPUUsage := ct.cumulativeMeter.Read(now)
+	if measuredCPUUsage == 0 {
 		return 0
 	}
-	scale := ct.cpu.Usage() / trackedAmount
+	scale := ct.cpu.Usage() / measuredCPUUsage
 	return ct.cumulativeAtLargeMeter.Read(now) * scale
 }
 
@@ -193,11 +193,11 @@ func (ct *cpuTracker) TimeUntilUtilization(
 	if !exists {
 		return 0
 	}
-	trackedAmount := ct.cumulativeMeter.Read(now)
-	if trackedAmount == 0 {
+	measuredCPUUsage := ct.cumulativeMeter.Read(now)
+	if measuredCPUUsage == 0 {
 		return 0
 	}
-	scale := ct.cpu.Usage() / trackedAmount
+	scale := ct.cpu.Usage() / measuredCPUUsage
 	if scale == 0 {
 		return 0
 	}

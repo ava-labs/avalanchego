@@ -22,7 +22,7 @@ type User interface {
 	// Usage returns the number of CPU cores of usage this user has attributed
 	// to it.
 	//
-	// For example, if this user is reporting a processes CPU utilization and
+	// For example, if this user is reporting a process's CPU utilization and
 	// that process is currently using 150% CPU (i.e. one and a half cores of
 	// compute) then the return value will be 1.5.
 	Usage() float64
@@ -135,6 +135,9 @@ func (m *manager) getCurrentUsage() float64 {
 	return usage / 100
 }
 
+// getSampleWeights converts the frequency of CPU sampling and the halflife of
+// the CPU sample's usefulness into weights to scale the newly sampled point and
+// previously samples.
 func getSampleWeights(frequency, halflife time.Duration) (float64, float64) {
 	halflifeInSamples := float64(halflife) / float64(frequency)
 	oldWeight := math.Exp(lnHalf / halflifeInSamples)

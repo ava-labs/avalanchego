@@ -3,6 +3,7 @@
 
 package cpu
 
+// NoUsage implements Usage() by always returning 0.
 var NoUsage User = noUsage{}
 
 type noUsage struct{}

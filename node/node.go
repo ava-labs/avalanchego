@@ -1210,7 +1210,7 @@ func (n *Node) shutdown() {
 	if n.cpuManager != nil {
 		err := n.cpuManager.Close()
 		if err != nil {
-			n.Log.Debug("error while shitting down the CPU manager: %s", err)
+			n.Log.Debug("error while shutting down the CPU manager: %s", err)
 		}
 	}
 	if n.IPCs != nil {
