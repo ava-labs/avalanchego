@@ -98,40 +98,50 @@ func (ct *cpuTracker) getMeter(nodeID ids.NodeID) meter.Meter {
 
 func (ct *cpuTracker) IncCPU(
 	nodeID ids.NodeID,
-	startTime time.Time,
+	now time.Time,
 	atLargePortion float64,
 ) {
 	ct.lock.Lock()
 	defer func() {
-		scale := ct.scale(startTime)
-		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(startTime) * scale)
-		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(startTime) * scale)
+		usage := cpu.Usage()
+		ct.metrics.cumulativeMetric.Set(usage)
+		trackedAmount := ct.cumulativeMeter.Read(now)
+		if trackedAmount == 0 {
+			ct.metrics.cumulativeAtLargeMetric.Set(0)
+		} else {
+			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * usage / trackedAmount)
+		}
 		ct.lock.Unlock()
 	}()
 
 	meter := ct.getMeter(nodeID)
-	meter.Inc(startTime, 1)
-	ct.cumulativeMeter.Inc(startTime, 1)
-	ct.cumulativeAtLargeMeter.Inc(startTime, atLargePortion)
+	meter.Inc(now, 1)
+	ct.cumulativeMeter.Inc(now, 1)
+	ct.cumulativeAtLargeMeter.Inc(now, atLargePortion)
 }
 
 func (ct *cpuTracker) DecCPU(
 	nodeID ids.NodeID,
-	endTime time.Time,
+	now time.Time,
 	atLargePortion float64,
 ) {
 	ct.lock.Lock()
 	defer func() {
-		scale := ct.scale(endTime)
-		ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(endTime) * scale)
-		ct.metrics.cumulativeMetric.Set(ct.cumulativeMeter.Read(endTime) * scale)
+		usage := cpu.Usage()
+		ct.metrics.cumulativeMetric.Set(usage)
+		trackedAmount := ct.cumulativeMeter.Read(now)
+		if trackedAmount == 0 {
+			ct.metrics.cumulativeAtLargeMetric.Set(0)
+		} else {
+			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * usage / trackedAmount)
+		}
 		ct.lock.Unlock()
 	}()
 
 	meter := ct.getMeter(nodeID)
-	meter.Dec(endTime, 1)
-	ct.cumulativeMeter.Dec(endTime, 1)
-	ct.cumulativeAtLargeMeter.Dec(endTime, atLargePortion)
+	meter.Dec(now, 1)
+	ct.cumulativeMeter.Dec(now, 1)
+	ct.cumulativeAtLargeMeter.Dec(now, atLargePortion)
 }
 
 func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
@@ -144,7 +154,12 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	if !exists {
 		return 0
 	}
-	return m.(meter.Meter).Read(now) * ct.scale(now)
+	trackedAmount := ct.cumulativeMeter.Read(now)
+	if trackedAmount == 0 {
+		return 0
+	}
+	scale := cpu.Usage() / trackedAmount
+	return m.(meter.Meter).Read(now) * scale
 }
 
 func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
@@ -152,7 +167,13 @@ func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
 	defer ct.lock.Unlock()
 
 	ct.prune(now)
-	return ct.cumulativeAtLargeMeter.Read(now) * ct.scale(now)
+
+	trackedAmount := ct.cumulativeMeter.Read(now)
+	if trackedAmount == 0 {
+		return 0
+	}
+	scale := cpu.Usage() / trackedAmount
+	return ct.cumulativeAtLargeMeter.Read(now) * scale
 }
 
 func (ct *cpuTracker) TimeUntilUtilization(
@@ -169,13 +190,15 @@ func (ct *cpuTracker) TimeUntilUtilization(
 	if !exists {
 		return 0
 	}
-	return m.(meter.Meter).TimeUntil(now, value/ct.scale(now))
-}
-
-func (ct *cpuTracker) scale(now time.Time) float64 {
 	trackedAmount := ct.cumulativeMeter.Read(now)
-	realUsage := cpu.Usage()
-	return realUsage / trackedAmount
+	if trackedAmount == 0 {
+		return 0
+	}
+	scale := cpu.Usage() / trackedAmount
+	if scale == 0 {
+		return 0
+	}
+	return m.(meter.Meter).TimeUntil(now, value/scale)
 }
 
 // prune attempts to remove cpu meters that currently show a value less than
