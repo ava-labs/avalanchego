@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/struCoder/pidusage"
+	"github.com/shirou/gopsutil/process"
 )
 
 var (
@@ -48,7 +48,7 @@ type Manager interface {
 
 type manager struct {
 	processesLock sync.Mutex
-	processes     map[int]struct{}
+	processes     map[int]*process.Process
 
 	usageLock sync.RWMutex
 	usage     float64
@@ -59,7 +59,7 @@ type manager struct {
 
 func NewManager(frequency, halflife time.Duration) Manager {
 	m := &manager{
-		processes: make(map[int]struct{}),
+		processes: make(map[int]*process.Process),
 		onClose:   make(chan struct{}),
 	}
 	go m.update(frequency, halflife)
@@ -74,8 +74,13 @@ func (m *manager) Usage() float64 {
 }
 
 func (m *manager) TrackProcess(pid int) {
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return
+	}
+
 	m.processesLock.Lock()
-	m.processes[pid] = struct{}{}
+	m.processes[pid] = p
 	m.processesLock.Unlock()
 }
 
@@ -119,15 +124,15 @@ func (m *manager) getCurrentUsage() float64 {
 	defer m.processesLock.Unlock()
 
 	var usage float64
-	for pid := range m.processes {
+	for _, p := range m.processes {
 		// If there is an error tracking the CPU utilization of a process,
 		// assume that the utilization is 0.
-		info, err := pidusage.GetStat(pid)
+		cpu, err := p.CPUPercent()
 		if err == nil {
-			usage += info.CPU / 100
+			usage += cpu
 		}
 	}
-	return usage
+	return usage / 100
 }
 
 func getSampleWeights(frequency, halflife time.Duration) (float64, float64) {
