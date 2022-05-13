@@ -178,7 +178,7 @@ You can override these defaults with the following config:
   "priority-regossip-frequency": "1s",
   "priority-regossip-max-txs": 32,
   "priority-regossip-addresses": ["<YOUR 0x-ADDRESS>"],
-  "regossip-txs-per-address": 16
+  "priority-regossip-txs-per-address": 16
 }
 ```
 
