@@ -4,7 +4,7 @@
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
 That is, the VM defines the behavior of the blockchain.
 
-Subnet EVM is the [Virtual Machine (VM)](https://docs.avax.network/learn/platform-overview#virtual-machines) that defines the Subnet Contract Chains. Subnet EVM is a simplified version of [Coreth VM (C-Chain)](https://github.com/ava-labs/coreth).
+Subnet EVM is the [Virtual Machine (VM)](https://docs.avax.network/overview/getting-started/avalanche-platform/#virtual-machines) that defines the Subnet Contract Chains. Subnet EVM is a simplified version of [Coreth VM (C-Chain)](https://github.com/ava-labs/coreth).
 
 This chain implements the Ethereum Virtual Machine and supports Solidity smart contracts as well as most other Ethereum client functionality.
 
@@ -143,7 +143,7 @@ genesis file (under the `"config"` key):
 }
 ```
 
-Next, you'll need to update your [chain config](https://docs.avax.network/build/references/command-line-interface/#chain-configs) with the following:
+Next, you'll need to update your [chain config](https://docs.avax.network/nodes/maintain/chain-config-flags#subnet-configs) with the following:
 
 ```json
 {
@@ -157,12 +157,12 @@ a "feeRecipient", the fees will be burned in blocks they produce._
 ## Priority Regossip
 
 A transaction is "regossiped" when the node does not find the transaction in
-a block after `tx-regossip-frequency` (defaults to `1m`). By default, up to 16 transactions
+a block after `priority-regossip-frequency` (defaults to `1m`). By default, up to 16 transactions
 (max 1 per address) are regossiped to validators per minute.
 
 Operators can use "priority regossip" to more aggressively "regossip" transactions for a set of
 important addresses (like bridge relayers). To do so, you'll need to update your
-[chain config](https://docs.avax.network/build/references/command-line-interface/#chain-configs) with the following:
+[chain config](https://docs.avax.network/nodes/maintain/chain-config-flags#subnet-configs) with the following:
 
 ```json
 {
