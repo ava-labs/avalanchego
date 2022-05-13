@@ -46,6 +46,7 @@ type TimeTracker interface {
 type cpuTracker struct {
 	lock sync.RWMutex
 
+	cpu     cpu.User
 	factory meter.Factory
 	// Tracks total CPU usage by all nodes.
 	cumulativeMeter meter.Meter
@@ -64,11 +65,13 @@ type cpuTracker struct {
 
 func NewCPUTracker(
 	reg prometheus.Registerer,
+	cpu cpu.User,
 	factory meter.Factory,
 	halflife time.Duration,
 ) (TimeTracker, error) {
 	t := &cpuTracker{
 		factory:                factory,
+		cpu:                    cpu,
 		cumulativeMeter:        factory.New(halflife),
 		cumulativeAtLargeMeter: factory.New(halflife),
 		halflife:               halflife,
@@ -103,7 +106,7 @@ func (ct *cpuTracker) IncCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		usage := cpu.Usage()
+		usage := ct.cpu.Usage()
 		ct.metrics.cumulativeMetric.Set(usage)
 		trackedAmount := ct.cumulativeMeter.Read(now)
 		if trackedAmount == 0 {
@@ -127,7 +130,7 @@ func (ct *cpuTracker) DecCPU(
 ) {
 	ct.lock.Lock()
 	defer func() {
-		usage := cpu.Usage()
+		usage := ct.cpu.Usage()
 		ct.metrics.cumulativeMetric.Set(usage)
 		trackedAmount := ct.cumulativeMeter.Read(now)
 		if trackedAmount == 0 {
@@ -158,7 +161,7 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	if trackedAmount == 0 {
 		return 0
 	}
-	scale := cpu.Usage() / trackedAmount
+	scale := ct.cpu.Usage() / trackedAmount
 	return m.(meter.Meter).Read(now) * scale
 }
 
@@ -172,7 +175,7 @@ func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
 	if trackedAmount == 0 {
 		return 0
 	}
-	scale := cpu.Usage() / trackedAmount
+	scale := ct.cpu.Usage() / trackedAmount
 	return ct.cumulativeAtLargeMeter.Read(now) * scale
 }
 
@@ -194,7 +197,7 @@ func (ct *cpuTracker) TimeUntilUtilization(
 	if trackedAmount == 0 {
 		return 0
 	}
-	scale := cpu.Usage() / trackedAmount
+	scale := ct.cpu.Usage() / trackedAmount
 	if scale == 0 {
 		return 0
 	}
