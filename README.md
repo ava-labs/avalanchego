@@ -166,7 +166,7 @@ important addresses (like bridge relayers). To do so, you'll need to update your
 
 ```json
 {
-  "tx-priority-regossip-addresses": ["<YOUR 0x-ADDRESS>"]
+  "priority-regossip-addresses": ["<YOUR 0x-ADDRESS>"]
 }
 ```
 
@@ -175,10 +175,10 @@ You can override these defaults with the following config:
 
 ```json
 {
-  "tx-priority-regossip-frequency": "1s",
-  "tx-priority-regossip-max-size": 32,
-  "tx-priority-regossip-addresses": ["<YOUR 0x-ADDRESS>"],
-  "tx-priority-regossip-address-txs": 16
+  "priority-regossip-frequency": "1s",
+  "priority-regossip-max-size": 32,
+  "priority-regossip-addresses": ["<YOUR 0x-ADDRESS>"],
+  "priority-regossip-address-txs": 16
 }
 ```
 
