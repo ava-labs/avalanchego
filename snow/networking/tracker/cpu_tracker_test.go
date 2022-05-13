@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +37,14 @@ func TestNewCPUTracker(t *testing.T) {
 func TestCPUTracker(t *testing.T) {
 	halflife := 5 * time.Second
 
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
+	ctrl := gomock.NewController(t)
+	mockUser := cpu.NewMockUser(ctrl)
+	returnValue := 1.0
+	mockUser.EXPECT().Usage().AnyTimes().DoAndReturn(func() float64 {
+		return returnValue
+	})
+
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 
 	node1 := ids.NodeID{1}
@@ -66,6 +74,8 @@ func TestCPUTracker(t *testing.T) {
 	if cumulative != sum {
 		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
 	}
+
+	returnValue = .5
 
 	startTime3 := endTime2
 	endTime3 := startTime3.Add(halflife)
