@@ -24,7 +24,7 @@ import (
 var (
 	// GitCommit will be set with -X during build step
 	GitCommit        string
-	ModuleVersion    = NewDefaultVersion(0, 0, 2)
+	ModuleVersion    = NewDefaultVersion(0, 2, 0)
 	ModuleVersionApp = NewDefaultApplication(
 		constants.PlatformName,
 		ModuleVersion.Major(),
