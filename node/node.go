@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -51,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -159,6 +161,8 @@ type Node struct {
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
+
+	cpuManager cpu.Manager
 
 	// Tracks the CPU usage caused by processing
 	// messages of each peer.
@@ -725,6 +729,7 @@ func (n *Node) initVMs() error {
 			FileReader:      filesystem.NewReader(),
 			Manager:         n.Config.VMManager,
 			PluginDirectory: n.Config.PluginDir,
+			CPUTracker:      n.cpuManager,
 		}),
 		VMRegisterer: vmRegisterer,
 	})
@@ -1033,8 +1038,10 @@ func (n *Node) initVdrs() (validators.Set, error) {
 
 // Initialize [n.CPUTracker].
 func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
+	n.cpuManager = cpu.NewManager(n.Config.CPUTrackerFrequency, n.Config.CPUTrackerHalflife)
+	n.cpuManager.TrackProcess(os.Getpid())
 	var err error
-	n.cpuTracker, err = tracker.NewCPUTracker(reg, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
+	n.cpuTracker, err = tracker.NewCPUTracker(reg, n.cpuManager, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
 	return err
 }
 
@@ -1199,6 +1206,9 @@ func (n *Node) shutdown() {
 		time.Sleep(n.Config.ShutdownWait)
 	}
 
+	if n.cpuManager != nil {
+		n.cpuManager.Shutdown()
+	}
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
 			n.Log.Debug("error during IPC shutdown: %s", err)
