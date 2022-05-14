@@ -39,10 +39,7 @@ func TestCPUTracker(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	mockUser := cpu.NewMockUser(ctrl)
-	returnValue := 1.0
-	mockUser.EXPECT().Usage().AnyTimes().DoAndReturn(func() float64 {
-		return returnValue
-	})
+	mockUser.EXPECT().Usage().Return(1.0).Times(3)
 
 	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
@@ -75,7 +72,7 @@ func TestCPUTracker(t *testing.T) {
 		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
 	}
 
-	returnValue = .5
+	mockUser.EXPECT().Usage().Return(.5).Times(3)
 
 	startTime3 := endTime2
 	endTime3 := startTime3.Add(halflife)

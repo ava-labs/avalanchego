@@ -105,17 +105,7 @@ func (ct *cpuTracker) IncCPU(
 	atLargePortion float64,
 ) {
 	ct.lock.Lock()
-	defer func() {
-		realCPUUsage := ct.cpu.Usage()
-		ct.metrics.cumulativeMetric.Set(realCPUUsage)
-		measuredCPUUsage := ct.cumulativeMeter.Read(now)
-		if measuredCPUUsage == 0 {
-			ct.metrics.cumulativeAtLargeMetric.Set(0)
-		} else {
-			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * realCPUUsage / measuredCPUUsage)
-		}
-		ct.lock.Unlock()
-	}()
+	defer ct.lock.Unlock()
 
 	meter := ct.getMeter(nodeID)
 	meter.Inc(now, 1)
@@ -129,17 +119,7 @@ func (ct *cpuTracker) DecCPU(
 	atLargePortion float64,
 ) {
 	ct.lock.Lock()
-	defer func() {
-		realCPUUsage := ct.cpu.Usage()
-		ct.metrics.cumulativeMetric.Set(realCPUUsage)
-		measuredCPUUsage := ct.cumulativeMeter.Read(now)
-		if measuredCPUUsage == 0 {
-			ct.metrics.cumulativeAtLargeMetric.Set(0)
-		} else {
-			ct.metrics.cumulativeAtLargeMetric.Set(ct.cumulativeAtLargeMeter.Read(now) * realCPUUsage / measuredCPUUsage)
-		}
-		ct.lock.Unlock()
-	}()
+	defer ct.lock.Unlock()
 
 	meter := ct.getMeter(nodeID)
 	meter.Dec(now, 1)
@@ -153,15 +133,26 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 
 	ct.prune(now)
 
+	realCPUUsage := ct.cpu.Usage()
+	ct.metrics.realCumulativeMetric.Set(realCPUUsage)
+
+	measuredCPUUsage := ct.cumulativeMeter.Read(now)
+	ct.metrics.cumulativeMetric.Set(measuredCPUUsage)
+
+	if measuredCPUUsage == 0 {
+		ct.metrics.cumulativeAtLargeMetric.Set(0)
+		return 0
+	}
+
+	scale := realCPUUsage / measuredCPUUsage
+	measuredAtLargeCPUUsage := ct.cumulativeAtLargeMeter.Read(now)
+	ct.metrics.realCumulativeAtLargeMetric.Set(measuredAtLargeCPUUsage * scale)
+	ct.metrics.cumulativeAtLargeMetric.Set(measuredAtLargeCPUUsage)
+
 	m, exists := ct.meters.Get(nodeID)
 	if !exists {
 		return 0
 	}
-	measuredCPUUsage := ct.cumulativeMeter.Read(now)
-	if measuredCPUUsage == 0 {
-		return 0
-	}
-	scale := ct.cpu.Usage() / measuredCPUUsage
 	return m.(meter.Meter).Read(now) * scale
 }
 
@@ -171,12 +162,23 @@ func (ct *cpuTracker) CumulativeAtLargeUtilization(now time.Time) float64 {
 
 	ct.prune(now)
 
+	realCPUUsage := ct.cpu.Usage()
+	ct.metrics.realCumulativeMetric.Set(realCPUUsage)
+
 	measuredCPUUsage := ct.cumulativeMeter.Read(now)
+	ct.metrics.cumulativeMetric.Set(measuredCPUUsage)
+
 	if measuredCPUUsage == 0 {
+		ct.metrics.cumulativeAtLargeMetric.Set(0)
 		return 0
 	}
-	scale := ct.cpu.Usage() / measuredCPUUsage
-	return ct.cumulativeAtLargeMeter.Read(now) * scale
+
+	scale := realCPUUsage / measuredCPUUsage
+	measuredAtLargeCPUUsage := ct.cumulativeAtLargeMeter.Read(now)
+	scaledAtLargeCPUUsage := measuredAtLargeCPUUsage * scale
+	ct.metrics.realCumulativeAtLargeMetric.Set(scaledAtLargeCPUUsage)
+	ct.metrics.cumulativeAtLargeMetric.Set(measuredAtLargeCPUUsage)
+	return scaledAtLargeCPUUsage
 }
 
 func (ct *cpuTracker) TimeUntilUtilization(
@@ -224,25 +226,39 @@ func (ct *cpuTracker) prune(now time.Time) {
 }
 
 type trackerMetrics struct {
-	cumulativeMetric        prometheus.Gauge
-	cumulativeAtLargeMetric prometheus.Gauge
+	realCumulativeMetric        prometheus.Gauge
+	realCumulativeAtLargeMetric prometheus.Gauge
+	cumulativeMetric            prometheus.Gauge
+	cumulativeAtLargeMetric     prometheus.Gauge
 }
 
 func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*trackerMetrics, error) {
 	m := &trackerMetrics{
+		realCumulativeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "real_cumulative_utilization",
+			Help:      "Real CPU utilization over all nodes. Value should be in [0, number of CPU cores]",
+		}),
+		realCumulativeAtLargeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "real_cumulative_at_large_utilization",
+			Help:      "Real CPU utilization attributed to the at-large CPU allocation over all nodes. Value should be in [0, number of CPU cores]",
+		}),
 		cumulativeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "cumulative_utilization",
-			Help:      "Estimated CPU utilization over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
+			Help:      "Tracked CPU utilization over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
 		}),
 		cumulativeAtLargeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "cumulative_at_large_utilization",
-			Help:      "Estimated CPU utilization attributed to the at-large CPU allocation over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
+			Help:      "Tracked CPU utilization attributed to the at-large CPU allocation over all nodes. Value should be in [0, number of CPU cores], but can go higher due to overestimation",
 		}),
 	}
 	errs := wrappers.Errs{}
 	errs.Add(
+		reg.Register(m.realCumulativeMetric),
+		reg.Register(m.realCumulativeAtLargeMetric),
 		reg.Register(m.cumulativeMetric),
 		reg.Register(m.cumulativeAtLargeMetric),
 	)

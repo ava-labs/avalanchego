@@ -4,7 +4,6 @@
 package cpu
 
 import (
-	"io"
 	"math"
 	"sync"
 	"time"
@@ -42,8 +41,8 @@ type Manager interface {
 	User
 	ProcessTracker
 
-	// Close any allocated resources and stop tracking all processes.
-	io.Closer
+	// Shutdown allocated resources and stop tracking all processes.
+	Shutdown()
 }
 
 type manager struct {
@@ -90,11 +89,10 @@ func (m *manager) UntrackProcess(pid int) {
 	m.processesLock.Unlock()
 }
 
-func (m *manager) Close() error {
+func (m *manager) Shutdown() {
 	m.closeOnce.Do(func() {
 		close(m.onClose)
 	})
-	return nil
 }
 
 func (m *manager) update(frequency, halflife time.Duration) {
