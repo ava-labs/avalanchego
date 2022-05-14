@@ -1,4 +1,4 @@
-name: Build + Test Mac-Windows
+name: Unit Tests Mac-Windows
 
 on:
   push:
@@ -16,6 +16,6 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "1.17.9" # The Go version to download (if necessary) and use.
-      - name: build_test
+      - name: test
         shell: bash
-        run: .github/workflows/build_and_test.sh
+        run: scripts/test.sh

@@ -113,7 +113,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 			IP:   net.IPv6loopback,
 			Port: 0,
 		},
-		version: version.CurrentApp,
+		version: version.ModuleVersionApp,
 		signer:  tlsCert0.PrivateKey.(crypto.Signer),
 		subnets: ids.Set{},
 
@@ -132,7 +132,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 			IP:   net.IPv6loopback,
 			Port: 1,
 		},
-		version: version.CurrentApp,
+		version: version.ModuleVersionApp,
 		signer:  tlsCert1.PrivateKey.(crypto.Signer),
 		subnets: ids.Set{},
 

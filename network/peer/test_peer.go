@@ -107,7 +107,7 @@ func StartTestPeer(
 				mc,
 				networkID,
 				ipDesc,
-				version.CurrentApp,
+				version.ModuleVersionApp,
 				tlsCert.PrivateKey.(crypto.Signer),
 				ids.Set{},
 				100,

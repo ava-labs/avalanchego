@@ -95,7 +95,19 @@ func TestTimeout(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Second,
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -181,7 +193,19 @@ func TestReliableMessages(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Second,
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -273,7 +297,19 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Second,
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()

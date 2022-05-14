@@ -101,6 +101,7 @@ func (cr *ChainRouter) Initialize(
 	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
+	appVersion version.Application,
 ) error {
 	cr.log = log
 	cr.msgCreator = msgCreator
@@ -112,7 +113,7 @@ func (cr *ChainRouter) Initialize(
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
 	cr.peers = make(map[ids.ShortID]version.Application)
-	cr.peers[nodeID] = version.CurrentApp
+	cr.peers[nodeID] = appVersion
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
 

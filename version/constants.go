@@ -22,13 +22,15 @@ import (
 
 // These are globals that describe network upgrades and node versions
 var (
-	Current                      = NewDefaultVersion(1, 7, 10)
-	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
-	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 7, 0)
-	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 6, 0)
-	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
-	PrevMinimumUnmaskedVersion   = NewDefaultApplication(constants.PlatformName, 1, 0, 0)
-	VersionParser                = NewDefaultApplicationParser()
+	// GitCommit will be set with -X during build step
+	GitCommit        string
+	ModuleVersion    = NewDefaultVersion(0, 2, 0)
+	ModuleVersionApp = NewDefaultApplication(
+		constants.PlatformName,
+		ModuleVersion.Major(),
+		ModuleVersion.Minor(),
+		ModuleVersion.Patch(),
+	)
 
 	CurrentDatabase = DatabaseVersion1_4_5
 	PrevDatabase    = DatabaseVersion1_0_0
@@ -76,6 +78,9 @@ var (
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	SunrisePhase0Times       = map[uint32]time.Time{}
+	SunrisePhase0DefaultTime = time.Date(2022, time.May, 16, 8, 0, 0, 0, time.UTC)
 
 	// FIXME: update this before release
 	XChainMigrationTimes = map[uint32]time.Time{
@@ -134,6 +139,13 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return ApricotPhase5DefaultTime
 }
 
+func GetSunrisePhase0Time(networkID uint32) time.Time {
+	if upgradeTime, exists := SunrisePhase0Times[networkID]; exists {
+		return upgradeTime
+	}
+	return SunrisePhase0DefaultTime
+}
+
 func GetXChainMigrationTime(networkID uint32) time.Time {
 	if upgradeTime, exists := XChainMigrationTimes[networkID]; exists {
 		return upgradeTime
@@ -143,12 +155,12 @@ func GetXChainMigrationTime(networkID uint32) time.Time {
 
 func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
-		CurrentApp,
-		MinimumCompatibleVersion,
-		GetApricotPhase5Time(networkID),
-		PrevMinimumCompatibleVersion,
-		MinimumUnmaskedVersion,
+		ModuleVersionApp,
+		ModuleVersionApp,
+		GetSunrisePhase0Time(networkID),
+		ModuleVersionApp,
+		ModuleVersionApp,
 		GetApricotPhase0Time(networkID),
-		PrevMinimumUnmaskedVersion,
+		ModuleVersionApp,
 	)
 }

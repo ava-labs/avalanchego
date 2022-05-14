@@ -164,6 +164,7 @@ func NewNetwork(
 	dialer dialer.Dialer,
 	router router.ExternalHandler,
 	benchlistManager benchlist.Manager,
+	versionCompatibility version.Compatibility,
 ) (Network, error) {
 	primaryNetworkValidators, ok := config.Validators.GetValidators(constants.PrimaryNetworkID)
 	if !ok {
@@ -212,7 +213,7 @@ func NewNetwork(
 		OutboundMsgThrottler: outboundMsgThrottler,
 		Network:              nil, // This is set below.
 		Router:               router,
-		VersionCompatibility: version.GetCompatibility(config.NetworkID),
+		VersionCompatibility: versionCompatibility,
 		VersionParser:        version.NewDefaultApplicationParser(),
 		MySubnets:            config.WhitelistedSubnets,
 		Beacons:              config.Beacons,

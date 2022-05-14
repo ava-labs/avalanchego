@@ -223,6 +223,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 				},
 			},
 			benchlist.NewManager(&benchlist.Config{}),
+			version.GetCompatibility(config.NetworkID),
 		)
 		assert.NoError(err)
 		networks[i] = net
