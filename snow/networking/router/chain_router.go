@@ -83,8 +83,6 @@ type ChainRouter struct {
 	// Must only be accessed in method [createRequestID].
 	// [lock] must be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
-	// App Version
-	appVersion version.Application
 }
 
 // Initialize the router.
