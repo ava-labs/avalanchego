@@ -26,7 +26,7 @@ import (
 var (
 	homeDir = os.ExpandEnv("$HOME")
 	// DefaultLogDirectory is the default directory where logs are saved
-	DefaultLogDirectory = fmt.Sprintf("%s/.%s/logs", homeDir, constants.AppName)
+	defaultLogDirectory = fmt.Sprintf("%s/.%s/logs", homeDir, constants.AppName)
 
 	// DefaultConfig provides a reasonable default logger configuration. It
 	// should not be modified, it should be copied if changes are intended on
@@ -39,7 +39,7 @@ var (
 		DisplayLevel:     Info,
 		DisplayHighlight: Plain,
 		LogLevel:         Debug,
-		Directory:        DefaultLogDirectory,
+		Directory:        defaultLogDirectory,
 	}
 )
 

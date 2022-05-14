@@ -2688,7 +2688,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Connected(vdr, version.CurrentApp); err != nil {
+	if err := bootstrapper.Connected(vdr, version.ModuleVersionApp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3125,7 +3125,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bootstrapper.Connected(vdr, version.CurrentApp); err != nil {
+	if err := bootstrapper.Connected(vdr, version.ModuleVersionApp); err != nil {
 		t.Fatal(err)
 	}
 

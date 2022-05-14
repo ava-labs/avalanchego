@@ -436,7 +436,7 @@ func (vm *VM) Preferred() (Block, error) {
 }
 
 func (vm *VM) Version() (string, error) {
-	return version.Current.String(), nil
+	return version.ModuleVersion.String(), nil
 }
 
 // CreateHandlers returns a map where:

@@ -2042,7 +2042,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		timeoutManager,
+		time.Second,
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
@@ -2167,7 +2179,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	handler.Start(false)
 
-	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
+	if err := bootstrapper.Connected(peerID, version.ModuleVersionApp); err != nil {
 		t.Fatal(err)
 	}
 

@@ -62,7 +62,19 @@ func TestShutdown(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Second,
+		ids.Set{},
+		nil,
+		HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	shutdownCalled := make(chan struct{}, 1)
@@ -162,6 +174,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		HealthConfig{},
 		"",
 		metrics,
+		version.ModuleVersionApp,
 	)
 	assert.NoError(t, err)
 
@@ -256,7 +269,19 @@ func TestRouterTimeout(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Millisecond,
+		ids.Set{},
+		nil,
+		HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -376,7 +401,19 @@ func TestRouterClearTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Millisecond,
+		ids.Set{},
+		nil,
+		HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -483,7 +520,19 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.ShortEmpty,
+		logging.NoLog{},
+		mc,
+		tm,
+		time.Millisecond,
+		ids.Set{},
+		nil,
+		HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+		version.ModuleVersionApp,
+	)
 	assert.NoError(t, err)
 
 	// Create bootstrapper, engine and handler

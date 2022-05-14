@@ -26,6 +26,7 @@ import (
 	"github.com/chain4travel/caminogo/snow/networking/handler"
 	"github.com/chain4travel/caminogo/snow/networking/timeout"
 	"github.com/chain4travel/caminogo/utils/logging"
+	"github.com/chain4travel/caminogo/version"
 )
 
 // Router routes consensus messages to the Handler of the consensus
@@ -45,6 +46,7 @@ type Router interface {
 		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
+		appVersion version.Application,
 	) error
 	Shutdown()
 	AddChain(chain handler.Handler)

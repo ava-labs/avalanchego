@@ -297,7 +297,7 @@ func (vm *VM) Shutdown() error {
 }
 
 func (vm *VM) Version() (string, error) {
-	return version.Current.String(), nil
+	return version.ModuleVersion.String(), nil
 }
 
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
