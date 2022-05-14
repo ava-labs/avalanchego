@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +22,7 @@ func TestNewCPUTracker(t *testing.T) {
 	halflife := 5 * time.Second
 	factory := &meter.ContinuousFactory{}
 
-	trackerIntf, err := NewCPUTracker(reg, factory, halflife)
+	trackerIntf, err := NewCPUTracker(reg, cpu.NoUsage, factory, halflife)
 	assert.NoError(err)
 	tracker, ok := trackerIntf.(*cpuTracker)
 	assert.True(ok)
@@ -35,7 +37,11 @@ func TestNewCPUTracker(t *testing.T) {
 func TestCPUTracker(t *testing.T) {
 	halflife := 5 * time.Second
 
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	ctrl := gomock.NewController(t)
+	mockUser := cpu.NewMockUser(ctrl)
+	mockUser.EXPECT().Usage().Return(1.0).Times(3)
+
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 
 	node1 := ids.NodeID{1}
@@ -66,6 +72,8 @@ func TestCPUTracker(t *testing.T) {
 		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
 	}
 
+	mockUser.EXPECT().Usage().Return(.5).Times(3)
+
 	startTime3 := endTime2
 	endTime3 := startTime3.Add(halflife)
 	newNode1Utilization := cpuTracker.Utilization(node1, endTime3)
@@ -92,7 +100,7 @@ func TestCPUTracker(t *testing.T) {
 
 func TestCPUTrackerTimeUntilUtilization(t *testing.T) {
 	halflife := 5 * time.Second
-	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, halflife)
+	cpuTracker, err := NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, halflife)
 	assert.NoError(t, err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()

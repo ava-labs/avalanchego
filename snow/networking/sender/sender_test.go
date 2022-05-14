@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -76,7 +77,7 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
@@ -177,7 +178,7 @@ func TestReliableMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
@@ -285,7 +286,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
