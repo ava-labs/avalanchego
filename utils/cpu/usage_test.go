@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const epsilon = 1e-9
+
 func TestGetSampleWeights(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -36,8 +38,8 @@ func TestGetSampleWeights(t *testing.T) {
 			assert := assert.New(t)
 
 			newWeight, oldWeight := getSampleWeights(test.frequency, test.halflife)
-			assert.Equal(1-test.oldWeight, newWeight)
-			assert.Equal(test.oldWeight, oldWeight)
+			assert.InDelta(1-test.oldWeight, newWeight, epsilon)
+			assert.InDelta(test.oldWeight, oldWeight, epsilon)
 		})
 	}
 }
