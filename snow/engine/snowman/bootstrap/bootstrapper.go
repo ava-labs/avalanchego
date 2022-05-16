@@ -472,8 +472,8 @@ func (b *bootstrapper) checkFinish() error {
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Ctx.ConsensusDispatcher,
-		b.Ctx.DecisionDispatcher,
+		b.Ctx.ConsensusAcceptor,
+		b.Ctx.DecisionAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err

@@ -131,34 +131,16 @@ func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
 func (ts *Topological) Add(blk Block) error {
-	parentID := blk.Parent()
-
 	blkID := blk.ID()
-	blkBytes := blk.Bytes()
-
-	// Notify anyone listening that this block was issued.
-	if err := ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
-		return err
-	}
-	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
-		return err
-	}
 	ts.Latency.Issued(blkID, ts.pollNumber)
 
+	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
 		if err := blk.Reject(); err != nil {
-			return err
-		}
-
-		// Notify anyone listening that this block was rejected.
-		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
-			return err
-		}
-		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
 			return err
 		}
 		ts.Latency.Rejected(blkID, ts.pollNumber)
@@ -551,12 +533,12 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be
-	// called before child.Accept to honor EventDispatcher.Accept's invariant.
-	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+	// Note that DecisionAcceptor.Accept / ConsensusAcceptor.Accept must be
+	// called before child.Accept to honor Acceptor.Accept's invariant.
+	if err := ts.ctx.DecisionAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
-	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+	if err := ts.ctx.ConsensusAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
 
@@ -589,15 +571,6 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		if err := child.Reject(); err != nil {
 			return err
 		}
-
-		// Notify anyone listening that this block was rejected.
-		bytes := child.Bytes()
-		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-			return err
-		}
-		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-			return err
-		}
 		ts.Latency.Rejected(childID, ts.pollNumber)
 
 		// Track which blocks have been directly rejected
@@ -624,15 +597,6 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 
 		for childID, child := range rejectedNode.children {
 			if err := child.Reject(); err != nil {
-				return err
-			}
-
-			// Notify anyone listening that this block was rejected.
-			bytes := child.Bytes()
-			if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-				return err
-			}
-			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 				return err
 			}
 			ts.Latency.Rejected(childID, ts.pollNumber)
