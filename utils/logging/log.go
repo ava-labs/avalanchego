@@ -57,17 +57,12 @@ func NewLogger(assertionsEnabled bool, prefix string, wrappedCores ...WrappedCor
 }
 
 func (l *log) Write(p []byte) (int, error) {
-	if l == nil {
-		return 0, nil
-	}
-
 	for _, wc := range l.wrappedCores {
 		if wc.WriterDisabled {
 			continue
 		}
 		_, _ = wc.Writer.Write(p)
 	}
-
 	return len(p), nil
 }
 
@@ -79,10 +74,12 @@ func (l *log) Stop() {
 
 // Should only be called from [Level] functions.
 func (l *log) log(level Level, format string, args ...interface{}) {
-	if l == nil && level == Off {
+	// This if check is only needed to avoid calling the (potentially expensive)
+	// Sprintf. Once the Sprintf is removed, this check can be removed as well.
+	if !l.internalLogger.Core().Enabled(zapcore.Level(level)) {
 		return
 	}
-	// TODO: remove this Sprintf and convert args to fields and use in ce.Write()
+	// TODO: remove this Sprintf and convert args to fields to use in ce.Write()
 	args = SanitizeArgs(args)
 	msg := fmt.Sprintf(format, args...)
 	if ce := l.internalLogger.Check(zapcore.Level(level), msg); ce != nil {

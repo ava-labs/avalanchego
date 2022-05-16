@@ -328,8 +328,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer")
 	fs.Duration(NetworkMaxReconnectDelayKey, time.Hour, "Maximum delay duration must be waited before attempting to reconnect a peer")
 
-	fs.Duration(CPUTrackerHalflifeKey, 15*time.Second, "Halflife to use for the CPU tracker. Larger halflife --> CPU usage metrics change more slowly.")
-	// Target CPU Utilization
+	// CPU management
+	fs.Duration(CPUTrackerFrequencyKey, 500*time.Millisecond, "Frequency to check the real CPU utilization of tracked processes. More frequent checks --> CPU usage metrics are more accurate, but more expensive to track")
+	fs.Duration(CPUTrackerHalflifeKey, 15*time.Second, "Halflife to use for the CPU tracker. Larger halflife --> CPU usage metrics change more slowly")
 	fs.Float64(CPUVdrAllocKey, float64(runtime.NumCPU())/2, "Number of CPUs allocated for use by validators. Value should be in range (0, total core count]")
 	fs.Float64(CPUAtLargeAllocKey, float64(runtime.NumCPU())/2, "Number of CPUs allocated for use by any peer. Value should be in range (0, total core count]")
 	fs.Float64(CPUNodeMaxAtLargeKey, 1.0/3.0, "A peer can take up to this portion of CPU usage from the at-large CPU allocation. Must be in [0,1]")

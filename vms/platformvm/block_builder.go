@@ -252,7 +252,7 @@ func (m *blockBuilder) ResetTimer() {
 
 	_, shouldReward, err := m.getStakerToReward(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %w", err)
+		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
 		return
 	}
 	if shouldReward {
@@ -262,7 +262,7 @@ func (m *blockBuilder) ResetTimer() {
 
 	_, shouldAdvanceTime, err := m.getNextChainTime(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("failed to fetch next chain time with %w", err)
+		m.vm.ctx.Log.Error("failed to fetch next chain time with %s", err)
 		return
 	}
 	if shouldAdvanceTime {
@@ -279,7 +279,7 @@ func (m *blockBuilder) ResetTimer() {
 	now := m.vm.clock.Time()
 	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
-		m.vm.ctx.Log.Error("couldn't get next staker change time: %w", err)
+		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)

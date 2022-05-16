@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
-	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ = ginkgo.Describe("[StaticHandlers]", func() {
@@ -132,34 +132,34 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		}
 
-		genesisUTXOs := make([]pChainApi.UTXO, len(keys))
+		genesisUTXOs := make([]pchainapi.UTXO, len(keys))
 		hrp := constants.NetworkIDToHRP[constants.UnitTestID]
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := formatting.FormatBech32(hrp, id.Bytes())
 			gomega.Expect(err).Should(gomega.BeNil())
-			genesisUTXOs[i] = pChainApi.UTXO{
+			genesisUTXOs[i] = pchainapi.UTXO{
 				Amount:  json.Uint64(50000 * units.MilliAvax),
 				Address: addr,
 			}
 		}
 
-		genesisValidators := make([]pChainApi.PrimaryValidator, len(keys))
+		genesisValidators := make([]pchainapi.PrimaryValidator, len(keys))
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := formatting.FormatBech32(hrp, id.Bytes())
 			gomega.Expect(err).Should(gomega.BeNil())
-			genesisValidators[i] = pChainApi.PrimaryValidator{
-				Staker: pChainApi.Staker{
+			genesisValidators[i] = pchainapi.PrimaryValidator{
+				Staker: pchainapi.Staker{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
 					NodeID:    ids.NodeID(id),
 				},
-				RewardOwner: &pChainApi.Owner{
+				RewardOwner: &pchainapi.Owner{
 					Threshold: 1,
 					Addresses: []string{addr},
 				},
-				Staked: []pChainApi.UTXO{{
+				Staked: []pchainapi.UTXO{{
 					Amount:  json.Uint64(10000),
 					Address: addr,
 				}},
@@ -167,7 +167,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			}
 		}
 
-		buildGenesisArgs := pChainApi.BuildGenesisArgs{
+		buildGenesisArgs := pchainapi.BuildGenesisArgs{
 			NetworkID:     json.Uint32(constants.UnitTestID),
 			AvaxAssetID:   ids.ID{'a', 'v', 'a', 'x'},
 			UTXOs:         genesisUTXOs,

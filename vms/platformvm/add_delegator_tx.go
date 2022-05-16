@@ -160,7 +160,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 			maximumWeight = math.Min64(maximumWeight, vm.MaxValidatorStake)
 		}
 
-		canDelegate, err := CanDelegate(
+		canDelegate, err := canDelegate(
 			currentDelegators,
 			pendingDelegators,
 			tx.AddDelegatorTx,
@@ -264,13 +264,13 @@ func (vm *VM) newAddDelegatorTx(
 	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
-// CanDelegate returns if the [new] delegator can be added to a validator who
+// canDelegate returns if the [new] delegator can be added to a validator who
 // has [current] and [pending] delegators. [currentStake] is the current amount
 // of stake on the validator, include the [current] delegators. [maximumStake]
 // is the maximum amount of stake that can be on the validator at any given
 // time. It is assumed that the validator without adding [new] does not violate
 // [maximumStake].
-func CanDelegate(
+func canDelegate(
 	current,
 	pending []*unsigned.AddDelegatorTx, // sorted by next start time first
 	new *unsigned.AddDelegatorTx,

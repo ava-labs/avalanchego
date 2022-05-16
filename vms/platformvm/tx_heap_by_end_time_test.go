@@ -82,7 +82,7 @@ func TestTxHeapStop(t *testing.T) {
 	txHeap.Add(validator0)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.EndTime()) {
 		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.EndTime())
-	} else if top := txHeap.GetAll()[0]; top.Unsigned.ID() != validator0.Unsigned.ID() {
+	} else if top := txHeap.List()[0]; top.Unsigned.ID() != validator0.Unsigned.ID() {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.Unsigned.ID(), validator0.Unsigned.ID())
 	}
 }
