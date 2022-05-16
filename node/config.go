@@ -205,6 +205,11 @@ type Config struct {
 	// VM management
 	VMManager vms.Manager `json:"-"`
 
+	// Frequency to check the real CPU utilization of tracked processes.
+	// More frequent checks --> CPU usage metrics are more accurate, but more
+	// expensive to track
+	CPUTrackerFrequency time.Duration `json:"cpuTrackerFrequency"`
+
 	// Halflife to use for the CPU tracker.
 	// Larger halflife --> CPU usage metrics change more slowly.
 	CPUTrackerHalflife time.Duration `json:"cpuTrackerHalflife"`

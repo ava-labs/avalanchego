@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 )
 
@@ -35,7 +36,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err = vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
@@ -125,7 +126,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
@@ -208,7 +209,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
@@ -283,7 +284,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	cpuTargeter, err := tracker.NewCPUTargeter(
 		prometheus.NewRegistry(),
