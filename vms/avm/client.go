@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -286,7 +286,7 @@ func (c *client) GetAtomicUTXOs(
 		}
 		utxos[i] = utxoBytes
 	}
-	endAddr, err := addressconverter.ParseAddressToID(res.EndIndex.Address)
+	endAddr, err := address.ParseAddressToID(res.EndIndex.Address)
 	if err != nil {
 		return nil, ids.ShortID{}, ids.Empty, err
 	}
@@ -483,7 +483,7 @@ func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options .
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	return addressconverter.ParseAddressToID(res.Address)
+	return address.ParseAddressToID(res.Address)
 }
 
 func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
@@ -492,7 +492,7 @@ func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options .
 	if err != nil {
 		return nil, err
 	}
-	return addressconverter.ParseAddressesToID(res.Addresses)
+	return address.ParseAddressesToID(res.Addresses)
 }
 
 func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (string, error) {
@@ -513,7 +513,7 @@ func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey st
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	return addressconverter.ParseAddressToID(res.Address)
+	return address.ParseAddressToID(res.Address)
 }
 
 func (c *client) Send(

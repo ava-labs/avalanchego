@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 // ClientStaker is the representation of a staker sent via client.
@@ -80,7 +80,7 @@ func apiOwnerToClientOwner(rewardOwner *APIOwner) (*ClientOwner, error) {
 	)
 	clientOwner.Locktime = uint64(rewardOwner.Locktime)
 	clientOwner.Threshold = uint32(rewardOwner.Threshold)
-	clientOwner.Addresses, err = addressconverter.ParseAddressesToID(rewardOwner.Addresses)
+	clientOwner.Addresses, err = address.ParseAddressesToID(rewardOwner.Addresses)
 	return &clientOwner, err
 }
 

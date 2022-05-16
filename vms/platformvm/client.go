@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/addressconverter"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -241,7 +241,7 @@ func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey st
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	return addressconverter.ParseAddressToID(res.Address)
+	return address.ParseAddressToID(res.Address)
 }
 
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
@@ -258,7 +258,7 @@ func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options .
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	return addressconverter.ParseAddressToID(res.Address)
+	return address.ParseAddressToID(res.Address)
 }
 
 func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
@@ -267,7 +267,7 @@ func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options .
 	if err != nil {
 		return nil, err
 	}
-	return addressconverter.ParseAddressesToID(res.Addresses)
+	return address.ParseAddressesToID(res.Addresses)
 }
 
 func (c *client) GetUTXOs(
@@ -313,7 +313,7 @@ func (c *client) GetAtomicUTXOs(
 		}
 		utxos[i] = utxoBytes
 	}
-	endAddr, err := addressconverter.ParseAddressToID(res.EndIndex.Address)
+	endAddr, err := address.ParseAddressToID(res.EndIndex.Address)
 	if err != nil {
 		return nil, ids.ShortID{}, ids.Empty, err
 	}
@@ -346,7 +346,7 @@ func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Op
 	subnets := make([]ClientSubnet, len(res.Subnets))
 	for i, APIsubnet := range res.Subnets {
 		subnets[i].ID = APIsubnet.ID
-		subnets[i].ControlKeys, err = addressconverter.ParseAddressesToID(APIsubnet.ControlKeys)
+		subnets[i].ControlKeys, err = address.ParseAddressesToID(APIsubnet.ControlKeys)
 		if err != nil {
 			return nil, err
 		}
