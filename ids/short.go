@@ -130,10 +130,12 @@ func IsUniqueShortIDs(ids []ShortID) bool {
 	return set.Len() == len(ids)
 }
 
-func ShortIDSliceToStringSlice(ids []ShortID) []string {
-	idsStr := make([]string, len(ids))
+// ShortIDsToStrings converts an array of shortIDs to an array of their string
+// representations
+func ShortIDsToStrings(ids []ShortID) []string {
+	idStrs := make([]string, len(ids))
 	for i, id := range ids {
-		idsStr[i] = id.String()
+		idStrs[i] = id.String()
 	}
-	return idsStr
+	return idStrs
 }

@@ -247,7 +247,7 @@ func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey st
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
 	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceRequest{
-		Addresses: ids.ShortIDSliceToStringSlice(addrs),
+		Addresses: ids.ShortIDsToStrings(addrs),
 	}, res, options...)
 	return res, err
 }
@@ -292,7 +292,7 @@ func (c *client) GetAtomicUTXOs(
 ) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
-		Addresses:   ids.ShortIDSliceToStringSlice(addrs),
+		Addresses:   ids.ShortIDsToStrings(addrs),
 		SourceChain: sourceChain,
 		Limit:       json.Uint32(limit),
 		StartIndex: api.Index{
@@ -431,7 +431,7 @@ func (c *client) AddValidator(
 	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
@@ -463,7 +463,7 @@ func (c *client) AddDelegator(
 	err := c.requester.SendRequest(ctx, "addDelegator", &AddDelegatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		}, APIStaker: APIStaker{
 			NodeID:      nodeID,
@@ -493,7 +493,7 @@ func (c *client) AddSubnetValidator(
 	err := c.requester.SendRequest(ctx, "addSubnetValidator", &AddSubnetValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
@@ -520,11 +520,11 @@ func (c *client) CreateSubnet(
 	err := c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APISubnet: APISubnet{
-			ControlKeys: ids.ShortIDSliceToStringSlice(controlKeys),
+			ControlKeys: ids.ShortIDsToStrings(controlKeys),
 			Threshold:   json.Uint32(threshold),
 		},
 	}, res, options...)
@@ -545,7 +545,7 @@ func (c *client) ExportAVAX(
 	err := c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		TargetChain: targetChain,
@@ -568,7 +568,7 @@ func (c *client) ImportAVAX(
 	err := c.requester.SendRequest(ctx, "importAVAX", &ImportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		To:          to.String(),
@@ -598,7 +598,7 @@ func (c *client) CreateBlockchain(
 	err = c.requester.SendRequest(ctx, "createBlockchain", &CreateBlockchainArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDSliceToStringSlice(from)},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		SubnetID:    subnetID,
@@ -701,7 +701,7 @@ func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...r
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest(ctx, "getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
-			Addresses: ids.ShortIDSliceToStringSlice(addrs),
+			Addresses: ids.ShortIDsToStrings(addrs),
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
