@@ -17,8 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	pChainGenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+
+	pchaingenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var (
@@ -340,7 +341,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	st.SetLastAccepted(genesisBlock.ID())
 
 	utxos, timestamp, initialSupply,
-		validators, chains, err := pChainGenesis.ExtractGenesisContent(genesisBytes)
+		validators, chains, err := pchaingenesis.ExtractGenesisContent(genesisBytes)
 	if err != nil {
 		return err
 	}

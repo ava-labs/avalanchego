@@ -15,7 +15,7 @@ var _ Heap = &txHeap{}
 type Heap interface {
 	Add(tx *signed.Tx)
 	Get(txID ids.ID) *signed.Tx
-	GetAll() []*signed.Tx
+	List() []*signed.Tx
 	Remove(txID ids.ID) *signed.Tx
 	Peek() *signed.Tx
 	RemoveTop() *signed.Tx
@@ -51,7 +51,7 @@ func (h *txHeap) Get(txID ids.ID) *signed.Tx {
 	return h.txs[index].tx
 }
 
-func (h *txHeap) GetAll() []*signed.Tx {
+func (h *txHeap) List() []*signed.Tx {
 	res := make([]*signed.Tx, 0, len(h.txs))
 	for _, ht := range h.txs {
 		res = append(res, ht.tx)

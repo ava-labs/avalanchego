@@ -30,7 +30,7 @@ func init() {
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []linearcodec.Codec{c, gc} {
+	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
 			c.RegisterType(&ProposalBlock{}),
 			c.RegisterType(&AbortBlock{}),

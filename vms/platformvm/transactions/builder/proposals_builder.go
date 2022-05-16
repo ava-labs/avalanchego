@@ -12,8 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 type ProposalsTxBuilder interface {
@@ -74,7 +75,7 @@ func (b *builder) NewAddValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: pChainValidator.Validator{
+		Validator: pchainvalidator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
@@ -116,7 +117,7 @@ func (b *builder) NewAddDelegatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: pChainValidator.Validator{
+		Validator: pchainvalidator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
@@ -164,8 +165,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		Validator: pChainValidator.SubnetValidator{
-			Validator: pChainValidator.Validator{
+		Validator: pchainvalidator.SubnetValidator{
+			Validator: pchainvalidator.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,

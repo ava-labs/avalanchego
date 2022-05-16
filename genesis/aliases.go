@@ -7,12 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	pchaingenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 // Aliases returns the default aliases based on the network ID
@@ -28,14 +27,11 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 	chainAliases := map[ids.ID][]string{
 		constants.PlatformChainID: {"P", "platform"},
 	}
-	genesis := &pChainGen.Genesis{} // TODO let's not re-create genesis to do aliasing
-	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
-		return nil, nil, err
-	}
-	if err := genesis.Initialize(); err != nil {
-		return nil, nil, err
-	}
 
+	genesis, err := pchaingenesis.New(genesisBytes) // TODO let's not re-create genesis to do aliasing
+	if err != nil {
+		return nil, nil, err
+	}
 	for _, chain := range genesis.Chains {
 		uChain := chain.Unsigned.(*unsigned.CreateChainTx)
 		switch uChain.VMID {
