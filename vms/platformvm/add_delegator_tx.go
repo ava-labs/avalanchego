@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -159,7 +159,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 			maximumWeight = math.Min64(maximumWeight, vm.MaxValidatorStake)
 		}
 
-		canDelegate, err := CanDelegate(
+		canDelegate, err := canDelegate(
 			currentDelegators,
 			pendingDelegators,
 			tx.AddDelegatorTx,
@@ -227,7 +227,7 @@ func (tx *StatefulAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
 // is the maximum amount of stake that can be on the validator at any given
 // time. It is assumed that the validator without adding [new] does not violate
 // [maximumStake].
-func CanDelegate(
+func canDelegate(
 	current,
 	pending []*unsigned.AddDelegatorTx, // sorted by next start time first
 	new *unsigned.AddDelegatorTx,
@@ -264,7 +264,7 @@ func maxStakeAmount(
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := pChainValidator.EndTimeHeap{}
+	toRemoveHeap := pchainvalidator.EndTimeHeap{}
 	for _, currentDelegator := range current {
 		toRemoveHeap.Add(&currentDelegator.Validator)
 	}

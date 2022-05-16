@@ -25,18 +25,22 @@ type Genesis struct {
 	Message       string       `serialize:"true"`
 }
 
-func (g *Genesis) Initialize() error {
-	for _, tx := range g.Validators {
+func New(genesisBytes []byte) (*Genesis, error) {
+	gen := &Genesis{}
+	if _, err := unsigned.GenCodec.Unmarshal(genesisBytes, gen); err != nil {
+		return nil, err
+	}
+	for _, tx := range gen.Validators {
 		if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	for _, tx := range g.Chains {
+	for _, tx := range gen.Chains {
 		if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return gen, nil
 }
 
 func ExtractGenesisContent(genesisBytes []byte) (
@@ -47,13 +51,11 @@ func ExtractGenesisContent(genesisBytes []byte) (
 	chains []*signed.Tx,
 	err error,
 ) {
-	genesis := &Genesis{}
-	if _, err = unsigned.GenCodec.Unmarshal(genesisBytes, genesis); err != nil {
+	genesis, err := New(genesisBytes)
+	if err != nil {
 		return
 	}
-	if err = genesis.Initialize(); err != nil {
-		return
-	}
+
 	utxos = make([]*avax.UTXO, 0, len(genesis.UTXOs))
 	for _, utxo := range genesis.UTXOs {
 		utxos = append(utxos, &utxo.UTXO)

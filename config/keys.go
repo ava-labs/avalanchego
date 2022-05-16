@@ -172,6 +172,7 @@ const (
 	CPUVdrAllocKey                                     = "throttler-inbound-cpu-validator-alloc"
 	CPUAtLargeAllocKey                                 = "throttler-inbound-cpu-at-large-alloc"
 	CPUNodeMaxAtLargeKey                               = "throttler-inbound-cpu-node-max-at-large-portion"
+	CPUTrackerFrequencyKey                             = "cpu-tracker-frequency"
 	CPUTrackerHalflifeKey                              = "cpu-tracker-halflife"
 	OutboundThrottlerAtLargeAllocSizeKey               = "throttler-outbound-at-large-alloc-size"
 	OutboundThrottlerVdrAllocSizeKey                   = "throttler-outbound-validator-alloc-size"
