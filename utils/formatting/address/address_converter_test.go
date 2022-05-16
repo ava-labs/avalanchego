@@ -6,7 +6,6 @@ package address
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,7 +55,7 @@ func TestAddressConversion(t *testing.T) {
 			srcAddrs: []string{
 				"not a valid address",
 			},
-			expectedErr: formatting.ErrNoSeparator,
+			expectedErr: errNoSeparator,
 		},
 	}
 	for _, test := range tests {

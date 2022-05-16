@@ -5,7 +5,6 @@ package address
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 // ConvertAddresses converts a list of addresses with arbitrary chains and HRPs
@@ -14,12 +13,12 @@ import (
 func ConvertAddresses(destChain string, toHRP string, addresses []string) ([]string, error) {
 	convertedAddrs := make([]string, len(addresses))
 	for i, addr := range addresses {
-		_, _, addrBytes, err := formatting.ParseAddress(addr)
+		_, _, addrBytes, err := ParseAddress(addr)
 		if err != nil {
 			return nil, err
 		}
 
-		newAddrStr, err := formatting.FormatAddress(destChain, toHRP, addrBytes)
+		newAddrStr, err := FormatAddress(destChain, toHRP, addrBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -29,7 +28,7 @@ func ConvertAddresses(destChain string, toHRP string, addresses []string) ([]str
 }
 
 func ParseAddressToID(addrStr string) (ids.ShortID, error) {
-	_, _, addrBytes, err := formatting.ParseAddress(addrStr)
+	_, _, addrBytes, err := ParseAddress(addrStr)
 	if err != nil {
 		return ids.ShortID{}, err
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -94,21 +93,6 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 		}
 	}
 	return pCTX, xCTX, utxos, nil
-}
-
-// FormatAddresses returns the string format of the provided address set for the
-// requested chain and hrp. This is useful to use with the API clients to
-// support address queries.
-func FormatAddresses(chain, hrp string, addrSet ids.ShortSet) ([]string, error) {
-	addrs := make([]string, 0, addrSet.Len())
-	for addr := range addrSet {
-		addrStr, err := formatting.FormatAddress(chain, hrp, addr[:])
-		if err != nil {
-			return nil, err
-		}
-		addrs = append(addrs, addrStr)
-	}
-	return addrs, nil
 }
 
 // AddAllUTXOs fetches all the UTXOs referenced by [addresses] that were sent

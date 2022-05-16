@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/version"
@@ -1853,7 +1854,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unknownChainAddr, err := formatting.FormatAddress("R", hrp, rawAddr.Bytes())
+	unknownChainAddr, err := address.FormatAddress("R", hrp, rawAddr.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

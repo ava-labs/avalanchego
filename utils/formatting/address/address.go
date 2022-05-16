@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package formatting
+package address
 
 import (
 	"errors"
@@ -11,12 +11,10 @@ import (
 	"github.com/btcsuite/btcutil/bech32"
 )
 
-const (
-	addressSep = "-"
-)
+const addressSep = "-"
 
 var (
-	ErrNoSeparator = errors.New("no separator found in address")
+	errNoSeparator = errors.New("no separator found in address")
 	errBits5To8    = errors.New("unable to convert address from 5-bit to 8-bit formatting")
 	errBits8To5    = errors.New("unable to convert address from 8-bit to 5-bit formatting")
 )
@@ -27,7 +25,7 @@ var (
 func ParseAddress(addrStr string) (string, string, []byte, error) {
 	addressParts := strings.SplitN(addrStr, addressSep, 2)
 	if len(addressParts) < 2 {
-		return "", "", nil, ErrNoSeparator
+		return "", "", nil, errNoSeparator
 	}
 	chainID := addressParts[0]
 	rawAddr := addressParts[1]

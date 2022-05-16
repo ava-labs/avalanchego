@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 var _ AddressManager = &addressManager{}
@@ -57,7 +57,7 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 }
 
 func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
+	chainIDAlias, hrp, addrBytes, err := address.ParseAddress(addrStr)
 	if err != nil {
 		return ids.ID{}, ids.ShortID{}, err
 	}
@@ -93,7 +93,7 @@ func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string
 		return "", err
 	}
 	hrp := constants.GetHRP(a.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+	return address.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
 func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
