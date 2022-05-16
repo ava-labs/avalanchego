@@ -53,7 +53,7 @@ func init() {
 // subpackage-level codecs were introduced, each handling serialization of specific types.
 // RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
 // are coherent with components one.
-func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		// The Fx is registered here because this is the same place it is

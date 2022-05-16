@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -138,7 +139,7 @@ func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
 }
 
 func newDefaultCPUTracker() tracker.TimeTracker {
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), meter.ContinuousFactory{}, 10*time.Second)
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		panic(err)
 	}
