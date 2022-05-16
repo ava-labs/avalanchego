@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs/socket"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -25,13 +24,13 @@ type EventSockets struct {
 }
 
 // newEventSockets creates a *ChainIPCs with both consensus and decisions IPCs
-func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher) (*EventSockets, error) {
-	consensusIPC, err := newEventIPCSocket(ctx, chainID, ipcConsensusIdentifier, consensusEvents)
+func newEventSockets(ctx context, chainID ids.ID, consensusAcceptorGroup, decisionAcceptorGroup snow.AcceptorGroup) (*EventSockets, error) {
+	consensusIPC, err := newEventIPCSocket(ctx, chainID, ipcConsensusIdentifier, consensusAcceptorGroup)
 	if err != nil {
 		return nil, err
 	}
 
-	decisionsIPC, err := newEventIPCSocket(ctx, chainID, ipcDecisionsIdentifier, decisionEvents)
+	decisionsIPC, err := newEventIPCSocket(ctx, chainID, ipcDecisionsIdentifier, decisionAcceptorGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +93,7 @@ type eventSocket struct {
 
 // newEventIPCSocket creates a *eventSocket for the given chain and
 // EventDispatcher that writes to a local IPC socket
-func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *triggers.EventDispatcher) (*eventSocket, error) {
+func newEventIPCSocket(ctx context, chainID ids.ID, name string, acceptorGroup snow.AcceptorGroup) (*eventSocket, error) {
 	var (
 		url     = ipcURL(ctx, chainID, name)
 		ipcName = ipcIdentifierPrefix + "-" + name
@@ -110,7 +109,7 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 		url:    url,
 		socket: socket.NewSocket(url, ctx.log),
 		unregisterFn: func() error {
-			return events.DeregisterChain(chainID, ipcName)
+			return acceptorGroup.DeregisterAcceptor(chainID, ipcName)
 		},
 	}
 
@@ -121,7 +120,7 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *trigger
 		return nil, err
 	}
 
-	if err := events.RegisterChain(chainID, ipcName, eis, false); err != nil {
+	if err := acceptorGroup.RegisterAcceptor(chainID, ipcName, eis, false); err != nil {
 		if err := eis.stop(); err != nil {
 			return nil, err
 		}

@@ -42,12 +42,12 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -121,8 +121,8 @@ type Node struct {
 	uptimeCalculator uptime.LockedCalculator
 
 	// dispatcher for events as they happen in consensus
-	DecisionDispatcher  *triggers.EventDispatcher
-	ConsensusDispatcher *triggers.EventDispatcher
+	DecisionAcceptorGroup  snow.AcceptorGroup
+	ConsensusAcceptorGroup snow.AcceptorGroup
 
 	IPCs *ipcs.ChainIPCs
 
@@ -438,8 +438,8 @@ func (n *Node) initBeacons() error {
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
 func (n *Node) initEventDispatchers() {
-	n.DecisionDispatcher = triggers.New(n.Log)
-	n.ConsensusDispatcher = triggers.New(n.Log)
+	n.DecisionAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.ConsensusAcceptorGroup = snow.NewAcceptorGroup(n.Log)
 }
 
 func (n *Node) initIPCs() error {
@@ -453,25 +453,26 @@ func (n *Node) initIPCs() error {
 	}
 
 	var err error
-	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
+	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusAcceptorGroup, n.DecisionAcceptorGroup, chainIDs)
 	return err
 }
 
 // Initialize [n.indexer].
-// Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
-// [n.Log], [n.APIServer], [n.chainManager] are initialized
+// Should only be called after [n.DB], [n.DecisionAcceptorGroup],
+// [n.ConsensusAcceptorGroup], [n.Log], [n.APIServer], [n.chainManager] are
+// initialized
 func (n *Node) initIndexer() error {
 	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
 	var err error
 	n.indexer, err = indexer.NewIndexer(indexer.Config{
-		IndexingEnabled:      n.Config.IndexAPIEnabled,
-		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
-		DB:                   txIndexerDB,
-		Log:                  n.Log,
-		DecisionDispatcher:   n.DecisionDispatcher,
-		ConsensusDispatcher:  n.ConsensusDispatcher,
-		APIServer:            n.APIServer,
-		ShutdownF:            func() { n.Shutdown(0) }, // TODO put exit code here
+		IndexingEnabled:        n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
+		DB:                     txIndexerDB,
+		Log:                    n.Log,
+		DecisionAcceptorGroup:  n.DecisionAcceptorGroup,
+		ConsensusAcceptorGroup: n.ConsensusAcceptorGroup,
+		APIServer:              n.APIServer,
+		ShutdownF:              func() { n.Shutdown(0) }, // TODO put exit code here
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
@@ -619,8 +620,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
 		VMManager:                               n.Config.VMManager,
-		DecisionEvents:                          n.DecisionDispatcher,
-		ConsensusEvents:                         n.ConsensusDispatcher,
+		DecisionAcceptorGroup:                   n.DecisionAcceptorGroup,
+		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
 		DBManager:                               n.DBManager,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
