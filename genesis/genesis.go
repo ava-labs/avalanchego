@@ -20,13 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
-	pChainApi "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	pchaingenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 const (
@@ -330,7 +330,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
-	platformvmArgs := pChainApi.BuildGenesisArgs{
+	platformvmArgs := pchainapi.BuildGenesisArgs{
 		AvaxAssetID:   avaxAssetID,
 		NetworkID:     json.Uint32(config.NetworkID),
 		Time:          json.Uint64(config.StartTime),
@@ -354,7 +354,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
-					pChainApi.UTXO{
+					pchainapi.UTXO{
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
 						Address:  addr,
@@ -379,7 +379,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.ID{}, err
 		}
 
-		utxos := []pChainApi.UTXO(nil)
+		utxos := []pchainapi.UTXO(nil)
 		for _, allocation := range nodeAllocations {
 			addr, err := formatting.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
@@ -390,7 +390,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
-				utxos = append(utxos, pChainApi.UTXO{
+				utxos = append(utxos, pchainapi.UTXO{
 					Locktime: json.Uint64(unlock.Locktime),
 					Amount:   json.Uint64(unlock.Amount),
 					Address:  addr,
@@ -403,13 +403,13 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		delegationFee := json.Uint32(staker.DelegationFee)
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			pChainApi.PrimaryValidator{
-				Staker: pChainApi.Staker{
+			pchainapi.PrimaryValidator{
+				Staker: pchainapi.Staker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,
 				},
-				RewardOwner: &pChainApi.Owner{
+				RewardOwner: &pchainapi.Owner{
 					Threshold: 1,
 					Addresses: []string{destAddrStr},
 				},
@@ -424,7 +424,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
-	platformvmArgs.Chains = []pChainApi.Chain{
+	platformvmArgs.Chains = []pchainapi.Chain{
 		{
 			GenesisData: avmReply.Bytes,
 			SubnetID:    constants.PrimaryNetworkID,
@@ -444,8 +444,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	platformvmReply := pChainApi.BuildGenesisReply{}
-	platformvmSS := pChainApi.StaticService{}
+	platformvmReply := pchainapi.BuildGenesisReply{}
+	platformvmSS := pchainapi.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
@@ -522,12 +522,9 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*signed.Tx, error) {
-	genesis := pChainGen.Genesis{}
-	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
-	}
-	if err := genesis.Initialize(); err != nil {
-		return nil, err
+	genesis, err := pchaingenesis.New(genesisBytes)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't build genesis from bytes due to: %w", err)
 	}
 	for _, chain := range genesis.Chains {
 		uChain := chain.Unsigned.(*unsigned.CreateChainTx)

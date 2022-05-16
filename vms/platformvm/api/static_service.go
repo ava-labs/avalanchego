@@ -320,7 +320,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		chains = append(chains, tx)
 	}
 
-	validatorTxs := vdrs.GetAll()
+	validatorTxs := vdrs.List()
 
 	// genesis holds the genesis state
 	genesis := genesis.Genesis{
@@ -347,25 +347,25 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 type innerSortUTXO []UTXO
 
-func (xa innerSortUTXO) Less(i, j int) bool {
-	if xa[i].Locktime < xa[j].Locktime {
+func (s innerSortUTXO) Less(i, j int) bool {
+	if s[i].Locktime < s[j].Locktime {
 		return true
-	} else if xa[i].Locktime > xa[j].Locktime {
+	} else if s[i].Locktime > s[j].Locktime {
 		return false
 	}
 
-	if xa[i].Amount < xa[j].Amount {
+	if s[i].Amount < s[j].Amount {
 		return true
-	} else if xa[i].Amount > xa[j].Amount {
+	} else if s[i].Amount > s[j].Amount {
 		return false
 	}
 
-	iAddrID, err := bech32ToID(xa[i].Address)
+	iAddrID, err := bech32ToID(s[i].Address)
 	if err != nil {
 		return false
 	}
 
-	jAddrID, err := bech32ToID(xa[j].Address)
+	jAddrID, err := bech32ToID(s[j].Address)
 	if err != nil {
 		return false
 	}
@@ -373,7 +373,7 @@ func (xa innerSortUTXO) Less(i, j int) bool {
 	return bytes.Compare(iAddrID.Bytes(), jAddrID.Bytes()) == -1
 }
 
-func (xa innerSortUTXO) Len() int      { return len(xa) }
-func (xa innerSortUTXO) Swap(i, j int) { xa[j], xa[i] = xa[i], xa[j] }
+func (s innerSortUTXO) Len() int      { return len(s) }
+func (s innerSortUTXO) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
 
-func sortUTXOs(a []UTXO) { sort.Sort(innerSortUTXO(a)) }
+func sortUTXOs(utxos []UTXO) { sort.Sort(innerSortUTXO(utxos)) }
