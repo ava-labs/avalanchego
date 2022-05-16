@@ -13,12 +13,12 @@ import (
 func ConvertAddresses(destChain string, toHRP string, addresses []string) ([]string, error) {
 	convertedAddrs := make([]string, len(addresses))
 	for i, addr := range addresses {
-		_, _, addrBytes, err := ParseAddress(addr)
+		_, _, addrBytes, err := Parse(addr)
 		if err != nil {
 			return nil, err
 		}
 
-		newAddrStr, err := FormatAddress(destChain, toHRP, addrBytes)
+		newAddrStr, err := Format(destChain, toHRP, addrBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -27,19 +27,19 @@ func ConvertAddresses(destChain string, toHRP string, addresses []string) ([]str
 	return convertedAddrs, nil
 }
 
-func ParseAddressToID(addrStr string) (ids.ShortID, error) {
-	_, _, addrBytes, err := ParseAddress(addrStr)
+func ParseToID(addrStr string) (ids.ShortID, error) {
+	_, _, addrBytes, err := Parse(addrStr)
 	if err != nil {
 		return ids.ShortID{}, err
 	}
 	return ids.ToShortID(addrBytes)
 }
 
-func ParseAddressesToID(addrsStr []string) ([]ids.ShortID, error) {
+func ParseToIDs(addrStrs []string) ([]ids.ShortID, error) {
 	var err error
-	addrs := make([]ids.ShortID, len(addrsStr))
-	for i, addrStr := range addrsStr {
-		addrs[i], err = ParseAddressToID(addrStr)
+	addrs := make([]ids.ShortID, len(addrStrs))
+	for i, addrStr := range addrStrs {
+		addrs[i], err = ParseToID(addrStr)
 		if err != nil {
 			return nil, err
 		}

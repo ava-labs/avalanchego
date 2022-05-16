@@ -22,7 +22,7 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	hrp := constants.GetHRP(5)
 
 	addrID := ids.ShortID{1}
-	addrStr, err := address.FormatAddress(chainAlias, hrp, addrID[:])
+	addrStr, err := address.Format(chainAlias, hrp, addrID[:])
 	assert.NoError(err)
 
 	msg := &AddAddresses{JSONAddresses: api.JSONAddresses{

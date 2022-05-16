@@ -59,7 +59,7 @@ func (c *AddAddresses) parseAddresses() error {
 		c.addressIds = make([][]byte, len(c.Addresses))
 	}
 	for i, addrStr := range c.Addresses {
-		_, _, addrBytes, err := address.ParseAddress(addrStr)
+		_, _, addrBytes, err := address.Parse(addrStr)
 		if err != nil {
 			return err
 		}

@@ -145,5 +145,5 @@ func formatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
 	}
 
 	hrp := constants.GetHRP(ctx.NetworkID)
-	return address.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+	return address.Format(chainIDAlias, hrp, addr.Bytes())
 }

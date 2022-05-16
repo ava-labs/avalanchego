@@ -57,7 +57,7 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 }
 
 func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := address.ParseAddress(addrStr)
+	chainIDAlias, hrp, addrBytes, err := address.Parse(addrStr)
 	if err != nil {
 		return ids.ID{}, ids.ShortID{}, err
 	}
@@ -93,7 +93,7 @@ func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string
 		return "", err
 	}
 	hrp := constants.GetHRP(a.ctx.NetworkID)
-	return address.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+	return address.Format(chainIDAlias, hrp, addr.Bytes())
 }
 
 func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {

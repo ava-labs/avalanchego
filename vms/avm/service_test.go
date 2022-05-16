@@ -1854,7 +1854,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unknownChainAddr, err := address.FormatAddress("R", hrp, rawAddr.Bytes())
+	unknownChainAddr, err := address.Format("R", hrp, rawAddr.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
