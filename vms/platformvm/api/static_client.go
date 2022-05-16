@@ -1,14 +1,12 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package api
 
 import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/utils/rpc"
-
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ StaticClient = &staticClient{}
@@ -17,9 +15,9 @@ var _ StaticClient = &staticClient{}
 type StaticClient interface {
 	BuildGenesis(
 		ctx context.Context,
-		args *api.BuildGenesisArgs,
+		args *BuildGenesisArgs,
 		options ...rpc.Option,
-	) (*api.BuildGenesisReply, error)
+	) (*BuildGenesisReply, error)
 }
 
 // staticClient is an implementation of a platformvm client for interacting with
@@ -37,10 +35,10 @@ func NewStaticClient(uri string) StaticClient {
 
 func (c *staticClient) BuildGenesis(
 	ctx context.Context,
-	args *api.BuildGenesisArgs,
+	args *BuildGenesisArgs,
 	options ...rpc.Option,
-) (resp *api.BuildGenesisReply, err error) {
-	resp = &api.BuildGenesisReply{}
+) (resp *BuildGenesisReply, err error) {
+	resp = &BuildGenesisReply{}
 	err = c.requester.SendRequest(ctx, "buildGenesis", args, resp, options...)
 	return resp, err
 }

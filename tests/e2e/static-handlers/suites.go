@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -181,7 +180,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		uris := e2e.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
-		staticClient := platformvm.NewStaticClient(uris[0])
+		staticClient := pchainapi.NewStaticClient(uris[0])
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		resp, err := staticClient.BuildGenesis(ctx, &buildGenesisArgs)
 		cancel()
