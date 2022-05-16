@@ -61,8 +61,8 @@ type Client interface {
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
 	GetBalance(ctx context.Context, addr ids.ShortID, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
+	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
 	// CreateAsset creates a new asset and returns its assetID
-	GetAllBalances(context.Context, ids.ShortID, bool, ...rpc.Option) ([]Balance, error)
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
