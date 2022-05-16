@@ -31,7 +31,7 @@ func NewRandomPolynomial(secret, maxCoefficient *big.Int, numCoefficients uint) 
 	return p, nil
 }
 
-func (p Polynomial) Evaluate(x int, mod *big.Int) *big.Int {
+func (p Polynomial) Evaluate(x uint, mod *big.Int) *big.Int {
 	numCoefficients := len(p)
 	if numCoefficients == 0 {
 		return big.NewInt(0)
@@ -40,7 +40,7 @@ func (p Polynomial) Evaluate(x int, mod *big.Int) *big.Int {
 	result := new(big.Int).Set(p[numCoefficients-1])
 	result.Mod(result, mod)
 
-	bigX := big.NewInt(int64(x))
+	bigX := new(big.Int).SetUint64(uint64(x))
 	for index := numCoefficients - 2; index >= 0; index-- {
 		result.Mul(result, bigX)
 		result.Add(result, p[index])

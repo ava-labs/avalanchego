@@ -8,6 +8,6 @@ import (
 )
 
 type Point struct {
-	X int
+	X uint
 	Y *big.Int
 }

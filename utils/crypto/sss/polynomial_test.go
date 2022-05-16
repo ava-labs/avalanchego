@@ -22,7 +22,7 @@ func TestNewRandomEmptyPolynomial(t *testing.T) {
 
 	expected := big.NewInt(0)
 
-	x := 0
+	x := uint(0)
 	val := p.Evaluate(x, maxCoefficient)
 
 	assert.Equal(expected.String(), val.String())
@@ -43,7 +43,7 @@ func TestNewRandomPolynomial(t *testing.T) {
 	p, err := NewRandomPolynomial(secret, maxCoefficient, numCoefficients)
 	assert.NoError(err)
 
-	x := 0
+	x := uint(0)
 	val := p.Evaluate(x, maxCoefficient)
 
 	assert.Equal(secret.String(), val.String())
@@ -53,7 +53,7 @@ func TestPolynomialEvaluate(t *testing.T) {
 	tests := []struct {
 		name     string
 		p        Polynomial
-		x        int
+		x        uint
 		mod      *big.Int
 		expected *big.Int
 	}{

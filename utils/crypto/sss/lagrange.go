@@ -7,96 +7,60 @@ import (
 	"math/big"
 )
 
-var zero = big.NewInt(0)
-
+// CalculateSecret performs a lagrange interpolation of the y-intercept of the
+// polynomial that is uniquely described by [points] in the finite field
+// described by [mod].
 func CalculateSecret(points []Point, mod *big.Int) *big.Int {
-	xProd := 1
-	for _, point := range points {
-		xProd *= -point.X
-	}
+	temp := new(big.Int)
+	temp2 := new(big.Int)
 
-	/*
-	 x_1-x_2    x_1-x_3    x_1-x_4
-	 x_2-x_3    x_2-x_4
-	 x_3-x_4
-	*/
-	/*
-	 1,2    1,3    1,4
-	 2,3    2,4
-	 3,4
-	*/
-	// TODO: alloc only 1 array
-	diffs := make([][]int, len(points)-1)
-	for i := range diffs {
-		thisDiff := make([]int, len(points)-i-1)
-		for jIndex, j := 0, i+1; j < len(points); jIndex, j = jIndex+1, j+1 {
-			thisDiff[jIndex] = points[i].X - points[j].X
-		}
-		diffs[i] = thisDiff
-	}
+	denominators := make([]*big.Int, len(points))
+	for i, iPoint := range points {
+		prod := new(big.Int)
+		denominators[i] = prod
+		prod.SetUint64(uint64(iPoint.X))
+		prod.Neg(prod)
 
-	denominators := make([]int, len(points))
-	for i, point := range points {
-		prod := big.NewInt(int64(-point.X))
-		if i < len(diffs) {
-			for _, diff := range diffs[i] {
-				prod.Mul(prod, big.NewInt(int64(diff)))
+		for j, jPoint := range points {
+			if i == j {
+				continue
 			}
+			temp.SetUint64(uint64(iPoint.X))
+			temp2.SetUint64(uint64(jPoint.X))
+			temp.Sub(temp, temp2)
+
+			prod.Mul(prod, temp)
 		}
-		for j := i - 1; j >= 0; j-- {
-			thisDiffs := diffs[j]
-			diff := thisDiffs[len(thisDiffs)-len(points)+i]
-			prod.Mul(prod, big.NewInt(-int64(diff)))
-		}
-		denominators[i] = int(prod.Int64())
 	}
 
-	denominatorProd := 1
+	denominatorProd := big.NewInt(1)
 	for _, denominator := range denominators {
-		denominatorProd *= denominator
+		denominatorProd.Mul(denominatorProd, denominator)
 	}
-	scale := xProd * denominatorProd
+
+	numerator := big.NewInt(1)
+	for _, point := range points {
+		temp.SetInt64(int64(-point.X))
+		numerator.Mul(numerator, temp)
+	}
+	numerator.Mul(numerator, denominatorProd)
 
 	result := big.NewInt(0)
 	for i, point := range points {
-		bigScale := big.NewInt(int64(scale))
-		bigScale.Mul(bigScale, point.Y)
-		bigScale.Mod(bigScale, mod)
+		temp.Set(numerator)
+		temp.Mul(temp, point.Y)
+		temp.Mod(temp, mod)
 
-		denominator := big.NewInt(int64(denominators[i]))
-		inverse(denominator, mod)
-		bigScale.Mul(bigScale, denominator)
+		denominator := denominators[i]
+		denominator.ModInverse(denominator, mod)
+		temp.Mul(temp, denominator)
 
-		result.Add(result, bigScale)
+		result.Add(result, temp)
 	}
 	result.Mod(result, mod)
-	denominator := big.NewInt(int64(denominatorProd))
-	inverse(denominator, mod)
-	result.Mul(result, denominator)
+	denominatorProd.ModInverse(denominatorProd, mod)
+	result.Mul(result, denominatorProd)
 	result.Mod(result, mod)
 
 	return result
-}
-
-func inverse(den, mod *big.Int) {
-	mod = new(big.Int).Set(mod)
-
-	temp := new(big.Int)
-	x := big.NewInt(0)
-	lastX := big.NewInt(1)
-	for mod.Cmp(zero) != 0 {
-		temp.Div(den, mod)
-		temp.Mul(temp, x)
-		temp.Sub(
-			lastX,
-			temp,
-		)
-		lastX.Set(x)
-		x.Set(temp)
-
-		temp.Mod(den, mod)
-		den.Set(mod)
-		mod, temp = temp, mod
-	}
-	den.Set(lastX)
 }
