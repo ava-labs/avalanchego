@@ -54,75 +54,70 @@ type ClientPrimaryDelegator struct {
 }
 
 func apiStakerToClientStaker(validator APIStaker) ClientStaker {
-	var clientStaker ClientStaker
-	clientStaker.TxID = validator.TxID
-	clientStaker.StartTime = uint64(validator.StartTime)
-	clientStaker.EndTime = uint64(validator.EndTime)
-	if validator.Weight != nil {
-		v := uint64(*validator.Weight)
-		clientStaker.Weight = &v
+	return ClientStaker{
+		TxID:        validator.TxID,
+		StartTime:   uint64(validator.StartTime),
+		EndTime:     uint64(validator.EndTime),
+		Weight:      (*uint64)(validator.Weight),
+		StakeAmount: (*uint64)(validator.StakeAmount),
+		NodeID:      validator.NodeID,
 	}
-	if validator.StakeAmount != nil {
-		v := uint64(*validator.StakeAmount)
-		clientStaker.StakeAmount = &v
-	}
-	clientStaker.NodeID = validator.NodeID
-	return clientStaker
 }
 
 func apiOwnerToClientOwner(rewardOwner *APIOwner) (*ClientOwner, error) {
 	if rewardOwner == nil {
 		return nil, nil
 	}
-	var (
-		err         error
-		clientOwner ClientOwner
-	)
-	clientOwner.Locktime = uint64(rewardOwner.Locktime)
-	clientOwner.Threshold = uint32(rewardOwner.Threshold)
-	clientOwner.Addresses, err = address.ParseToIDs(rewardOwner.Addresses)
-	return &clientOwner, err
+
+	addrs, err := address.ParseToIDs(rewardOwner.Addresses)
+	return &ClientOwner{
+		Locktime:  uint64(rewardOwner.Locktime),
+		Threshold: uint32(rewardOwner.Threshold),
+		Addresses: addrs,
+	}, err
 }
 
 func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrimaryValidator, error) {
 	clientValidators := make([]ClientPrimaryValidator, len(validatorsSliceIntf))
 	for i, validatorMapIntf := range validatorsSliceIntf {
-		b, err := json.Marshal(validatorMapIntf)
+		validatorMapJSON, err := json.Marshal(validatorMapIntf)
 		if err != nil {
 			return nil, err
 		}
-		var validator APIPrimaryValidator
-		err = json.Unmarshal(b, &validator)
+
+		var apiValidator APIPrimaryValidator
+		err = json.Unmarshal(validatorMapJSON, &apiValidator)
 		if err != nil {
 			return nil, err
 		}
-		clientValidators[i].ClientStaker = apiStakerToClientStaker(validator.APIStaker)
-		clientValidators[i].RewardOwner, err = apiOwnerToClientOwner(validator.RewardOwner)
+
+		rewardOwner, err := apiOwnerToClientOwner(apiValidator.RewardOwner)
 		if err != nil {
 			return nil, err
 		}
-		if validator.PotentialReward != nil {
-			v := uint64(*validator.PotentialReward)
-			clientValidators[i].PotentialReward = &v
-		}
-		clientValidators[i].DelegationFee = float32(validator.DelegationFee)
-		if validator.Uptime != nil {
-			v := float32(*validator.Uptime)
-			clientValidators[i].Uptime = &v
-		}
-		if validator.Connected != nil {
-			v := *validator.Connected
-			clientValidators[i].Connected = &v
-		}
-		clientValidators[i].Delegators = make([]ClientPrimaryDelegator, len(validator.Delegators))
-		for j, delegator := range validator.Delegators {
-			clientValidators[i].Delegators[j].ClientStaker = apiStakerToClientStaker(delegator.APIStaker)
-			clientValidators[i].Delegators[j].RewardOwner, err = apiOwnerToClientOwner(delegator.RewardOwner)
+
+		clientDelegators := make([]ClientPrimaryDelegator, len(apiValidator.Delegators))
+		for j, apiDelegator := range apiValidator.Delegators {
+			rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
 			if err != nil {
 				return nil, err
 			}
-			v := uint64(*delegator.PotentialReward)
-			clientValidators[i].Delegators[j].PotentialReward = &v
+
+			clientDelegators[j] = ClientPrimaryDelegator{
+				ClientStaker:    apiStakerToClientStaker(apiDelegator.APIStaker),
+				RewardOwner:     rewardOwner,
+				PotentialReward: (*uint64)(apiDelegator.PotentialReward),
+			}
+		}
+
+		clientValidators[i] = ClientPrimaryValidator{
+			ClientStaker:    apiStakerToClientStaker(apiValidator.APIStaker),
+			RewardOwner:     rewardOwner,
+			PotentialReward: (*uint64)(apiValidator.PotentialReward),
+			DelegationFee:   float32(apiValidator.DelegationFee),
+			Uptime:          (*float32)(apiValidator.Uptime),
+			Connected:       apiValidator.Connected,
+			Delegators:      clientDelegators,
 		}
 	}
 	return clientValidators, nil
