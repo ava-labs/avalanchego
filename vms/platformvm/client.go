@@ -374,11 +374,7 @@ func (c *client) GetCurrentValidators(
 	if err != nil {
 		return nil, err
 	}
-	validators, err := getClientPrimaryValidators(res.Validators)
-	if err != nil {
-		return nil, err
-	}
-	return validators, nil
+	return getClientPrimaryValidators(res.Validators)
 }
 
 func (c *client) GetPendingValidators(
