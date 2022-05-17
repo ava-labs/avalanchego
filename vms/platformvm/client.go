@@ -318,10 +318,7 @@ func (c *client) GetAtomicUTXOs(
 		return nil, ids.ShortID{}, ids.Empty, err
 	}
 	endUTXOID, err := ids.FromString(res.EndIndex.UTXO)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.Empty, err
-	}
-	return utxos, endAddr, endUTXOID, nil
+	return utxos, endAddr, endUTXOID, err
 }
 
 // ClientSubnet is a representation of a subnet used in client methods

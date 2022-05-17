@@ -112,13 +112,14 @@ func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, err
 // doing also components validations), or not localized.
 // If both attempts fail, reports error from localized address parsing
 func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) {
-	addr, localAddrErr := a.ParseLocalAddress(addrStr)
-	if localAddrErr != nil {
-		var err error
-		addr, err = ids.ShortFromString(addrStr)
-		if err != nil {
-			return ids.ShortEmpty, fmt.Errorf("couldn't parse address %q: %w", addrStr, localAddrErr)
-		}
+	addr, err := ids.ShortFromString(addrStr)
+	if err == nil {
+		return addr, nil
+	}
+
+	addr, err = a.ParseLocalAddress(addrStr)
+	if err != nil {
+		return addr, fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
 	}
 	return addr, nil
 }
