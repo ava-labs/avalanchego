@@ -93,7 +93,7 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
+func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, acceptors ...snow.Acceptor) (int, error) {
 	ctx.Executing(true)
 	defer ctx.Executing(false)
 
@@ -125,10 +125,11 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 
 		jobID := job.ID()
 		ctx.Log.Debug("Executing: %s", jobID)
-		// Note that event.Accept must be called before executing [job]
-		// to honor EventDispatcher.Accept's invariant.
-		for _, event := range events {
-			if err := event.Accept(ctx, job.ID(), job.Bytes()); err != nil {
+		jobBytes := job.Bytes()
+		// Note that acceptor.Accept must be called before executing [job] to
+		// honor Acceptor.Accept's invariant.
+		for _, acceptor := range acceptors {
+			if err := acceptor.Accept(ctx, jobID, jobBytes); err != nil {
 				return numExecuted, err
 			}
 		}

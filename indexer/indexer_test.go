@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -55,14 +54,14 @@ func (a *apiServerMock) AddAliases(string, ...string) error {
 func TestNewIndexer(t *testing.T) {
 	assert := assert.New(t)
 	config := Config{
-		IndexingEnabled:      true,
-		AllowIncompleteIndex: true,
-		Log:                  logging.NoLog{},
-		DB:                   memdb.New(),
-		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
-		DecisionDispatcher:   triggers.New(logging.NoLog{}),
-		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
+		IndexingEnabled:        true,
+		AllowIncompleteIndex:   true,
+		Log:                    logging.NoLog{},
+		DB:                     memdb.New(),
+		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:              &apiServerMock{},
+		ShutdownF:              func() {},
 	}
 
 	idxrIntf, err := NewIndexer(config)
@@ -82,8 +81,8 @@ func TestNewIndexer(t *testing.T) {
 	assert.Len(idxr.txIndices, 0)
 	assert.NotNil(idxr.vtxIndices)
 	assert.Len(idxr.vtxIndices, 0)
-	assert.NotNil(idxr.consensusDispatcher)
-	assert.NotNil(idxr.decisionDispatcher)
+	assert.NotNil(idxr.consensusAcceptorGroup)
+	assert.NotNil(idxr.decisionAcceptorGroup)
 	assert.NotNil(idxr.shutdownF)
 	assert.False(idxr.hasRunBefore)
 }
@@ -96,13 +95,13 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	shutdown := &sync.WaitGroup{}
 	shutdown.Add(1)
 	config := Config{
-		IndexingEnabled:     true,
-		Log:                 logging.NoLog{},
-		DB:                  db,
-		ConsensusDispatcher: triggers.New(logging.NoLog{}),
-		DecisionDispatcher:  triggers.New(logging.NoLog{}),
-		APIServer:           &apiServerMock{},
-		ShutdownF:           func() { shutdown.Done() },
+		IndexingEnabled:        true,
+		Log:                    logging.NoLog{},
+		DB:                     db,
+		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:              &apiServerMock{},
+		ShutdownF:              func() { shutdown.Done() },
 	}
 
 	idxrIntf, err := NewIndexer(config)
@@ -130,19 +129,17 @@ func TestIndexer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cd := triggers.New(logging.NoLog{})
-	dd := triggers.New(logging.NoLog{})
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
-		IndexingEnabled:      true,
-		AllowIncompleteIndex: false,
-		Log:                  logging.NoLog{},
-		DB:                   db,
-		ConsensusDispatcher:  cd,
-		DecisionDispatcher:   dd,
-		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
+		IndexingEnabled:        true,
+		AllowIncompleteIndex:   false,
+		Log:                    logging.NoLog{},
+		DB:                     db,
+		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:              &apiServerMock{},
+		ShutdownF:              func() {},
 	}
 
 	// Create indexer
@@ -192,7 +189,7 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	assert.NoError(cd.Accept(chain1Ctx, blkID, blkBytes))
+	assert.NoError(config.ConsensusAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes))
 
 	blkIdx := idxr.blockIndices[chain1Ctx.ChainID]
 	assert.NotNil(blkIdx)
@@ -303,7 +300,7 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Once()
 
-	assert.NoError(cd.Accept(chain2Ctx, vtxID, blkBytes))
+	assert.NoError(config.ConsensusAcceptorGroup.Accept(chain2Ctx, vtxID, blkBytes))
 
 	vtxIdx := idxr.vtxIndices[chain2Ctx.ChainID]
 	assert.NotNil(vtxIdx)
@@ -352,7 +349,7 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Once()
 
-	assert.NoError(dd.Accept(chain2Ctx, txID, blkBytes))
+	assert.NoError(config.DecisionAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
 	assert.NotNil(txIdx)
@@ -429,14 +426,14 @@ func TestIncompleteIndex(t *testing.T) {
 
 	baseDB := memdb.New()
 	config := Config{
-		IndexingEnabled:      false,
-		AllowIncompleteIndex: false,
-		Log:                  logging.NoLog{},
-		DB:                   versiondb.New(baseDB),
-		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
-		DecisionDispatcher:   triggers.New(logging.NoLog{}),
-		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
+		IndexingEnabled:        false,
+		AllowIncompleteIndex:   false,
+		Log:                    logging.NoLog{},
+		DB:                     versiondb.New(baseDB),
+		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:              &apiServerMock{},
+		ShutdownF:              func() {},
 	}
 	idxrIntf, err := NewIndexer(config)
 	assert.NoError(err)
@@ -513,14 +510,14 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
-		IndexingEnabled:      true,
-		AllowIncompleteIndex: false,
-		Log:                  logging.NoLog{},
-		DB:                   db,
-		ConsensusDispatcher:  triggers.New(logging.NoLog{}),
-		DecisionDispatcher:   triggers.New(logging.NoLog{}),
-		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
+		IndexingEnabled:        true,
+		AllowIncompleteIndex:   false,
+		Log:                    logging.NoLog{},
+		DB:                     db,
+		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:              &apiServerMock{},
+		ShutdownF:              func() {},
 	}
 
 	// Create indexer
