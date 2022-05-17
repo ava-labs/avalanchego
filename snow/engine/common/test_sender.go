@@ -8,11 +8,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 var (
 	_ Sender = &SenderTest{}
 
+	errAccept                = errors.New("unexpectedly called Accept")
 	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
 	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
 	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
@@ -23,6 +25,7 @@ var (
 type SenderTest struct {
 	T *testing.T
 
+	CantAccept,
 	CantSendGetStateSummaryFrontier, CantSendStateSummaryFrontier,
 	CantSendGetAcceptedStateSummary, CantSendAcceptedStateSummary,
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
@@ -32,6 +35,7 @@ type SenderTest struct {
 	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
+	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
 	SendGetStateSummaryFrontierF func(ids.NodeIDSet, uint32)
 	SendStateSummaryFrontierF    func(ids.NodeID, uint32, []byte)
 	SendGetAcceptedStateSummaryF func(ids.NodeIDSet, uint32, []uint64)
@@ -56,6 +60,7 @@ type SenderTest struct {
 
 // Default set the default callable value to [cant]
 func (s *SenderTest) Default(cant bool) {
+	s.CantAccept = cant
 	s.CantSendGetStateSummaryFrontier = cant
 	s.CantSendStateSummaryFrontier = cant
 	s.CantSendGetAcceptedStateSummary = cant
@@ -76,6 +81,22 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
 	s.CantSendAppGossipSpecific = cant
+}
+
+// SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
+// wasn't initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
+	if s.AcceptF != nil {
+		return s.AcceptF(ctx, containerID, container)
+	}
+	if !s.CantAccept {
+		return nil
+	}
+	if s.T != nil {
+		s.T.Fatal(errAccept)
+	}
+	return errAccept
 }
 
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it

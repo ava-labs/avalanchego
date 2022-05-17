@@ -120,16 +120,12 @@ func (t *cpuThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 	// [waited] is true if we waited for this node's CPU usage
 	// to fall to an acceptable level before returning
 	waited := false
-	// Note that we increment [numWaiting] here even though
-	// we might not actually wait. In this case, [numWaiting]
-	// will be decremented pretty much immediately.
-	// Technically this causes this metric to be incorrect for
-	// a small duration, but doing it like this makes the code cleaner.
-	t.metrics.awaitingAcquire.Inc()
 	defer func() {
-		t.metrics.awaitingAcquire.Dec()
 		if waited {
 			t.metrics.totalWaits.Inc()
+			// Note that [t.metrics.awaitingAcquire.Inc()]
+			// was called once if and only if [waited] is true.
+			t.metrics.awaitingAcquire.Dec()
 		} else {
 			t.metrics.totalNoWaits.Inc()
 		}
@@ -165,6 +161,10 @@ func (t *cpuThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 			// optimistically re-checking whether the node's CPU usage is now at
 			// an acceptable level.
 			waitDuration = t.MaxRecheckDelay
+		}
+		if !waited {
+			// Note this is called at most once.
+			t.metrics.awaitingAcquire.Inc()
 		}
 		waited = true
 		timer.Reset(waitDuration)
