@@ -60,6 +60,7 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 	}
 
 	utxos := NewUTXOs()
+	addrList := addrs.List()
 	chains := []struct {
 		id     ids.ID
 		client UTXOClient
@@ -85,7 +86,7 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 				destinationChain.codec,
 				sourceChain.id,
 				destinationChain.id,
-				addrs.List(),
+				addrList,
 			)
 			if err != nil {
 				return nil, nil, nil, err
@@ -142,6 +143,7 @@ func AddAllUTXOs(
 			break
 		}
 
+		// Update the vars to query the next page of UTXOs.
 		startAddr = endAddr
 		startUTXO = endUTXO
 	}
