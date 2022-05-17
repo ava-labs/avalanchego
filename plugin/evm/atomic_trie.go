@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
+	"github.com/ava-labs/coreth/core/types"
+	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -24,14 +26,15 @@ import (
 
 const (
 	trieCommitSizeCap          = 10 * units.MiB
-	commitHeightInterval       = uint64(4096)
 	progressLogUpdate          = 30 * time.Second
-	sharedMemoryApplyBatchSize = 2000 // sepcifies the number of atomic operations to batch progress updates
+	atomicKeyLength            = wrappers.LongLen + common.HashLength
+	sharedMemoryApplyBatchSize = 2000 // specifies the number of atomic operations to batch progress updates
 )
 
 var (
-	lastCommittedKey             = []byte("atomicTrieLastCommittedBlock")
-	appliedSharedMemoryCursorKey = []byte("atomicTrieLastAppliedToSharedMemory")
+	_                            AtomicTrie = &atomicTrie{}
+	lastCommittedKey                        = []byte("atomicTrieLastCommittedBlock")
+	appliedSharedMemoryCursorKey            = []byte("atomicTrieLastAppliedToSharedMemory")
 )
 
 // AtomicTrie maintains an index of atomic operations by blockchainIDs for every block
@@ -50,11 +53,6 @@ type AtomicTrie interface {
 
 	// LastCommitted returns the last committed hash and corresponding block height
 	LastCommitted() (common.Hash, uint64)
-
-	// UpdateLastCommitted sets the state to last committed hash and height
-	// This function is used by statesync.Syncer to set the atomic trie metadata
-	// as it is not synced as part of the atomic trie.
-	UpdateLastCommitted(hash common.Hash, height uint64) error
 
 	// TrieDB returns the underlying trie database
 	TrieDB() *trie.Database
@@ -77,12 +75,16 @@ type AtomicTrie interface {
 	// from [previousLastAcceptedHeight+1] to the [lastAcceptedHeight] set by state sync
 	// will not have been executed on shared memory.
 	MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight uint64) error
+
+	// Syncer creates and returns a new Syncer object that can be used to sync the
+	// state of the atomic trie from peers
+	Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64) Syncer
 }
 
 // AtomicTrieIterator is a stateful iterator that iterates the leafs of an AtomicTrie
 type AtomicTrieIterator interface {
 	// Next advances the iterator to the next node in the atomic trie and
-	// returns true if there are more nodes to iterate
+	// returns true if there are more leaves to iterate
 	Next() bool
 
 	// Key returns the current database key that the iterator is iterating
@@ -121,15 +123,13 @@ type atomicTrie struct {
 	sharedMemory         atomic.SharedMemory
 }
 
-var _ AtomicTrie = &atomicTrie{}
-
 // NewAtomicTrie returns a new instance of a atomicTrie with the default commitHeightInterval.
 // Initializes the trie before returning it.
 // If the cursor set by MarkApplyToSharedMemoryCursor exists, the atomic operations are applied synchronously
 // during initialization (blocks until ApplyToSharedMemory completes).
 func NewAtomicTrie(
 	db *versiondb.Database, sharedMemory atomic.SharedMemory,
-	bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64,
+	bonusBlocks map[uint64]ids.ID, repo AtomicTxRepository, codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (AtomicTrie, error) {
 	return newAtomicTrie(db, sharedMemory, bonusBlocks, repo, codec, lastAcceptedHeight, commitHeightInterval)
 }
@@ -146,6 +146,15 @@ func newAtomicTrie(
 	root, height, err := lastCommittedRootIfExists(metadataDB)
 	if err != nil {
 		return nil, err
+	}
+	// If the last committed height is above the last accepted height, then we fall back to
+	// the last commit below the last accepted height.
+	if height > lastAcceptedHeight {
+		height = nearestCommitHeight(lastAcceptedHeight, commitHeightInterval)
+		root, err = getRoot(metadataDB, height)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	triedb := trie.NewDatabaseWithConfig(
@@ -312,14 +321,18 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	if lastAcceptedBlockNumber == 0 {
 		return nil
 	}
-	// now that all heights < finalCommitHeight have been processed
-	// commit the trie
-	if err := a.commit(finalCommitHeight); err != nil {
-		return err
-	}
-	// Flush any remaining changes that have not been committed yet in the versiondb.
-	if err := a.db.Commit(); err != nil {
-		return err
+	// now that all heights less than [finalCommitHeight] have been processed
+	// commit the trie. If [a.lastCommittedHeight] is already the same as
+	// [finalCommitHeight] (or higher, which can occur if we resume a state sync)
+	// we skip this commit.
+	if finalCommitHeight > a.lastCommittedHeight {
+		if err := a.commit(finalCommitHeight); err != nil {
+			return err
+		}
+		// Flush any remaining changes that have not been committed yet in the versiondb.
+		if err := a.db.Commit(); err != nil {
+			return err
+		}
 	}
 
 	// process uncommitted ops for heights > finalCommitHeight
@@ -338,7 +351,10 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 	a.log.Info(
 		"finished initializing atomic trie",
 		"lastAcceptedBlockNumber", lastAcceptedBlockNumber,
-		"preCommitEntriesIndexed", preCommitBlockIndexed, "postCommitEntriesIndexed", postCommitTxIndexed,
+		"preCommitEntriesIndexed", preCommitBlockIndexed,
+		"postCommitEntriesIndexed", postCommitTxIndexed,
+		"lastCommittedHash", a.lastCommittedHash,
+		"lastCommitedHeight", a.lastCommittedHeight,
 		"time", time.Since(start),
 	)
 	return nil
@@ -397,7 +413,7 @@ func (a *atomicTrie) commit(height uint64) error {
 		return err
 	}
 
-	if err := a.UpdateLastCommitted(hash, height); err != nil {
+	if err := a.updateLastCommitted(hash, height); err != nil {
 		return err
 	}
 	return nil
@@ -413,7 +429,7 @@ func (a *atomicTrie) updateTrie(height uint64, atomicOps map[ids.ID]*atomic.Requ
 		}
 
 		// key is [height]+[blockchainID]
-		keyPacker := wrappers.Packer{Bytes: make([]byte, wrappers.LongLen+common.HashLength)}
+		keyPacker := wrappers.Packer{Bytes: make([]byte, atomicKeyLength)}
 		keyPacker.PackLong(height)
 		keyPacker.PackFixedBytes(blockchainID[:])
 		if err := a.trie.TryUpdate(keyPacker.Bytes, valueBytes); err != nil {
@@ -429,9 +445,9 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 	return a.lastCommittedHash, a.lastCommittedHeight
 }
 
-// UpdateLastCommitted adds [height] -> [root] to the index and marks it as the last committed
+// updateLastCommitted adds [height] -> [root] to the index and marks it as the last committed
 // root/height pair.
-func (a *atomicTrie) UpdateLastCommitted(root common.Hash, height uint64) error {
+func (a *atomicTrie) updateLastCommitted(root common.Hash, height uint64) error {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
@@ -470,10 +486,23 @@ func (a *atomicTrie) TrieDB() *trie.Database {
 // if trie was not committed at provided height, it returns
 // common.Hash{} instead
 func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
+	return getRoot(a.metadataDB, height)
+}
+
+// getRoot is a helper function to return the committed atomic trie root hash at [height]
+// from [metadataDB].
+func getRoot(metadataDB database.Database, height uint64) (common.Hash, error) {
+	if height == 0 {
+		// if root is queried at height == 0, return the empty root hash
+		// this may occur if peers ask for the most recent state summary
+		// and number of accepted blocks is less than the commit interval.
+		return types.EmptyRootHash, nil
+	}
+
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
-	hash, err := a.metadataDB.Get(heightBytes)
+	hash, err := metadataDB.Get(heightBytes)
 	switch {
 	case err == database.ErrNotFound:
 		return common.Hash{}, nil
@@ -581,4 +610,10 @@ func (a *atomicTrie) MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight ui
 	// Set the cursor to [previousLastAcceptedHeight+1] so that we begin the iteration at the
 	// first item that has not been applied to shared memory.
 	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, previousLastAcceptedHeight+1)
+}
+
+// Syncer creates and returns a new Syncer object that can be used to sync the
+// state of the atomic trie from peers
+func (a *atomicTrie) Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64) Syncer {
+	return newAtomicSyncer(client, a, targetRoot, targetHeight)
 }

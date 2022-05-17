@@ -10,12 +10,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const Version = uint16(0)
-const maxMessageSize = 1 * units.MiB
+const (
+	Version        = uint16(0)
+	maxMessageSize = 1 * units.MiB
+)
 
-func BuildCodec() (codec.Manager, error) {
-	codecManager := codec.NewManager(maxMessageSize)
+var Codec codec.Manager
+
+func init() {
+	Codec = codec.NewManager(maxMessageSize)
 	c := linearcodec.NewDefault()
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		// Gossip types
@@ -23,7 +28,7 @@ func BuildCodec() (codec.Manager, error) {
 		c.RegisterType(EthTxsGossip{}),
 
 		// Types for state sync frontier consensus
-		c.RegisterType(SyncableBlock{}),
+		c.RegisterType(SyncSummary{}),
 
 		// state sync types
 		c.RegisterType(BlockRequest{}),
@@ -32,9 +37,11 @@ func BuildCodec() (codec.Manager, error) {
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),
-		c.RegisterType(SerializedMap{}),
 
-		codecManager.RegisterCodec(Version, c),
+		Codec.RegisterCodec(Version, c),
 	)
-	return codecManager, errs.Err
+
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }

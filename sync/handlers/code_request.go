@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/statesync/handlers/stats"
+	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -23,10 +23,10 @@ import (
 type CodeRequestHandler struct {
 	codeReader ethdb.KeyValueReader
 	codec      codec.Manager
-	stats      stats.HandlerStats
+	stats      stats.CodeRequestHandlerStats
 }
 
-func NewCodeRequestHandler(codeReader ethdb.KeyValueReader, stats stats.HandlerStats, codec codec.Manager) *CodeRequestHandler {
+func NewCodeRequestHandler(codeReader ethdb.KeyValueReader, codec codec.Manager, stats stats.CodeRequestHandlerStats) *CodeRequestHandler {
 	handler := &CodeRequestHandler{
 		codeReader: codeReader,
 		codec:      codec,

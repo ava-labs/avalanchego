@@ -21,15 +21,12 @@ func TestMarshalCodeRequest(t *testing.T) {
 
 	base64CodeRequest := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAc29tZSBjb2RlIHBscw=="
 
-	codec, err := BuildCodec()
-	assert.NoError(t, err)
-
-	codeRequestBytes, err := codec.Marshal(Version, codeRequest)
+	codeRequestBytes, err := Codec.Marshal(Version, codeRequest)
 	assert.NoError(t, err)
 	assert.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
 
 	var c CodeRequest
-	_, err = codec.Unmarshal(codeRequestBytes, &c)
+	_, err = Codec.Unmarshal(codeRequestBytes, &c)
 	assert.NoError(t, err)
 	assert.Equal(t, codeRequest.Hash, c.Hash)
 }
@@ -50,15 +47,12 @@ func TestMarshalCodeResponse(t *testing.T) {
 
 	base64CodeResponse := "AAAAAAAyUv38ByGCZU8WP18PmmIdcpVmx00QA3xNe7sEB9HixkmBhVrYaB0NhtHpHgAWeTnLZpQ="
 
-	codec, err := BuildCodec()
-	assert.NoError(t, err)
-
-	codeResponseBytes, err := codec.Marshal(Version, codeResponse)
+	codeResponseBytes, err := Codec.Marshal(Version, codeResponse)
 	assert.NoError(t, err)
 	assert.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
 
 	var c CodeResponse
-	_, err = codec.Unmarshal(codeResponseBytes, &c)
+	_, err = Codec.Unmarshal(codeResponseBytes, &c)
 	assert.NoError(t, err)
 	assert.Equal(t, codeResponse.Data, c.Data)
 }

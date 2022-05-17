@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/statesync/handlers/stats"
+	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
@@ -40,18 +40,14 @@ func TestBlockRequestHandler(t *testing.T) {
 		blocksDB[blk.Hash()] = blk
 	}
 
-	codec, err := message.BuildCodec()
-	if err != nil {
-		t.Fatal("error building codec", err)
-	}
-
+	mockHandlerStats := &stats.MockHandlerStats{}
 	blockRequestHandler := NewBlockRequestHandler(func(hash common.Hash, height uint64) *types.Block {
 		blk, ok := blocksDB[hash]
 		if !ok || blk.NumberU64() != height {
 			return nil
 		}
 		return blk
-	}, codec, stats.NewNoopHandlerStats())
+	}, message.Codec, mockHandlerStats)
 
 	tests := []struct {
 		name string
@@ -64,6 +60,7 @@ func TestBlockRequestHandler(t *testing.T) {
 		requestedParents  uint16
 		expectedBlocks    int
 		expectNilResponse bool
+		assertResponse    func(t *testing.T, response []byte)
 	}{
 		{
 			name:             "handler_returns_blocks_as_requested",
@@ -89,6 +86,9 @@ func TestBlockRequestHandler(t *testing.T) {
 			startBlockHeight:  1_000_000,
 			requestedParents:  64,
 			expectNilResponse: true,
+			assertResponse: func(t *testing.T, _ []byte) {
+				assert.Equal(t, uint32(1), mockHandlerStats.MissingBlockHashCount)
+			},
 		},
 	}
 	for _, test := range tests {
@@ -108,6 +108,9 @@ func TestBlockRequestHandler(t *testing.T) {
 			if err != nil {
 				t.Fatal("unexpected error during block request", err)
 			}
+			if test.assertResponse != nil {
+				test.assertResponse(t, responseBytes)
+			}
 
 			if test.expectNilResponse {
 				assert.Nil(t, responseBytes)
@@ -117,7 +120,7 @@ func TestBlockRequestHandler(t *testing.T) {
 			assert.NotEmpty(t, responseBytes)
 
 			var response message.BlockResponse
-			if _, err = codec.Unmarshal(responseBytes, &response); err != nil {
+			if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
 				t.Fatal("error unmarshalling", err)
 			}
 			assert.Len(t, response.Blocks, test.expectedBlocks)
@@ -131,6 +134,7 @@ func TestBlockRequestHandler(t *testing.T) {
 				assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
 				test.startBlockIndex--
 			}
+			mockHandlerStats.Reset()
 		})
 	}
 }
@@ -155,11 +159,6 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 		blocksDB[blk.Hash()] = blk
 	}
 
-	codec, err := message.BuildCodec()
-	if err != nil {
-		t.Fatal("error building codec", err)
-	}
-
 	cancelAfterNumRequests := 2
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -175,7 +174,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 			return nil
 		}
 		return blk
-	}, codec, stats.NewNoopHandlerStats())
+	}, message.Codec, stats.NewNoopHandlerStats())
 
 	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
 		Hash:    blocks[10].Hash(),
@@ -188,7 +187,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	assert.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
-	if _, err = codec.Unmarshal(responseBytes, &response); err != nil {
+	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
 		t.Fatal("error unmarshalling", err)
 	}
 	// requested 8 blocks, received cancelAfterNumRequests because of timeout

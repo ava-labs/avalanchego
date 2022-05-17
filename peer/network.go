@@ -36,11 +36,11 @@ type Network interface {
 	validators.Connector
 	common.AppHandler
 
-	// RequestAny synchronously sends request to the first connected peer that matches the specified minVersion in
-	// random order.
-	// A peer is considered a match if its version is greater than or equal to the specified minVersion
-	// Returns an error if the request could not be sent to a peer with the desired [minVersion].
-	RequestAny(minVersion version.Application, message []byte, handler message.ResponseHandler) error
+	// RequestAny synchronously sends request to a randomly chosen peer with a
+	// node version greater than or equal to minVersion.
+	// Returns the ID of the chosen peer, and an error if the request could not
+	// be sent to a peer with the desired [minVersion].
+	RequestAny(minVersion version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
 
 	// Request sends message to given nodeID, notifying handler when there's a response or timeout
 	Request(nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
@@ -86,18 +86,20 @@ func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID
 		outstandingResponseHandlerMap: make(map[uint32]message.ResponseHandler),
 		peers:                         make(map[ids.NodeID]version.Application),
 		activeRequests:                semaphore.NewWeighted(maxActiveRequests),
+		gossipHandler:                 message.NoopMempoolGossipHandler{},
+		requestHandler:                message.NoopRequestHandler{},
 	}
 }
 
-// RequestAny sends given request to the first connected peer that matches the specified minVersion
-// A peer is considered a match if its version is greater than or equal to the specified minVersion
-// If minVersion is nil, then the request will be sent to any peer regardless of their version
-// Returns a non-nil error if we were not able to send a request to a peer with >= [minVersion]
-// or we fail to send a request to the selected peer.
-func (n *network) RequestAny(minVersion version.Application, request []byte, handler message.ResponseHandler) error {
+// RequestAny synchronously sends request to a randomly chosen peer with a
+// node version greater than or equal to minVersion. If minVersion is nil,
+// the request will be sent to any peer regardless of their version.
+// Returns the ID of the chosen peer, and an error if the request could not
+// be sent to a peer with the desired [minVersion].
+func (n *network) RequestAny(minVersion version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
 	if err := n.activeRequests.Acquire(context.Background(), 1); err != nil {
-		return errAcquiringSemaphore
+		return ids.EmptyNodeID, errAcquiringSemaphore
 	}
 
 	n.lock.Lock()
@@ -108,12 +110,12 @@ func (n *network) RequestAny(minVersion version.Application, request []byte, han
 		// we get a random peerID key that we compare minimum version that
 		// we have
 		if minVersion == nil || nodeVersion.Compare(minVersion) >= 0 {
-			return n.request(nodeID, request, handler)
+			return nodeID, n.request(nodeID, request, handler)
 		}
 	}
 
 	n.activeRequests.Release(1)
-	return fmt.Errorf("no peers found matching version %s out of %d peers", minVersion, len(n.peers))
+	return ids.EmptyNodeID, fmt.Errorf("no peers found matching version %s out of %d peers", minVersion, len(n.peers))
 }
 
 // Request sends request message bytes to specified nodeID, notifying the responseHandler on response or failure

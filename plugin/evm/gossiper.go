@@ -52,7 +52,7 @@ type pushGossiper struct {
 	gossipActivationTime time.Time
 	config               Config
 
-	client        peer.Client
+	client        peer.NetworkClient
 	blockchain    *core.BlockChain
 	txPool        *core.TxPool
 	atomicMempool *Mempool
@@ -73,9 +73,13 @@ type pushGossiper struct {
 	codec codec.Manager
 }
 
-// newPushGossiper constructs and returns a pushGossiper
-// assumes vm.chainConfig.ApricotPhase4BlockTimestamp is set
-func (vm *VM) newPushGossiper() Gossiper {
+// createGossiper constructs and returns a pushGossiper or noopGossiper
+// based on whether vm.chainConfig.ApricotPhase4BlockTimestamp is set
+func (vm *VM) createGossiper() Gossiper {
+	if vm.chainConfig.ApricotPhase4BlockTimestamp == nil {
+		return &noopGossiper{}
+	}
+
 	net := &pushGossiper{
 		ctx:                  vm.ctx,
 		gossipActivationTime: time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),

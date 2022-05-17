@@ -12,52 +12,59 @@ import (
 )
 
 var (
-	_ Client = &client{}
+	_ NetworkClient = &client{}
 
-	errRequestFailed = errors.New("request failed")
+	ErrRequestFailed = errors.New("request failed")
 )
 
-// Client defines ability to send request / response through the Network
-type Client interface {
-	// RequestAny synchronously sends request to the first connected peer that matches the specified minVersion in
-	// random order.
-	// A peer is considered a match if its version is greater than or equal to the specified minVersion
-	// Returns errNoPeersMatchingVersion if no peer could be found matching specified version
-	// and errRequestFailed if the request should be retried.
-	RequestAny(minVersion version.Application, request []byte) ([]byte, error)
+// NetworkClient defines ability to send request / response through the Network
+type NetworkClient interface {
+	// RequestAny synchronously sends request to a randomly chosen peer with a
+	// node version greater than or equal to minVersion.
+	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+	// the request should be retried.
+	RequestAny(minVersion version.Application, request []byte) ([]byte, ids.NodeID, error)
 
 	// Request synchronously sends request to the selected nodeID
-	// Returns response bytes
-	// Returns errRequestFailed if request should be retried
+	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	Request(nodeID ids.NodeID, request []byte) ([]byte, error)
 
 	// Gossip sends given gossip message to peers
 	Gossip(gossip []byte) error
 }
 
-// client implements Client interface
+// client implements NetworkClient interface
 // provides ability to send request / responses through the Network
 type client struct {
 	network Network
 }
 
-// RequestAny synchronously sends request to the first connected peer that matches the specified minVersion in
-// random order and blocks until it receives a response or the request could not be sent or times out.
-// Returns the response bytes from the peer.
-func (c *client) RequestAny(minVersion version.Application, request []byte) ([]byte, error) {
+// NewNetworkClient returns Client for a given network
+func NewNetworkClient(network Network) NetworkClient {
+	return &client{
+		network: network,
+	}
+}
+
+// RequestAny synchronously sends request to a randomly chosen peer with a
+// node version greater than or equal to minVersion.
+// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+// the request should be retried.
+func (c *client) RequestAny(minVersion version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	waitingHandler := newWaitingResponseHandler()
-	if err := c.network.RequestAny(minVersion, request, waitingHandler); err != nil {
-		return nil, err
+	nodeID, err := c.network.RequestAny(minVersion, request, waitingHandler)
+	if err != nil {
+		return nil, ids.EmptyNodeID, err
 	}
 	response := <-waitingHandler.responseChan
 	if waitingHandler.failed {
-		return nil, errRequestFailed
+		return nil, ids.EmptyNodeID, ErrRequestFailed
 	}
-	return response, nil
+	return response, nodeID, nil
 }
 
-// Request synchronously sends [request] message to specified [nodeID]
-// This function blocks until a response is received from the peer
+// Request synchronously sends request to the specified nodeID
+// Returns response bytes and ErrRequestFailed if the request should be retried.
 func (c *client) Request(nodeID ids.NodeID, request []byte) ([]byte, error) {
 	waitingHandler := newWaitingResponseHandler()
 	if err := c.network.Request(nodeID, request, waitingHandler); err != nil {
@@ -65,18 +72,11 @@ func (c *client) Request(nodeID ids.NodeID, request []byte) ([]byte, error) {
 	}
 	response := <-waitingHandler.responseChan
 	if waitingHandler.failed {
-		return nil, errRequestFailed
+		return nil, ErrRequestFailed
 	}
 	return response, nil
 }
 
 func (c *client) Gossip(gossip []byte) error {
 	return c.network.Gossip(gossip)
-}
-
-// NewClient returns Client for a given network
-func NewClient(network Network) Client {
-	return &client{
-		network: network,
-	}
 }
