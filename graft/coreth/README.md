@@ -57,3 +57,19 @@ A block with a timestamp more than 10 seconds in the future will not be consider
 Snowman consensus does not use difficulty in any way, so the difficulty of every block is required to be set to 1. This means that the DIFFICULTY opcode should not be used as a source of randomness.
 
 Additionally, with the change from the DIFFICULTY OpCode to the RANDOM OpCode (RANDOM replaces DIFFICULTY directly), there is no planned change to provide a stronger source of randomness. The RANDOM OpCode relies on the Eth2.0 Randomness Beacon, which has no direct parallel within the context of either Coreth or Snowman consensus. Therefore, instead of providing a weaker source of randomness that may be manipulated, the RANDOM OpCode will not be supported. Instead, it will continue the behavior of the DIFFICULTY OpCode of returning the block's difficulty, such that it will always return 1.
+
+## Block Format
+
+To support these changes, there have been a number of changes to the C-Chain block format compared to what exists on Ethereum.
+
+### Block Body
+
+* `Version`: provides version of the `ExtData` in the block. Currently, this field is always 0.
+* `ExtData`: extra data field within the block body to store atomic transaction bytes.
+
+### Block Header
+
+* `ExtDataHash`: the hash of the bytes in the `ExtDataHash` field
+* `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
+* `ExtDataGasUsed`: amount of gas consumed by the atomic transactions in the block
+* `BlockGasCost`: surcharge for producing a block faster than the target rate
