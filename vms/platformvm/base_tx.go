@@ -15,7 +15,7 @@ import (
 // BaseTx contains fields common to many transaction types. It should be
 // embedded in transaction implementations.
 type BaseTx struct {
-	avax.BaseTx `serialize:"true" json:"inputs"`
+	avax.BaseTx `serialize:"true"`
 
 	// true iff this transaction has already passed syntactic verification
 	syntacticallyVerified bool

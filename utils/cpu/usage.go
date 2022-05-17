@@ -125,7 +125,7 @@ func (m *manager) getCurrentUsage() float64 {
 	for _, p := range m.processes {
 		// If there is an error tracking the CPU utilization of a process,
 		// assume that the utilization is 0.
-		cpu, err := p.CPUPercent()
+		cpu, err := p.Percent(0)
 		if err == nil {
 			usage += cpu
 		}
