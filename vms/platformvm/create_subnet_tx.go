@@ -9,60 +9,29 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
+var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
 
-// UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
-type UnsignedCreateSubnetTx struct {
-	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
-	// Who is authorized to manage this subnet
-	Owner fx.Owner `serialize:"true" json:"owner"`
+// StatefulCreateSubnetTx is an unsigned proposal to create a new subnet
+type StatefulCreateSubnetTx struct {
+	*unsigned.CreateSubnetTx `serialize:"true"`
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
-func (tx *UnsignedCreateSubnetTx) InputUTXOs() ids.Set { return nil }
+func (tx *StatefulCreateSubnetTx) InputUTXOs() ids.Set { return nil }
 
-func (tx *UnsignedCreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+func (tx *StatefulCreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	return ids.ID{}, nil, nil
 }
 
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [UnsignedCreateSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
-func (tx *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
-	tx.BaseTx.InitCtx(ctx)
-	tx.Owner.InitCtx(ctx)
-}
-
-// SyntacticVerify verifies that this transaction is well-formed
-func (tx *UnsignedCreateSubnetTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
-		return nil
-	}
-
-	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
-		return err
-	}
-	if err := tx.Owner.Verify(); err != nil {
-		return err
-	}
-
-	tx.syntacticallyVerified = true
-	return nil
-}
-
 // Attempts to verify this transaction with the provided state.
-func (tx *UnsignedCreateSubnetTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (tx *StatefulCreateSubnetTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
 	vs := newVersionedState(
 		parentState,
 		parentState.CurrentStakerChainState(),
@@ -73,10 +42,10 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(vm *VM, parentState MutableStat
 }
 
 // Execute this transaction.
-func (tx *UnsignedCreateSubnetTx) Execute(
+func (tx *StatefulCreateSubnetTx) Execute(
 	vm *VM,
 	vs VersionedState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (
 	func() error,
 	error,
@@ -89,7 +58,15 @@ func (tx *UnsignedCreateSubnetTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(
+		vs,
+		tx.CreateSubnetTx,
+		tx.Ins,
+		tx.Outs,
+		stx.Creds,
+		createSubnetTxFee,
+		vm.ctx.AVAXAssetID,
+	); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +88,7 @@ func (vm *VM) newCreateSubnetTx(
 	ownerAddrs []ids.ShortID, // control addresses for the new subnet
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*signed.Tx, error) {
 	timestamp := vm.internalState.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	ins, outs, _, signers, err := vm.stake(keys, 0, createSubnetTxFee, changeAddr)
@@ -123,8 +100,8 @@ func (vm *VM) newCreateSubnetTx(
 	ids.SortShortIDs(ownerAddrs)
 
 	// Create the tx
-	utx := &UnsignedCreateSubnetTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	utx := &unsigned.CreateSubnetTx{
+		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
@@ -135,7 +112,7 @@ func (vm *VM) newCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &signed.Tx{Unsigned: utx}
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}

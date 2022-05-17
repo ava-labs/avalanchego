@@ -6,23 +6,21 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
+	_ StatefulProposalTx = &StatefulAddValidatorTx{}
+
 	errNilTx                     = errors.New("tx is nil")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
@@ -30,98 +28,15 @@ var (
 	errStakeTooLong              = errors.New("staking period is too long")
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
 	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", maxFutureStartTime)
-	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
-
-	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
-	_ TimedTx            = &UnsignedAddValidatorTx{}
 )
 
-// UnsignedAddValidatorTx is an unsigned addValidatorTx
-type UnsignedAddValidatorTx struct {
-	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
-	// Describes the delegatee
-	Validator pChainValidator.Validator `serialize:"true" json:"validator"`
-	// Where to send staked tokens when done validating
-	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
-	// Where to send staking rewards when done validating
-	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
-	// Fee this validator charges delegators as a percentage, times 10,000
-	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
-	Shares uint32 `serialize:"true" json:"shares"`
-}
-
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [UnsignedAddValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
-func (tx *UnsignedAddValidatorTx) InitCtx(ctx *snow.Context) {
-	tx.BaseTx.InitCtx(ctx)
-	for _, out := range tx.Stake {
-		out.FxID = secp256k1fx.ID
-		out.InitCtx(ctx)
-	}
-	tx.RewardsOwner.InitCtx(ctx)
-}
-
-// StartTime of this validator
-func (tx *UnsignedAddValidatorTx) StartTime() time.Time {
-	return tx.Validator.StartTime()
-}
-
-// EndTime of this validator
-func (tx *UnsignedAddValidatorTx) EndTime() time.Time {
-	return tx.Validator.EndTime()
-}
-
-// Weight of this validator
-func (tx *UnsignedAddValidatorTx) Weight() uint64 {
-	return tx.Validator.Weight()
-}
-
-// SyntacticVerify returns nil iff [tx] is valid
-func (tx *UnsignedAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
-		return nil
-	case tx.Shares > reward.PercentDenominator: // Ensure delegators shares are in the allowed amount
-		return errTooManyShares
-	}
-
-	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
-		return fmt.Errorf("failed to verify BaseTx: %w", err)
-	}
-	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
-	}
-
-	totalStakeWeight := uint64(0)
-	for _, out := range tx.Stake {
-		if err := out.Verify(); err != nil {
-			return fmt.Errorf("failed to verify output: %w", err)
-		}
-		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
-		if err != nil {
-			return err
-		}
-		totalStakeWeight = newWeight
-	}
-
-	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
-		return errOutputsNotSorted
-	case totalStakeWeight != tx.Validator.Wght:
-		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
-	}
-
-	// cache that this is valid
-	tx.syntacticallyVerified = true
-	return nil
+// StatefulAddValidatorTx is an unsigned addValidatorTx
+type StatefulAddValidatorTx struct {
+	*unsigned.AddValidatorTx `serialize:"true"`
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *UnsignedAddValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (tx *StatefulAddValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
 	startTime := tx.StartTime()
 	maxLocalStartTime := vm.clock.Time().Add(maxFutureStartTime)
 	if startTime.After(maxLocalStartTime) {
@@ -138,10 +53,10 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(vm *VM, parentState MutableStat
 }
 
 // Execute this transaction.
-func (tx *UnsignedAddValidatorTx) Execute(
+func (tx *StatefulAddValidatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -221,7 +136,15 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.AddStakerTxFee, vm.ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(
+			parentState,
+			tx.AddValidatorTx,
+			tx.Ins,
+			outs,
+			stx.Creds,
+			vm.AddStakerTxFee,
+			vm.ctx.AVAXAssetID,
+		); err != nil {
 			return nil, nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}
 
@@ -256,7 +179,7 @@ func (tx *UnsignedAddValidatorTx) Execute(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx *StatefulAddValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
@@ -270,14 +193,14 @@ func (vm *VM) newAddValidatorTx(
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*signed.Tx, error) {
 	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
-	utx := &UnsignedAddValidatorTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	utx := &unsigned.AddValidatorTx{
+		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
@@ -297,7 +220,7 @@ func (vm *VM) newAddValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &signed.Tx{Unsigned: utx}
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}

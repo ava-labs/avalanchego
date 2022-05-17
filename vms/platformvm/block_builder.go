@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 )
 
 const (
@@ -84,13 +86,13 @@ func (m *blockBuilder) Initialize(
 }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
+func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	// Initialize the transaction
 	if err := tx.Sign(Codec, nil); err != nil {
 		return err
 	}
 
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 	if m.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
 		// as if it was successfully added
@@ -110,7 +112,11 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	if err := tx.UnsignedTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
+	statefulTx, err := MakeStatefulTx(tx)
+	if err != nil {
+		return fmt.Errorf("unsopported stateful tx, err %w", err)
+	}
+	if err := statefulTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
 		m.MarkDropped(txID)
 		return err
 	}
@@ -122,12 +128,12 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 }
 
 // AddVerifiedTx attempts to add a transaction to the mempool
-func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
+func (m *blockBuilder) AddVerifiedTx(tx *signed.Tx) error {
 	if m.dropIncoming {
 		return errMempoolReentrancy
 	}
 
-	txBytes := tx.Bytes()
+	txBytes := tx.Unsigned.Bytes()
 	if len(txBytes) > TargetTxSize {
 		return errTxTooBig
 	}
@@ -203,7 +209,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Get the proposal transaction that should be issued.
 	tx := m.PopProposalTx()
-	startTime := tx.UnsignedTx.(TimedTx).StartTime()
+	startTime := tx.Unsigned.(timed.Tx).StartTime()
 
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
@@ -309,11 +315,11 @@ func (m *blockBuilder) getStakerToReward(preferredState MutableState) (ids.ID, b
 		return ids.Empty, false, err
 	}
 
-	staker, ok := tx.UnsignedTx.(TimedTx)
+	staker, ok := tx.Unsigned.(timed.Tx)
 	if !ok {
-		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.UnsignedTx)
+		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
 	}
-	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
+	return tx.Unsigned.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the
@@ -339,13 +345,13 @@ func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	syncTime := now.Add(syncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
-		startTime := tx.UnsignedTx.(TimedTx).StartTime()
+		startTime := tx.Unsigned.(timed.Tx).StartTime()
 		if !startTime.Before(syncTime) {
 			m.AddProposalTx(tx)
 			return true
 		}
 
-		txID := tx.ID()
+		txID := tx.Unsigned.ID()
 		errMsg := fmt.Sprintf(
 			"synchrony bound (%s) is later than staker start time (%s)",
 			syncTime,

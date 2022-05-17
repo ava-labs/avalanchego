@@ -7,21 +7,22 @@ import (
 	"container/heap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
 var _ TxHeap = &txHeap{}
 
 type TxHeap interface {
-	Add(tx *Tx)
-	Get(txID ids.ID) *Tx
-	Remove(txID ids.ID) *Tx
-	Peek() *Tx
-	RemoveTop() *Tx
+	Add(tx *signed.Tx)
+	Get(txID ids.ID) *signed.Tx
+	Remove(txID ids.ID) *signed.Tx
+	Peek() *signed.Tx
+	RemoveTop() *signed.Tx
 	Len() int
 }
 
 type heapTx struct {
-	tx    *Tx
+	tx    *signed.Tx
 	index int
 	age   int
 }
@@ -39,9 +40,9 @@ func (h *txHeap) initialize(self heap.Interface) {
 	h.txIDToIndex = make(map[ids.ID]int)
 }
 
-func (h *txHeap) Add(tx *Tx) { heap.Push(h.self, tx) }
+func (h *txHeap) Add(tx *signed.Tx) { heap.Push(h.self, tx) }
 
-func (h *txHeap) Get(txID ids.ID) *Tx {
+func (h *txHeap) Get(txID ids.ID) *signed.Tx {
 	index, exists := h.txIDToIndex[txID]
 	if !exists {
 		return nil
@@ -49,17 +50,17 @@ func (h *txHeap) Get(txID ids.ID) *Tx {
 	return h.txs[index].tx
 }
 
-func (h *txHeap) Remove(txID ids.ID) *Tx {
+func (h *txHeap) Remove(txID ids.ID) *signed.Tx {
 	index, exists := h.txIDToIndex[txID]
 	if !exists {
 		return nil
 	}
-	return heap.Remove(h.self, index).(*Tx)
+	return heap.Remove(h.self, index).(*signed.Tx)
 }
 
-func (h *txHeap) Peek() *Tx { return h.txs[0].tx }
+func (h *txHeap) Peek() *signed.Tx { return h.txs[0].tx }
 
-func (h *txHeap) RemoveTop() *Tx { return heap.Pop(h.self).(*Tx) }
+func (h *txHeap) RemoveTop() *signed.Tx { return heap.Pop(h.self).(*signed.Tx) }
 
 func (h *txHeap) Len() int { return len(h.txs) }
 
@@ -74,16 +75,16 @@ func (h *txHeap) Swap(i, j int) {
 	h.txs[i] = iTx
 	h.txs[j] = jTx
 
-	iTxID := iTx.tx.ID()
-	jTxID := jTx.tx.ID()
+	iTxID := iTx.tx.Unsigned.ID()
+	jTxID := jTx.tx.Unsigned.ID()
 	h.txIDToIndex[iTxID] = i
 	h.txIDToIndex[jTxID] = j
 }
 
 func (h *txHeap) Push(x interface{}) {
-	tx := x.(*Tx)
+	tx := x.(*signed.Tx)
 
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 	_, exists := h.txIDToIndex[txID]
 	if exists {
 		return
@@ -104,7 +105,7 @@ func (h *txHeap) Pop() interface{} {
 	h.txs = h.txs[:newLen]
 
 	tx := htx.tx
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 	delete(h.txIDToIndex, txID)
 	return tx
 }

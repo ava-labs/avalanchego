@@ -15,85 +15,36 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	errNoExportOutputs  = errors.New("no export outputs")
-	errOutputsNotSorted = errors.New("outputs not sorted")
-	errOverflowExport   = errors.New("overflow when computing export amount + txFee")
+	_ StatefulAtomicTx = &StatefulExportTx{}
 
-	_ UnsignedAtomicTx = &UnsignedExportTx{}
+	errOverflowExport = errors.New("overflow when computing export amount + txFee")
 )
 
-// UnsignedExportTx is an unsigned ExportTx
-type UnsignedExportTx struct {
-	BaseTx `serialize:"true"`
-
-	// Which chain to send the funds to
-	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
-
-	// Outputs that are exported to the chain
-	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
-}
-
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [UnsignedExportTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
-func (tx *UnsignedExportTx) InitCtx(ctx *snow.Context) {
-	tx.BaseTx.InitCtx(ctx)
-	for _, out := range tx.ExportedOutputs {
-		out.FxID = secp256k1fx.ID
-		out.InitCtx(ctx)
-	}
+// StatefulExportTx is an unsigned ExportTx
+type StatefulExportTx struct {
+	*unsigned.ExportTx `serialize:"true"`
 }
 
 // InputUTXOs returns an empty set
-func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return nil }
-
-// SyntacticVerify this transaction is well-formed
-func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
-		return nil
-	case len(tx.ExportedOutputs) == 0:
-		return errNoExportOutputs
-	}
-
-	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
-		return err
-	}
-
-	for _, out := range tx.ExportedOutputs {
-		if err := out.Verify(); err != nil {
-			return fmt.Errorf("output failed verification: %w", err)
-		}
-		if _, ok := out.Output().(*stakeable.LockOut); ok {
-			return errWrongLocktime
-		}
-	}
-	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
-		return errOutputsNotSorted
-	}
-
-	tx.syntacticallyVerified = true
-	return nil
-}
+func (tx *StatefulExportTx) InputUTXOs() ids.Set { return nil }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *UnsignedExportTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (tx *StatefulExportTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
 	_, err := tx.AtomicExecute(vm, parentState, stx)
 	return err
 }
 
 // Execute this transaction.
-func (tx *UnsignedExportTx) Execute(
+func (tx *StatefulExportTx) Execute(
 	vm *VM,
 	vs VersionedState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (func() error, error) {
 	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
@@ -110,7 +61,15 @@ func (tx *UnsignedExportTx) Execute(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(
+		vs,
+		tx.ExportTx,
+		tx.Ins,
+		outs,
+		stx.Creds,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
+	); err != nil {
 		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
 	}
 
@@ -123,7 +82,7 @@ func (tx *UnsignedExportTx) Execute(
 }
 
 // AtomicOperations returns the shared memory requests
-func (tx *UnsignedExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
+func (tx *StatefulExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -156,10 +115,10 @@ func (tx *UnsignedExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error)
 }
 
 // Execute this transaction and return the versioned state.
-func (tx *UnsignedExportTx) AtomicExecute(
+func (tx *StatefulExportTx) AtomicExecute(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (VersionedState, error) {
 	// Set up the state if this tx is committed
 	newState := newVersionedState(
@@ -172,7 +131,7 @@ func (tx *UnsignedExportTx) AtomicExecute(
 }
 
 // Accept this transaction.
-func (tx *UnsignedExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
+func (tx *StatefulExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
 	chainID, requests, err := tx.AtomicOperations()
 	if err != nil {
 		return err
@@ -187,7 +146,7 @@ func (vm *VM) newExportTx(
 	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*signed.Tx, error) {
 	toBurn, err := math.Add64(amount, vm.TxFee)
 	if err != nil {
 		return nil, errOverflowExport
@@ -198,8 +157,8 @@ func (vm *VM) newExportTx(
 	}
 
 	// Create the transaction
-	utx := &UnsignedExportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	utx := &unsigned.ExportTx{
+		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
@@ -218,7 +177,7 @@ func (vm *VM) newExportTx(
 			},
 		}},
 	}
-	tx := &Tx{UnsignedTx: utx}
+	tx := &signed.Tx{Unsigned: utx}
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}

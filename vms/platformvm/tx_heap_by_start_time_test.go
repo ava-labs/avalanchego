@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 func TestTxHeapByStartTime(t *testing.T) {
@@ -35,7 +36,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddValidatorTx)
+	vdr0Tx := validator0.Unsigned.(*unsigned.AddValidatorTx)
 
 	validator1, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -50,7 +51,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddValidatorTx)
+	vdr1Tx := validator1.Unsigned.(*unsigned.AddValidatorTx)
 
 	validator2, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -65,7 +66,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddValidatorTx)
+	vdr2Tx := validator2.Unsigned.(*unsigned.AddValidatorTx)
 
 	txHeap.Add(validator2)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.StartTime()) {
@@ -80,7 +81,7 @@ func TestTxHeapByStartTime(t *testing.T) {
 	txHeap.Add(validator0)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.StartTime()) {
 		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.StartTime())
-	} else if top := txHeap.Peek(); top.ID() != validator0.ID() {
-		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), validator0.ID())
+	} else if top := txHeap.Peek(); top.Unsigned.ID() != validator0.Unsigned.ID() {
+		t.Fatalf("TxHeap prioritized %s, expected %s", top.Unsigned.ID(), validator0.Unsigned.ID())
 	}
 }

@@ -10,21 +10,23 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var (
+	_ StatefulProposalTx = &StatefulRewardValidatorTx{}
+
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 	errWrongTxType         = errors.New("wrong transaction type")
-
-	_ UnsignedProposalTx = &UnsignedRewardValidatorTx{}
 )
 
-// UnsignedRewardValidatorTx is a transaction that represents a proposal to
+// StatefulRewardValidatorTx is a transaction that represents a proposal to
 // remove a validator that is currently validating from the validator set.
 //
 // If this transaction is accepted and the next block accepted is a Commit
@@ -34,28 +36,12 @@ var (
 // If this transaction is accepted and the next block accepted is an Abort
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX but no reward.
-type UnsignedRewardValidatorTx struct {
-	avax.Metadata
-
-	// ID of the tx that created the delegator/validator being removed/rewarded
-	TxID ids.ID `serialize:"true" json:"txID"`
-
-	// Marks if this validator should be rewarded according to this node.
-	shouldPreferCommit bool
-}
-
-func (tx *UnsignedRewardValidatorTx) InitCtx(*snow.Context) {}
-
-func (tx *UnsignedRewardValidatorTx) InputIDs() ids.Set {
-	return nil
-}
-
-func (tx *UnsignedRewardValidatorTx) SyntacticVerify(*snow.Context) error {
-	return nil
+type StatefulRewardValidatorTx struct {
+	*unsigned.RewardValidatorTx `serialize:"true"`
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *UnsignedRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (tx *StatefulRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
 	_, _, err := tx.Execute(vm, parentState, stx)
 	return err
 }
@@ -66,10 +52,10 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(vm *VM, parentState MutableS
 // The next validator to be removed must be the validator specified in this block.
 // The next validator to be removed must be have an end time equal to the current
 //   chain timestamp.
-func (tx *UnsignedRewardValidatorTx) Execute(
+func (tx *StatefulRewardValidatorTx) Execute(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *signed.Tx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -93,7 +79,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		return nil, nil, err
 	}
 
-	stakerID := stakerTx.ID()
+	stakerID := stakerTx.Unsigned.ID()
 	if stakerID != tx.TxID {
 		return nil, nil, fmt.Errorf(
 			"attempting to remove TxID: %s. Should be removing %s",
@@ -104,7 +90,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 
 	// Verify that the chain's timestamp is the validator's end time
 	currentTime := parentState.GetTimestamp()
-	staker, ok := stakerTx.UnsignedTx.(TimedTx)
+	staker, ok := stakerTx.Unsigned.(timed.Tx)
 	if !ok {
 		return nil, nil, errWrongTxType
 	}
@@ -137,8 +123,8 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		nodeID    ids.NodeID
 		startTime time.Time
 	)
-	switch uStakerTx := stakerTx.UnsignedTx.(type) {
-	case *UnsignedAddValidatorTx:
+	switch uStakerTx := stakerTx.Unsigned.(type) {
+	case *unsigned.AddValidatorTx:
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
@@ -180,7 +166,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 		// Handle reward preferences
 		nodeID = uStakerTx.Validator.ID()
 		startTime = uStakerTx.StartTime()
-	case *UnsignedAddDelegatorTx:
+	case *unsigned.AddDelegatorTx:
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
@@ -277,7 +263,7 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate uptime: %w", err)
 	}
-	tx.shouldPreferCommit = uptime >= vm.UptimePercentage
+	tx.ShouldPreferCommit = uptime >= vm.UptimePercentage
 
 	return onCommitState, onAbortState, nil
 }
@@ -289,15 +275,16 @@ func (tx *UnsignedRewardValidatorTx) Execute(
 // responsive and correct during the time they are validating.
 // Right now they receive a reward if they're up (but not necessarily
 // correct and responsive) for a sufficient amount of time
-func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
-	return tx.shouldPreferCommit
+func (tx *StatefulRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
+	return tx.ShouldPreferCommit
 }
 
 // RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.
-func (vm *VM) newRewardValidatorTx(txID ids.ID) (*Tx, error) {
-	tx := &Tx{UnsignedTx: &UnsignedRewardValidatorTx{
+func (vm *VM) newRewardValidatorTx(txID ids.ID) (*signed.Tx, error) {
+	utx := &unsigned.RewardValidatorTx{
 		TxID: txID,
-	}}
+	}
+	tx := &signed.Tx{Unsigned: utx}
 	return tx, tx.Sign(Codec, nil)
 }

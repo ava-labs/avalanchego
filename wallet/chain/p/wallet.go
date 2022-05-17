@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -134,13 +136,13 @@ type Wallet interface {
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
-		utx platformvm.UnsignedTx,
+		utx unsigned.Tx,
 		options ...common.Option,
 	) (ids.ID, error)
 
 	// IssueTx issues the signed tx.
 	IssueTx(
-		tx *platformvm.Tx,
+		tx *signed.Tx,
 		options ...common.Option,
 	) (ids.ID, error)
 }
@@ -268,7 +270,7 @@ func (w *wallet) IssueExportTx(
 }
 
 func (w *wallet) IssueUnsignedTx(
-	utx platformvm.UnsignedTx,
+	utx unsigned.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)
@@ -282,12 +284,12 @@ func (w *wallet) IssueUnsignedTx(
 }
 
 func (w *wallet) IssueTx(
-	tx *platformvm.Tx,
+	tx *signed.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	txID, err := w.client.IssueTx(ctx, tx.Bytes())
+	txID, err := w.client.IssueTx(ctx, tx.Unsigned.Bytes())
 	if err != nil {
 		return ids.Empty, err
 	}

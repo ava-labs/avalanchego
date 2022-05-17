@@ -569,13 +569,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	xChainID := createAVMTx.ID()
+	xChainID := createAVMTx.Unsigned.ID()
 
 	createEVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, constants.EVMID)
 	if err != nil {
 		return err
 	}
-	cChainID := createEVMTx.ID()
+	cChainID := createEVMTx.Unsigned.ID()
 
 	// If any of these chains die, the node shuts down
 	criticalChains := ids.Set{}

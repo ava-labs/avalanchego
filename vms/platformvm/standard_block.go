@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 type StandardBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Txs []*Tx `serialize:"true" json:"txs"`
+	Txs []*signed.Tx `serialize:"true" json:"txs"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transactions
@@ -40,7 +41,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		if err := tx.Sign(Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
-		tx.InitCtx(vm.ctx)
+		tx.Unsigned.InitCtx(vm.ctx)
 	}
 	return nil
 }
@@ -97,14 +98,18 @@ func (sb *StandardBlock) Verify() error {
 
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		txID := tx.ID()
+		txID := tx.Unsigned.ID()
 
-		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
+		statefulTx, err := MakeStatefulTx(tx)
+		if err != nil {
+			return err
+		}
+		decisionTx, ok := statefulTx.(StatefulDecisionTx)
 		if !ok {
 			return errWrongTxType
 		}
 
-		inputUTXOs := utx.InputUTXOs()
+		inputUTXOs := decisionTx.InputUTXOs()
 		// ensure it doesn't overlap with current input batch
 		if sb.inputs.Overlaps(inputUTXOs) {
 			return errConflictingBatchTxs
@@ -112,7 +117,7 @@ func (sb *StandardBlock) Verify() error {
 		// Add UTXOs to batch
 		sb.inputs.Union(inputUTXOs)
 
-		onAccept, err := utx.Execute(sb.vm, sb.onAcceptState, tx)
+		onAccept, err := decisionTx.Execute(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			return err
@@ -163,13 +168,17 @@ func (sb *StandardBlock) Accept() error {
 	// Set up the shared memory operations
 	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range sb.Txs {
-		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
+		statefulTx, err := MakeStatefulTx(tx)
+		if err != nil {
+			return err
+		}
+		decisionTx, ok := statefulTx.(StatefulDecisionTx)
 		if !ok {
 			return errWrongTxType
 		}
 
 		// Get the shared memory operations this transaction is performing
-		chainID, txRequests, err := utx.AtomicOperations()
+		chainID, txRequests, err := decisionTx.AtomicOperations()
 		if err != nil {
 			return err
 		}
@@ -236,7 +245,7 @@ func (sb *StandardBlock) Reject() error {
 		if err := sb.vm.blockBuilder.AddVerifiedTx(tx); err != nil {
 			sb.vm.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
-				tx.ID(),
+				tx.Unsigned.ID(),
 				err,
 			)
 		}
@@ -246,7 +255,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{

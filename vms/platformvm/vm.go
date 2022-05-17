@@ -38,6 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -239,7 +241,7 @@ func (vm *VM) initBlockchains() error {
 			return err
 		}
 		for _, subnet := range subnets {
-			if err := vm.createSubnet(subnet.ID()); err != nil {
+			if err := vm.createSubnet(subnet.Unsigned.ID()); err != nil {
 				return err
 			}
 		}
@@ -263,8 +265,8 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (vm *VM) createChain(tx *Tx) error {
-	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
+func (vm *VM) createChain(tx *signed.Tx) error {
+	unsignedTx, ok := tx.Unsigned.(*unsigned.CreateChainTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -276,7 +278,7 @@ func (vm *VM) createChain(tx *Tx) error {
 	}
 
 	chainParams := chains.ChainParameters{
-		ID:          tx.ID(),
+		ID:          tx.Unsigned.ID(),
 		SubnetID:    unsignedTx.SubnetID,
 		GenesisData: unsignedTx.GenesisData,
 		VMAlias:     unsignedTx.VMID.String(),

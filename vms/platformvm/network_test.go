@@ -11,10 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/stretchr/testify/assert"
 )
 
-func getValidTx(vm *VM, t *testing.T) *Tx {
+func getValidTx(vm *VM, t *testing.T) *signed.Tx {
 	res, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -54,10 +55,10 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 
 	// create a tx
 	tx := getValidTx(vm, t)
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 
 	msg := message.Tx{
-		Tx: tx.Bytes(),
+		Tx: tx.Unsigned.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
@@ -80,15 +81,15 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	reply, ok := replyIntf.(*message.Tx)
 	assert.True(ok, "unknown message type")
 
-	retrivedTx := &Tx{}
+	retrivedTx := &signed.Tx{}
 	_, err = Codec.Unmarshal(reply.Tx, retrivedTx)
 	assert.NoError(err, "failed unmarshalling tx")
 
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &retrivedTx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &retrivedTx.Unsigned)
 	assert.NoError(err, "failed unmarshalling tx")
 
-	retrivedTx.Initialize(unsignedBytes, reply.Tx)
-	assert.Equal(txID, retrivedTx.ID())
+	retrivedTx.Unsigned.Initialize(unsignedBytes, reply.Tx)
+	assert.Equal(txID, retrivedTx.Unsigned.ID())
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
@@ -107,13 +108,13 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 
 	// create a tx and mark as invalid
 	tx := getValidTx(vm, t)
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 	vm.mempool.MarkDropped(txID)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()
 	msg := message.Tx{
-		Tx: tx.Bytes(),
+		Tx: tx.Unsigned.Bytes(),
 	}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
@@ -147,7 +148,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	// add a tx to the mempool and show it gets gossiped
 	tx := getValidTx(vm, t)
-	txID := tx.ID()
+	txID := tx.Unsigned.ID()
 
 	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
@@ -160,19 +161,19 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	reply, ok := replyIntf.(*message.Tx)
 	assert.True(ok, "unknown message type")
 
-	retrivedTx := &Tx{}
+	retrivedTx := &signed.Tx{}
 	_, err = Codec.Unmarshal(reply.Tx, retrivedTx)
 	assert.NoError(err, "failed unmarshalling tx")
 
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &retrivedTx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &retrivedTx.Unsigned)
 	assert.NoError(err, "failed unmarshalling tx")
 
-	retrivedTx.Initialize(unsignedBytes, reply.Tx)
-	assert.Equal(txID, retrivedTx.ID())
+	retrivedTx.Unsigned.Initialize(unsignedBytes, reply.Tx)
+	assert.Equal(txID, retrivedTx.Unsigned.ID())
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
-	vm.mempool.RemoveDecisionTxs([]*Tx{tx})
+	vm.mempool.RemoveDecisionTxs([]*signed.Tx{tx})
 	err = vm.mempool.AddVerifiedTx(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 

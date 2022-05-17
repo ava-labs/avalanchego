@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package unsigned
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,13 +13,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var (
+	ErrNilTx                 = errors.New("tx is nil")
+	ErrOutputsNotSorted      = errors.New("outputs not sorted")
+	ErrInputsNotSortedUnique = errors.New("inputs not sorted and unique")
+)
+
 // BaseTx contains fields common to many transaction types. It should be
 // embedded in transaction implementations.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 
 	// true iff this transaction has already passed syntactic verification
-	syntacticallyVerified bool
+	SyntacticallyVerified bool
 }
 
 func (tx *BaseTx) InputIDs() ids.Set {
@@ -46,8 +53,8 @@ func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
 	if err := tx.MetadataVerify(ctx); err != nil {
@@ -65,9 +72,9 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
-		return errOutputsNotSorted
+		return ErrOutputsNotSorted
 	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
-		return errInputsNotSortedUnique
+		return ErrInputsNotSortedUnique
 	default:
 		return nil
 	}

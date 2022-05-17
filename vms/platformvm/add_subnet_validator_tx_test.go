@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -28,7 +30,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
 	// Case: tx is nil
-	var unsignedTx *UnsignedAddSubnetValidatorTx
+	var unsignedTx *unsigned.AddSubnetValidatorTx
 	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
@@ -46,10 +48,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).NetworkID++
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -66,10 +68,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{}
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).Validator.Subnet = ids.ID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because Subnet ID is empty")
 	}
 
@@ -86,10 +88,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Wght = 0
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).Validator.Wght = 0
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because of no weight")
 	}
 
@@ -106,11 +108,11 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
+		tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
+	if err = tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because sig indices weren't unique")
 	}
 
@@ -125,7 +127,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err != nil {
+	} else if err := tx.Unsigned.SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -155,7 +157,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
 	}
 
@@ -173,7 +177,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err != nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +220,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
@@ -241,7 +249,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator starts validating primary " +
 			"network before starting to validate primary network")
 	}
@@ -258,7 +268,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator stops validating primary " +
 			"network after stops validating primary network")
 	}
@@ -275,7 +287,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err != nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err != nil {
 		t.Fatalf("should have passed verification")
 	}
 
@@ -294,7 +308,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because starts validating at current timestamp")
 	}
 
@@ -339,7 +355,11 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := duplicateSubnetTx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, duplicateSubnetTx); err == nil {
+	statefulTx, err := MakeStatefulTx(duplicateSubnetTx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, duplicateSubnetTx); err == nil {
 		t.Fatal("should have failed verification because validator already validating the specified subnet")
 	}
 
@@ -364,7 +384,12 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+
+	statefulTx, err = MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because tx has 3 signatures but only 2 needed")
 	}
 
@@ -382,11 +407,16 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove a signature
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
+		tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
+
+	statefulTx, err = MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}
 
@@ -404,12 +434,16 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Replace a valid signature with one from keys[3]
-	sig, err := keys[3].SignHash(hashing.ComputeHash256(tx.UnsignedBytes()))
+	sig, err := keys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	statefulTx, err = MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because a control sig is invalid")
 	}
 
@@ -437,7 +471,11 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+	statefulTx, err = MakeStatefulTx(tx)
+	if err != nil {
+		t.Fatalf("couldn't make stateful tx: %s", err)
+	}
+	if _, _, err = statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 	}
 }
@@ -453,7 +491,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	var unmarshaledTx Tx
+	var unmarshaledTx signed.Tx
 
 	// valid tx
 	tx, err := vm.newAddSubnetValidatorTx(
@@ -481,7 +519,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err != nil {
+	if err := unmarshaledTx.Unsigned.SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
