@@ -33,6 +33,7 @@ var (
 		TrieDirtyLimit: 256,
 		Pruning:        true, // Enable pruning
 		SnapshotLimit:  256,
+		CommitInterval: 4096,
 	}
 )
 
@@ -115,6 +116,7 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 				TrieDirtyLimit: 256,
 				Pruning:        true, // Enable pruning
 				SnapshotLimit:  0,    // Disable snapshots
+				CommitInterval: 4096,
 			},
 			chainConfig,
 			lastAcceptedHash,
@@ -161,6 +163,7 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 				TrieDirtyLimit: 256,
 				Pruning:        true, // Enable pruning
 				SnapshotLimit:  0,    // Disable snapshots
+				CommitInterval: 4096,
 			},
 			chainConfig,
 			lastAcceptedHash,
@@ -193,6 +196,7 @@ func TestEnableSnapshots(t *testing.T) {
 				TrieDirtyLimit: 256,
 				Pruning:        true,      // Enable pruning
 				SnapshotLimit:  snapLimit, // Disable snapshots
+				CommitInterval: 4096,
 			},
 			chainConfig,
 			lastAcceptedHash,

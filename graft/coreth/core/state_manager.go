@@ -41,8 +41,7 @@ func init() {
 }
 
 const (
-	commitInterval = 4096
-	tipBufferSize  = 32
+	tipBufferSize = 32
 )
 
 type TrieWriter interface {
@@ -66,9 +65,9 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 			TrieDB:             db,
 			memoryCap:          common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
 			imageCap:           4 * 1024 * 1024,
-			commitInterval:     commitInterval,
+			commitInterval:     config.CommitInterval,
 			tipBuffer:          make([]common.Hash, tipBufferSize),
-			randomizedInterval: uint64(rand.Int63n(commitInterval)) + commitInterval,
+			randomizedInterval: uint64(rand.Int63n(int64(config.CommitInterval))) + config.CommitInterval,
 		}
 	} else {
 		return &noPruningTrieWriter{

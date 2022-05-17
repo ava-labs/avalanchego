@@ -6,8 +6,13 @@ package handlers
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/coreth/sync/handlers/stats"
+	"github.com/ava-labs/coreth/trie"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var _ message.RequestHandler = &syncHandler{}
@@ -19,17 +24,19 @@ type syncHandler struct {
 	codeRequestHandler            *CodeRequestHandler
 }
 
+// NewSyncHandler constructs the handler for serving state sync.
 func NewSyncHandler(
-	stateTrieLeafsRequestHandler *LeafsRequestHandler,
-	atomicTrieLeafsRequestHandler *LeafsRequestHandler,
-	blockRequestHandler *BlockRequestHandler,
-	codeRequestHandler *CodeRequestHandler,
+	getBlock func(common.Hash, uint64) *types.Block,
+	evmTrieDB *trie.Database,
+	atomicTrieDB *trie.Database,
+	networkCodec codec.Manager,
+	stats stats.HandlerStats,
 ) message.RequestHandler {
 	return &syncHandler{
-		stateTrieLeafsRequestHandler:  stateTrieLeafsRequestHandler,
-		atomicTrieLeafsRequestHandler: atomicTrieLeafsRequestHandler,
-		blockRequestHandler:           blockRequestHandler,
-		codeRequestHandler:            codeRequestHandler,
+		stateTrieLeafsRequestHandler:  NewLeafsRequestHandler(evmTrieDB, networkCodec, stats),
+		atomicTrieLeafsRequestHandler: NewLeafsRequestHandler(atomicTrieDB, networkCodec, stats),
+		blockRequestHandler:           NewBlockRequestHandler(getBlock, networkCodec, stats),
+		codeRequestHandler:            NewCodeRequestHandler(evmTrieDB.DiskDB(), networkCodec, stats),
 	}
 }
 
