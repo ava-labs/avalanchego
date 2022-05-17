@@ -5,11 +5,14 @@ package common
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Sender defines how a consensus engine sends messages and requests to other
 // validators
 type Sender interface {
+	snow.Acceptor
+
 	StateSummarySender
 	AcceptedStateSummarySender
 	FrontierSender

@@ -327,8 +327,8 @@ func AddTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	// track consensus events to ensure idempotency in case of redundant vertex adds
-	consensusEvents := snow.NewEventDispatcherTracker()
-	ctx.ConsensusDispatcher = consensusEvents
+	consensusEvents := snow.NewAcceptorTracker()
+	ctx.ConsensusAcceptor = consensusEvents
 
 	if err := avl.Initialize(ctx, params, seedVertices); err != nil {
 		t.Fatal(err)
@@ -423,9 +423,6 @@ func AddTest(t *testing.T, factory Factory) {
 			preferenceSet := avl.Preferences().List()
 			if !ids.UnsortedEquals(tv.preferenceSet, preferenceSet) {
 				t.Fatalf("#%d-%d: expected preferenceSet %v, got %v", i, j, preferenceSet, tv.preferenceSet)
-			}
-			if issued, _ := consensusEvents.IsIssued(tv.toAdd.ID()); issued != tv.issued {
-				t.Fatalf("#%d-%d: expected issued %d, got %d", i, j, tv.issued, issued)
 			}
 			if accepted, _ := consensusEvents.IsAccepted(tv.toAdd.ID()); accepted != tv.accepted {
 				t.Fatalf("#%d-%d: expected accepted %d, got %d", i, j, tv.accepted, accepted)
@@ -2609,8 +2606,8 @@ func SilenceTransactionVertexEventsTest(t *testing.T, factory Factory) {
 	}}}
 
 	ctx := snow.DefaultConsensusContextTest()
-	tracker := snow.NewEventDispatcherTracker()
-	ctx.DecisionDispatcher = tracker
+	tracker := snow.NewAcceptorTracker()
+	ctx.DecisionAcceptor = tracker
 
 	err := avl.Initialize(ctx, params, vts)
 	if err != nil {
@@ -2628,10 +2625,6 @@ func SilenceTransactionVertexEventsTest(t *testing.T, factory Factory) {
 
 	if err := avl.Add(vtx0); err != nil {
 		t.Fatal(err)
-	}
-
-	if _, issued := tracker.IsIssued(vtx0.ID()); issued {
-		t.Fatalf("Shouldn't have reported the transaction vertex as issued")
 	}
 
 	votes := ids.UniqueBag{}
