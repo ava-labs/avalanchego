@@ -170,15 +170,6 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	}
 
 	txID := tx.ID()
-	bytes := tx.Bytes()
-
-	// Notify the IPC socket that this tx has been issued if the transaction has
-	// a binary format.
-	if len(bytes) > 0 {
-		if err := dg.ctx.DecisionDispatcher.Issue(dg.ctx, txID, bytes); err != nil {
-			return false, err
-		}
-	}
 
 	// Notify the metrics that this transaction is being issued.
 	if tx.HasWhitelist() {
@@ -197,12 +188,12 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	// any conflicting transactions. Therefore, this transaction is treated as
 	// vacuously accepted and doesn't need to be voted on.
 
-	// Notify those listening for accepted txs if the transaction has
-	// a binary format.
-	if len(bytes) > 0 {
-		// Note that DecisionDispatcher.Accept must be called before
-		// tx.Accept to honor EventDispatcher.Accept's invariant.
-		if err := dg.ctx.DecisionDispatcher.Accept(dg.ctx, txID, bytes); err != nil {
+	// Notify those listening for accepted txs if the transaction has a binary
+	// format.
+	if bytes := tx.Bytes(); len(bytes) > 0 {
+		// Note that DecisionAcceptor.Accept must be called before tx.Accept to
+		// honor Acceptor.Accept's invariant.
+		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, bytes); err != nil {
 			return false, err
 		}
 	}
@@ -618,9 +609,9 @@ func (dg *Directed) acceptTx(tx Tx) error {
 	// Notify those listening that this tx has been accepted if the transaction
 	// has a binary format.
 	if bytes := tx.Bytes(); len(bytes) > 0 {
-		// Note that DecisionDispatcher.Accept must be called before
-		// tx.Accept to honor EventDispatcher.Accept's invariant.
-		if err := dg.ctx.DecisionDispatcher.Accept(dg.ctx, txID, bytes); err != nil {
+		// Note that DecisionAcceptor.Accept must be called before tx.Accept to
+		// honor Acceptor.Accept's invariant.
+		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, bytes); err != nil {
 			return err
 		}
 	}
@@ -657,14 +648,6 @@ func (dg *Directed) rejectTx(tx Tx) error {
 	// cause fatal errors aren't sent to an IPC peer.
 	if err := tx.Reject(); err != nil {
 		return err
-	}
-
-	// Notify the IPC that the tx was rejected if the transaction has a binary
-	// format.
-	if bytes := tx.Bytes(); len(bytes) > 0 {
-		if err := dg.ctx.DecisionDispatcher.Reject(dg.ctx, txID, bytes); err != nil {
-			return err
-		}
 	}
 
 	// Update the metrics to account for this transaction's rejection
