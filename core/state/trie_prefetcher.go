@@ -29,9 +29,9 @@ package state
 import (
 	"sync"
 
+	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 )
 
 var (
