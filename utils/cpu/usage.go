@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -52,6 +53,7 @@ type proc struct {
 }
 
 type manager struct {
+	log           logging.Logger
 	processesLock sync.Mutex
 	processes     map[int]*proc
 
@@ -62,8 +64,9 @@ type manager struct {
 	onClose   chan struct{}
 }
 
-func NewManager(frequency, halflife time.Duration) Manager {
+func NewManager(log logging.Logger, frequency, halflife time.Duration) Manager {
 	m := &manager{
+		log:       log,
 		processes: make(map[int]*proc),
 		onClose:   make(chan struct{}),
 	}
@@ -125,6 +128,8 @@ func (m *manager) update(frequency, halflife time.Duration) {
 		m.usage = oldWeight*m.usage + currentScaledUsage
 		m.usageLock.Unlock()
 
+		m.log.Info("Updated CPU estimate to %f", m.Usage())
+
 		select {
 		case <-ticker.C:
 		case <-m.onClose:
@@ -140,7 +145,7 @@ func (m *manager) getCurrentUsage() float64 {
 	defer m.processesLock.Unlock()
 
 	var usage float64
-	for _, p := range m.processes {
+	for pid, p := range m.processes {
 		// If there is an error tracking the CPU utilization of a process,
 		// assume that the utilization is 0.
 		times, err := p.p.Times()
@@ -148,7 +153,9 @@ func (m *manager) getCurrentUsage() float64 {
 			continue
 		}
 
-		currentTotalSecondsProcessing := times.User + times.System + times.Iowait
+		m.log.Info("Updating CPU usage of %d : total = %f : stats = %s", pid, times.Total(), times)
+
+		currentTotalSecondsProcessing := times.Total()
 		totalSinceLastPolled := currentTotalSecondsProcessing - p.lastTotalSecondsProcessing
 		p.lastTotalSecondsProcessing = currentTotalSecondsProcessing
 

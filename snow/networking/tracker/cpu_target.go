@@ -54,7 +54,7 @@ type cpuTargeter struct {
 
 func (ct *cpuTargeter) TargetCPUUsage(nodeID ids.NodeID) float64 {
 	// This node's at-large allocation is min([remaining at large], [max at large for a given peer])
-	atLargeCPUUsed := ct.cpuTracker.CumulativeUtilization(ct.clock.Time())
+	atLargeCPUUsed := ct.cpuTracker.CumulativeUtilization()
 	atLargeCPUAlloc := math.Max(0, ct.atLargeCPUAlloc-atLargeCPUUsed)
 	atLargeCPUAlloc = math.Min(atLargeCPUAlloc, ct.atLargeMaxCPU)
 
