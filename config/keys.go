@@ -169,7 +169,6 @@ const (
 	InboundThrottlerBandwidthRefillRateKey             = "throttler-inbound-bandwidth-refill-rate"
 	InboundThrottlerBandwidthMaxBurstSizeKey           = "throttler-inbound-bandwidth-max-burst-size"
 	InboundThrottlerCPUMaxRecheckDelayKey              = "throttler-inbound-cpu-max-recheck-delay"
-	CPUVdrAllocKey                                     = "throttler-inbound-cpu-validator-alloc"
 	CPUAtLargeAllocKey                                 = "throttler-inbound-cpu-at-large-alloc"
 	CPUNodeMaxAtLargeKey                               = "throttler-inbound-cpu-node-max-at-large-portion"
 	CPUTrackerFrequencyKey                             = "cpu-tracker-frequency"
