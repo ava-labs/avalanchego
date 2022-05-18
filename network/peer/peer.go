@@ -81,7 +81,7 @@ type Peer interface {
 	// Send attempts to send [msg] to the peer. The peer takes ownership of
 	// [msg] for reference counting. This returns false if the message is
 	// guaranteed not to be delivered to the peer.
-	Send(msg message.OutboundMessage) bool
+	Send(ctx context.Context, msg message.OutboundMessage) bool
 
 	// StartClose will begin shutting down the peer. It will not block.
 	StartClose()
@@ -108,6 +108,9 @@ type peer struct {
 
 	// node ID of this peer.
 	id ids.NodeID
+
+	// queue of messages to send to this peer.
+	messageQueue MessageQueue
 
 	// ip is the claimed IP the peer gave us in the Version message.
 	ip *SignedIP
@@ -148,22 +151,6 @@ type peer struct {
 	// onClosed is closed when the peer is closed
 	onClosed chan struct{}
 
-	// Signalled when a message is added to [sendQueue], and when [p.closing] is
-	// set to true. [sendQueueCond.L] must be held when using [sendQueue] and
-	// [canSend].
-	sendQueueCond *sync.Cond
-
-	// closing flags whether the peer has started shutting down.
-	closing bool
-
-	// canSend flags whether the send queue has been closed. This is separate
-	// from [closing] because it's possible for the send queue to be flushed
-	// before [StartClose] is called.
-	canSend bool
-
-	// queue of the messages to be sent to this peer
-	sendQueue []message.OutboundMessage
-
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
@@ -174,6 +161,7 @@ func Start(
 	conn net.Conn,
 	cert *x509.Certificate,
 	id ids.NodeID,
+	messageQueue MessageQueue,
 ) Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
@@ -181,21 +169,15 @@ func Start(
 		conn:               conn,
 		cert:               cert,
 		id:                 id,
+		messageQueue:       messageQueue,
 		onFinishHandshake:  make(chan struct{}),
 		numExecuting:       3,
 		onClosingCtx:       onClosingCtx,
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
-		sendQueueCond:      sync.NewCond(&sync.Mutex{}),
-		canSend:            true,
 	}
 
 	p.trackedSubnets.Add(constants.PrimaryNetworkID)
-
-	// Make sure that the version is the first message sent
-	msg, err := p.Network.Version()
-	p.Log.AssertNoError(err)
-	p.Send(msg)
 
 	go p.readMessages()
 	go p.writeMessages()
@@ -265,36 +247,8 @@ func (p *peer) ObservedUptime() uint8 {
 	return uptime
 }
 
-func (p *peer) Send(msg message.OutboundMessage) bool {
-	// Acquire space on the outbound message queue, or drop [msg] if we can't.
-	if !p.OutboundMsgThrottler.Acquire(msg, p.id) {
-		p.Log.Debug(
-			"dropping %s message to %s due to rate-limiting",
-			msg.Op(), p.id,
-		)
-		p.Metrics.SendFailed(msg)
-		return false
-	}
-
-	// Invariant: must call p.outboundMsgThrottler.Release(msg, p.id) when done
-	// sending [msg] or when we give up sending [msg].
-
-	p.sendQueueCond.L.Lock()
-	defer p.sendQueueCond.L.Unlock()
-
-	if !p.canSend {
-		p.Log.Debug(
-			"dropping %s message to %s due to a closed connection",
-			msg.Op(), p.id,
-		)
-		p.OutboundMsgThrottler.Release(msg, p.id)
-		p.Metrics.SendFailed(msg)
-		return false
-	}
-
-	p.sendQueue = append(p.sendQueue, msg)
-	p.sendQueueCond.Signal()
-	return true
+func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
+	return p.messageQueue.Push(ctx, msg)
 }
 
 func (p *peer) StartClose() {
@@ -306,15 +260,7 @@ func (p *peer) StartClose() {
 			)
 		}
 
-		// The lock is grabbed here to avoid any potential race conditions
-		// causing the [Broadcast] to be dropped.
-		p.sendQueueCond.L.Lock()
-		p.closing = true
-		// Per [p.sendQueueCond]'s spec, it is signalled when [p.closing] is set
-		// to true so that we exit the WriteMessages goroutine.
-		p.sendQueueCond.Broadcast()
-		p.sendQueueCond.L.Unlock()
-
+		p.messageQueue.Close()
 		p.onClosingCtxCancel()
 	})
 }
@@ -466,118 +412,77 @@ func (p *peer) readMessages() {
 
 func (p *peer) writeMessages() {
 	defer func() {
-		// Release the bytes of the unsent messages to the outbound message
-		// throttler
-		p.sendQueueCond.L.Lock()
-		p.canSend = false
-		for _, msg := range p.sendQueue {
-			p.OutboundMsgThrottler.Release(msg, p.id)
-			p.Metrics.SendFailed(msg)
-		}
-		p.sendQueue = nil
-		p.sendQueueCond.L.Unlock()
-
 		p.StartClose()
 		p.close()
 	}()
 
 	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
-	for { // When this loop exits, p.sendQueueCond.L is unlocked
-		msg, ok := p.nextMessageWithoutBlocking()
-		if !ok {
-			// Make sure the peer was fully sent all prior messages before
-			// blocking.
-			if err := writer.Flush(); err != nil {
-				p.Log.Verbo(
-					"couldn't flush writer to %s: %s",
-					p.id, err,
-				)
-				return
-			}
-			msg, ok = p.nextMessageWithBlocking()
-			if !ok {
-				// This peer is closing
-				return
-			}
-		}
 
-		msgBytes := msg.Bytes()
-		p.Log.Verbo(
-			"sending message to %s:\n%s",
-			p.id, formatting.DumpBytes(msgBytes),
-		)
+	// Make sure that the version is the first message sent
+	msg, err := p.Network.Version()
+	p.Log.AssertNoError(err)
 
-		msgLen := uint32(len(msgBytes))
-		msgLenBytes := [wrappers.IntLen]byte{}
-		binary.BigEndian.PutUint32(msgLenBytes[:], msgLen)
-
-		if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
-			p.Log.Verbo(
-				"error setting write deadline to %s due to: %s",
-				p.id, err,
-			)
-			p.OutboundMsgThrottler.Release(msg, p.id)
-			msg.DecRef()
-			return
-		}
-
-		// Write the message
-		var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
-		if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
-			p.Log.Verbo("error writing to %s: %s", p.id, err)
-			p.OutboundMsgThrottler.Release(msg, p.id)
-			msg.DecRef()
-			return
-		}
-
-		p.OutboundMsgThrottler.Release(msg, p.id)
-
-		now := p.Clock.Time().Unix()
-		atomic.StoreInt64(&p.Config.LastSent, now)
-		atomic.StoreInt64(&p.lastSent, now)
-		p.Metrics.Sent(msg)
-	}
-}
-
-// Returns the next message to send to this peer.
-// If there is no message to send or the peer is closing, returns false.
-func (p *peer) nextMessageWithoutBlocking() (message.OutboundMessage, bool) {
-	p.sendQueueCond.L.Lock()
-	defer p.sendQueueCond.L.Unlock()
-
-	if len(p.sendQueue) == 0 || p.closing {
-		// There isn't a message to send or the peer is closing.
-		return nil, false
-	}
-
-	msg := p.sendQueue[0]
-	p.sendQueue[0] = nil
-	p.sendQueue = p.sendQueue[1:]
-	return msg, true
-}
-
-// Blocks until there is a message to send to this peer, then returns it.
-// Returns false if the peer is closing.
-func (p *peer) nextMessageWithBlocking() (message.OutboundMessage, bool) {
-	p.sendQueueCond.L.Lock()
-	defer p.sendQueueCond.L.Unlock()
+	p.writeMessage(writer, msg)
 
 	for {
-		if p.closing {
-			return nil, false
+		msg, ok := p.messageQueue.PopNow()
+		if ok {
+			p.writeMessage(writer, msg)
+			continue
 		}
-		if len(p.sendQueue) > 0 {
-			// There is a message to send
-			break
+
+		// Make sure the peer was fully sent all prior messages before
+		// blocking.
+		if err := writer.Flush(); err != nil {
+			p.Log.Verbo(
+				"couldn't flush writer to %s: %s",
+				p.id, err,
+			)
+			return
 		}
-		// Wait until there is a message to send
-		p.sendQueueCond.Wait()
+
+		msg, ok = p.messageQueue.Pop()
+		if !ok {
+			// This peer is closing
+			return
+		}
+
+		p.writeMessage(writer, msg)
+	}
+}
+
+func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
+	msgBytes := msg.Bytes()
+	p.Log.Verbo(
+		"sending message to %s:\n%s",
+		p.id, formatting.DumpBytes(msgBytes),
+	)
+
+	msgLen := uint32(len(msgBytes))
+	msgLenBytes := [wrappers.IntLen]byte{}
+	binary.BigEndian.PutUint32(msgLenBytes[:], msgLen)
+
+	if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
+		p.Log.Verbo(
+			"error setting write deadline to %s due to: %s",
+			p.id, err,
+		)
+		msg.DecRef()
+		return
 	}
 
-	msg := p.sendQueue[0]
-	p.sendQueue[0] = nil
-	p.sendQueue = p.sendQueue[1:]
-	return msg, true
+	// Write the message
+	var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
+	if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
+		p.Log.Verbo("error writing to %s: %s", p.id, err)
+		msg.DecRef()
+		return
+	}
+
+	now := p.Clock.Time().Unix()
+	atomic.StoreInt64(&p.Config.LastSent, now)
+	atomic.StoreInt64(&p.lastSent, now)
+	p.Metrics.Sent(msg)
 }
 
 func (p *peer) sendPings() {
@@ -612,7 +517,7 @@ func (p *peer) sendPings() {
 
 			msg, err := p.MessageCreator.Ping()
 			p.Log.AssertNoError(err)
-			p.Send(msg)
+			p.Send(p.onClosingCtx, msg)
 		case <-p.onClosingCtx.Done():
 			return
 		}
@@ -655,7 +560,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 func (p *peer) handlePing(_ message.InboundMessage) {
 	msg, err := p.Network.Pong(p.id)
 	p.Log.AssertNoError(err)
-	p.Send(msg)
+	p.Send(p.onClosingCtx, msg)
 }
 
 func (p *peer) handlePong(msg message.InboundMessage) {
@@ -788,7 +693,7 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 
 	peerlistMsg, err := p.Network.Peers()
 	p.Log.AssertNoError(err)
-	p.Send(peerlistMsg)
+	p.Send(p.onClosingCtx, peerlistMsg)
 }
 
 func (p *peer) handlePeerList(msg message.InboundMessage) {

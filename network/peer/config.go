@@ -27,7 +27,6 @@ type Config struct {
 	MessageCreator       message.Creator
 	Log                  logging.Logger
 	InboundMsgThrottler  throttling.InboundMsgThrottler
-	OutboundMsgThrottler throttling.OutboundMsgThrottler
 	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
