@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -25,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/gorilla/rpc/v2"
 )
@@ -55,13 +55,14 @@ var (
 
 // Config for an indexer
 type Config struct {
-	DB                                      database.Database
-	Log                                     logging.Logger
-	IndexingEnabled                         bool
-	AllowIncompleteIndex                    bool
-	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
-	APIServer                               server.PathAdder
-	ShutdownF                               func()
+	DB                     database.Database
+	Log                    logging.Logger
+	IndexingEnabled        bool
+	AllowIncompleteIndex   bool
+	DecisionAcceptorGroup  snow.AcceptorGroup
+	ConsensusAcceptorGroup snow.AcceptorGroup
+	APIServer              server.PathAdder
+	ShutdownF              func()
 }
 
 // Indexer causes accepted containers for a given chain
@@ -77,18 +78,18 @@ type Indexer interface {
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	indexer := &indexer{
-		codec:                codec.NewManager(codecMaxSize),
-		log:                  config.Log,
-		db:                   config.DB,
-		allowIncompleteIndex: config.AllowIncompleteIndex,
-		indexingEnabled:      config.IndexingEnabled,
-		consensusDispatcher:  config.ConsensusDispatcher,
-		decisionDispatcher:   config.DecisionDispatcher,
-		txIndices:            map[ids.ID]Index{},
-		vtxIndices:           map[ids.ID]Index{},
-		blockIndices:         map[ids.ID]Index{},
-		pathAdder:            config.APIServer,
-		shutdownF:            config.ShutdownF,
+		codec:                  codec.NewManager(codecMaxSize),
+		log:                    config.Log,
+		db:                     config.DB,
+		allowIncompleteIndex:   config.AllowIncompleteIndex,
+		indexingEnabled:        config.IndexingEnabled,
+		decisionAcceptorGroup:  config.DecisionAcceptorGroup,
+		consensusAcceptorGroup: config.ConsensusAcceptorGroup,
+		txIndices:              map[ids.ID]Index{},
+		vtxIndices:             map[ids.ID]Index{},
+		blockIndices:           map[ids.ID]Index{},
+		pathAdder:              config.APIServer,
+		shutdownF:              config.ShutdownF,
 	}
 
 	if err := indexer.codec.RegisterCodec(
@@ -136,10 +137,10 @@ type indexer struct {
 	// Chain ID --> index of txs of that chain (if applicable)
 	txIndices map[ids.ID]Index
 
-	// Notifies of newly accepted blocks and vertices
-	consensusDispatcher *triggers.EventDispatcher
 	// Notifies of newly accepted transactions
-	decisionDispatcher *triggers.EventDispatcher
+	decisionAcceptorGroup snow.AcceptorGroup
+	// Notifies of newly accepted blocks and vertices
+	consensusAcceptorGroup snow.AcceptorGroup
 }
 
 // Assumes [engine]'s context lock is not held
@@ -224,7 +225,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 
 	switch engine.(type) {
 	case snowman.Engine:
-		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
+		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusAcceptorGroup)
 		if err != nil {
 			i.log.Fatal("couldn't create block index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -234,7 +235,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 		i.blockIndices[chainID] = index
 	case avalanche.Engine:
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
+		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusAcceptorGroup)
 		if err != nil {
 			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -244,7 +245,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		}
 		i.vtxIndices[chainID] = vtxIndex
 
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher)
+		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionAcceptorGroup)
 		if err != nil {
 			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
 			if err := i.close(); err != nil {
@@ -266,7 +267,7 @@ func (i *indexer) registerChainHelper(
 	chainID ids.ID,
 	prefixEnd byte,
 	name, endpoint string,
-	dispatcher *triggers.EventDispatcher,
+	acceptorGroup snow.AcceptorGroup,
 ) (Index, error) {
 	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
@@ -279,7 +280,7 @@ func (i *indexer) registerChainHelper(
 	}
 
 	// Register index to learn about new accepted vertices
-	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index, true); err != nil {
+	if err := acceptorGroup.RegisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index, true); err != nil {
 		_ = index.Close()
 		return nil, err
 	}
@@ -322,19 +323,19 @@ func (i *indexer) close() error {
 	for chainID, txIndex := range i.txIndices {
 		errs.Add(
 			txIndex.Close(),
-			i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.decisionAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	for chainID, vtxIndex := range i.vtxIndices {
 		errs.Add(
 			vtxIndex.Close(),
-			i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.consensusAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	for chainID, blockIndex := range i.blockIndices {
 		errs.Add(
 			blockIndex.Close(),
-			i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.consensusAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	errs.Add(i.db.Close())

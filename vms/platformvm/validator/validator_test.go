@@ -1,16 +1,24 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package validator
 
 import (
 	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
-var errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
+const defaultWeight = 10000
+
+var (
+	errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
+
+	// each key controls an address that has [defaultBalance] AVAX at genesis
+	keys = crypto.BuildTestKeys()
+)
 
 func TestValidatorBoundedBy(t *testing.T) {
 	// case 1: a starts, a finishes, b starts, b finishes

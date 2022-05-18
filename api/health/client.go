@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Interface compliance
 var _ Client = &client{}
 
 // Client interface for Avalanche Health API Endpoint

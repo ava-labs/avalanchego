@@ -19,11 +19,14 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -76,6 +79,19 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	assert.NoError(err)
 
+	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	assert.NoError(err)
+	cpuTargeter, err := tracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           10,
+			AtLargeCPUAlloc:       10,
+			PeerMaxAtLargePortion: 0.5,
+		},
+		validators.NewSet(),
+		cpuTracker,
+	)
+	assert.NoError(err)
 	sharedConfig := Config{
 		Metrics:              metrics,
 		MessageCreator:       mc,
@@ -90,6 +106,8 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PingFrequency:        constants.DefaultPingFrequency,
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
+		CPUTracker:           cpuTracker,
+		CPUTargeter:          cpuTargeter,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig

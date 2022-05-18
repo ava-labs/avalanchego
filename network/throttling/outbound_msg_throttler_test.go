@@ -29,7 +29,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -170,7 +170,7 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -216,7 +216,7 @@ func TestBypassThrottling(t *testing.T) {
 	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,

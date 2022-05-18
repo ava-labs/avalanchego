@@ -53,6 +53,12 @@ type Getter interface {
 	// Attempt to load a block.
 	//
 	// If the block does not exist, database.ErrNotFound should be returned.
+	//
+	// It is expected that blocks that have been successfully verified should be
+	// returned correctly. It is also expected that blocks that have been
+	// accepted by the consensus engine should be able to be fetched. It is not
+	// required for blocks that have been rejected by the consensus engine to be
+	// able to be fetched.
 	GetBlock(ids.ID) (snowman.Block, error)
 }
 
@@ -62,5 +68,7 @@ type Parser interface {
 	//
 	// The block should be represented by the full byte array, without extra
 	// bytes.
+	//
+	// It is expected for all historical blocks to be parseable.
 	ParseBlock([]byte) (snowman.Block, error)
 }

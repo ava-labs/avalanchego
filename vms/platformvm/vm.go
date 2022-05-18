@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -68,7 +69,6 @@ var (
 	_ validators.Connector = &VM{}
 	_ secp256k1fx.VM       = &VM{}
 	_ validators.State     = &VM{}
-	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 type VM struct {
@@ -102,7 +102,7 @@ type VM struct {
 	// ID of the last accepted block
 	lastAcceptedID ids.ID
 
-	fx            Fx
+	fx            fx.Fx
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not

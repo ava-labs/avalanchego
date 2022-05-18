@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -239,7 +240,7 @@ utxoFor:
 				}
 				lockedNotStakeable = newBalance
 			}
-		case *StakeableLockOut:
+		case *stakeable.LockOut:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
 			switch {
 			case !ok:
@@ -667,6 +668,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 	currentValidators := service.vm.internalState.CurrentStakerChainState()
 
+	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
 		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
 		if err != nil {
@@ -758,7 +760,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					StakeAmount: &weight,
 				},
 				Uptime:          &uptime,
-				Connected:       &connected,
+				Connected:       connected,
 				PotentialReward: &potentialReward,
 				RewardOwner:     rewardOwner,
 				DelegationFee:   delegationFee,
@@ -770,14 +772,19 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
 				continue
 			}
-
+			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, APIStaker{
-				TxID:      tx.ID(),
-				NodeID:    staker.Validator.ID(),
-				StartTime: json.Uint64(staker.StartTime().Unix()),
-				EndTime:   json.Uint64(staker.EndTime().Unix()),
-				Weight:    &weight,
+			connected := service.vm.uptimeManager.IsConnected(nodeID)
+			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+			reply.Validators = append(reply.Validators, APISubnetValidator{
+				APIStaker: APIStaker{
+					NodeID:    nodeID,
+					TxID:      tx.ID(),
+					StartTime: json.Uint64(staker.StartTime().Unix()),
+					EndTime:   json.Uint64(staker.EndTime().Unix()),
+					Weight:    &weight,
+				},
+				Connected: connected && tracksSubnet,
 			})
 		default:
 			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
@@ -871,7 +878,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 					StakeAmount: &weight,
 				},
 				DelegationFee: delegationFee,
-				Connected:     &connected,
+				Connected:     connected,
 			})
 		case *UnsignedAddSubnetValidatorTx:
 			if args.SubnetID != staker.Validator.Subnet {
@@ -881,13 +888,19 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				continue
 			}
 
+			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, APIStaker{
-				TxID:      tx.ID(),
-				NodeID:    staker.Validator.ID(),
-				StartTime: json.Uint64(staker.StartTime().Unix()),
-				EndTime:   json.Uint64(staker.EndTime().Unix()),
-				Weight:    &weight,
+			connected := service.vm.uptimeManager.IsConnected(nodeID)
+			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+			reply.Validators = append(reply.Validators, APISubnetValidator{
+				APIStaker: APIStaker{
+					NodeID:    nodeID,
+					TxID:      tx.ID(),
+					StartTime: json.Uint64(staker.StartTime().Unix()),
+					EndTime:   json.Uint64(staker.EndTime().Unix()),
+					Weight:    &weight,
+				},
+				Connected: connected && tracksSubnet,
 			})
 		default:
 			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
@@ -2051,7 +2064,7 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 			continue
 		}
 		out := stake.Out
-		if lockedOut, ok := out.(*StakeableLockOut); ok {
+		if lockedOut, ok := out.(*stakeable.LockOut); ok {
 			// This output can only be used for staking until [stakeOnlyUntil]
 			out = lockedOut.TransferableOut
 		}
@@ -2171,18 +2184,31 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 	return nil
 }
 
+// GetTotalStakeArgs are the arguments for calling GetTotalStake
+type GetTotalStakeArgs struct {
+	// Subnet we're getting the total stake
+	// If omitted returns Primary network weight
+	SubnetID ids.ID `json:"subnetID"`
+}
+
 // GetTotalStakeReply is the response from calling GetTotalStake.
 type GetTotalStakeReply struct {
-	Stake json.Uint64 `json:"stake"`
+	Stake  json.Uint64 `json:"stake,omitempty"`
+	Weight json.Uint64 `json:"weight,omitempty"`
 }
 
 // GetTotalStake returns the total amount staked on the Primary Network
-func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *GetTotalStakeReply) error {
-	vdrs, ok := service.vm.Validators.GetValidators(constants.PrimaryNetworkID)
+func (service *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply *GetTotalStakeReply) error {
+	vdrs, ok := service.vm.Validators.GetValidators(args.SubnetID)
 	if !ok {
-		return errNoPrimaryValidators
+		return errNoValidators
 	}
-	reply.Stake = json.Uint64(vdrs.Weight())
+	weight := json.Uint64(vdrs.Weight())
+	if args.SubnetID == constants.PrimaryNetworkID {
+		reply.Stake = weight
+	} else {
+		reply.Weight = weight
+	}
 	return nil
 }
 

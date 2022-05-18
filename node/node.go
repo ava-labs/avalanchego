@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -41,19 +42,22 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -61,6 +65,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -116,8 +121,8 @@ type Node struct {
 	uptimeCalculator uptime.LockedCalculator
 
 	// dispatcher for events as they happen in consensus
-	DecisionDispatcher  *triggers.EventDispatcher
-	ConsensusDispatcher *triggers.EventDispatcher
+	DecisionAcceptorGroup  snow.AcceptorGroup
+	ConsensusAcceptorGroup snow.AcceptorGroup
 
 	IPCs *ipcs.ChainIPCs
 
@@ -156,6 +161,16 @@ type Node struct {
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
+
+	cpuManager cpu.Manager
+
+	// Tracks the CPU usage caused by processing
+	// messages of each peer.
+	cpuTracker tracker.TimeTracker
+
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	cpuTargeter tracker.CPUTargeter
 }
 
 /*
@@ -164,7 +179,9 @@ type Node struct {
  ******************************************************************************
  */
 
-func (n *Node) initNetworking() error {
+// Initialize the networking layer.
+// Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
+func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", n.Config.IP.Port))
 	if err != nil {
 		return err
@@ -190,13 +207,6 @@ func (n *Node) initNetworking() error {
 
 	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert)
 
-	// Initialize validator manager and primary network's validator set
-	primaryNetworkValidators := validators.NewSet()
-	n.vdrs = validators.NewManager()
-	if err := n.vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators); err != nil {
-		return err
-	}
-
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
@@ -207,12 +217,12 @@ func (n *Node) initNetworking() error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
-		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
+		if err := primaryNetVdrs.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
 			return err
 		}
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
-			vdrs:   primaryNetworkValidators,
+			vdrs:   primaryNetVdrs,
 			weight: n.Config.DisabledStakingWeight,
 		}
 	}
@@ -256,6 +266,8 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
+	n.Config.NetworkConfig.CPUTracker = n.cpuTracker
+	n.Config.NetworkConfig.CPUTargeter = n.cpuTargeter
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
@@ -426,8 +438,8 @@ func (n *Node) initBeacons() error {
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
 func (n *Node) initEventDispatchers() {
-	n.DecisionDispatcher = triggers.New(n.Log)
-	n.ConsensusDispatcher = triggers.New(n.Log)
+	n.DecisionAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.ConsensusAcceptorGroup = snow.NewAcceptorGroup(n.Log)
 }
 
 func (n *Node) initIPCs() error {
@@ -441,25 +453,26 @@ func (n *Node) initIPCs() error {
 	}
 
 	var err error
-	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
+	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusAcceptorGroup, n.DecisionAcceptorGroup, chainIDs)
 	return err
 }
 
 // Initialize [n.indexer].
-// Should only be called after [n.DB], [n.DecisionDispatcher], [n.ConsensusDispatcher],
-// [n.Log], [n.APIServer], [n.chainManager] are initialized
+// Should only be called after [n.DB], [n.DecisionAcceptorGroup],
+// [n.ConsensusAcceptorGroup], [n.Log], [n.APIServer], [n.chainManager] are
+// initialized
 func (n *Node) initIndexer() error {
 	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
 	var err error
 	n.indexer, err = indexer.NewIndexer(indexer.Config{
-		IndexingEnabled:      n.Config.IndexAPIEnabled,
-		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
-		DB:                   txIndexerDB,
-		Log:                  n.Log,
-		DecisionDispatcher:   n.DecisionDispatcher,
-		ConsensusDispatcher:  n.ConsensusDispatcher,
-		APIServer:            n.APIServer,
-		ShutdownF:            func() { n.Shutdown(0) }, // TODO put exit code here
+		IndexingEnabled:        n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
+		DB:                     txIndexerDB,
+		Log:                    n.Log,
+		DecisionAcceptorGroup:  n.DecisionAcceptorGroup,
+		ConsensusAcceptorGroup: n.ConsensusAcceptorGroup,
+		APIServer:              n.APIServer,
+		ShutdownF:              func() { n.Shutdown(0) }, // TODO put exit code here
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
@@ -607,8 +620,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
 		VMManager:                               n.Config.VMManager,
-		DecisionEvents:                          n.DecisionDispatcher,
-		ConsensusEvents:                         n.ConsensusDispatcher,
+		DecisionAcceptorGroup:                   n.DecisionAcceptorGroup,
+		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
 		DBManager:                               n.DBManager,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
@@ -640,6 +653,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		CPUTracker:                              n.cpuTracker,
+		CPUTargeter:                             n.cpuTargeter,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		StateSyncDisableRequests:                n.Config.StateSyncDisableRequests,
 	})
@@ -672,26 +687,29 @@ func (n *Node) initVMs() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
-			Chains:                 n.chainManager,
-			Validators:             vdrs,
-			UptimeLockedCalculator: n.uptimeCalculator,
-			StakingEnabled:         n.Config.EnableStaking,
-			WhitelistedSubnets:     n.Config.WhitelistedSubnets,
-			TxFee:                  n.Config.TxFee,
-			CreateAssetTxFee:       n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
-			CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
-			UptimePercentage:       n.Config.UptimeRequirement,
-			MinValidatorStake:      n.Config.MinValidatorStake,
-			MaxValidatorStake:      n.Config.MaxValidatorStake,
-			MinDelegatorStake:      n.Config.MinDelegatorStake,
-			MinDelegationFee:       n.Config.MinDelegationFee,
-			MinStakeDuration:       n.Config.MinStakeDuration,
-			MaxStakeDuration:       n.Config.MaxStakeDuration,
-			RewardConfig:           n.Config.RewardConfig,
-			ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
-			ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
-			ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
+			Config: config.Config{
+				Chains:                 n.chainManager,
+				Validators:             vdrs,
+				SubnetTracker:          n.Net,
+				UptimeLockedCalculator: n.uptimeCalculator,
+				StakingEnabled:         n.Config.EnableStaking,
+				WhitelistedSubnets:     n.Config.WhitelistedSubnets,
+				TxFee:                  n.Config.TxFee,
+				CreateAssetTxFee:       n.Config.CreateAssetTxFee,
+				CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
+				CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
+				UptimePercentage:       n.Config.UptimeRequirement,
+				MinValidatorStake:      n.Config.MinValidatorStake,
+				MaxValidatorStake:      n.Config.MaxValidatorStake,
+				MinDelegatorStake:      n.Config.MinDelegatorStake,
+				MinDelegationFee:       n.Config.MinDelegationFee,
+				MinStakeDuration:       n.Config.MinStakeDuration,
+				MaxStakeDuration:       n.Config.MaxStakeDuration,
+				RewardConfig:           n.Config.RewardConfig,
+				ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
+				ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
+				ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
+			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
@@ -712,6 +730,7 @@ func (n *Node) initVMs() error {
 			FileReader:      filesystem.NewReader(),
 			Manager:         n.Config.VMManager,
 			PluginDirectory: n.Config.PluginDir,
+			CPUTracker:      n.cpuManager,
 		}),
 		VMRegisterer: vmRegisterer,
 	})
@@ -882,7 +901,7 @@ func (n *Node) initInfoAPI() error {
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
-	healthChecker, err := health.New(n.MetricsRegisterer)
+	healthChecker, err := health.New(n.Log, n.MetricsRegisterer)
 	if err != nil {
 		return err
 	}
@@ -1008,6 +1027,42 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	return nil
 }
 
+// Initializes [n.vdrs] and returns the Primary Network validator set.
+func (n *Node) initVdrs() (validators.Set, error) {
+	n.vdrs = validators.NewManager()
+	vdrSet := validators.NewSet()
+	if err := n.vdrs.Set(constants.PrimaryNetworkID, vdrSet); err != nil {
+		return vdrSet, fmt.Errorf("couldn't set primary network validators: %w", err)
+	}
+	return vdrSet, nil
+}
+
+// Initialize [n.CPUTracker].
+func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
+	n.cpuManager = cpu.NewManager(n.Config.CPUTrackerFrequency, n.Config.CPUTrackerHalflife)
+	n.cpuManager.TrackProcess(os.Getpid())
+	var err error
+	n.cpuTracker, err = tracker.NewCPUTracker(reg, n.cpuManager, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
+	return err
+}
+
+// Initialize [n.CPUTracker].
+// Assumed [n.CPUTracker] is already initialized.
+func (n *Node) initCPUTargeter(
+	reg prometheus.Registerer,
+	config *tracker.CPUTargeterConfig,
+	vdrs validators.Set,
+) error {
+	var err error
+	n.cpuTargeter, err = tracker.NewCPUTargeter(
+		reg,
+		config,
+		vdrs,
+		n.cpuTracker,
+	)
+	return err
+}
+
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
@@ -1021,6 +1076,7 @@ func (n *Node) Initialize(
 	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
+
 	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID)
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
@@ -1058,10 +1114,20 @@ func (n *Node) Initialize(
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
-		return fmt.Errorf("problem TheOneCreator: %w", err)
+		return fmt.Errorf("problem initializing message creator: %w", err)
 	}
 
-	if err = n.initNetworking(); err != nil { // Set up all networking
+	primaryNetVdrs, err := n.initVdrs()
+	if err != nil {
+		return fmt.Errorf("problem initializing validators: %w", err)
+	}
+	if err := n.initCPUTracker(n.MetricsRegisterer); err != nil {
+		return fmt.Errorf("problem initializing CPU tracker: %w", err)
+	}
+	if err := n.initCPUTargeter(n.MetricsRegisterer, &config.CPUTargeterConfig, primaryNetVdrs); err != nil {
+		return fmt.Errorf("problem initializing CPU targeter: %w", err)
+	}
+	if err = n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
@@ -1141,6 +1207,9 @@ func (n *Node) shutdown() {
 		time.Sleep(n.Config.ShutdownWait)
 	}
 
+	if n.cpuManager != nil {
+		n.cpuManager.Shutdown()
+	}
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
 			n.Log.Debug("error during IPC shutdown: %s", err)

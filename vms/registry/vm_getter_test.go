@@ -7,12 +7,14 @@ import (
 	"errors"
 	"io/fs"
 	"testing"
+	"time"
 
 	"gotest.tools/assert"
 
 	"github.com/golang/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -145,6 +147,7 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 			FileReader:      mockReader,
 			Manager:         mockManager,
 			PluginDirectory: pluginDir,
+			CPUTracker:      cpu.NewManager(time.Hour, time.Hour),
 		},
 	)
 

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -117,15 +118,16 @@ func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			K:                     v.GetInt(SnowSampleSizeKey),
-			Alpha:                 v.GetInt(SnowQuorumSizeKey),
-			BetaVirtuous:          v.GetInt(SnowVirtuousCommitThresholdKey),
-			BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
-			ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
-			OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
-			MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
-			MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
-			MixedQueryNumPush:     int(v.GetUint(SnowMixedQueryNumPushKey)),
+			K:                       v.GetInt(SnowSampleSizeKey),
+			Alpha:                   v.GetInt(SnowQuorumSizeKey),
+			BetaVirtuous:            v.GetInt(SnowVirtuousCommitThresholdKey),
+			BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
+			ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
+			OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
+			MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
+			MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
+			MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
+			MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
 		},
 		BatchSize: v.GetInt(SnowAvalancheBatchSizeKey),
 		Parents:   v.GetInt(SnowAvalancheNumParentsKey),
@@ -133,10 +135,8 @@ func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
-	loggingConfig := logging.DefaultConfig
-	if v.IsSet(LogsDirKey) {
-		loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
-	}
+	loggingConfig := logging.Config{}
+	loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
 	var err error
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
@@ -150,8 +150,13 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	if err != nil {
 		return loggingConfig, err
 	}
-	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.LogFormat, err = logging.ToFormat(v.GetString(LogFormatKey), os.Stdout.Fd())
 	loggingConfig.DisableWriterDisplaying = v.GetBool(LogDisableDisplayPluginLogsKey)
+	loggingConfig.MaxSize = int(v.GetUint(LogRotaterMaxSizeKey))
+	loggingConfig.MaxFiles = int(v.GetUint(LogRotaterMaxFilesKey))
+	loggingConfig.MaxAge = int(v.GetUint(LogRotaterMaxAgeKey))
+	loggingConfig.Compress = v.GetBool(LogRotaterCompressEnabledKey)
+
 	return loggingConfig, err
 }
 
@@ -343,6 +348,9 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 					MaxBurstSize: v.GetUint64(InboundThrottlerBandwidthMaxBurstSizeKey),
 				},
 				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
+				CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+					MaxRecheckDelay: v.GetDuration(InboundThrottlerCPUMaxRecheckDelayKey),
+				},
 			},
 
 			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
@@ -426,7 +434,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	case config.MaxClockDifference < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
-
 	return config, nil
 }
 
@@ -1046,6 +1053,26 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	}
 }
 
+func getCPUTargeterConfig(v *viper.Viper) (tracker.CPUTargeterConfig, error) {
+	vdrCPUAlloc := v.GetFloat64(CPUVdrAllocKey)
+	atLargeCPUAlloc := v.GetFloat64(CPUAtLargeAllocKey)
+	maxAtLargePortionPerNode := v.GetFloat64(CPUNodeMaxAtLargeKey)
+	switch {
+	case vdrCPUAlloc <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUVdrAllocKey, vdrCPUAlloc)
+	case atLargeCPUAlloc <= 0:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUAtLargeAllocKey, atLargeCPUAlloc)
+	case maxAtLargePortionPerNode < 0 || maxAtLargePortionPerNode > 1:
+		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUNodeMaxAtLargeKey, maxAtLargePortionPerNode)
+	default:
+		return tracker.CPUTargeterConfig{
+			VdrCPUAlloc:           vdrCPUAlloc,
+			AtLargeCPUAlloc:       atLargeCPUAlloc,
+			PeerMaxAtLargePortion: maxAtLargePortionPerNode,
+		}, nil
+	}
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -1203,5 +1230,13 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// VM Aliases
 	nodeConfig.VMManager, err = getVMManager(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.CPUTrackerFrequency = v.GetDuration(CPUTrackerFrequencyKey)
+	nodeConfig.CPUTrackerHalflife = v.GetDuration(CPUTrackerHalflifeKey)
+
+	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	return nodeConfig, err
 }

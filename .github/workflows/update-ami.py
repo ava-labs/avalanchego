@@ -20,6 +20,10 @@ for var in variables:
   if var is None:
     print("A Variable is not set correctly or this is not the right repo.  Exiting.")
     exit(0)
+
+if 'rc' in tag:
+  print("This is a release candidate.  Nothing to do.")
+  exit(0)
   
 client = boto3.client('marketplace-catalog',region_name='us-east-1')
 

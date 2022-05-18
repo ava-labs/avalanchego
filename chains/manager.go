@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -45,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
@@ -142,8 +142,8 @@ type ManagerConfig struct {
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents              *triggers.EventDispatcher
-	ConsensusEvents             *triggers.EventDispatcher
+	DecisionAcceptorGroup       snow.AcceptorGroup
+	ConsensusAcceptorGroup      snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.Creator    // message creator, shared with network
 	Router                      router.Router      // Routes incoming messages to the appropriate chain
@@ -185,6 +185,12 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+
+	// Tracks CPU usage caused by each peer.
+	CPUTracker timetracker.TimeTracker
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	CPUTargeter timetracker.CPUTargeter
 
 	StateSyncBeacons         []ids.NodeID
 	StateSyncDisableRequests bool
@@ -373,9 +379,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
 		},
-		DecisionDispatcher:  m.DecisionEvents,
-		ConsensusDispatcher: m.ConsensusEvents,
-		Registerer:          consensusMetrics,
+		DecisionAcceptor:  m.DecisionAcceptorGroup,
+		ConsensusAcceptor: m.ConsensusAcceptorGroup,
+		Registerer:        consensusMetrics,
 	}
 	// We set the state to Initializing here because failing to set the state
 	// before it's first access would cause a panic.
@@ -562,7 +568,7 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -612,6 +618,8 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
+		m.CPUTracker,
+		m.CPUTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -743,7 +751,7 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -806,6 +814,8 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
+		m.CPUTracker,
+		m.CPUTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)

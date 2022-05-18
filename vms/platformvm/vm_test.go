@@ -36,18 +36,23 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -80,7 +85,7 @@ var (
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
-	keys []*crypto.PrivateKeySECP256K1R
+	keys = crypto.BuildTestKeys()
 
 	defaultMinValidatorStake = 5 * units.MilliAvax
 	defaultMaxValidatorStake = 500 * units.MilliAvax
@@ -93,7 +98,7 @@ var (
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	// Its threshold is 2
 	testSubnet1            *UnsignedCreateSubnetTx
-	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
+	testSubnet1ControlKeys = keys[0:3]
 
 	xChainID = ids.Empty.Prefix(0)
 	cChainID = ids.Empty.Prefix(1)
@@ -108,25 +113,6 @@ const (
 	testNetworkID = 10 // To be used in tests
 	defaultWeight = 10000
 )
-
-func init() {
-	ctx := defaultContext()
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		ctx.Log.AssertNoError(err)
-		pk, err := factory.ToPrivateKey(privKeyBytes)
-		ctx.Log.AssertNoError(err)
-		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
-	}
-	testSubnet1ControlKeys = keys[0:3]
-}
 
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
@@ -320,21 +306,23 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 
 func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	vm := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      defaultValidateEndTime,
-		ApricotPhase4Time:      defaultValidateEndTime,
-		ApricotPhase5Time:      defaultValidateEndTime,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			Validators:             validators.NewManager(),
+			TxFee:                  defaultTxFee,
+			CreateSubnetTxFee:      100 * defaultTxFee,
+			CreateBlockchainTxFee:  100 * defaultTxFee,
+			MinValidatorStake:      defaultMinValidatorStake,
+			MaxValidatorStake:      defaultMaxValidatorStake,
+			MinDelegatorStake:      defaultMinDelegatorStake,
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+			ApricotPhase3Time:      defaultValidateEndTime,
+			ApricotPhase4Time:      defaultValidateEndTime,
+			ApricotPhase5Time:      defaultValidateEndTime,
+		},
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -400,16 +388,18 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}
 
 	vm := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		TxFee:                  defaultTxFee,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			TxFee:                  defaultTxFee,
+			MinValidatorStake:      defaultMinValidatorStake,
+			MaxValidatorStake:      defaultMaxValidatorStake,
+			MinDelegatorStake:      defaultMinDelegatorStake,
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -1713,12 +1703,14 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
@@ -1795,12 +1787,14 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	secondVM.clock.Set(defaultGenesisTime)
@@ -1835,12 +1829,14 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1912,12 +1908,14 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	secondVM.clock.Set(defaultGenesisTime)
@@ -1958,12 +1956,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	vm := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2101,6 +2101,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
+	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
+	cpuTargeter, err := timetracker.NewCPUTargeter(
+		prometheus.NewRegistry(),
+		&timetracker.CPUTargeterConfig{
+			VdrCPUAlloc:           1000,
+			AtLargeCPUAlloc:       1000,
+			PeerMaxAtLargePortion: .5,
+		},
+		vdrs,
+		cpuTracker,
+	)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
@@ -2108,6 +2121,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		time.Hour,
+		cpuTracker,
+		cpuTargeter,
 	)
 	assert.NoError(t, err)
 
@@ -2227,12 +2242,14 @@ func TestUnverifiedParent(t *testing.T) {
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	vm := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	vm.clock.Set(defaultGenesisTime)
@@ -2382,12 +2399,14 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vm := &VM{Factory: Factory{
-		Chains:                 chains.MockManager{},
-		Validators:             validators.NewManager(),
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+		},
 	}}
 
 	vm.clock.Set(defaultGenesisTime)

@@ -56,19 +56,6 @@ type Logger interface {
 	// executes the desired exit function
 	RecoverAndExit(f, exit func())
 
-	// Only events above or equal to the level set will be logged
-	SetLogLevel(Level)
-	// Only logged events above or equal to the level set will be logged
-	SetDisplayLevel(Level)
-	// Gets current LogLevel
-	GetLogLevel() Level
-	// Gets current DisplayLevel
-	GetDisplayLevel() Level
-	// Add a prefix to all logged messages
-	SetPrefix(string)
-	// Enable or disable the display of contextual information for logged events
-	SetContextualDisplayingEnabled(bool)
-
 	// Stop this logger and write back all meta-data.
 	Stop()
 }

@@ -5,7 +5,6 @@ package validators
 
 import (
 	"math"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -301,6 +300,12 @@ func TestSetAddWeightCallback(t *testing.T) {
 	callcount := 0
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			callcount++
+		},
 		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
 			assert.Equal(t, vdr0, nodeID)
 			assert.Equal(t, weight0, oldWeight)
@@ -310,7 +315,7 @@ func TestSetAddWeightCallback(t *testing.T) {
 	})
 	err = s.AddWeight(vdr0, weight1)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, callcount)
+	assert.Equal(t, 2, callcount)
 }
 
 func TestSetRemoveWeightCallback(t *testing.T) {
@@ -324,6 +329,12 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 	assert.NoError(t, err)
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			callcount++
+		},
 		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
 			assert.Equal(t, vdr0, nodeID)
 			assert.Equal(t, weight0, oldWeight)
@@ -333,7 +344,7 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 	})
 	err = s.RemoveWeight(vdr0, weight1)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, callcount)
+	assert.Equal(t, 2, callcount)
 }
 
 func TestSetValidatorRemovedCallback(t *testing.T) {
@@ -347,6 +358,12 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			callcount++
+		},
 		onRemoved: func(nodeID ids.NodeID, weight uint64) {
 			assert.Equal(t, vdr0, nodeID)
 			assert.Equal(t, weight0, weight)
@@ -355,7 +372,7 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	})
 	err = s.RemoveWeight(vdr0, weight0)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, callcount)
+	assert.Equal(t, 2, callcount)
 }
 
 func TestSetValidatorSetCallback(t *testing.T) {
@@ -374,19 +391,21 @@ func TestSetValidatorSetCallback(t *testing.T) {
 
 	newValidators := []Validator{&validator{nodeID: vdr0, weight: weight0}, &validator{nodeID: vdr2, weight: weight2}}
 	callcount := 0
-	var lock sync.Mutex
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, weight uint64) {
-			lock.Lock()
-			defer lock.Unlock()
-			assert.Equal(t, vdr2, nodeID)
-			assert.Equal(t, weight2, weight)
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			if nodeID == vdr1 {
+				assert.Equal(t, weight1, weight)
+			}
+			if nodeID == vdr2 {
+				assert.Equal(t, weight2, weight)
+			}
 			callcount++
 		},
 		onRemoved: func(nodeID ids.NodeID, weight uint64) {
-			lock.Lock()
-			defer lock.Unlock()
 			assert.Equal(t, vdr1, nodeID)
 			assert.Equal(t, weight1, weight)
 			callcount++
@@ -395,5 +414,5 @@ func TestSetValidatorSetCallback(t *testing.T) {
 
 	err = s.Set(newValidators)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, callcount)
+	assert.Equal(t, 4, callcount)
 }

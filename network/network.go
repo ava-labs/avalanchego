@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -57,6 +58,7 @@ type Network interface {
 	health.Checker
 
 	peer.Network
+	common.SubnetTracker
 
 	// StartClose this network and all existing connections it has. Calling
 	// StartClose multiple times is handled gracefully.
@@ -166,6 +168,8 @@ func NewNetwork(
 		metricsRegisterer,
 		primaryNetworkValidators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
+		config.CPUTracker,
+		config.CPUTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
@@ -210,6 +214,8 @@ func NewNetwork(
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
+		CPUTracker:           config.CPUTracker,
+		CPUTargeter:          config.CPUTargeter,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
@@ -364,7 +370,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(ip utils.IPCertDesc) {
+func (n *network) Track(ip utils.IPCertDesc) bool {
 	nodeID := ids.NodeIDFromCert(ip.Cert)
 
 	// Verify that we do want to attempt to make a connection to this peer
@@ -373,7 +379,7 @@ func (n *network) Track(ip utils.IPCertDesc) {
 	// This check only improves performance, as the values are recalculated once
 	// the lock is grabbed before actually attempting to connect to the peer.
 	if !n.shouldTrack(nodeID, ip) {
-		return
+		return false
 	}
 
 	signedIP := peer.SignedIP{
@@ -386,38 +392,44 @@ func (n *network) Track(ip utils.IPCertDesc) {
 
 	if err := signedIP.Verify(ip.Cert); err != nil {
 		n.peerConfig.Log.Debug("signature verification failed for %s: %s", nodeID, err)
-		return
+		return false
 	}
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	_, connected := n.connectedPeers.GetByID(nodeID)
-	if connected {
+	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
 		// If I'm currently connected to [nodeID] then they will have told me
 		// how to connect to them in the future, and I don't need to attempt to
 		// connect to them now.
-		return
+		return false
 	}
 
 	tracked, isTracked := n.trackedIPs[nodeID]
-	if isTracked {
-		if tracked.ip.Timestamp < ip.Time {
-			// Stop tracking the old IP and instead start tracking new one.
-			tracked := tracked.trackNewIP(&peer.UnsignedIP{
-				IP:        ip.IPDesc,
-				Timestamp: ip.Time,
-			})
-			n.trackedIPs[nodeID] = tracked
-			n.dial(n.onCloseCtx, nodeID, tracked)
+	switch {
+	case isTracked:
+		if tracked.ip.Timestamp >= ip.Time {
+			return false
 		}
-	} else if n.wantsConnection(nodeID) {
+		// Stop tracking the old IP and instead start tracking new one.
+		tracked := tracked.trackNewIP(&peer.UnsignedIP{
+			IP:        ip.IPDesc,
+			Timestamp: ip.Time,
+		})
+		n.trackedIPs[nodeID] = tracked
+		n.dial(n.onCloseCtx, nodeID, tracked)
+		return true
+	case n.wantsConnection(nodeID):
 		tracked := newTrackedIP(&peer.UnsignedIP{
 			IP:        ip.IPDesc,
 			Timestamp: ip.Time,
 		})
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
+		return true
+	default:
+		// This node isn't tracked and we don't want to connect to it.
+		return false
 	}
 }
 
@@ -571,6 +583,18 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc) {
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
+}
+
+func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
+
+	peer, connected := n.connectedPeers.GetByID(nodeID)
+	if !connected {
+		return false
+	}
+	trackedSubnets := peer.TrackedSubnets()
+	return trackedSubnets.Contains(subnetID)
 }
 
 func (n *network) sampleValidatorIPs() []utils.IPCertDesc {

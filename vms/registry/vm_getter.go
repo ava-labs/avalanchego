@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
@@ -32,6 +33,7 @@ type VMGetterConfig struct {
 	FileReader      filesystem.Reader
 	Manager         vms.Manager
 	PluginDirectory string
+	CPUTracker      cpu.ProcessTracker
 }
 
 type vmGetter struct {
@@ -93,6 +95,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 
 		unregisteredVMs[vmID] = rpcchainvm.NewFactory(
 			filepath.Join(getter.config.PluginDirectory, file.Name()),
+			getter.config.CPUTracker,
 		)
 	}
 	return registeredVMs, unregisteredVMs, nil
