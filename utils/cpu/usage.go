@@ -45,9 +45,15 @@ type Manager interface {
 	Shutdown()
 }
 
+type proc struct {
+	p                          *process.Process
+	lastPolled                 time.Time
+	lastTotalSecondsProcessing float64
+}
+
 type manager struct {
 	processesLock sync.Mutex
-	processes     map[int]*process.Process
+	processes     map[int]*proc
 
 	usageLock sync.RWMutex
 	usage     float64
@@ -58,7 +64,7 @@ type manager struct {
 
 func NewManager(frequency, halflife time.Duration) Manager {
 	m := &manager{
-		processes: make(map[int]*process.Process),
+		processes: make(map[int]*proc),
 		onClose:   make(chan struct{}),
 	}
 	go m.update(frequency, halflife)
@@ -78,8 +84,18 @@ func (m *manager) TrackProcess(pid int) {
 		return
 	}
 
+	creationTimeMS, err := p.CreateTime()
+	if err != nil {
+		return
+	}
+
+	proc := &proc{
+		p:                          p,
+		lastPolled:                 time.Unix(creationTimeMS/int64(time.Millisecond), 0),
+		lastTotalSecondsProcessing: 0,
+	}
 	m.processesLock.Lock()
-	m.processes[pid] = p
+	m.processes[pid] = proc
 	m.processesLock.Unlock()
 }
 
@@ -118,6 +134,8 @@ func (m *manager) update(frequency, halflife time.Duration) {
 }
 
 func (m *manager) getCurrentUsage() float64 {
+	now := time.Now()
+
 	m.processesLock.Lock()
 	defer m.processesLock.Unlock()
 
@@ -125,12 +143,25 @@ func (m *manager) getCurrentUsage() float64 {
 	for _, p := range m.processes {
 		// If there is an error tracking the CPU utilization of a process,
 		// assume that the utilization is 0.
-		cpu, err := p.Percent(0)
-		if err == nil {
-			usage += cpu
+		times, err := p.p.Times()
+		if err != nil {
+			continue
 		}
+
+		currentTotalSecondsProcessing := times.User + times.System + times.Iowait
+		totalSinceLastPolled := currentTotalSecondsProcessing - p.lastTotalSecondsProcessing
+		p.lastTotalSecondsProcessing = currentTotalSecondsProcessing
+
+		secondsSinceLastPolled := now.Sub(p.lastPolled).Seconds()
+		p.lastPolled = now
+
+		if secondsSinceLastPolled <= 0 || totalSinceLastPolled <= 0 {
+			continue
+		}
+
+		usage += totalSinceLastPolled / secondsSinceLastPolled
 	}
-	return usage / 100
+	return usage
 }
 
 // getSampleWeights converts the frequency of CPU sampling and the halflife of
