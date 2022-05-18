@@ -1049,18 +1049,14 @@ func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
 // Initialize [n.CPUTracker].
 // Assumed [n.CPUTracker] is already initialized.
 func (n *Node) initCPUTargeter(
-	reg prometheus.Registerer,
 	config *tracker.CPUTargeterConfig,
 	vdrs validators.Set,
-) error {
-	var err error
-	n.cpuTargeter, err = tracker.NewCPUTargeter(
-		reg,
+) {
+	n.cpuTargeter = tracker.NewCPUTargeter(
 		config,
 		vdrs,
 		n.cpuTracker,
 	)
-	return err
 }
 
 // Initialize this node
@@ -1124,9 +1120,7 @@ func (n *Node) Initialize(
 	if err := n.initCPUTracker(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing CPU tracker: %w", err)
 	}
-	if err := n.initCPUTargeter(n.MetricsRegisterer, &config.CPUTargeterConfig, primaryNetVdrs); err != nil {
-		return fmt.Errorf("problem initializing CPU targeter: %w", err)
-	}
+	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
 	if err = n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}

@@ -8,8 +8,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,30 +23,26 @@ func TestNewCPUTargeter(t *testing.T) {
 
 	clock := mockable.Clock{}
 	config := &CPUTargeterConfig{
-		Clock:                 mockable.Clock{},
-		VdrCPUAlloc:           10,
-		AtLargeCPUAlloc:       11,
-		PeerMaxAtLargePortion: 0.5,
+		Clock:              mockable.Clock{},
+		VdrCPUAlloc:        10,
+		MaxNonVdrUsage:     10,
+		MaxNonVdrNodeUsage: 10,
 	}
 	vdrs := validators.NewSet()
 	cpuTracker := NewMockTimeTracker(ctrl)
 
-	targeterIntf, err := NewCPUTargeter(
-		prometheus.NewRegistry(),
+	targeterIntf := NewCPUTargeter(
 		config,
 		vdrs,
 		cpuTracker,
 	)
-	assert.NoError(err)
 	targeter, ok := targeterIntf.(*cpuTargeter)
 	assert.True(ok)
 	assert.Equal(clock, targeter.clock)
 	assert.Equal(vdrs, targeter.vdrs)
 	assert.Equal(cpuTracker, targeter.cpuTracker)
-	assert.Equal(config.VdrCPUAlloc, targeter.vdrCPUAlloc)
-	assert.Equal(config.AtLargeCPUAlloc, targeter.atLargeCPUAlloc)
-	assert.Equal(config.AtLargeCPUAlloc*config.PeerMaxAtLargePortion, targeter.atLargeMaxCPU)
-	assert.NotNil(targeter.metrics)
+	assert.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
+	assert.Equal(config.MaxNonVdrNodeUsage, targeter.maxNonVdrNodeUsage)
 }
 
 func TestCPUTarget(t *testing.T) {
@@ -69,82 +63,73 @@ func TestCPUTarget(t *testing.T) {
 
 	cpuTracker := NewMockTimeTracker(ctrl)
 	config := &CPUTargeterConfig{
-		VdrCPUAlloc:           20,
-		AtLargeCPUAlloc:       10,
-		PeerMaxAtLargePortion: 0.5,
+		VdrCPUAlloc:        20,
+		MaxNonVdrUsage:     10,
+		MaxNonVdrNodeUsage: 5,
 	}
 
-	cpuTargeter, err := NewCPUTargeter(
-		prometheus.NewRegistry(),
+	cpuTargeter := NewCPUTargeter(
 		config,
 		vdrs,
 		cpuTracker,
 	)
-	assert.NoError(t, err)
 
 	type test struct {
-		name                  string
-		setup                 func()
-		nodeID                ids.NodeID
-		expectedVdrCPUAlloc   float64
-		expectAtLargeCPUAlloc float64
+		name             string
+		setup            func()
+		nodeID           ids.NodeID
+		expectedCPUAlloc float64
 	}
 	tests := []test{
 		{
 			name: "Vdr alloc and at-large alloc",
 			setup: func() {
 				// At large utilization is less than max
-				cpuTracker.EXPECT().CumulativeAtLargeUtilization(gomock.Any()).Return(config.AtLargeCPUAlloc - 1).Times(1)
+				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage - 1).Times(1)
 			},
-			nodeID:                vdr,
-			expectedVdrCPUAlloc:   2, // 20 * (1/10)
-			expectAtLargeCPUAlloc: 1, // min(max(0,10-9),5)
+			nodeID:           vdr,
+			expectedCPUAlloc: 2 + 1, // 20 * (1/10) + min(max(0,10-9),5)
 		},
 		{
 			name: "no vdr alloc and at-large alloc",
 			setup: func() {
 				// At large utilization is less than max
-				cpuTracker.EXPECT().CumulativeAtLargeUtilization(gomock.Any()).Return(config.AtLargeCPUAlloc - 1).Times(1)
+				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage - 1).Times(1)
 			},
-			nodeID:                nonVdr,
-			expectedVdrCPUAlloc:   0, // 0 * (1/10)
-			expectAtLargeCPUAlloc: 1, // min(max(0,10-9), 5)
+			nodeID:           nonVdr,
+			expectedCPUAlloc: 0 + 1, // 0 * (1/10) + min(max(0,10-9), 5)
 		},
 		{
 			name: "at-large alloc maxed",
 			setup: func() {
-				cpuTracker.EXPECT().CumulativeAtLargeUtilization(gomock.Any()).Return(float64(0)).Times(1)
+				cpuTracker.EXPECT().CumulativeUtilization().Return(float64(0)).Times(1)
 			},
-			nodeID:                nonVdr,
-			expectedVdrCPUAlloc:   0, // 0 * (1/10)
-			expectAtLargeCPUAlloc: 5, // min(max(0,10-0), 5)
+			nodeID:           nonVdr,
+			expectedCPUAlloc: 0 + 5, // 0 * (1/10) + min(max(0,10-0), 5)
 		},
 		{
 			name: "at-large alloc completely used",
 			setup: func() {
-				cpuTracker.EXPECT().CumulativeAtLargeUtilization(gomock.Any()).Return(config.AtLargeCPUAlloc).Times(1)
+				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage).Times(1)
 			},
-			nodeID:                nonVdr,
-			expectedVdrCPUAlloc:   0, // 0 * (1/10)
-			expectAtLargeCPUAlloc: 0, // min(max(0,10-10), 5)
+			nodeID:           nonVdr,
+			expectedCPUAlloc: 0 + 0, // 0 * (1/10) + min(max(0,10-10), 5)
 		},
 		{
 			name: "at-large alloc exceeded used",
 			setup: func() {
-				cpuTracker.EXPECT().CumulativeAtLargeUtilization(gomock.Any()).Return(config.AtLargeCPUAlloc + 1).Times(1)
+				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage + 1).Times(1)
 			},
-			nodeID:                nonVdr,
-			expectedVdrCPUAlloc:   0, // 0 * (1/10)
-			expectAtLargeCPUAlloc: 0, // min(max(0,10-11), 5)
+			nodeID:           nonVdr,
+			expectedCPUAlloc: 0 + 0, // 0 * (1/10) + min(max(0,10-11), 5)
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
-			gotVdrCPUAlloc, gotAtLargeCPUAlloc, _ := cpuTargeter.TargetCPUUsage(tt.nodeID)
-			assert.Equal(t, tt.expectedVdrCPUAlloc, gotVdrCPUAlloc)
-			assert.Equal(t, tt.expectAtLargeCPUAlloc, gotAtLargeCPUAlloc)
+			cpuAlloc := cpuTargeter.TargetCPUUsage(tt.nodeID)
+			assert.Equal(t, tt.expectedCPUAlloc, cpuAlloc)
 		})
 	}
 }

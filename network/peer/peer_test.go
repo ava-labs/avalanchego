@@ -81,17 +81,6 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	assert.NoError(err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           10,
-			AtLargeCPUAlloc:       10,
-			PeerMaxAtLargePortion: 0.5,
-		},
-		validators.NewSet(),
-		cpuTracker,
-	)
-	assert.NoError(err)
 	sharedConfig := Config{
 		Metrics:              metrics,
 		MessageCreator:       mc,
@@ -107,7 +96,15 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		CPUTracker:           cpuTracker,
-		CPUTargeter:          cpuTargeter,
+		CPUTargeter: tracker.NewCPUTargeter(
+			&tracker.CPUTargeterConfig{
+				VdrCPUAlloc:        10,
+				MaxNonVdrUsage:     10,
+				MaxNonVdrNodeUsage: 10,
+			},
+			validators.NewSet(),
+			cpuTracker,
+		),
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig

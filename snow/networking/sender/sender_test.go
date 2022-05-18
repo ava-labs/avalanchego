@@ -79,17 +79,15 @@ func TestTimeout(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
+	cpuTargeter := tracker.NewCPUTargeter(
 		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
+			VdrCPUAlloc:        10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
 		},
 		vdrs,
 		cpuTracker,
 	)
-	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -180,17 +178,15 @@ func TestReliableMessages(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
+	cpuTargeter := tracker.NewCPUTargeter(
 		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
+			VdrCPUAlloc:        10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
 		},
 		vdrs,
 		cpuTracker,
 	)
-	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -288,17 +284,15 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
+	cpuTargeter := tracker.NewCPUTargeter(
 		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
+			VdrCPUAlloc:        10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
 		},
 		vdrs,
 		cpuTracker,
 	)
-	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,

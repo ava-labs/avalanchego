@@ -28,7 +28,6 @@ func TestNewCPUTracker(t *testing.T) {
 	assert.True(ok)
 	assert.Equal(factory, tracker.factory)
 	assert.NotNil(tracker.cumulativeMeter)
-	assert.NotNil(tracker.cumulativeAtLargeMeter)
 	assert.Equal(halflife, tracker.halflife)
 	assert.NotNil(tracker.meters)
 	assert.NotNil(tracker.metrics)
@@ -51,14 +50,14 @@ func TestCPUTracker(t *testing.T) {
 	startTime1 := time.Now()
 	endTime1 := startTime1.Add(halflife)
 	// Note that all CPU usage is attributed to at-large allocation.
-	cpuTracker.IncCPU(node1, startTime1, 1)
-	cpuTracker.DecCPU(node1, endTime1, 1)
+	cpuTracker.IncCPU(node1, startTime1)
+	cpuTracker.DecCPU(node1, endTime1)
 
 	startTime2 := endTime1
 	endTime2 := startTime2.Add(halflife)
 	// Note that all CPU usage is attributed to at-large allocation.
-	cpuTracker.IncCPU(node2, startTime2, 1)
-	cpuTracker.DecCPU(node2, endTime2, 1)
+	cpuTracker.IncCPU(node2, startTime2)
+	cpuTracker.DecCPU(node2, endTime2)
 
 	node1Utilization := cpuTracker.Utilization(node1, endTime2)
 	node2Utilization := cpuTracker.Utilization(node2, endTime2)
@@ -66,7 +65,7 @@ func TestCPUTracker(t *testing.T) {
 		t.Fatalf("Utilization should have been higher for the more recent spender")
 	}
 
-	cumulative := cpuTracker.CumulativeAtLargeUtilization(endTime2)
+	cumulative := cpuTracker.CumulativeUtilization()
 	sum := node1Utilization + node2Utilization
 	if cumulative != sum {
 		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
@@ -80,7 +79,7 @@ func TestCPUTracker(t *testing.T) {
 	if newNode1Utilization >= node1Utilization {
 		t.Fatalf("node CPU utilization should decrease over time")
 	}
-	newCumulative := cpuTracker.CumulativeAtLargeUtilization(endTime3)
+	newCumulative := cpuTracker.CumulativeUtilization()
 	if newCumulative >= cumulative {
 		t.Fatal("at-large CPU utilization should decrease over time ")
 	}
@@ -88,10 +87,10 @@ func TestCPUTracker(t *testing.T) {
 	startTime4 := endTime3
 	endTime4 := startTime4.Add(halflife)
 	// Note that only half of CPU usage is attributed to at-large allocation.
-	cpuTracker.IncCPU(node1, startTime4, 0.5)
-	cpuTracker.DecCPU(node1, endTime4, 0.5)
+	cpuTracker.IncCPU(node1, startTime4)
+	cpuTracker.DecCPU(node1, endTime4)
 
-	cumulative = cpuTracker.CumulativeAtLargeUtilization(endTime2)
+	cumulative = cpuTracker.CumulativeUtilization()
 	sum = node1Utilization + node2Utilization
 	if cumulative >= sum {
 		t.Fatal("Sum of CPU usage should exceed cumulative at-large utilization")
@@ -105,10 +104,10 @@ func TestCPUTrackerTimeUntilUtilization(t *testing.T) {
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()
 	// Start the meter
-	cpuTracker.IncCPU(nodeID, now, 1)
+	cpuTracker.IncCPU(nodeID, now)
 	// One halflife passes; stop the meter
 	now = now.Add(halflife)
-	cpuTracker.DecCPU(nodeID, now, 1)
+	cpuTracker.DecCPU(nodeID, now)
 	// Read the current value
 	currentVal := cpuTracker.Utilization(nodeID, now)
 	// Suppose we want to wait for the value to be

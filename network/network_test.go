@@ -122,20 +122,15 @@ func init() {
 }
 
 func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
+	return tracker.NewCPUTargeter(
 		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: 0.5,
+			VdrCPUAlloc:        10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
 		},
 		validators.NewSet(),
 		cpuTracker,
 	)
-	if err != nil {
-		panic(err)
-	}
-	return cpuTargeter
 }
 
 func newDefaultCPUTracker() tracker.TimeTracker {
