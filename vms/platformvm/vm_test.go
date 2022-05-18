@@ -2103,17 +2103,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Asynchronously passes messages from the network to the consensus engine
 	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
-	cpuTargeter, err := timetracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
+	cpuTargeter := timetracker.NewCPUTargeter(
 		&timetracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
+			VdrCPUAlloc:        10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
 		},
 		vdrs,
 		cpuTracker,
 	)
-	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
@@ -2125,17 +2123,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		cpuTargeter,
 	)
 	assert.NoError(t, err)
-
-	bootstrapper, err := bootstrap.New(
-		bootstrapConfig,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler.SetBootstrapper(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:           bootstrapConfig.Ctx,
@@ -2160,6 +2147,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler.SetConsensus(engine)
+
+	bootstrapper, err := bootstrap.New(
+		bootstrapConfig,
+		engine.Start,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.SetBootstrapper(bootstrapper)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)

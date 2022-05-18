@@ -81,23 +81,11 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 
 	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	assert.NoError(err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           10,
-			AtLargeCPUAlloc:       10,
-			PeerMaxAtLargePortion: 0.5,
-		},
-		validators.NewSet(),
-		cpuTracker,
-	)
-	assert.NoError(err)
 	sharedConfig := Config{
 		Metrics:              metrics,
 		MessageCreator:       mc,
 		Log:                  logging.NoLog{},
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
-		OutboundMsgThrottler: throttling.NewNoOutboundThrottler(),
 		VersionCompatibility: version.GetCompatibility(constants.LocalID),
 		VersionParser:        version.DefaultApplicationParser,
 		MySubnets:            ids.Set{},
@@ -107,7 +95,15 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		CPUTracker:           cpuTracker,
-		CPUTargeter:          cpuTargeter,
+		CPUTargeter: tracker.NewCPUTargeter(
+			&tracker.CPUTargeterConfig{
+				VdrCPUAlloc:        10,
+				MaxNonVdrUsage:     10,
+				MaxNonVdrNodeUsage: 10,
+			},
+			validators.NewSet(),
+			cpuTracker,
+		),
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig
@@ -176,6 +172,12 @@ func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
 			rawPeer0.conn,
 			rawPeer1.cert,
 			rawPeer1.nodeID,
+			NewThrottledMessageQueue(
+				rawPeer0.config.Metrics,
+				rawPeer1.nodeID,
+				logging.NoLog{},
+				throttling.NewNoOutboundThrottler(),
+			),
 		),
 		inboundMsgChan: rawPeer0.inboundMsgChan,
 	}
@@ -185,6 +187,12 @@ func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
 			rawPeer1.conn,
 			rawPeer0.cert,
 			rawPeer0.nodeID,
+			NewThrottledMessageQueue(
+				rawPeer1.config.Metrics,
+				rawPeer0.nodeID,
+				logging.NoLog{},
+				throttling.NewNoOutboundThrottler(),
+			),
 		),
 		inboundMsgChan: rawPeer1.inboundMsgChan,
 	}
@@ -220,6 +228,12 @@ func TestReady(t *testing.T) {
 		rawPeer0.conn,
 		rawPeer1.cert,
 		rawPeer1.nodeID,
+		NewThrottledMessageQueue(
+			rawPeer0.config.Metrics,
+			rawPeer1.nodeID,
+			logging.NoLog{},
+			throttling.NewNoOutboundThrottler(),
+		),
 	)
 
 	isReady := peer0.Ready()
@@ -230,6 +244,12 @@ func TestReady(t *testing.T) {
 		rawPeer1.conn,
 		rawPeer0.cert,
 		rawPeer0.nodeID,
+		NewThrottledMessageQueue(
+			rawPeer1.config.Metrics,
+			rawPeer0.nodeID,
+			logging.NoLog{},
+			throttling.NewNoOutboundThrottler(),
+		),
 	)
 
 	err := peer0.AwaitReady(context.Background())
@@ -258,7 +278,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	assert.NoError(err)
 
-	sent := peer0.Send(outboundGetMsg)
+	sent := peer0.Send(context.Background(), outboundGetMsg)
 	assert.True(sent)
 
 	inboundGetMsg := <-peer1.inboundMsgChan

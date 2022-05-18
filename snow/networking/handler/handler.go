@@ -367,10 +367,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	// Determine what portion of CPU usage should be attributed to the validator
-	// CPU allocation and at-large CPU allocation.
-	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
-	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
+	h.cpuTracker.IncCPU(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	defer func() {
 		h.ctx.Lock.Unlock()
@@ -379,7 +376,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.DecCPU(nodeID, endTime, atLargeCPUPortion)
+		h.cpuTracker.DecCPU(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling sync message: %s", op)
@@ -578,16 +575,13 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	// Determine what portion of CPU usage should be attributed to the validator
-	// CPU allocation and at-large CPU allocation.
-	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
-	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
+	h.cpuTracker.IncCPU(nodeID, startTime)
 	defer func() {
 		var (
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.DecCPU(nodeID, endTime, atLargeCPUPortion)
+		h.cpuTracker.DecCPU(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling async message: %s", op)
