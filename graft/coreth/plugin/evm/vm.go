@@ -47,9 +47,9 @@ import (
 	// inside of cmd/geth.
 	_ "github.com/ava-labs/coreth/eth/tracers/native"
 
+	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
@@ -365,7 +365,7 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
-	metrics.Enabled = vm.config.MetricsEnabled
+	// Enable debug-level metrics that might impact runtime performance
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
 	vm.toEngine = toEngine
@@ -582,7 +582,7 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 			&statesyncclient.ClientConfig{
 				NetworkClient:    vm.client,
 				Codec:            vm.networkCodec,
-				Stats:            stats.NewStats(vm.config.MetricsEnabled),
+				Stats:            stats.NewClientSyncerStats(),
 				MaxAttempts:      maxRetryAttempts,
 				MaxRetryDelay:    defaultMaxRetryDelay,
 				StateSyncNodeIDs: stateSyncIDs,
@@ -648,10 +648,6 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 			status:    choices.Accepted,
 			atomicTxs: atomicTxs,
 		},
-	}
-	if !vm.config.MetricsEnabled {
-		vm.State = chain.NewState(config)
-		return nil
 	}
 
 	// Register chain state metrics

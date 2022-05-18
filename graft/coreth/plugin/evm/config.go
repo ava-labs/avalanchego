@@ -19,7 +19,6 @@ const (
 	defaultSnapshotAsync                          = true
 	defaultRpcGasCap                              = 50_000_000 // Default to 50M Gas Limit
 	defaultRpcTxFeeCap                            = 100        // 100 AVAX
-	defaultMetricsEnabled                         = true
 	defaultMetricsExpensiveEnabled                = false
 	defaultApiMaxDuration                         = 0 // Default to no maximum API call duration
 	defaultWsCpuRefillRate                        = 0 // Default to no maximum WS CPU usage
@@ -92,8 +91,7 @@ type Config struct {
 	PopulateMissingTriesParallelism int     `json:"populate-missing-tries-parallelism"` // Number of concurrent readers to use when re-populating missing tries on startup.
 
 	// Metric Settings
-	MetricsEnabled          bool `json:"metrics-enabled"`
-	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"`
+	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"` // Debug-level metrics that might impact runtime performance
 
 	// API Settings
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
@@ -148,7 +146,6 @@ func (c *Config) SetDefaults() {
 	c.EnabledEthAPIs = defaultEnabledAPIs
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
-	c.MetricsEnabled = defaultMetricsEnabled
 	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate

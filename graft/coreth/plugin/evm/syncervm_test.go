@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/peer"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
@@ -72,6 +73,11 @@ func TestStateSyncFromScratch(t *testing.T) {
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	rand.Seed(1)
+	// Hack: registering metrics uses global variables, so we need to disable metrics here so that we can initialize the VM twice.
+	metrics.Enabled = false
+	defer func() {
+		metrics.Enabled = true
+	}()
 
 	var lock sync.Mutex
 	reqCount := 0
