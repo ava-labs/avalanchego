@@ -30,7 +30,7 @@ type TimeTracker interface {
 	// Returns the current EWMA of CPU utilization for the given node.
 	Utilization(ids.NodeID, time.Time) float64
 	// Returns the current EWMA of CPU utilization by all nodes.
-	CumulativeUtilization(time.Time) float64
+	CumulativeUtilization() float64
 	// Returns the duration between [now] and when the CPU utilization of
 	// [nodeID] reaches [value], assuming that the node uses no more CPU.
 	// If the node's CPU utilization isn't known, or is already <= [value],
@@ -139,7 +139,7 @@ func (ct *cpuTracker) Utilization(nodeID ids.NodeID, now time.Time) float64 {
 	return m.(meter.Meter).Read(now) * scale
 }
 
-func (ct *cpuTracker) CumulativeUtilization(now time.Time) float64 {
+func (ct *cpuTracker) CumulativeUtilization() float64 {
 	return ct.cpu.Usage()
 }
 
