@@ -194,6 +194,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint64(InboundThrottlerBandwidthRefillRateKey, 512*units.KiB, "Max average inbound bandwidth usage of a peer, in bytes per second. See BandwidthThrottler")
 	fs.Uint64(InboundThrottlerBandwidthMaxBurstSizeKey, uint64(constants.DefaultMaxMessageSize), "Max inbound bandwidth a node can use at once. Must be at least the max message size. See BandwidthThrottler")
 	fs.Duration(InboundThrottlerCPUMaxRecheckDelayKey, 5*time.Second, "In the CPU-based network throttler, check at least this often whether the node's CPU usage has fallen to an acceptable level")
+	fs.Duration(InboundThrottlerDiskMaxRecheckDelayKey, 5*time.Second, "In the disk-based network throttler, check at least this often whether the node's disk usage has fallen to an acceptable level")
 
 	// Outbound Throttling
 	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 6*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler")
@@ -334,6 +335,11 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Float64(CPUVdrAllocKey, float64(runtime.NumCPU()), "Maximum number of CPUs to allocate for use by validators. Value should be in range [0, total core count]")
 	fs.Float64(CPUMaxNonVdrUsageKey, .8*float64(runtime.NumCPU()), "Number of CPUs that if fully utilized, will rate limit all non-validators. Value should be in range [0, total core count]")
 	fs.Float64(CPUMaxNonVdrNodeUsageKey, float64(runtime.NumCPU())/8, "Maximum number of CPUs that a non-validator can utilize. Value should be in range [0, total core count]")
+
+	// Disk management
+	fs.Float64(DiskVdrAllocKey, 100*units.MiB, "Maximum number of disk reads/writes per second to allocate for use by validators. Must be > 0")
+	fs.Float64(DiskMaxNonVdrUsageKey, 80*units.MiB, "Number of disk reads/writes per second that, if fully utilized, will rate limit all non-validators. Must be >= 0")
+	fs.Float64(DiskMaxNonVdrNodeUsageKey, 12*units.MiB, "Maximum number of disk reads/writes per second that a non-validator can utilize. Must be >= 0")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

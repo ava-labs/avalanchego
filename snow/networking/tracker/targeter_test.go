@@ -12,40 +12,36 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 // Assert fields are set correctly.
-func TestNewCPUTargeter(t *testing.T) {
+func TestNewTargeter(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	clock := mockable.Clock{}
-	config := &CPUTargeterConfig{
-		Clock:              mockable.Clock{},
-		VdrCPUAlloc:        10,
+	config := &TargeterConfig{
+		VdrAlloc:           10,
 		MaxNonVdrUsage:     10,
 		MaxNonVdrNodeUsage: 10,
 	}
 	vdrs := validators.NewSet()
-	cpuTracker := NewMockTimeTracker(ctrl)
+	tracker := NewMockTracker(ctrl)
 
-	targeterIntf := NewCPUTargeter(
+	targeterIntf := NewTargeter(
 		config,
 		vdrs,
-		cpuTracker,
+		tracker,
 	)
-	targeter, ok := targeterIntf.(*cpuTargeter)
+	targeter, ok := targeterIntf.(*targeter)
 	assert.True(ok)
-	assert.Equal(clock, targeter.clock)
 	assert.Equal(vdrs, targeter.vdrs)
-	assert.Equal(cpuTracker, targeter.cpuTracker)
+	assert.Equal(tracker, targeter.tracker)
 	assert.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
 	assert.Equal(config.MaxNonVdrNodeUsage, targeter.maxNonVdrNodeUsage)
 }
 
-func TestCPUTarget(t *testing.T) {
+func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -61,75 +57,75 @@ func TestCPUTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cpuTracker := NewMockTimeTracker(ctrl)
-	config := &CPUTargeterConfig{
-		VdrCPUAlloc:        20,
+	tracker := NewMockTracker(ctrl)
+	config := &TargeterConfig{
+		VdrAlloc:           20,
 		MaxNonVdrUsage:     10,
 		MaxNonVdrNodeUsage: 5,
 	}
 
-	cpuTargeter := NewCPUTargeter(
+	targeter := NewTargeter(
 		config,
 		vdrs,
-		cpuTracker,
+		tracker,
 	)
 
 	type test struct {
-		name             string
-		setup            func()
-		nodeID           ids.NodeID
-		expectedCPUAlloc float64
+		name           string
+		setup          func()
+		nodeID         ids.NodeID
+		expectedTarget float64
 	}
 	tests := []test{
 		{
 			name: "Vdr alloc and at-large alloc",
 			setup: func() {
 				// At large utilization is less than max
-				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage - 1).Times(1)
+				tracker.EXPECT().TotalUsage().Return(config.MaxNonVdrUsage - 1).Times(1)
 			},
-			nodeID:           vdr,
-			expectedCPUAlloc: 2 + 1, // 20 * (1/10) + min(max(0,10-9),5)
+			nodeID:         vdr,
+			expectedTarget: 2 + 1, // 20 * (1/10) + min(max(0,10-9),5)
 		},
 		{
 			name: "no vdr alloc and at-large alloc",
 			setup: func() {
 				// At large utilization is less than max
-				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage - 1).Times(1)
+				tracker.EXPECT().TotalUsage().Return(config.MaxNonVdrUsage - 1).Times(1)
 			},
-			nodeID:           nonVdr,
-			expectedCPUAlloc: 0 + 1, // 0 * (1/10) + min(max(0,10-9), 5)
+			nodeID:         nonVdr,
+			expectedTarget: 0 + 1, // 0 * (1/10) + min(max(0,10-9), 5)
 		},
 		{
 			name: "at-large alloc maxed",
 			setup: func() {
-				cpuTracker.EXPECT().CumulativeUtilization().Return(float64(0)).Times(1)
+				tracker.EXPECT().TotalUsage().Return(float64(0)).Times(1)
 			},
-			nodeID:           nonVdr,
-			expectedCPUAlloc: 0 + 5, // 0 * (1/10) + min(max(0,10-0), 5)
+			nodeID:         nonVdr,
+			expectedTarget: 0 + 5, // 0 * (1/10) + min(max(0,10-0), 5)
 		},
 		{
 			name: "at-large alloc completely used",
 			setup: func() {
-				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage).Times(1)
+				tracker.EXPECT().TotalUsage().Return(config.MaxNonVdrUsage).Times(1)
 			},
-			nodeID:           nonVdr,
-			expectedCPUAlloc: 0 + 0, // 0 * (1/10) + min(max(0,10-10), 5)
+			nodeID:         nonVdr,
+			expectedTarget: 0 + 0, // 0 * (1/10) + min(max(0,10-10), 5)
 		},
 		{
 			name: "at-large alloc exceeded used",
 			setup: func() {
-				cpuTracker.EXPECT().CumulativeUtilization().Return(config.MaxNonVdrUsage + 1).Times(1)
+				tracker.EXPECT().TotalUsage().Return(config.MaxNonVdrUsage + 1).Times(1)
 			},
-			nodeID:           nonVdr,
-			expectedCPUAlloc: 0 + 0, // 0 * (1/10) + min(max(0,10-11), 5)
+			nodeID:         nonVdr,
+			expectedTarget: 0 + 0, // 0 * (1/10) + min(max(0,10-11), 5)
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
-			cpuAlloc := cpuTargeter.TargetCPUUsage(tt.nodeID)
-			assert.Equal(t, tt.expectedCPUAlloc, cpuAlloc)
+			target := targeter.TargetUsage(tt.nodeID)
+			assert.Equal(t, tt.expectedTarget, target)
 		})
 	}
 }

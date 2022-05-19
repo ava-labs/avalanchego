@@ -158,10 +158,14 @@ type Config struct {
 	// (there is one buffer per peer)
 	PeerWriteBufferSize int `json:"peerWriteBufferSize"`
 
-	// Tracks the CPU usage caused by processing messages of each peer.
-	CPUTracker tracker.TimeTracker `json:"-"`
+	// Tracks the CPU/disk usage caused by processing messages of each peer.
+	ResourceTracker tracker.ResourceTracker `json:"-"`
 
 	// Specifies how much CPU usage each peer can cause before
 	// we rate-limit them.
-	CPUTargeter tracker.CPUTargeter `json:"-"`
+	CPUTargeter tracker.Targeter `json:"-"`
+
+	// Specifies how much disk usage each peer can cause before
+	// we rate-limit them.
+	DiskTargeter tracker.Targeter `json:"-"`
 }

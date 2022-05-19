@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 )
@@ -33,7 +33,7 @@ type VMGetterConfig struct {
 	FileReader      filesystem.Reader
 	Manager         vms.Manager
 	PluginDirectory string
-	CPUTracker      cpu.ProcessTracker
+	CPUTracker      resource.ProcessTracker
 }
 
 type vmGetter struct {

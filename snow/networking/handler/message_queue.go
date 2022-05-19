@@ -50,7 +50,7 @@ type messageQueue struct {
 	// Validator set for the chain associated with this
 	vdrs validators.Set
 	// Tracks CPU utilization of each node
-	cpuTracker tracker.TimeTracker
+	cpuTracker tracker.Tracker
 
 	cond   *sync.Cond
 	closed bool
@@ -63,7 +63,7 @@ type messageQueue struct {
 func NewMessageQueue(
 	log logging.Logger,
 	vdrs validators.Set,
-	cpuTracker tracker.TimeTracker,
+	cpuTracker tracker.Tracker,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
@@ -205,7 +205,7 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
 	// Validators are allowed to use more CPm. More weight --> more CPU use allowed.
-	recentCPUUtilized := m.cpuTracker.Utilization(nodeID, m.clock.Time())
+	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
-	return recentCPUUtilized <= maxCPU
+	return recentCPUUsage <= maxCPU
 }
