@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -97,7 +96,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey string `json:"privateKey"`
+	PrivateKey ids.PrivateKey `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -122,34 +121,21 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	// We assume that the maximum size of a byte slice that
-	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
-	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
+	reply.PrivateKey = ids.PrivateKey(sk.Bytes())
 	return user.Close()
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey string `json:"privateKey"`
+	PrivateKey ids.PrivateKey `json:"privateKey"`
 }
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("Platform: ImportKey called for user '%s'", args.Username)
 
-	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
-		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
-	}
-
-	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
-	if err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-
-	skIntf, err := service.vm.factory.ToPrivateKey(privKeyBytes)
+	skIntf, err := service.vm.factory.ToPrivateKey(args.PrivateKey.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
