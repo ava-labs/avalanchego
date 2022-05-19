@@ -360,8 +360,10 @@ func (c *client) CreateAsset(
 	var err error
 	holders := make([]*Holder, len(clientHolders))
 	for i, clientHolder := range clientHolders {
-		holders[i].Amount = cjson.Uint64(clientHolder.Amount)
-		holders[i].Address = clientHolder.Address.String()
+		holders[i] = &Holder{
+			Amount:  cjson.Uint64(clientHolder.Amount),
+			Address: clientHolder.Address.String(),
+		}
 	}
 	minters := make([]Owners, len(clientMinters))
 	for i, clientMinter := range clientMinters {
