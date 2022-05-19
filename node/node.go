@@ -1043,10 +1043,15 @@ func (n *Node) initVdrs() (validators.Set, error) {
 
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
-	n.resourceManager = resource.NewManager(n.Config.CPUTrackerFrequency, n.Config.CPUTrackerHalflife)
+	n.resourceManager = resource.NewManager(
+		n.Config.SystemTrackerFrequency,
+		n.Config.SystemTrackerCPUHalflife,
+		n.Config.SystemTrackerDiskHalflife,
+	)
 	n.resourceManager.TrackProcess(os.Getpid())
+
 	var err error
-	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
+	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.SystemTrackerProcessingHalflife)
 	return err
 }
 

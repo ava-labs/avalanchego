@@ -71,12 +71,12 @@ type manager struct {
 	onClose   chan struct{}
 }
 
-func NewManager(frequency, halflife time.Duration) Manager {
+func NewManager(frequency, cpuHalflife, diskHalflife time.Duration) Manager {
 	m := &manager{
 		processes: make(map[int]*proc),
 		onClose:   make(chan struct{}),
 	}
-	go m.update(frequency, halflife)
+	go m.update(frequency, cpuHalflife, diskHalflife)
 	return m
 }
 
@@ -119,23 +119,24 @@ func (m *manager) Shutdown() {
 	})
 }
 
-func (m *manager) update(frequency, halflife time.Duration) {
+func (m *manager) update(frequency, cpuHalflife, diskHalflife time.Duration) {
 	ticker := time.NewTicker(frequency)
 	defer ticker.Stop()
 
-	newWeight, oldWeight := getSampleWeights(frequency, halflife)
+	newCPUWeight, oldCPUWeight := getSampleWeights(frequency, cpuHalflife)
+	newDiskWeight, oldDiskWeight := getSampleWeights(frequency, diskHalflife)
 
 	frequencyInSeconds := frequency.Seconds()
 	for {
 		currentCPUUsage, currentReadUsage, currentWriteUsage := m.getActiveUsage(frequencyInSeconds)
-		currentScaledCPUUsage := newWeight * currentCPUUsage
-		currentScaledReadUsage := newWeight * currentReadUsage
-		currentScaledWriteUsage := newWeight * currentWriteUsage
+		currentScaledCPUUsage := newCPUWeight * currentCPUUsage
+		currentScaledReadUsage := newDiskWeight * currentReadUsage
+		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
 		m.usageLock.Lock()
-		m.cpuUsage = oldWeight*m.cpuUsage + currentScaledCPUUsage
-		m.readUsage = oldWeight*m.readUsage + currentScaledReadUsage
-		m.writeUsage = oldWeight*m.writeUsage + currentScaledWriteUsage
+		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
+		m.readUsage = oldDiskWeight*m.readUsage + currentScaledReadUsage
+		m.writeUsage = oldDiskWeight*m.writeUsage + currentScaledWriteUsage
 		m.usageLock.Unlock()
 
 		select {

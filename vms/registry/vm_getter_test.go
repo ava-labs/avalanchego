@@ -147,7 +147,7 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 			FileReader:      mockReader,
 			Manager:         mockManager,
 			PluginDirectory: pluginDir,
-			CPUTracker:      resource.NewManager(time.Hour, time.Hour),
+			CPUTracker:      resource.NewManager(time.Hour, time.Hour, time.Hour),
 		},
 	)
 

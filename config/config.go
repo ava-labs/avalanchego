@@ -1257,8 +1257,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	nodeConfig.CPUTrackerFrequency = v.GetDuration(CPUTrackerFrequencyKey)
-	nodeConfig.CPUTrackerHalflife = v.GetDuration(CPUTrackerHalflifeKey)
+	nodeConfig.SystemTrackerFrequency = v.GetDuration(SystemTrackerFrequencyKey)
+	nodeConfig.SystemTrackerProcessingHalflife = v.GetDuration(SystemTrackerProcessingHalflifeKey)
+	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
+	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
 	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	if err != nil {
