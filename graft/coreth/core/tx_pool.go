@@ -632,12 +632,19 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 	return txs
 }
 
-func (pool *TxPool) CheckNonceOrdering(from common.Address, txNonce uint64) error {
+// checks transaction validity against the current state.
+func (pool *TxPool) checkTxState(from common.Address, tx *types.Transaction) error {
 	pool.currentStateLock.Lock()
 	defer pool.currentStateLock.Unlock()
 
+	// cost == V + GP * GL
+	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
+		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
+	}
+
+	txNonce := tx.Nonce()
 	// Ensure the transaction adheres to nonce ordering
-	if currentNonce, txNonce := pool.currentState.GetNonce(from), txNonce; currentNonce > txNonce {
+	if currentNonce := pool.currentState.GetNonce(from); currentNonce > txNonce {
 		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)",
 			ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
 	}
@@ -692,18 +699,13 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.minimumFee != nil && tx.GasFeeCapIntCmp(pool.minimumFee) < 0 {
 		return fmt.Errorf("%w: address %s have gas fee cap (%d) < pool minimum fee cap (%d)", ErrUnderpriced, from.Hex(), tx.GasFeeCap(), pool.minimumFee)
 	}
+
 	// Ensure the transaction adheres to nonce ordering
-	if err := pool.CheckNonceOrdering(from, tx.Nonce()); err != nil {
+	if err := pool.checkTxState(from, tx); err != nil {
 		return err
 	}
 	// Transactor should have enough funds to cover the costs
-	// cost == V + GP * GL
-	pool.currentStateLock.Lock()
-	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
-		pool.currentStateLock.Unlock()
-		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
-	}
-	pool.currentStateLock.Unlock()
+
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
 	if err != nil {
@@ -990,7 +992,7 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 	newErrs, dirtyAddrs := pool.addTxsLocked(news, local)
 	pool.mu.Unlock()
 
-	var nilSlot = 0
+	nilSlot := 0
 	for _, err := range newErrs {
 		for errs[nilSlot] != nil {
 			nilSlot++
