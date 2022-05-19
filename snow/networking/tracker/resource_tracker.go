@@ -283,7 +283,7 @@ func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*tracker
 		processingTimeMetric: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "processing_time",
-			Help:      "Tracked processing time over all nodes. Value would excepted to be in [0, number of CPU cores], but can go higher IO bound processes and thread multiplexing",
+			Help:      "Tracked processing time over all nodes. Value expected to be in [0, number of CPU cores], but can go higher due to IO bound processes and thread multiplexing",
 		}),
 		cpuMetric: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
