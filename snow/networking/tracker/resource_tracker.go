@@ -238,7 +238,7 @@ func (rt *resourceTracker) StopProcessing(nodeID ids.NodeID, now time.Time) {
 
 // getMeter returns the meter used to measure CPU time spent processing
 // messages from [nodeID].
-// assumes [ct.lock] is held.
+// assumes [rt.lock] is held.
 func (rt *resourceTracker) getMeter(nodeID ids.NodeID) meter.Meter {
 	m, exists := rt.meters.Get(nodeID)
 	if exists {
@@ -253,7 +253,7 @@ func (rt *resourceTracker) getMeter(nodeID ids.NodeID) meter.Meter {
 // prune attempts to remove meters that currently show a value less than
 // [epsilon].
 //
-// Because [ct.meters] isn't guaranteed to be sorted by their values, this
+// Because [rt.meters] isn't guaranteed to be sorted by their values, this
 // doesn't guarantee that all meters showing less than [epsilon] are removed.
 func (rt *resourceTracker) prune(now time.Time) {
 	for {

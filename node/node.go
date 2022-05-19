@@ -1135,7 +1135,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing validators: %w", err)
 	}
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
-		return fmt.Errorf("problem initializing CPU tracker: %w", err)
+		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
 	n.initDiskTargeter(&config.DiskTargeterConfig, primaryNetVdrs)
