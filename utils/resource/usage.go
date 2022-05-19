@@ -202,7 +202,7 @@ func (m *manager) getActiveUsage() (float64, float64, float64) {
 
 		p.lastUpdateTime = now
 		p.lastReadBytes = io.ReadBytes
-		p.lastWriteBytes = io.ReadBytes
+		p.lastWriteBytes = io.WriteBytes
 	}
 
 	return usage / 100, read, write
