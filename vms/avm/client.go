@@ -399,8 +399,10 @@ func (c *client) CreateFixedCapAsset(
 	res := &FormattedAssetID{}
 	holders := make([]*Holder, len(clientHolders))
 	for i, clientHolder := range clientHolders {
-		holders[i].Amount = cjson.Uint64(clientHolder.Amount)
-		holders[i].Address = clientHolder.Address.String()
+		holders[i] = &Holder{
+			Amount:  cjson.Uint64(clientHolder.Amount),
+			Address: clientHolder.Address.String(),
+		}
 	}
 	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{

@@ -31,7 +31,7 @@ func (mc *mockClient) SendRequest(
 	return nil
 }
 
-func TestCreateAsset(t *testing.T) {
+func TestClientCreateAsset(t *testing.T) {
 	assert := assert.New(t)
 	client := client{}
 	{
@@ -120,6 +120,81 @@ func TestCreateAsset(t *testing.T) {
 			0,
 			clientHolders,
 			clientMinters,
+		)
+	}
+}
+
+func TestClientCreateFixedCapAsset(t *testing.T) {
+	assert := assert.New(t)
+	client := client{}
+	{
+		// empty slices
+		clientHolders := []*ClientHolder{}
+		clientFrom := []ids.ShortID{}
+		clientChangeAddr := ids.GenerateTestShortID()
+		serviceHolders := []*Holder{}
+		serviceFrom := []string{}
+		serviceChangeAddr := clientChangeAddr.String()
+		expectedInData := &CreateAssetArgs{
+			JSONSpendHeader: api.JSONSpendHeader{
+				JSONFromAddrs:  api.JSONFromAddrs{From: serviceFrom},
+				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: serviceChangeAddr},
+			},
+			InitialHolders: serviceHolders,
+		}
+		client.requester = &mockClient{
+			assert:         assert,
+			expectedInData: expectedInData,
+		}
+		_, _ = client.CreateFixedCapAsset(
+			context.Background(),
+			api.UserPass{},
+			clientFrom,
+			clientChangeAddr,
+			"",
+			"",
+			0,
+			clientHolders,
+		)
+	}
+	{
+		// non empty slices
+		clientHolders := []*ClientHolder{
+			{
+				Amount:  11,
+				Address: ids.GenerateTestShortID(),
+			},
+		}
+		clientFrom := []ids.ShortID{ids.GenerateTestShortID()}
+		clientChangeAddr := ids.GenerateTestShortID()
+		serviceHolders := []*Holder{
+			{
+				Amount:  json.Uint64(clientHolders[0].Amount),
+				Address: clientHolders[0].Address.String(),
+			},
+		}
+		serviceFrom := []string{clientFrom[0].String()}
+		serviceChangeAddr := clientChangeAddr.String()
+		expectedInData := &CreateAssetArgs{
+			JSONSpendHeader: api.JSONSpendHeader{
+				JSONFromAddrs:  api.JSONFromAddrs{From: serviceFrom},
+				JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: serviceChangeAddr},
+			},
+			InitialHolders: serviceHolders,
+		}
+		client.requester = &mockClient{
+			assert:         assert,
+			expectedInData: expectedInData,
+		}
+		_, _ = client.CreateFixedCapAsset(
+			context.Background(),
+			api.UserPass{},
+			clientFrom,
+			clientChangeAddr,
+			"",
+			"",
+			0,
+			clientHolders,
 		)
 	}
 }
