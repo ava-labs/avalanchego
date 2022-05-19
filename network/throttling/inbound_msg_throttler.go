@@ -5,6 +5,7 @@ package throttling
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -25,10 +26,11 @@ type InboundMsgThrottler interface {
 }
 
 type InboundMsgThrottlerConfig struct {
-	MsgByteThrottlerConfig
-	BandwidthThrottlerConfig
-	CPUThrottlerConfig
-	MaxProcessingMsgsPerNode uint64 `json:"maxProcessingMsgsPerNode"`
+	MsgByteThrottlerConfig   `json:"byteThrottlerConfig"`
+	BandwidthThrottlerConfig `json:"bandwidthThrottlerConfig"`
+	CPUThrottlerConfig       SystemThrottlerConfig `json:"cpuThrottlerConfig"`
+	DiskThrottlerConfig      SystemThrottlerConfig `json:"diskThrottlerConfig"`
+	MaxProcessingMsgsPerNode uint64                `json:"maxProcessingMsgsPerNode"`
 }
 
 // Returns a new, sybil-safe inbound message throttler.
@@ -38,8 +40,9 @@ func NewInboundMsgThrottler(
 	registerer prometheus.Registerer,
 	vdrs validators.Set,
 	throttlerConfig InboundMsgThrottlerConfig,
-	cpuTracker tracker.TimeTracker,
-	cpuTargeter tracker.CPUTargeter,
+	resourceTracker tracker.ResourceTracker,
+	cpuTargeter tracker.Targeter,
+	diskTargeter tracker.Targeter,
 ) (InboundMsgThrottler, error) {
 	byteThrottler, err := newInboundMsgByteThrottler(
 		log,
@@ -68,13 +71,24 @@ func NewInboundMsgThrottler(
 	if err != nil {
 		return nil, err
 	}
-	cpuThrottler, err := NewCPUThrottler(
-		namespace,
+	cpuThrottler, err := NewSystemThrottler(
+		fmt.Sprintf("%s_cpu", namespace),
 		registerer,
 		throttlerConfig.CPUThrottlerConfig,
 		vdrs,
-		cpuTracker,
+		resourceTracker.CPUTracker(),
 		cpuTargeter,
+	)
+	if err != nil {
+		return nil, err
+	}
+	diskThrottler, err := NewSystemThrottler(
+		fmt.Sprintf("%s_disk", namespace),
+		registerer,
+		throttlerConfig.DiskThrottlerConfig,
+		vdrs,
+		resourceTracker.DiskTracker(),
+		diskTargeter,
 	)
 	if err != nil {
 		return nil, err
@@ -84,6 +98,7 @@ func NewInboundMsgThrottler(
 		bufferThrottler:    bufferThrottler,
 		bandwidthThrottler: bandwidthThrottler,
 		cpuThrottler:       cpuThrottler,
+		diskThrottler:      diskThrottler,
 	}, nil
 }
 
@@ -109,7 +124,9 @@ type inboundMsgThrottler struct {
 	// node that we're currently processing.
 	byteThrottler *inboundMsgByteThrottler
 	// Rate-limits based on CPU usage caused by a given node.
-	cpuThrottler CPUThrottler
+	cpuThrottler SystemThrottler
+	// Rate-limits based on disk usage caused by a given node.
+	diskThrottler SystemThrottler
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
@@ -123,6 +140,8 @@ func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeI
 	t.bandwidthThrottler.Acquire(ctx, msgSize, nodeID)
 	// Wait until our CPU usage drops to an acceptable level.
 	t.cpuThrottler.Acquire(ctx, nodeID)
+	// Wait until our disk usage drops to an acceptable level.
+	t.diskThrottler.Acquire(ctx, nodeID)
 	// Acquire space on the inbound message byte buffer
 	t.byteThrottler.Acquire(msgSize, nodeID)
 }

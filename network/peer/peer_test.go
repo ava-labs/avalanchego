@@ -24,9 +24,9 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -79,7 +79,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	assert.NoError(err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	assert.NoError(err)
 	sharedConfig := Config{
 		Metrics:              metrics,
@@ -94,16 +94,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PingFrequency:        constants.DefaultPingFrequency,
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
-		CPUTracker:           cpuTracker,
-		CPUTargeter: tracker.NewCPUTargeter(
-			&tracker.CPUTargeterConfig{
-				VdrCPUAlloc:        10,
-				MaxNonVdrUsage:     10,
-				MaxNonVdrNodeUsage: 10,
-			},
-			validators.NewSet(),
-			cpuTracker,
-		),
+		ResourceTracker:      resourceTracker,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig

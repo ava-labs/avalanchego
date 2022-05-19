@@ -52,13 +52,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -162,15 +162,19 @@ type Node struct {
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
 
-	cpuManager cpu.Manager
+	resourceManager resource.Manager
 
-	// Tracks the CPU usage caused by processing
+	// Tracks the CPU/disk usage caused by processing
 	// messages of each peer.
-	cpuTracker tracker.TimeTracker
+	resourceTracker tracker.ResourceTracker
 
 	// Specifies how much CPU usage each peer can cause before
 	// we rate-limit them.
-	cpuTargeter tracker.CPUTargeter
+	cpuTargeter tracker.Targeter
+
+	// Specifies how much disk usage each peer can cause before
+	// we rate-limit them.
+	diskTargeter tracker.Targeter
 }
 
 /*
@@ -266,8 +270,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
-	n.Config.NetworkConfig.CPUTracker = n.cpuTracker
+	n.Config.NetworkConfig.ResourceTracker = n.resourceTracker
 	n.Config.NetworkConfig.CPUTargeter = n.cpuTargeter
+	n.Config.NetworkConfig.DiskTargeter = n.diskTargeter
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
@@ -653,8 +658,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
-		CPUTracker:                              n.cpuTracker,
-		CPUTargeter:                             n.cpuTargeter,
+		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		StateSyncDisableRequests:                n.Config.StateSyncDisableRequests,
 	})
@@ -730,7 +734,7 @@ func (n *Node) initVMs() error {
 			FileReader:      filesystem.NewReader(),
 			Manager:         n.Config.VMManager,
 			PluginDirectory: n.Config.PluginDir,
-			CPUTracker:      n.cpuManager,
+			CPUTracker:      n.resourceManager,
 		}),
 		VMRegisterer: vmRegisterer,
 	})
@@ -1037,25 +1041,38 @@ func (n *Node) initVdrs() (validators.Set, error) {
 	return vdrSet, nil
 }
 
-// Initialize [n.CPUTracker].
-func (n *Node) initCPUTracker(reg prometheus.Registerer) error {
-	n.cpuManager = cpu.NewManager(n.Config.CPUTrackerFrequency, n.Config.CPUTrackerHalflife)
-	n.cpuManager.TrackProcess(os.Getpid())
+// Initialize [n.resourceManager].
+func (n *Node) initResourceManager(reg prometheus.Registerer) error {
+	n.resourceManager = resource.NewManager(n.Config.CPUTrackerFrequency, n.Config.CPUTrackerHalflife)
+	n.resourceManager.TrackProcess(os.Getpid())
 	var err error
-	n.cpuTracker, err = tracker.NewCPUTracker(reg, n.cpuManager, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
+	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.CPUTrackerHalflife)
 	return err
 }
 
-// Initialize [n.CPUTracker].
-// Assumed [n.CPUTracker] is already initialized.
+// Initialize [n.cpuTargeter].
+// Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initCPUTargeter(
-	config *tracker.CPUTargeterConfig,
+	config *tracker.TargeterConfig,
 	vdrs validators.Set,
 ) {
-	n.cpuTargeter = tracker.NewCPUTargeter(
+	n.cpuTargeter = tracker.NewTargeter(
 		config,
 		vdrs,
-		n.cpuTracker,
+		n.resourceTracker.CPUTracker(),
+	)
+}
+
+// Initialize [n.diskTargeter].
+// Assumes [n.resourceTracker] is already initialized.
+func (n *Node) initDiskTargeter(
+	config *tracker.TargeterConfig,
+	vdrs validators.Set,
+) {
+	n.diskTargeter = tracker.NewTargeter(
+		config,
+		vdrs,
+		n.resourceTracker.DiskTracker(),
 	)
 }
 
@@ -1117,10 +1134,11 @@ func (n *Node) Initialize(
 	if err != nil {
 		return fmt.Errorf("problem initializing validators: %w", err)
 	}
-	if err := n.initCPUTracker(n.MetricsRegisterer); err != nil {
+	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing CPU tracker: %w", err)
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
+	n.initDiskTargeter(&config.DiskTargeterConfig, primaryNetVdrs)
 	if err = n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
@@ -1201,8 +1219,8 @@ func (n *Node) shutdown() {
 		time.Sleep(n.Config.ShutdownWait)
 	}
 
-	if n.cpuManager != nil {
-		n.cpuManager.Shutdown()
+	if n.resourceManager != nil {
+		n.resourceManager.Shutdown()
 	}
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {

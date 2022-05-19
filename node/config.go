@@ -214,5 +214,7 @@ type Config struct {
 	// Larger halflife --> CPU usage metrics change more slowly.
 	CPUTrackerHalflife time.Duration `json:"cpuTrackerHalflife"`
 
-	CPUTargeterConfig tracker.CPUTargeterConfig `json:"cpuTargeterConfig"`
+	CPUTargeterConfig tracker.TargeterConfig `json:"cpuTargeterConfig"`
+
+	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
 }

@@ -36,12 +36,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -2101,17 +2101,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
-	cpuTargeter := timetracker.NewCPUTargeter(
-		&timetracker.CPUTargeterConfig{
-			VdrCPUAlloc:        10,
-			MaxNonVdrUsage:     10,
-			MaxNonVdrNodeUsage: 10,
-		},
-		vdrs,
-		cpuTracker,
-	)
 	handler, err := handler.New(
 		mc,
 		bootstrapConfig.Ctx,
@@ -2120,7 +2111,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		nil,
 		time.Hour,
 		cpuTracker,
-		cpuTargeter,
 	)
 	assert.NoError(t, err)
 

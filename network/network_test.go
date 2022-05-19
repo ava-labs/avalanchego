@@ -25,9 +25,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -71,10 +71,13 @@ var (
 				RefillRate:   units.MiB,
 				MaxBurstSize: constants.DefaultMaxMessageSize,
 			},
-			CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
 				MaxRecheckDelay: 50 * time.Millisecond,
 			},
 			MaxProcessingMsgsPerNode: 100,
+			DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: 50 * time.Millisecond,
+			},
 		},
 		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 			VdrAllocSize:        1 * units.GiB,
@@ -112,33 +115,35 @@ var (
 		RequireValidatorToConnect: false,
 
 		MaximumInboundMessageTimeout: 30 * time.Second,
-		CPUTracker:                   newDefaultCPUTracker(),
+		ResourceTracker:              newDefaultResourceTracker(),
 		CPUTargeter:                  nil, // Set in init
+		DiskTargeter:                 nil, // Set in init
 	}
 )
 
 func init() {
-	defaultConfig.CPUTargeter = newDefaultCPUTargeter(defaultConfig.CPUTracker)
+	defaultConfig.CPUTargeter = newDefaultTargeter(defaultConfig.ResourceTracker.CPUTracker())
+	defaultConfig.DiskTargeter = newDefaultTargeter(defaultConfig.ResourceTracker.DiskTracker())
 }
 
-func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
-	return tracker.NewCPUTargeter(
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:        10,
+func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
+	return tracker.NewTargeter(
+		&tracker.TargeterConfig{
+			VdrAlloc:           10,
 			MaxNonVdrUsage:     10,
 			MaxNonVdrNodeUsage: 10,
 		},
 		validators.NewSet(),
-		cpuTracker,
+		t,
 	)
 }
 
-func newDefaultCPUTracker() tracker.TimeTracker {
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+func newDefaultResourceTracker() tracker.ResourceTracker {
+	tracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		panic(err)
 	}
-	return cpuTracker
+	return tracker
 }
 
 func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {

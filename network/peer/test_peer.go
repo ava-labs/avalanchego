@@ -20,9 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -90,7 +90,7 @@ func StartTestPeer(
 		IP:   net.IPv6zero,
 		Port: 0,
 	}
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -118,16 +118,7 @@ func StartTestPeer(
 			PingFrequency:        constants.DefaultPingFrequency,
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
-			CPUTracker:           cpuTracker,
-			CPUTargeter: tracker.NewCPUTargeter(
-				&tracker.CPUTargeterConfig{
-					VdrCPUAlloc:        10,
-					MaxNonVdrUsage:     10,
-					MaxNonVdrNodeUsage: 10,
-				},
-				validators.NewSet(),
-				cpuTracker,
-			),
+			ResourceTracker:      resourceTracker,
 		},
 		conn,
 		cert,
