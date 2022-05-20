@@ -4,34 +4,25 @@
 package ids
 
 import (
-	//"bytes"
-	//"encoding/json"
-	//"reflect"
+	"fmt"
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPrivateKeyEquality(t *testing.T) {
-    assert := assert.New(t)
-	pk := PrivateKey{24}
-	pkCopy := PrivateKey{24}
-	assert.Equal(pk, pkCopy)
-	pk2 := PrivateKey{}
-	assert.NotEqual(pk, pk2)
-}
 func TestPrivateKeyFromString(t *testing.T) {
-    assert := assert.New(t)
+	assert := assert.New(t)
 	pk := PrivateKey{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	pkStr := pk.String()
 	pk2, err := PrivateKeyFromString(pkStr)
-    assert.NoError(err)
+	assert.NoError(err)
 	assert.Equal(pk, pk2)
-    expected := "PrivateKey-2qg4x8qM2s2qGNSXG"
-    assert.Equal(expected, pkStr)
+	expected := "PrivateKey-2qg4x8qM2s2qGNSXG"
+	assert.Equal(expected, pkStr)
 }
 
 func TestPrivateKeyFromStringError(t *testing.T) {
-    assert := assert.New(t)
+	assert := assert.New(t)
 	tests := []struct {
 		in string
 	}{
@@ -42,13 +33,13 @@ func TestPrivateKeyFromStringError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := PrivateKeyFromString(tt.in)
-            assert.Error(err)
+			assert.Error(err)
 		})
 	}
 }
 
 func TestPrivateKeyMarshalJSON(t *testing.T) {
-    assert := assert.New(t)
+	assert := assert.New(t)
 	tests := []struct {
 		label string
 		in    PrivateKey
@@ -66,133 +57,97 @@ func TestPrivateKeyMarshalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			out, err := tt.in.MarshalJSON()
-            assert.Equal(err, tt.err)
-            assert.Equal(out, tt.out)
+			assert.Equal(err, tt.err)
+			assert.Equal(out, tt.out)
 		})
 	}
 }
-/*
 
-func TestNodeIDUnmarshalJSON(t *testing.T) {
+func TestPrivateKeyUnmarshalJSON(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		label     string
 		in        []byte
-		out       NodeID
+		out       PrivateKey
 		shouldErr bool
 	}{
-		{"NodeID{}", []byte("null"), NodeID{}, false},
+		{"PrivateKey{}", []byte("null"), PrivateKey{}, false},
 		{
-			"NodeID(\"ava labs\")",
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
-			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+			"PrivateKey(\"ava labs\")",
+			[]byte("\"PrivateKey-2qg4x8qM2s2qGNSXG\""),
+			PrivateKey{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			false,
 		},
 		{
 			"missing start quote",
-			[]byte("NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
-			NodeID{},
+			[]byte("PrivateKey-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			PrivateKey{},
 			true,
 		},
 		{
 			"missing end quote",
-			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
-			NodeID{},
+			[]byte("\"PrivateKey-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
+			PrivateKey{},
 			true,
 		},
 		{
-			"NodeID-",
-			[]byte("\"NodeID-\""),
-			NodeID{},
+			"PrivateKey-",
+			[]byte("\"PrivateKey-\""),
+			PrivateKey{},
 			true,
 		},
 		{
-			"NodeID-1",
-			[]byte("\"NodeID-1\""),
-			NodeID{},
-			true,
-		},
-		{
-			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
-			[]byte("\"NodeID-1\""),
-			NodeID{},
+			"PrivateKey-1",
+			[]byte("\"PrivateKey-1\""),
+			PrivateKey{},
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			foo := NodeID{}
+			foo := PrivateKey{}
+			fmt.Println(foo.String())
 			err := foo.UnmarshalJSON(tt.in)
-			switch {
-			case err == nil && tt.shouldErr:
-				t.Errorf("Expected no error but got error %v", err)
-			case err != nil && !tt.shouldErr:
-				t.Errorf("unxpected error: %v", err)
-			case foo != tt.out:
-				t.Errorf("got %q, expected %q", foo, tt.out)
+			if tt.shouldErr {
+				assert.Error(err)
+			} else {
+				assert.NoError(err)
 			}
+			assert.Equal(foo, tt.out)
 		})
 	}
 }
 
-func TestNodeIDString(t *testing.T) {
+func TestPrivateKeyString(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		label    string
-		id       NodeID
+		id       PrivateKey
 		expected string
 	}{
-		{"NodeID{}", NodeID{}, "NodeID-111111111111111111116DBWJs"},
-		{"NodeID{24}", NodeID{24}, "NodeID-3BuDc2d1Efme5Apba6SJ8w3Tz7qeh6mHt"},
+		{"PrivateKey{}", PrivateKey{}, "PrivateKey-45PJLL"},
+		{"PrivateKey{24}", PrivateKey{24}, "PrivateKey-3nv2Q5L"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			result := tt.id.String()
-			if result != tt.expected {
-				t.Errorf("got %q, expected %q", result, tt.expected)
-			}
+			assert.Equal(result, tt.expected)
 		})
 	}
 }
 
-func TestSortNodeIDs(t *testing.T) {
-	ids := []NodeID{
+func TestSortPrivateKeys(t *testing.T) {
+	assert := assert.New(t)
+	pks := []PrivateKey{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	SortNodeIDs(ids)
-	expected := []NodeID{
+	SortPrivateKeys(pks)
+	expected := []PrivateKey{
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	if !reflect.DeepEqual(ids, expected) {
-		t.Fatal("[]NodeID was not sorted lexographically")
-	}
+	assert.Equal(pks, expected)
 }
-
-func TestNodeIDMapMarshalling(t *testing.T) {
-	originalMap := map[NodeID]int{
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
-	}
-	mapJSON, err := json.Marshal(originalMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var unmarshalledMap map[NodeID]int
-	err = json.Unmarshal(mapJSON, &unmarshalledMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(originalMap) != len(unmarshalledMap) {
-		t.Fatalf("wrong map lengths")
-	}
-	for originalID, num := range originalMap {
-		if unmarshalledMap[originalID] != num {
-			t.Fatalf("map was incorrectly Unmarshalled")
-		}
-	}
-}
-*/
