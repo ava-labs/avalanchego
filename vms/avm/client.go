@@ -357,7 +357,6 @@ func (c *client) CreateAsset(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
-	var err error
 	holders := make([]*Holder, len(clientHolders))
 	for i, clientHolder := range clientHolders {
 		holders[i] = &Holder{
@@ -367,10 +366,12 @@ func (c *client) CreateAsset(
 	}
 	minters := make([]Owners, len(clientMinters))
 	for i, clientMinter := range clientMinters {
-		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
-		minters[i].Minters = ids.ShortIDsToStrings(clientMinter.Minters)
+		minters[i] = Owners{
+			Threshold: cjson.Uint32(clientMinter.Threshold),
+			Minters:   ids.ShortIDsToStrings(clientMinter.Minters),
+		}
 	}
-	err = c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -432,8 +433,10 @@ func (c *client) CreateVariableCapAsset(
 	res := &FormattedAssetID{}
 	minters := make([]Owners, len(clientMinters))
 	for i, clientMinter := range clientMinters {
-		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
-		minters[i].Minters = ids.ShortIDsToStrings(clientMinter.Minters)
+		minters[i] = Owners{
+			Threshold: cjson.Uint32(clientMinter.Threshold),
+			Minters:   ids.ShortIDsToStrings(clientMinter.Minters),
+		}
 	}
 	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -462,8 +465,10 @@ func (c *client) CreateNFTAsset(
 	res := &FormattedAssetID{}
 	minters := make([]Owners, len(clientMinters))
 	for i, clientMinter := range clientMinters {
-		minters[i].Threshold = cjson.Uint32(clientMinter.Threshold)
-		minters[i].Minters = ids.ShortIDsToStrings(clientMinter.Minters)
+		minters[i] = Owners{
+			Threshold: cjson.Uint32(clientMinter.Threshold),
+			Minters:   ids.ShortIDsToStrings(clientMinter.Minters),
+		}
 	}
 	err := c.requester.SendRequest(ctx, "createNFTAsset", &CreateNFTAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
@@ -557,9 +562,11 @@ func (c *client) SendMultiple(
 	res := &api.JSONTxID{}
 	outputs := make([]SendOutput, len(clientOutputs))
 	for i, clientOutput := range clientOutputs {
-		outputs[i].Amount = cjson.Uint64(clientOutput.Amount)
-		outputs[i].AssetID = clientOutput.AssetID
-		outputs[i].To = clientOutput.To.String()
+		outputs[i] = SendOutput{
+			Amount:  cjson.Uint64(clientOutput.Amount),
+			AssetID: clientOutput.AssetID,
+			To:      clientOutput.To.String(),
+		}
 	}
 	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{

@@ -342,13 +342,17 @@ func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Op
 		return nil, err
 	}
 	subnets := make([]ClientSubnet, len(res.Subnets))
-	for i, APIsubnet := range res.Subnets {
-		subnets[i].ID = APIsubnet.ID
-		subnets[i].ControlKeys, err = address.ParseToIDs(APIsubnet.ControlKeys)
+	for i, apiSubnet := range res.Subnets {
+		controlKeys, err := address.ParseToIDs(apiSubnet.ControlKeys)
 		if err != nil {
 			return nil, err
 		}
-		subnets[i].Threshold = uint32(APIsubnet.Threshold)
+
+		subnets[i] = ClientSubnet{
+			ID:          apiSubnet.ID,
+			ControlKeys: controlKeys,
+			Threshold:   uint32(apiSubnet.Threshold),
+		}
 	}
 	return subnets, err
 }
