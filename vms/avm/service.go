@@ -46,6 +46,7 @@ var (
 	errNilTxID                = errors.New("nil transaction ID")
 	errNoAddresses            = errors.New("no addresses provided")
 	errNoKeys                 = errors.New("from addresses have no keys or funds")
+	errMissingPrivateKey      = errors.New("argument 'privateKey' not given")
 )
 
 // Service defines the base service for the asset vm
@@ -826,22 +827,20 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return err
 	}
 
-	sk, err := user.GetKey(addr)
+	reply.PrivateKey, err = user.GetKey(addr)
 	if err != nil {
 		// Drop any potential error closing the database to report the original
 		// error
 		_ = user.Close()
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
-
-	reply.PrivateKey = sk
 	return user.Close()
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
+	PrivateKey *crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ImportKeyReply is the response for ImportKey
@@ -854,7 +853,9 @@ type ImportKeyReply struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
 
-	sk := &args.PrivateKey
+	if args.PrivateKey == nil {
+		return errMissingPrivateKey
+	}
 
 	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -862,11 +863,11 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 	defer user.Close()
 
-	if err := user.PutKeys(sk); err != nil {
+	if err := user.PutKeys(args.PrivateKey); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	newAddress := sk.PublicKey().Address()
+	newAddress := args.PrivateKey.PublicKey().Address()
 	reply.Address, err = service.vm.FormatLocalAddress(newAddress)
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)

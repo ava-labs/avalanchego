@@ -117,7 +117,7 @@ type Client interface {
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
 	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error)
 	// ImportKey imports [privateKey] to [user]
-	ImportKey(ctx context.Context, user api.UserPass, privateKey crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
 	Mint(
 		ctx context.Context,
@@ -505,7 +505,7 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.Shor
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,

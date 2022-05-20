@@ -65,6 +65,7 @@ var (
 	errMissingName                = errors.New("argument 'name' not given")
 	errMissingVMID                = errors.New("argument 'vmID' not given")
 	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
+	errMissingPrivateKey          = errors.New("argument 'privateKey' not given")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -97,7 +98,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
+	PrivateKey *crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -114,32 +115,32 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return err
 	}
 
-	sk, err := user.GetKey(address)
+	reply.PrivateKey, err = user.GetKey(address)
 	if err != nil {
 		// Drop any potential error closing the user to report the original
 		// error
 		_ = user.Close()
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
-
-	reply.PrivateKey = *sk
 	return user.Close()
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
+	PrivateKey *crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("Platform: ImportKey called for user '%s'", args.Username)
 
-	sk := &args.PrivateKey
+	if args.PrivateKey == nil {
+		return errMissingPrivateKey
+	}
 
 	var err error
-	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
+	reply.Address, err = service.vm.FormatLocalAddress(args.PrivateKey.PublicKey().Address())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -150,7 +151,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 	defer user.Close()
 
-	if err := user.PutKeys(sk); err != nil {
+	if err := user.PutKeys(args.PrivateKey); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return user.Close()

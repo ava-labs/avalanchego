@@ -2407,7 +2407,7 @@ func TestImportExportKey(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		PrivateKey: *sk,
+		PrivateKey: sk,
 	}
 	importReply := &api.JSONAddress{}
 	if err = s.ImportKey(nil, importArgs, importReply); err != nil {
@@ -2456,7 +2456,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		PrivateKey: *sk,
+		PrivateKey: sk,
 	}
 	reply := api.JSONAddress{}
 	if err = s.ImportKey(nil, &args, &reply); err != nil {
