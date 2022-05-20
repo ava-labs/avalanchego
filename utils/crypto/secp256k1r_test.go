@@ -101,18 +101,18 @@ func TestVerifyMutatedSignature(t *testing.T) {
 
 func TestPrivateKeySECP256K1RFromString(t *testing.T) {
 	assert := assert.New(t)
-    // PrivateKeySECP256K1RFromString(String)
+	// PrivateKeySECP256K1RFromString(String)
 	f := FactorySECP256K1R{}
 	kIntf, _ := f.NewPrivateKey()
-    k := kIntf.(*PrivateKeySECP256K1R)
+	k := kIntf.(*PrivateKeySECP256K1R)
 	k2, err := PrivateKeySECP256K1RFromString(k.String())
 	assert.NoError(err)
 	assert.Equal(k, &k2)
-    // String(PrivateKeySECP256K1RFromString)
-    kStr := "PrivateKey-2qg4x8qM2s2qGNSXG"
+	// String(PrivateKeySECP256K1RFromString)
+	kStr := "PrivateKey-2qg4x8qM2s2qGNSXG"
 	k2, err = PrivateKeySECP256K1RFromString(kStr)
 	assert.NoError(err)
-    assert.Equal(kStr, k2.String())
+	assert.Equal(kStr, k2.String())
 }
 
 func TestPrivateKeySECP256K1RFromStringError(t *testing.T) {
@@ -134,30 +134,30 @@ func TestPrivateKeySECP256K1RFromStringError(t *testing.T) {
 
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
 	assert := assert.New(t)
-    // UnmarshalJSON(MarshalJSON)
+	// UnmarshalJSON(MarshalJSON)
 	f := FactorySECP256K1R{}
 	kIntf, _ := f.NewPrivateKey()
-    k := kIntf.(*PrivateKeySECP256K1R)
-    kJSON, err := k.MarshalJSON()
+	k := kIntf.(*PrivateKeySECP256K1R)
+	kJSON, err := k.MarshalJSON()
 	assert.NoError(err)
-    k2 := PrivateKeySECP256K1R{}
-    err = k2.UnmarshalJSON(kJSON)
+	k2 := PrivateKeySECP256K1R{}
+	err = k2.UnmarshalJSON(kJSON)
 	assert.NoError(err)
 	assert.Equal(k, &k2)
-    // MarshalJSON(UnmarshalJSON)
-    kJSON = []byte("\"PrivateKey-2qg4x8qM2s2qGNSXG\"")
-    err = k2.UnmarshalJSON(kJSON)
+	// MarshalJSON(UnmarshalJSON)
+	kJSON = []byte("\"PrivateKey-2qg4x8qM2s2qGNSXG\"")
+	err = k2.UnmarshalJSON(kJSON)
 	assert.NoError(err)
-    kJSON2, err := k2.MarshalJSON()
+	kJSON2, err := k2.MarshalJSON()
 	assert.NoError(err)
-    assert.Equal(kJSON, kJSON2)
+	assert.Equal(kJSON, kJSON2)
 }
 
 func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 	assert := assert.New(t)
 	tests := []struct {
-		label     string
-		in        []byte
+		label string
+		in    []byte
 	}{
 		{
 			"missing start quote",
@@ -180,7 +180,7 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			foo := PrivateKeySECP256K1R{}
 			err := foo.UnmarshalJSON(tt.in)
-            assert.Error(err)
+			assert.Error(err)
 		})
 	}
 }
