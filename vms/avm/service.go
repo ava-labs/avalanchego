@@ -854,7 +854,7 @@ type ImportKeyReply struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
 
-	sk := args.PrivateKey
+	sk := &args.PrivateKey
 
 	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -862,7 +862,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 	defer user.Close()
 
-	if err := user.PutKeys(&sk); err != nil {
+	if err := user.PutKeys(sk); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
