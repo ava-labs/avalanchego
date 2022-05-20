@@ -1,51 +1,41 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package txs
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const (
-	codecVersion = 0
-)
+const codecVersion = 0
 
-var (
-	_ codec.Registry = &codecRegistry{}
-	_ secp256k1fx.VM = &fxVM{}
-)
+var _ Parser = &parser{}
 
-type codecRegistry struct {
-	codecs      []codec.Registry
-	index       int
-	typeToIndex map[reflect.Type]int
+type Parser interface {
+	Codec() codec.Manager
+	GenesisCodec() codec.Manager
+
+	Parse(bytes []byte) (*Tx, error)
+	ParseGenesis(bytes []byte) (*Tx, error)
 }
 
-func (cr *codecRegistry) RegisterType(val interface{}) error {
-	valType := reflect.TypeOf(val)
-	cr.typeToIndex[valType] = cr.index
-
-	errs := wrappers.Errs{}
-	for _, c := range cr.codecs {
-		errs.Add(c.RegisterType(val))
-	}
-	return errs.Err
+type parser struct {
+	cm  codec.Manager
+	gcm codec.Manager
 }
 
-// NewCodecs returns the genesis codec and the normal codec for the provided
-// feature extensions.
-func NewCodecs(fxs []fxs.Fx) (codec.Manager, codec.Manager, error) {
-	return newCustomCodecs(
+func NewParser(fxs []fxs.Fx) (Parser, error) {
+	return NewCustomParser(
 		make(map[reflect.Type]int),
 		&mockable.Clock{},
 		logging.NoLog{},
@@ -53,13 +43,13 @@ func NewCodecs(fxs []fxs.Fx) (codec.Manager, codec.Manager, error) {
 	)
 }
 
-func newCustomCodecs(
+func NewCustomParser(
 	typeToFxIndex map[reflect.Type]int,
 	clock *mockable.Clock,
 	log logging.Logger,
 	fxs []fxs.Fx,
-) (codec.Manager, codec.Manager, error) {
-	gc := linearcodec.NewCustomMaxLength(1 << 20)
+) (Parser, error) {
+	gc := linearcodec.New([]string{reflectcodec.DefaultTagName}, 1<<20)
 	c := linearcodec.NewDefault()
 
 	gcm := codec.NewManager(math.MaxInt32)
@@ -82,7 +72,7 @@ func newCustomCodecs(
 		gcm.RegisterCodec(codecVersion, gc),
 	)
 	if errs.Errored() {
-		return nil, nil, errs.Err
+		return nil, errs.Err
 	}
 
 	vm := &fxVM{
@@ -97,20 +87,35 @@ func newCustomCodecs(
 			typeToIndex: vm.typeToFxIndex,
 		}
 		if err := fx.Initialize(vm); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	return gcm, cm, nil
+	return &parser{
+		cm:  cm,
+		gcm: gcm,
+	}, nil
 }
 
-type fxVM struct {
-	typeToFxIndex map[reflect.Type]int
+func (p *parser) Codec() codec.Manager                   { return p.cm }
+func (p *parser) GenesisCodec() codec.Manager            { return p.gcm }
+func (p *parser) Parse(bytes []byte) (*Tx, error)        { return parse(p.cm, bytes) }
+func (p *parser) ParseGenesis(bytes []byte) (*Tx, error) { return parse(p.gcm, bytes) }
 
-	clock         *mockable.Clock
-	log           logging.Logger
-	codecRegistry codec.Registry
+func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
+	tx := &Tx{}
+	parsedVersion, err := cm.Unmarshal(bytes, tx)
+	if err != nil {
+		return nil, err
+	}
+	if parsedVersion != codecVersion {
+		return nil, fmt.Errorf("expected codec version %d but got %d", codecVersion, parsedVersion)
+	}
+
+	unsignedBytes, err := cm.Marshal(codecVersion, tx)
+	if err != nil {
+		return nil, err
+	}
+	tx.UnsignedTx.Initialize(unsignedBytes, bytes)
+
+	return tx, nil
 }
-
-func (vm *fxVM) Clock() *mockable.Clock        { return vm.clock }
-func (vm *fxVM) CodecRegistry() codec.Registry { return vm.codecRegistry }
-func (vm *fxVM) Logger() logging.Logger        { return vm.log }

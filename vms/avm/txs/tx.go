@@ -1,13 +1,13 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package txs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -20,8 +20,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var errNilTx = errors.New("nil tx is not valid")
+
 type UnsignedTx interface {
-	Init(*VM) error
+	snow.ContextInitializable
+
 	Initialize(unsignedBytes, bytes []byte)
 	ID() ids.ID
 	UnsignedBytes() []byte
@@ -42,8 +45,7 @@ type UnsignedTx interface {
 		creationTxFee uint64,
 		numFxs int,
 	) error
-	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error
-	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
+	Visit(visitor Visitor) error
 }
 
 // Tx is the core operation that can be performed. The tx uses the UTXO model.
@@ -55,19 +57,6 @@ type Tx struct {
 	UnsignedTx `serialize:"true" json:"unsignedTx"`
 
 	Creds []*fxs.FxCredential `serialize:"true" json:"credentials"` // The credentials of this transaction
-}
-
-// Init initializes FxID where required
-// Used for JSON marshaling of data
-func (t *Tx) Init(vm *VM) error {
-	for _, cred := range t.Creds {
-		fx, err := vm.getParsedFx(cred.Verifiable)
-		if err != nil {
-			return err
-		}
-		cred.FxID = fx.ID
-	}
-	return t.UnsignedTx.Init(vm)
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the
@@ -110,15 +99,6 @@ func (t *Tx) SyntacticVerify(
 		)
 	}
 	return nil
-}
-
-// SemanticVerify verifies that this transaction is well-formed.
-func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
-	if t == nil {
-		return errNilTx
-	}
-
-	return t.UnsignedTx.SemanticVerify(vm, tx, t.Credentials())
 }
 
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {

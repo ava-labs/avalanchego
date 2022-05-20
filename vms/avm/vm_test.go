@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -882,7 +883,7 @@ func TestIssueNFT(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []*FxCredential{
+		Creds: []*fxs.FxCredential{
 			{Verifiable: &nftfx.Credential{}},
 		},
 	}
@@ -1014,7 +1015,7 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &FxCredential{
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &fxs.FxCredential{
 		Verifiable: &propertyfx.Credential{
 			Credential: secp256k1fx.Credential{
 				Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -1049,7 +1050,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &FxCredential{Verifiable: &propertyfx.Credential{}})
+	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &fxs.FxCredential{Verifiable: &propertyfx.Credential{}})
 
 	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {

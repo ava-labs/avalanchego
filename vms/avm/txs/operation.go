@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package txs
 
 import (
 	"bytes"
@@ -69,7 +69,7 @@ func SortOperations(ops []*Operation, c codec.Manager) {
 	sort.Sort(&innerSortOperation{ops: ops, codec: c})
 }
 
-func isSortedAndUniqueOperations(ops []*Operation, c codec.Manager) bool {
+func IsSortedAndUniqueOperations(ops []*Operation, c codec.Manager) bool {
 	return utils.IsSortedAndUnique(&innerSortOperation{ops: ops, codec: c})
 }
 
@@ -99,6 +99,6 @@ func (ops *innerSortOperationsWithSigners) Swap(i, j int) {
 	ops.signers[j], ops.signers[i] = ops.signers[i], ops.signers[j]
 }
 
-func sortOperationsWithSigners(ops []*Operation, signers [][]*crypto.PrivateKeySECP256K1R, codec codec.Manager) {
+func SortOperationsWithSigners(ops []*Operation, signers [][]*crypto.PrivateKeySECP256K1R, codec codec.Manager) {
 	sort.Sort(&innerSortOperationsWithSigners{ops: ops, signers: signers, codec: codec})
 }
