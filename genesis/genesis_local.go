@@ -6,7 +6,6 @@ package genesis
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -20,10 +19,10 @@ import (
 
 const (
 	VMRQKeyStr          = "vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE"
-	VMRQKeyFormattedStr = ids.PrivateKeyPrefix + VMRQKeyStr
+	VMRQKeyFormattedStr = crypto.PrivateKeyPrefix + VMRQKeyStr
 
 	EWOQKeyStr          = "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	EWOQKeyFormattedStr = ids.PrivateKeyPrefix + EWOQKeyStr
+	EWOQKeyFormattedStr = crypto.PrivateKeyPrefix + EWOQKeyStr
 )
 
 var (

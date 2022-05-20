@@ -19,13 +19,13 @@ import (
 const (
 	// The encoding used to convert IDs from bytes to string and vice versa
 	defaultEncoding = formatting.CB58
-	nullStr         = "null"
+	NullStr         = "null"
 )
 
 var (
 	// Empty is a useful all zero value
 	Empty            = ID{}
-	errMissingQuotes = errors.New("first and last characters should be quotes")
+	ErrMissingQuotes = errors.New("first and last characters should be quotes")
 )
 
 // ID wraps a 32 byte hash used as an identifier
@@ -55,15 +55,15 @@ func (id ID) MarshalJSON() ([]byte, error) {
 
 func (id *ID) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == nullStr { // If "null", do nothing
+	if str == NullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
-		return errMissingQuotes
+		return ErrMissingQuotes
 	}
 
 	lastIndex := len(str) - 1
 	if str[0] != '"' || str[lastIndex] != '"' {
-		return errMissingQuotes
+		return ErrMissingQuotes
 	}
 
 	// Parse CB58 formatted string to bytes

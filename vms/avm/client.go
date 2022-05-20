@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -114,9 +115,9 @@ type Client interface {
 	// ListAddresses returns all addresses on this chain controlled by [user]
 	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
-	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (ids.PrivateKey, error)
+	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (crypto.PrivateKeySECP256K1R, error)
 	// ImportKey imports [privateKey] to [user]
-	ImportKey(ctx context.Context, user api.UserPass, privateKey ids.PrivateKey, options ...rpc.Option) (ids.ShortID, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
 	Mint(
 		ctx context.Context,
@@ -495,7 +496,7 @@ func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options .
 	return address.ParseToIDs(res.Addresses)
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (ids.PrivateKey, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (crypto.PrivateKeySECP256K1R, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -504,7 +505,7 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.Shor
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey ids.PrivateKey, options ...rpc.Option) (ids.ShortID, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,

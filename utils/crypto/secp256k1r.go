@@ -6,7 +6,9 @@ package crypto
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sort"
+	"strings"
 
 	stdecdsa "crypto/ecdsa"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -40,6 +43,8 @@ const (
 	// picked to avoid a binary representation that would allow compact
 	// signatures to be mistaken for other components.
 	compactSigMagicOffset = 27
+
+	PrivateKeyPrefix = "PrivateKey-"
 )
 
 var (
@@ -182,6 +187,62 @@ func (k *PrivateKeySECP256K1R) Bytes() []byte {
 		k.bytes = k.sk.Serialize()
 	}
 	return k.bytes
+}
+
+func (k *PrivateKeySECP256K1R) String() string {
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of a SECP256K1 private key
+	kStr, _ := formatting.EncodeWithChecksum(formatting.CB58, k.Bytes())
+	return PrivateKeyPrefix + kStr
+}
+
+func (k *PrivateKeySECP256K1R) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + k.String() + "\""), nil
+}
+
+func (k *PrivateKeySECP256K1R) MarshalText() ([]byte, error) {
+	return []byte(k.String()), nil
+}
+
+func (k *PrivateKeySECP256K1R) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if str == ids.NullStr { // If "null", do nothing
+		return nil
+	} else if len(str) <= 2+len(PrivateKeyPrefix) {
+		return fmt.Errorf("expected PrivateKey length to be > %d", 2+len(PrivateKeyPrefix))
+	}
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return ids.ErrMissingQuotes
+	}
+
+	var err error
+	*k, err = PrivateKeySECP256K1RFromString(str[1:lastIndex])
+	return err
+}
+
+func (k *PrivateKeySECP256K1R) UnmarshalText(text []byte) error {
+	return k.UnmarshalJSON(text)
+}
+
+// PrivateKeySECP256K1RFromString is the inverse of PrivateKeySECP256K1R.String()
+func PrivateKeySECP256K1RFromString(kStr string) (PrivateKeySECP256K1R, error) {
+	if !strings.HasPrefix(kStr, PrivateKeyPrefix) {
+		return PrivateKeySECP256K1R{}, fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
+	}
+	trimmedKStr := strings.TrimPrefix(kStr, PrivateKeyPrefix)
+	kBytes, err := formatting.Decode(formatting.CB58, trimmedKStr)
+	if err != nil {
+		return PrivateKeySECP256K1R{}, fmt.Errorf("problem parsing private key: %w", err)
+	}
+	factory := FactorySECP256K1R{}
+	kIntf, err := factory.ToPrivateKey(kBytes)
+	if err != nil {
+		return PrivateKeySECP256K1R{}, fmt.Errorf("problem parsing private key: %w", err)
+	}
+	k := kIntf.(*PrivateKeySECP256K1R)
+	return *k, nil
 }
 
 // raw sig has format [v || r || s] whereas the sig has format [r || s || v]

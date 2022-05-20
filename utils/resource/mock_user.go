@@ -5,8 +5,9 @@
 package resource
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockUser is a mock of User interface

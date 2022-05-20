@@ -97,7 +97,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey ids.PrivateKey `json:"privateKey"`
+	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -122,26 +122,23 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey = ids.PrivateKey(sk.Bytes())
+	reply.PrivateKey = *sk
 	return user.Close()
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey ids.PrivateKey `json:"privateKey"`
+	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("Platform: ImportKey called for user '%s'", args.Username)
 
-	skIntf, err := service.vm.factory.ToPrivateKey(args.PrivateKey.Bytes())
-	if err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+	sk := &args.PrivateKey
 
+	var err error
 	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)

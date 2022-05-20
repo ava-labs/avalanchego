@@ -116,7 +116,7 @@ func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrim
 			PotentialReward: (*uint64)(apiValidator.PotentialReward),
 			DelegationFee:   float32(apiValidator.DelegationFee),
 			Uptime:          (*float32)(apiValidator.Uptime),
-			Connected:       apiValidator.Connected,
+			Connected:       &apiValidator.Connected,
 			Delegators:      clientDelegators,
 		}
 	}

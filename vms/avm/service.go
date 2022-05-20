@@ -809,7 +809,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey ids.PrivateKey `json:"privateKey"`
+	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -834,14 +834,14 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey = ids.PrivateKey(sk.Bytes())
+	reply.PrivateKey = *sk
 	return user.Close()
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey ids.PrivateKey `json:"privateKey"`
+	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ImportKeyReply is the response for ImportKey
@@ -854,12 +854,7 @@ type ImportKeyReply struct {
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
 
-	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(args.PrivateKey.Bytes())
-	if err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+	sk := args.PrivateKey
 
 	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -867,7 +862,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 	defer user.Close()
 
-	if err := user.PutKeys(sk); err != nil {
+	if err := user.PutKeys(&sk); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
 

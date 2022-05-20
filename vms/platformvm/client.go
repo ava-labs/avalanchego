@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -24,9 +25,9 @@ type Client interface {
 	// GetHeight returns the current block height of the P Chain
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// ExportKey returns the private key corresponding to [address] from [user]'s account
-	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (ids.PrivateKey, error)
+	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (crypto.PrivateKeySECP256K1R, error)
 	// ImportKey imports the specified [privateKey] to [user]'s keystore
-	ImportKey(ctx context.Context, user api.UserPass, privateKey ids.PrivateKey, options ...rpc.Option) (ids.ShortID, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
 	// GetBalance returns the balance of [addrs] on the P Chain
 	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
 	// CreateAddress creates a new address for [user]
@@ -223,7 +224,7 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 	return uint64(res.Height), err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (ids.PrivateKey, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (crypto.PrivateKeySECP256K1R, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -232,7 +233,7 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.S
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey ids.PrivateKey, options ...rpc.Option) (ids.ShortID, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,
