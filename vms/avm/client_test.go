@@ -56,7 +56,7 @@ func TestClientCreateAsset(t *testing.T) {
 			assert:         assert,
 			expectedInData: expectedInData,
 		}
-		_, _ = client.CreateAsset(
+		_, err := client.CreateAsset(
 			context.Background(),
 			api.UserPass{},
 			clientFrom,
@@ -67,6 +67,7 @@ func TestClientCreateAsset(t *testing.T) {
 			clientHolders,
 			clientMinters,
 		)
+		assert.NoError(err)
 	}
 	{
 		// non empty slices
@@ -110,7 +111,7 @@ func TestClientCreateAsset(t *testing.T) {
 			assert:         assert,
 			expectedInData: expectedInData,
 		}
-		_, _ = client.CreateAsset(
+		_, err := client.CreateAsset(
 			context.Background(),
 			api.UserPass{},
 			clientFrom,
@@ -121,6 +122,7 @@ func TestClientCreateAsset(t *testing.T) {
 			clientHolders,
 			clientMinters,
 		)
+		assert.NoError(err)
 	}
 }
 
@@ -146,7 +148,7 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			assert:         assert,
 			expectedInData: expectedInData,
 		}
-		_, _ = client.CreateFixedCapAsset(
+		_, err := client.CreateFixedCapAsset(
 			context.Background(),
 			api.UserPass{},
 			clientFrom,
@@ -156,6 +158,7 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			0,
 			clientHolders,
 		)
+		assert.NoError(err)
 	}
 	{
 		// non empty slices
@@ -186,7 +189,7 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			assert:         assert,
 			expectedInData: expectedInData,
 		}
-		_, _ = client.CreateFixedCapAsset(
+		_, err := client.CreateFixedCapAsset(
 			context.Background(),
 			api.UserPass{},
 			clientFrom,
@@ -196,5 +199,6 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			0,
 			clientHolders,
 		)
+		assert.NoError(err)
 	}
 }
