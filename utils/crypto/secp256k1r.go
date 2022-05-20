@@ -206,9 +206,7 @@ func (k *PrivateKeySECP256K1R) MarshalText() ([]byte, error) {
 
 func (k *PrivateKeySECP256K1R) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == ids.NullStr { // If "null", do nothing
-		return nil
-	} else if len(str) <= 2+len(PrivateKeyPrefix) {
+	if len(str) <= 2+len(PrivateKeyPrefix) {
 		return fmt.Errorf("expected PrivateKey length to be > %d", 2+len(PrivateKeyPrefix))
 	}
 

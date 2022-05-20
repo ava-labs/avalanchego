@@ -36,7 +36,7 @@ func (id NodeID) MarshalText() ([]byte, error) {
 
 func (id *NodeID) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == NullStr { // If "null", do nothing
+	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) <= 2+len(NodeIDPrefix) {
 		return fmt.Errorf("expected NodeID length to be > %d", 2+len(NodeIDPrefix))
