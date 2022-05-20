@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var _ HandlerStats = &MockHandlerStats{}
+
 // MockHandlerStats is mock for capturing and asserting on handler metrics in test
 type MockHandlerStats struct {
 	lock sync.Mutex
@@ -27,6 +29,9 @@ type MockHandlerStats struct {
 	LeafsReturnedSum,
 	MissingRootCount,
 	TrieErrorCount uint32
+	ProofKeysReturned int64
+	LeafsReadTime,
+	GenerateRangeProofTime,
 	LeafRequestProcessingTimeSum time.Duration
 }
 
@@ -47,6 +52,9 @@ func (m *MockHandlerStats) Reset() {
 	m.MissingRootCount = 0
 	m.TrieErrorCount = 0
 	m.LeafRequestProcessingTimeSum = 0
+	m.ProofKeysReturned = 0
+	m.GenerateRangeProofTime = 0
+	m.LeafsReadTime = 0
 }
 
 func (m *MockHandlerStats) IncBlockRequest() {
@@ -119,6 +127,24 @@ func (m *MockHandlerStats) UpdateLeafsRequestProcessingTime(duration time.Durati
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.LeafRequestProcessingTimeSum += duration
+}
+
+func (m *MockHandlerStats) UpdateReadLeafsTime(duration time.Duration) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.LeafsReadTime += duration
+}
+
+func (m *MockHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.GenerateRangeProofTime += duration
+}
+
+func (m *MockHandlerStats) UpdateRangeProofKeysReturned(numProofKeys int64) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.ProofKeysReturned += numProofKeys
 }
 
 func (m *MockHandlerStats) IncMissingRoot() {

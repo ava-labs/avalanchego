@@ -35,6 +35,9 @@ type LeafsRequestHandlerStats interface {
 	IncInvalidLeafsRequest()
 	UpdateLeafsReturned(numLeafs uint16)
 	UpdateLeafsRequestProcessingTime(duration time.Duration)
+	UpdateReadLeafsTime(duration time.Duration)
+	UpdateGenerateRangeProofTime(duration time.Duration)
+	UpdateRangeProofKeysReturned(numProofKeys int64)
 	IncMissingRoot()
 	IncTrieError()
 }
@@ -57,6 +60,9 @@ type handlerStats struct {
 	invalidLeafsRequest        metrics.Counter
 	leafsReturned              metrics.Histogram
 	leafsRequestProcessingTime metrics.Timer
+	leafsReadTime              metrics.Timer
+	generateRangeProofTime     metrics.Timer
+	proofKeysReturned          metrics.Histogram
 	missingRoot                metrics.Counter
 	trieError                  metrics.Counter
 }
@@ -109,6 +115,18 @@ func (h *handlerStats) UpdateLeafsReturned(numLeafs uint16) {
 	h.leafsReturned.Update(int64(numLeafs))
 }
 
+func (h *handlerStats) UpdateReadLeafsTime(duration time.Duration) {
+	h.leafsReadTime.Update(duration)
+}
+
+func (h *handlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
+	h.generateRangeProofTime.Update(duration)
+}
+
+func (h *handlerStats) UpdateRangeProofKeysReturned(numProofKeys int64) {
+	h.proofKeysReturned.Update(numProofKeys)
+}
+
 func (h *handlerStats) IncMissingRoot() {
 	h.missingRoot.Inc(1)
 }
@@ -139,6 +157,9 @@ func NewHandlerStats(enabled bool) HandlerStats {
 		invalidLeafsRequest:        metrics.GetOrRegisterCounter("leafs_request_invalid", nil),
 		leafsRequestProcessingTime: metrics.GetOrRegisterTimer("leafs_request_processing_time", nil),
 		leafsReturned:              metrics.GetOrRegisterHistogram("leafs_request_total_leafs", nil, metrics.NewExpDecaySample(1028, 0.015)),
+		leafsReadTime:              metrics.GetOrRegisterTimer("leafs_read_time", nil),
+		generateRangeProofTime:     metrics.GetOrRegisterTimer("generate_range_proof_time", nil),
+		proofKeysReturned:          metrics.GetOrRegisterHistogram("proof_keys_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
 		missingRoot:                metrics.GetOrRegisterCounter("leafs_request_missing_root", nil),
 		trieError:                  metrics.GetOrRegisterCounter("leafs_request_trie_error", nil),
 	}
@@ -152,17 +173,20 @@ func NewNoopHandlerStats() HandlerStats {
 }
 
 // all operations are no-ops
-func (n *noopHandlerStats) IncBlockRequest()                               {}
-func (n *noopHandlerStats) IncMissingBlockHash()                           {}
-func (n *noopHandlerStats) UpdateBlocksReturned(uint16)                    {}
-func (n *noopHandlerStats) UpdateBlockRequestProcessingTime(time.Duration) {}
-func (n *noopHandlerStats) IncCodeRequest()                                {}
-func (n *noopHandlerStats) IncMissingCodeHash()                            {}
-func (n *noopHandlerStats) UpdateCodeReadTime(time.Duration)               {}
-func (n *noopHandlerStats) UpdateCodeBytesReturned(uint32)                 {}
-func (n *noopHandlerStats) IncLeafsRequest()                               {}
-func (n *noopHandlerStats) IncInvalidLeafsRequest()                        {}
-func (n *noopHandlerStats) UpdateLeafsRequestProcessingTime(time.Duration) {}
-func (n *noopHandlerStats) UpdateLeafsReturned(uint16)                     {}
-func (n *noopHandlerStats) IncMissingRoot()                                {}
-func (n *noopHandlerStats) IncTrieError()                                  {}
+func (n *noopHandlerStats) IncBlockRequest()                                    {}
+func (n *noopHandlerStats) IncMissingBlockHash()                                {}
+func (n *noopHandlerStats) UpdateBlocksReturned(uint16)                         {}
+func (n *noopHandlerStats) UpdateBlockRequestProcessingTime(time.Duration)      {}
+func (n *noopHandlerStats) IncCodeRequest()                                     {}
+func (n *noopHandlerStats) IncMissingCodeHash()                                 {}
+func (n *noopHandlerStats) UpdateCodeReadTime(time.Duration)                    {}
+func (n *noopHandlerStats) UpdateCodeBytesReturned(uint32)                      {}
+func (n *noopHandlerStats) IncLeafsRequest()                                    {}
+func (n *noopHandlerStats) IncInvalidLeafsRequest()                             {}
+func (n *noopHandlerStats) UpdateLeafsRequestProcessingTime(time.Duration)      {}
+func (n *noopHandlerStats) UpdateLeafsReturned(uint16)                          {}
+func (n *noopHandlerStats) UpdateReadLeafsTime(duration time.Duration)          {}
+func (n *noopHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {}
+func (n *noopHandlerStats) UpdateRangeProofKeysReturned(numProofKeys int64)     {}
+func (n *noopHandlerStats) IncMissingRoot()                                     {}
+func (n *noopHandlerStats) IncTrieError()                                       {}
