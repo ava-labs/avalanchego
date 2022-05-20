@@ -280,16 +280,14 @@ func (t *Transitive) Shutdown() error {
 }
 
 func (t *Transitive) Notify(msg common.Message) error {
-	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
-	switch msg {
-	case common.PendingTxs:
-		// the pending txs message means we should attempt to build a block.
-		t.pendingBuildBlocks++
-		return t.buildBlocks()
-	default:
+	if msg != common.PendingTxs {
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+		return nil
 	}
-	return nil
+
+	// the pending txs message means we should attempt to build a block.
+	t.pendingBuildBlocks++
+	return t.buildBlocks()
 }
 
 func (t *Transitive) Context() *snow.ConsensusContext {
@@ -338,9 +336,14 @@ func (t *Transitive) Start(startReqID uint32) error {
 		return err
 	}
 
-	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
+	t.Ctx.Log.Info("consensus starting with %s as the last accepted block", lastAcceptedID)
 	t.metrics.bootstrapFinished.Set(1)
+
 	t.Ctx.SetState(snow.NormalOp)
+	if err := t.VM.SetState(snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
+			err)
+	}
 	return nil
 }
 
@@ -615,11 +618,14 @@ func (t *Transitive) sendMixedQuery(blk snowman.Block) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		// Send a push query to some of the validators, and a pull query to the rest.
-		// Note that [vdrList] doesn't contain duplicates so its length may be < k.
+		numPushTo := t.Params.MixedQueryNumPushVdr
+		if !t.Validators.Contains(t.Ctx.NodeID) {
+			numPushTo = t.Params.MixedQueryNumPushNonVdr
+		}
 		common.SendMixedQuery(
 			t.Sender,
-			vdrBag.List(),
-			t.Params.MixedQueryNumPush,
+			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
+			numPushTo,
 			t.RequestID,
 			blk.ID(),
 			blk.Bytes(),

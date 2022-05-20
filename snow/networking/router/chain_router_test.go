@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,8 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -57,6 +61,8 @@ func TestShutdown(t *testing.T) {
 	shutdownCalled := make(chan struct{}, 1)
 
 	ctx := snow.DefaultConsensusContextTest()
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -64,6 +70,7 @@ func TestShutdown(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -94,7 +101,10 @@ func TestShutdown(t *testing.T) {
 	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
+
 	chainRouter.Shutdown()
 
 	ticker := time.NewTicker(250 * time.Millisecond)
@@ -155,6 +165,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -162,6 +174,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -196,6 +209,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	shutdownFinished := make(chan struct{}, 1)
@@ -262,6 +277,8 @@ func TestRouterTimeout(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -269,6 +286,7 @@ func TestRouterTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -314,6 +332,8 @@ func TestRouterTimeout(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	// Register requests for each request type
@@ -374,6 +394,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	assert.NoError(t, err)
 
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -381,6 +403,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -403,6 +426,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	// Register requests for each request type
@@ -485,7 +510,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	vID := ids.GenerateTestNodeID()
 	err = vdrs.AddWeight(vID, 1)
 	assert.NoError(t, err)
-
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -493,6 +519,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -520,6 +547,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	handler.SetConsensus(engine)
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	var inMsg message.InboundMessage

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -156,4 +157,15 @@ type Config struct {
 	// Size, in bytes, of the buffer that we write peer messages into
 	// (there is one buffer per peer)
 	PeerWriteBufferSize int `json:"peerWriteBufferSize"`
+
+	// Tracks the CPU/disk usage caused by processing messages of each peer.
+	ResourceTracker tracker.ResourceTracker `json:"-"`
+
+	// Specifies how much CPU usage each peer can cause before
+	// we rate-limit them.
+	CPUTargeter tracker.Targeter `json:"-"`
+
+	// Specifies how much disk usage each peer can cause before
+	// we rate-limit them.
+	DiskTargeter tracker.Targeter `json:"-"`
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -117,15 +118,16 @@ func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			K:                     v.GetInt(SnowSampleSizeKey),
-			Alpha:                 v.GetInt(SnowQuorumSizeKey),
-			BetaVirtuous:          v.GetInt(SnowVirtuousCommitThresholdKey),
-			BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
-			ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
-			OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
-			MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
-			MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
-			MixedQueryNumPush:     int(v.GetUint(SnowMixedQueryNumPushKey)),
+			K:                       v.GetInt(SnowSampleSizeKey),
+			Alpha:                   v.GetInt(SnowQuorumSizeKey),
+			BetaVirtuous:            v.GetInt(SnowVirtuousCommitThresholdKey),
+			BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
+			ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
+			OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
+			MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
+			MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
+			MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
+			MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
 		},
 		BatchSize: v.GetInt(SnowAvalancheBatchSizeKey),
 		Parents:   v.GetInt(SnowAvalancheNumParentsKey),
@@ -133,10 +135,8 @@ func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
-	loggingConfig := logging.DefaultConfig
-	if v.IsSet(LogsDirKey) {
-		loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
-	}
+	loggingConfig := logging.Config{}
+	loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
 	var err error
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
@@ -150,8 +150,13 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	if err != nil {
 		return loggingConfig, err
 	}
-	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.LogFormat, err = logging.ToFormat(v.GetString(LogFormatKey), os.Stdout.Fd())
 	loggingConfig.DisableWriterDisplaying = v.GetBool(LogDisableDisplayPluginLogsKey)
+	loggingConfig.MaxSize = int(v.GetUint(LogRotaterMaxSizeKey))
+	loggingConfig.MaxFiles = int(v.GetUint(LogRotaterMaxFilesKey))
+	loggingConfig.MaxAge = int(v.GetUint(LogRotaterMaxAgeKey))
+	loggingConfig.Compress = v.GetBool(LogRotaterCompressEnabledKey)
+
 	return loggingConfig, err
 }
 
@@ -343,6 +348,12 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 					MaxBurstSize: v.GetUint64(InboundThrottlerBandwidthMaxBurstSizeKey),
 				},
 				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
+				CPUThrottlerConfig: throttling.SystemThrottlerConfig{
+					MaxRecheckDelay: v.GetDuration(InboundThrottlerCPUMaxRecheckDelayKey),
+				},
+				DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+					MaxRecheckDelay: v.GetDuration(InboundThrottlerDiskMaxRecheckDelayKey),
+				},
 			},
 
 			OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
@@ -426,7 +437,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	case config.MaxClockDifference < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
-
 	return config, nil
 }
 
@@ -448,7 +458,9 @@ func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) 
 
 func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 	var (
-		config       = node.StateSyncConfig{}
+		config = node.StateSyncConfig{
+			StateSyncDisableRequests: v.GetBool(StateSyncDisableRequests),
+		}
 		stateSyncIPs = strings.Split(v.GetString(StateSyncIPsKey), ",")
 		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
 	)
@@ -1044,6 +1056,46 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	}
 }
 
+func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
+	vdrAlloc := v.GetFloat64(CPUVdrAllocKey)
+	maxNonVdrUsage := v.GetFloat64(CPUMaxNonVdrUsageKey)
+	maxNonVdrNodeUsage := v.GetFloat64(CPUMaxNonVdrNodeUsageKey)
+	switch {
+	case vdrAlloc < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", CPUVdrAllocKey, vdrAlloc)
+	case maxNonVdrUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", CPUMaxNonVdrUsageKey, maxNonVdrUsage)
+	case maxNonVdrNodeUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", CPUMaxNonVdrNodeUsageKey, maxNonVdrNodeUsage)
+	default:
+		return tracker.TargeterConfig{
+			VdrAlloc:           vdrAlloc,
+			MaxNonVdrUsage:     maxNonVdrUsage,
+			MaxNonVdrNodeUsage: maxNonVdrNodeUsage,
+		}, nil
+	}
+}
+
+func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
+	vdrAlloc := v.GetFloat64(DiskVdrAllocKey)
+	maxNonVdrUsage := v.GetFloat64(DiskMaxNonVdrUsageKey)
+	maxNonVdrNodeUsage := v.GetFloat64(DiskMaxNonVdrNodeUsageKey)
+	switch {
+	case vdrAlloc < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", DiskVdrAllocKey, vdrAlloc)
+	case maxNonVdrUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", DiskMaxNonVdrUsageKey, maxNonVdrUsage)
+	case maxNonVdrNodeUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", DiskMaxNonVdrNodeUsageKey, maxNonVdrNodeUsage)
+	default:
+		return tracker.TargeterConfig{
+			VdrAlloc:           vdrAlloc,
+			MaxNonVdrUsage:     maxNonVdrUsage,
+			MaxNonVdrNodeUsage: maxNonVdrNodeUsage,
+		}, nil
+	}
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -1201,5 +1253,20 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// VM Aliases
 	nodeConfig.VMManager, err = getVMManager(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.SystemTrackerFrequency = v.GetDuration(SystemTrackerFrequencyKey)
+	nodeConfig.SystemTrackerProcessingHalflife = v.GetDuration(SystemTrackerProcessingHalflifeKey)
+	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
+	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
+
+	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.DiskTargeterConfig, err = getDiskTargeterConfig(v)
 	return nodeConfig, err
 }

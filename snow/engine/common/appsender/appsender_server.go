@@ -17,7 +17,7 @@ import (
 var _ appsenderpb.AppSenderServer = &Server{}
 
 type Server struct {
-	appsenderpb.UnimplementedAppSenderServer
+	appsenderpb.UnsafeAppSenderServer
 	appSender common.AppSender
 }
 

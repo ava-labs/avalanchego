@@ -14,13 +14,15 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 var (
-	errWrongVM         = errors.New("wrong vm type")
-	_          Factory = &factory{}
+	errWrongVM = errors.New("wrong vm type")
+
+	_ Factory = &factory{}
 )
 
 type Factory interface {
@@ -29,12 +31,14 @@ type Factory interface {
 }
 
 type factory struct {
-	path string
+	path           string
+	processTracker resource.ProcessTracker
 }
 
-func NewFactory(path string) Factory {
+func NewFactory(path string, processTracker resource.ProcessTracker) Factory {
 	return &factory{
-		path: path,
+		path:           path,
+		processTracker: processTracker,
 	}
 }
 
@@ -98,7 +102,6 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 		return nil, pluginErr(errWrongVM)
 	}
 
-	vm.SetProcess(client)
-	vm.ctx = ctx
+	vm.SetProcess(ctx, client, f.processTracker)
 	return vm, nil
 }

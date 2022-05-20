@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -24,9 +25,9 @@ var (
 
 type Operation struct {
 	avax.Asset `serialize:"true"`
-	UTXOIDs    []*avax.UTXOID `serialize:"true" json:"inputIDs"`
-	FxID       ids.ID         `serialize:"false" json:"fxID"`
-	Op         FxOperation    `serialize:"true" json:"operation"`
+	UTXOIDs    []*avax.UTXOID  `serialize:"true" json:"inputIDs"`
+	FxID       ids.ID          `serialize:"false" json:"fxID"`
+	Op         fxs.FxOperation `serialize:"true" json:"operation"`
 }
 
 func (op *Operation) Verify(c codec.Manager) error {

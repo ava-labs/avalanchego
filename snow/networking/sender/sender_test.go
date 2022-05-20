@@ -5,7 +5,6 @@ package sender
 
 import (
 	"math/rand"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -22,8 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -33,29 +35,6 @@ var defaultGossipConfig = GossipConfig{
 	OnAcceptPeerSize:          2,
 	AppGossipValidatorSize:    2,
 	AppGossipNonValidatorSize: 2,
-}
-
-func TestSenderContext(t *testing.T) {
-	context := snow.DefaultConsensusContextTest()
-	metrics := prometheus.NewRegistry()
-	msgCreator, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
-	externalSender := &ExternalSenderTest{TB: t}
-	externalSender.Default(true)
-	senderIntf, err := New(
-		context,
-		msgCreator,
-		externalSender,
-		&router.ChainRouter{},
-		nil,
-		defaultGossipConfig,
-	)
-	assert.NoError(t, err)
-	sender := senderIntf.(*sender)
-
-	if res := sender.Context(); !reflect.DeepEqual(res, context) {
-		t.Fatalf("Got %#v, expected %#v", res, context)
-	}
 }
 
 func TestTimeout(t *testing.T) {
@@ -98,6 +77,8 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
 	ctx := snow.DefaultConsensusContextTest()
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -105,6 +86,7 @@ func TestTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Hour,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -129,6 +111,8 @@ func TestTimeout(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	vdrIDs := ids.NodeIDSet{}
@@ -182,7 +166,8 @@ func TestReliableMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
-
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -190,6 +175,7 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		nil,
 		1,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -219,6 +205,8 @@ func TestReliableMessages(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	go func() {
@@ -274,6 +262,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -281,6 +271,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 
@@ -309,6 +300,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
 	go func() {

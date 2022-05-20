@@ -21,7 +21,7 @@ var _ keystorepb.KeystoreServer = &Server{}
 
 // Server is a snow.Keystore that is managed over RPC.
 type Server struct {
-	keystorepb.UnimplementedKeystoreServer
+	keystorepb.UnsafeKeystoreServer
 	ks keystore.BlockchainKeystore
 }
 

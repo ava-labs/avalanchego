@@ -15,7 +15,7 @@ var _ aliasreaderpb.AliasReaderServer = &Server{}
 
 // Server enables alias lookups over RPC.
 type Server struct {
-	aliasreaderpb.UnimplementedAliasReaderServer
+	aliasreaderpb.UnsafeAliasReaderServer
 	aliaser ids.AliaserReader
 }
 

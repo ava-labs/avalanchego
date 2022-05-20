@@ -46,13 +46,14 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	vm.T = t
 	engCfg.VM = vm
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
 	if err != nil {
 		t.Fatal(err)
 	}
 	engCfg.AllGetsServer = snowGetHandler
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -62,7 +63,6 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 
 	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
 
-	vm.CantSetState = false
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
@@ -77,8 +77,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -390,15 +389,15 @@ func TestEngineQuery(t *testing.T) {
 func TestEngineMultipleQuery(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
-		K:                     3,
-		Alpha:                 2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-		MixedQueryNumPush:     3,
+		K:                       3,
+		Alpha:                   2,
+		BetaVirtuous:            1,
+		BetaRogue:               2,
+		ConcurrentRepolls:       1,
+		OptimalProcessing:       1,
+		MaxOutstandingItems:     1,
+		MaxItemProcessingTime:   1,
+		MixedQueryNumPushNonVdr: 3,
 	}
 
 	vals := validators.NewSet()
@@ -427,6 +426,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -447,8 +447,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -872,15 +871,15 @@ func TestEngineRepoll(t *testing.T) {
 func TestVoteCanceling(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
-		K:                     3,
-		Alpha:                 2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-		MixedQueryNumPush:     3,
+		K:                       3,
+		Alpha:                   2,
+		BetaVirtuous:            1,
+		BetaRogue:               2,
+		ConcurrentRepolls:       1,
+		OptimalProcessing:       1,
+		MaxOutstandingItems:     1,
+		MaxItemProcessingTime:   1,
+		MixedQueryNumPushNonVdr: 3,
 	}
 
 	vals := validators.NewSet()
@@ -909,6 +908,7 @@ func TestVoteCanceling(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -932,8 +932,7 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1026,8 +1025,7 @@ func TestEngineNoQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1076,8 +1074,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1731,6 +1728,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -1751,8 +1749,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1814,15 +1811,15 @@ func TestEngineAggressivePolling(t *testing.T) {
 func TestEngineDoubleChit(t *testing.T) {
 	engCfg := DefaultConfigs()
 	engCfg.Params = snowball.Parameters{
-		K:                     2,
-		Alpha:                 2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-		MixedQueryNumPush:     2,
+		K:                       2,
+		Alpha:                   2,
+		BetaVirtuous:            1,
+		BetaRogue:               2,
+		ConcurrentRepolls:       1,
+		OptimalProcessing:       1,
+		MaxOutstandingItems:     1,
+		MaxItemProcessingTime:   1,
+		MixedQueryNumPushNonVdr: 2,
 	}
 
 	vals := validators.NewSet()
@@ -1848,6 +1845,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -1869,8 +1867,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1973,6 +1970,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.VM = vm
 
 	vm.Default(true)
+	vm.CantSetState = false
 	vm.CantSetPreference = false
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
@@ -1993,8 +1991,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := te.Start(startReqID); err != nil {
+	if err := te.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3009,13 +3006,13 @@ func TestMixedQueryNumPushSet(t *testing.T) {
 			fmt.Sprint(i),
 			func(t *testing.T) {
 				engCfg := DefaultConfigs()
-				engCfg.Params.MixedQueryNumPush = i
+				engCfg.Params.MixedQueryNumPushVdr = i
 				te, err := newTransitive(engCfg)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if te.Params.MixedQueryNumPush != i {
-					t.Fatalf("expected to push query %v validators but got %v", i, te.Config.Params.MixedQueryNumPush)
+				if te.Params.MixedQueryNumPushVdr != i {
+					t.Fatalf("expected to push query %v validators but got %v", i, te.Config.Params.MixedQueryNumPushVdr)
 				}
 			},
 		)
@@ -3023,112 +3020,133 @@ func TestMixedQueryNumPushSet(t *testing.T) {
 }
 
 func TestSendMixedQuery(t *testing.T) {
-	engConfig := DefaultConfigs()
-	commonCfg := common.DefaultConfigTest()
-	// Override the parameters k and MixedQueryNumPush,
-	// and update the validator set to have k validators.
-	engConfig.Params.Alpha = 12
-	engConfig.Params.MixedQueryNumPush = 12
-	engConfig.Params.K = 20
-	_, vdrSet, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
-
-	vdrsList := []validators.Validator{}
-	vdrs := ids.NodeIDSet{}
-	for i := 0; i < te.Config.Params.K; i++ {
-		vdr := ids.GenerateTestNodeID()
-		vdrs.Add(vdr)
-		vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
+	type test struct {
+		isVdr bool
 	}
-	if err := vdrSet.Set(vdrsList); err != nil {
-		t.Fatal(err)
+	tests := []test{
+		{isVdr: true},
+		{isVdr: false},
 	}
+	for _, tt := range tests {
+		t.Run(
+			fmt.Sprintf("is validator: %v", tt.isVdr),
+			func(t *testing.T) {
+				engConfig := DefaultConfigs()
+				commonCfg := common.DefaultConfigTest()
+				// Override the parameters k and MixedQueryNumPushNonVdr,
+				// and update the validator set to have k validators.
+				engConfig.Params.Alpha = 12
+				engConfig.Params.MixedQueryNumPushNonVdr = 12
+				engConfig.Params.MixedQueryNumPushVdr = 14
+				engConfig.Params.K = 20
+				_, vdrSet, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
 
-	// [blk1] is a child of [gBlk] and passes verification
-	blk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: gBlk.ID(),
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
+				vdrsList := []validators.Validator{}
+				vdrs := ids.NodeIDSet{}
+				for i := 0; i < te.Config.Params.K; i++ {
+					vdr := ids.GenerateTestNodeID()
+					vdrs.Add(vdr)
+					vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
+				}
+				if tt.isVdr {
+					vdrs.Add(te.Ctx.NodeID)
+					vdrsList = append(vdrsList, validators.NewValidator(te.Ctx.NodeID, 1))
+				}
+				if err := vdrSet.Set(vdrsList); err != nil {
+					t.Fatal(err)
+				}
 
-	// The VM should be able to parse [blk1]
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, blk1.Bytes()):
-			return blk1, nil
-		default:
-			t.Fatalf("Unknown block bytes")
-			return nil, nil
-		}
-	}
+				// [blk1] is a child of [gBlk] and passes verification
+				blk1 := &snowman.TestBlock{
+					TestDecidable: choices.TestDecidable{
+						IDV:     ids.GenerateTestID(),
+						StatusV: choices.Processing,
+					},
+					ParentV: gBlk.ID(),
+					HeightV: 1,
+					BytesV:  []byte{1},
+				}
 
-	// The VM should only be able to retrieve [gBlk] from storage
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case gBlk.ID():
-			return gBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
+				// The VM should be able to parse [blk1]
+				vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+					switch {
+					case bytes.Equal(b, blk1.Bytes()):
+						return blk1, nil
+					default:
+						t.Fatalf("Unknown block bytes")
+						return nil, nil
+					}
+				}
 
-	pullQuerySent := new(bool)
-	pullQueryReqID := new(uint32)
-	pullQueriedVdrs := ids.NodeIDSet{}
-	sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID) {
-		switch {
-		case *pullQuerySent:
-			t.Fatalf("Asked multiple times")
-		case blkID != blk1.ID():
-			t.Fatalf("Expected engine to request blk1")
-		}
-		pullQueriedVdrs.Union(inVdrs)
-		*pullQuerySent = true
-		*pullQueryReqID = requestID
-	}
+				// The VM should only be able to retrieve [gBlk] from storage
+				vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+					switch blkID {
+					case gBlk.ID():
+						return gBlk, nil
+					default:
+						return nil, errUnknownBlock
+					}
+				}
 
-	pushQuerySent := new(bool)
-	pushQueryReqID := new(uint32)
-	pushQueriedVdrs := ids.NodeIDSet{}
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
-		switch {
-		case *pushQuerySent:
-			t.Fatal("Asked multiple times")
-		case blkID != blk1.ID():
-		case !bytes.Equal(blkBytes, blk1.Bytes()):
-			t.Fatal("got unexpected block bytes instead of blk1")
-		}
-		*pushQuerySent = true
-		*pushQueryReqID = requestID
-		pushQueriedVdrs.Union(inVdrs)
-	}
+				pullQuerySent := new(bool)
+				pullQueryReqID := new(uint32)
+				pullQueriedVdrs := ids.NodeIDSet{}
+				sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID) {
+					switch {
+					case *pullQuerySent:
+						t.Fatalf("Asked multiple times")
+					case blkID != blk1.ID():
+						t.Fatalf("Expected engine to request blk1")
+					}
+					pullQueriedVdrs.Union(inVdrs)
+					*pullQuerySent = true
+					*pullQueryReqID = requestID
+				}
 
-	// Give the engine blk1. It should insert it into consensus and send a mixed query
-	// consisting of 12 pull queries and 8 push queries.
-	if err := te.Put(vdrSet.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+				pushQuerySent := new(bool)
+				pushQueryReqID := new(uint32)
+				pushQueriedVdrs := ids.NodeIDSet{}
+				sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+					switch {
+					case *pushQuerySent:
+						t.Fatal("Asked multiple times")
+					case blkID != blk1.ID():
+						t.Fatal("got unexpected block bytes instead of blk1")
+					case !bytes.Equal(blkBytes, blk1.Bytes()):
+						t.Fatal("got unexpected block bytes instead of blk1")
+					}
+					*pushQuerySent = true
+					*pushQueryReqID = requestID
+					pushQueriedVdrs.Union(inVdrs)
+				}
 
-	switch {
-	case !*pullQuerySent:
-		t.Fatal("expected us to send pull queries")
-	case !*pushQuerySent:
-		t.Fatal("expected us to send push queries")
-	case *pushQueryReqID != *pullQueryReqID:
-		t.Fatalf("expected equal push query (%v) and pull query (%v) req IDs", *pushQueryReqID, *pullQueryReqID)
-	case pushQueriedVdrs.Len()+pullQueriedVdrs.Len() != te.Config.Params.K:
-		t.Fatalf("expected num push queried (%d) + num pull queried (%d) to be %d", pushQueriedVdrs.Len(), pullQueriedVdrs.Len(), te.Config.Params.K)
-	case pushQueriedVdrs.Len() != te.Params.MixedQueryNumPush:
-		t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPush)
-	}
+				// Give the engine blk1. It should insert it into consensus and send a mixed query
+				// consisting of 12 push queries and 8 pull queries.
+				if err := te.Put(vdrSet.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
+					t.Fatal(err)
+				}
 
-	pullQueriedVdrs.Union(pushQueriedVdrs) // Now this holds all queried validators (push and pull)
-	for vdr := range pullQueriedVdrs {
-		if !vdrs.Contains(vdr) {
-			t.Fatalf("got unexpected vdr %v", vdr)
-		}
+				switch {
+				case !*pullQuerySent:
+					t.Fatal("expected us to send pull queries")
+				case !*pushQuerySent:
+					t.Fatal("expected us to send push queries")
+				case *pushQueryReqID != *pullQueryReqID:
+					t.Fatalf("expected equal push query (%v) and pull query (%v) req IDs", *pushQueryReqID, *pullQueryReqID)
+				case pushQueriedVdrs.Len()+pullQueriedVdrs.Len() != te.Config.Params.K:
+					t.Fatalf("expected num push queried (%d) + num pull queried (%d) to be %d", pushQueriedVdrs.Len(), pullQueriedVdrs.Len(), te.Config.Params.K)
+				case !tt.isVdr && pushQueriedVdrs.Len() != te.Params.MixedQueryNumPushNonVdr:
+					t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPushNonVdr)
+				case tt.isVdr && pushQueriedVdrs.Len() != te.Params.MixedQueryNumPushVdr:
+					t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPushVdr)
+				}
+
+				pullQueriedVdrs.Union(pushQueriedVdrs) // Now this holds all queried validators (push and pull)
+				for vdr := range pullQueriedVdrs {
+					if !vdrs.Contains(vdr) {
+						t.Fatalf("got unexpected vdr %v", vdr)
+					}
+				}
+			})
 	}
 }

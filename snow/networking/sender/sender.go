@@ -18,10 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var (
-	_ snow.Acceptor = &sender{}
-	_ common.Sender = &sender{}
-)
+var _ common.Sender = &sender{}
 
 type GossipConfig struct {
 	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize"`
@@ -86,9 +83,6 @@ func New(
 	}
 	return s, nil
 }
-
-// Context of this sender
-func (s *sender) Context() *snow.ConsensusContext { return s.ctx }
 
 func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets

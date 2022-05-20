@@ -5,6 +5,8 @@ package logging
 
 import "strings"
 
+// TODO: remove when we transition to support structured logging
+
 func Sanitize(s string) string {
 	return strings.ReplaceAll(s, "\n", "\\n")
 }

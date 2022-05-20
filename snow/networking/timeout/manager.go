@@ -69,10 +69,18 @@ func NewManager(
 	metricsNamespace string,
 	metricsRegister prometheus.Registerer,
 ) (Manager, error) {
-	m := &manager{
-		benchlistMgr: benchlistMgr,
+	tm, err := timer.NewAdaptiveTimeoutManager(
+		timeoutConfig,
+		metricsNamespace,
+		metricsRegister,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create timeout manager: %w", err)
 	}
-	return m, m.tm.Initialize(timeoutConfig, metricsNamespace, metricsRegister)
+	return &manager{
+		benchlistMgr: benchlistMgr,
+		tm:           tm,
+	}, nil
 }
 
 type manager struct {

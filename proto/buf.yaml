@@ -1,5 +1,10 @@
 version: v1
 name: buf.build/ava-labs/avalanchego
+build:
+  excludes:
+    # for golang we handle prometheus as a buf dep so we exclude it from generate, this proto
+    # file is required by languages such as rust.
+    - io/prometheus
 breaking:
   use:
     - FILE

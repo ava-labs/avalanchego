@@ -81,6 +81,7 @@ type inboundMsgByteThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
+// TODO pass in a context to allow early cancellation.
 func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 	startTime := time.Now()
 	defer func() {

@@ -9,13 +9,17 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -32,6 +36,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err = vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -39,6 +45,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -83,6 +90,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
 	handler.Push(msg)
 
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+
 	handler.Start(false)
 
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -105,6 +114,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -112,6 +123,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -145,6 +157,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+
 	handler.Start(false)
 
 	nodeID := ids.EmptyNodeID
@@ -171,6 +185,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -178,6 +194,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		nil,
 		nil,
 		1,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -200,6 +217,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	}
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 
 	handler.Start(false)
 
@@ -229,6 +248,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
 	handler, err := New(
 		mc,
 		ctx,
@@ -236,8 +257,20 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		msgFromVMChan,
 		nil,
 		time.Second,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
+
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
@@ -248,6 +281,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
+
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 
 	handler.Start(false)
 	msgFromVMChan <- 0

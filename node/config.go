@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -90,8 +91,9 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs []ids.NodeID   `json:"stateSyncIDs"`
-	StateSyncIPs []utils.IPDesc `json:"stateSyncIPs"`
+	StateSyncIDs             []ids.NodeID   `json:"stateSyncIDs"`
+	StateSyncIPs             []utils.IPDesc `json:"stateSyncIPs"`
+	StateSyncDisableRequests bool           `json:"stateSyncDisableRequests"`
 }
 
 type BootstrapConfig struct {
@@ -202,4 +204,25 @@ type Config struct {
 
 	// VM management
 	VMManager vms.Manager `json:"-"`
+
+	// Halflife to use for the processing requests tracker.
+	// Larger halflife --> usage metrics change more slowly.
+	SystemTrackerProcessingHalflife time.Duration `json:"systemTrackerProcessingHalflife"`
+
+	// Frequency to check the real resource usage of tracked processes.
+	// More frequent checks --> usage metrics are more accurate, but more
+	// expensive to track
+	SystemTrackerFrequency time.Duration `json:"systemTrackerFrequency"`
+
+	// Halflife to use for the cpu tracker.
+	// Larger halflife --> cpu usage metrics change more slowly.
+	SystemTrackerCPUHalflife time.Duration `json:"systemTrackerCPUHalflife"`
+
+	// Halflife to use for the disk tracker.
+	// Larger halflife --> disk usage metrics change more slowly.
+	SystemTrackerDiskHalflife time.Duration `json:"systemTrackerDiskHalflife"`
+
+	CPUTargeterConfig tracker.TargeterConfig `json:"cpuTargeterConfig"`
+
+	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
 }

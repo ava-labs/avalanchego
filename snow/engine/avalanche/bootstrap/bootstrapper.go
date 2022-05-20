@@ -248,7 +248,7 @@ func (b *bootstrapper) Timeout() error {
 	if !b.Config.Subnet.IsBootstrapped() {
 		return b.Restart(true)
 	}
-	return b.finish()
+	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 
 func (b *bootstrapper) Gossip() error { return nil }
@@ -260,11 +260,15 @@ func (b *bootstrapper) Shutdown() error {
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
+
 	b.Ctx.SetState(snow.Bootstrapping)
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
+			err)
+	}
+
 	b.Config.SharedCfg.RequestID = startReqID
 
 	if !b.WeightTracker.EnoughConnectedWeight() {
@@ -439,11 +443,6 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
-	}
-
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -480,7 +479,7 @@ func (b *bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.VtxBlocked.PendingJobs())
 	}
 
-	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionAcceptor)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -490,7 +489,7 @@ func (b *bootstrapper) checkFinish() error {
 	} else {
 		b.Ctx.Log.Debug("executing vertex state transitions...")
 	}
-	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusAcceptor)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -525,16 +524,5 @@ func (b *bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	return b.finish()
-}
-
-// Finish bootstrapping
-func (b *bootstrapper) finish() error {
-	if err := b.VM.SetState(snow.NormalOp); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
-			err)
-	}
-
-	// Start consensus
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }

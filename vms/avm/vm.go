@@ -40,6 +40,7 @@ import (
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
 
 const (
@@ -98,7 +99,7 @@ type VM struct {
 	db     *versiondb.Database
 
 	typeToFxIndex map[reflect.Type]int
-	fxs           []*parsedFx
+	fxs           []*extensions.ParsedFx
 
 	walletService WalletService
 
@@ -163,18 +164,18 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
 
-	typedFxs := make([]Fx, len(fxs))
-	vm.fxs = make([]*parsedFx, len(fxs))
+	typedFxs := make([]extensions.Fx, len(fxs))
+	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
 	for i, fxContainer := range fxs {
 		if fxContainer == nil {
 			return errIncompatibleFx
 		}
-		fx, ok := fxContainer.Fx.(Fx)
+		fx, ok := fxContainer.Fx.(extensions.Fx)
 		if !ok {
 			return errIncompatibleFx
 		}
 		typedFxs[i] = fx
-		vm.fxs[i] = &parsedFx{
+		vm.fxs[i] = &extensions.ParsedFx{
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
@@ -569,7 +570,7 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 
 // getParsedFx returns the parsedFx object for a given TransferableInput
 // or TransferableOutput object
-func (vm *VM) getParsedFx(val interface{}) (*parsedFx, error) {
+func (vm *VM) getParsedFx(val interface{}) (*extensions.ParsedFx, error) {
 	idx, err := vm.getFx(val)
 	if err != nil {
 		return nil, err
