@@ -45,10 +45,14 @@ const (
 	compactSigMagicOffset = 27
 
 	PrivateKeyPrefix = "PrivateKey-"
+	nullStr          = "null"
 )
 
 var (
-	errCompressed = errors.New("wasn't expecting a compressed key")
+	errCompressed              = errors.New("wasn't expecting a compressed key")
+	errMissingQuotes           = errors.New("first and last characters should be quotes")
+	errMissingKeyPrefix        = fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
+	errInvalidPrivateKeyLength = fmt.Errorf("private key has unexpected length, expected %d", SECP256K1RSKLen)
 
 	_ RecoverableFactory = &FactorySECP256K1R{}
 	_ PublicKey          = &PublicKeySECP256K1R{}
@@ -71,6 +75,9 @@ func (*FactorySECP256K1R) ToPublicKey(b []byte) (PublicKey, error) {
 }
 
 func (*FactorySECP256K1R) ToPrivateKey(b []byte) (PrivateKey, error) {
+	if len(b) != SECP256K1RSKLen {
+		return nil, errInvalidPrivateKeyLength
+	}
 	return &PrivateKeySECP256K1R{
 		sk:    secp256k1.PrivKeyFromBytes(b),
 		bytes: b,
@@ -192,8 +199,8 @@ func (k *PrivateKeySECP256K1R) Bytes() []byte {
 func (k *PrivateKeySECP256K1R) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	kStr, _ := formatting.EncodeWithChecksum(formatting.CB58, k.Bytes())
-	return PrivateKeyPrefix + kStr
+	keyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, k.Bytes())
+	return PrivateKeyPrefix + keyStr
 }
 
 func (k *PrivateKeySECP256K1R) MarshalJSON() ([]byte, error) {
@@ -206,41 +213,40 @@ func (k *PrivateKeySECP256K1R) MarshalText() ([]byte, error) {
 
 func (k *PrivateKeySECP256K1R) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if len(str) <= 2+len(PrivateKeyPrefix) {
-		return fmt.Errorf("expected PrivateKey length to be > %d", 2+len(PrivateKeyPrefix))
+	if str == nullStr { // If "null", do nothing
+		return nil
+	} else if len(str) < 2 {
+		return errMissingQuotes
 	}
 
 	lastIndex := len(str) - 1
 	if str[0] != '"' || str[lastIndex] != '"' {
-		return ids.ErrMissingQuotes
+		return errMissingQuotes
 	}
 
-	var err error
-	*k, err = PrivateKeySECP256K1RFromString(str[1:lastIndex])
-	return err
+	strNoQuotes := str[1:lastIndex]
+	if !strings.HasPrefix(strNoQuotes, PrivateKeyPrefix) {
+		return errMissingKeyPrefix
+	}
+
+	strNoPrefix := strNoQuotes[len(PrivateKeyPrefix):]
+	keyBytes, err := formatting.Decode(formatting.CB58, strNoPrefix)
+	if err != nil {
+		return err
+	}
+	if len(keyBytes) != SECP256K1RSKLen {
+		return errInvalidPrivateKeyLength
+	}
+
+	*k = PrivateKeySECP256K1R{
+		sk:    secp256k1.PrivKeyFromBytes(keyBytes),
+		bytes: keyBytes,
+	}
+	return nil
 }
 
 func (k *PrivateKeySECP256K1R) UnmarshalText(text []byte) error {
 	return k.UnmarshalJSON(text)
-}
-
-// PrivateKeySECP256K1RFromString is the inverse of PrivateKeySECP256K1R.String()
-func PrivateKeySECP256K1RFromString(kStr string) (PrivateKeySECP256K1R, error) {
-	if !strings.HasPrefix(kStr, PrivateKeyPrefix) {
-		return PrivateKeySECP256K1R{}, fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
-	}
-	trimmedKStr := strings.TrimPrefix(kStr, PrivateKeyPrefix)
-	kBytes, err := formatting.Decode(formatting.CB58, trimmedKStr)
-	if err != nil {
-		return PrivateKeySECP256K1R{}, fmt.Errorf("problem parsing private key: %w", err)
-	}
-	factory := FactorySECP256K1R{}
-	kIntf, err := factory.ToPrivateKey(kBytes)
-	if err != nil {
-		return PrivateKeySECP256K1R{}, fmt.Errorf("problem parsing private key: %w", err)
-	}
-	k := kIntf.(*PrivateKeySECP256K1R)
-	return *k, nil
 }
 
 // raw sig has format [v || r || s] whereas the sig has format [r || s || v]

@@ -44,7 +44,7 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 
 	lastIndex := len(str) - 1
 	if str[0] != '"' || str[lastIndex] != '"' {
-		return ErrMissingQuotes
+		return errMissingQuotes
 	}
 
 	var err error

@@ -56,12 +56,12 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
-		return ErrMissingQuotes
+		return errMissingQuotes
 	}
 
 	lastIndex := len(str) - 1
 	if str[0] != '"' || str[lastIndex] != '"' {
-		return ErrMissingQuotes
+		return errMissingQuotes
 	}
 
 	// Parse CB58 formatted string to bytes

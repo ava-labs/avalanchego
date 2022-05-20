@@ -99,58 +99,20 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestPrivateKeySECP256K1RFromString(t *testing.T) {
-	assert := assert.New(t)
-	// PrivateKeySECP256K1RFromString(String)
-	f := FactorySECP256K1R{}
-	kIntf, _ := f.NewPrivateKey()
-	k := kIntf.(*PrivateKeySECP256K1R)
-	k2, err := PrivateKeySECP256K1RFromString(k.String())
-	assert.NoError(err)
-	assert.Equal(k, &k2)
-	// String(PrivateKeySECP256K1RFromString)
-	kStr := "PrivateKey-2qg4x8qM2s2qGNSXG"
-	k2, err = PrivateKeySECP256K1RFromString(kStr)
-	assert.NoError(err)
-	assert.Equal(kStr, k2.String())
-}
-
-func TestPrivateKeySECP256K1RFromStringError(t *testing.T) {
-	assert := assert.New(t)
-	tests := []struct {
-		in string
-	}{
-		{""},
-		{"foo"},
-		{"foobar"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			_, err := PrivateKeySECP256K1RFromString(tt.in)
-			assert.Error(err)
-		})
-	}
-}
-
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
 	assert := assert.New(t)
-	// UnmarshalJSON(MarshalJSON)
+
 	f := FactorySECP256K1R{}
-	kIntf, _ := f.NewPrivateKey()
-	k := kIntf.(*PrivateKeySECP256K1R)
-	kJSON, err := k.MarshalJSON()
+	keyIntf, _ := f.NewPrivateKey()
+	key := keyIntf.(*PrivateKeySECP256K1R)
+
+	keyJSON, err := key.MarshalJSON()
 	assert.NoError(err)
-	k2 := PrivateKeySECP256K1R{}
-	err = k2.UnmarshalJSON(kJSON)
+
+	key2 := PrivateKeySECP256K1R{}
+	err = key2.UnmarshalJSON(keyJSON)
 	assert.NoError(err)
-	assert.Equal(k, &k2)
-	// MarshalJSON(UnmarshalJSON)
-	kJSON = []byte("\"PrivateKey-2qg4x8qM2s2qGNSXG\"")
-	err = k2.UnmarshalJSON(kJSON)
-	assert.NoError(err)
-	kJSON2, err := k2.MarshalJSON()
-	assert.NoError(err)
-	assert.Equal(kJSON, kJSON2)
+	assert.Equal(key.PublicKey().Address(), key2.PublicKey().Address())
 }
 
 func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
@@ -160,20 +122,28 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 		in    []byte
 	}{
 		{
+			"too short",
+			[]byte(`"`),
+		},
+		{
 			"missing start quote",
-			[]byte("PrivateKey-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
+			[]byte(`PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
 		},
 		{
 			"missing end quote",
-			[]byte("\"PrivateKey-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
+			[]byte(`"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`),
 		},
 		{
-			"PrivateKey-",
-			[]byte("\"PrivateKey-\""),
+			"incorrect prefix",
+			[]byte(`"PrivateKfy-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
 		},
 		{
-			"PrivateKey-1",
-			[]byte("\"PrivateKey-1\""),
+			`"PrivateKey-"`,
+			[]byte(`"PrivateKey-"`),
+		},
+		{
+			`"PrivateKey-1"`,
+			[]byte(`"PrivateKey-1"`),
 		},
 	}
 	for _, tt := range tests {

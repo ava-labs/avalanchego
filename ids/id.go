@@ -24,8 +24,9 @@ const (
 
 var (
 	// Empty is a useful all zero value
-	Empty            = ID{}
-	ErrMissingQuotes = errors.New("first and last characters should be quotes")
+	Empty = ID{}
+
+	errMissingQuotes = errors.New("first and last characters should be quotes")
 )
 
 // ID wraps a 32 byte hash used as an identifier
@@ -58,12 +59,12 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
-		return ErrMissingQuotes
+		return errMissingQuotes
 	}
 
 	lastIndex := len(str) - 1
 	if str[0] != '"' || str[lastIndex] != '"' {
-		return ErrMissingQuotes
+		return errMissingQuotes
 	}
 
 	// Parse CB58 formatted string to bytes
