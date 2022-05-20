@@ -118,6 +118,8 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		leafsResponse.Keys = append(leafsResponse.Keys, it.Key)
 		leafsResponse.Vals = append(leafsResponse.Vals, it.Value)
 	}
+	// Update read leafs time here, so that we include the case that an error occurred.
+	lrh.stats.UpdateReadLeafsTime(time.Since(startTime))
 
 	if it.Err != nil {
 		log.Debug("failed to iterate trie, dropping request", "nodeID", nodeID, "requestID", requestID, "request", leafsRequest, "err", it.Err)
@@ -147,7 +149,10 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		if len(leafsResponse.Keys) > 0 {
 			end = leafsResponse.Keys[len(leafsResponse.Keys)-1]
 		}
+		rangeProofStart := time.Now()
 		leafsResponse.ProofKeys, leafsResponse.ProofVals, err = GenerateRangeProof(t, start, end)
+		lrh.stats.UpdateGenerateRangeProofTime(time.Since(rangeProofStart))
+		lrh.stats.UpdateRangeProofKeysReturned(int64(len(leafsResponse.Keys)))
 		// Generate the proof and add it to the response.
 		if err != nil {
 			log.Debug("failed to create valid proof serving leafs request", "nodeID", nodeID, "requestID", requestID, "request", leafsRequest, "err", err)
