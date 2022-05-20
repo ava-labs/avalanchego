@@ -809,7 +809,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey crypto.PrivateKeySECP256K1R `json:"privateKey"`
+	PrivateKey *crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -834,7 +834,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey = *sk
+	reply.PrivateKey = sk
 	return user.Close()
 }
 
