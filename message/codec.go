@@ -229,7 +229,7 @@ func (c *codec) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()
 	}
 
 	if p.Offset != len(p.Bytes) {
-		return nil, fmt.Errorf("expected length %d but got %d", len(p.Bytes), p.Offset)
+		return nil, fmt.Errorf("expected length %d but got %d", p.Offset, len(p.Bytes))
 	}
 
 	var expirationTime time.Time
