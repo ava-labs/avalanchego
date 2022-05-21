@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"strings"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -33,9 +31,10 @@ const (
 )
 
 var (
-	errNoAddresses   = errors.New("no addresses provided")
-	errNoSourceChain = errors.New("no source chain provided")
-	errNilTxID       = errors.New("nil transaction ID")
+	errNoAddresses       = errors.New("no addresses provided")
+	errNoSourceChain     = errors.New("no source chain provided")
+	errNilTxID           = errors.New("nil transaction ID")
+	errMissingPrivateKey = errors.New("argument 'privateKey' not given")
 
 	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
@@ -100,8 +99,8 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey    string `json:"privateKey"`
-	PrivateKeyHex string `json:"privateKeyHex"`
+	PrivateKey    *crypto.PrivateKeySECP256K1R `json:"privateKey"`
+	PrivateKeyHex string                       `json:"privateKeyHex"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -123,50 +122,29 @@ func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		secpFactory: &service.vm.secpFactory,
 		db:          db,
 	}
-	sk, err := user.getKey(address)
+	reply.PrivateKey, err = user.getKey(address)
 	if err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
-	encodedKey, err := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
-	if err != nil {
-		return fmt.Errorf("problem encoding bytes as cb58: %w", err)
-	}
-	reply.PrivateKey = constants.SecretKeyPrefix + encodedKey
-	reply.PrivateKeyHex = hexutil.Encode(sk.Bytes())
+	reply.PrivateKeyHex = hexutil.Encode(reply.PrivateKey.Bytes())
 	return nil
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey string `json:"privateKey"`
+	PrivateKey *crypto.PrivateKeySECP256K1R `json:"privateKey"`
 }
 
 // ImportKey adds a private key to the provided user
 func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	log.Info("EVM: ImportKey called", "username", args.Username)
 
-	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
-		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	if args.PrivateKey == nil {
+		return errMissingPrivateKey
 	}
 
-	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
-	pkBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
-	if err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-
-	skIntf, err := service.vm.secpFactory.ToPrivateKey(pkBytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing private key: %w", err)
-	}
-	sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		return fmt.Errorf("expected *crypto.PrivateKeySECP256K1R but got %T", skIntf)
-	}
-
-	// TODO: return eth address here
-	reply.Address = GetEthAddress(sk).Hex()
+	reply.Address = GetEthAddress(args.PrivateKey).Hex()
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -178,7 +156,7 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		secpFactory: &service.vm.secpFactory,
 		db:          db,
 	}
-	if err := user.putAddress(sk); err != nil {
+	if err := user.putAddress(args.PrivateKey); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
 	return nil

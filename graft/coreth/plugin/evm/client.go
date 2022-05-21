@@ -7,12 +7,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/ethereum/go-ethereum/log"
+
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 // Interface compliance
@@ -25,8 +28,8 @@ type Client interface {
 	GetAtomicTx(ctx context.Context, txID ids.ID) ([]byte, error)
 	GetAtomicUTXOs(ctx context.Context, addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error)
 	ListAddresses(ctx context.Context, userPass api.UserPass) ([]string, error)
-	ExportKey(ctx context.Context, userPass api.UserPass, addr string) (string, string, error)
-	ImportKey(ctx context.Context, userPass api.UserPass, privateKey string) (string, error)
+	ExportKey(ctx context.Context, userPass api.UserPass, addr string) (*crypto.PrivateKeySECP256K1R, string, error)
+	ImportKey(ctx context.Context, userPass api.UserPass, privateKey *crypto.PrivateKeySECP256K1R) (string, error)
 	Import(ctx context.Context, userPass api.UserPass, to string, sourceChain string) (ids.ID, error)
 	ExportAVAX(ctx context.Context, userPass api.UserPass, amount uint64, to string) (ids.ID, error)
 	Export(ctx context.Context, userPass api.UserPass, amount uint64, to string, assetID string) (ids.ID, error)
@@ -132,7 +135,7 @@ func (c *client) ListAddresses(ctx context.Context, user api.UserPass) ([]string
 
 // ExportKey returns the private key corresponding to [addr] controlled by [user]
 // in both Avalanche standard format and hex format
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr string) (string, string, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr string) (*crypto.PrivateKeySECP256K1R, string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -142,7 +145,7 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr string) 
 }
 
 // ImportKey imports [privateKey] to [user]
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string) (string, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,
