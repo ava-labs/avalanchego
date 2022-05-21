@@ -135,7 +135,37 @@ A fully populated genesis JSON with the above allocation would look like (note t
 }
 ```
 
-## Setting a Custom Fee Recipient
+### Chain Config
+
+`chainID`: Denotes the chainID of to be created chain. Must be picked carefully since a conflict with other chains can cause issues.
+
+#### Hardforks
+
+`homesteadBlock`, `eip150Block`, `eip150Hash`, `eip155Block`, `byzantiumBlock`, `constantinopleBlock`, `petersburgBlock`, `istanbulBlock`, `muirGlacierBlock`, `subnetEVMTimestamp` are hardfork activation times. Changing these may cause issues, so treat them carefully.
+
+#### Fee Config
+
+`gasLimit`: Gas limit of blocks.
+
+`minBaseFee`: Minimum base fee of transactions. It is also the initial base fee for EIP-1559 blocks.
+
+`targetGas`: The target gas consumption of blocks. If the network starts producing blocks with gas cost higher than this, base fees are increased accordingly.
+
+`baseFeeChangeDenominator`: The amount the base fee can change between blocks.
+
+`minBlockGasCost`: Minimum gas cost a block should cover.
+
+`maxBlockGasCost`: Maximum gas cost a block should cover.
+
+`targetBlockRate`: The targeted block rate that network should produce blocks. If the network starts producing faster than this, base fees are increased accordingly.
+
+`blockGasCostStep`: The block gas cost change step between blocks.
+
+### Header
+
+The fields `nonce`, `timestamp`, `extraData`, `gasLimit`, `difficulty`, `mixHash`, `coinbase`, `number`, `gasUsed`, `parentHash` defines the genesis block header. The field `gasLimit` should be set to match the `gasLimit` set in the `feeConfig`. You do not need to change any of the other genesis header fields.
+
+### Setting a Custom Fee Recipient
 
 By default, all fees are burned (sent to the blackhole address). However, it is
 possible to enable block producers to set a fee recipient (get compensated for
