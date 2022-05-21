@@ -98,3 +98,59 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	_, err = factory.RecoverPublicKey(msg, sig)
 	assert.Error(t, err)
 }
+
+func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+
+	f := FactorySECP256K1R{}
+	keyIntf, _ := f.NewPrivateKey()
+	key := keyIntf.(*PrivateKeySECP256K1R)
+
+	keyJSON, err := key.MarshalJSON()
+	assert.NoError(err)
+
+	key2 := PrivateKeySECP256K1R{}
+	err = key2.UnmarshalJSON(keyJSON)
+	assert.NoError(err)
+	assert.Equal(key.PublicKey().Address(), key2.PublicKey().Address())
+}
+
+func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
+	assert := assert.New(t)
+	tests := []struct {
+		label string
+		in    []byte
+	}{
+		{
+			"too short",
+			[]byte(`"`),
+		},
+		{
+			"missing start quote",
+			[]byte(`PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+		},
+		{
+			"missing end quote",
+			[]byte(`"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`),
+		},
+		{
+			"incorrect prefix",
+			[]byte(`"PrivateKfy-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+		},
+		{
+			`"PrivateKey-"`,
+			[]byte(`"PrivateKey-"`),
+		},
+		{
+			`"PrivateKey-1"`,
+			[]byte(`"PrivateKey-1"`),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			foo := PrivateKeySECP256K1R{}
+			err := foo.UnmarshalJSON(tt.in)
+			assert.Error(err)
+		})
+	}
+}

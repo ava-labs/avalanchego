@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strings"
 	"testing"
 	"time"
 
@@ -137,16 +136,8 @@ func TestExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.HasPrefix(reply.PrivateKey, constants.SecretKeyPrefix) {
-		t.Fatalf("ExportKeyReply is missing secret key prefix: %s", constants.SecretKeyPrefix)
-	}
-	privateKeyString := strings.TrimPrefix(reply.PrivateKey, constants.SecretKeyPrefix)
-	privKeyBytes, err := formatting.Decode(formatting.CB58, privateKeyString)
-	if err != nil {
-		t.Fatalf("Failed to parse key: %s", err)
-	}
-	if !bytes.Equal(testPrivateKey, privKeyBytes) {
-		t.Fatalf("Expected %v, got %v", testPrivateKey, privKeyBytes)
+	if !bytes.Equal(testPrivateKey, reply.PrivateKey.Bytes()) {
+		t.Fatalf("Expected %v, got %v", testPrivateKey, reply.PrivateKey.Bytes())
 	}
 }
 

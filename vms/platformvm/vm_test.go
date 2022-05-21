@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -165,7 +166,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -178,7 +179,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -240,7 +241,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +254,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -479,7 +480,7 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		_, addrBytes, err := formatting.ParseBech32(utxo.Address)
+		_, addrBytes, err := address.ParseBech32(utxo.Address)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -499,7 +500,7 @@ func TestGenesis(t *testing.T) {
 		} else if out.Amount() != uint64(utxo.Amount) {
 			id := keys[0].PublicKey().Address()
 			hrp := constants.NetworkIDToHRP[testNetworkID]
-			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			addr, err := address.FormatBech32(hrp, id.Bytes())
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -118,7 +119,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 						if err := json.Unmarshal(b, &holder); err != nil {
 							return fmt.Errorf("problem unmarshaling holder: %w", err)
 						}
-						_, addrbuff, err := formatting.ParseBech32(holder.Address)
+						_, addrbuff, err := address.ParseBech32(holder.Address)
 						if err != nil {
 							return fmt.Errorf("problem parsing holder address: %w", err)
 						}
@@ -150,12 +151,12 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 								Threshold: 1,
 							},
 						}
-						for _, address := range owners.Minters {
-							_, addrbuff, err := formatting.ParseBech32(address)
+						for _, addrStr := range owners.Minters {
+							_, addrBytes, err := address.ParseBech32(addrStr)
 							if err != nil {
 								return fmt.Errorf("problem parsing minters address: %w", err)
 							}
-							addr, err := ids.ToShortID(addrbuff)
+							addr, err := ids.ToShortID(addrBytes)
 							if err != nil {
 								return fmt.Errorf("problem parsing minters address: %w", err)
 							}
