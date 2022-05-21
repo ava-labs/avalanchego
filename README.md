@@ -46,11 +46,11 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 
 ## Run Local Network
 
-See [Create a Local EVM Subnet](https://docs.avax.network/subnets/create-a-local-subnet).
+See [Create an EVM Subnet on Local](https://docs.avax.network/subnets/create-a-local-subnet).
 
 ## Fuji Subnet Deployment
 
-See [Fuji Testnet Deployment](https://docs.avax.network/subnets/fuji-deployment).
+See [Create an EVM Subnet on Fuji Testnet](https://docs.avax.network/subnets/create-a-fuji-subnet).
 
 
 ## Setting the Genesis Allocation
