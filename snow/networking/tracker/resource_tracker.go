@@ -114,6 +114,7 @@ func (t *diskResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 
+	// [realWriteUsage] is only used for metrics.
 	realReadUsage, realWriteUsage := rt.resources.DiskUsage()
 	rt.metrics.diskReadsMetric.Set(realReadUsage)
 	rt.metrics.diskWritesMetric.Set(realWriteUsage)
@@ -130,14 +131,13 @@ func (t *diskResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
 		return 0
 	}
 
-	realIOUsage := realReadUsage + realWriteUsage
 	portionUsageByNode := m.(meter.Meter).Read(now) / measuredProcessingTime
-	return realIOUsage * portionUsageByNode
+	return realReadUsage * portionUsageByNode
 }
 
 func (t *diskResourceTracker) TotalUsage() float64 {
-	realReadUsage, realWriteUsage := t.t.resources.DiskUsage()
-	return realReadUsage + realWriteUsage
+	realReadUsage, _ := t.t.resources.DiskUsage()
+	return realReadUsage
 }
 
 func (t *diskResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, value float64) time.Duration {
@@ -159,16 +159,16 @@ func (t *diskResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, v
 		return 0
 	}
 
+	// [realWriteUsage] is only used for metrics.
 	realReadUsage, realWriteUsage := rt.resources.DiskUsage()
 	rt.metrics.diskReadsMetric.Set(realReadUsage)
 	rt.metrics.diskWritesMetric.Set(realWriteUsage)
 
-	realIOUsage := realReadUsage + realWriteUsage
-	if realIOUsage == 0 {
+	if realReadUsage == 0 {
 		return 0
 	}
 
-	scale := realIOUsage / measuredProcessingTime
+	scale := realReadUsage / measuredProcessingTime
 	return m.(meter.Meter).TimeUntil(now, value/scale)
 }
 

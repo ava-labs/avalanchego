@@ -341,9 +341,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Float64(CPUMaxNonVdrNodeUsageKey, float64(runtime.NumCPU())/8, "Maximum number of CPUs that a non-validator can utilize. Value should be in range [0, total core count]")
 
 	// Disk management
-	fs.Float64(DiskVdrAllocKey, 100*units.MiB, "Maximum number of disk reads/writes per second to allocate for use by validators. Must be > 0")
-	fs.Float64(DiskMaxNonVdrUsageKey, 80*units.MiB, "Number of disk reads/writes per second that, if fully utilized, will rate limit all non-validators. Must be >= 0")
-	fs.Float64(DiskMaxNonVdrNodeUsageKey, 12*units.MiB, "Maximum number of disk reads/writes per second that a non-validator can utilize. Must be >= 0")
+	fs.Float64(DiskVdrAllocKey, 1000*units.GiB, "Maximum number of disk reads/writes per second to allocate for use by validators. Must be > 0")
+	fs.Float64(DiskMaxNonVdrUsageKey, 1000*units.GiB, "Number of disk reads/writes per second that, if fully utilized, will rate limit all non-validators. Must be >= 0")
+	fs.Float64(DiskMaxNonVdrNodeUsageKey, 1000*units.GiB, "Maximum number of disk reads/writes per second that a non-validator can utilize. Must be >= 0")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
