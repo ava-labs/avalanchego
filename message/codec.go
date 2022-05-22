@@ -227,6 +227,9 @@ func (c *codec) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()
 	for _, field := range msgFields {
 		fieldValues[field] = field.Unpacker()(&p)
 	}
+	if p.Err != nil {
+		return nil, p.Err
+	}
 
 	if p.Offset != len(p.Bytes) {
 		return nil, fmt.Errorf("expected length %d but got %d", p.Offset, len(p.Bytes))
@@ -248,5 +251,5 @@ func (c *codec) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()
 		nodeID:                nodeID,
 		expirationTime:        expirationTime,
 		onFinishedHandling:    onFinishedHandling,
-	}, p.Err
+	}, nil
 }
