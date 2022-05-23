@@ -248,7 +248,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 		txRequested bool
 	)
 	sender.CantSendAppGossip = false
-	sender.SendAppRequestF = func(_ ids.ShortSet, _ uint32, _ []byte) error {
+	sender.SendAppRequestF = func(_ ids.NodeIDSet, _ uint32, _ []byte) error {
 		txRequested = true
 		return nil
 	}
@@ -270,7 +270,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	err = vm.AppGossip(nodeID, msgBytes)
 	assert.NoError(err)
 	assert.False(txRequested, "tx should not be requested")

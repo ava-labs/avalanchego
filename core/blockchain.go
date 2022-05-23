@@ -54,8 +54,6 @@ import (
 )
 
 var (
-	removeTxIndicesKey = []byte("removed_tx_indices")
-
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
 	errFutureBlockUnsupported  = errors.New("future block insertion not supported")
@@ -317,23 +315,6 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 		return fmt.Errorf("could not load last accepted block")
 	}
 
-	// Remove all processing transaction indices leftover from when we used to
-	// write transaction indices as soon as a block was verified.
-	indicesRemoved, err := bc.db.Has(removeTxIndicesKey)
-	if err != nil {
-		return fmt.Errorf("unable to determine if transaction indices removed: %w", err)
-	}
-	if !indicesRemoved {
-		indicesRemoved, err := bc.removeIndices(currentBlock.NumberU64(), bc.lastAccepted.NumberU64())
-		if err != nil {
-			return err
-		}
-		if err := bc.db.Put(removeTxIndicesKey, bc.lastAccepted.Number().Bytes()); err != nil {
-			return fmt.Errorf("unable to mark indices removed: %w", err)
-		}
-		log.Debug("removed processing transaction indices", "count", indicesRemoved, "currentBlock", currentBlock.NumberU64(), "lastAccepted", bc.lastAccepted.NumberU64())
-	}
-
 	// This ensures that the head block is updated to the last accepted block on startup
 	if err := bc.setPreference(bc.lastAccepted); err != nil {
 		return fmt.Errorf("failed to set preference to last accepted block while loading last state: %w", err)
@@ -343,27 +324,6 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 	// available. The state may not be available if it was not committed due
 	// to an unclean shutdown.
 	return bc.reprocessState(bc.lastAccepted, 2*commitInterval)
-}
-
-// removeIndices removes all transaction lookup entries for the transactions contained in the canonical chain
-// from block at height [to] to block at height [from]. Blocks are traversed in reverse order.
-func (bc *BlockChain) removeIndices(from, to uint64) (int, error) {
-	indicesRemoved := 0
-	batch := bc.db.NewBatch()
-	for i := from; i > to; i-- {
-		b := bc.GetBlockByNumber(i)
-		if b == nil {
-			return indicesRemoved, fmt.Errorf("could not load canonical block at height %d", i)
-		}
-		for _, tx := range b.Transactions() {
-			rawdb.DeleteTxLookupEntry(batch, tx.Hash())
-			indicesRemoved++
-		}
-	}
-	if err := batch.Write(); err != nil {
-		return 0, fmt.Errorf("failed to write batch while removing indices (from: %d, to: %d): %w", from, to, err)
-	}
-	return indicesRemoved, nil
 }
 
 func (bc *BlockChain) loadGenesisState() error {

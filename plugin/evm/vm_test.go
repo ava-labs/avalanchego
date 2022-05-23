@@ -61,7 +61,7 @@ var (
 	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 	// config overridden in vm.Initialize.
 	genesisJSONMuirGlacier = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0xF423F\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONSubnetEVM   = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0xF423F\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONSubnetEVM   = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 	firstTxAmount          *big.Int
 	genesisBalance         *big.Int
 )
@@ -172,9 +172,10 @@ func GenesisVM(t *testing.T,
 	*VM, manager.Manager,
 	*engCommon.SenderTest,
 ) {
+	t.Helper()
 	vm := &VM{}
 	ctx, dbManager, genesisBytes, issuer := setupGenesis(t, genesisJSON)
-	appSender := &engCommon.SenderTest{}
+	appSender := &engCommon.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
 	if err := vm.Initialize(
@@ -518,12 +519,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -589,8 +585,8 @@ func TestSetPreferenceRace(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -773,12 +769,7 @@ func TestReorgProtection(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -844,8 +835,8 @@ func TestReorgProtection(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -955,12 +946,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1026,8 +1012,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1130,12 +1116,7 @@ func TestStickyPreference(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1201,8 +1182,8 @@ func TestStickyPreference(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1403,12 +1384,7 @@ func TestUncleBlock(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1472,8 +1448,8 @@ func TestUncleBlock(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1591,12 +1567,7 @@ func TestEmptyBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1666,12 +1637,8 @@ func TestAcceptReorg(t *testing.T) {
 	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1737,8 +1704,8 @@ func TestAcceptReorg(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1867,12 +1834,7 @@ func TestFutureBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1930,12 +1892,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		}
 	}()
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -2016,7 +1973,7 @@ func TestConfigureLogLevel(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			vm := &VM{}
 			ctx, dbManager, genesisBytes, issuer := setupGenesis(t, test.genesisJSON)
-			appSender := &engCommon.SenderTest{}
+			appSender := &engCommon.SenderTest{T: t}
 			appSender.CantSendAppGossip = true
 			appSender.SendAppGossipF = func([]byte) error { return nil }
 			err := vm.Initialize(
@@ -2077,12 +2034,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -2125,8 +2077,8 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice*3), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice*3), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2220,11 +2172,6 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
 	if err != nil {
 		t.Fatal(err)
@@ -2235,7 +2182,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	}
 
 	// Send basic transaction to construct a simple block and confirm that the precompile state configuration in the worker behaves correctly.
-	tx := types.NewTransaction(uint64(0), key.Address, new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)

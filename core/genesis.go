@@ -185,9 +185,11 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 		return nil, errGenesisNoConfig
 	}
 	// Make sure genesis gas limit is consistent
-	gasLimitConfig := genesis.Config.FeeConfig.GasLimit.Uint64()
-	if gasLimitConfig != genesis.GasLimit {
-		return nil, fmt.Errorf("gas limit in fee config (%d) does not match gas limit in header (%d)", gasLimitConfig, genesis.GasLimit)
+	if genesis.Config.IsSubnetEVM(common.Big0) {
+		gasLimitConfig := genesis.Config.FeeConfig.GasLimit.Uint64()
+		if gasLimitConfig != genesis.GasLimit {
+			return nil, fmt.Errorf("gas limit in fee config (%d) does not match gas limit in header (%d)", gasLimitConfig, genesis.GasLimit)
+		}
 	}
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)

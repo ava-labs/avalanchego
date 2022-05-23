@@ -15,7 +15,7 @@ type CounterHandler struct {
 	Txs int
 }
 
-func (h *CounterHandler) HandleTxs(ids.ShortID, TxsGossip) error {
+func (h *CounterHandler) HandleTxs(ids.NodeID, TxsGossip) error {
 	h.Txs++
 	return nil
 }
@@ -26,7 +26,7 @@ func TestHandleTxs(t *testing.T) {
 	handler := CounterHandler{}
 	msg := TxsGossip{}
 
-	err := msg.Handle(&handler, ids.ShortEmpty)
+	err := msg.Handle(&handler, ids.EmptyNodeID)
 	assert.NoError(err)
 	assert.Equal(1, handler.Txs)
 }
@@ -36,6 +36,6 @@ func TestNoopHandler(t *testing.T) {
 
 	handler := NoopMempoolGossipHandler{}
 
-	err := handler.HandleTxs(ids.ShortEmpty, TxsGossip{})
+	err := handler.HandleTxs(ids.EmptyNodeID, TxsGossip{})
 	assert.NoError(err)
 }

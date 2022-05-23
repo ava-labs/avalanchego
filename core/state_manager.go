@@ -29,11 +29,16 @@ package core
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ethereum/go-ethereum/common"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 const (
 	commitInterval = 4096

@@ -663,14 +663,30 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 	return txs
 }
 
-func (pool *TxPool) CheckNonceOrdering(from common.Address, txNonce uint64) error {
+// checks transaction validity against the current state.
+func (pool *TxPool) checkTxState(from common.Address, tx *types.Transaction) error {
 	pool.currentStateLock.Lock()
 	defer pool.currentStateLock.Unlock()
 
+	// cost == V + GP * GL
+	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
+		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
+	}
+
+	txNonce := tx.Nonce()
 	// Ensure the transaction adheres to nonce ordering
-	if currentNonce, txNonce := pool.currentState.GetNonce(from), txNonce; currentNonce > txNonce {
+	if currentNonce := pool.currentState.GetNonce(from); currentNonce > txNonce {
 		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)",
 			ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
+	}
+	isTxAllowList := pool.chainconfig.IsTxAllowList(pool.currentHead.Number)
+
+	// If the tx allow list is enabled, return an error if the from address is not allow listed.
+	if isTxAllowList {
+		txAllowListRole := precompile.GetTxAllowListStatus(pool.currentState, from)
+		if !txAllowListRole.IsEnabled() {
+			return fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, from)
+		}
 	}
 	return nil
 }
@@ -723,28 +739,12 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.minimumFee != nil && tx.GasFeeCapIntCmp(pool.minimumFee) < 0 {
 		return fmt.Errorf("%w: address %s have gas fee cap (%d) < pool minimum fee cap (%d)", ErrUnderpriced, from.Hex(), tx.GasFeeCap(), pool.minimumFee)
 	}
+
 	// Ensure the transaction adheres to nonce ordering
-	if err := pool.CheckNonceOrdering(from, tx.Nonce()); err != nil {
+	if err := pool.checkTxState(from, tx); err != nil {
 		return err
 	}
 
-	isTxAllowList := pool.chainconfig.IsTxAllowList(pool.currentHead.Number)
-	// Transactor should have enough funds to cover the costs
-	// cost == V + GP * GL
-	pool.currentStateLock.Lock()
-	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
-		pool.currentStateLock.Unlock()
-		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
-	}
-	// If the tx allow list is enabled, return an error if the from address is not allow listed.
-	if isTxAllowList {
-		txAllowListRole := precompile.GetTxAllowListStatus(pool.currentState, from)
-		if !txAllowListRole.IsEnabled() {
-			pool.currentStateLock.Unlock()
-			return fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, from)
-		}
-	}
-	pool.currentStateLock.Unlock()
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
 	if err != nil {

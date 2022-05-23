@@ -50,7 +50,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	// Force-load the native, to trigger registration
-	_ "github.com/ava-labs/subnet-evm/eth/tracers/js"
 	_ "github.com/ava-labs/subnet-evm/eth/tracers/native"
 )
 
@@ -132,12 +131,6 @@ type callTracerTest struct {
 	Context *callContext  `json:"context"`
 	Input   string        `json:"input"`
 	Result  *callTrace    `json:"result"`
-}
-
-// Iterates over all the input-output datasets in the tracer test harness and
-// runs the JavaScript tracers against them.
-func TestCallTracerLegacy(t *testing.T) {
-	testCallTracer("callTracerLegacy", "call_tracer_legacy", t)
 }
 
 func TestCallTracerNative(t *testing.T) {
@@ -269,7 +262,7 @@ func BenchmarkTracers(b *testing.B) {
 			if err := json.Unmarshal(blob, test); err != nil {
 				b.Fatalf("failed to parse testcase: %v", err)
 			}
-			benchTracer("callTracerNative", test, b)
+			benchTracer("callTracer", test, b)
 		})
 	}
 }

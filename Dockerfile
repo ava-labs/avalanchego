@@ -15,7 +15,7 @@ WORKDIR /build
 COPY go.mod go.sum avalanchego* ./
 
 # Download avalanche dependencies using go mod
-RUN go mod download
+RUN go mod download && go mod tidy -compat=1.17
 
 # Copy the code into the container
 COPY . .

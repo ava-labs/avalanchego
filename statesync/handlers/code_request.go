@@ -40,7 +40,7 @@ func NewCodeRequestHandler(codeReader ethdb.KeyValueReader, stats stats.HandlerS
 // Returns nothing if code hash is not found
 // Expects returned errors to be treated as FATAL
 // Assumes ctx is active
-func (n *CodeRequestHandler) OnCodeRequest(_ context.Context, nodeID ids.ShortID, requestID uint32, codeRequest message.CodeRequest) ([]byte, error) {
+func (n *CodeRequestHandler) OnCodeRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, codeRequest message.CodeRequest) ([]byte, error) {
 	startTime := time.Now()
 	n.stats.IncCodeRequest()
 

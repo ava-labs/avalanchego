@@ -34,14 +34,14 @@ type GossipMessage interface {
 	fmt.Stringer
 
 	// Handle this gossip message with the gossip handler.
-	Handle(handler GossipHandler, nodeID ids.ShortID) error
+	Handle(handler GossipHandler, nodeID ids.NodeID) error
 }
 
 type TxsGossip struct {
 	Txs []byte `serialize:"true"`
 }
 
-func (msg TxsGossip) Handle(handler GossipHandler, nodeID ids.ShortID) error {
+func (msg TxsGossip) Handle(handler GossipHandler, nodeID ids.NodeID) error {
 	return handler.HandleTxs(nodeID, msg)
 }
 
