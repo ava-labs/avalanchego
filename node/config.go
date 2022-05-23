@@ -205,14 +205,24 @@ type Config struct {
 	// VM management
 	VMManager vms.Manager `json:"-"`
 
-	// Frequency to check the real CPU utilization of tracked processes.
-	// More frequent checks --> CPU usage metrics are more accurate, but more
+	// Halflife to use for the processing requests tracker.
+	// Larger halflife --> usage metrics change more slowly.
+	SystemTrackerProcessingHalflife time.Duration `json:"systemTrackerProcessingHalflife"`
+
+	// Frequency to check the real resource usage of tracked processes.
+	// More frequent checks --> usage metrics are more accurate, but more
 	// expensive to track
-	CPUTrackerFrequency time.Duration `json:"cpuTrackerFrequency"`
+	SystemTrackerFrequency time.Duration `json:"systemTrackerFrequency"`
 
-	// Halflife to use for the CPU tracker.
-	// Larger halflife --> CPU usage metrics change more slowly.
-	CPUTrackerHalflife time.Duration `json:"cpuTrackerHalflife"`
+	// Halflife to use for the cpu tracker.
+	// Larger halflife --> cpu usage metrics change more slowly.
+	SystemTrackerCPUHalflife time.Duration `json:"systemTrackerCPUHalflife"`
 
-	CPUTargeterConfig tracker.CPUTargeterConfig `json:"cpuTargeterConfig"`
+	// Halflife to use for the disk tracker.
+	// Larger halflife --> disk usage metrics change more slowly.
+	SystemTrackerDiskHalflife time.Duration `json:"systemTrackerDiskHalflife"`
+
+	CPUTargeterConfig tracker.TargeterConfig `json:"cpuTargeterConfig"`
+
+	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
 }

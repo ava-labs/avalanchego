@@ -10,7 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -23,42 +25,42 @@ type Client interface {
 	// GetHeight returns the current block height of the P Chain
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// ExportKey returns the private key corresponding to [address] from [user]'s account
-	ExportKey(ctx context.Context, user api.UserPass, address string, options ...rpc.Option) (string, error)
+	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error)
 	// ImportKey imports the specified [privateKey] to [user]'s keystore
-	ImportKey(ctx context.Context, user api.UserPass, address string, options ...rpc.Option) (string, error)
-	// GetBalance returns the balance of [address] on the P Chain
-	GetBalance(ctx context.Context, addrs []string, options ...rpc.Option) (*GetBalanceResponse, error)
+	ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
+	// GetBalance returns the balance of [addrs] on the P Chain
+	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
 	// CreateAddress creates a new address for [user]
-	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error)
+	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error)
 	// ListAddresses returns an array of platform addresses controlled by [user]
-	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error)
+	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
-		addrs []string,
+		addrs []ids.ShortID,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
-	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+	) ([][]byte, ids.ShortID, ids.ID, error)
+	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addrs]
 	// from [sourceChain]
 	GetAtomicUTXOs(
 		ctx context.Context,
-		addrs []string,
+		addrs []ids.ShortID,
 		sourceChain string,
 		limit uint32,
-		startAddress,
-		startUTXOID string,
+		startAddress ids.ShortID,
+		startUTXOID ids.ID,
 		options ...rpc.Option,
-	) ([][]byte, api.Index, error)
+	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetSubnets returns information about the specified subnets
-	GetSubnets(context.Context, []ids.ID, ...rpc.Option) ([]APISubnet, error)
+	GetSubnets(context.Context, []ids.ID, ...rpc.Option) ([]ClientSubnet, error)
 	// GetStakingAssetID returns the assetID of the asset used for staking on
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPrimaryValidator, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
 	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
@@ -70,9 +72,9 @@ type Client interface {
 	AddValidator(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		rewardAddress string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		rewardAddress ids.ShortID,
 		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
@@ -85,9 +87,9 @@ type Client interface {
 	AddDelegator(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		rewardAddress string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		rewardAddress ids.ShortID,
 		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
@@ -99,9 +101,9 @@ type Client interface {
 	AddSubnetValidator(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		subnetID string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		subnetID ids.ID,
 		nodeID ids.NodeID,
 		stakeAmount,
 		startTime,
@@ -112,9 +114,9 @@ type Client interface {
 	CreateSubnet(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		controlKeys []string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		controlKeys []ids.ShortID,
 		threshold uint32,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -122,9 +124,10 @@ type Client interface {
 	ExportAVAX(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		to string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		to ids.ShortID,
+		toChainIDAlias string,
 		amount uint64,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -132,9 +135,9 @@ type Client interface {
 	ImportAVAX(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr,
-		to,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		to ids.ShortID,
 		sourceChain string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -142,8 +145,8 @@ type Client interface {
 	CreateBlockchain(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		subnetID ids.ID,
 		vmID string,
 		fxIDs []string,
@@ -174,9 +177,9 @@ type Client interface {
 		freq time.Duration,
 		options ...rpc.Option,
 	) (*GetTxStatusResponse, error)
-	// GetStake returns the amount of nAVAX that [addresses] have cumulatively
+	// GetStake returns the amount of nAVAX that [addrs] have cumulatively
 	// staked on the Primary Network.
-	GetStake(ctx context.Context, addrs []string, options ...rpc.Option) (uint64, [][]byte, error)
+	GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (uint64, [][]byte, error)
 	// GetMinStake returns the minimum staking amount in nAVAX for validators
 	// and delegators respectively
 	GetMinStake(ctx context.Context, options ...rpc.Option) (uint64, uint64, error)
@@ -221,96 +224,137 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 	return uint64(res.Height), err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, address string, options ...rpc.Option) (string, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
 		UserPass: user,
-		Address:  address,
+		Address:  address.String(),
 	}, res, options...)
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey string, options ...rpc.Option) (string, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
 		UserPass:   user,
 		PrivateKey: privateKey,
 	}, res, options...)
-	return res.Address, err
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return address.ParseToID(res.Address)
 }
 
-func (c *client) GetBalance(ctx context.Context, addrs []string, options ...rpc.Option) (*GetBalanceResponse, error) {
+func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
 	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceRequest{
-		Addresses: addrs,
+		Addresses: ids.ShortIDsToStrings(addrs),
 	}, res, options...)
 	return res, err
 }
 
-func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (string, error) {
+func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "createAddress", &user, res, options...)
-	return res.Address, err
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return address.ParseToID(res.Address)
 }
 
-func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]string, error) {
+func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest(ctx, "listAddresses", &user, res, options...)
-	return res.Addresses, err
+	if err != nil {
+		return nil, err
+	}
+	return address.ParseToIDs(res.Addresses)
 }
 
 func (c *client) GetUTXOs(
 	ctx context.Context,
-	addrs []string,
+	addrs []ids.ShortID,
 	limit uint32,
-	startAddress string,
-	startUTXOID string,
+	startAddress ids.ShortID,
+	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([][]byte, api.Index, error) {
+) ([][]byte, ids.ShortID, ids.ID, error) {
 	return c.GetAtomicUTXOs(ctx, addrs, "", limit, startAddress, startUTXOID, options...)
 }
 
 func (c *client) GetAtomicUTXOs(
 	ctx context.Context,
-	addrs []string,
+	addrs []ids.ShortID,
 	sourceChain string,
 	limit uint32,
-	startAddress string,
-	startUTXOID string,
+	startAddress ids.ShortID,
+	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([][]byte, api.Index, error) {
+) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
-		Addresses:   addrs,
+		Addresses:   ids.ShortIDsToStrings(addrs),
 		SourceChain: sourceChain,
 		Limit:       json.Uint32(limit),
 		StartIndex: api.Index{
-			Address: startAddress,
-			UTXO:    startUTXOID,
+			Address: startAddress.String(),
+			UTXO:    startUTXOID.String(),
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)
 	if err != nil {
-		return nil, api.Index{}, err
+		return nil, ids.ShortID{}, ids.Empty, err
 	}
 
 	utxos := make([][]byte, len(res.UTXOs))
 	for i, utxo := range res.UTXOs {
 		utxoBytes, err := formatting.Decode(res.Encoding, utxo)
 		if err != nil {
-			return nil, api.Index{}, err
+			return nil, ids.ShortID{}, ids.Empty, err
 		}
 		utxos[i] = utxoBytes
 	}
-	return utxos, res.EndIndex, nil
+	endAddr, err := address.ParseToID(res.EndIndex.Address)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.Empty, err
+	}
+	endUTXOID, err := ids.FromString(res.EndIndex.UTXO)
+	return utxos, endAddr, endUTXOID, err
 }
 
-func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Option) ([]APISubnet, error) {
+// ClientSubnet is a representation of a subnet used in client methods
+type ClientSubnet struct {
+	// ID of the subnet
+	ID ids.ID
+	// Each element of [ControlKeys] the address of a public key.
+	// A transaction to add a validator to this subnet requires
+	// signatures from [Threshold] of these keys to be valid.
+	ControlKeys []ids.ShortID
+	Threshold   uint32
+}
+
+func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Option) ([]ClientSubnet, error) {
 	res := &GetSubnetsResponse{}
 	err := c.requester.SendRequest(ctx, "getSubnets", &GetSubnetsArgs{
 		IDs: ids,
 	}, res, options...)
-	return res.Subnets, err
+	if err != nil {
+		return nil, err
+	}
+	subnets := make([]ClientSubnet, len(res.Subnets))
+	for i, apiSubnet := range res.Subnets {
+		controlKeys, err := address.ParseToIDs(apiSubnet.ControlKeys)
+		if err != nil {
+			return nil, err
+		}
+
+		subnets[i] = ClientSubnet{
+			ID:          apiSubnet.ID,
+			ControlKeys: controlKeys,
+			Threshold:   uint32(apiSubnet.Threshold),
+		}
+	}
+	return subnets, nil
 }
 
 func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error) {
@@ -326,13 +370,16 @@ func (c *client) GetCurrentValidators(
 	subnetID ids.ID,
 	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
-) ([]interface{}, error) {
+) ([]ClientPrimaryValidator, error) {
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
 		NodeIDs:  nodeIDs,
 	}, res, options...)
-	return res.Validators, err
+	if err != nil {
+		return nil, err
+	}
+	return getClientPrimaryValidators(res.Validators)
 }
 
 func (c *client) GetPendingValidators(
@@ -367,9 +414,9 @@ func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSi
 func (c *client) AddValidator(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	rewardAddress string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	rewardAddress ids.ShortID,
 	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
@@ -381,8 +428,9 @@ func (c *client) AddValidator(
 	jsonStakeAmount := json.Uint64(stakeAmount)
 	err := c.requester.SendRequest(ctx, "addValidator", &AddValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass:      user,
-			JSONFromAddrs: api.JSONFromAddrs{From: from},
+			UserPass:       user,
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID,
@@ -390,7 +438,7 @@ func (c *client) AddValidator(
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		RewardAddress:     rewardAddress,
+		RewardAddress:     rewardAddress.String(),
 		DelegationFeeRate: json.Float32(delegationFeeRate),
 	}, res, options...)
 	return res.TxID, err
@@ -399,9 +447,9 @@ func (c *client) AddValidator(
 func (c *client) AddDelegator(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	rewardAddress string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	rewardAddress ids.ShortID,
 	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
@@ -413,15 +461,15 @@ func (c *client) AddDelegator(
 	err := c.requester.SendRequest(ctx, "addDelegator", &AddDelegatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		}, APIStaker: APIStaker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		RewardAddress: rewardAddress,
+		RewardAddress: rewardAddress.String(),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -429,9 +477,9 @@ func (c *client) AddDelegator(
 func (c *client) AddSubnetValidator(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	subnetID string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	subnetID ids.ID,
 	nodeID ids.NodeID,
 	stakeAmount,
 	startTime,
@@ -443,8 +491,8 @@ func (c *client) AddSubnetValidator(
 	err := c.requester.SendRequest(ctx, "addSubnetValidator", &AddSubnetValidatorArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APIStaker: APIStaker{
 			NodeID:      nodeID,
@@ -452,7 +500,7 @@ func (c *client) AddSubnetValidator(
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
 		},
-		SubnetID: subnetID,
+		SubnetID: subnetID.String(),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -460,9 +508,9 @@ func (c *client) AddSubnetValidator(
 func (c *client) CreateSubnet(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	controlKeys []string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	controlKeys []ids.ShortID,
 	threshold uint32,
 	options ...rpc.Option,
 ) (ids.ID, error) {
@@ -470,11 +518,11 @@ func (c *client) CreateSubnet(
 	err := c.requester.SendRequest(ctx, "createSubnet", &CreateSubnetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		APISubnet: APISubnet{
-			ControlKeys: controlKeys,
+			ControlKeys: ids.ShortIDsToStrings(controlKeys),
 			Threshold:   json.Uint32(threshold),
 		},
 	}, res, options...)
@@ -484,9 +532,10 @@ func (c *client) CreateSubnet(
 func (c *client) ExportAVAX(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	to string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	to ids.ShortID,
+	targetChain string,
 	amount uint64,
 	options ...rpc.Option,
 ) (ids.ID, error) {
@@ -494,11 +543,12 @@ func (c *client) ExportAVAX(
 	err := c.requester.SendRequest(ctx, "exportAVAX", &ExportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		To:     to,
-		Amount: json.Uint64(amount),
+		TargetChain: targetChain,
+		To:          to.String(),
+		Amount:      json.Uint64(amount),
 	}, res, options...)
 	return res.TxID, err
 }
@@ -506,9 +556,9 @@ func (c *client) ExportAVAX(
 func (c *client) ImportAVAX(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr,
-	to,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	to ids.ShortID,
 	sourceChain string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
@@ -516,10 +566,10 @@ func (c *client) ImportAVAX(
 	err := c.requester.SendRequest(ctx, "importAVAX", &ImportAVAXArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		To:          to,
+		To:          to.String(),
 		SourceChain: sourceChain,
 	}, res, options...)
 	return res.TxID, err
@@ -528,8 +578,8 @@ func (c *client) ImportAVAX(
 func (c *client) CreateBlockchain(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	subnetID ids.ID,
 	vmID string,
 	fxIDs []string,
@@ -546,8 +596,8 @@ func (c *client) CreateBlockchain(
 	err = c.requester.SendRequest(ctx, "createBlockchain", &CreateBlockchainArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		SubnetID:    subnetID,
 		VMID:        vmID,
@@ -645,11 +695,11 @@ func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason 
 	}
 }
 
-func (c *client) GetStake(ctx context.Context, addrs []string, options ...rpc.Option) (uint64, [][]byte, error) {
+func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (uint64, [][]byte, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest(ctx, "getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
-			Addresses: addrs,
+			Addresses: ids.ShortIDsToStrings(addrs),
 		},
 		Encoding: formatting.Hex,
 	}, res, options...)

@@ -17,6 +17,7 @@ linters:
     - asciicheck
     - bodyclose
     - deadcode
+    - depguard
     - errcheck
     - exportloopref
     - goconst
@@ -62,3 +63,8 @@ linters-settings:
   gosec:
     excludes:
       - G107 # https://securego.io/docs/rules/g107.html
+  depguard:
+    list-type: blacklist
+    packages-with-error-message:
+      - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
+    include-go-root: true
