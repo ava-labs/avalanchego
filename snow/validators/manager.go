@@ -50,7 +50,7 @@ func NewManager() Manager {
 }
 
 type manager struct {
-	lock sync.Mutex
+	lock sync.RWMutex
 
 	// Key: Subnet ID
 	// Value: The validators that validate the subnet
@@ -99,8 +99,8 @@ func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.NodeID, weight uint64)
 }
 
 func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	vdrs, ok := m.subnetToVdrs[subnetID]
 	return vdrs, ok
@@ -141,8 +141,8 @@ func (m *manager) RevealValidator(vdrID ids.NodeID) error {
 }
 
 func (m *manager) Contains(subnetID ids.ID, vdrID ids.NodeID) bool {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	vdrs, ok := m.subnetToVdrs[subnetID]
 	if ok {
@@ -152,8 +152,8 @@ func (m *manager) Contains(subnetID ids.ID, vdrID ids.NodeID) bool {
 }
 
 func (m *manager) String() string {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	subnets := make([]ids.ID, 0, len(m.subnetToVdrs))
 	for subnetID := range m.subnetToVdrs {

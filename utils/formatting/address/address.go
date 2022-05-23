@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package formatting
+package address
 
 import (
 	"errors"
@@ -11,9 +11,7 @@ import (
 	"github.com/btcsuite/btcutil/bech32"
 )
 
-const (
-	addressSep = "-"
-)
+const addressSep = "-"
 
 var (
 	errNoSeparator = errors.New("no separator found in address")
@@ -21,10 +19,10 @@ var (
 	errBits8To5    = errors.New("unable to convert address from 8-bit to 5-bit formatting")
 )
 
-// ParseAddress takes in an address string and splits returns the corresponding
-// parts. This returns the chain ID alias, bech32 HRP, address bytes, and an
-// error if it occurs.
-func ParseAddress(addrStr string) (string, string, []byte, error) {
+// Parse takes in an address string and splits returns the corresponding parts.
+// This returns the chain ID alias, bech32 HRP, address bytes, and an error if
+// it occurs.
+func Parse(addrStr string) (string, string, []byte, error) {
 	addressParts := strings.SplitN(addrStr, addressSep, 2)
 	if len(addressParts) < 2 {
 		return "", "", nil, errNoSeparator
@@ -36,13 +34,9 @@ func ParseAddress(addrStr string) (string, string, []byte, error) {
 	return chainID, hrp, addr, err
 }
 
-// FormatAddress takes in a chain prefix, HRP, and byte slice to produce a
-// string for an address.
-func FormatAddress(
-	chainIDAlias string,
-	hrp string,
-	addr []byte,
-) (string, error) {
+// Format takes in a chain prefix, HRP, and byte slice to produce a string for
+// an address.
+func Format(chainIDAlias string, hrp string, addr []byte) (string, error) {
 	addrStr, err := FormatBech32(hrp, addr)
 	if err != nil {
 		return "", err

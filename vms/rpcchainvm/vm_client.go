@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/cpu"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -81,10 +81,10 @@ const (
 // VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
-	client     vmpb.VMClient
-	proc       *plugin.Client
-	pid        int
-	cpuTracker cpu.ProcessTracker
+	client         vmpb.VMClient
+	proc           *plugin.Client
+	pid            int
+	processTracker resource.ProcessTracker
 
 	messenger    *messenger.Server
 	keystore     *gkeystore.Server
@@ -112,12 +112,12 @@ func NewClient(client vmpb.VMClient) *VMClient {
 }
 
 // SetProcess gives ownership of the server process to the client.
-func (vm *VMClient) SetProcess(ctx *snow.Context, proc *plugin.Client, cpuTracker cpu.ProcessTracker) {
+func (vm *VMClient) SetProcess(ctx *snow.Context, proc *plugin.Client, processTracker resource.ProcessTracker) {
 	vm.ctx = ctx
 	vm.proc = proc
-	vm.cpuTracker = cpuTracker
+	vm.processTracker = processTracker
 	vm.pid = proc.ReattachConfig().Pid
-	cpuTracker.TrackProcess(vm.pid)
+	processTracker.TrackProcess(vm.pid)
 }
 
 func (vm *VMClient) Initialize(
@@ -372,7 +372,7 @@ func (vm *VMClient) Shutdown() error {
 	}
 
 	vm.proc.Kill()
-	vm.cpuTracker.UntrackProcess(vm.pid)
+	vm.processTracker.UntrackProcess(vm.pid)
 	return errs.Err
 }
 

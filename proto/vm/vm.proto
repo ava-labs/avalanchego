@@ -184,7 +184,7 @@ message BlockRejectRequest {
 
 message HealthRequest {
   // grpc_checks is a map [name]=address of the gRPC servers to perform the
-  // health check agaist.
+  // health check against.
   map<string, string> grpc_checks = 1;
 }
 

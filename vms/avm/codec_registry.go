@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -43,7 +44,7 @@ func (cr *codecRegistry) RegisterType(val interface{}) error {
 
 // NewCodecs returns the genesis codec and the normal codec for the provided
 // feature extensions.
-func NewCodecs(fxs []Fx) (codec.Manager, codec.Manager, error) {
+func NewCodecs(fxs []fxs.Fx) (codec.Manager, codec.Manager, error) {
 	return newCustomCodecs(
 		make(map[reflect.Type]int),
 		&mockable.Clock{},
@@ -56,7 +57,7 @@ func newCustomCodecs(
 	typeToFxIndex map[reflect.Type]int,
 	clock *mockable.Clock,
 	log logging.Logger,
-	fxs []Fx,
+	fxs []fxs.Fx,
 ) (codec.Manager, codec.Manager, error) {
 	gc := linearcodec.NewCustomMaxLength(1 << 20)
 	c := linearcodec.NewDefault()

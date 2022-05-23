@@ -122,13 +122,9 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.NewShortSet(len(args.From))
-	for _, addrStr := range args.From {
-		addr, err := w.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'From' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseServiceAddresses(w.vm, args.From)
+	if err != nil {
+		return fmt.Errorf("couldn't parse 'From' addresses: %w", err)
 	}
 
 	// Load user's UTXOs/keys
@@ -178,7 +174,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amounts[assetID] = newAmount
 
 		// Parse the to address
-		to, err := w.vm.ParseLocalAddress(output.To)
+		to, err := avax.ParseServiceAddress(w.vm, output.To)
 		if err != nil {
 			return fmt.Errorf("problem parsing to address %q: %w", output.To, err)
 		}
