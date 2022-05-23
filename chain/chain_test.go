@@ -45,7 +45,8 @@ func (tc *testChain) insertBlock(block *types.Block) {
 func newTestChain(name string, config *eth.Config,
 	inBlockCh <-chan []byte, outBlockCh chan<- []byte,
 	inAckCh <-chan struct{}, outAckCh chan<- struct{},
-	t *testing.T) *testChain {
+	t *testing.T,
+) *testChain {
 	chain, err := NewETHChain(
 		config,
 		&node.Config{},

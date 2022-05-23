@@ -51,7 +51,7 @@ var (
 	ExtraDataSize        = 80
 	RollupWindow  uint64 = 10
 
-	DefaultFeeConfig = &FeeConfig{
+	DefaultFeeConfig = FeeConfig{
 		GasLimit:        big.NewInt(8_000_000),
 		TargetBlockRate: 2, // in seconds
 
@@ -66,7 +66,7 @@ var (
 )
 
 var (
-	// AvalancheMainnetChainConfig is the configuration for Avalanche Main Network
+	// SubnetEVMDefaultChainConfig is the default configuration
 	SubnetEVMDefaultChainConfig = &ChainConfig{
 		ChainID:             SubnetEVMChainID,
 		HomesteadBlock:      big.NewInt(0),
@@ -113,8 +113,8 @@ type ChainConfig struct {
 
 	SubnetEVMTimestamp *big.Int `json:"subnetEVMTimestamp,omitempty"` // A placeholder for the latest avalanche forks (nil = no fork, 0 = already activated)
 
-	FeeConfig          *FeeConfig `json:"feeConfig,omitempty"`
-	AllowFeeRecipients bool       `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
+	FeeConfig          FeeConfig `json:"feeConfig,omitempty"`
+	AllowFeeRecipients bool      `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 
 	ContractDeployerAllowListConfig precompile.ContractDeployerAllowListConfig `json:"contractDeployerAllowListConfig,omitempty"` // Config for the contract deployer allow list precompile
 	ContractNativeMinterConfig      precompile.ContractNativeMinterConfig      `json:"contractNativeMinterConfig,omitempty"`      // Config for the native minter precompile
@@ -227,9 +227,9 @@ func (c *ChainConfig) IsTxAllowList(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.TxAllowListConfig.Timestamp(), blockTimestamp)
 }
 
-// GetFeeConfig returns the *FeeConfig if it exists, otherwise it returns [DefaultFeeConfig].
-func (c *ChainConfig) GetFeeConfig() *FeeConfig {
-	if c.FeeConfig == nil {
+// GetFeeConfig returns the *FeeConfig if it exists, otherwise it returns [DefaultFeeConfig()].
+func (c *ChainConfig) GetFeeConfig() FeeConfig {
+	if c.FeeConfig == (FeeConfig{}) {
 		return DefaultFeeConfig
 	}
 	return c.FeeConfig

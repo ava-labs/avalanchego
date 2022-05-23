@@ -2241,6 +2241,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
+
 	genesis.Config.TxAllowListConfig = precompile.TxAllowListConfig{
 		AllowListConfig: precompile.AllowListConfig{
 			BlockTimestamp:  big.NewInt(0),

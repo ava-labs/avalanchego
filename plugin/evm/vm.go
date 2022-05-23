@@ -258,7 +258,7 @@ func (vm *VM) Initialize(
 		g.Config = params.SubnetEVMDefaultChainConfig
 	}
 
-	if g.Config.FeeConfig == nil {
+	if g.Config.FeeConfig == (params.FeeConfig{}) {
 		g.Config.FeeConfig = params.DefaultFeeConfig
 	}
 
