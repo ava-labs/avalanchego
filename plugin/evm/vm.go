@@ -272,6 +272,7 @@ func (vm *VM) Initialize(
 	ethConfig.RPCEVMTimeout = vm.config.APIMaxDuration.Duration
 	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
+	ethConfig.TxPool.Locals = vm.config.PriorityRegossipAddresses
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	ethConfig.Preimages = vm.config.Preimages
