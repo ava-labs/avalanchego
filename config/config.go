@@ -35,9 +35,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -469,7 +469,7 @@ func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 		if ip == "" {
 			continue
 		}
-		addr, err := utils.ToIPDesc(ip)
+		addr, err := ips.ToIPPort(ip)
 		if err != nil {
 			return node.StateSyncConfig{}, fmt.Errorf("couldn't parse state sync ip %s: %w", ip, err)
 		}
@@ -523,7 +523,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		if ip == "" {
 			continue
 		}
-		addr, err := utils.ToIPDesc(ip)
+		addr, err := ips.ToIPPort(ip)
 		if err != nil {
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 		}
@@ -593,7 +593,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	}
 
 	stakingPort := uint16(v.GetUint(StakingPortKey))
-	config.IP = utils.NewDynamicIPDesc(ip, stakingPort)
+	config.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
 	return config, nil
 }
 

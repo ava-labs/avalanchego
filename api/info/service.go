@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -34,7 +34,7 @@ var (
 type Info struct {
 	Parameters
 	log           logging.Logger
-	myIP          *utils.DynamicIPDesc
+	myIP          ips.DynamicIPPort
 	networking    network.Network
 	chainManager  chains.Manager
 	vmManager     vms.Manager
@@ -60,7 +60,7 @@ func NewService(
 	log logging.Logger,
 	chainManager chains.Manager,
 	vmManager vms.Manager,
-	myIP *utils.DynamicIPDesc,
+	myIP ips.DynamicIPPort,
 	network network.Network,
 	versionParser version.ApplicationParser,
 	validators validators.Set,
@@ -137,7 +137,7 @@ type GetNodeIPReply struct {
 func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
 	service.log.Debug("Info: GetNodeIP called")
 
-	reply.IP = service.myIP.IP().String()
+	reply.IP = service.myIP.IPPort().String()
 	return nil
 }
 

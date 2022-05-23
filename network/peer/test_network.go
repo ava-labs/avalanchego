@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -20,7 +20,7 @@ type testNetwork struct {
 	mc message.Creator
 
 	networkID uint32
-	ip        utils.IPDesc
+	ip        ips.IPPort
 	version   version.Application
 	signer    crypto.Signer
 	subnets   ids.Set
@@ -32,7 +32,7 @@ type testNetwork struct {
 func NewTestNetwork(
 	mc message.Creator,
 	networkID uint32,
-	ipDesc utils.IPDesc,
+	ipPort ips.IPPort,
 	version version.Application,
 	signer crypto.Signer,
 	subnets ids.Set,
@@ -41,7 +41,7 @@ func NewTestNetwork(
 	return &testNetwork{
 		mc:        mc,
 		networkID: networkID,
-		ip:        ipDesc,
+		ip:        ipPort,
 		version:   version,
 		signer:    signer,
 		subnets:   subnets,
@@ -53,7 +53,7 @@ func (n *testNetwork) Connected(ids.NodeID) {}
 
 func (n *testNetwork) AllowConnection(ids.NodeID) bool { return true }
 
-func (n *testNetwork) Track(utils.IPCertDesc) bool { return true }
+func (n *testNetwork) Track(ips.ClaimedIPPort) bool { return true }
 
 func (n *testNetwork) Disconnected(ids.NodeID) {}
 

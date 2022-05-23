@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -44,7 +44,7 @@ const maxMessageToSend = 1024
 //   peer.
 func StartTestPeer(
 	ctx context.Context,
-	ip utils.IPDesc,
+	ip ips.IPPort,
 	networkID uint32,
 	router router.InboundHandler,
 ) (Peer, error) {
@@ -86,7 +86,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	ipDesc := utils.IPDesc{
+	ipPort := ips.IPPort{
 		IP:   net.IPv6zero,
 		Port: 0,
 	}
@@ -103,7 +103,7 @@ func StartTestPeer(
 			Network: NewTestNetwork(
 				mc,
 				networkID,
-				ipDesc,
+				ipPort,
 				version.CurrentApp,
 				tlsCert.PrivateKey.(crypto.Signer),
 				ids.Set{},

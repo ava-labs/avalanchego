@@ -6,7 +6,7 @@ package peer
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 // Network defines the interface that is used by a peer to help establish a well
@@ -25,7 +25,7 @@ type Network interface {
 	// Returns false if this call was not "useful". That is, we were already
 	// connected to this node, we already had this tracking information, the
 	// signature is invalid or we don't want to connect.
-	Track(utils.IPCertDesc) bool
+	Track(ips.ClaimedIPPort) bool
 
 	// Disconnected is called when the peer finishes shutting down. It is not
 	// guaranteed that [Connected] was called for the provided peer. However, it

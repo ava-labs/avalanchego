@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -103,7 +103,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		mc: mc,
 
 		networkID: constants.LocalID,
-		ip: utils.IPDesc{
+		ip: ips.IPPort{
 			IP:   net.IPv6loopback,
 			Port: 0,
 		},
@@ -122,7 +122,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		mc: mc,
 
 		networkID: constants.LocalID,
-		ip: utils.IPDesc{
+		ip: ips.IPPort{
 			IP:   net.IPv6loopback,
 			Port: 1,
 		},
