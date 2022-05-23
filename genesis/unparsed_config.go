@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 var errInvalidETHAddress = errors.New("invalid eth address")
@@ -40,7 +40,7 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 	}
 	a.ETHAddr = ethAddr
 
-	_, _, avaxAddrBytes, err := formatting.ParseAddress(ua.AVAXAddr)
+	_, _, avaxAddrBytes, err := address.Parse(ua.AVAXAddr)
 	if err != nil {
 		return a, err
 	}
@@ -65,7 +65,7 @@ func (us UnparsedStaker) Parse() (Staker, error) {
 		DelegationFee: us.DelegationFee,
 	}
 
-	_, _, avaxAddrBytes, err := formatting.ParseAddress(us.RewardAddress)
+	_, _, avaxAddrBytes, err := address.Parse(us.RewardAddress)
 	if err != nil {
 		return s, err
 	}
@@ -114,7 +114,7 @@ func (uc UnparsedConfig) Parse() (Config, error) {
 		c.Allocations[i] = a
 	}
 	for i, isa := range uc.InitialStakedFunds {
-		_, _, avaxAddrBytes, err := formatting.ParseAddress(isa)
+		_, _, avaxAddrBytes, err := address.Parse(isa)
 		if err != nil {
 			return c, err
 		}

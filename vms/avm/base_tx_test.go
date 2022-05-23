@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -844,7 +845,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*FxCredential{{
+		Creds: []*fxs.FxCredential{{
 			Verifiable: &avax.TestVerifiable{},
 		}},
 	}
@@ -1029,7 +1030,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*FxCredential{
+		Creds: []*fxs.FxCredential{
 			{
 				Verifiable: &secp256k1fx.Credential{
 					Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
@@ -1466,7 +1467,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*FxCredential{{
+		Creds: []*fxs.FxCredential{{
 			Verifiable: &avax.TestVerifiable{},
 		}},
 	}
@@ -1611,7 +1612,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*FxCredential{
+		Creds: []*fxs.FxCredential{
 			{
 				Verifiable: &secp256k1fx.Credential{
 					Sigs: [][crypto.SECP256K1RSigLen]byte{{}},

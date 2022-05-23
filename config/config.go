@@ -348,8 +348,11 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 					MaxBurstSize: v.GetUint64(InboundThrottlerBandwidthMaxBurstSizeKey),
 				},
 				MaxProcessingMsgsPerNode: v.GetUint64(InboundThrottlerMaxProcessingMsgsPerNodeKey),
-				CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+				CPUThrottlerConfig: throttling.SystemThrottlerConfig{
 					MaxRecheckDelay: v.GetDuration(InboundThrottlerCPUMaxRecheckDelayKey),
+				},
+				DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+					MaxRecheckDelay: v.GetDuration(InboundThrottlerDiskMaxRecheckDelayKey),
 				},
 			},
 
@@ -1053,22 +1056,42 @@ func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	}
 }
 
-func getCPUTargeterConfig(v *viper.Viper) (tracker.CPUTargeterConfig, error) {
-	vdrCPUAlloc := v.GetFloat64(CPUVdrAllocKey)
-	atLargeCPUAlloc := v.GetFloat64(CPUAtLargeAllocKey)
-	maxAtLargePortionPerNode := v.GetFloat64(CPUNodeMaxAtLargeKey)
+func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
+	vdrAlloc := v.GetFloat64(CPUVdrAllocKey)
+	maxNonVdrUsage := v.GetFloat64(CPUMaxNonVdrUsageKey)
+	maxNonVdrNodeUsage := v.GetFloat64(CPUMaxNonVdrNodeUsageKey)
 	switch {
-	case vdrCPUAlloc <= 0:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUVdrAllocKey, vdrCPUAlloc)
-	case atLargeCPUAlloc <= 0:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) <= 0", CPUAtLargeAllocKey, atLargeCPUAlloc)
-	case maxAtLargePortionPerNode < 0 || maxAtLargePortionPerNode > 1:
-		return tracker.CPUTargeterConfig{}, fmt.Errorf("%q (%f) < 0 or >1", CPUNodeMaxAtLargeKey, maxAtLargePortionPerNode)
+	case vdrAlloc < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", CPUVdrAllocKey, vdrAlloc)
+	case maxNonVdrUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", CPUMaxNonVdrUsageKey, maxNonVdrUsage)
+	case maxNonVdrNodeUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", CPUMaxNonVdrNodeUsageKey, maxNonVdrNodeUsage)
 	default:
-		return tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           vdrCPUAlloc,
-			AtLargeCPUAlloc:       atLargeCPUAlloc,
-			PeerMaxAtLargePortion: maxAtLargePortionPerNode,
+		return tracker.TargeterConfig{
+			VdrAlloc:           vdrAlloc,
+			MaxNonVdrUsage:     maxNonVdrUsage,
+			MaxNonVdrNodeUsage: maxNonVdrNodeUsage,
+		}, nil
+	}
+}
+
+func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
+	vdrAlloc := v.GetFloat64(DiskVdrAllocKey)
+	maxNonVdrUsage := v.GetFloat64(DiskMaxNonVdrUsageKey)
+	maxNonVdrNodeUsage := v.GetFloat64(DiskMaxNonVdrNodeUsageKey)
+	switch {
+	case vdrAlloc < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", DiskVdrAllocKey, vdrAlloc)
+	case maxNonVdrUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", DiskMaxNonVdrUsageKey, maxNonVdrUsage)
+	case maxNonVdrNodeUsage < 0:
+		return tracker.TargeterConfig{}, fmt.Errorf("%q (%f) < 0", DiskMaxNonVdrNodeUsageKey, maxNonVdrNodeUsage)
+	default:
+		return tracker.TargeterConfig{
+			VdrAlloc:           vdrAlloc,
+			MaxNonVdrUsage:     maxNonVdrUsage,
+			MaxNonVdrNodeUsage: maxNonVdrNodeUsage,
 		}, nil
 	}
 }
@@ -1234,9 +1257,16 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	nodeConfig.CPUTrackerFrequency = v.GetDuration(CPUTrackerFrequencyKey)
-	nodeConfig.CPUTrackerHalflife = v.GetDuration(CPUTrackerHalflifeKey)
+	nodeConfig.SystemTrackerFrequency = v.GetDuration(SystemTrackerFrequencyKey)
+	nodeConfig.SystemTrackerProcessingHalflife = v.GetDuration(SystemTrackerProcessingHalflifeKey)
+	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
+	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
 	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.DiskTargeterConfig, err = getDiskTargeterConfig(v)
 	return nodeConfig, err
 }

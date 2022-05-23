@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -36,18 +36,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err = vdrs.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
-		},
-		vdrs,
-		cpuTracker,
-	)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
@@ -56,8 +45,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		cpuTracker,
-		cpuTargeter,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -126,18 +114,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
-		},
-		vdrs,
-		cpuTracker,
-	)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
@@ -146,8 +123,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		cpuTracker,
-		cpuTargeter,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -209,18 +185,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
-		},
-		vdrs,
-		cpuTracker,
-	)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
@@ -229,8 +194,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		nil,
 		nil,
 		1,
-		cpuTracker,
-		cpuTargeter,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -284,18 +248,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
-		},
-		vdrs,
-		cpuTracker,
-	)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := New(
 		mc,
@@ -304,8 +257,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		msgFromVMChan,
 		nil,
 		time.Second,
-		cpuTracker,
-		cpuTargeter,
+		resourceTracker,
 	)
 	assert.NoError(t, err)
 

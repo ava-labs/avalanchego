@@ -25,7 +25,7 @@ func TestQueue(t *testing.T) {
 	defer ctrl.Finish()
 
 	assert := assert.New(t)
-	cpuTracker := tracker.NewMockTimeTracker(ctrl)
+	cpuTracker := tracker.NewMockTracker(ctrl)
 	vdrs := validators.NewSet()
 	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
@@ -46,9 +46,9 @@ func TestQueue(t *testing.T) {
 		vdr1ID,
 	)
 
-	// Push then pop should work regardless of utilization when there are
-	// no other messages on [u.msgs]
-	cpuTracker.EXPECT().Utilization(vdr1ID, gomock.Any()).Return(0.1).Times(1)
+	// Push then pop should work regardless of usage when there are no other
+	// messages on [u.msgs]
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.1).Times(1)
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
@@ -58,7 +58,7 @@ func TestQueue(t *testing.T) {
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
 
-	cpuTracker.EXPECT().Utilization(vdr1ID, gomock.Any()).Return(0.0).Times(1)
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
@@ -68,7 +68,7 @@ func TestQueue(t *testing.T) {
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
 
-	cpuTracker.EXPECT().Utilization(vdr1ID, gomock.Any()).Return(1.0).Times(1)
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(1.0).Times(1)
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
@@ -78,7 +78,7 @@ func TestQueue(t *testing.T) {
 	assert.EqualValues(0, u.Len())
 	assert.EqualValues(msg1, gotMsg1)
 
-	cpuTracker.EXPECT().Utilization(vdr1ID, gomock.Any()).Return(0.0).Times(1)
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	assert.EqualValues(1, u.Len())
@@ -99,9 +99,9 @@ func TestQueue(t *testing.T) {
 	u.Push(msg2)
 	assert.EqualValues(2, u.Len())
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr2ID])
-	// Set vdr1's CPU utilization to 99% and vdr2's to .01
-	cpuTracker.EXPECT().Utilization(vdr1ID, gomock.Any()).Return(.99).Times(2)
-	cpuTracker.EXPECT().Utilization(vdr2ID, gomock.Any()).Return(.01).Times(1)
+	// Set vdr1's usage to 99% and vdr2's to .01
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(.99).Times(2)
+	cpuTracker.EXPECT().Usage(vdr2ID, gomock.Any()).Return(.01).Times(1)
 	// Pop should return msg2 first because vdr1 has exceeded it's portion of CPU time
 	gotMsg2, ok := u.Pop()
 	assert.True(ok)
@@ -125,16 +125,16 @@ func TestQueue(t *testing.T) {
 
 	// msg1 should get popped first because nonVdrNodeID1 and nonVdrNodeID2
 	// exceeded their limit
-	cpuTracker.EXPECT().Utilization(nonVdrNodeID1, gomock.Any()).Return(.34).Times(1)
-	cpuTracker.EXPECT().Utilization(nonVdrNodeID2, gomock.Any()).Return(.34).Times(2)
-	cpuTracker.EXPECT().Utilization(vdr1ID, gomock.Any()).Return(0.0).Times(1)
+	cpuTracker.EXPECT().Usage(nonVdrNodeID1, gomock.Any()).Return(.34).Times(1)
+	cpuTracker.EXPECT().Usage(nonVdrNodeID2, gomock.Any()).Return(.34).Times(2)
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
 
 	// u.msgs is [msg3, msg4, msg1]
 	gotMsg1, ok = u.Pop()
 	assert.True(ok)
 	assert.EqualValues(msg1, gotMsg1)
 	// u.msgs is [msg3, msg4]
-	cpuTracker.EXPECT().Utilization(nonVdrNodeID1, gomock.Any()).Return(.51).Times(2)
+	cpuTracker.EXPECT().Usage(nonVdrNodeID1, gomock.Any()).Return(.51).Times(2)
 	gotMsg4, ok := u.Pop()
 	assert.True(ok)
 	assert.EqualValues(msg4, gotMsg4)
