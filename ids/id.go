@@ -24,7 +24,8 @@ const (
 
 var (
 	// Empty is a useful all zero value
-	Empty            = ID{}
+	Empty = ID{}
+
 	errMissingQuotes = errors.New("first and last characters should be quotes")
 )
 

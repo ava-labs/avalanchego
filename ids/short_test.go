@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShortString(t *testing.T) {
@@ -150,4 +152,11 @@ func TestShortIDMapMarshalling(t *testing.T) {
 			t.Fatalf("map was incorrectly Unmarshalled")
 		}
 	}
+}
+
+func TestShortIDsToStrings(t *testing.T) {
+	shortIDs := []ShortID{{1}, {2}, {2}}
+	expected := []string{"6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp"}
+	shortStrings := ShortIDsToStrings(shortIDs)
+	assert.EqualValues(t, expected, shortStrings)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -28,7 +29,7 @@ func TestBuildGenesis(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		addrMap[addrStr], err = formatting.FormatBech32(testHRP, b)
+		addrMap[addrStr], err = address.FormatBech32(testHRP, b)
 		if err != nil {
 			t.Fatal(err)
 		}

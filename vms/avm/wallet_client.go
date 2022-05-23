@@ -25,11 +25,11 @@ type WalletClient interface {
 	Send(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
 		amount uint64,
-		assetID,
-		to,
+		assetID string,
+		to ids.ShortID,
 		memo string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -37,9 +37,9 @@ type WalletClient interface {
 	SendMultiple(
 		ctx context.Context,
 		user api.UserPass,
-		from []string,
-		changeAddr string,
-		outputs []SendOutput,
+		from []ids.ShortID,
+		changeAddr ids.ShortID,
+		outputs []ClientSendOutput,
 		memo string,
 		options ...rpc.Option,
 	) (ids.ID, error)
@@ -70,14 +70,26 @@ func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte, options ...r
 	return res.TxID, err
 }
 
+// ClientSendOutput specifies that [Amount] of asset [AssetID] be sent to [To]
+type ClientSendOutput struct {
+	// The amount of funds to send
+	Amount uint64
+
+	// ID of the asset being sent
+	AssetID string
+
+	// Address of the recipient
+	To ids.ShortID
+}
+
 func (c *walletClient) Send(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
 	amount uint64,
-	assetID,
-	to,
+	assetID string,
+	to ids.ShortID,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
@@ -85,13 +97,13 @@ func (c *walletClient) Send(
 	err := c.requester.SendRequest(ctx, "send", &SendArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		SendOutput: SendOutput{
 			Amount:  cjson.Uint64(amount),
 			AssetID: assetID,
-			To:      to,
+			To:      to.String(),
 		},
 		Memo: memo,
 	}, res, options...)
@@ -101,20 +113,26 @@ func (c *walletClient) Send(
 func (c *walletClient) SendMultiple(
 	ctx context.Context,
 	user api.UserPass,
-	from []string,
-	changeAddr string,
-	outputs []SendOutput,
+	from []ids.ShortID,
+	changeAddr ids.ShortID,
+	outputs []ClientSendOutput,
 	memo string,
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
+	serviceOutputs := make([]SendOutput, len(outputs))
+	for i, output := range outputs {
+		serviceOutputs[i].Amount = cjson.Uint64(output.Amount)
+		serviceOutputs[i].AssetID = output.AssetID
+		serviceOutputs[i].To = output.To.String()
+	}
 	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
-			JSONFromAddrs:  api.JSONFromAddrs{From: from},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		Outputs: outputs,
+		Outputs: serviceOutputs,
 		Memo:    memo,
 	}, res, options...)
 	return res.TxID, err

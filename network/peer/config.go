@@ -27,7 +27,6 @@ type Config struct {
 	MessageCreator       message.Creator
 	Log                  logging.Logger
 	InboundMsgThrottler  throttling.InboundMsgThrottler
-	OutboundMsgThrottler throttling.OutboundMsgThrottler
 	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
@@ -43,10 +42,6 @@ type Config struct {
 	// Must only be accessed atomically
 	LastSent, LastReceived int64
 
-	// Tracks CPU usage caused by each peer.
-	CPUTracker tracker.TimeTracker
-
-	// Specifies how much CPU usage each peer can cause before
-	// we rate-limit them.
-	CPUTargeter tracker.CPUTargeter
+	// Tracks CPU/disk usage caused by each peer.
+	ResourceTracker tracker.ResourceTracker
 }
