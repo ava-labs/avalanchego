@@ -199,6 +199,11 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
+	pingMessge, err := msgCreator.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("initializing common ping message failed with: %w", err)
+	}
+
 	peerConfig := &peer.Config{
 		ReadBufferSize:       config.PeerReadBufferSize,
 		WriteBufferSize:      config.PeerWriteBufferSize,
@@ -217,6 +222,7 @@ func NewNetwork(
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
+		PingMessage:          pingMessge,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{

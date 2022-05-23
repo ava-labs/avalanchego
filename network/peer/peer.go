@@ -516,9 +516,8 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			msg, err := p.MessageCreator.Ping()
-			p.Log.AssertNoError(err)
-			p.Send(p.onClosingCtx, msg)
+			p.Config.PingMessage.AddRef()
+			p.Send(p.onClosingCtx, p.Config.PingMessage)
 		case <-p.onClosingCtx.Done():
 			return
 		}

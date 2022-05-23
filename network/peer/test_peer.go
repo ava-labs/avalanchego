@@ -94,6 +94,12 @@ func StartTestPeer(
 	if err != nil {
 		return nil, err
 	}
+
+	pingMessage, err := mc.Ping()
+	if err != nil {
+		return nil, err
+	}
+
 	peer := Start(
 		&Config{
 			Metrics:             metrics,
@@ -119,6 +125,7 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
+			PingMessage:          pingMessage,
 		},
 		conn,
 		cert,
