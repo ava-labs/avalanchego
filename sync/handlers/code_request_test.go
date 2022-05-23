@@ -4,7 +4,6 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"testing"
@@ -28,46 +27,90 @@ func TestCodeRequestHandler(t *testing.T) {
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	rawdb.WriteCode(database, codeHash, codeBytes)
 
+	maxSizeCodeBytes := make([]byte, params.MaxCodeSize)
+	n, err := rand.Read(maxSizeCodeBytes)
+	assert.NoError(t, err)
+	assert.Equal(t, params.MaxCodeSize, n)
+	maxSizeCodeHash := crypto.Keccak256Hash(maxSizeCodeBytes)
+	rawdb.WriteCode(database, maxSizeCodeHash, maxSizeCodeBytes)
+
 	mockHandlerStats := &stats.MockHandlerStats{}
 	codeRequestHandler := NewCodeRequestHandler(database, message.Codec, mockHandlerStats)
 
-	// query for known code entry
-	responseBytes, err := codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 1, message.CodeRequest{Hash: codeHash})
-	assert.NoError(t, err)
-
-	var response message.CodeResponse
-	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
-		t.Fatal("error unmarshalling CodeResponse", err)
+	tests := map[string]struct {
+		setup       func() (request message.CodeRequest, expectedCodeResponse [][]byte)
+		verifyStats func(t *testing.T, stats *stats.MockHandlerStats)
+	}{
+		"normal": {
+			setup: func() (request message.CodeRequest, expectedCodeResponse [][]byte) {
+				return message.CodeRequest{
+					Hashes: []common.Hash{codeHash},
+				}, [][]byte{codeBytes}
+			},
+			verifyStats: func(t *testing.T, stats *stats.MockHandlerStats) {
+				assert.EqualValues(t, 1, mockHandlerStats.CodeRequestCount)
+				assert.EqualValues(t, len(codeBytes), mockHandlerStats.CodeBytesReturnedSum)
+			},
+		},
+		"duplicate hashes": {
+			setup: func() (request message.CodeRequest, expectedCodeResponse [][]byte) {
+				return message.CodeRequest{
+					Hashes: []common.Hash{codeHash, codeHash},
+				}, nil
+			},
+			verifyStats: func(t *testing.T, stats *stats.MockHandlerStats) {
+				assert.EqualValues(t, 1, mockHandlerStats.DuplicateHashesRequested)
+			},
+		},
+		"too many hashes": {
+			setup: func() (request message.CodeRequest, expectedCodeResponse [][]byte) {
+				return message.CodeRequest{
+					Hashes: []common.Hash{{1}, {2}, {3}, {4}, {5}, {6}},
+				}, nil
+			},
+			verifyStats: func(t *testing.T, stats *stats.MockHandlerStats) {
+				assert.EqualValues(t, 1, mockHandlerStats.TooManyHashesRequested)
+			},
+		},
+		"max size code handled": {
+			setup: func() (request message.CodeRequest, expectedCodeResponse [][]byte) {
+				return message.CodeRequest{
+					Hashes: []common.Hash{maxSizeCodeHash},
+				}, [][]byte{maxSizeCodeBytes}
+			},
+			verifyStats: func(t *testing.T, stats *stats.MockHandlerStats) {
+				assert.EqualValues(t, 1, mockHandlerStats.CodeRequestCount)
+				assert.EqualValues(t, params.MaxCodeSize, mockHandlerStats.CodeBytesReturnedSum)
+			},
+		},
 	}
-	assert.True(t, bytes.Equal(codeBytes, response.Data))
-	assert.EqualValues(t, 1, mockHandlerStats.CodeRequestCount)
-	assert.EqualValues(t, len(response.Data), mockHandlerStats.CodeBytesReturnedSum)
-	mockHandlerStats.Reset()
 
-	// query for missing code entry
-	responseBytes, err = codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 2, message.CodeRequest{Hash: common.BytesToHash([]byte("some unknown hash"))})
-	assert.NoError(t, err)
-	assert.Nil(t, responseBytes)
-	assert.EqualValues(t, 1, mockHandlerStats.MissingCodeHashCount)
-	mockHandlerStats.Reset()
+	for name, test := range tests {
+		// Reset stats before each test
+		mockHandlerStats.Reset()
 
-	// assert max size code bytes are handled
-	codeBytes = make([]byte, params.MaxCodeSize)
-	n, err := rand.Read(codeBytes)
-	assert.NoError(t, err)
-	assert.Equal(t, params.MaxCodeSize, n)
-	codeHash = crypto.Keccak256Hash(codeBytes)
-	rawdb.WriteCode(database, codeHash, codeBytes)
+		t.Run(name, func(t *testing.T) {
+			request, expectedResponse := test.setup()
+			responseBytes, err := codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+			assert.NoError(t, err)
 
-	responseBytes, err = codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 3, message.CodeRequest{Hash: codeHash})
-	assert.NoError(t, err)
-	assert.NotNil(t, responseBytes)
-
-	response = message.CodeResponse{}
-	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
-		t.Fatal("error unmarshalling CodeResponse", err)
+			// If the expected resposne is empty, assert that the handler returns an empty response and return early.
+			if len(expectedResponse) == 0 {
+				assert.Len(t, responseBytes, 0, "expected response to be empty")
+				return
+			}
+			var response message.CodeResponse
+			if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
+				t.Fatal("error unmarshalling CodeResponse", err)
+			}
+			if len(expectedResponse) != len(response.Data) {
+				t.Fatalf("Unexpected length of code data expected %d != %d", len(expectedResponse), len(response.Data))
+			}
+			for i, code := range expectedResponse {
+				// assert.True(t, bytes.Equal(code, response.Data[i]), "code bytes mismatch at index %d", i)
+				assert.Equal(t, code, response.Data[i], "code bytes mismatch at index %d", i)
+			}
+			test.verifyStats(t, mockHandlerStats)
+		})
 	}
-	assert.True(t, bytes.Equal(codeBytes, response.Data))
-	assert.EqualValues(t, 1, mockHandlerStats.CodeRequestCount)
-	assert.EqualValues(t, len(response.Data), mockHandlerStats.CodeBytesReturnedSum)
 }

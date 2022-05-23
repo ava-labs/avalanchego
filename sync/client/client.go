@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/ava-labs/coreth/ethdb/memorydb"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/sync/client/stats"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -32,14 +33,16 @@ import (
 )
 
 var (
-	StateSyncVersion      = version.NewDefaultApplication(constants.PlatformName, 1, 7, 11)
-	errEmptyResponse      = errors.New("empty response")
-	errTooManyBlocks      = errors.New("response contains more blocks than requested")
-	errHashMismatch       = errors.New("hash does not match expected value")
-	errInvalidRangeProof  = errors.New("failed to verify range proof")
-	errExceededRetryLimit = errors.New("exceeded request retry limit")
-	errTooManyLeaves      = errors.New("response contains more than requested leaves")
-	errUnmarshalResponse  = errors.New("failed to unmarshal response")
+	StateSyncVersion          = version.NewDefaultApplication(constants.PlatformName, 1, 7, 11)
+	errEmptyResponse          = errors.New("empty response")
+	errTooManyBlocks          = errors.New("response contains more blocks than requested")
+	errHashMismatch           = errors.New("hash does not match expected value")
+	errInvalidRangeProof      = errors.New("failed to verify range proof")
+	errExceededRetryLimit     = errors.New("exceeded request retry limit")
+	errTooManyLeaves          = errors.New("response contains more than requested leaves")
+	errUnmarshalResponse      = errors.New("failed to unmarshal response")
+	errInvalidCodeResponseLen = errors.New("number of code bytes in response does not match requested hashes")
+	errMaxCodeSizeExceeded    = errors.New("max code size exceeded")
 )
 var _ Client = &client{}
 
@@ -52,8 +55,8 @@ type Client interface {
 	// specified range from height to height-parents is inclusive
 	GetBlocks(blockHash common.Hash, height uint64, parents uint16) ([]*types.Block, error)
 
-	// GetCode synchronously retrieves code associated with given common.Hash
-	GetCode(common.Hash) ([]byte, error)
+	// GetCode synchronously retrieves code associated with the given hashes
+	GetCode(hashes []common.Hash) ([][]byte, error)
 }
 
 // parseResponseFn parses given response bytes in context of specified request
@@ -233,15 +236,15 @@ func parseBlocks(codec codec.Manager, req message.Request, data []byte) (interfa
 	return blocks, len(blocks), nil
 }
 
-func (c *client) GetCode(hash common.Hash) ([]byte, error) {
-	req := message.NewCodeRequest(hash)
+func (c *client) GetCode(hashes []common.Hash) ([][]byte, error) {
+	req := message.NewCodeRequest(hashes)
 
 	data, err := c.get(req, parseCode)
 	if err != nil {
-		return nil, fmt.Errorf("could not get code (%s): %w", hash, err)
+		return nil, fmt.Errorf("could not get code (%s): %w", req, err)
 	}
 
-	return data.([]byte), nil
+	return data.([][]byte), nil
 }
 
 // parseCode validates given object as a code object
@@ -252,17 +255,26 @@ func parseCode(codec codec.Manager, req message.Request, data []byte) (interface
 	if _, err := codec.Unmarshal(data, &response); err != nil {
 		return nil, 0, err
 	}
-	if len(response.Data) == 0 {
-		return nil, 0, errEmptyResponse
+
+	codeRequest := req.(message.CodeRequest)
+	if len(response.Data) != len(codeRequest.Hashes) {
+		return nil, 0, fmt.Errorf("%w (got %d) (requested %d)", errInvalidCodeResponseLen, len(response.Data), len(codeRequest.Hashes))
 	}
 
-	hash := crypto.Keccak256Hash(response.Data)
-	expected := req.(message.CodeRequest).Hash
-	if hash != expected {
-		return nil, 0, fmt.Errorf("%w for code: (got %v) (expected %v)", errHashMismatch, hash, expected)
+	totalBytes := 0
+	for i, code := range response.Data {
+		if len(code) > params.MaxCodeSize {
+			return nil, 0, fmt.Errorf("%w: (hash %s) (size %d)", errMaxCodeSizeExceeded, codeRequest.Hashes[i], len(code))
+		}
+
+		hash := crypto.Keccak256Hash(code)
+		if hash != codeRequest.Hashes[i] {
+			return nil, 0, fmt.Errorf("%w for code at index %d: (got %v) (expected %v)", errHashMismatch, i, hash, codeRequest.Hashes[i])
+		}
+		totalBytes += len(code)
 	}
 
-	return response.Data, len(response.Data), nil
+	return response.Data, totalBytes, nil
 }
 
 // get submits given request and blockingly returns with either a parsed response object or error
