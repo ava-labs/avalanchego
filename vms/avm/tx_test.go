@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -92,7 +93,7 @@ func TestTxInvalidCredential(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*FxCredential{{Verifiable: &avax.TestVerifiable{Err: errors.New("")}}},
+		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{Err: errors.New("")}}},
 	}
 	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)
@@ -147,7 +148,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 				},
 			},
 		}},
-		Creds: []*FxCredential{
+		Creds: []*fxs.FxCredential{
 			{Verifiable: &avax.TestVerifiable{}},
 			{Verifiable: &avax.TestVerifiable{}},
 		},
@@ -199,7 +200,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 				},
 			},
 		}},
-		Creds: []*FxCredential{{Verifiable: &avax.TestVerifiable{}}},
+		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{}}},
 	}
 	if err := tx.SignSECP256K1Fx(m, nil); err != nil {
 		t.Fatal(err)

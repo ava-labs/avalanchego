@@ -20,11 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -148,9 +150,9 @@ func GetAVAXTxFromGenesisTest(genesisBytes []byte, tb testing.TB) *Tx {
 
 // BuildGenesisTest is the common Genesis builder for most tests
 func BuildGenesisTest(tb testing.TB) []byte {
-	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
-	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
-	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
+	addr0Str, _ := address.FormatBech32(testHRP, addrs[0].Bytes())
+	addr1Str, _ := address.FormatBech32(testHRP, addrs[1].Bytes())
+	addr2Str, _ := address.FormatBech32(testHRP, addrs[2].Bytes())
 
 	defaultArgs := &BuildGenesisArgs{
 		Encoding: formatting.Hex,
@@ -882,7 +884,7 @@ func TestIssueNFT(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []*FxCredential{
+		Creds: []*fxs.FxCredential{
 			{Verifiable: &nftfx.Credential{}},
 		},
 	}
@@ -1014,7 +1016,7 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &FxCredential{
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &fxs.FxCredential{
 		Verifiable: &propertyfx.Credential{
 			Credential: secp256k1fx.Credential{
 				Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -1049,7 +1051,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &FxCredential{Verifiable: &propertyfx.Credential{}})
+	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &fxs.FxCredential{Verifiable: &propertyfx.Credential{}})
 
 	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {
@@ -1067,9 +1069,9 @@ func TestIssueProperty(t *testing.T) {
 }
 
 func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	addr0Str, _ := formatting.FormatBech32(testHRP, addrs[0].Bytes())
-	addr1Str, _ := formatting.FormatBech32(testHRP, addrs[1].Bytes())
-	addr2Str, _ := formatting.FormatBech32(testHRP, addrs[2].Bytes())
+	addr0Str, _ := address.FormatBech32(testHRP, addrs[0].Bytes())
+	addr1Str, _ := address.FormatBech32(testHRP, addrs[1].Bytes())
+	addr2Str, _ := address.FormatBech32(testHRP, addrs[2].Bytes())
 	assetAlias := "asset1"
 	customArgs := &BuildGenesisArgs{
 		Encoding: formatting.Hex,

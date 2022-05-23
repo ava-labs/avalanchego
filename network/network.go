@@ -99,6 +99,8 @@ type network struct {
 	// messages
 	ipSigner *ipSigner
 
+	outboundMsgThrottler throttling.OutboundMsgThrottler
+
 	// Limits the number of connection attempts based on IP.
 	inboundConnUpgradeThrottler throttling.InboundConnUpgradeThrottler
 	// Listens for and accepts new inbound connections
@@ -168,8 +170,9 @@ func NewNetwork(
 		metricsRegisterer,
 		primaryNetworkValidators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		config.CPUTracker,
+		config.ResourceTracker,
 		config.CPUTargeter,
+		config.DiskTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
@@ -203,7 +206,6 @@ func NewNetwork(
 		MessageCreator:       msgCreator,
 		Log:                  log,
 		InboundMsgThrottler:  inboundMsgThrottler,
-		OutboundMsgThrottler: outboundMsgThrottler,
 		Network:              nil, // This is set below.
 		Router:               router,
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
@@ -214,15 +216,15 @@ func NewNetwork(
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
-		CPUTracker:           config.CPUTracker,
-		CPUTargeter:          config.CPUTargeter,
+		ResourceTracker:      config.ResourceTracker,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
-		config:     config,
-		peerConfig: peerConfig,
-		metrics:    metrics,
-		ipSigner:   newIPSigner(&config.MyIP, &peerConfig.Clock, config.TLSKey),
+		config:               config,
+		peerConfig:           peerConfig,
+		metrics:              metrics,
+		ipSigner:             newIPSigner(&config.MyIP, &peerConfig.Clock, config.TLSKey),
+		outboundMsgThrottler: outboundMsgThrottler,
 
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
@@ -715,7 +717,7 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.NodeI
 		// Add a reference to the message so that if it is sent, it won't be
 		// collected until it is done being processed.
 		msg.AddRef()
-		if peer.Send(msg) {
+		if peer.Send(n.onCloseCtx, msg) {
 			sentTo.Add(peer.ID())
 
 			// TODO: move send fail rate calculations into the peer metrics
@@ -982,7 +984,18 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 
 	n.peerConfig.Log.Verbo("starting handshake with %s", nodeID)
 
-	peer := peer.Start(n.peerConfig, tlsConn, cert, nodeID)
+	peer := peer.Start(
+		n.peerConfig,
+		tlsConn,
+		cert,
+		nodeID,
+		peer.NewThrottledMessageQueue(
+			n.peerConfig.Metrics,
+			nodeID,
+			n.peerConfig.Log,
+			n.outboundMsgThrottler,
+		),
+	)
 	n.connectingPeers.Add(peer)
 	return nil
 }

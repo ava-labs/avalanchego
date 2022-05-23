@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package fxs
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +19,7 @@ var (
 	_ Fx = &propertyfx.Fx{}
 )
 
-type parsedFx struct {
+type ParsedFx struct {
 	ID ids.ID
 	Fx Fx
 }
