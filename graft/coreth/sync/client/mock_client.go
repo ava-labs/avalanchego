@@ -31,7 +31,7 @@ type MockClient struct {
 	GetLeafsIntercept func(req message.LeafsRequest, res message.LeafsResponse) (message.LeafsResponse, error)
 	// GetCodesIntercept is called on every GetCode request if set to a non-nil callback.
 	// The returned response will be returned by MockClient to the caller.
-	GetCodeIntercept func(codeHash common.Hash, codeBytes []byte) ([]byte, error)
+	GetCodeIntercept func(hashes []common.Hash, codeBytes [][]byte) ([][]byte, error)
 	// GetBlocksIntercept is called on every GetBlocks request if set to a non-nil callback.
 	// The returned response will be returned by MockClient to the caller.
 	GetBlocksIntercept func(blockReq message.BlockRequest, blocks types.Blocks) (types.Blocks, error)
@@ -74,11 +74,11 @@ func (ml *MockClient) LeavesReceived() int32 {
 	return atomic.LoadInt32(&ml.leavesReceived)
 }
 
-func (ml *MockClient) GetCode(codeHash common.Hash) ([]byte, error) {
+func (ml *MockClient) GetCode(hashes []common.Hash) ([][]byte, error) {
 	if ml.codesHandler == nil {
 		panic("no code handler for mock client")
 	}
-	request := message.CodeRequest{Hash: codeHash}
+	request := message.CodeRequest{Hashes: hashes}
 	response, err := ml.codesHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
 	if err != nil {
 		return nil, err
@@ -88,9 +88,9 @@ func (ml *MockClient) GetCode(codeHash common.Hash) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	code := codeBytesIntf.([]byte)
+	code := codeBytesIntf.([][]byte)
 	if ml.GetCodeIntercept != nil {
-		code, err = ml.GetCodeIntercept(codeHash, code)
+		code, err = ml.GetCodeIntercept(hashes, code)
 	}
 	if err == nil {
 		atomic.AddInt32(&ml.codeReceived, int32(lenCode))

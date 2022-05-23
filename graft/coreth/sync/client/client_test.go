@@ -34,16 +34,56 @@ const maxAttempts = 5
 func TestGetCode(t *testing.T) {
 	mockNetClient := &mockNetwork{}
 
-	// test happy path - code response is valid
-	codeResponse := message.CodeResponse{
-		Data: []byte("this is the code"),
+	tests := map[string]struct {
+		setupRequest func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte)
+		expectedErr  error
+	}{
+		"normal": {
+			setupRequest: func() ([]common.Hash, message.CodeResponse, [][]byte) {
+				code := []byte("this is the code")
+				codeHash := crypto.Keccak256Hash(code)
+				codeSlices := [][]byte{code}
+				return []common.Hash{codeHash}, message.CodeResponse{
+					Data: codeSlices,
+				}, codeSlices
+			},
+			expectedErr: nil,
+		},
+		"unexpected code bytes": {
+			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+				return []common.Hash{{1}}, message.CodeResponse{
+					Data: [][]byte{{1}},
+				}, nil
+			},
+			expectedErr: errHashMismatch,
+		},
+		"too many code elements returned": {
+			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+				return []common.Hash{{1}}, message.CodeResponse{
+					Data: [][]byte{{1}, {2}},
+				}, nil
+			},
+			expectedErr: errInvalidCodeResponseLen,
+		},
+		"too few code elements returned": {
+			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+				return []common.Hash{{1}}, message.CodeResponse{
+					Data: [][]byte{},
+				}, nil
+			},
+			expectedErr: errInvalidCodeResponseLen,
+		},
+		"code size is too large": {
+			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+				oversizedCode := make([]byte, params.MaxCodeSize+1)
+				codeHash := crypto.Keccak256Hash(oversizedCode)
+				return []common.Hash{codeHash}, message.CodeResponse{
+					Data: [][]byte{oversizedCode},
+				}, nil
+			},
+			expectedErr: errMaxCodeSizeExceeded,
+		},
 	}
-	response, err := message.Codec.Marshal(message.Version, codeResponse)
-	if err != nil {
-		t.Fatal("could not marshal response", err)
-	}
-	mockNetClient.mockResponse(1, response)
-	codeHash := crypto.Keccak256Hash(codeResponse.Data)
 
 	stateSyncClient := NewClient(&ClientConfig{
 		NetworkClient:    mockNetClient,
@@ -53,21 +93,39 @@ func TestGetCode(t *testing.T) {
 		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
 	})
-	codeBytes, err := stateSyncClient.GetCode(codeHash)
-	if err != nil {
-		t.Fatal("unexpected error in test", err)
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			codeHashes, res, expectedCode := test.setupRequest()
+
+			responseBytes, err := message.Codec.Marshal(message.Version, res)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Dirty hack required because the client will re-request if it encounters
+			// an error.
+			if test.expectedErr == nil {
+				mockNetClient.mockResponse(1, responseBytes)
+			} else {
+				mockNetClient.mockResponse(maxAttempts, responseBytes)
+			}
+
+			codeBytes, err := stateSyncClient.GetCode(codeHashes)
+			// If we expect an error, assert that one occurred and return
+			if test.expectedErr != nil {
+				assert.ErrorIs(t, err, test.expectedErr)
+				assert.Equal(t, uint(maxAttempts), mockNetClient.numCalls)
+				return
+			}
+			// Otherwise, assert there was no error and that the result is as expected
+			assert.NoError(t, err)
+			assert.Equal(t, len(codeBytes), len(expectedCode))
+			for i, code := range codeBytes {
+				assert.Equal(t, expectedCode[i], code)
+			}
+			assert.Equal(t, uint(1), mockNetClient.numCalls)
+		})
 	}
-	assert.EqualValues(t, 1, mockNetClient.numCalls)
-	assert.Equal(t, codeBytes, codeResponse.Data)
-
-	// test where code data does not match the code hash
-	codeHash = common.BytesToHash([]byte("some hash that does not match data"))
-	mockNetClient.mockResponse(maxAttempts, response)
-
-	codeBytes, err = stateSyncClient.GetCode(codeHash)
-	assert.Nil(t, codeBytes)
-	assert.Error(t, err)
-	assert.EqualValues(t, maxAttempts, mockNetClient.numCalls)
 }
 
 func TestGetBlocks(t *testing.T) {

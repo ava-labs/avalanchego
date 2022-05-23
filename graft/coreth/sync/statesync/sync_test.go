@@ -33,7 +33,7 @@ type syncTest struct {
 	prepareForTest    func(t *testing.T) (clientDB ethdb.Database, serverTrieDB *trie.Database, syncRoot common.Hash)
 	expectedError     error
 	GetLeafsIntercept func(message.LeafsRequest, message.LeafsResponse) (message.LeafsResponse, error)
-	GetCodeIntercept  func(common.Hash, []byte) ([]byte, error)
+	GetCodeIntercept  func([]common.Hash, [][]byte) ([][]byte, error)
 }
 
 func testSync(t *testing.T, test syncTest) {
@@ -169,7 +169,7 @@ func TestSimpleSyncCases(t *testing.T) {
 				root := fillAccountsWithStorage(t, serverTrieDB, common.Hash{}, 100)
 				return memorydb.New(), serverTrieDB, root
 			},
-			GetCodeIntercept: func(_ common.Hash, b []byte) ([]byte, error) {
+			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
 				return nil, clientErr
 			},
 			expectedError: clientErr,

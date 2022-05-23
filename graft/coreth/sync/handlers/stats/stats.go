@@ -26,6 +26,8 @@ type BlockRequestHandlerStats interface {
 type CodeRequestHandlerStats interface {
 	IncCodeRequest()
 	IncMissingCodeHash()
+	IncTooManyHashesRequested()
+	IncDuplicateHashesRequested()
 	UpdateCodeReadTime(duration time.Duration)
 	UpdateCodeBytesReturned(bytes uint32)
 }
@@ -50,10 +52,12 @@ type handlerStats struct {
 	blockRequestProcessingTime metrics.Timer
 
 	// CodeRequestHandler stats
-	codeRequest       metrics.Counter
-	missingCodeHash   metrics.Counter
-	codeBytesReturned metrics.Histogram
-	codeReadDuration  metrics.Timer
+	codeRequest              metrics.Counter
+	missingCodeHash          metrics.Counter
+	tooManyHashesRequested   metrics.Counter
+	duplicateHashesRequested metrics.Counter
+	codeBytesReturned        metrics.Histogram
+	codeReadDuration         metrics.Timer
 
 	// LeafsRequestHandler stats
 	leafsRequest               metrics.Counter
@@ -89,6 +93,14 @@ func (h *handlerStats) IncCodeRequest() {
 
 func (h *handlerStats) IncMissingCodeHash() {
 	h.missingCodeHash.Inc(1)
+}
+
+func (h *handlerStats) IncTooManyHashesRequested() {
+	h.tooManyHashesRequested.Inc(1)
+}
+
+func (h *handlerStats) IncDuplicateHashesRequested() {
+	h.duplicateHashesRequested.Inc(1)
 }
 
 func (h *handlerStats) UpdateCodeReadTime(duration time.Duration) {
@@ -147,10 +159,12 @@ func NewHandlerStats(enabled bool) HandlerStats {
 		blockRequestProcessingTime: metrics.GetOrRegisterTimer("block_request_processing_time", nil),
 
 		// initialize code request stats
-		codeRequest:       metrics.GetOrRegisterCounter("code_request_count", nil),
-		missingCodeHash:   metrics.GetOrRegisterCounter("code_request_missing_code_hash", nil),
-		codeReadDuration:  metrics.GetOrRegisterTimer("code_request_read_time", nil),
-		codeBytesReturned: metrics.GetOrRegisterHistogram("code_request_bytes_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
+		codeRequest:              metrics.GetOrRegisterCounter("code_request_count", nil),
+		missingCodeHash:          metrics.GetOrRegisterCounter("code_request_missing_code_hash", nil),
+		tooManyHashesRequested:   metrics.GetOrRegisterCounter("code_request_too_many_hashes", nil),
+		duplicateHashesRequested: metrics.GetOrRegisterCounter("code_request_duplicate_hashes", nil),
+		codeReadDuration:         metrics.GetOrRegisterTimer("code_request_read_time", nil),
+		codeBytesReturned:        metrics.GetOrRegisterHistogram("code_request_bytes_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
 
 		// initialise leafs request stats
 		leafsRequest:               metrics.GetOrRegisterCounter("leafs_request_count", nil),
@@ -179,6 +193,8 @@ func (n *noopHandlerStats) UpdateBlocksReturned(uint16)                         
 func (n *noopHandlerStats) UpdateBlockRequestProcessingTime(time.Duration)      {}
 func (n *noopHandlerStats) IncCodeRequest()                                     {}
 func (n *noopHandlerStats) IncMissingCodeHash()                                 {}
+func (n *noopHandlerStats) IncTooManyHashesRequested()                          {}
+func (n *noopHandlerStats) IncDuplicateHashesRequested()                        {}
 func (n *noopHandlerStats) UpdateCodeReadTime(time.Duration)                    {}
 func (n *noopHandlerStats) UpdateCodeBytesReturned(uint32)                      {}
 func (n *noopHandlerStats) IncLeafsRequest()                                    {}
