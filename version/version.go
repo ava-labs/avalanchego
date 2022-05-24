@@ -23,10 +23,10 @@ var (
 )
 
 type Semantic struct {
-	Major int    `json:"major" yaml:"major"`
-	Minor int    `json:"minor" yaml:"minor"`
-	Patch int    `json:"patch" yaml:"patch"`
-	Str   string `json:"string" yaml:"string"`
+	Major int `json:"major" yaml:"major"`
+	Minor int `json:"minor" yaml:"minor"`
+	Patch int `json:"patch" yaml:"patch"`
+	Str   string
 }
 
 func NewDefaultSemantic(major, minor, patch int) Semantic {
