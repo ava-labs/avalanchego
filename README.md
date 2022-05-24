@@ -44,6 +44,16 @@ The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,
 - Removed Atomic Txs and Shared Memory
 - Removed Multicoin Contract and State
 
+## Block Format
+
+To support these changes, there have been a number of changes to the SubnetEVM block format compared to what exists on the C-Chain and Ethereum. Here we list the changes to the block format as compared to Ethereum.
+
+### Block Header
+
+* `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
+* `BlockGasCost`: surcharge for producing a block faster than the target rate
+
+
 ## Run Local Network
 
 See [Create a Local EVM Subnet](https://docs.avax.network/subnets/create-a-local-subnet).

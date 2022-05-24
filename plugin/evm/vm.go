@@ -238,7 +238,6 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
-	metrics.Enabled = vm.config.MetricsEnabled
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
 	vm.shutdownChan = make(chan struct{}, 1)
