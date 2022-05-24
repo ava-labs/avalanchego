@@ -14,6 +14,8 @@ import (
 
 	"github.com/kardianos/osext"
 
+	"github.com/spf13/viper"
+
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/rocksdb"
@@ -26,21 +28,21 @@ import (
 const (
 	DefaultHTTPPort    = 9650
 	DefaultStakingPort = 9651
+
+	AvalancheGoDataDirVar    = "AVALANCHEGO_DATA_DIR"
+	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
 )
 
-// Results of parsing the CLI
 var (
-	defaultNetworkName     = constants.MainnetName
-	homeDir                = os.ExpandEnv("$HOME")
-	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
-	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
-	defaultDBDir           = filepath.Join(defaultDataDir, "db")
-	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
-	defaultStakingPath     = filepath.Join(defaultDataDir, "staking")
+	// [defaultUnexpandedDataDir] will be expanded when reading the flags
+	defaultDataDir         = filepath.Join("$HOME", ".avalanchego")
+	defaultDBDir           = filepath.Join(defaultUnexpandedDataDir, "db")
+	defaultLogDir          = filepath.Join(defaultUnexpandedDataDir, "logs")
+	defaultProfileDir      = filepath.Join(defaultUnexpandedDataDir, "profiles")
+	defaultStakingPath     = filepath.Join(defaultUnexpandedDataDir, "staking")
 	defaultStakingKeyPath  = filepath.Join(defaultStakingPath, "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultStakingPath, "staker.crt")
-	defaultLogDirectory    = filepath.Join(defaultDataDir, "logs")
-	defaultConfigDir       = filepath.Join(defaultDataDir, "configs")
+	defaultConfigDir       = filepath.Join(defaultUnexpandedDataDir, "configs")
 	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
 	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
 	defaultVMAliasFilePath = filepath.Join(defaultVMConfigDir, "aliases.json")
@@ -63,7 +65,7 @@ func init() {
 	defaultBuildDirs = append(defaultBuildDirs,
 		wd,
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		defaultDataDir,
+		defaultUnexpandedDataDir,
 	)
 }
 
@@ -79,6 +81,8 @@ func addProcessFlags(fs *flag.FlagSet) {
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
+	// Home directory
+	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max")
 
@@ -93,7 +97,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(GenesisConfigContentKey, "", "Specifies base64 encoded genesis content")
 
 	// Network ID
-	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
+	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
 
 	// AVAX fees
 	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
@@ -108,7 +112,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DBConfigContentKey, "", "Specifies base64 encoded database config content")
 
 	// Logging
-	fs.String(LogsDirKey, defaultLogDirectory, "Logging directory for Avalanche")
+	fs.String(LogsDirKey, defaultLogDir, "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogFormatKey, "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
@@ -354,4 +358,27 @@ func BuildFlagSet() *flag.FlagSet {
 	addProcessFlags(fs)
 	addNodeFlags(fs)
 	return fs
+}
+
+// GetExpandedArg gets the string in viper corresponding to [key] and expands
+// any variables using the OS env. If the [AvalancheGoDataDirVar] var is used,
+// we expand the value of the variable with the string in viper corresponding to
+// [DataDirKey].
+func GetExpandedArg(v *viper.Viper, key string) string {
+	return GetExpandedString(v, v.GetString(key))
+}
+
+// GetExpandedString expands [s] with any variables using the OS env. If the
+// [AvalancheGoDataDirVar] var is used, we expand the value of the variable with
+// the string in viper corresponding to [DataDirKey].
+func GetExpandedString(v *viper.Viper, s string) string {
+	return os.Expand(
+		s,
+		func(strVar string) string {
+			if strVar == AvalancheGoDataDirVar {
+				return os.ExpandEnv(v.GetString(DataDirKey))
+			}
+			return os.Getenv(strVar)
+		},
+	)
 }

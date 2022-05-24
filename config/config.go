@@ -74,7 +74,7 @@ var (
 func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
 	config := runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
-		BuildDir:              os.ExpandEnv(v.GetString(BuildDirKey)),
+		BuildDir:              GetExpandedArg(v, BuildDirKey),
 		PluginMode:            v.GetBool(PluginModeKey),
 	}
 
@@ -100,6 +100,7 @@ func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
 
 	foundBuildDir := false
 	for _, dir := range defaultBuildDirs {
+		dir = GetExpandedString(v, dir)
 		if validBuildDir(dir) {
 			config.BuildDir = dir
 			foundBuildDir = true
@@ -136,7 +137,7 @@ func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	loggingConfig := logging.Config{}
-	loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
+	loggingConfig.Directory = GetExpandedArg(v, LogsDirKey)
 	var err error
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
@@ -194,7 +195,7 @@ func getIPCConfig(v *viper.Viper) node.IPCConfig {
 		config.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
 	}
 	if v.IsSet(IpcsPathKey) {
-		config.IPCPath = os.ExpandEnv(v.GetString(IpcsPathKey))
+		config.IPCPath = GetExpandedArg(v, IpcsPathKey)
 	}
 	return config
 }
@@ -213,7 +214,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	case v.IsSet(HTTPSKeyFileKey):
-		httpsKeyFilepath := os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
+		httpsKeyFilepath := GetExpandedArg(v, HTTPSKeyFileKey)
 		if httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
@@ -227,7 +228,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	case v.IsSet(HTTPSCertFileKey):
-		httpsCertFilepath := os.ExpandEnv(v.GetString(HTTPSCertFileKey))
+		httpsCertFilepath := GetExpandedArg(v, HTTPSCertFileKey)
 		if httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
 			return node.HTTPConfig{}, err
 		}
@@ -599,7 +600,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 	config := profiler.Config{
-		Dir:         os.ExpandEnv(v.GetString(ProfileDirKey)),
+		Dir:         GetExpandedArg(v, ProfileDirKey),
 		Enabled:     v.GetBool(ProfileContinuousEnabledKey),
 		Freq:        v.GetDuration(ProfileContinuousFreqKey),
 		MaxNumFiles: v.GetInt(ProfileContinuousMaxFilesKey),
@@ -633,8 +634,8 @@ func getStakingTLSCertFromFlag(v *viper.Viper) (tls.Certificate, error) {
 
 func getStakingTLSCertFromFile(v *viper.Viper) (tls.Certificate, error) {
 	// Parse the staking key/cert paths and expand environment variables
-	stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
-	stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
+	stakingKeyPath := GetExpandedArg(v, StakingKeyPathKey)
+	stakingCertPath := GetExpandedArg(v, StakingCertPathKey)
 
 	// If staking key/cert locations are specified but not found, error
 	if v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey) {
@@ -684,8 +685,8 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	config := node.StakingConfig{
 		EnableStaking:         v.GetBool(StakingEnabledKey),
 		DisabledStakingWeight: v.GetUint64(StakingDisabledWeightKey),
-		StakingKeyPath:        os.ExpandEnv(v.GetString(StakingKeyPathKey)),
-		StakingCertPath:       os.ExpandEnv(v.GetString(StakingCertPathKey)),
+		StakingKeyPath:        GetExpandedArg(v, StakingKeyPathKey),
+		StakingCertPath:       GetExpandedArg(v, StakingCertPathKey),
 	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
 		return node.StakingConfig{}, errInvalidStakerWeights
@@ -755,7 +756,7 @@ func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
 
 	// if content is not specified go for the file
 	if v.IsSet(GenesisConfigFileKey) {
-		genesisFileName := os.ExpandEnv(v.GetString(GenesisConfigFileKey))
+		genesisFileName := GetExpandedArg(v, GenesisConfigFileKey)
 		return genesis.FromFile(networkID, genesisFileName)
 	}
 
@@ -794,7 +795,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 			return node.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	} else if v.IsSet(DBConfigFileKey) {
-		path := os.ExpandEnv(v.GetString(DBConfigFileKey))
+		path := GetExpandedArg(v, DBConfigFileKey)
 		configBytes, err = os.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
@@ -804,7 +805,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 	return node.DatabaseConfig{
 		Name: v.GetString(DBTypeKey),
 		Path: filepath.Join(
-			os.ExpandEnv(v.GetString(DBPathKey)),
+			GetExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),
 		),
 		Config: configBytes,
@@ -866,7 +867,7 @@ func getVMManager(v *viper.Viper) (vms.Manager, error) {
 
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
-	configDir := os.ExpandEnv(v.GetString(configKey))
+	configDir := GetExpandedArg(v, configKey)
 	cleanPath := filepath.Clean(configDir)
 	ok, err := storage.FolderExists(cleanPath)
 	if err != nil {
