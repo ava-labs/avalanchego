@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -26,6 +26,8 @@ var (
 // StatefulAddSubnetValidatorTx is an unsigned addSubnetValidatorTx
 type StatefulAddSubnetValidatorTx struct {
 	*unsigned.AddSubnetValidatorTx `serialize:"true"`
+
+	txID ids.ID // ID of signed add subnet validator tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -56,7 +58,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 	error,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -98,7 +100,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 		if err == nil {
 			// This validator is attempting to validate with a currently
 			// validing node.
-			vdrTx = currentValidator.AddValidatorTx()
+			vdrTx, _ = currentValidator.AddValidatorTx()
 
 			// Ensure that this transaction isn't a duplicate add validator tx.
 			subnets := currentValidator.SubnetValidators()
@@ -111,7 +113,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 		} else {
 			// This validator is attempting to validate with a node that hasn't
 			// started validating yet.
-			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, errDSValidatorSubset
@@ -197,15 +199,14 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 	// Consume the UTXOS
 	consumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	produceOutputs(onCommitState, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	produceOutputs(onAbortState, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	return onCommitState, onAbortState, nil
 }
@@ -245,8 +246,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		Validator: pChainValidator.SubnetValidator{
-			Validator: pChainValidator.Validator{
+		Validator: pchainvalidator.SubnetValidator{
+			Validator: pchainvalidator.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,
@@ -256,9 +257,9 @@ func (vm *VM) newAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(vm.ctx)
+	return tx, tx.SyntacticVerify(vm.ctx)
 }

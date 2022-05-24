@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -32,6 +32,8 @@ var (
 // StatefulAddDelegatorTx is an unsigned addDelegatorTx
 type StatefulAddDelegatorTx struct {
 	*unsigned.AddDelegatorTx `serialize:"true"`
+
+	txID ids.ID // ID of signed add subnet validator tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -62,7 +64,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 	error,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -111,18 +113,18 @@ func (tx *StatefulAddDelegatorTx) Execute(
 		var (
 			vdrTx                  *unsigned.AddValidatorTx
 			currentDelegatorWeight uint64
-			currentDelegators      []*unsigned.AddDelegatorTx
+			currentDelegators      []signed.DelegatorAndID
 		)
 		if err == nil {
 			// This delegator is attempting to delegate to a currently validing
 			// node.
-			vdrTx = currentValidator.AddValidatorTx()
+			vdrTx, _ = currentValidator.AddValidatorTx()
 			currentDelegatorWeight = currentValidator.DelegatorWeight()
 			currentDelegators = currentValidator.Delegators()
 		} else {
 			// This delegator is attempting to delegate to a node that hasn't
 			// started validating yet.
-			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, errDelegatorSubset
@@ -201,15 +203,14 @@ func (tx *StatefulAddDelegatorTx) Execute(
 	// Consume the UTXOS
 	consumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	produceOutputs(onCommitState, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, outs)
+	produceOutputs(onAbortState, tx.txID, vm.ctx.AVAXAssetID, outs)
 
 	return onCommitState, onAbortState, nil
 }
@@ -242,7 +243,7 @@ func (vm *VM) newAddDelegatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: pChainValidator.Validator{
+		Validator: pchainvalidator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
@@ -255,11 +256,11 @@ func (vm *VM) newAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(vm.ctx)
+	return tx, tx.SyntacticVerify(vm.ctx)
 }
 
 // canDelegate returns if the [new] delegator can be added to a validator who
@@ -270,7 +271,7 @@ func (vm *VM) newAddDelegatorTx(
 // [maximumStake].
 func canDelegate(
 	current,
-	pending []*unsigned.AddDelegatorTx, // sorted by next start time first
+	pending []signed.DelegatorAndID, // sorted by next start time first
 	new *unsigned.AddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
@@ -298,16 +299,16 @@ func canDelegate(
 // * [pending] is sorted in order of increasing delegation start time
 func maxStakeAmount(
 	current,
-	pending []*unsigned.AddDelegatorTx, // sorted by next start time first
+	pending []signed.DelegatorAndID, // sorted by next start time first
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := pChainValidator.EndTimeHeap{}
+	toRemoveHeap := pchainvalidator.EndTimeHeap{}
 	for _, currentDelegator := range current {
-		toRemoveHeap.Add(&currentDelegator.Validator)
+		toRemoveHeap.Add(&currentDelegator.UnsignedAddDelegatorTx.Validator)
 	}
 
 	var (
@@ -320,7 +321,7 @@ func maxStakeAmount(
 	// starts.
 	for _, nextPending := range pending { // Iterates in order of increasing start time
 		// Calculate what the amount staked will be when this delegation starts.
-		nextPendingStartTime := nextPending.StartTime()
+		nextPendingStartTime := nextPending.UnsignedAddDelegatorTx.StartTime()
 
 		if nextPendingStartTime.After(endTime) {
 			// This delegation starts after [endTime].
@@ -365,7 +366,7 @@ func maxStakeAmount(
 		// Add to [currentStake] the stake of this pending delegator to
 		// calculate what the stake will be when this pending delegation has
 		// started.
-		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
+		currentStake, err = math.Add64(currentStake, nextPending.UnsignedAddDelegatorTx.Validator.Wght)
 		if err != nil {
 			return 0, err
 		}
@@ -383,7 +384,7 @@ func maxStakeAmount(
 
 		// This pending delegator is a current delegator relative
 		// when considering later pending delegators that start late
-		toRemoveHeap.Add(&nextPending.Validator)
+		toRemoveHeap.Add(&nextPending.UnsignedAddDelegatorTx.Validator)
 	}
 
 	// [currentStake] is now the amount staked before the next pending delegator
@@ -443,10 +444,9 @@ func (vm *VM) maxSubnetStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	var (
-		vdrTx  *unsigned.AddSubnetValidatorTx
-		exists bool
+		vdrTxAndID signed.SubnetValidatorAndID
+		exists     bool
 	)
-
 	pendingStakers := vm.internalState.PendingStakerChainState()
 	pendingValidator := pendingStakers.GetValidator(nodeID)
 
@@ -454,16 +454,17 @@ func (vm *VM) maxSubnetStakeAmount(
 	currentValidator, err := currentStakers.GetValidator(nodeID)
 	switch err {
 	case nil:
-		vdrTx, exists = currentValidator.SubnetValidators()[subnetID]
+		vdrTxAndID, exists = currentValidator.SubnetValidators()[subnetID]
 		if !exists {
-			vdrTx = pendingValidator.SubnetValidators()[subnetID]
+			vdrTxAndID = pendingValidator.SubnetValidators()[subnetID]
 		}
 	case database.ErrNotFound:
-		vdrTx = pendingValidator.SubnetValidators()[subnetID]
+		vdrTxAndID = pendingValidator.SubnetValidators()[subnetID]
 	default:
 		return 0, err
 	}
 
+	vdrTx := vdrTxAndID.UnsignedAddSubnetValidator
 	if vdrTx == nil {
 		return 0, nil
 	}
@@ -489,7 +490,7 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 
 	switch err {
 	case nil:
-		vdrTx := currentValidator.AddValidatorTx()
+		vdrTx, _ := currentValidator.AddValidatorTx()
 		if vdrTx.StartTime().After(endTime) {
 			return 0, nil
 		}
@@ -510,7 +511,7 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 			currentWeight,
 		)
 	case database.ErrNotFound:
-		futureValidator, err := pendingStakers.GetValidatorTx(nodeID)
+		futureValidator, _, err := pendingStakers.GetValidatorTx(nodeID)
 		if err == database.ErrNotFound {
 			return 0, nil
 		}

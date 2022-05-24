@@ -38,11 +38,11 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 		uChain := chain.Unsigned.(*unsigned.CreateChainTx)
 		switch uChain.VMID {
 		case constants.AVMID:
-			apiAliases[constants.ChainAliasPrefix+chain.Unsigned.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "avm"}
-			chainAliases[chain.Unsigned.ID()] = GetXChainAliases()
+			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "avm"}
+			chainAliases[chain.ID()] = GetXChainAliases()
 		case constants.EVMID:
-			apiAliases[constants.ChainAliasPrefix+chain.Unsigned.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
-			chainAliases[chain.Unsigned.ID()] = GetCChainAliases()
+			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
+			chainAliases[chain.ID()] = GetCChainAliases()
 		}
 	}
 	return apiAliases, chainAliases, nil

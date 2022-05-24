@@ -123,11 +123,11 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 
 func (m *mempool) Add(tx *signed.Tx) error {
 	// Note: a previously dropped tx can be re-added
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	if m.Has(txID) {
 		return errDuplicatedTx
 	}
-	if txBytes := tx.Unsigned.Bytes(); len(txBytes) > m.bytesAvailable {
+	if txBytes := tx.Bytes(); len(txBytes) > m.bytesAvailable {
 		return errMempoolFull
 	}
 
@@ -184,7 +184,7 @@ func (m *mempool) HasProposalTx() bool { return m.unissuedProposalTxs.Len() > 0 
 
 func (m *mempool) RemoveDecisionTxs(txs []*signed.Tx) {
 	for _, tx := range txs {
-		txID := tx.Unsigned.ID()
+		txID := tx.ID()
 		if m.unissuedDecisionTxs.Remove(txID) != nil {
 			m.deregister(tx)
 		}
@@ -192,7 +192,7 @@ func (m *mempool) RemoveDecisionTxs(txs []*signed.Tx) {
 }
 
 func (m *mempool) RemoveProposalTx(tx *signed.Tx) {
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	if m.unissuedProposalTxs.Remove(txID) != nil {
 		m.deregister(tx)
 	}
@@ -202,7 +202,7 @@ func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*signed.Tx {
 	var txs []*signed.Tx
 	for m.unissuedDecisionTxs.Len() > 0 {
 		tx := m.unissuedDecisionTxs.Peek()
-		txBytes := tx.Unsigned.Bytes()
+		txBytes := tx.Bytes()
 		if len(txBytes) > maxTxsBytes {
 			return txs
 		}
@@ -231,13 +231,13 @@ func (m *mempool) WasDropped(txID ids.ID) bool {
 }
 
 func (m *mempool) register(tx *signed.Tx) {
-	txBytes := tx.Unsigned.Bytes()
+	txBytes := tx.Bytes()
 	m.bytesAvailable -= len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 }
 
 func (m *mempool) deregister(tx *signed.Tx) {
-	txBytes := tx.Unsigned.Bytes()
+	txBytes := tx.Bytes()
 	m.bytesAvailable += len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 

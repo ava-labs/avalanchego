@@ -15,16 +15,19 @@ func MakeStatefulTx(tx *signed.Tx) (StatefulTx, error) {
 	case *unsigned.AddDelegatorTx:
 		return &StatefulAddDelegatorTx{
 			AddDelegatorTx: utx,
+			txID:           tx.ID(),
 		}, nil
 
 	case *unsigned.AddSubnetValidatorTx:
 		return &StatefulAddSubnetValidatorTx{
 			AddSubnetValidatorTx: utx,
+			txID:                 tx.ID(),
 		}, nil
 
 	case *unsigned.AddValidatorTx:
 		return &StatefulAddValidatorTx{
 			AddValidatorTx: utx,
+			txID:           tx.ID(),
 		}, nil
 	case *unsigned.AdvanceTimeTx:
 		return &StatefulAdvanceTimeTx{
@@ -37,10 +40,12 @@ func MakeStatefulTx(tx *signed.Tx) (StatefulTx, error) {
 	case *unsigned.CreateChainTx:
 		return &StatefulCreateChainTx{
 			CreateChainTx: utx,
+			txID:          tx.ID(),
 		}, nil
 	case *unsigned.CreateSubnetTx:
 		return &StatefulCreateSubnetTx{
 			CreateSubnetTx: utx,
+			txID:           tx.ID(),
 		}, nil
 	case *unsigned.ImportTx:
 		return &StatefulImportTx{

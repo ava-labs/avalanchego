@@ -221,7 +221,7 @@ func (vs *versionedStateImpl) GetTx(txID ids.ID) (*signed.Tx, status.Status, err
 }
 
 func (vs *versionedStateImpl) AddTx(tx *signed.Tx, status status.Status) {
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	txStatus := &txStatusImpl{
 		tx:     tx,
 		status: status,

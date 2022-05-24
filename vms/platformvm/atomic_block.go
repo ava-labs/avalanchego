@@ -44,7 +44,7 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
-	ab.Tx.Unsigned.Initialize(unsignedBytes, signedBytes)
+	ab.Tx.Initialize(unsignedBytes, signedBytes)
 	ab.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
@@ -71,7 +71,10 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
-	blkID := ab.ID()
+	var (
+		blkID = ab.ID()
+		txID  = ab.Tx.ID()
+	)
 
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
 		return err
@@ -122,7 +125,6 @@ func (ab *AtomicBlock) Verify() error {
 
 	onAccept, err := atomicTx.AtomicExecute(ab.vm, parentState, &ab.Tx)
 	if err != nil {
-		txID := atomicTx.ID()
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
@@ -138,7 +140,11 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 func (ab *AtomicBlock) Accept() error {
-	blkID := ab.ID()
+	var (
+		blkID = ab.ID()
+		txID  = ab.Tx.ID()
+	)
+
 	ab.vm.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
@@ -175,7 +181,7 @@ func (ab *AtomicBlock) Accept() error {
 	if err := atomicTx.AtomicAccept(ab.vm.ctx, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
-			atomicTx.ID(),
+			txID,
 			blkID,
 			err,
 		)
@@ -209,7 +215,7 @@ func (ab *AtomicBlock) Reject() error {
 	if err := ab.vm.blockBuilder.AddVerifiedTx(&ab.Tx); err != nil {
 		ab.vm.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
-			ab.Tx.Unsigned.ID(),
+			ab.Tx.ID(),
 			err,
 		)
 	}

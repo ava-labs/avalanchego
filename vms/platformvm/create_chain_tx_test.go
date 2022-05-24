@@ -146,7 +146,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.Unsigned.(*unsigned.CreateChainTx).SyntacticallyVerified = false
 		tx.Unsigned = test.setup(tx.Unsigned.(*unsigned.CreateChainTx))
-		if err := tx.Unsigned.SyntacticVerify(vm.ctx); err != nil && !test.shouldErr {
+		if err := tx.SyntacticVerify(vm.ctx); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)

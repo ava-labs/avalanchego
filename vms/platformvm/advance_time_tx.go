@@ -206,10 +206,10 @@ func (tx *StatefulAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
 func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*signed.Tx, error) {
-	tx := &signed.Tx{
-		Unsigned: &unsigned.AdvanceTimeTx{
-			Time: uint64(timestamp.Unix()),
-		},
+	utx := &unsigned.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
+	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	if err != nil {
+		return nil, err
 	}
-	return tx, tx.Sign(Codec, nil)
+	return tx, tx.SyntacticVerify(vm.ctx)
 }
