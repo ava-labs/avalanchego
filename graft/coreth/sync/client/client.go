@@ -326,7 +326,12 @@ func (c *client) get(request message.Request, parseFn parseResponseFn) (interfac
 		metric.UpdateRequestLatency(time.Since(start))
 
 		if err != nil {
-			log.Info("request failed, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
+			ctx := make([]interface{}, 0, 8)
+			if nodeID != ids.EmptyNodeID {
+				ctx = append(ctx, "nodeID", nodeID)
+			}
+			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
+			log.Debug("request failed, retrying", ctx...)
 			metric.IncFailed()
 			continue
 		} else {

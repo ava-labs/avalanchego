@@ -54,11 +54,11 @@ func (c *client) RequestAny(minVersion version.Application, request []byte) ([]b
 	waitingHandler := newWaitingResponseHandler()
 	nodeID, err := c.network.RequestAny(minVersion, request, waitingHandler)
 	if err != nil {
-		return nil, ids.EmptyNodeID, err
+		return nil, nodeID, err
 	}
 	response := <-waitingHandler.responseChan
 	if waitingHandler.failed {
-		return nil, ids.EmptyNodeID, ErrRequestFailed
+		return nil, nodeID, ErrRequestFailed
 	}
 	return response, nodeID, nil
 }
