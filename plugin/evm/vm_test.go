@@ -172,7 +172,6 @@ func GenesisVM(t *testing.T,
 	*VM, manager.Manager,
 	*engCommon.SenderTest,
 ) {
-	t.Helper()
 	vm := &VM{}
 	ctx, dbManager, genesisBytes, issuer := setupGenesis(t, genesisJSON)
 	appSender := &engCommon.SenderTest{T: t}
