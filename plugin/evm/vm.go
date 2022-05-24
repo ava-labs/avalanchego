@@ -14,16 +14,19 @@ import (
 	"sync"
 	"time"
 
+	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
 	subnetEVM "github.com/ava-labs/subnet-evm/chain"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
-	"github.com/ava-labs/subnet-evm/metrics/prometheus"
+	"github.com/ava-labs/subnet-evm/metrics"
+	subnetEVMPrometheus "github.com/ava-labs/subnet-evm/metrics/prometheus"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+	"github.com/prometheus/client_golang/prometheus"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -34,7 +37,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
@@ -73,6 +75,10 @@ const (
 	decidedCacheSize    = 100
 	missingCacheSize    = 50
 	unverifiedCacheSize = 50
+
+	// Prefixes for metrics gatherers
+	ethMetricsPrefix        = "eth"
+	chainStateMetricsPrefix = "chain_state"
 )
 
 // Define the API endpoints for the VM
@@ -151,6 +157,9 @@ type VM struct {
 	client       peer.Client
 	networkCodec codec.Manager
 
+	// Metrics
+	multiGatherer avalanchegoMetrics.MultiGatherer
+
 	bootstrapped bool
 }
 
@@ -220,12 +229,13 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.ctx = ctx
 	// Set log level
 	logLevel, err := log.LvlFromString(vm.config.LogLevel)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
+
+	vm.ctx = ctx
 	vm.setLogLevel(logLevel)
 	if b, err := json.Marshal(vm.config); err == nil {
 		log.Info("Initializing Subnet EVM VM", "Version", Version, "Config", string(b))
@@ -238,7 +248,7 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
-	metrics.Enabled = vm.config.MetricsEnabled
+	// Enable debug-level metrics that might impact runtime performance
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
 	vm.shutdownChan = make(chan struct{}, 1)
@@ -352,6 +362,10 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
+	if err := vm.initializeMetrics(); err != nil {
+		return err
+	}
+
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
@@ -376,34 +390,58 @@ func (vm *VM) Initialize(
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
 
-	vm.State = chain.NewState(&chain.Config{
-		DecidedCacheSize:    decidedCacheSize,
-		MissingCacheSize:    missingCacheSize,
-		UnverifiedCacheSize: unverifiedCacheSize,
-		LastAcceptedBlock: &Block{
-			id:       ids.ID(lastAccepted.Hash()),
-			ethBlock: lastAccepted,
-			vm:       vm,
-			status:   choices.Accepted,
-		},
-		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
-		GetBlock:           vm.getBlock,
-		UnmarshalBlock:     vm.parseBlock,
-		BuildBlock:         vm.buildBlock,
-	})
+	if err := vm.initChainState(vm.chain.LastAcceptedBlock()); err != nil {
+		return err
+	}
 
 	vm.builder.awaitSubmittedTxs()
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
-	// Only provide metrics if they are being populated.
+	return nil
+}
+
+func (vm *VM) initializeMetrics() error {
+	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
+	// If metrics are enabled, register the default metrics regitry
 	if metrics.Enabled {
-		gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
-		if err := ctx.Metrics.Register(gatherer); err != nil {
+		gatherer := subnetEVMPrometheus.Gatherer(metrics.DefaultRegistry)
+		if err := vm.multiGatherer.Register(ethMetricsPrefix, gatherer); err != nil {
+			return err
+		}
+		// Register [multiGatherer] after registerers have been registered to it
+		if err := vm.ctx.Metrics.Register(vm.multiGatherer); err != nil {
 			return err
 		}
 	}
-
 	return nil
+}
+
+func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
+	config := &chain.Config{
+		DecidedCacheSize:    decidedCacheSize,
+		MissingCacheSize:    missingCacheSize,
+		UnverifiedCacheSize: unverifiedCacheSize,
+		GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
+		GetBlock:            vm.getBlock,
+		UnmarshalBlock:      vm.parseBlock,
+		BuildBlock:          vm.buildBlock,
+		LastAcceptedBlock: &Block{
+			id:       ids.ID(lastAcceptedBlock.Hash()),
+			ethBlock: lastAcceptedBlock,
+			vm:       vm,
+			status:   choices.Accepted,
+		},
+	}
+
+	// Register chain state metrics
+	chainStateRegisterer := prometheus.NewRegistry()
+	state, err := chain.NewMeteredState(chainStateRegisterer, config)
+	if err != nil {
+		return fmt.Errorf("could not create metered state: %w", err)
+	}
+	vm.State = state
+
+	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
 func (vm *VM) initGossipHandling() {
