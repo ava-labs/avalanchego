@@ -2,7 +2,12 @@
 
 ## [v0.8.10](https://github.com/ava-labs/coreth/releases/tag/v0.8.10)
 
+- Add beta support for fast sync
+- Bump trie tip buffer size to 32
+- Fix bug in metrics initialization
+
 ## [v0.8.9](https://github.com/ava-labs/coreth/releases/tag/v0.8.9)
+
 - Fix deadlock bug on shutdown causing historical re-generation on restart
 - Add API endpoint to fetch running VM Config
 - Add AvalancheGo custom log formatting to C-Chain logs
