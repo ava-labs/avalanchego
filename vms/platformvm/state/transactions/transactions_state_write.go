@@ -72,7 +72,7 @@ func (ts *state) writeCurrentStakers() (err error) {
 
 	weightDiffs := make(map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff) // subnetID -> nodeID -> weightDiff
 	for _, currentStaker := range ts.addedCurrentStakers {
-		txID := currentStaker.AddStakerTx.Unsigned.ID()
+		txID := currentStaker.AddStakerTx.ID()
 		potentialReward := currentStaker.PotentialReward
 
 		var (
@@ -180,7 +180,7 @@ func (ts *state) writeCurrentStakers() (err error) {
 			return unsigned.ErrWrongTxType
 		}
 
-		txID := tx.Unsigned.ID()
+		txID := tx.ID()
 		if err = db.Delete(txID[:]); err != nil {
 			return
 		}
@@ -280,7 +280,7 @@ func (ts *state) writePendingStakers() error {
 			return unsigned.ErrWrongTxType
 		}
 
-		txID := tx.Unsigned.ID()
+		txID := tx.ID()
 		if err := db.Put(txID[:], nil); err != nil {
 			return fmt.Errorf("failed to write pending stakers with: %w", err)
 		}
@@ -300,7 +300,7 @@ func (ts *state) writePendingStakers() error {
 			return unsigned.ErrWrongTxType
 		}
 
-		txID := tx.Unsigned.ID()
+		txID := tx.ID()
 		if err := db.Delete(txID[:]); err != nil {
 			return fmt.Errorf("failed to write pending stakers with: %w", err)
 		}
@@ -333,7 +333,7 @@ func (ts *state) writeTXs() error {
 		txID := txID
 
 		stx := stateTx{
-			Tx:     txStatus.Tx.Unsigned.Bytes(),
+			Tx:     txStatus.Tx.Bytes(),
 			Status: txStatus.Status,
 		}
 
@@ -391,7 +391,7 @@ func (ts *state) writeUTXOs() error {
 
 func (ts *state) writeSubnets() error {
 	for _, subnet := range ts.addedSubnets {
-		subnetID := subnet.Unsigned.ID()
+		subnetID := subnet.ID()
 
 		if err := ts.subnetDB.Put(subnetID[:], nil); err != nil {
 			return fmt.Errorf("failed to write current subnets with: %w", err)
@@ -406,7 +406,7 @@ func (ts *state) writeChains() error {
 		for _, chain := range chains {
 			chainDB := ts.getChainDB(subnetID)
 
-			chainID := chain.Unsigned.ID()
+			chainID := chain.ID()
 			if err := chainDB.Put(chainID[:], nil); err != nil {
 				return fmt.Errorf("failed to write chains with: %w", err)
 			}

@@ -14,8 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+
+	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var _ StatefulDecisionTx = &StatefulCreateChainTx{}
@@ -28,6 +29,8 @@ const (
 // StatefulCreateChainTx is an unsigned CreateChainTx
 type StatefulCreateChainTx struct {
 	*unsigned.CreateChainTx `serialize:"true"`
+
+	txID ids.ID // ID of signed create subnet tx
 }
 
 func (tx *StatefulCreateChainTx) InputUTXOs() ids.Set { return nil }
@@ -61,7 +64,7 @@ func (tx *StatefulCreateChainTx) Execute(
 		return nil, errWrongNumberOfCredentials
 	}
 
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
 	}
 
@@ -106,14 +109,13 @@ func (tx *StatefulCreateChainTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddChain(stx)
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { return platformutils.CreateChain(vm.Config, tx.CreateChainTx) }
+	onAccept := func() error { return platformutils.CreateChain(vm.Config, tx.CreateChainTx, tx.txID) }
 	return onAccept, nil
 }
 

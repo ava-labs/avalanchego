@@ -71,7 +71,7 @@ func (pb *ProposalBlock) Reject() error {
 	if err := pb.vm.blockBuilder.AddVerifiedTx(&pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
-			pb.Tx.Unsigned.ID(),
+			pb.Tx.ID(),
 			err,
 		)
 	}
@@ -91,7 +91,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
-	pb.Tx.Unsigned.Initialize(unsignedBytes, signedBytes)
+	pb.Tx.Initialize(unsignedBytes, signedBytes)
 	pb.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
@@ -107,7 +107,10 @@ func (pb *ProposalBlock) setBaseState() {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	blkID := pb.ID()
+	var (
+		blkID = pb.ID()
+		txID  = pb.Tx.ID()
+	)
 
 	if err := pb.CommonBlock.Verify(); err != nil {
 		return err
@@ -138,7 +141,6 @@ func (pb *ProposalBlock) Verify() error {
 
 	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
 	if err != nil {
-		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return err
 	}

@@ -80,7 +80,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 		return nil, nil, err
 	}
 
-	stakerID := stakerTx.Unsigned.ID()
+	stakerID := stakerTx.ID()
 	if stakerID != tx.TxID {
 		return nil, nil, fmt.Errorf(
 			"attempting to remove TxID: %s. Should be removing %s",
@@ -192,7 +192,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 				err,
 			)
 		}
-		vdrTx := vdr.AddValidatorTx()
+		vdrTx, _ := vdr.AddValidatorTx()
 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee

@@ -28,6 +28,8 @@ var (
 // StatefulImportTx is an unsigned ImportTx
 type StatefulImportTx struct {
 	*unsigned.ImportTx `serialize:"true"`
+
+	txID ids.ID // ID of signed create subnet tx
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
@@ -58,7 +60,7 @@ func (tx *StatefulImportTx) Execute(
 	vs state.Versioned,
 	stx *signed.Tx,
 ) (func() error, error) {
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
 	}
 
@@ -106,8 +108,7 @@ func (tx *StatefulImportTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 

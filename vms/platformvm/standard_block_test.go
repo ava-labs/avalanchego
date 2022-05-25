@@ -93,7 +93,7 @@ func TestAtomicTxImports(t *testing.T) {
 	assert.NoError(err)
 	err = b.Accept()
 	assert.NoError(err)
-	_, txStatus, err := vm.internalState.GetTx(tx.Unsigned.ID())
+	_, txStatus, err := vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state
 	assert.Equal(txStatus, status.Committed)

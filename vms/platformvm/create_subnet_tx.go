@@ -19,6 +19,8 @@ var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
 // StatefulCreateSubnetTx is an unsigned proposal to create a new subnet
 type StatefulCreateSubnetTx struct {
 	*unsigned.CreateSubnetTx `serialize:"true"`
+
+	txID ids.ID // ID of signed create subnet tx
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
@@ -49,7 +51,7 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	error,
 ) {
 	// Make sure this transaction is well formed.
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
 	}
 
@@ -71,8 +73,7 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddSubnet(stx)
 

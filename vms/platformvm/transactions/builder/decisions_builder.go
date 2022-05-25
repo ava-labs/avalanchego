@@ -73,11 +73,11 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+	return tx, tx.SyntacticVerify(b.ctx)
 }
 
 func (b *builder) NewCreateSubnetTx(
@@ -109,9 +109,9 @@ func (b *builder) NewCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+	return tx, tx.SyntacticVerify(b.ctx)
 }

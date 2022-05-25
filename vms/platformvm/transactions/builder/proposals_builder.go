@@ -89,11 +89,11 @@ func (b *builder) NewAddValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+	return tx, tx.SyntacticVerify(b.ctx)
 }
 
 func (b *builder) NewAddDelegatorTx(
@@ -130,11 +130,11 @@ func (b *builder) NewAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+	return tx, tx.SyntacticVerify(b.ctx)
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
@@ -176,31 +176,32 @@ func (b *builder) NewAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+	return tx, tx.SyntacticVerify(b.ctx)
 }
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
 func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*signed.Tx, error) {
 	utx := &unsigned.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, nil); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+	return tx, tx.SyntacticVerify(b.ctx)
 }
 
 // RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.
 func (b *builder) NewRewardValidatorTx(txID ids.ID) (*signed.Tx, error) {
 	utx := &unsigned.RewardValidatorTx{TxID: txID}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(unsigned.Codec, nil); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(b.ctx)
+
+	return tx, tx.SyntacticVerify(b.ctx)
 }

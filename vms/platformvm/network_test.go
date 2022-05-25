@@ -55,11 +55,9 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 
 	// create a tx
 	tx := getValidTx(vm, t)
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 
-	msg := message.Tx{
-		Tx: tx.Unsigned.Bytes(),
-	}
+	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 	// Free lock because [AppGossip] waits for the context lock
@@ -88,8 +86,8 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	unsignedBytes, err := Codec.Marshal(CodecVersion, &retrivedTx.Unsigned)
 	assert.NoError(err, "failed unmarshalling tx")
 
-	retrivedTx.Unsigned.Initialize(unsignedBytes, reply.Tx)
-	assert.Equal(txID, retrivedTx.Unsigned.ID())
+	retrivedTx.Initialize(unsignedBytes, reply.Tx)
+	assert.Equal(txID, retrivedTx.ID())
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
@@ -108,14 +106,12 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 
 	// create a tx and mark as invalid
 	tx := getValidTx(vm, t)
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	vm.mempool.MarkDropped(txID)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()
-	msg := message.Tx{
-		Tx: tx.Unsigned.Bytes(),
-	}
+	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 	vm.ctx.Lock.Unlock()
@@ -148,7 +144,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	// add a tx to the mempool and show it gets gossiped
 	tx := getValidTx(vm, t)
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 
 	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
@@ -168,8 +164,8 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	unsignedBytes, err := Codec.Marshal(CodecVersion, &retrivedTx.Unsigned)
 	assert.NoError(err, "failed unmarshalling tx")
 
-	retrivedTx.Unsigned.Initialize(unsignedBytes, reply.Tx)
-	assert.Equal(txID, retrivedTx.Unsigned.ID())
+	retrivedTx.Initialize(unsignedBytes, reply.Tx)
+	assert.Equal(txID, retrivedTx.ID())
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil

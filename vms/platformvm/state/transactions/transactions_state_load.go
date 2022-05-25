@@ -118,9 +118,12 @@ func (ts *state) LoadCurrentValidators() error {
 		cs.Validators = append(cs.Validators, tx)
 		cs.ValidatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
-				subnets: make(map[ids.ID]*unsigned.AddSubnetValidatorTx),
+				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
 			},
-			addValidatorTx:  addValidatorTx,
+			addValidator: signed.ValidatorAndID{
+				UnsignedAddValidatorTx: addValidatorTx,
+				TxID:                   txID,
+			},
 			potentialReward: uptime.PotentialReward,
 		}
 		cs.ValidatorsByTxID[txID] = &ValidatorReward{
@@ -165,7 +168,10 @@ func (ts *state) LoadCurrentValidators() error {
 			return unsigned.ErrDelegatorSubset
 		}
 		vdr.delegatorWeight += addDelegatorTx.Validator.Wght
-		vdr.delegators = append(vdr.delegators, addDelegatorTx)
+		vdr.delegators = append(vdr.delegators, signed.DelegatorAndID{
+			UnsignedAddDelegatorTx: addDelegatorTx,
+			TxID:                   txID,
+		})
 		cs.ValidatorsByTxID[txID] = &ValidatorReward{
 			AddStakerTx:     tx,
 			PotentialReward: potentialReward,
@@ -198,7 +204,11 @@ func (ts *state) LoadCurrentValidators() error {
 		if !exists {
 			return unsigned.ErrDSValidatorSubset
 		}
-		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = addSubnetValidatorTx
+		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = signed.SubnetValidatorAndID{
+			UnsignedAddSubnetValidator: addSubnetValidatorTx,
+			TxID:                       txID,
+		}
+
 		cs.ValidatorsByTxID[txID] = &ValidatorReward{
 			AddStakerTx: tx,
 		}
@@ -219,7 +229,7 @@ func (ts *state) LoadCurrentValidators() error {
 
 func (ts *state) LoadPendingValidators() error {
 	ps := &pendingStaker{
-		validatorsByNodeID:      make(map[ids.NodeID]*unsigned.AddValidatorTx),
+		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}
 
@@ -242,7 +252,10 @@ func (ts *state) LoadPendingValidators() error {
 		}
 
 		ps.validators = append(ps.validators, tx)
-		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = addValidatorTx
+		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = signed.ValidatorAndID{
+			UnsignedAddValidatorTx: addValidatorTx,
+			TxID:                   txID,
+		}
 	}
 	if err := validatorIt.Error(); err != nil {
 		return err
@@ -268,11 +281,19 @@ func (ts *state) LoadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID]; exists {
-			vdr.delegators = append(vdr.delegators, addDelegatorTx)
+			vdr.delegators = append(vdr.delegators, signed.DelegatorAndID{
+				UnsignedAddDelegatorTx: addDelegatorTx,
+				TxID:                   txID,
+			})
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
-				delegators: []*unsigned.AddDelegatorTx{addDelegatorTx},
-				subnets:    make(map[ids.ID]*unsigned.AddSubnetValidatorTx),
+				delegators: []signed.DelegatorAndID{
+					{
+						UnsignedAddDelegatorTx: addDelegatorTx,
+						TxID:                   txID,
+					},
+				},
+				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
 			}
 		}
 	}
@@ -300,11 +321,17 @@ func (ts *state) LoadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID]; exists {
-			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = addSubnetValidatorTx
+			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = signed.SubnetValidatorAndID{
+				UnsignedAddSubnetValidator: addSubnetValidatorTx,
+				TxID:                       txID,
+			}
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
-					addSubnetValidatorTx.Validator.Subnet: addSubnetValidatorTx,
+				subnets: map[ids.ID]signed.SubnetValidatorAndID{
+					addSubnetValidatorTx.Validator.Subnet: {
+						UnsignedAddSubnetValidator: addSubnetValidatorTx,
+						TxID:                       txID,
+					},
 				},
 			}
 		}

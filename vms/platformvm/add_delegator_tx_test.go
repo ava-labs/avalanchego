@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
@@ -34,7 +35,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : tx is nil
 	var unsignedTx *unsigned.AddDelegatorTx
-	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
+	stx := signed.Tx{
+		Unsigned: unsignedTx,
+	}
+	if err := stx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -54,7 +58,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*unsigned.AddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddDelegatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -69,7 +73,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.Unsigned.SyntacticVerify(vm.ctx); err != nil {
+	} else if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }

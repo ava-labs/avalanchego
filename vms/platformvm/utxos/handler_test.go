@@ -41,7 +41,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	now := time.Unix(1607133207, 0)
 
 	unsignedTx := unsigned.BaseTx{}
-	unsignedTx.Initialize([]byte{0}, []byte{1})
+	unsignedTx.Initialize([]byte{0})
 
 	// Note that setting [chainTimestamp] also set's the handler's clock.
 	// Adjust input/output locktimes accordingly.

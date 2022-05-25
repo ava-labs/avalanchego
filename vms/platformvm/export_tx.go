@@ -23,6 +23,8 @@ var _ StatefulAtomicTx = &StatefulExportTx{}
 // StatefulExportTx is an unsigned ExportTx
 type StatefulExportTx struct {
 	*unsigned.ExportTx `serialize:"true"`
+
+	txID ids.ID // ID of signed create subnet tx
 }
 
 // InputUTXOs returns an empty set
@@ -40,7 +42,7 @@ func (tx *StatefulExportTx) Execute(
 	vs state.Versioned,
 	stx *signed.Tx,
 ) (func() error, error) {
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
 	}
 
@@ -70,20 +72,17 @@ func (tx *StatefulExportTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 
 // AtomicOperations returns the shared memory requests
 func (tx *StatefulExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
-	txID := tx.ID()
-
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
-				TxID:        txID,
+				TxID:        tx.txID,
 				OutputIndex: uint32(len(tx.Outs) + i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},
