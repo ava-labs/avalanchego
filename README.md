@@ -54,8 +54,8 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 
 ### Block Header
 
-* `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
-* `BlockGasCost`: surcharge for producing a block faster than the target rate
+- `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
+- `BlockGasCost`: surcharge for producing a block faster than the target rate
 
 
 ## Run Local Network
@@ -69,9 +69,9 @@ See [Create an EVM Subnet on Fuji Testnet](https://docs.avax.network/subnets/cre
 
 ## Customize a Subnet
 
-* [Genesis](https://docs.avax.network/subnets/customize-a-subnet#genesis) 
-* [Precompile](https://docs.avax.network/subnets/customize-a-subnet#precompiles)
-* [Priority Regossip](https://docs.avax.network/subnets/customize-a-subnet#priority-regossip)
+- [Genesis](https://docs.avax.network/subnets/customize-a-subnet#genesis) 
+- [Precompile](https://docs.avax.network/subnets/customize-a-subnet#precompiles)
+- [Priority Regossip](https://docs.avax.network/subnets/customize-a-subnet#priority-regossip)
 
 ## Join the WAGMI Subnet Demo
 
