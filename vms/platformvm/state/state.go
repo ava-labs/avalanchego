@@ -38,6 +38,8 @@ type Content interface {
 type State interface {
 	Content
 
+	// Upon vm initialization, SyncGenesis loads
+	// information from genesis block as marshalled from bytes
 	SyncGenesis(
 		genesisBlkID ids.ID,
 		genesisTimestamp uint64,
@@ -46,6 +48,9 @@ type State interface {
 		genesisValidator []*signed.Tx,
 		genesisChains []*signed.Tx,
 	) error
+
+	// Upon vm initialization, Load pulls
+	// information previously stored on disk
 	Load() error
 
 	Write() error

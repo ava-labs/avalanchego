@@ -111,11 +111,16 @@ type Content interface {
 // transaction db upon vm initialization, along with methods to
 // persist updated state.
 type Management interface {
+	// Upon vm initialization, SyncGenesis loads
+	// transactions data from genesis block as marshalled from bytes
 	SyncGenesis(
 		genesisUtxos []*avax.UTXO,
 		genesisValidator []*signed.Tx,
 		genesisChains []*signed.Tx,
 	) error
+
+	// Upon vm initialization, LoadTxs pulls
+	// transactions data previously stored on disk
 	LoadTxs() error
 
 	WriteTxs() error

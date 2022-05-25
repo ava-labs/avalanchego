@@ -55,11 +55,16 @@ type Content interface {
 // metadata db upon vm initialization, along with methods to
 // persist updated state.
 type Management interface {
+	// Upon vm initialization, SyncGenesis loads
+	// metadata from genesis block as marshalled from bytes
 	SyncGenesis(
 		genesisBlkID ids.ID,
 		genesisTimestamp uint64,
 		genesisInitialSupply uint64,
 	) error
+
+	// Upon vm initialization, LoadMetadata pulls
+	// metadata previously stored on disk
 	LoadMetadata() error
 
 	WriteMetadata() error
