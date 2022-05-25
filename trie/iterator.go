@@ -161,8 +161,11 @@ func (e seekError) Error() string {
 }
 
 func newNodeIterator(trie *Trie, start []byte) NodeIterator {
-	if trie.Hash() == emptyState {
-		return new(nodeIterator)
+	if trie.Hash() == emptyRoot {
+		return &nodeIterator{
+			trie: trie,
+			err:  errIteratorEnd,
+		}
 	}
 	it := &nodeIterator{trie: trie}
 	it.err = it.seek(start)
