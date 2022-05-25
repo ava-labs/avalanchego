@@ -56,7 +56,7 @@ jobs:
           go-version: 1.17
       - name: Run e2e tests
         shell: bash
-        run: E2E=true scripts/run.sh 1.7.10 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+        run: E2E=true scripts/run.sh 1.7.11 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 
   release:
     needs: [lint_test, unit_test, e2e_test]
