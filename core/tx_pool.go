@@ -679,10 +679,9 @@ func (pool *TxPool) checkTxState(from common.Address, tx *types.Transaction) err
 		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)",
 			ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
 	}
-	isTxAllowList := pool.chainconfig.IsTxAllowList(pool.currentHead.Number)
 
 	// If the tx allow list is enabled, return an error if the from address is not allow listed.
-	if isTxAllowList {
+	if pool.chainconfig.IsTxAllowList(pool.currentHead.Number) {
 		txAllowListRole := precompile.GetTxAllowListStatus(pool.currentState, from)
 		if !txAllowListRole.IsEnabled() {
 			return fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, from)
