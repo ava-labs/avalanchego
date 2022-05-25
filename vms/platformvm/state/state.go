@@ -4,7 +4,7 @@
 package state
 
 import (
-	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -44,7 +44,7 @@ type State interface {
 }
 
 func New(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 	cfg *config.Config,
 	ctx *snow.Context,
 	localStake prometheus.Gauge,
@@ -62,7 +62,7 @@ func New(
 }
 
 func NewMetered(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 	metrics prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,

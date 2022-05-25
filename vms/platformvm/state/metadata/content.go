@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -24,7 +23,7 @@ var (
 )
 
 func NewState(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 ) DataState {
 	return &state{
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),

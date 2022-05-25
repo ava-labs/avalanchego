@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -70,7 +69,7 @@ type state struct {
 	totalStake prometheus.Gauge
 	rewards    reward.Calculator
 
-	baseDB *versiondb.Database
+	baseDB database.Database
 
 	validatorStateImpl
 
@@ -144,7 +143,7 @@ type stateTx struct {
 }
 
 func NewState(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 	metadata metadata.DataState,
 	cfg *config.Config,
 	ctx *snow.Context,
@@ -224,7 +223,7 @@ func NewState(
 }
 
 func NewMeteredTransactionsState(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 	metadata metadata.DataState,
 	metrics prometheus.Registerer,
 	cfg *config.Config,
