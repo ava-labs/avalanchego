@@ -232,7 +232,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctx, request := test.prepareTestFn()
-			response, err := leafsHandler.OnLeafsRequest(ctx, ids.GenerateTestShortID(), 1, request)
+			response, err := leafsHandler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 			test.assertResponseFn(t, request, response, err)
 		})
 	}

@@ -39,6 +39,19 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+func TestEmptyIterator(t *testing.T) {
+	trie := newEmpty()
+	iter := trie.NodeIterator(nil)
+
+	seen := make(map[string]struct{})
+	for iter.Next(true) {
+		seen[string(iter.Path())] = struct{}{}
+	}
+	if len(seen) != 0 {
+		t.Fatal("Unexpected trie node iterated")
+	}
+}
+
 func TestIterator(t *testing.T) {
 	trie := newEmpty()
 	vals := []struct{ k, v string }{

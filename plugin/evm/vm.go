@@ -30,7 +30,6 @@ import (
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"
 	// is added to a map of client-accessible tracers. In geth, this is done
 	// inside of cmd/geth.
-	_ "github.com/ava-labs/subnet-evm/eth/tracers/js"
 	_ "github.com/ava-labs/subnet-evm/eth/tracers/native"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -239,7 +238,6 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
-	metrics.Enabled = vm.config.MetricsEnabled
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
 	vm.shutdownChan = make(chan struct{}, 1)
@@ -259,7 +257,7 @@ func (vm *VM) Initialize(
 		g.Config = params.SubnetEVMDefaultChainConfig
 	}
 
-	if g.Config.FeeConfig == nil {
+	if g.Config.FeeConfig == (params.FeeConfig{}) {
 		g.Config.FeeConfig = params.DefaultFeeConfig
 	}
 
@@ -273,6 +271,7 @@ func (vm *VM) Initialize(
 	ethConfig.RPCEVMTimeout = vm.config.APIMaxDuration.Duration
 	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
+	ethConfig.TxPool.Locals = vm.config.PriorityRegossipAddresses
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	ethConfig.Preimages = vm.config.Preimages

@@ -529,7 +529,6 @@ var bindTests = []struct {
 	},
 	// Tests that structs are correctly unpacked
 	{
-
 		`Structs`,
 		`
 		pragma solidity ^0.6.5;
@@ -2006,7 +2005,7 @@ func golangBindings(t *testing.T, overload bool) {
 	// defer os.RemoveAll(ws)
 
 	pkg := filepath.Join(ws, "bindtest")
-	if err = os.MkdirAll(pkg, 0700); err != nil {
+	if err = os.MkdirAll(pkg, 0o700); err != nil {
 		t.Fatalf("failed to create package: %v", err)
 	}
 	// Generate the test suite for all the contracts
@@ -2031,7 +2030,7 @@ func golangBindings(t *testing.T, overload bool) {
 			if err != nil {
 				t.Fatalf("test %d: failed to generate binding: %v", i, err)
 			}
-			if err = ioutil.WriteFile(filepath.Join(pkg, strings.ToLower(tt.name)+".go"), []byte(bind), 0600); err != nil {
+			if err = ioutil.WriteFile(filepath.Join(pkg, strings.ToLower(tt.name)+".go"), []byte(bind), 0o600); err != nil {
 				t.Fatalf("test %d: failed to write binding: %v", i, err)
 			}
 			// Generate the test file with the injected test code
@@ -2047,7 +2046,7 @@ func golangBindings(t *testing.T, overload bool) {
 				%s
 			}
 		`, tt.imports, tt.name, tt.tester)
-			if err := ioutil.WriteFile(filepath.Join(pkg, strings.ToLower(tt.name)+"_test.go"), []byte(code), 0600); err != nil {
+			if err := ioutil.WriteFile(filepath.Join(pkg, strings.ToLower(tt.name)+"_test.go"), []byte(code), 0o600); err != nil {
 				t.Fatalf("test %d: failed to write tests: %v", i, err)
 			}
 		})

@@ -60,10 +60,9 @@ var (
 	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 	// config overridden in vm.Initialize.
-	genesisJSONMuirGlacier = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0xF423F\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONSubnetEVM   = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0xF423F\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	firstTxAmount          *big.Int
-	genesisBalance         *big.Int
+	genesisJSONSubnetEVM = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	firstTxAmount        *big.Int
+	genesisBalance       *big.Int
 )
 
 func init() {
@@ -104,6 +103,7 @@ func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
 func NewContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
+	ctx.NodeID = ids.GenerateTestNodeID()
 	ctx.ChainID = testCChainID
 	ctx.AVAXAssetID = testAvaxAssetID
 	ctx.XChainID = testXChainID
@@ -174,7 +174,7 @@ func GenesisVM(t *testing.T,
 ) {
 	vm := &VM{}
 	ctx, dbManager, genesisBytes, issuer := setupGenesis(t, genesisJSON)
-	appSender := &engCommon.SenderTest{}
+	appSender := &engCommon.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func([]byte) error { return nil }
 	if err := vm.Initialize(
@@ -202,7 +202,7 @@ func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
 	enabledEthAPIs := []string{"internal-private-debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONMuirGlacier, configJSON, "")
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, configJSON, "")
 	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	assert.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
 	assert.NoError(t, vm.Shutdown())
@@ -212,7 +212,7 @@ func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
 	enabledEthAPIs := []string{"internal-private-debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONMuirGlacier, configJSON, "")
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, configJSON, "")
 
 	var vmConfig Config
 	vmConfig.SetDefaults()
@@ -223,7 +223,7 @@ func TestVMConfigDefaults(t *testing.T) {
 }
 
 func TestVMNilConfig(t *testing.T) {
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONMuirGlacier, "", "")
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, "", "")
 
 	// VM Config should match defaults if no config is passed in
 	var vmConfig Config
@@ -236,7 +236,7 @@ func TestVMContinuosProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONMuirGlacier, configJSON, "")
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, configJSON, "")
 	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
 	assert.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
 
@@ -500,8 +500,8 @@ func TestBuildEthTxBlock(t *testing.T) {
 func TestSetPreferenceRace(t *testing.T) {
 	// Create two VMs which will agree on block A and then
 	// build the two distinct preferred chains above
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":true}", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":true}", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -518,12 +518,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -589,8 +584,8 @@ func TestSetPreferenceRace(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -755,8 +750,8 @@ func TestSetPreferenceRace(t *testing.T) {
 // accept block C, which should be an orphaned block at this point and
 // get rejected.
 func TestReorgProtection(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":false}", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "{\"pruning-enabled\":false}", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":false}", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":false}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -773,12 +768,7 @@ func TestReorgProtection(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -844,8 +834,8 @@ func TestReorgProtection(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -937,8 +927,8 @@ func TestReorgProtection(t *testing.T) {
 //  / \
 // B   C
 func TestNonCanonicalAccept(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -955,12 +945,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1026,8 +1011,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1112,8 +1097,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 //     |
 //     D
 func TestStickyPreference(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1130,12 +1115,7 @@ func TestStickyPreference(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1201,8 +1181,8 @@ func TestStickyPreference(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1386,8 +1366,8 @@ func TestStickyPreference(t *testing.T) {
 //     |
 //     D
 func TestUncleBlock(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1403,12 +1383,7 @@ func TestUncleBlock(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1472,8 +1447,8 @@ func TestUncleBlock(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1583,7 +1558,7 @@ func TestUncleBlock(t *testing.T) {
 // Regression test to ensure that a VM that is not able to parse a block that
 // contains no transactions.
 func TestEmptyBlock(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1591,12 +1566,7 @@ func TestEmptyBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1649,8 +1619,8 @@ func TestEmptyBlock(t *testing.T) {
 //     |
 //     D
 func TestAcceptReorg(t *testing.T) {
-	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
-	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer1, vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
@@ -1666,12 +1636,8 @@ func TestAcceptReorg(t *testing.T) {
 	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1737,8 +1703,8 @@ func TestAcceptReorg(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1859,7 +1825,7 @@ func TestAcceptReorg(t *testing.T) {
 }
 
 func TestFutureBlock(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1867,12 +1833,7 @@ func TestFutureBlock(t *testing.T) {
 		}
 	}()
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -1922,7 +1883,7 @@ func TestFutureBlock(t *testing.T) {
 }
 
 func TestLastAcceptedBlockNumberAllow(t *testing.T) {
-	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONMuirGlacier, "", "")
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1930,12 +1891,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		}
 	}()
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -2016,7 +1972,7 @@ func TestConfigureLogLevel(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			vm := &VM{}
 			ctx, dbManager, genesisBytes, issuer := setupGenesis(t, test.genesisJSON)
-			appSender := &engCommon.SenderTest{}
+			appSender := &engCommon.SenderTest{T: t}
 			appSender.CantSendAppGossip = true
 			appSender.SendAppGossipF = func([]byte) error { return nil }
 			err := vm.Initialize(
@@ -2077,12 +2033,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx := types.NewTransaction(uint64(0), key.Address, new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -2125,8 +2076,8 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice*3), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), key.PrivateKey)
+		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice*3), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2220,11 +2171,6 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key, err := accountKeystore.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
 	if err != nil {
 		t.Fatal(err)
@@ -2235,7 +2181,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	}
 
 	// Send basic transaction to construct a simple block and confirm that the precompile state configuration in the worker behaves correctly.
-	tx := types.NewTransaction(uint64(0), key.Address, new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	if err != nil {
 		t.Fatal(err)
@@ -2294,6 +2240,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
+
 	genesis.Config.TxAllowListConfig = precompile.TxAllowListConfig{
 		AllowListConfig: precompile.AllowListConfig{
 			BlockTimestamp:  big.NewInt(0),

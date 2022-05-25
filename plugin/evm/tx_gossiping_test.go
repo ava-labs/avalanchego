@@ -31,7 +31,7 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 	balance := big.NewInt(0xffffffffffffff)
 	genesis := &core.Genesis{
 		Difficulty: common.Big0,
-		GasLimit:   uint64(999999),
+		GasLimit:   params.TestChainConfig.FeeConfig.GasLimit.Uint64(),
 	}
 	funds := make(map[common.Address]core.GenesisAccount)
 	for _, addr := range addrs {
@@ -248,7 +248,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 		txRequested bool
 	)
 	sender.CantSendAppGossip = false
-	sender.SendAppRequestF = func(_ ids.ShortSet, _ uint32, _ []byte) error {
+	sender.SendAppRequestF = func(_ ids.NodeIDSet, _ uint32, _ []byte) error {
 		txRequested = true
 		return nil
 	}
@@ -270,7 +270,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
 
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	err = vm.AppGossip(nodeID, msgBytes)
 	assert.NoError(err)
 	assert.False(txRequested, "tx should not be requested")
