@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -208,7 +208,7 @@ func (vm *VM) newAddValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: pchainvalidator.Validator{
+		Validator: p_validator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
