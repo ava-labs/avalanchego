@@ -50,10 +50,12 @@ func MakeStatefulTx(tx *signed.Tx) (StatefulTx, error) {
 	case *unsigned.ImportTx:
 		return &StatefulImportTx{
 			ImportTx: utx,
+			txID:     tx.ID(),
 		}, nil
 	case *unsigned.ExportTx:
 		return &StatefulExportTx{
 			ExportTx: utx,
+			txID:     tx.ID(),
 		}, nil
 
 	default:
