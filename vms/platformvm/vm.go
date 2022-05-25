@@ -63,11 +63,9 @@ const (
 )
 
 var (
-	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooEarly = errors.New("start time is before the current chain time")
-	errStartAfterEndTime = errors.New("start time is after the end time")
-	errWrongCacheType    = errors.New("unexpectedly cached type")
+	errInvalidID      = errors.New("invalid ID")
+	errDSCantValidate = errors.New("new blockchain can't be validated by primary network")
+	errWrongCacheType = errors.New("unexpectedly cached type")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}

@@ -99,6 +99,17 @@ type Content interface {
 	AddPendingStaker(tx *signed.Tx)
 	DeletePendingStaker(tx *signed.Tx)
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
+
+	// Return the maximum amount of stake on a node (including delegations) at any
+	// given time between [startTime] and [endTime] given that:
+	// * The amount of stake on the node right now is [currentStake]
+	// * The delegations currently on this node are [current]
+	// * [current] is sorted in order of increasing delegation end time.
+	// * The stake delegated in [current] are already included in [currentStake]
+	// * [startTime] is in the future, and [endTime] > [startTime]
+	// * The delegations that will be on this node in the future are [pending]
+	// * The start time of all delegations in [pending] are in the future
+	// * [pending] is sorted in order of increasing delegation start time
 	MaxStakeAmount(
 		subnetID ids.ID,
 		nodeID ids.NodeID,
