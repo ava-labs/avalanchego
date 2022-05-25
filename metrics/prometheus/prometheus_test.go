@@ -9,12 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ava-labs/subnet-evm/metrics"
 )
-
-func init() {
-	metrics.Enabled = true
-}
 
 func TestGatherer(t *testing.T) {
 	registry := metrics.NewRegistry()

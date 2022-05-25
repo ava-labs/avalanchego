@@ -31,8 +31,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/metrics"
 )
 
 // The fields below define the low level database schema prefixing.

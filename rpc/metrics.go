@@ -29,7 +29,7 @@ package rpc
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ava-labs/subnet-evm/metrics"
 )
 
 var (
