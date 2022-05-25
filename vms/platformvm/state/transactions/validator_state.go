@@ -4,6 +4,7 @@
 package transactions
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -20,8 +21,8 @@ import (
 var _ ValidatorState = &validatorState{}
 
 type ValidatorState interface {
-	SetCurrentStakerChainState(cs CurrentStaker)
-	CurrentStakerChainState() CurrentStaker
+	SetCurrentStakerChainState(cs CurrentStakerState)
+	CurrentStakerChainState() CurrentStakerState
 	SetPendingStakerChainState(ps PendingStaker)
 	PendingStakerChainState() PendingStaker
 
@@ -31,7 +32,7 @@ type ValidatorState interface {
 }
 
 func NewValidatorState(
-	current CurrentStaker,
+	current CurrentStakerState,
 	pending PendingStaker,
 ) ValidatorState {
 	return &validatorState{
@@ -41,11 +42,11 @@ func NewValidatorState(
 }
 
 type validatorState struct {
-	current CurrentStaker
+	current CurrentStakerState
 	pending PendingStaker
 }
 
-func (vs *validatorState) CurrentStakerChainState() CurrentStaker {
+func (vs *validatorState) CurrentStakerChainState() CurrentStakerState {
 	return vs.current
 }
 
@@ -53,7 +54,7 @@ func (vs *validatorState) PendingStakerChainState() PendingStaker {
 	return vs.pending
 }
 
-func (vs *validatorState) SetCurrentStakerChainState(cs CurrentStaker) {
+func (vs *validatorState) SetCurrentStakerChainState(cs CurrentStakerState) {
 	vs.current = cs
 }
 
@@ -68,7 +69,7 @@ func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 		nextStakerToRemove := currentStakers[0]
 		staker, ok := nextStakerToRemove.Unsigned.(timed.Tx)
 		if !ok {
-			return time.Time{}, unsigned.ErrWrongTxType
+			return time.Time{}, fmt.Errorf("expected tx type timed.Tx but got %T", nextStakerToRemove.Unsigned)
 		}
 		if endTime := staker.EndTime(); endTime.Before(earliest) {
 			earliest = endTime
@@ -79,7 +80,7 @@ func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 		nextStakerToAdd := pendingStakers[0]
 		staker, ok := nextStakerToAdd.Unsigned.(timed.Tx)
 		if !ok {
-			return time.Time{}, unsigned.ErrWrongTxType
+			return time.Time{}, fmt.Errorf("expected tx type timed.Tx but got %T", nextStakerToAdd.Unsigned)
 		}
 		if startTime := staker.StartTime(); startTime.Before(earliest) {
 			earliest = startTime

@@ -4,6 +4,7 @@
 package transactions
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -30,7 +31,7 @@ func (s *state) SyncGenesis(
 	for _, vdrTx := range genesisValidator {
 		tx, ok := vdrTx.Unsigned.(*unsigned.AddValidatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
 		stakeAmount := tx.Validator.Wght
@@ -55,7 +56,7 @@ func (s *state) SyncGenesis(
 	for _, chain := range genesisChains {
 		unsignedChain, ok := chain.Unsigned.(*unsigned.CreateChainTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", chain.Unsigned)
 		}
 
 		// Ensure all chains that the genesis bytes say to create have the right
@@ -83,7 +84,7 @@ func (s *state) LoadTxs() error {
 }
 
 func (s *state) LoadCurrentValidators() error {
-	cs := &currentStaker{
+	cs := &currentStakerState{
 		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl),
 		validatorsByTxID:   make(map[ids.ID]*ValidatorReward),
 	}
@@ -112,7 +113,7 @@ func (s *state) LoadCurrentValidators() error {
 
 		addValidatorTx, ok := tx.Unsigned.(*unsigned.AddValidatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx.Unsigned)
 		}
 
 		cs.validators = append(cs.validators, tx)
@@ -159,7 +160,7 @@ func (s *state) LoadCurrentValidators() error {
 
 		addDelegatorTx, ok := tx.Unsigned.(*unsigned.AddDelegatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx.Unsigned)
 		}
 
 		cs.validators = append(cs.validators, tx)
@@ -196,7 +197,7 @@ func (s *state) LoadCurrentValidators() error {
 
 		addSubnetValidatorTx, ok := tx.Unsigned.(*unsigned.AddSubnetValidatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx.Unsigned)
 		}
 
 		cs.validators = append(cs.validators, tx)
@@ -248,7 +249,7 @@ func (s *state) LoadPendingValidators() error {
 
 		addValidatorTx, ok := tx.Unsigned.(*unsigned.AddValidatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx.Unsigned)
 		}
 
 		ps.validators = append(ps.validators, tx)
@@ -276,7 +277,7 @@ func (s *state) LoadPendingValidators() error {
 
 		addDelegatorTx, ok := tx.Unsigned.(*unsigned.AddDelegatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx.Unsigned)
 		}
 
 		ps.validators = append(ps.validators, tx)
@@ -316,7 +317,7 @@ func (s *state) LoadPendingValidators() error {
 
 		addSubnetValidatorTx, ok := tx.Unsigned.(*unsigned.AddSubnetValidatorTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx.Unsigned)
 		}
 
 		ps.validators = append(ps.validators, tx)

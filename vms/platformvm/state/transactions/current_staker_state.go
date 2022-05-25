@@ -21,12 +21,12 @@ import (
 )
 
 var (
-	_ CurrentStaker = &currentStaker{}
+	_ CurrentStakerState = &currentStakerState{}
 
 	ErrNotEnoughValidators = errors.New("not enough validators")
 )
 
-type CurrentStaker interface {
+type CurrentStakerState interface {
 	// The NextStaker value returns the next staker that is going to be removed
 	// using a RewardValidatorTx. Therefore, only AddValidatorTxs and
 	// AddDelegatorTxs will be returned. AddSubnetValidatorTxs are removed using
@@ -40,8 +40,8 @@ type CurrentStaker interface {
 		addDelegators []*ValidatorReward,
 		addSubnetValidators []*signed.Tx,
 		numTxsToRemove int,
-	) (CurrentStaker, error)
-	DeleteNextStaker() (CurrentStaker, error)
+	) (CurrentStakerState, error)
+	DeleteNextStaker() (CurrentStakerState, error)
 
 	// Stakers returns the current stakers on the network sorted in order of the
 	// order of their future removal from the validator set.
@@ -53,10 +53,10 @@ type CurrentStaker interface {
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 }
 
-// currentStaker is a copy on write implementation for versioning
+// currentStakerState is a copy on write implementation for versioning
 // the validator set. None of the slices, maps, or pointers should be modified
 // after initialization.
-type currentStaker struct {
+type currentStakerState struct {
 	// nodeID -> validator
 	validatorsByNodeID map[ids.NodeID]*currentValidatorImpl
 
@@ -77,14 +77,14 @@ type ValidatorReward struct {
 	PotentialReward uint64
 }
 
-func (cs *currentStaker) GetNextStaker() (addStakerTx *signed.Tx, potentialReward uint64, err error) {
+func (cs *currentStakerState) GetNextStaker() (addStakerTx *signed.Tx, potentialReward uint64, err error) {
 	if cs.nextStaker == nil {
 		return nil, 0, database.ErrNotFound
 	}
 	return cs.nextStaker.AddStakerTx, cs.nextStaker.PotentialReward, nil
 }
 
-func (cs *currentStaker) GetValidator(nodeID ids.NodeID) (currentValidator, error) {
+func (cs *currentStakerState) GetValidator(nodeID ids.NodeID) (currentValidator, error) {
 	vdr, exists := cs.validatorsByNodeID[nodeID]
 	if !exists {
 		return nil, database.ErrNotFound
@@ -92,16 +92,16 @@ func (cs *currentStaker) GetValidator(nodeID ids.NodeID) (currentValidator, erro
 	return vdr, nil
 }
 
-func (cs *currentStaker) UpdateStakers(
+func (cs *currentStakerState) UpdateStakers(
 	addValidatorTxs []*ValidatorReward,
 	addDelegatorTxs []*ValidatorReward,
 	addSubnetValidatorTxs []*signed.Tx,
 	numTxsToRemove int,
-) (CurrentStaker, error) {
+) (CurrentStakerState, error) {
 	if numTxsToRemove > len(cs.validators) {
 		return nil, ErrNotEnoughValidators
 	}
-	newCS := &currentStaker{
+	newCS := &currentStakerState{
 		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.validatorsByNodeID)+len(addValidatorTxs)),
 		validatorsByTxID:   make(map[ids.ID]*ValidatorReward, len(cs.validatorsByTxID)+len(addValidatorTxs)+len(addDelegatorTxs)+len(addSubnetValidatorTxs)),
 		validators:         cs.validators[numTxsToRemove:], // sorted in order of removal
@@ -151,7 +151,7 @@ func (cs *currentStaker) UpdateStakers(
 				}
 				newCS.validatorsByTxID[vdr.AddStakerTx.ID()] = vdr
 			default:
-				return nil, unsigned.ErrWrongTxType
+				return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx)
 			}
 		}
 
@@ -171,7 +171,7 @@ func (cs *currentStaker) UpdateStakers(
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 				newCS.validatorsByTxID[vdr.AddStakerTx.ID()] = vdr
 			default:
-				return nil, unsigned.ErrWrongTxType
+				return nil, fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx)
 			}
 		}
 
@@ -191,7 +191,7 @@ func (cs *currentStaker) UpdateStakers(
 				}
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
-				return nil, unsigned.ErrWrongTxType
+				return nil, fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx)
 			}
 
 			wrappedTx := &ValidatorReward{
@@ -219,7 +219,7 @@ func (cs *currentStaker) UpdateStakers(
 			}
 			newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 		default:
-			return nil, unsigned.ErrWrongTxType
+			return nil, fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx)
 		}
 	}
 
@@ -227,14 +227,14 @@ func (cs *currentStaker) UpdateStakers(
 	return newCS, nil
 }
 
-func (cs *currentStaker) DeleteNextStaker() (CurrentStaker, error) {
+func (cs *currentStakerState) DeleteNextStaker() (CurrentStakerState, error) {
 	removedTx, _, err := cs.GetNextStaker()
 	if err != nil {
 		return nil, err
 	}
 	removedTxID := removedTx.ID()
 
-	newCS := &currentStaker{
+	newCS := &currentStakerState{
 		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
 		validatorsByTxID:   make(map[ids.ID]*ValidatorReward, len(cs.validatorsByTxID)-1),
 		validators:         cs.validators[1:], // sorted in order of removal
@@ -269,7 +269,7 @@ func (cs *currentStaker) DeleteNextStaker() (CurrentStaker, error) {
 			}
 		}
 	default:
-		return nil, unsigned.ErrWrongTxType
+		return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx or *unsigned.AddDelegatorTx but got %T", removedTx.Unsigned)
 	}
 
 	for txID, vdr := range cs.validatorsByTxID {
@@ -282,11 +282,11 @@ func (cs *currentStaker) DeleteNextStaker() (CurrentStaker, error) {
 	return newCS, nil
 }
 
-func (cs *currentStaker) Stakers() []*signed.Tx {
+func (cs *currentStakerState) Stakers() []*signed.Tx {
 	return cs.validators
 }
 
-func (cs *currentStaker) Apply(c Content) {
+func (cs *currentStakerState) Apply(c Content) {
 	for _, added := range cs.addedStakers {
 		c.AddCurrentStaker(added.AddStakerTx, added.PotentialReward)
 	}
@@ -300,14 +300,14 @@ func (cs *currentStaker) Apply(c Content) {
 	cs.deletedStakers = nil
 }
 
-func (cs *currentStaker) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
+func (cs *currentStakerState) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	if subnetID == constants.PrimaryNetworkID {
 		return cs.primaryValidatorSet()
 	}
 	return cs.subnetValidatorSet(subnetID)
 }
 
-func (cs *currentStaker) primaryValidatorSet() (validators.Set, error) {
+func (cs *currentStakerState) primaryValidatorSet() (validators.Set, error) {
 	vdrs := validators.NewSet()
 
 	var err error
@@ -325,7 +325,7 @@ func (cs *currentStaker) primaryValidatorSet() (validators.Set, error) {
 	return vdrs, nil
 }
 
-func (cs *currentStaker) subnetValidatorSet(subnetID ids.ID) (validators.Set, error) {
+func (cs *currentStakerState) subnetValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	vdrs := validators.NewSet()
 
 	for nodeID, vdr := range cs.validatorsByNodeID {
@@ -341,7 +341,7 @@ func (cs *currentStaker) subnetValidatorSet(subnetID ids.ID) (validators.Set, er
 	return vdrs, nil
 }
 
-func (cs *currentStaker) GetStaker(txID ids.ID) (tx *signed.Tx, reward uint64, err error) {
+func (cs *currentStakerState) GetStaker(txID ids.ID) (tx *signed.Tx, reward uint64, err error) {
 	staker, exists := cs.validatorsByTxID[txID]
 	if !exists {
 		return nil, 0, database.ErrNotFound
@@ -351,7 +351,7 @@ func (cs *currentStaker) GetStaker(txID ids.ID) (tx *signed.Tx, reward uint64, e
 
 // SetNextStaker to the next staker that will be removed using a
 // RewardValidatorTx.
-func (cs *currentStaker) SetNextStaker() {
+func (cs *currentStakerState) SetNextStaker() {
 	for _, tx := range cs.validators {
 		switch tx.Unsigned.(type) {
 		case *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx:

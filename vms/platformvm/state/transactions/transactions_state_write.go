@@ -123,7 +123,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
 		default:
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		subnetDiffs, ok := weightDiffs[subnetID]
@@ -177,7 +177,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
 		default:
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		txID := tx.ID()
@@ -277,7 +277,7 @@ func (s *state) writePendingStakers() error {
 		case *unsigned.AddSubnetValidatorTx:
 			db = s.pendingSubnetValidatorList
 		default:
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		txID := tx.ID()
@@ -297,7 +297,7 @@ func (s *state) writePendingStakers() error {
 		case *unsigned.AddSubnetValidatorTx:
 			db = s.pendingSubnetValidatorList
 		default:
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		txID := tx.ID()

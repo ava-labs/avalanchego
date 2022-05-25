@@ -4,18 +4,12 @@
 package unsigned
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var (
-	_ Tx = &RewardValidatorTx{}
-
-	ErrWrongTxType = errors.New("wrong transaction type")
-)
+var _ Tx = &RewardValidatorTx{}
 
 // RewardValidatorTx is a transaction that represents a proposal to
 // remove a validator that is currently validating from the validator set.

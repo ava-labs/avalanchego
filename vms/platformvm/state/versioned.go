@@ -56,7 +56,7 @@ type utxoImpl struct {
 
 func NewVersioned(
 	ps Mutable,
-	current transactions.CurrentStaker,
+	current transactions.CurrentStakerState,
 	pending transactions.PendingStaker,
 ) Versioned {
 	return &versioned{
