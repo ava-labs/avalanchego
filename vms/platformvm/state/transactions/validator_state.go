@@ -23,8 +23,8 @@ var _ ValidatorState = &validatorState{}
 type ValidatorState interface {
 	SetCurrentStakerChainState(cs CurrentStakerState)
 	CurrentStakerChainState() CurrentStakerState
-	SetPendingStakerChainState(ps PendingStaker)
-	PendingStakerChainState() PendingStaker
+	SetPendingStakerChainState(ps PendingStakerState)
+	PendingStakerChainState() PendingStakerState
 
 	// GetNextStakerChangeTime returns the next time
 	// that a staker set change should occur.
@@ -33,7 +33,7 @@ type ValidatorState interface {
 
 func NewValidatorState(
 	current CurrentStakerState,
-	pending PendingStaker,
+	pending PendingStakerState,
 ) ValidatorState {
 	return &validatorState{
 		current: current,
@@ -43,14 +43,14 @@ func NewValidatorState(
 
 type validatorState struct {
 	current CurrentStakerState
-	pending PendingStaker
+	pending PendingStakerState
 }
 
 func (vs *validatorState) CurrentStakerChainState() CurrentStakerState {
 	return vs.current
 }
 
-func (vs *validatorState) PendingStakerChainState() PendingStaker {
+func (vs *validatorState) PendingStakerChainState() PendingStakerState {
 	return vs.pending
 }
 
@@ -58,7 +58,7 @@ func (vs *validatorState) SetCurrentStakerChainState(cs CurrentStakerState) {
 	vs.current = cs
 }
 
-func (vs *validatorState) SetPendingStakerChainState(ps PendingStaker) {
+func (vs *validatorState) SetPendingStakerChainState(ps PendingStakerState) {
 	vs.pending = ps
 }
 

@@ -229,7 +229,7 @@ func (s *state) LoadCurrentValidators() error {
 }
 
 func (s *state) LoadPendingValidators() error {
-	ps := &pendingStaker{
+	ps := &pendingStakerState{
 		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// Mutable interface collects all methods updating
+// metadata state upon blocks execution
 type Mutable interface {
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -16,6 +18,9 @@ type Mutable interface {
 	SetCurrentSupply(cs uint64)
 }
 
+// Content interface collects all methods to query and mutate
+// all of the tracked metadata. Note this Content is a superset
+// of Mutable
 type Content interface {
 	Mutable
 
@@ -27,6 +32,9 @@ type Content interface {
 	GetHeight() uint64
 }
 
+// Management interface collects all methods used to initialize
+// metadata db upon vm initialization, along with methods to
+// persist updated state.
 type Management interface {
 	SyncGenesis(
 		genesisBlkID ids.ID,

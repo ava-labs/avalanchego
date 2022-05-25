@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
+// Mutable interface collects all methods updating
+// transactions state upon blocks execution.
 type Mutable interface {
 	ValidatorState
 	UTXOState
@@ -27,6 +29,9 @@ type Mutable interface {
 	AddTx(tx *signed.Tx, status status.Status)
 }
 
+// Content interface collects all methods to query and mutate
+// all transactions related state. Note this Content is a superset
+// of Mutable
 type Content interface {
 	Mutable
 	uptime.State
@@ -45,6 +50,9 @@ type Content interface {
 	) (uint64, error)
 }
 
+// Management interface collects all methods used to initialize
+// transaction db upon vm initialization, along with methods to
+// persist updated state.
 type Management interface {
 	SyncGenesis(
 		genesisUtxos []*avax.UTXO,

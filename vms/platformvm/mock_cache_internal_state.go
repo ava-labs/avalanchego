@@ -479,10 +479,10 @@ func (mr *MockInternalStateMockRecorder) MaxStakeAmount(subnetID, nodeID, startT
 }
 
 // PendingStakerChainState mocks base method.
-func (m *MockInternalState) PendingStakerChainState() transactions.PendingStaker {
+func (m *MockInternalState) PendingStakerChainState() transactions.PendingStakerState {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PendingStakerChainState")
-	ret0, _ := ret[0].(transactions.PendingStaker)
+	ret0, _ := ret[0].(transactions.PendingStakerState)
 	return ret0
 }
 
@@ -541,7 +541,7 @@ func (mr *MockInternalStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomo
 }
 
 // SetPendingStakerChainState mocks base method.
-func (m *MockInternalState) SetPendingStakerChainState(ps transactions.PendingStaker) {
+func (m *MockInternalState) SetPendingStakerChainState(ps transactions.PendingStakerState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetPendingStakerChainState", ps)
 }

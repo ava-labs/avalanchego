@@ -16,16 +16,25 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Mutable interface collects all methods updating
+// metadata and transactions state upon blocks execution
 type Mutable interface {
 	transactions.Mutable
 	metadata.Mutable
 }
 
+// Content interface collects all methods to query and mutate
+// all metadata and transactions state. Note this Content
+// is a superset of Mutable
 type Content interface {
 	transactions.Content
 	metadata.Content
 }
 
+// State interface collects Content along with all methods
+// used to initialize metadata and transactions state db
+// upon vm initialization, along with methods to
+// persist updated state.
 type State interface {
 	Content
 
