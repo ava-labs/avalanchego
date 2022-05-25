@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 
 	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -92,7 +92,7 @@ func (tx *AddDelegatorTx) Execute(
 		return nil, nil, ErrStakeTooLong
 	case tx.Validator.Wght < verifier.PlatformConfig().MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, nil, pChainValidator.ErrWeightTooSmall
+		return nil, nil, p_validator.ErrWeightTooSmall
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))

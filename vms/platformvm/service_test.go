@@ -34,7 +34,7 @@ import (
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
-	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -636,10 +636,10 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, vdr := range genesis.Validators {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
-			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
+			gotVdr, ok := response.Validators[i].(p_api.PrimaryValidator)
 			switch {
 			case !ok:
-				t.Fatal("expected pchainapi.PrimaryValidator")
+				t.Fatal("expected p_api.PrimaryValidator")
 			case gotVdr.NodeID != vdr.NodeID:
 			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
@@ -711,7 +711,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Make sure the delegator is there
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
-		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
+		vdr := response.Validators[i].(p_api.PrimaryValidator)
 		if vdr.NodeID != validatorNodeID {
 			continue
 		}

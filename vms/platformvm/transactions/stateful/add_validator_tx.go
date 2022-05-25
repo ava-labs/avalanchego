@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -86,7 +86,7 @@ func (tx *AddValidatorTx) Execute(
 
 	switch {
 	case tx.Validator.Wght < verifier.PlatformConfig().MinValidatorStake: // Ensure validator is staking at least the minimum amount
-		return nil, nil, pChainValidator.ErrWeightTooSmall
+		return nil, nil, p_validator.ErrWeightTooSmall
 	case tx.Validator.Wght > verifier.PlatformConfig().MaxValidatorStake: // Ensure validator isn't staking too much
 		return nil, nil, ErrWeightTooLarge
 	case tx.Shares < verifier.PlatformConfig().MinDelegationFee:

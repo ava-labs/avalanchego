@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	pchaingenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	p_api "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 // Aliases returns the default aliases based on the network ID
@@ -28,7 +28,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 		constants.PlatformChainID: {"P", "platform"},
 	}
 
-	genesis, err := pchaingenesis.New(genesisBytes) // TODO let's not re-create genesis to do aliasing
+	genesis, err := p_api.New(genesisBytes) // TODO let's not re-create genesis to do aliasing
 	if err != nil {
 		return nil, nil, err
 	}
