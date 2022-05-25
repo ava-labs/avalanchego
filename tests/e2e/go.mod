@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/ava-labs/avalanche-network-runner-sdk v0.0.0
-	github.com/ava-labs/avalanchego v1.7.11-rc.27
+	github.com/ava-labs/avalanchego v1.7.11
 	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.19.0
 	sigs.k8s.io/yaml v1.3.0
