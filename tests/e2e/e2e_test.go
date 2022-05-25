@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanche-network-runner/client"
+	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
 	"github.com/ava-labs/avalanchego/ids"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/formatter"
@@ -120,7 +120,7 @@ const (
 )
 
 var (
-	cli             client.Client
+	cli             runner_sdk.Client
 	subnetEVMRPCEps []string
 )
 
@@ -128,7 +128,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(mode).Should(gomega.Or(gomega.Equal("test"), gomega.Equal("run")))
 
 	var err error
-	cli, err = client.New(client.Config{
+	cli, err = runner_sdk.New(runner_sdk.Config{
 		LogLevel:    networkRunnerLogLevel,
 		Endpoint:    gRPCEp,
 		DialTimeout: 10 * time.Second,
@@ -141,9 +141,9 @@ var _ = ginkgo.BeforeSuite(func() {
 		resp, err := cli.Start(
 			ctx,
 			execPath,
-			client.WithLogLevel(logLevel),
-			client.WithPluginDir(pluginDir),
-			client.WithCustomVMs(map[string]string{
+			runner_sdk.WithLogLevel(logLevel),
+			runner_sdk.WithPluginDir(pluginDir),
+			runner_sdk.WithCustomVMs(map[string]string{
 				vmName: vmGenesisPath,
 			}))
 		cancel()

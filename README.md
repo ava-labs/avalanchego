@@ -1,3 +1,6 @@
+
+![Github Actions](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)
+
 # Subnet EVM
 
 [Avalanche](https://docs.avax.network/learn/platform-overview) is a network composed of multiple blockchains.
@@ -19,6 +22,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 [v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
 [v0.2.0] AvalancheGo@v1.7.7-v1.7.9
 [v0.2.1] AvalancheGo@v1.7.10
+[v0.2.2] AvalancheGo@v1.7.11
 ```
 
 ## API
@@ -50,8 +54,8 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 
 ### Block Header
 
-* `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
-* `BlockGasCost`: surcharge for producing a block faster than the target rate
+- `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
+- `BlockGasCost`: surcharge for producing a block faster than the target rate
 
 
 ## Run Local Network
@@ -65,9 +69,9 @@ See [Create an EVM Subnet on Fuji Testnet](https://docs.avax.network/subnets/cre
 
 ## Customize a Subnet
 
-* [Genesis](https://docs.avax.network/subnets/customize-a-subnet#genesis) 
-* [Precompile](https://docs.avax.network/subnets/customize-a-subnet#precompiles)
-* [Priority Regossip](https://docs.avax.network/subnets/customize-a-subnet#priority-regossip)
+- [Genesis](https://docs.avax.network/subnets/customize-a-subnet#genesis) 
+- [Precompile](https://docs.avax.network/subnets/customize-a-subnet#precompiles)
+- [Priority Regossip](https://docs.avax.network/subnets/customize-a-subnet#priority-regossip)
 
 ## Join the WAGMI Subnet Demo
 
