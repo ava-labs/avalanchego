@@ -29,15 +29,13 @@ package state
 import (
 	"sync"
 
+	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 )
 
-var (
-	// triePrefetchMetricsPrefix is the prefix under which to publis the metrics.
-	triePrefetchMetricsPrefix = "trie/prefetch/"
-)
+// triePrefetchMetricsPrefix is the prefix under which to publis the metrics.
+var triePrefetchMetricsPrefix = "trie/prefetch/"
 
 // triePrefetcher is an active prefetcher, which receives accounts or storage
 // items and does trie-loading of them. The goal is to get as much useful content

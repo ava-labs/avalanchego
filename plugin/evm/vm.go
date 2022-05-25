@@ -14,16 +14,21 @@ import (
 	"sync"
 	"time"
 
+	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
+
 	subnetEVM "github.com/ava-labs/subnet-evm/chain"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
-	"github.com/ava-labs/subnet-evm/metrics/prometheus"
+	"github.com/ava-labs/subnet-evm/metrics"
+	subnetEVMPrometheus "github.com/ava-labs/subnet-evm/metrics/prometheus"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -34,7 +39,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
@@ -73,6 +77,10 @@ const (
 	decidedCacheSize    = 100
 	missingCacheSize    = 50
 	unverifiedCacheSize = 50
+
+	// Prefixes for metrics gatherers
+	ethMetricsPrefix        = "eth"
+	chainStateMetricsPrefix = "chain_state"
 )
 
 // Define the API endpoints for the VM
@@ -127,6 +135,7 @@ type VM struct {
 	genesisHash common.Hash
 	chain       *subnetEVM.ETHChain
 	chainConfig *params.ChainConfig
+
 	// [db] is the VM's current database managed by ChainState
 	db *versiondb.Database
 	// [chaindb] is the database supplied to the Ethereum backend
@@ -134,6 +143,8 @@ type VM struct {
 	// [acceptedBlockDB] is the database to store the last accepted
 	// block.
 	acceptedBlockDB database.Database
+
+	toEngine chan<- commonEng.Message
 
 	builder *blockBuilder
 
@@ -150,6 +161,9 @@ type VM struct {
 	peer.Network
 	client       peer.Client
 	networkCodec codec.Manager
+
+	// Metrics
+	multiGatherer avalanchegoMetrics.MultiGatherer
 
 	bootstrapped bool
 }
@@ -220,12 +234,13 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.ctx = ctx
 	// Set log level
 	logLevel, err := log.LvlFromString(vm.config.LogLevel)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
+
+	vm.ctx = ctx
 	vm.setLogLevel(logLevel)
 	if b, err := json.Marshal(vm.config); err == nil {
 		log.Info("Initializing Subnet EVM VM", "Version", Version, "Config", string(b))
@@ -238,8 +253,10 @@ func (vm *VM) Initialize(
 		return errUnsupportedFXs
 	}
 
+	// Enable debug-level metrics that might impact runtime performance
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
+	vm.toEngine = toEngine
 	vm.shutdownChan = make(chan struct{}, 1)
 	baseDB := dbManager.Current().Database
 	// Use NewNested rather than New so that the structure of the database
@@ -247,7 +264,6 @@ func (vm *VM) Initialize(
 	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, baseDB)}
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return err
@@ -262,9 +278,9 @@ func (vm *VM) Initialize(
 	}
 
 	ethConfig := ethconfig.NewDefaultConfig()
-	// change network ID
-	ethConfig.NetworkId = g.Config.ChainID.Uint64()
 	ethConfig.Genesis = g
+	ethConfig.NetworkId = g.Config.ChainID.Uint64()
+
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
 	ethConfig.RPCGasCap = vm.config.RPCGasCap
@@ -308,51 +324,20 @@ func (vm *VM) Initialize(
 		log.Warn("Chain enabled `AllowFeeRecipients`, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
 	}
 
-	// Handle offline pruning
-	ethConfig.OfflinePruning = vm.config.OfflinePruning
-	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
-	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
-	if len(ethConfig.OfflinePruningDataDirectory) != 0 {
-		if err := os.MkdirAll(ethConfig.OfflinePruningDataDirectory, perms.ReadWriteExecute); err != nil {
-			log.Error("failed to create offline pruning data directory", "error", err)
-			return err
-		}
-	}
+	vm.genesisHash = ethConfig.Genesis.ToBlock(nil).Hash()
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
 
-	nodecfg := node.Config{
-		SubnetEVMVersion:      Version,
-		KeyStoreDir:           vm.config.KeystoreDirectory,
-		ExternalSigner:        vm.config.KeystoreExternalSigner,
-		InsecureUnlockAllowed: vm.config.KeystoreInsecureUnlockAllowed,
-	}
-
-	// Attempt to load last accepted block to determine if it is necessary to
-	// initialize state with the genesis block.
-	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
-	var lastAcceptedHash common.Hash
-	switch {
-	case lastAcceptedErr == database.ErrNotFound:
-		// Set [lastAcceptedHash] to the genesis block hash.
-		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
-	case lastAcceptedErr != nil:
-		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
-	case len(lastAcceptedBytes) != common.HashLength:
-		return fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
-	default:
-		lastAcceptedHash = common.BytesToHash(lastAcceptedBytes)
-	}
-	ethChain, err := subnetEVM.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), lastAcceptedHash, &vm.clock)
+	lastAcceptedHash, err := vm.readLastAccepted()
 	if err != nil {
 		return err
 	}
-	vm.chain = ethChain
-	lastAccepted := vm.chain.LastAcceptedBlock()
+	log.Info("reading accepted block db", "lastAcceptedHash", lastAcceptedHash)
 
-	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
-	vm.handleGasPriceUpdates()
+	if err := vm.initializeMetrics(); err != nil {
+		return err
+	}
 
 	vm.networkCodec, err = message.BuildCodec()
 	if err != nil {
@@ -362,56 +347,92 @@ func (vm *VM) Initialize(
 	// initialize peer network
 	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, ctx.NodeID, vm.config.MaxOutboundActiveRequests)
 	vm.client = peer.NewClient(vm.Network)
-	vm.initGossipHandling()
 
-	// start goroutines to manage block building
-	//
-	// NOTE: gossip network must be initialized first otherwie ETH tx gossip will
-	// not work.
-	vm.builder = vm.NewBlockBuilder(toEngine)
-
-	vm.chain.Start()
-
-	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
-	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
-
-	vm.State = chain.NewState(&chain.Config{
-		DecidedCacheSize:    decidedCacheSize,
-		MissingCacheSize:    missingCacheSize,
-		UnverifiedCacheSize: unverifiedCacheSize,
-		LastAcceptedBlock: &Block{
-			id:       ids.ID(lastAccepted.Hash()),
-			ethBlock: lastAccepted,
-			vm:       vm,
-			status:   choices.Accepted,
-		},
-		GetBlockIDAtHeight: vm.GetBlockIDAtHeight,
-		GetBlock:           vm.getBlock,
-		UnmarshalBlock:     vm.parseBlock,
-		BuildBlock:         vm.buildBlock,
-	})
-
-	vm.builder.awaitSubmittedTxs()
-	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
-
-	// Only provide metrics if they are being populated.
-	if metrics.Enabled {
-		gatherer := prometheus.Gatherer(metrics.DefaultRegistry)
-		if err := ctx.Metrics.Register(gatherer); err != nil {
-			return err
-		}
+	if err := vm.initializeChain(lastAcceptedHash, ethConfig); err != nil {
+		return err
 	}
+
+	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	return nil
 }
 
+func (vm *VM) initializeMetrics() error {
+	vm.multiGatherer = avalanchegoMetrics.NewMultiGatherer()
+	// If metrics are enabled, register the default metrics regitry
+	if metrics.Enabled {
+		gatherer := subnetEVMPrometheus.Gatherer(metrics.DefaultRegistry)
+		if err := vm.multiGatherer.Register(ethMetricsPrefix, gatherer); err != nil {
+			return err
+		}
+		// Register [multiGatherer] after registerers have been registered to it
+		if err := vm.ctx.Metrics.Register(vm.multiGatherer); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.Config) error {
+	nodecfg := node.Config{
+		SubnetEVMVersion:      Version,
+		KeyStoreDir:           vm.config.KeystoreDirectory,
+		ExternalSigner:        vm.config.KeystoreExternalSigner,
+		InsecureUnlockAllowed: vm.config.KeystoreInsecureUnlockAllowed,
+	}
+
+	ethChain, err := subnetEVM.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), lastAcceptedHash, &vm.clock)
+	if err != nil {
+		return err
+	}
+	vm.chain = ethChain
+
+	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
+	vm.handleGasPriceUpdates()
+
+	// start goroutines to manage block building
+	//
+	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will
+	// not work.
+	vm.gossiper = vm.createGossipper()
+	vm.builder = vm.NewBlockBuilder(vm.toEngine)
+	vm.builder.awaitSubmittedTxs()
+
+	vm.chain.Start()
+	return vm.initChainState(vm.chain.LastAcceptedBlock())
+}
+
+func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
+	config := &chain.Config{
+		DecidedCacheSize:    decidedCacheSize,
+		MissingCacheSize:    missingCacheSize,
+		UnverifiedCacheSize: unverifiedCacheSize,
+		GetBlockIDAtHeight:  vm.GetBlockIDAtHeight,
+		GetBlock:            vm.getBlock,
+		UnmarshalBlock:      vm.parseBlock,
+		BuildBlock:          vm.buildBlock,
+		LastAcceptedBlock: &Block{
+			id:       ids.ID(lastAcceptedBlock.Hash()),
+			ethBlock: lastAcceptedBlock,
+			vm:       vm,
+			status:   choices.Accepted,
+		},
+	}
+
+	// Register chain state metrics
+	chainStateRegisterer := prometheus.NewRegistry()
+	state, err := chain.NewMeteredState(chainStateRegisterer, config)
+	if err != nil {
+		return fmt.Errorf("could not create metered state: %w", err)
+	}
+	vm.State = state
+
+	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
+}
+
 func (vm *VM) initGossipHandling() {
 	if vm.chainConfig.SubnetEVMTimestamp != nil {
-		vm.gossiper = vm.newPushGossiper()
 		vm.Network.SetGossipHandler(NewGossipHandler(vm))
-	} else {
-		vm.gossiper = &noopGossiper{}
-		vm.Network.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	}
 }
 
@@ -421,6 +442,7 @@ func (vm *VM) SetState(state snow.State) error {
 		vm.bootstrapped = false
 		return nil
 	case snow.NormalOp:
+		vm.initGossipHandling()
 		vm.bootstrapped = true
 		return nil
 	default:
@@ -692,4 +714,26 @@ func (vm *VM) startContinuousProfiler() {
 	}()
 	// Wait for shutdownChan to be closed
 	<-vm.shutdownChan
+}
+
+// readLastAccepted reads the last accepted hash from [acceptedBlockDB] and returns the
+// last accepted block hash and height by reading directly from [vm.chaindb] instead of relying
+// on [chain].
+// Note: assumes chaindb, ethConfig, and genesisHash have been initialized.
+func (vm *VM) readLastAccepted() (common.Hash, error) {
+	// Attempt to load last accepted block to determine if it is necessary to
+	// initialize state with the genesis block.
+	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
+	switch {
+	case lastAcceptedErr == database.ErrNotFound:
+		// If there is nothing in the database, return the genesis block hash and height
+		return vm.genesisHash, nil
+	case lastAcceptedErr != nil:
+		return common.Hash{}, fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
+	case len(lastAcceptedBytes) != common.HashLength:
+		return common.Hash{}, fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
+	default:
+		lastAcceptedHash := common.BytesToHash(lastAcceptedBytes)
+		return lastAcceptedHash, nil
+	}
 }

@@ -35,8 +35,6 @@ import (
 	"runtime"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/metrics/exp"
 	"github.com/fjl/memsize/memsizeui"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
@@ -189,17 +187,12 @@ func Setup(ctx *cli.Context) error {
 		address := fmt.Sprintf("%s:%d", listenHost, port)
 		// This context value ("metrics.addr") represents the utils.MetricsHTTPFlag.Name.
 		// It cannot be imported because it will cause a cyclical dependency.
-		StartPProf(address, !ctx.GlobalIsSet("metrics.addr"))
+		StartPProf(address)
 	}
 	return nil
 }
 
-func StartPProf(address string, withMetrics bool) {
-	// Hook go-metrics into expvar on any /debug/metrics request, load all vars
-	// from the registry into expvar, and execute regular expvar handler.
-	if withMetrics {
-		exp.Exp(metrics.DefaultRegistry)
-	}
+func StartPProf(address string) {
 	http.Handle("/memsize/", http.StripPrefix("/memsize", &Memsize))
 	log.Info("Starting pprof server", "addr", fmt.Sprintf("http://%s/debug/pprof", address))
 	go func() {

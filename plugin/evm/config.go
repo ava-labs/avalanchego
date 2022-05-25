@@ -83,7 +83,7 @@ type Config struct {
 	PopulateMissingTriesParallelism int     `json:"populate-missing-tries-parallelism"` // Number of concurrent readers to use when re-populating missing tries on startup.
 
 	// Metric Settings
-	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"`
+	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"` // Debug-level metrics that might impact runtime performance
 
 	// API Settings
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
