@@ -79,7 +79,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 		return nil, nil, err
 	}
 
-	stakerID := stakerTx.Unsigned.ID()
+	stakerID := stakerTx.ID()
 	if stakerID != tx.TxID {
 		return nil, nil, fmt.Errorf(
 			"attempting to remove TxID: %s. Should be removing %s",
@@ -191,7 +191,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 				err,
 			)
 		}
-		vdrTx := vdr.AddValidatorTx()
+		vdrTx, _ := vdr.AddValidatorTx()
 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
@@ -282,9 +282,11 @@ func (tx *StatefulRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 // RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.
 func (vm *VM) newRewardValidatorTx(txID ids.ID) (*signed.Tx, error) {
-	utx := &unsigned.RewardValidatorTx{
-		TxID: txID,
+	utx := &unsigned.RewardValidatorTx{TxID: txID}
+	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	if err != nil {
+		return nil, err
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	return tx, tx.Sign(Codec, nil)
+
+	return tx, tx.SyntacticVerify(vm.ctx)
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -31,7 +31,7 @@ type AddDelegatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator pChainValidator.Validator `serialize:"true" json:"validator"`
+	Validator pchainvalidator.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating

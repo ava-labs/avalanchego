@@ -20,7 +20,7 @@ var _ pendingStakerChainState = &pendingStakerChainStateImpl{}
 // pendingStakerChainState manages the set of stakers (both validators and
 // delegators) that are slated to start staking in the future.
 type pendingStakerChainState interface {
-	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *unsigned.AddValidatorTx, err error)
+	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *unsigned.AddValidatorTx, txID ids.ID, err error)
 	GetValidator(nodeID ids.NodeID) validator
 
 	AddStaker(addStakerTx *signed.Tx) pendingStakerChainState
@@ -38,7 +38,7 @@ type pendingStakerChainState interface {
 // after initialization.
 type pendingStakerChainStateImpl struct {
 	// nodeID -> validator
-	validatorsByNodeID      map[ids.NodeID]*unsigned.AddValidatorTx
+	validatorsByNodeID      map[ids.NodeID]signed.ValidatorAndID
 	validatorExtrasByNodeID map[ids.NodeID]*validatorImpl
 
 	// list of pending validators in order of their removal from the pending
@@ -49,12 +49,16 @@ type pendingStakerChainStateImpl struct {
 	deletedStakers []*signed.Tx
 }
 
-func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.NodeID) (addStakerTx *unsigned.AddValidatorTx, err error) {
+func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.NodeID) (
+	addStakerTx *unsigned.AddValidatorTx,
+	txID ids.ID,
+	err error,
+) {
 	vdr, exists := ps.validatorsByNodeID[nodeID]
 	if !exists {
-		return nil, database.ErrNotFound
+		return nil, ids.Empty, database.ErrNotFound
 	}
-	return vdr, nil
+	return vdr.UnsignedAddValidatorTx, vdr.TxID, nil
 }
 
 func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.NodeID) validator {
@@ -73,15 +77,19 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *signed.Tx) pending
 	newPS.validators[len(ps.validators)] = addStakerTx
 	sortValidatorsByAddition(newPS.validators)
 
+	txID := addStakerTx.ID()
 	switch tx := addStakerTx.Unsigned.(type) {
 	case *unsigned.AddValidatorTx:
 		newPS.validatorExtrasByNodeID = ps.validatorExtrasByNodeID
 
-		newPS.validatorsByNodeID = make(map[ids.NodeID]*unsigned.AddValidatorTx, len(ps.validatorsByNodeID)+1)
+		newPS.validatorsByNodeID = make(map[ids.NodeID]signed.ValidatorAndID, len(ps.validatorsByNodeID)+1)
 		for nodeID, vdr := range ps.validatorsByNodeID {
 			newPS.validatorsByNodeID[nodeID] = vdr
 		}
-		newPS.validatorsByNodeID[tx.Validator.NodeID] = tx
+		newPS.validatorsByNodeID[tx.Validator.NodeID] = signed.ValidatorAndID{
+			UnsignedAddValidatorTx: tx,
+			TxID:                   txID,
+		}
 	case *unsigned.AddDelegatorTx:
 		newPS.validatorsByNodeID = ps.validatorsByNodeID
 
@@ -92,9 +100,12 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *signed.Tx) pending
 			}
 		}
 		if vdr, exists := ps.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
-			newDelegators := make([]*unsigned.AddDelegatorTx, len(vdr.delegators)+1)
+			newDelegators := make([]signed.DelegatorAndID, len(vdr.delegators)+1)
 			copy(newDelegators, vdr.delegators)
-			newDelegators[len(vdr.delegators)] = tx
+			newDelegators[len(vdr.delegators)] = signed.DelegatorAndID{
+				UnsignedAddDelegatorTx: tx,
+				TxID:                   txID,
+			}
 			sortDelegatorsByAddition(newDelegators)
 
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
@@ -103,8 +114,11 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *signed.Tx) pending
 			}
 		} else {
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
-				delegators: []*unsigned.AddDelegatorTx{
-					tx,
+				delegators: []signed.DelegatorAndID{
+					{
+						UnsignedAddDelegatorTx: tx,
+						TxID:                   txID,
+					},
 				},
 			}
 		}
@@ -118,20 +132,25 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *signed.Tx) pending
 			}
 		}
 		if vdr, exists := ps.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
-			newSubnets := make(map[ids.ID]*unsigned.AddSubnetValidatorTx, len(vdr.subnets)+1)
+			newSubnets := make(map[ids.ID]signed.SubnetValidatorAndID, len(vdr.subnets)+1)
 			for subnet, subnetTx := range vdr.subnets {
 				newSubnets[subnet] = subnetTx
 			}
-			newSubnets[tx.Validator.Subnet] = tx
-
+			newSubnets[tx.Validator.Subnet] = signed.SubnetValidatorAndID{
+				UnsignedAddSubnetValidator: tx,
+				TxID:                       txID,
+			}
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				delegators: vdr.delegators,
 				subnets:    newSubnets,
 			}
 		} else {
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]*unsigned.AddSubnetValidatorTx{
-					tx.Validator.Subnet: tx,
+				subnets: map[ids.ID]signed.SubnetValidatorAndID{
+					tx.Validator.Subnet: {
+						UnsignedAddSubnetValidator: tx,
+						TxID:                       txID,
+					},
 				},
 			}
 		}
@@ -144,7 +163,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *signed.Tx) pending
 
 func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingStakerChainState {
 	newPS := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.NodeID]*unsigned.AddValidatorTx, len(ps.validatorsByNodeID)),
+		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID, len(ps.validatorsByNodeID)),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
 		validators:              ps.validators[numToRemove:],
 
@@ -178,7 +197,7 @@ func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingSta
 				delete(newPS.validatorExtrasByNodeID, tx.Validator.NodeID)
 				break
 			}
-			newSubnets := make(map[ids.ID]*unsigned.AddSubnetValidatorTx, len(vdr.subnets)-1)
+			newSubnets := make(map[ids.ID]signed.SubnetValidatorAndID, len(vdr.subnets)-1)
 			for subnetID, subnetTx := range vdr.subnets {
 				if subnetID != tx.Validator.Subnet {
 					newSubnets[subnetID] = subnetTx
@@ -264,8 +283,8 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 	}
 
 	// If the end times are the same, then we sort by the tx type. First we
-	// add UnsignedAddValidatorTx, then UnsignedAddDelegatorTx, then
-	// UnsignedAddSubnetValidatorTxs.
+	// add unsigned.AddValidatorTx, then unsigned.AddDelegatorTx, then
+	// unsigned.AddSubnetValidatorTxs.
 	if iPriority > jPriority {
 		return true
 	}
@@ -275,8 +294,8 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 
 	// If the end times are the same, and the tx types are the same, then we
 	// sort by the txID.
-	iTxID := iDel.Unsigned.ID()
-	jTxID := jDel.Unsigned.ID()
+	iTxID := iDel.ID()
+	jTxID := jDel.ID()
 	return bytes.Compare(iTxID[:], jTxID[:]) == -1
 }
 
@@ -292,14 +311,14 @@ func sortValidatorsByAddition(s []*signed.Tx) {
 	sort.Sort(innerSortValidatorsByAddition(s))
 }
 
-type innerSortDelegatorsByAddition []*unsigned.AddDelegatorTx
+type innerSortDelegatorsByAddition []signed.DelegatorAndID
 
 func (s innerSortDelegatorsByAddition) Less(i, j int) bool {
 	iDel := s[i]
 	jDel := s[j]
 
-	iStartTime := iDel.StartTime()
-	jStartTime := jDel.StartTime()
+	iStartTime := iDel.UnsignedAddDelegatorTx.StartTime()
+	jStartTime := jDel.UnsignedAddDelegatorTx.StartTime()
 	if iStartTime.Before(jStartTime) {
 		return true
 	}
@@ -308,8 +327,8 @@ func (s innerSortDelegatorsByAddition) Less(i, j int) bool {
 	}
 
 	// If the end times are the same, then we sort by the txID
-	iTxID := iDel.ID()
-	jTxID := jDel.ID()
+	iTxID := iDel.TxID
+	jTxID := jDel.TxID
 	return bytes.Compare(iTxID[:], jTxID[:]) == -1
 }
 
@@ -321,6 +340,6 @@ func (s innerSortDelegatorsByAddition) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func sortDelegatorsByAddition(s []*unsigned.AddDelegatorTx) {
+func sortDelegatorsByAddition(s []signed.DelegatorAndID) {
 	sort.Sort(innerSortDelegatorsByAddition(s))
 }

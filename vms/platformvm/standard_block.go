@@ -98,7 +98,7 @@ func (sb *StandardBlock) Verify() error {
 
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		txID := tx.Unsigned.ID()
+		txID := tx.ID()
 
 		statefulTx, err := MakeStatefulTx(tx)
 		if err != nil {
@@ -245,7 +245,7 @@ func (sb *StandardBlock) Reject() error {
 		if err := sb.vm.blockBuilder.AddVerifiedTx(tx); err != nil {
 			sb.vm.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
-				tx.Unsigned.ID(),
+				tx.ID(),
 				err,
 			)
 		}

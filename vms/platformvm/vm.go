@@ -242,7 +242,7 @@ func (vm *VM) initBlockchains() error {
 			return err
 		}
 		for _, subnet := range subnets {
-			if err := vm.createSubnet(subnet.Unsigned.ID()); err != nil {
+			if err := vm.createSubnet(subnet.ID()); err != nil {
 				return err
 			}
 		}
@@ -279,7 +279,7 @@ func (vm *VM) createChain(tx *signed.Tx) error {
 	}
 
 	chainParams := chains.ChainParameters{
-		ID:          tx.Unsigned.ID(),
+		ID:          tx.ID(),
 		SubnetID:    unsignedTx.SubnetID,
 		GenesisData: unsignedTx.GenesisData,
 		VMAlias:     unsignedTx.VMID.String(),
