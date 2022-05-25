@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var _ Builder = &builderWithOptions{}
@@ -53,7 +53,7 @@ func (b *builderWithOptions) GetImportableBalance(
 }
 
 func (b *builderWithOptions) NewAddValidatorTx(
-	validator *pchainvalidator.Validator,
+	validator *p_validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
@@ -67,7 +67,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 }
 
 func (b *builderWithOptions) NewAddSubnetValidatorTx(
-	validator *pchainvalidator.SubnetValidator,
+	validator *p_validator.SubnetValidator,
 	options ...common.Option,
 ) (*unsigned.AddSubnetValidatorTx, error) {
 	return b.Builder.NewAddSubnetValidatorTx(
@@ -77,7 +77,7 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 }
 
 func (b *builderWithOptions) NewAddDelegatorTx(
-	validator *pchainvalidator.Validator,
+	validator *p_validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*unsigned.AddDelegatorTx, error) {

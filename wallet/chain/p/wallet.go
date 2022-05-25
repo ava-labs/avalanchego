@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -55,7 +55,7 @@ type Wallet interface {
 	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddValidatorTx(
-		validator *pchainvalidator.Validator,
+		validator *p_validator.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
 		options ...common.Option,
@@ -67,7 +67,7 @@ type Wallet interface {
 	// - [validator] specifies all the details of the validation period such as
 	//   the startTime, endTime, sampling weight, nodeID, and subnetID.
 	IssueAddSubnetValidatorTx(
-		validator *pchainvalidator.SubnetValidator,
+		validator *p_validator.SubnetValidator,
 		options ...common.Option,
 	) (ids.ID, error)
 
@@ -79,7 +79,7 @@ type Wallet interface {
 	// - [rewardsOwner] specifies the owner of all the rewards this delegator
 	//   may accrue at the end of its delegation period.
 	IssueAddDelegatorTx(
-		validator *pchainvalidator.Validator,
+		validator *p_validator.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (ids.ID, error)
@@ -184,7 +184,7 @@ func (w *wallet) IssueBaseTx(
 }
 
 func (w *wallet) IssueAddValidatorTx(
-	validator *pchainvalidator.Validator,
+	validator *p_validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
@@ -197,7 +197,7 @@ func (w *wallet) IssueAddValidatorTx(
 }
 
 func (w *wallet) IssueAddSubnetValidatorTx(
-	validator *pchainvalidator.SubnetValidator,
+	validator *p_validator.SubnetValidator,
 	options ...common.Option,
 ) (ids.ID, error) {
 	utx, err := w.builder.NewAddSubnetValidatorTx(validator, options...)
@@ -208,7 +208,7 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 }
 
 func (w *wallet) IssueAddDelegatorTx(
-	validator *pchainvalidator.Validator,
+	validator *p_validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (ids.ID, error) {
