@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+var _ ethdb.Database = &Database{}
+
 // Database implements ethdb.Database
 type Database struct{ database.Database }
 

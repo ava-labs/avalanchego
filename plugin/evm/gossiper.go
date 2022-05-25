@@ -399,7 +399,7 @@ func NewGossipHandler(vm *VM) *GossipHandler {
 	}
 }
 
-func (h *GossipHandler) HandleTxs(nodeID ids.ShortID, msg message.TxsGossip) error {
+func (h *GossipHandler) HandleTxs(nodeID ids.NodeID, msg message.TxsGossip) error {
 	log.Trace(
 		"AppGossip called with TxsGossip",
 		"peerID", nodeID,

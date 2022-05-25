@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	defaultPeerVersion = version.NewDefaultApplication("subnet-evmtest", 1, 0, 0)
+	defaultPeerVersion = version.NewDefaultApplication("subnetevmtest", 1, 0, 0)
 
 	_ message.Request = &HelloRequest{}
 	_                 = &HelloResponse{}
@@ -41,7 +41,7 @@ var (
 )
 
 func TestNetworkDoesNotConnectToItself(t *testing.T) {
-	selfNodeID := ids.GenerateTestShortID()
+	selfNodeID := ids.GenerateTestNodeID()
 	n := NewNetwork(nil, nil, selfNodeID, 1)
 	assert.NoError(t, n.Connected(selfNodeID, version.NewDefaultApplication("avalanchego", 1, 0, 0)))
 	assert.EqualValues(t, 0, n.Size())
@@ -52,7 +52,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	senderWg := &sync.WaitGroup{}
 	var net Network
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.ShortSet, requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(nodes ids.NodeIDSet, requestID uint32, requestBytes []byte) error {
 			nodeID, _ := nodes.Pop()
 			senderWg.Add(1)
 			go func() {
@@ -63,7 +63,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			}()
 			return nil
 		},
-		sendAppResponseFn: func(nodeID ids.ShortID, requestID uint32, responseBytes []byte) error {
+		sendAppResponseFn: func(nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
@@ -77,10 +77,10 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
-	net = NewNetwork(sender, codecManager, ids.ShortEmpty, 16)
+	net = NewNetwork(sender, codecManager, ids.EmptyNodeID, 16)
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
 	client := NewClient(net)
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	assert.NoError(t, net.Connected(nodeID, defaultPeerVersion))
 
 	requestMessage := HelloRequest{Message: "this is a request"}
@@ -121,9 +121,9 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	senderWg := &sync.WaitGroup{}
 	var net Network
 	var lock sync.Mutex
-	contactedNodes := make(map[ids.ShortID]struct{})
+	contactedNodes := make(map[ids.NodeID]struct{})
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.ShortSet, requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(nodes ids.NodeIDSet, requestID uint32, requestBytes []byte) error {
 			nodeID, _ := nodes.Pop()
 			lock.Lock()
 			contactedNodes[nodeID] = struct{}{}
@@ -137,7 +137,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			}()
 			return nil
 		},
-		sendAppResponseFn: func(nodeID ids.ShortID, requestID uint32, responseBytes []byte) error {
+		sendAppResponseFn: func(nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
@@ -151,16 +151,16 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
-	net = NewNetwork(sender, codecManager, ids.ShortEmpty, 16)
+	net = NewNetwork(sender, codecManager, ids.EmptyNodeID, 16)
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
 	client := NewClient(net)
 
-	nodes := []ids.ShortID{
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
-		ids.GenerateTestShortID(),
+	nodes := []ids.NodeID{
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
 	}
 	for _, nodeID := range nodes {
 		assert.NoError(t, net.Connected(nodeID, defaultPeerVersion))
@@ -179,7 +179,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	for i := 0; i < totalCalls; i++ {
 		nodeIdx = (nodeIdx + 1) % (len(nodes))
 		nodeID := nodes[nodeIdx]
-		go func(wg *sync.WaitGroup, nodeID ids.ShortID) {
+		go func(wg *sync.WaitGroup, nodeID ids.NodeID) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 			assert.NoError(t, err)
@@ -205,19 +205,19 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	// ensure empty nodeID is not allowed
-	_, err := client.Request(ids.ShortID{}, []byte("hello there"))
+	_, err := client.Request(ids.EmptyNodeID, []byte("hello there"))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot send request to empty nodeID")
 }
 
 func TestRequestMinVersion(t *testing.T) {
 	callNum := uint32(0)
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	codecManager := buildCodec(t, TestMessage{})
 
 	var net Network
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.ShortSet, reqID uint32, messageBytes []byte) error {
+		sendAppRequestFn: func(nodes ids.NodeIDSet, reqID uint32, messageBytes []byte) error {
 			atomic.AddUint32(&callNum, 1)
 			assert.True(t, nodes.Contains(nodeID), "request nodes should contain expected nodeID")
 			assert.Len(t, nodes, 1, "request nodes should contain exactly one node")
@@ -237,20 +237,20 @@ func TestRequestMinVersion(t *testing.T) {
 	}
 
 	// passing nil as codec works because the net.AppRequest is never called
-	net = NewNetwork(sender, codecManager, ids.ShortEmpty, 1)
+	net = NewNetwork(sender, codecManager, ids.EmptyNodeID, 1)
 	client := NewClient(net)
 	requestMessage := TestMessage{Message: "this is a request"}
 	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 	assert.NoError(t, err)
-	assert.NoError(t, net.Connected(nodeID, version.NewDefaultApplication("subnet-evmtest", 1, 7, 1)))
+	assert.NoError(t, net.Connected(nodeID, version.NewDefaultApplication("subnetevmtest", 1, 7, 1)))
 
 	// ensure version does not match
-	responseBytes, err := client.RequestAny(version.NewDefaultApplication("subnet-evmtest", 2, 0, 0), requestBytes)
-	assert.Equal(t, err.Error(), "no peers found matching version subnet-evmtest/2.0.0 out of 1 peers")
+	responseBytes, err := client.RequestAny(version.NewDefaultApplication("subnetevmtest", 2, 0, 0), requestBytes)
+	assert.Equal(t, err.Error(), "no peers found matching version subnetevmtest/2.0.0 out of 1 peers")
 	assert.Nil(t, responseBytes)
 
 	// ensure version matches and the request goes through
-	responseBytes, err = client.RequestAny(version.NewDefaultApplication("subnet-evmtest", 1, 0, 0), requestBytes)
+	responseBytes, err = client.RequestAny(version.NewDefaultApplication("subnetevmtest", 1, 0, 0), requestBytes)
 	assert.NoError(t, err)
 
 	var response TestMessage
@@ -264,10 +264,10 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 	var net Network
 	responded := false
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.ShortSet, reqID uint32, message []byte) error {
+		sendAppRequestFn: func(nodes ids.NodeIDSet, reqID uint32, message []byte) error {
 			return nil
 		},
-		sendAppResponseFn: func(nodeID ids.ShortID, reqID uint32, message []byte) error {
+		sendAppResponseFn: func(nodeID ids.NodeID, reqID uint32, message []byte) error {
 			responded = true
 			return nil
 		},
@@ -281,9 +281,9 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 	requestHandler := &testRequestHandler{
 		processingDuration: 500 * time.Millisecond,
 	}
-	net = NewNetwork(sender, codecManager, ids.ShortEmpty, 1)
+	net = NewNetwork(sender, codecManager, ids.EmptyNodeID, 1)
 	net.SetRequestHandler(requestHandler)
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 
 	requestHandler.response, err = marshalStruct(codecManager, TestMessage{Message: "hi there"})
 	assert.NoError(t, err)
@@ -302,7 +302,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 func TestGossip(t *testing.T) {
 	codecManager := buildCodec(t, HelloGossip{})
 
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	var clientNetwork Network
 	wg := &sync.WaitGroup{}
 	sentGossip := false
@@ -320,7 +320,7 @@ func TestGossip(t *testing.T) {
 	}
 
 	gossipHandler := &testGossipHandler{}
-	clientNetwork = NewNetwork(sender, codecManager, ids.ShortEmpty, 1)
+	clientNetwork = NewNetwork(sender, codecManager, ids.EmptyNodeID, 1)
 	clientNetwork.SetGossipHandler(gossipHandler)
 
 	assert.NoError(t, clientNetwork.Connected(nodeID, defaultPeerVersion))
@@ -342,11 +342,11 @@ func TestGossip(t *testing.T) {
 func TestHandleInvalidMessages(t *testing.T) {
 	codecManager := buildCodec(t, HelloGossip{}, TestMessage{})
 
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(1)
 	sender := testAppSender{}
 
-	clientNetwork := NewNetwork(sender, codecManager, ids.ShortEmpty, 1)
+	clientNetwork := NewNetwork(sender, codecManager, ids.EmptyNodeID, 1)
 	clientNetwork.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	clientNetwork.SetRequestHandler(&testRequestHandler{})
 
@@ -391,11 +391,11 @@ func TestHandleInvalidMessages(t *testing.T) {
 func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	codecManager := buildCodec(t, TestMessage{})
 
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(1)
 	sender := testAppSender{}
 
-	clientNetwork := NewNetwork(sender, codecManager, ids.ShortEmpty, 1)
+	clientNetwork := NewNetwork(sender, codecManager, ids.EmptyNodeID, 1)
 	clientNetwork.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	clientNetwork.SetRequestHandler(&testRequestHandler{err: errors.New("fail")}) // Return an error from the request handler
 
@@ -432,20 +432,20 @@ func buildGossip(codec codec.Manager, msg message.GossipMessage) ([]byte, error)
 }
 
 type testAppSender struct {
-	sendAppRequestFn  func(ids.ShortSet, uint32, []byte) error
-	sendAppResponseFn func(ids.ShortID, uint32, []byte) error
+	sendAppRequestFn  func(ids.NodeIDSet, uint32, []byte) error
+	sendAppResponseFn func(ids.NodeID, uint32, []byte) error
 	sendAppGossipFn   func([]byte) error
 }
 
-func (t testAppSender) SendAppGossipSpecific(ids.ShortSet, []byte) error {
+func (t testAppSender) SendAppGossipSpecific(ids.NodeIDSet, []byte) error {
 	panic("not implemented")
 }
 
-func (t testAppSender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, message []byte) error {
+func (t testAppSender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, message []byte) error {
 	return t.sendAppRequestFn(nodeIDs, requestID, message)
 }
 
-func (t testAppSender) SendAppResponse(nodeID ids.ShortID, requestID uint32, message []byte) error {
+func (t testAppSender) SendAppResponse(nodeID ids.NodeID, requestID uint32, message []byte) error {
 	return t.sendAppResponseFn(nodeID, requestID, message)
 }
 
@@ -457,7 +457,7 @@ type HelloRequest struct {
 	Message string `serialize:"true"`
 }
 
-func (h HelloRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler message.RequestHandler) ([]byte, error) {
+func (h HelloRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler message.RequestHandler) ([]byte, error) {
 	// casting is only necessary for test since RequestHandler does not implement anything at the moment
 	return handler.(TestRequestHandler).HandleHelloRequest(ctx, nodeID, requestID, &h)
 }
@@ -470,7 +470,7 @@ type GreetingRequest struct {
 	Greeting string `serialize:"true"`
 }
 
-func (g GreetingRequest) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler message.RequestHandler) ([]byte, error) {
+func (g GreetingRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler message.RequestHandler) ([]byte, error) {
 	// casting is only necessary for test since RequestHandler does not implement anything at the moment
 	return handler.(TestRequestHandler).HandleGreetingRequest(ctx, nodeID, requestID, &g)
 }
@@ -488,8 +488,8 @@ type GreetingResponse struct {
 }
 
 type TestRequestHandler interface {
-	HandleHelloRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request *HelloRequest) ([]byte, error)
-	HandleGreetingRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request *GreetingRequest) ([]byte, error)
+	HandleHelloRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request *HelloRequest) ([]byte, error)
+	HandleGreetingRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request *GreetingRequest) ([]byte, error)
 }
 
 type HelloGreetingRequestHandler struct {
@@ -497,11 +497,11 @@ type HelloGreetingRequestHandler struct {
 	codec codec.Manager
 }
 
-func (h *HelloGreetingRequestHandler) HandleHelloRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request *HelloRequest) ([]byte, error) {
+func (h *HelloGreetingRequestHandler) HandleHelloRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request *HelloRequest) ([]byte, error) {
 	return h.codec.Marshal(message.Version, HelloResponse{Response: "Hi"})
 }
 
-func (h *HelloGreetingRequestHandler) HandleGreetingRequest(ctx context.Context, nodeID ids.ShortID, requestID uint32, request *GreetingRequest) ([]byte, error) {
+func (h *HelloGreetingRequestHandler) HandleGreetingRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request *GreetingRequest) ([]byte, error) {
 	return h.codec.Marshal(message.Version, GreetingResponse{Greet: "Hey there"})
 }
 
@@ -509,7 +509,7 @@ type TestMessage struct {
 	Message string `serialize:"true"`
 }
 
-func (t TestMessage) Handle(ctx context.Context, nodeID ids.ShortID, requestID uint32, handler message.RequestHandler) ([]byte, error) {
+func (t TestMessage) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler message.RequestHandler) ([]byte, error) {
 	return handler.(*testRequestHandler).handleTestRequest(ctx, nodeID, requestID, &t)
 }
 
@@ -521,7 +521,7 @@ type HelloGossip struct {
 	Msg string `serialize:"true"`
 }
 
-func (h HelloGossip) Handle(handler message.GossipHandler, nodeID ids.ShortID) error {
+func (h HelloGossip) Handle(handler message.GossipHandler, nodeID ids.NodeID) error {
 	return handler.HandleTxs(nodeID, message.TxsGossip{})
 }
 
@@ -540,11 +540,11 @@ func (h HelloGossip) Bytes() []byte {
 
 type testGossipHandler struct {
 	received bool
-	nodeID   ids.ShortID
+	nodeID   ids.NodeID
 	msg      []byte
 }
 
-func (t *testGossipHandler) HandleTxs(nodeID ids.ShortID, _ message.TxsGossip) error {
+func (t *testGossipHandler) HandleTxs(nodeID ids.NodeID, msg message.TxsGossip) error {
 	t.received = true
 	t.nodeID = nodeID
 	return nil
@@ -558,7 +558,7 @@ type testRequestHandler struct {
 	err                error
 }
 
-func (r *testRequestHandler) handleTestRequest(ctx context.Context, _ ids.ShortID, _ uint32, _ *TestMessage) ([]byte, error) {
+func (r *testRequestHandler) handleTestRequest(ctx context.Context, _ ids.NodeID, _ uint32, _ *TestMessage) ([]byte, error) {
 	r.calls++
 	select {
 	case <-time.After(r.processingDuration):

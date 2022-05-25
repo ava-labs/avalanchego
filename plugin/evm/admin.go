@@ -75,3 +75,12 @@ func (p *Admin) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.S
 	reply.Success = true
 	return nil
 }
+
+type ConfigReply struct {
+	Config *Config `json:"config"`
+}
+
+func (p *Admin) GetVMConfig(r *http.Request, args *struct{}, reply *ConfigReply) error {
+	reply.Config = &p.vm.config
+	return nil
+}

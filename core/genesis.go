@@ -184,7 +184,7 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	if genesis.Config == nil {
 		return nil, errGenesisNoConfig
 	}
-	// Make sure genesis gas limit is consistent
+	// Make sure genesis gas limit is consistent in SubnetEVM fork
 	gasLimitConfig := genesis.Config.FeeConfig.GasLimit.Uint64()
 	if gasLimitConfig != genesis.GasLimit {
 		return nil, fmt.Errorf("gas limit in fee config (%d) does not match gas limit in header (%d)", gasLimitConfig, genesis.GasLimit)
