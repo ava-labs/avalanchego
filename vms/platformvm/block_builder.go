@@ -91,7 +91,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 		return fmt.Errorf("unsopported stateful tx, err %w", err)
 	}
 
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	if m.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
 		// as if it was successfully added
@@ -128,7 +128,7 @@ func (m *blockBuilder) AddVerifiedTx(tx *signed.Tx) error {
 		return errMempoolReentrancy
 	}
 
-	txBytes := tx.Unsigned.Bytes()
+	txBytes := tx.Bytes()
 	if len(txBytes) > TargetTxSize {
 		return errTxTooBig
 	}
@@ -314,7 +314,7 @@ func (m *blockBuilder) getStakerToReward(preferredState state.Mutable) (ids.ID, 
 	if !ok {
 		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
 	}
-	return tx.Unsigned.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
+	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the
@@ -346,7 +346,7 @@ func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 			return true
 		}
 
-		txID := tx.Unsigned.ID()
+		txID := tx.ID()
 		errMsg := fmt.Sprintf(
 			"synchrony bound (%s) is later than staker start time (%s)",
 			syncTime,

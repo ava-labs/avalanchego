@@ -151,7 +151,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.Unsigned.(*unsigned.CreateChainTx).SyntacticallyVerified = false
 		tx.Unsigned = test.setup(tx.Unsigned.(*unsigned.CreateChainTx))
-		if err := tx.Unsigned.(*unsigned.CreateChainTx).SyntacticVerify(h.ctx); err != nil && !test.shouldErr {
+		if err := tx.SyntacticVerify(h.ctx); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)
@@ -408,8 +408,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				VMID:       constants.AVMID,
 				SubnetAuth: subnetAuth,
 			}
-			tx := &signed.Tx{Unsigned: utx}
-			err = tx.Sign(unsigned.Codec, signers)
+			tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
 			assert.NoError(err)
 
 			vs := state.NewVersioned(

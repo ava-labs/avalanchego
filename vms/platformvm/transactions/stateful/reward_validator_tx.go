@@ -28,6 +28,7 @@ var (
 
 type RewardValidatorTx struct {
 	*unsigned.RewardValidatorTx
+	ID ids.ID // ID of signed reward validator tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -78,7 +79,7 @@ func (tx *RewardValidatorTx) Execute(
 		return nil, nil, err
 	}
 
-	stakerID := stakerTx.Unsigned.ID()
+	stakerID := stakerTx.ID()
 	if stakerID != tx.TxID {
 		return nil, nil, fmt.Errorf(
 			"attempting to remove TxID: %s. Should be removing %s",
@@ -190,7 +191,7 @@ func (tx *RewardValidatorTx) Execute(
 				err,
 			)
 		}
-		vdrTx := vdr.AddValidatorTx()
+		vdrTx, _ := vdr.AddValidatorTx()
 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee

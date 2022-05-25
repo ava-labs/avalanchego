@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -34,6 +35,9 @@ const maxValidatorWeightFactor uint64 = 5
 
 type AddDelegatorTx struct {
 	*unsigned.AddDelegatorTx
+
+	txID        ids.ID // ID of signed add subnet validator tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -71,7 +75,12 @@ func (tx *AddDelegatorTx) Execute(
 	ctx := verifier.Ctx()
 
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(verifier.Ctx()); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx.AddDelegatorTx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
@@ -120,18 +129,18 @@ func (tx *AddDelegatorTx) Execute(
 		var (
 			vdrTx                  *unsigned.AddValidatorTx
 			currentDelegatorWeight uint64
-			currentDelegators      []*unsigned.AddDelegatorTx
+			currentDelegators      []signed.DelegatorAndID
 		)
 		if err == nil {
 			// This delegator is attempting to delegate to a currently validing
 			// node.
-			vdrTx = currentValidator.AddValidatorTx()
+			vdrTx, _ = currentValidator.AddValidatorTx()
 			currentDelegatorWeight = currentValidator.DelegatorWeight()
 			currentDelegators = currentValidator.Delegators()
 		} else {
 			// This delegator is attempting to delegate to a node that hasn't
 			// started validating yet.
-			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, unsigned.ErrDelegatorSubset
@@ -204,25 +213,20 @@ func (tx *AddDelegatorTx) Execute(
 	}
 
 	// Set up the state if this tx is committed
-	stx := &signed.Tx{
-		Unsigned: tx.AddDelegatorTx,
-		Creds:    creds,
-	}
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
 	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(onCommitState, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onCommitState, tx.txID, ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(onAbortState, txID, ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(onAbortState, tx.txID, ctx.AVAXAssetID, outs)
 
 	return onCommitState, onAbortState, nil
 }

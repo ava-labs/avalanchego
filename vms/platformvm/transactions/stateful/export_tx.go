@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
@@ -21,6 +22,9 @@ var _ AtomicTx = &ExportTx{}
 
 type ExportTx struct {
 	*unsigned.ExportTx
+
+	txID        ids.ID // ID of signed add subnet validator tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 // InputUTXOs returns an empty set
@@ -44,7 +48,12 @@ func (tx *ExportTx) Execute(
 ) (func() error, error) {
 	ctx := verifier.Ctx()
 
-	if err := tx.SyntacticVerify(ctx); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx.ExportTx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
@@ -74,20 +83,17 @@ func (tx *ExportTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 
 // AtomicOperations returns the shared memory requests
 func (tx *ExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
-	txID := tx.ID()
-
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
-				TxID:        txID,
+				TxID:        tx.txID,
 				OutputIndex: uint32(len(tx.Outs) + i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},

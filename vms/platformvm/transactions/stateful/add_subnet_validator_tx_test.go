@@ -29,7 +29,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: tx is nil
 	var unsignedTx *unsigned.AddSubnetValidatorTx
-	if err := unsignedTx.SyntacticVerify(h.ctx); err == nil {
+	stx := signed.Tx{
+		Unsigned: unsignedTx,
+	}
+	if err := stx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -49,7 +52,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticVerify(h.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -69,7 +72,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).Validator.Subnet = ids.ID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticVerify(h.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because Subnet ID is empty")
 	}
 
@@ -89,7 +92,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).Validator.Wght = 0
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticVerify(h.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because of no weight")
 	}
 
@@ -110,7 +113,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err = tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticVerify(h.ctx); err == nil {
+	if err = tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because sig indices weren't unique")
 	}
 
@@ -125,7 +128,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticVerify(h.ctx); err != nil {
+	} else if err := tx.SyntacticVerify(h.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -600,7 +603,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := unmarshaledTx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticVerify(h.ctx); err != nil {
+	if err := unmarshaledTx.SyntacticVerify(h.ctx); err != nil {
 		t.Fatal(err)
 	}
 }

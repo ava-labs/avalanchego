@@ -4,6 +4,7 @@
 package stateful
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils"
@@ -31,7 +32,7 @@ type TxVerifier interface {
 	PlatformConfig() *config.Config
 	Bootstrapped() bool
 	FeatureExtension() fx.Fx
-	CreateChain(tx unsigned.Tx) error
+	CreateChain(tx unsigned.Tx, txID ids.ID) error
 }
 
 func NewVerifier(
@@ -78,6 +79,6 @@ func (v *verifier) PlatformConfig() *config.Config { return v.cfg }
 func (v *verifier) Bootstrapped() bool             { return v.bootstrapped.GetValue() }
 func (v *verifier) FeatureExtension() fx.Fx        { return v.fx }
 
-func (v *verifier) CreateChain(tx unsigned.Tx) error {
-	return platformutils.CreateChain(*v.cfg, tx)
+func (v *verifier) CreateChain(tx unsigned.Tx, txID ids.ID) error {
+	return platformutils.CreateChain(*v.cfg, tx, txID)
 }

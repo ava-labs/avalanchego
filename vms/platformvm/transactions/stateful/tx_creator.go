@@ -15,40 +15,55 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 	case *unsigned.AddDelegatorTx:
 		return &AddDelegatorTx{
 			AddDelegatorTx: utx,
+			txID:           tx.ID(),
+			signedBytes:    tx.Bytes(),
 		}, nil
 
 	case *unsigned.AddSubnetValidatorTx:
 		return &AddSubnetValidatorTx{
 			AddSubnetValidatorTx: utx,
+			txID:                 tx.ID(),
+			signedBytes:          tx.Bytes(),
 		}, nil
 
 	case *unsigned.AddValidatorTx:
 		return &AddValidatorTx{
 			AddValidatorTx: utx,
+			txID:           tx.ID(),
+			signedBytes:    tx.Bytes(),
 		}, nil
 	case *unsigned.AdvanceTimeTx:
 		return &AdvanceTimeTx{
 			AdvanceTimeTx: utx,
+			ID:            tx.ID(),
 		}, nil
 	case *unsigned.RewardValidatorTx:
 		return &RewardValidatorTx{
 			RewardValidatorTx: utx,
+			ID:                tx.ID(),
 		}, nil
 	case *unsigned.CreateChainTx:
 		return &CreateChainTx{
 			CreateChainTx: utx,
+			txID:          tx.ID(),
+			signedBytes:   tx.Bytes(),
 		}, nil
 	case *unsigned.CreateSubnetTx:
 		return &CreateSubnetTx{
 			CreateSubnetTx: utx,
+			txID:           tx.ID(),
+			signedBytes:    tx.Bytes(),
 		}, nil
 	case *unsigned.ImportTx:
 		return &ImportTx{
 			ImportTx: utx,
+			txID:     tx.ID(),
 		}, nil
 	case *unsigned.ExportTx:
 		return &ExportTx{
-			ExportTx: utx,
+			ExportTx:    utx,
+			txID:        tx.ID(),
+			signedBytes: tx.Bytes(),
 		}, nil
 
 	default:

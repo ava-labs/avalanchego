@@ -20,11 +20,15 @@ var _ Tx = &AdvanceTimeTx{}
 //   * proposed timestamp > [current chain time]
 //   * proposed timestamp <= [time for next staker set change]
 type AdvanceTimeTx struct {
-	avax.Metadata
-
 	// Unix time this block proposes increasing the timestamp to
 	Time uint64 `serialize:"true" json:"time"`
+
+	unsignedBytes []byte // Unsigned byte representation of this data
 }
+
+func (tx *AdvanceTimeTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsignedBytes }
+
+func (tx *AdvanceTimeTx) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func (tx *AdvanceTimeTx) InitCtx(*snow.Context) {}
 
@@ -33,10 +37,6 @@ func (tx *AdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-func (tx *AdvanceTimeTx) InputIDs() ids.Set {
-	return nil
-}
-
-func (tx *AdvanceTimeTx) SyntacticVerify(*snow.Context) error {
-	return nil
-}
+func (tx *AdvanceTimeTx) InputIDs() ids.Set                   { return nil }
+func (tx *AdvanceTimeTx) Outputs() []*avax.TransferableOutput { return nil }
+func (tx *AdvanceTimeTx) SyntacticVerify(*snow.Context) error { return nil }

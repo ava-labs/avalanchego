@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -34,6 +35,9 @@ const MaxFutureStartTime = 24 * 7 * 2 * time.Hour
 
 type AddValidatorTx struct {
 	*unsigned.AddValidatorTx
+
+	txID        ids.ID // ID of signed add validator tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -71,7 +75,12 @@ func (tx *AddValidatorTx) Execute(
 	ctx := verifier.Ctx()
 
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(verifier.Ctx()); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx.AddValidatorTx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
@@ -128,7 +137,7 @@ func (tx *AddValidatorTx) Execute(
 		}
 
 		// Ensure this validator isn't about to become a validator.
-		_, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+		_, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is about to become a primary network validator",
@@ -166,25 +175,20 @@ func (tx *AddValidatorTx) Execute(
 	}
 
 	// Set up the state if this tx is committed
-	stx := &signed.Tx{
-		Unsigned: tx.AddValidatorTx,
-		Creds:    creds,
-	}
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
 	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(onCommitState, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onCommitState, tx.txID, ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(onAbortState, txID, ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(onAbortState, tx.txID, ctx.AVAXAssetID, outs)
 
 	return onCommitState, onAbortState, nil
 }

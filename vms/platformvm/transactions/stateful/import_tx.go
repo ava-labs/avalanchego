@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
@@ -21,6 +22,9 @@ var _ AtomicTx = &ImportTx{}
 
 type ImportTx struct {
 	*unsigned.ImportTx
+
+	txID        ids.ID // ID of signed add subnet validator tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -41,7 +45,12 @@ func (tx *ImportTx) Execute(
 ) (func() error, error) {
 	ctx := verifier.Ctx()
 
-	if err := tx.SyntacticVerify(ctx); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx.ImportTx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
@@ -97,8 +106,7 @@ func (tx *ImportTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
 	return nil, nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -19,6 +20,9 @@ var _ ProposalTx = &AddSubnetValidatorTx{}
 
 type AddSubnetValidatorTx struct {
 	*unsigned.AddSubnetValidatorTx
+
+	txID        ids.ID // ID of signed add subnet validator tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -56,7 +60,12 @@ func (tx *AddSubnetValidatorTx) Execute(
 	ctx := verifier.Ctx()
 
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(verifier.Ctx()); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx.AddSubnetValidatorTx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
@@ -98,7 +107,7 @@ func (tx *AddSubnetValidatorTx) Execute(
 		if err == nil {
 			// This validator is attempting to validate with a currently
 			// validing node.
-			vdrTx = currentValidator.AddValidatorTx()
+			vdrTx, _ = currentValidator.AddValidatorTx()
 
 			// Ensure that this transaction isn't a duplicate add validator tx.
 			subnets := currentValidator.SubnetValidators()
@@ -111,7 +120,7 @@ func (tx *AddSubnetValidatorTx) Execute(
 		} else {
 			// This validator is attempting to validate with a node that hasn't
 			// started validating yet.
-			vdrTx, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
 					return nil, nil, unsigned.ErrDSValidatorSubset
@@ -190,25 +199,20 @@ func (tx *AddSubnetValidatorTx) Execute(
 	}
 
 	// Set up the state if this tx is committed
-	stx := &signed.Tx{
-		Unsigned: tx.AddSubnetValidatorTx,
-		Creds:    creds,
-	}
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
 	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(onCommitState, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onCommitState, tx.txID, ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxos.ConsumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(onAbortState, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(onAbortState, tx.txID, ctx.AVAXAssetID, tx.Outs)
 
 	return onCommitState, onAbortState, nil
 }

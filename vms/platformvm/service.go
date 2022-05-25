@@ -477,7 +477,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets[i] = APISubnet{
-				ID:          subnet.Unsigned.ID(),
+				ID:          subnet.ID(),
 				ControlKeys: controlAddrs,
 				Threshold:   json.Uint32(owner.Threshold),
 			}
@@ -537,7 +537,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		response.Subnets = append(response.Subnets,
 			APISubnet{
-				ID:          subnet.ID(),
+				ID:          subnetID,
 				ControlKeys: controlAddrs,
 				Threshold:   json.Uint32(owner.Threshold),
 			},
@@ -612,7 +612,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
-		_, rewardAmount, err := currentValidators.GetStaker(tx.Unsigned.ID())
+		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
 		if err != nil {
 			return err
 		}
@@ -646,7 +646,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			potentialReward := json.Uint64(rewardAmount)
 			delegator := pchainapi.PrimaryDelegator{
 				Staker: pchainapi.Staker{
-					TxID:        tx.Unsigned.ID(),
+					TxID:        tx.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -695,7 +695,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			reply.Validators = append(reply.Validators, pchainapi.PrimaryValidator{
 				Staker: pchainapi.Staker{
-					TxID:        tx.Unsigned.ID(),
+					TxID:        tx.ID(),
 					NodeID:      nodeID,
 					StartTime:   json.Uint64(startTime.Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -721,7 +721,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			reply.Validators = append(reply.Validators, pchainapi.SubnetValidator{
 				Staker: pchainapi.Staker{
 					NodeID:    nodeID,
-					TxID:      tx.Unsigned.ID(),
+					TxID:      tx.ID(),
 					StartTime: json.Uint64(staker.StartTime().Unix()),
 					EndTime:   json.Uint64(staker.EndTime().Unix()),
 					Weight:    &weight,
@@ -792,7 +792,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 			weight := json.Uint64(staker.Validator.Weight())
 			reply.Delegators = append(reply.Delegators, pchainapi.Staker{
-				TxID:        tx.Unsigned.ID(),
+				TxID:        tx.ID(),
 				NodeID:      staker.Validator.ID(),
 				StartTime:   json.Uint64(staker.StartTime().Unix()),
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -813,7 +813,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, pchainapi.PrimaryValidator{
 				Staker: pchainapi.Staker{
-					TxID:        tx.Unsigned.ID(),
+					TxID:        tx.ID(),
 					NodeID:      staker.Validator.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -837,7 +837,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			reply.Validators = append(reply.Validators, pchainapi.SubnetValidator{
 				Staker: pchainapi.Staker{
 					NodeID:    nodeID,
-					TxID:      tx.Unsigned.ID(),
+					TxID:      tx.ID(),
 					StartTime: json.Uint64(staker.StartTime().Unix()),
 					EndTime:   json.Uint64(staker.EndTime().Unix()),
 					Weight:    &weight,
@@ -1004,7 +1004,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
-	reply.TxID = tx.Unsigned.ID()
+	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1105,7 +1105,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
-	reply.TxID = tx.Unsigned.ID()
+	reply.TxID = tx.ID()
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1202,7 +1202,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
-	response.TxID = tx.Unsigned.ID()
+	response.TxID = tx.ID()
 	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1274,7 +1274,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
-	response.TxID = tx.Unsigned.ID()
+	response.TxID = tx.ID()
 	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1366,7 +1366,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
-	response.TxID = tx.Unsigned.ID()
+	response.TxID = tx.ID()
 	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1442,7 +1442,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 		return err
 	}
 
-	response.TxID = tx.Unsigned.ID()
+	response.TxID = tx.ID()
 	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1563,7 +1563,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
-	response.TxID = tx.Unsigned.ID()
+	response.TxID = tx.ID()
 	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
@@ -1753,7 +1753,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 
 	response.BlockchainIDs = make([]ids.ID, len(chains))
 	for i, chain := range chains {
-		response.BlockchainIDs[i] = chain.Unsigned.ID()
+		response.BlockchainIDs[i] = chain.ID()
 	}
 	return nil
 }
@@ -1790,7 +1790,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 
 	response.Blockchains = []APIBlockchain{}
 	for _, subnet := range subnets {
-		subnetID := subnet.Unsigned.ID()
+		subnetID := subnet.ID()
 		chains, err := service.vm.internalState.GetChains(subnetID)
 		if err != nil {
 			return fmt.Errorf(
@@ -1801,12 +1801,13 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		}
 
 		for _, chainTx := range chains {
+			chainID := chainTx.ID()
 			chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
 			if !ok {
 				return unsigned.ErrWrongTxType
 			}
 			response.Blockchains = append(response.Blockchains, APIBlockchain{
-				ID:       chain.ID(),
+				ID:       chainID,
 				Name:     chain.ChainName,
 				SubnetID: subnetID,
 				VMID:     chain.VMID,
@@ -1819,12 +1820,13 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
 	for _, chainTx := range chains {
+		chainID := chainTx.ID()
 		chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
 		if !ok {
 			return unsigned.ErrWrongTxType
 		}
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
-			ID:       chain.ID(),
+			ID:       chainID,
 			Name:     chain.ChainName,
 			SubnetID: constants.PrimaryNetworkID,
 			VMID:     chain.VMID,
@@ -1852,7 +1854,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
-	response.TxID = tx.Unsigned.ID()
+	response.TxID = tx.ID()
 	return nil
 }
 
@@ -1864,7 +1866,7 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	txBytes := tx.Unsigned.Bytes()
+	txBytes := tx.Bytes()
 	response.Encoding = args.Encoding
 
 	if args.Encoding == formatting.JSON {

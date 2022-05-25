@@ -202,6 +202,6 @@ func TestAllSignedTxMarshalling(t *testing.T) {
 		signedTx, err := tt.createSignedTx()
 		assert.NoError(err)
 		assert.Equal(tt.unsignedBytes, signedTx.Unsigned.UnsignedBytes())
-		assert.Equal(tt.signedBytes, signedTx.Unsigned.Bytes())
+		assert.Equal(tt.signedBytes, signedTx.Bytes())
 	}
 }

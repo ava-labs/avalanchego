@@ -241,8 +241,8 @@ func TestGetTxStatus(t *testing.T) {
 	}
 	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
 
-	arg := &GetTxStatusArgs{TxID: tx.Unsigned.ID()}
-	argIncludeReason := &GetTxStatusArgs{TxID: tx.Unsigned.ID(), IncludeReason: true}
+	arg := &GetTxStatusArgs{TxID: tx.ID()}
+	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
 
 	var resp GetTxStatusResponse
 	err = service.GetTxStatus(nil, arg, &resp)
@@ -361,7 +361,7 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 			arg := &api.GetTxArgs{
-				TxID:     tx.Unsigned.ID(),
+				TxID:     tx.ID(),
 				Encoding: encoding,
 			}
 			var response api.GetTxReply
@@ -395,7 +395,7 @@ func TestGetTx(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
-					if !bytes.Equal(responseTxBytes, tx.Unsigned.Bytes()) {
+					if !bytes.Equal(responseTxBytes, tx.Bytes()) {
 						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
 					}
 				case formatting.JSON:

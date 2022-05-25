@@ -33,14 +33,16 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	toRemoveTxID := toRemoveTx.ID()
 	toRemove := toRemoveTx.Unsigned.(*unsigned.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemove.ID()); err != nil {
+	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID); err != nil {
 		t.Fatal(err)
 	} else {
 		verifiableTx := AddValidatorTx{
 			AddValidatorTx: toRemove,
+			txID:           toRemoveTxID,
 		}
 		if _, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
 			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
@@ -56,6 +58,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	} else {
 		verifiableTx := AddValidatorTx{
 			AddValidatorTx: toRemove,
+			txID:           toRemoveTxID,
 		}
 		if _, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
 			t.Fatalf("should have failed because validator ID is wrong")
@@ -63,7 +66,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	}
 
 	// Case 3: Happy path
-	tx, err := h.txBuilder.NewRewardValidatorTx(toRemove.ID())
+	tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +88,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if toRemove.ID() == nextToRemoveTx.Unsigned.ID() {
+	if toRemoveTxID == nextToRemoveTx.ID() {
 		t.Fatalf("Should have removed the previous validator")
 	}
 
@@ -127,10 +130,11 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	toRemoveTxID := toRemoveTx.ID()
 	toRemove := toRemoveTx.Unsigned.(*unsigned.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemove.ID()); err != nil {
+	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID); err != nil {
 		t.Fatal(err)
 	} else {
 		verifiableTx := AddValidatorTx{
@@ -157,7 +161,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	}
 
 	// Case 3: Happy path
-	tx, err := h.txBuilder.NewRewardValidatorTx(toRemove.ID())
+	tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +183,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if toRemove.ID() == nextToRemoveTx.Unsigned.ID() {
+	if toRemoveTxID == nextToRemoveTx.ID() {
 		t.Fatalf("Should have removed the previous validator")
 	}
 
@@ -266,7 +270,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.True(ok)
 	assert.Equal(h.cfg.MinValidatorStake+h.cfg.MinDelegatorStake, stake)
 
-	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.Unsigned.ID())
+	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 	uTx, ok := tx.Unsigned.(*unsigned.RewardValidatorTx)
 	if !ok {
@@ -369,7 +373,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	err = h.tState.Load()
 	assert.NoError(err)
 
-	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.Unsigned.ID())
+	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 	uTx, ok := tx.Unsigned.(*unsigned.RewardValidatorTx)
 	if !ok {

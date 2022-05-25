@@ -55,7 +55,7 @@ func NewBackend(ctx Context, utxos ChainUTXOs, txs map[ids.ID]*signed.Tx) Backen
 
 func (b *backend) AcceptTx(ctx stdcontext.Context, tx *signed.Tx) error {
 	var baseTx *unsigned.BaseTx
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	switch utx := tx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx:
 		baseTx = &utx.BaseTx
@@ -105,7 +105,7 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *signed.Tx) error {
 		return err
 	}
 
-	producedUTXOSlice := baseTx.UTXOs()
+	producedUTXOSlice := tx.UTXOs()
 	err = b.addUTXOs(ctx, constants.PlatformChainID, producedUTXOSlice)
 	if err != nil {
 		return err

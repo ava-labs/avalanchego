@@ -27,6 +27,9 @@ const (
 
 type CreateChainTx struct {
 	*unsigned.CreateChainTx
+
+	txID        ids.ID // ID of signed create chain tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 func (tx *CreateChainTx) InputUTXOs() ids.Set { return nil }
@@ -69,7 +72,12 @@ func (tx *CreateChainTx) Execute(
 		return nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
-	if err := tx.SyntacticVerify(verifier.Ctx()); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx.CreateChainTx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
 		return nil, err
 	}
 
@@ -113,17 +121,12 @@ func (tx *CreateChainTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
-	stx := &signed.Tx{
-		Unsigned: tx.CreateChainTx,
-		Creds:    creds,
-	}
 	vs.AddChain(stx)
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { return verifier.CreateChain(tx.CreateChainTx) }
+	onAccept := func() error { return verifier.CreateChain(tx.CreateChainTx, tx.txID) }
 	return onAccept, nil
 }

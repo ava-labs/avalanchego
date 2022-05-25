@@ -18,6 +18,9 @@ var _ DecisionTx = &CreateSubnetTx{}
 
 type CreateSubnetTx struct {
 	*unsigned.CreateSubnetTx
+
+	txID        ids.ID // ID of signed create subnet tx
+	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
@@ -57,7 +60,12 @@ func (tx *CreateSubnetTx) Execute(
 	)
 
 	// Make sure this transaction is well formed.
-	if err := tx.SyntacticVerify(ctx); err != nil {
+	stx := &signed.Tx{
+		Unsigned: tx,
+		Creds:    creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
+	if err := stx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
@@ -78,13 +86,8 @@ func (tx *CreateSubnetTx) Execute(
 	// Consume the UTXOS
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	utxos.ProduceOutputs(vs, txID, ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
-	stx := &signed.Tx{
-		Unsigned: tx,
-		Creds:    creds,
-	}
 	vs.AddSubnet(stx)
 
 	return nil, nil

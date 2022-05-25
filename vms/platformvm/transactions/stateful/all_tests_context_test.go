@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -60,7 +61,7 @@ var (
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
 
-	testSubnet1            *unsigned.CreateSubnetTx
+	testSubnet1            *signed.Tx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 )
 
@@ -155,7 +156,8 @@ func addSubnet(
 	txVerifier TxVerifier,
 ) {
 	// Create a subnet
-	tx, err := txBuilder.NewCreateSubnetTx(
+	var err error
+	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
 			preFundedKeys[0].PublicKey().Address(),
@@ -170,7 +172,7 @@ func addSubnet(
 	}
 
 	// store it
-	executableTx, err := MakeStatefulTx(tx)
+	executableTx, err := MakeStatefulTx(testSubnet1)
 	if err != nil {
 		panic(err)
 	}
@@ -183,14 +185,12 @@ func addSubnet(
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	_, err = vDecisionTx.Execute(txVerifier, versionedState, tx.Creds)
+	_, err = vDecisionTx.Execute(txVerifier, versionedState, testSubnet1.Creds)
 	if err != nil {
 		panic(err)
 	}
-	versionedState.AddTx(tx, status.Committed)
+	versionedState.AddTx(testSubnet1, status.Committed)
 	versionedState.Apply(tState)
-
-	testSubnet1 = tx.Unsigned.(*unsigned.CreateSubnetTx)
 }
 
 func defaultState(

@@ -94,7 +94,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		n.log.Warn("failed building signed tx from bytes: %s", err)
 		return nil
 	}
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
@@ -118,7 +118,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 }
 
 func (n *network) GossipTx(tx *signed.Tx) error {
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := n.recentTxs.Get(txID); has {
 		return nil
@@ -127,9 +127,7 @@ func (n *network) GossipTx(tx *signed.Tx) error {
 
 	n.log.Debug("gossiping tx %s", txID)
 
-	msg := &message.Tx{
-		Tx: tx.Unsigned.Bytes(),
-	}
+	msg := &message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(msg)
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message with: %w", err)

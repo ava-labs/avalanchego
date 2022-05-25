@@ -5,6 +5,7 @@ package utils
 
 import (
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
@@ -12,7 +13,7 @@ import (
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func CreateChain(vmCfg config.Config, utx unsigned.Tx) error {
+func CreateChain(vmCfg config.Config, utx unsigned.Tx, txID ids.ID) error {
 	unsignedTx, ok := utx.(*unsigned.CreateChainTx)
 	if !ok {
 		return unsigned.ErrWrongTxType
@@ -25,7 +26,7 @@ func CreateChain(vmCfg config.Config, utx unsigned.Tx) error {
 	}
 
 	chainParams := chains.ChainParameters{
-		ID:          utx.ID(),
+		ID:          txID,
 		SubnetID:    unsignedTx.SubnetID,
 		GenesisData: unsignedTx.GenesisData,
 		VMAlias:     unsignedTx.VMID.String(),
