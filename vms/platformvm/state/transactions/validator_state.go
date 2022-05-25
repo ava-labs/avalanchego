@@ -150,7 +150,7 @@ func (vs *validatorState) maxPrimarySubnetStakeAmount(
 		if err != nil {
 			return 0, err
 		}
-		return MaxStakeAmount(
+		return getMaxStakeAmount(
 			currentValidator.Delegators(),
 			pendingValidator.Delegators(),
 			startTime,
@@ -172,7 +172,7 @@ func (vs *validatorState) maxPrimarySubnetStakeAmount(
 			return 0, nil
 		}
 
-		return MaxStakeAmount(
+		return getMaxStakeAmount(
 			nil,
 			pendingValidator.Delegators(),
 			startTime,
@@ -197,7 +197,7 @@ func CanDelegate(
 	currentStake,
 	maximumStake uint64,
 ) (bool, error) {
-	maxStake, err := MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+	maxStake, err := getMaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
 	if err != nil {
 		return false, err
 	}
@@ -218,7 +218,7 @@ func CanDelegate(
 // * The delegations that will be on this node in the future are [pending]
 // * The start time of all delegations in [pending] are in the future
 // * [pending] is sorted in order of increasing delegation start time
-func MaxStakeAmount(
+func getMaxStakeAmount(
 	current,
 	pending []signed.DelegatorAndID, // sorted by next start time first
 	startTime time.Time,
