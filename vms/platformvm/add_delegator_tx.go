@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 
-	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -265,7 +265,7 @@ func maxStakeAmount(
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := pchainvalidator.EndTimeHeap{}
+	toRemoveHeap := p_validator.EndTimeHeap{}
 	for _, currentDelegator := range current {
 		toRemoveHeap.Add(&currentDelegator.UnsignedAddDelegatorTx.Validator)
 	}

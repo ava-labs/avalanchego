@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
@@ -443,7 +443,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	if err := server.RegisterService(&pchainapi.StaticService{}, "platform"); err != nil {
+	if err := server.RegisterService(&p_api.StaticService{}, "platform"); err != nil {
 		return nil, err
 	}
 
