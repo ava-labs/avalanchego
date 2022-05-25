@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 
-	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -246,8 +246,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		Validator: pchainvalidator.SubnetValidator{
-			Validator: pchainvalidator.Validator{
+		Validator: p_validator.SubnetValidator{
+			Validator: p_validator.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,
