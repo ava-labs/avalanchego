@@ -8,9 +8,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
-var _ validatorCache = &validatorImpl{}
+var _ validator = &validatorImpl{}
 
-type validatorCache interface {
+type validator interface {
 	Delegators() []signed.DelegatorAndID
 	SubnetValidators() map[ids.ID]signed.SubnetValidatorAndID
 }

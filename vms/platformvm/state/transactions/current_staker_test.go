@@ -57,7 +57,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	}
 
 	cs := &currentStaker{
-		ValidatorsByNodeID: map[ids.NodeID]*currentValidatorImpl{
+		validatorsByNodeID: map[ids.NodeID]*currentValidatorImpl{
 			nodeID0: vdr0,
 			nodeID1: vdr1,
 			nodeID2: vdr2,
@@ -168,7 +168,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 	}
 
 	cs := &currentStaker{
-		ValidatorsByNodeID: map[ids.NodeID]*currentValidatorImpl{
+		validatorsByNodeID: map[ids.NodeID]*currentValidatorImpl{
 			nodeID0: vdr0,
 			nodeID1: vdr1,
 			nodeID2: vdr2,

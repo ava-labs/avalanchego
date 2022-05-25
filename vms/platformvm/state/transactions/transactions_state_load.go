@@ -16,14 +16,14 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-func (ts *state) SyncGenesis(
+func (s *state) SyncGenesis(
 	genesisUtxos []*avax.UTXO,
 	genesisValidator []*signed.Tx,
 	genesisChains []*signed.Tx,
 ) error {
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesisUtxos {
-		ts.AddUTXO(utxo)
+		s.AddUTXO(utxo)
 	}
 
 	// Persist primary network validator set at genesis
@@ -35,9 +35,9 @@ func (ts *state) SyncGenesis(
 
 		stakeAmount := tx.Validator.Wght
 		stakeDuration := tx.Validator.Duration()
-		currentSupply := ts.GetCurrentSupply()
+		currentSupply := s.GetCurrentSupply()
 
-		r := ts.rewards.Calculate(
+		r := s.rewards.Calculate(
 			stakeDuration,
 			stakeAmount,
 			currentSupply,
@@ -47,9 +47,9 @@ func (ts *state) SyncGenesis(
 			return err
 		}
 
-		ts.AddCurrentStaker(vdrTx, r)
-		ts.AddTx(vdrTx, status.Committed)
-		ts.SetCurrentSupply(newCurrentSupply)
+		s.AddCurrentStaker(vdrTx, r)
+		s.AddTx(vdrTx, status.Committed)
+		s.SetCurrentSupply(newCurrentSupply)
 	}
 
 	for _, chain := range genesisChains {
@@ -60,35 +60,35 @@ func (ts *state) SyncGenesis(
 
 		// Ensure all chains that the genesis bytes say to create have the right
 		// network ID
-		if unsignedChain.NetworkID != ts.ctx.NetworkID {
+		if unsignedChain.NetworkID != s.ctx.NetworkID {
 			return avax.ErrWrongNetworkID
 		}
 
-		ts.AddChain(chain)
-		ts.AddTx(chain, status.Committed)
+		s.AddChain(chain)
+		s.AddTx(chain, status.Committed)
 	}
 
-	if err := ts.WriteTxs(); err != nil {
+	if err := s.WriteTxs(); err != nil {
 		return err
 	}
 
-	return ts.DataState.WriteMetadata()
+	return s.DataState.WriteMetadata()
 }
 
-func (ts *state) LoadTxs() error {
-	if err := ts.LoadCurrentValidators(); err != nil {
+func (s *state) LoadTxs() error {
+	if err := s.LoadCurrentValidators(); err != nil {
 		return err
 	}
-	return ts.LoadPendingValidators()
+	return s.LoadPendingValidators()
 }
 
-func (ts *state) LoadCurrentValidators() error {
+func (s *state) LoadCurrentValidators() error {
 	cs := &currentStaker{
-		ValidatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl),
-		ValidatorsByTxID:   make(map[ids.ID]*ValidatorReward),
+		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl),
+		validatorsByTxID:   make(map[ids.ID]*ValidatorReward),
 	}
 
-	validatorIt := ts.currentValidatorList.NewIterator()
+	validatorIt := s.currentValidatorList.NewIterator()
 	defer validatorIt.Release()
 	for validatorIt.Next() {
 		txIDBytes := validatorIt.Key()
@@ -96,7 +96,7 @@ func (ts *state) LoadCurrentValidators() error {
 		if err != nil {
 			return err
 		}
-		tx, _, err := ts.GetTx(txID)
+		tx, _, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
@@ -115,8 +115,8 @@ func (ts *state) LoadCurrentValidators() error {
 			return unsigned.ErrWrongTxType
 		}
 
-		cs.Validators = append(cs.Validators, tx)
-		cs.ValidatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
+		cs.validators = append(cs.validators, tx)
+		cs.validatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
 				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
 			},
@@ -126,19 +126,19 @@ func (ts *state) LoadCurrentValidators() error {
 			},
 			potentialReward: uptime.PotentialReward,
 		}
-		cs.ValidatorsByTxID[txID] = &ValidatorReward{
+		cs.validatorsByTxID[txID] = &ValidatorReward{
 			AddStakerTx:     tx,
 			PotentialReward: uptime.PotentialReward,
 		}
 
-		ts.uptimes[addValidatorTx.Validator.NodeID] = uptime
+		s.uptimes[addValidatorTx.Validator.NodeID] = uptime
 	}
 
 	if err := validatorIt.Error(); err != nil {
 		return err
 	}
 
-	delegatorIt := ts.currentDelegatorList.NewIterator()
+	delegatorIt := s.currentDelegatorList.NewIterator()
 	defer delegatorIt.Release()
 	for delegatorIt.Next() {
 		txIDBytes := delegatorIt.Key()
@@ -146,7 +146,7 @@ func (ts *state) LoadCurrentValidators() error {
 		if err != nil {
 			return err
 		}
-		tx, _, err := ts.GetTx(txID)
+		tx, _, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
@@ -162,8 +162,8 @@ func (ts *state) LoadCurrentValidators() error {
 			return unsigned.ErrWrongTxType
 		}
 
-		cs.Validators = append(cs.Validators, tx)
-		vdr, exists := cs.ValidatorsByNodeID[addDelegatorTx.Validator.NodeID]
+		cs.validators = append(cs.validators, tx)
+		vdr, exists := cs.validatorsByNodeID[addDelegatorTx.Validator.NodeID]
 		if !exists {
 			return unsigned.ErrDelegatorSubset
 		}
@@ -172,7 +172,7 @@ func (ts *state) LoadCurrentValidators() error {
 			UnsignedAddDelegatorTx: addDelegatorTx,
 			TxID:                   txID,
 		})
-		cs.ValidatorsByTxID[txID] = &ValidatorReward{
+		cs.validatorsByTxID[txID] = &ValidatorReward{
 			AddStakerTx:     tx,
 			PotentialReward: potentialReward,
 		}
@@ -181,7 +181,7 @@ func (ts *state) LoadCurrentValidators() error {
 		return err
 	}
 
-	subnetValidatorIt := ts.currentSubnetValidatorList.NewIterator()
+	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
 		txIDBytes := subnetValidatorIt.Key()
@@ -189,7 +189,7 @@ func (ts *state) LoadCurrentValidators() error {
 		if err != nil {
 			return err
 		}
-		tx, _, err := ts.GetTx(txID)
+		tx, _, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
@@ -199,8 +199,8 @@ func (ts *state) LoadCurrentValidators() error {
 			return unsigned.ErrWrongTxType
 		}
 
-		cs.Validators = append(cs.Validators, tx)
-		vdr, exists := cs.ValidatorsByNodeID[addSubnetValidatorTx.Validator.NodeID]
+		cs.validators = append(cs.validators, tx)
+		vdr, exists := cs.validatorsByNodeID[addSubnetValidatorTx.Validator.NodeID]
 		if !exists {
 			return unsigned.ErrDSValidatorSubset
 		}
@@ -209,7 +209,7 @@ func (ts *state) LoadCurrentValidators() error {
 			TxID:                       txID,
 		}
 
-		cs.ValidatorsByTxID[txID] = &ValidatorReward{
+		cs.validatorsByTxID[txID] = &ValidatorReward{
 			AddStakerTx: tx,
 		}
 	}
@@ -217,23 +217,23 @@ func (ts *state) LoadCurrentValidators() error {
 		return err
 	}
 
-	for _, vdr := range cs.ValidatorsByNodeID {
-		SortDelegatorsByRemoval(vdr.delegators)
+	for _, vdr := range cs.validatorsByNodeID {
+		sortDelegatorsByRemoval(vdr.delegators)
 	}
-	SortValidatorsByRemoval(cs.Validators)
+	sortValidatorsByRemoval(cs.validators)
 	cs.SetNextStaker()
 
-	ts.SetCurrentStakerChainState(cs)
+	s.SetCurrentStakerChainState(cs)
 	return nil
 }
 
-func (ts *state) LoadPendingValidators() error {
+func (s *state) LoadPendingValidators() error {
 	ps := &pendingStaker{
 		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}
 
-	validatorIt := ts.pendingValidatorList.NewIterator()
+	validatorIt := s.pendingValidatorList.NewIterator()
 	defer validatorIt.Release()
 	for validatorIt.Next() {
 		txIDBytes := validatorIt.Key()
@@ -241,7 +241,7 @@ func (ts *state) LoadPendingValidators() error {
 		if err != nil {
 			return err
 		}
-		tx, _, err := ts.GetTx(txID)
+		tx, _, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
@@ -261,7 +261,7 @@ func (ts *state) LoadPendingValidators() error {
 		return err
 	}
 
-	delegatorIt := ts.pendingDelegatorList.NewIterator()
+	delegatorIt := s.pendingDelegatorList.NewIterator()
 	defer delegatorIt.Release()
 	for delegatorIt.Next() {
 		txIDBytes := delegatorIt.Key()
@@ -269,7 +269,7 @@ func (ts *state) LoadPendingValidators() error {
 		if err != nil {
 			return err
 		}
-		tx, _, err := ts.GetTx(txID)
+		tx, _, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
@@ -301,7 +301,7 @@ func (ts *state) LoadPendingValidators() error {
 		return err
 	}
 
-	subnetValidatorIt := ts.pendingSubnetValidatorList.NewIterator()
+	subnetValidatorIt := s.pendingSubnetValidatorList.NewIterator()
 	defer subnetValidatorIt.Release()
 	for subnetValidatorIt.Next() {
 		txIDBytes := subnetValidatorIt.Key()
@@ -309,7 +309,7 @@ func (ts *state) LoadPendingValidators() error {
 		if err != nil {
 			return err
 		}
-		tx, _, err := ts.GetTx(txID)
+		tx, _, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
@@ -345,6 +345,6 @@ func (ts *state) LoadPendingValidators() error {
 	}
 	sortValidatorsByAddition(ps.validators)
 
-	ts.SetPendingStakerChainState(ps)
+	s.SetPendingStakerChainState(ps)
 	return nil
 }

@@ -21,7 +21,7 @@ var _ PendingStaker = &pendingStaker{}
 // delegators) that are slated to start staking in the future.
 type PendingStaker interface {
 	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *unsigned.AddValidatorTx, txID ids.ID, err error)
-	GetValidator(nodeID ids.NodeID) validatorCache
+	GetValidator(nodeID ids.NodeID) validator
 
 	AddStaker(addStakerTx *signed.Tx) PendingStaker
 	DeleteStakers(numToRemove int) PendingStaker
@@ -61,7 +61,7 @@ func (ps *pendingStaker) GetValidatorTx(nodeID ids.NodeID) (
 	return vdr.UnsignedAddValidatorTx, vdr.TxID, nil
 }
 
-func (ps *pendingStaker) GetValidator(nodeID ids.NodeID) validatorCache {
+func (ps *pendingStaker) GetValidator(nodeID ids.NodeID) validator {
 	if vdr, exists := ps.validatorExtrasByNodeID[nodeID]; exists {
 		return vdr
 	}

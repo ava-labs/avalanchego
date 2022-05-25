@@ -17,7 +17,7 @@ import (
 	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
-var _ ValidatorState = &validatorStateImpl{}
+var _ ValidatorState = &validatorState{}
 
 type ValidatorState interface {
 	SetCurrentStakerChainState(cs CurrentStaker)
@@ -34,34 +34,34 @@ func NewValidatorState(
 	current CurrentStaker,
 	pending PendingStaker,
 ) ValidatorState {
-	return &validatorStateImpl{
+	return &validatorState{
 		current: current,
 		pending: pending,
 	}
 }
 
-type validatorStateImpl struct {
+type validatorState struct {
 	current CurrentStaker
 	pending PendingStaker
 }
 
-func (vs *validatorStateImpl) CurrentStakerChainState() CurrentStaker {
+func (vs *validatorState) CurrentStakerChainState() CurrentStaker {
 	return vs.current
 }
 
-func (vs *validatorStateImpl) PendingStakerChainState() PendingStaker {
+func (vs *validatorState) PendingStakerChainState() PendingStaker {
 	return vs.pending
 }
 
-func (vs *validatorStateImpl) SetCurrentStakerChainState(cs CurrentStaker) {
+func (vs *validatorState) SetCurrentStakerChainState(cs CurrentStaker) {
 	vs.current = cs
 }
 
-func (vs *validatorStateImpl) SetPendingStakerChainState(ps PendingStaker) {
+func (vs *validatorState) SetPendingStakerChainState(ps PendingStaker) {
 	vs.pending = ps
 }
 
-func (vs *validatorStateImpl) GetNextStakerChangeTime() (time.Time, error) {
+func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 	earliest := mockable.MaxTime
 	currentStakers := vs.CurrentStakerChainState()
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
@@ -70,8 +70,7 @@ func (vs *validatorStateImpl) GetNextStakerChangeTime() (time.Time, error) {
 		if !ok {
 			return time.Time{}, unsigned.ErrWrongTxType
 		}
-		endTime := staker.EndTime()
-		if endTime.Before(earliest) {
+		if endTime := staker.EndTime(); endTime.Before(earliest) {
 			earliest = endTime
 		}
 	}
@@ -82,15 +81,14 @@ func (vs *validatorStateImpl) GetNextStakerChangeTime() (time.Time, error) {
 		if !ok {
 			return time.Time{}, unsigned.ErrWrongTxType
 		}
-		startTime := staker.StartTime()
-		if startTime.Before(earliest) {
+		if startTime := staker.StartTime(); startTime.Before(earliest) {
 			earliest = startTime
 		}
 	}
 	return earliest, nil
 }
 
-func (vs *validatorStateImpl) maxSubnetStakeAmount(
+func (vs *validatorState) maxSubnetStakeAmount(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
 	startTime time.Time,
@@ -128,7 +126,7 @@ func (vs *validatorStateImpl) maxSubnetStakeAmount(
 	return vdrTx.Weight(), nil
 }
 
-func (vs *validatorStateImpl) maxPrimarySubnetStakeAmount(
+func (vs *validatorState) maxPrimarySubnetStakeAmount(
 	nodeID ids.NodeID,
 	startTime time.Time,
 	endTime time.Time,

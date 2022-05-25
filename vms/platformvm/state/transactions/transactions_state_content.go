@@ -71,7 +71,7 @@ type state struct {
 
 	baseDB database.Database
 
-	validatorStateImpl
+	validatorState
 
 	addedCurrentStakers   []*ValidatorReward
 	deletedCurrentStakers []*signed.Tx
@@ -99,8 +99,8 @@ type state struct {
 	validatorDiffsCache cache.Cacher // cache of heightWithSubnet -> map[ids.ShortID]*ValidatorWeightDiff
 	validatorDiffsDB    database.Database
 
-	addedTxs map[ids.ID]*TxStatusImpl // map of txID -> {*transaction.Tx, Status}
-	txCache  cache.Cacher             // cache of txID -> {*transaction.Tx, Status} if the entry is nil, it is not in the database
+	addedTxs map[ids.ID]*TxAndStatus // map of txID -> {*transaction.Tx, Status}
+	txCache  cache.Cacher            // cache of txID -> {*transaction.Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
@@ -127,7 +127,7 @@ type ValidatorWeightDiff struct {
 	Amount   uint64 `serialize:"true"`
 }
 
-type TxStatusImpl struct {
+type TxAndStatus struct {
 	Tx     *signed.Tx
 	Status status.Status
 }
@@ -137,7 +137,7 @@ type heightWithSubnet struct {
 	SubnetID ids.ID `serialize:"true"`
 }
 
-type stateTx struct {
+type txBytesAndStatus struct {
 	Tx     []byte        `serialize:"true"`
 	Status status.Status `serialize:"true"`
 }
@@ -200,7 +200,7 @@ func NewState(
 		validatorDiffsDB:             validatorDiffsDB,
 		validatorDiffsCache:          &cache.LRU{Size: validatorDiffsCacheSize},
 
-		addedTxs: make(map[ids.ID]*TxStatusImpl),
+		addedTxs: make(map[ids.ID]*TxAndStatus),
 		txDB:     prefixdb.New(txPrefix, baseDB),
 		txCache:  &cache.LRU{Size: txCacheSize},
 
@@ -328,7 +328,7 @@ func NewMeteredTransactionsState(
 		validatorDiffsDB:             validatorDiffsDB,
 		validatorDiffsCache:          validatorDiffsCache,
 
-		addedTxs: make(map[ids.ID]*TxStatusImpl),
+		addedTxs: make(map[ids.ID]*TxAndStatus),
 		txDB:     prefixdb.New(txPrefix, baseDB),
 		txCache:  txCache,
 
@@ -350,12 +350,12 @@ func NewMeteredTransactionsState(
 	}, err
 }
 
-func (ts *state) GetSubnets() ([]*signed.Tx, error) {
-	if ts.cachedSubnets != nil {
-		return ts.cachedSubnets, nil
+func (s *state) GetSubnets() ([]*signed.Tx, error) {
+	if s.cachedSubnets != nil {
+		return s.cachedSubnets, nil
 	}
 
-	subnetDBIt := ts.subnetDB.NewIterator()
+	subnetDBIt := s.subnetDB.NewIterator()
 	defer subnetDBIt.Release()
 
 	txs := []*signed.Tx(nil)
@@ -365,7 +365,7 @@ func (ts *state) GetSubnets() ([]*signed.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		subnetTx, _, err := ts.GetTx(subnetID)
+		subnetTx, _, err := s.GetTx(subnetID)
 		if err != nil {
 			return nil, err
 		}
@@ -374,23 +374,23 @@ func (ts *state) GetSubnets() ([]*signed.Tx, error) {
 	if err := subnetDBIt.Error(); err != nil {
 		return nil, err
 	}
-	txs = append(txs, ts.addedSubnets...)
-	ts.cachedSubnets = txs
+	txs = append(txs, s.addedSubnets...)
+	s.cachedSubnets = txs
 	return txs, nil
 }
 
-func (ts *state) AddSubnet(createSubnetTx *signed.Tx) {
-	ts.addedSubnets = append(ts.addedSubnets, createSubnetTx)
-	if ts.cachedSubnets != nil {
-		ts.cachedSubnets = append(ts.cachedSubnets, createSubnetTx)
+func (s *state) AddSubnet(createSubnetTx *signed.Tx) {
+	s.addedSubnets = append(s.addedSubnets, createSubnetTx)
+	if s.cachedSubnets != nil {
+		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
 }
 
-func (ts *state) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
-	if chainsIntf, cached := ts.chainCache.Get(subnetID); cached {
+func (s *state) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
+	if chainsIntf, cached := s.chainCache.Get(subnetID); cached {
 		return chainsIntf.([]*signed.Tx), nil
 	}
-	chainDB := ts.getChainDB(subnetID)
+	chainDB := s.getChainDB(subnetID)
 	chainDBIt := chainDB.NewIterator()
 	defer chainDBIt.Release()
 
@@ -401,7 +401,7 @@ func (ts *state) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		chainTx, _, err := ts.GetTx(chainID)
+		chainTx, _, err := s.GetTx(chainID)
 		if err != nil {
 			return nil, err
 		}
@@ -410,52 +410,52 @@ func (ts *state) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 	if err := chainDBIt.Error(); err != nil {
 		return nil, err
 	}
-	txs = append(txs, ts.addedChains[subnetID]...)
-	ts.chainCache.Put(subnetID, txs)
+	txs = append(txs, s.addedChains[subnetID]...)
+	s.chainCache.Put(subnetID, txs)
 	return txs, nil
 }
 
-func (ts *state) AddChain(createChainTxIntf *signed.Tx) {
+func (s *state) AddChain(createChainTxIntf *signed.Tx) {
 	createChainTx := createChainTxIntf.Unsigned.(*unsigned.CreateChainTx)
 	subnetID := createChainTx.SubnetID
-	ts.addedChains[subnetID] = append(ts.addedChains[subnetID], createChainTxIntf)
-	if chainsIntf, cached := ts.chainCache.Get(subnetID); cached {
+	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
+	if chainsIntf, cached := s.chainCache.Get(subnetID); cached {
 		chains := chainsIntf.([]*signed.Tx)
 		chains = append(chains, createChainTxIntf)
-		ts.chainCache.Put(subnetID, chains)
+		s.chainCache.Put(subnetID, chains)
 	}
 }
 
-func (ts *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
-	if chainDBIntf, cached := ts.chainDBCache.Get(subnetID); cached {
+func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
+	if chainDBIntf, cached := s.chainDBCache.Get(subnetID); cached {
 		return chainDBIntf.(linkeddb.LinkedDB)
 	}
-	rawChainDB := prefixdb.New(subnetID[:], ts.chainDB)
+	rawChainDB := prefixdb.New(subnetID[:], s.chainDB)
 	chainDB := linkeddb.NewDefault(rawChainDB)
-	ts.chainDBCache.Put(subnetID, chainDB)
+	s.chainDBCache.Put(subnetID, chainDB)
 	return chainDB
 }
 
-func (ts *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
-	if tx, exists := ts.addedTxs[txID]; exists {
+func (s *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
+	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.Tx, tx.Status, nil
 	}
-	if txIntf, cached := ts.txCache.Get(txID); cached {
+	if txIntf, cached := s.txCache.Get(txID); cached {
 		if txIntf == nil {
 			return nil, status.Unknown, database.ErrNotFound
 		}
-		tx := txIntf.(*TxStatusImpl)
+		tx := txIntf.(*TxAndStatus)
 		return tx.Tx, tx.Status, nil
 	}
-	txBytes, err := ts.txDB.Get(txID[:])
+	txBytes, err := s.txDB.Get(txID[:])
 	if err == database.ErrNotFound {
-		ts.txCache.Put(txID, nil)
+		s.txCache.Put(txID, nil)
 		return nil, status.Unknown, database.ErrNotFound
 	} else if err != nil {
 		return nil, status.Unknown, err
 	}
 
-	stx := stateTx{}
+	stx := txBytesAndStatus{}
 	if _, err := unsigned.GenCodec.Unmarshal(txBytes, &stx); err != nil {
 		return nil, status.Unknown, err
 	}
@@ -468,31 +468,31 @@ func (ts *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 		return nil, status.Unknown, err
 	}
 
-	ptx := &TxStatusImpl{
+	ptx := &TxAndStatus{
 		Tx:     &tx,
 		Status: stx.Status,
 	}
 
-	ts.txCache.Put(txID, ptx)
+	s.txCache.Put(txID, ptx)
 	return ptx.Tx, ptx.Status, nil
 }
 
-func (ts *state) AddTx(tx *signed.Tx, status status.Status) {
-	ts.addedTxs[tx.ID()] = &TxStatusImpl{
+func (s *state) AddTx(tx *signed.Tx, status status.Status) {
+	s.addedTxs[tx.ID()] = &TxAndStatus{
 		Tx:     tx,
 		Status: status,
 	}
 }
 
-func (ts *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
-	if utxos, exists := ts.addedRewardUTXOs[txID]; exists {
+func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
 		return utxos, nil
 	}
-	if utxos, exists := ts.rewardUTXOsCache.Get(txID); exists {
+	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
 		return utxos.([]*avax.UTXO), nil
 	}
 
-	rawTxDB := prefixdb.New(txID[:], ts.rewardUTXODB)
+	rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
 	txDB := linkeddb.NewDefault(rawTxDB)
 	it := txDB.NewIterator()
 	defer it.Release()
@@ -509,57 +509,57 @@ func (ts *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 		return nil, err
 	}
 
-	ts.rewardUTXOsCache.Put(txID, utxos)
+	s.rewardUTXOsCache.Put(txID, utxos)
 	return utxos, nil
 }
 
-func (ts *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
-	ts.addedRewardUTXOs[txID] = append(ts.addedRewardUTXOs[txID], utxo)
+func (s *state) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+	s.addedRewardUTXOs[txID] = append(s.addedRewardUTXOs[txID], utxo)
 }
 
-func (ts *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
-	if utxo, exists := ts.modifiedUTXOs[utxoID]; exists {
+func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	if utxo, exists := s.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
 			return nil, database.ErrNotFound
 		}
 		return utxo, nil
 	}
-	return ts.utxoState.GetUTXO(utxoID)
+	return s.utxoState.GetUTXO(utxoID)
 }
 
-func (ts *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	return ts.utxoState.UTXOIDs(addr, start, limit)
+func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	return s.utxoState.UTXOIDs(addr, start, limit)
 }
 
-func (ts *state) AddUTXO(utxo *avax.UTXO) {
-	ts.modifiedUTXOs[utxo.InputID()] = utxo
+func (s *state) AddUTXO(utxo *avax.UTXO) {
+	s.modifiedUTXOs[utxo.InputID()] = utxo
 }
 
-func (ts *state) DeleteUTXO(utxoID ids.ID) {
-	ts.modifiedUTXOs[utxoID] = nil
+func (s *state) DeleteUTXO(utxoID ids.ID) {
+	s.modifiedUTXOs[utxoID] = nil
 }
 
-func (ts *state) GetUptime(nodeID ids.NodeID) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	uptime, exists := ts.uptimes[nodeID]
+func (s *state) GetUptime(nodeID ids.NodeID) (upDuration time.Duration, lastUpdated time.Time, err error) {
+	uptime, exists := s.uptimes[nodeID]
 	if !exists {
 		return 0, time.Time{}, database.ErrNotFound
 	}
 	return uptime.UpDuration, uptime.lastUpdated, nil
 }
 
-func (ts *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
-	uptime, exists := ts.uptimes[nodeID]
+func (s *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
+	uptime, exists := s.uptimes[nodeID]
 	if !exists {
 		return database.ErrNotFound
 	}
 	uptime.UpDuration = upDuration
 	uptime.lastUpdated = lastUpdated
-	ts.updatedUptimes[nodeID] = struct{}{}
+	s.updatedUptimes[nodeID] = struct{}{}
 	return nil
 }
 
-func (ts *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
-	currentValidator, err := ts.CurrentStakerChainState().GetValidator(nodeID)
+func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
+	currentValidator, err := s.CurrentStakerChainState().GetValidator(nodeID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -568,26 +568,26 @@ func (ts *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return unsignedVdrTx.StartTime(), nil
 }
 
-func (ts *state) AddCurrentStaker(tx *signed.Tx, potentialReward uint64) {
-	ts.addedCurrentStakers = append(ts.addedCurrentStakers, &ValidatorReward{
+func (s *state) AddCurrentStaker(tx *signed.Tx, potentialReward uint64) {
+	s.addedCurrentStakers = append(s.addedCurrentStakers, &ValidatorReward{
 		AddStakerTx:     tx,
 		PotentialReward: potentialReward,
 	})
 }
 
-func (ts *state) DeleteCurrentStaker(tx *signed.Tx) {
-	ts.deletedCurrentStakers = append(ts.deletedCurrentStakers, tx)
+func (s *state) DeleteCurrentStaker(tx *signed.Tx) {
+	s.deletedCurrentStakers = append(s.deletedCurrentStakers, tx)
 }
 
-func (ts *state) AddPendingStaker(tx *signed.Tx) {
-	ts.addedPendingStakers = append(ts.addedPendingStakers, tx)
+func (s *state) AddPendingStaker(tx *signed.Tx) {
+	s.addedPendingStakers = append(s.addedPendingStakers, tx)
 }
 
-func (ts *state) DeletePendingStaker(tx *signed.Tx) {
-	ts.deletedPendingStakers = append(ts.deletedPendingStakers, tx)
+func (s *state) DeletePendingStaker(tx *signed.Tx) {
+	s.deletedPendingStakers = append(s.deletedPendingStakers, tx)
 }
 
-func (ts *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
+func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
 		Height:   height,
 		SubnetID: subnetID,
@@ -598,11 +598,11 @@ func (ts *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[id
 	}
 	prefixStr := string(prefixBytes)
 
-	if weightDiffsIntf, ok := ts.validatorDiffsCache.Get(prefixStr); ok {
+	if weightDiffsIntf, ok := s.validatorDiffsCache.Get(prefixStr); ok {
 		return weightDiffsIntf.(map[ids.NodeID]*ValidatorWeightDiff), nil
 	}
 
-	rawDiffDB := prefixdb.New(prefixBytes, ts.validatorDiffsDB)
+	rawDiffDB := prefixdb.New(prefixBytes, s.validatorDiffsDB)
 	diffDB := linkeddb.NewDefault(rawDiffDB)
 	diffIter := diffDB.NewIterator()
 
@@ -622,11 +622,11 @@ func (ts *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[id
 		weightDiffs[nodeID] = &weightDiff
 	}
 
-	ts.validatorDiffsCache.Put(prefixStr, weightDiffs)
+	s.validatorDiffsCache.Put(prefixStr, weightDiffs)
 	return weightDiffs, nil
 }
 
-func (ts *state) MaxStakeAmount(
+func (s *state) MaxStakeAmount(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
 	startTime time.Time,
@@ -635,11 +635,11 @@ func (ts *state) MaxStakeAmount(
 	if startTime.After(endTime) {
 		return 0, errStartAfterEndTime
 	}
-	if timestamp := ts.GetTimestamp(); startTime.Before(timestamp) {
+	if timestamp := s.GetTimestamp(); startTime.Before(timestamp) {
 		return 0, errStartTimeTooEarly
 	}
 	if subnetID == constants.PrimaryNetworkID {
-		return ts.maxPrimarySubnetStakeAmount(nodeID, startTime, endTime)
+		return s.maxPrimarySubnetStakeAmount(nodeID, startTime, endTime)
 	}
-	return ts.maxSubnetStakeAmount(subnetID, nodeID, startTime, endTime)
+	return s.maxSubnetStakeAmount(subnetID, nodeID, startTime, endTime)
 }
