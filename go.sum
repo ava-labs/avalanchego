@@ -71,8 +71,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883/go.mod h1:rCTlJbsFo29Kk6CurOXKm700vrz8f0KW0JNfpkRJY/8=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/apache/arrow/go/arrow v0.0.0-20191024131854-af6fa24be0db/go.mod h1:VTxUBvSJ3s3eHAg65PNgrsn5BtqCRPdmyXh6rAfdxN0=
-github.com/ava-labs/avalanchego v1.7.11-rc.27 h1:GjjGmo1FCcQRsWwVtOxhXLXVczyyriN3wE5uu8nTnYU=
-github.com/ava-labs/avalanchego v1.7.11-rc.27/go.mod h1:tbCKLCFYkAm9Q4eaXVhexar9ycJoDNEtwzjlH0PQ82Q=
+github.com/ava-labs/avalanchego v1.7.11 h1:tb/dYm85sUm1M0N+2yfwq4dm1X967PKDdjU3lmg7qEs=
+github.com/ava-labs/avalanchego v1.7.11/go.mod h1:z/zteB07lMn/xO0aPRJOw80VGuLsn7FRfgbMCd0y4HY=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
