@@ -191,7 +191,7 @@ EOF
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: use "go install -v github.com/ava-labs/avalanche-network-runner/cmd/avalanche-network-runner@v${NETWORK_RUNNER_VERSION}"
-NETWORK_RUNNER_VERSION=1.0.12
+NETWORK_RUNNER_VERSION=1.0.16
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then

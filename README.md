@@ -1,3 +1,6 @@
+
+![Github Actions](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)
+
 # Subnet EVM
 
 [Avalanche](https://docs.avax.network/learn/platform-overview) is a network composed of multiple blockchains.

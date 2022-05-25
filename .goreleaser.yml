@@ -1,0 +1,23 @@
+# ref. https://goreleaser.com/customization/build/
+builds:
+  - id: subnet-evm
+    main: ./plugin
+    binary: subnet-evm
+    flags:
+      - -v
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: linux
+        goarch: 386
+      - goos: windows
+        goarch: 386
+      - goos: freebsd
+        goarch: 386
+
+release:
+  # Repo in which the release will be created.
+  # Default is extracted from the origin remote URL or empty if its private hosted.
+  github:
+    owner: ava-labs
+    name: subnet-evm
