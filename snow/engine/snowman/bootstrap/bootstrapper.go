@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -62,10 +61,13 @@ type bootstrapper struct {
 
 	awaitingTimeout bool
 
-	// set of validators to fetch containers from
-	// initialized to config.Beacons, vdrs responding
-	// with empty GetAncestors messages are removed
-	// from this set so we avoid contacting them again
+	// fetchFrom is the set of nodes that we can fetch the next container from.
+	// When a container is fetched, the nodeID is removed from [fetchFrom] to
+	// attempt to limit a single request to a peer at any given time. When the
+	// response is received, either and Ancestors or an AncestorsFailed, the
+	// nodeID will be added back to [fetchFrom] unless the Ancestors message is
+	// empty. This is to attempt to prevent requesting containers from that peer
+	// again.
 	fetchFrom ids.NodeIDSet
 }
 
@@ -103,9 +105,6 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 	config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 
-	// initialize set of validators to fetch containers from using [Config.Beacons]
-	b.setFetchFrom(b.Config.Beacons)
-
 	return b, nil
 }
 
@@ -130,7 +129,7 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	b.startingHeight = lastAccepted.Height()
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if !b.WeightTracker.EnoughConnectedWeight() {
+	if !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -141,24 +140,30 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]
 func (b *bootstrapper) Ancestors(vdr ids.NodeID, requestID uint32, blks [][]byte) error {
-	lenBlks := len(blks)
-	if lenBlks == 0 {
-		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
-		// avoid contacting [vdr] about ancestors again
-		b.markUnavailable(vdr)
-		return b.GetAncestorsFailed(vdr, requestID)
-	}
-	if lenBlks > b.Config.AncestorsMaxContainersReceived {
-		blks = blks[:b.Config.AncestorsMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring %d containers in Ancestors(%s, %d)",
-			lenBlks-b.Config.AncestorsMaxContainersReceived, vdr, requestID)
-	}
-
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok { // this message isn't in response to a request we made
 		b.Ctx.Log.Debug("received unexpected Ancestors from %s with ID %d", vdr, requestID)
 		return nil
+	}
+
+	lenBlks := len(blks)
+	if lenBlks == 0 {
+		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
+
+		b.markUnavailable(vdr)
+
+		// Send another request for this
+		return b.fetch(wantedBlkID)
+	}
+
+	// This node has responded - so add it back into the set
+	b.fetchFrom.Add(vdr)
+
+	if lenBlks > b.Config.AncestorsMaxContainersReceived {
+		blks = blks[:b.Config.AncestorsMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in Ancestors(%s, %d)",
+			lenBlks-b.Config.AncestorsMaxContainersReceived, vdr, requestID)
 	}
 
 	blocks, err := block.BatchedParseBlock(b.VM, blks)
@@ -193,6 +198,10 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) erro
 			vdr, requestID)
 		return nil
 	}
+
+	// This node timed out their request, so we can add them back to [fetchFrom]
+	b.fetchFrom.Add(vdr)
+
 	// Send another request for this
 	return b.fetch(blkID)
 }
@@ -202,16 +211,18 @@ func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Applicat
 		return err
 	}
 
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
-		b.started = true
-		return b.Startup()
+	b.fetchFrom.Add(nodeID)
+
+	if b.started || !b.StartupTracker.ShouldStart() {
+		return nil
 	}
 
-	return nil
+	b.started = true
+	return b.Startup()
 }
 
 func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
@@ -219,7 +230,12 @@ func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
 		return err
 	}
 
-	return b.WeightTracker.RemoveWeightForNode(nodeID)
+	if err := b.StartupTracker.Disconnected(nodeID); err != nil {
+		return err
+	}
+
+	b.markUnavailable(nodeID)
+	return nil
 }
 
 func (b *bootstrapper) Timeout() error {
@@ -256,6 +272,9 @@ func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.Blocked.MissingIDs()
+
+	// Initialize the fetch from set to the currently preferred peers
+	b.fetchFrom = b.StartupTracker.PreferredPeers()
 
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -307,6 +326,10 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	if !ok {
 		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
 	}
+
+	// We only allow one outbound request at a time from a node
+	b.markUnavailable(validatorID)
+
 	b.Config.SharedCfg.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
@@ -314,14 +337,16 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	return nil
 }
 
-// markUnavailable removes [vdr] from the set of validators used to fetch ancestors.
-// if the set becomes empty, it is reset to [b.Config.Beacons] so bootstrapping can continue.
-func (b *bootstrapper) markUnavailable(vdr ids.NodeID) {
-	b.fetchFrom.Remove(vdr)
+// markUnavailable removes [nodeID] from the set of peers used to fetch
+// ancestors. If the set becomes empty, it is reset to the currently preferred
+// peers so bootstrapping can continue.
+func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
+	b.fetchFrom.Remove(nodeID)
 
-	// if [fetchFrom] has become empty, reset it to [b.Config.Beacons]
+	// if [fetchFrom] has become empty, reset it to the currently preferred
+	// peers
 	if b.fetchFrom.Len() == 0 {
-		b.setFetchFrom(b.Config.Beacons)
+		b.fetchFrom = b.StartupTracker.PreferredPeers()
 	}
 }
 
@@ -514,12 +539,4 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
-}
-
-// setFetchFrom populates fetchFrom using [beacons]
-func (b *bootstrapper) setFetchFrom(beacons validators.Set) {
-	b.fetchFrom = ids.NewNodeIDSet(beacons.Len())
-	for _, vdr := range beacons.List() {
-		b.fetchFrom.Add(vdr.ID())
-	}
 }

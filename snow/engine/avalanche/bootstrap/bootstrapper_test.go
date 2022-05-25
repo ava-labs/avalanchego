@@ -66,13 +66,17 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		t.Fatal(err)
 	}
 
+	peerTracker := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
+	peers.RegisterCallbackListener(startupTracker)
+
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
-		WeightTracker:                  tracker.NewWeightTracker(peers, peers.Weight()/2+1),
+		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		Subnet:                         subnet,
 		Timer:                          &common.TimerTest{},

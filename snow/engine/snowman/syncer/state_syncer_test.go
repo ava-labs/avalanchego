@@ -86,13 +86,17 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	alpha := vdrs.Weight()
 	startupAlpha := alpha
 
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Validators:    vdrs,
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         alpha,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Validators:     vdrs,
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          alpha,
+		StartupTracker: startup,
 	}
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
@@ -101,7 +105,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	startReqID := uint32(0)
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
-	assert.False(commonCfg.WeightTracker.EnoughConnectedWeight())
+	assert.False(commonCfg.StartupTracker.ShouldStart())
 	assert.NoError(syncer.Start(startReqID))
 	assert.False(syncer.started)
 
@@ -110,7 +114,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.NoError(vdrs.AddWeight(vdr0, startupAlpha/2))
 	assert.NoError(syncer.Connected(vdr0, version.CurrentApp))
 
-	assert.False(commonCfg.WeightTracker.EnoughConnectedWeight())
+	assert.False(commonCfg.StartupTracker.ShouldStart())
 	assert.NoError(syncer.Start(startReqID))
 	assert.False(syncer.started)
 
@@ -119,7 +123,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	assert.NoError(vdrs.AddWeight(vdr, startupAlpha))
 	assert.NoError(syncer.Connected(vdr, version.CurrentApp))
 
-	assert.True(commonCfg.WeightTracker.EnoughConnectedWeight())
+	assert.True(commonCfg.StartupTracker.ShouldStart())
 	assert.NoError(syncer.Start(startReqID))
 	assert.True(syncer.started)
 }
@@ -129,12 +133,17 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
@@ -166,12 +175,17 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, _ := buildTestsObjects(t, &commonCfg)
 
@@ -195,12 +209,17 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
@@ -232,12 +251,17 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -317,12 +341,17 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -383,12 +412,17 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -462,12 +496,17 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
 		Beacons:                     vdrs,
 		SampleK:                     vdrs.Len(),
 		Alpha:                       (vdrs.Weight() + 1) / 2,
-		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
+		StartupTracker:              startup,
 		RetryBootstrap:              true,
 		RetryBootstrapWarnFrequency: 1,
 	}
@@ -549,12 +588,17 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -617,12 +661,17 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -729,12 +778,17 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -827,12 +881,17 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -966,12 +1025,17 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
 		Beacons:                     vdrs,
 		SampleK:                     vdrs.Len(),
 		Alpha:                       (vdrs.Weight() + 1) / 2,
-		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
+		StartupTracker:              startup,
 		RetryBootstrap:              true, // this sets RetryStateSyncing too
 		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
 	}
@@ -1069,12 +1133,17 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
-		Ctx:           snow.DefaultConsensusContextTest(),
-		Beacons:       vdrs,
-		SampleK:       vdrs.Len(),
-		Alpha:         (vdrs.Weight() + 1) / 2,
-		WeightTracker: tracker.NewWeightTracker(vdrs, startupAlpha),
+		Ctx:            snow.DefaultConsensusContextTest(),
+		Beacons:        vdrs,
+		SampleK:        vdrs.Len(),
+		Alpha:          (vdrs.Weight() + 1) / 2,
+		StartupTracker: startup,
 	}
 	syncer, fullVM, sender := buildTestsObjects(t, &commonCfg)
 
@@ -1210,12 +1279,17 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, startupAlpha)
+	vdrs.RegisterCallbackListener(startup)
+
 	commonCfg := common.Config{
 		Ctx:                         snow.DefaultConsensusContextTest(),
 		Beacons:                     vdrs,
 		SampleK:                     vdrs.Len(),
 		Alpha:                       (vdrs.Weight() + 1) / 2,
-		WeightTracker:               tracker.NewWeightTracker(vdrs, startupAlpha),
+		StartupTracker:              startup,
 		RetryBootstrap:              true, // this sets RetryStateSyncing too
 		RetryBootstrapWarnFrequency: 1,    // this sets RetrySyncingWarnFrequency too
 	}
