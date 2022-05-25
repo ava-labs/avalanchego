@@ -100,7 +100,7 @@ func (tx *StatefulImportTx) Execute(
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := vm.spendOps.SemanticVerifySpendUTXOs(tx, utxosList, ins, tx.Outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+		if err := vm.spendHandler.SemanticVerifySpendUTXOs(tx, utxosList, ins, tx.Outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 			return nil, err
 		}
 	}

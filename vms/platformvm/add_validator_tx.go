@@ -136,7 +136,7 @@ func (tx *StatefulAddValidatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := vm.spendOps.SemanticVerifySpend(
+		if err := vm.spendHandler.SemanticVerifySpend(
 			parentState,
 			tx.AddValidatorTx,
 			tx.Ins,

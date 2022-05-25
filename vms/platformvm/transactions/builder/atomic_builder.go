@@ -16,10 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	ErrNoFunds        = errors.New("no spendable funds were found")
-	errOverflowExport = errors.New("overflow when computing export amount + txFee")
-)
+var errNoFunds = errors.New("no spendable funds were found")
 
 // Max number of items allowed in a page
 const MaxPageSize = 1024
@@ -85,7 +82,7 @@ func (b *builder) NewImportTx(
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
 
 	if importedAmount == 0 {
-		return nil, ErrNoFunds // No imported UTXOs were spendable
+		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
 	ins := []*avax.TransferableInput{}
@@ -138,7 +135,7 @@ func (b *builder) NewExportTx(
 ) (*signed.Tx, error) {
 	toBurn, err := math.Add64(amount, b.cfg.TxFee)
 	if err != nil {
-		return nil, errOverflowExport
+		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
 	}
 	ins, outs, _, signers, err := b.Stake(keys, 0, toBurn, changeAddr)
 	if err != nil {

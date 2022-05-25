@@ -169,7 +169,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := vm.spendOps.SemanticVerifySpend(
+		if err := vm.spendHandler.SemanticVerifySpend(
 			parentState,
 			tx.AddSubnetValidatorTx,
 			tx.Ins,

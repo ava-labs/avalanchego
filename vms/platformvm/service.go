@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -524,7 +523,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		}
 		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 		if !ok {
-			return utxos.ErrUnknownOwners
+			return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
 		}
 
 		controlAddrs := make([]string, len(owner.Addrs))

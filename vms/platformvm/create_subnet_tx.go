@@ -58,7 +58,7 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	if err := vm.spendOps.SemanticVerifySpend(
+	if err := vm.spendHandler.SemanticVerifySpend(
 		vs,
 		tx.CreateSubnetTx,
 		tx.Ins,

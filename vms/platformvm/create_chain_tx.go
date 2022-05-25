@@ -76,7 +76,7 @@ func (tx *StatefulCreateChainTx) Execute(
 	// Verify the flowcheck
 	timestamp := vs.GetTimestamp()
 	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
-	if err := vm.spendOps.SemanticVerifySpend(
+	if err := vm.spendHandler.SemanticVerifySpend(
 		vs,
 		tx.CreateChainTx,
 		tx.Ins,

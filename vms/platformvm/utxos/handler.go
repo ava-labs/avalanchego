@@ -63,6 +63,19 @@ func ProduceOutputs(
 
 // TODO: Stake and Authorize be replaced by similar methods in the P-chain wallet
 type SpendingOps interface {
+	// Stake the provided amount while deducting the provided fee.
+	// Arguments:
+	// - [keys] are the owners of the funds
+	// - [amount] is the amount of funds that are trying to be staked
+	// - [fee] is the amount of AVAX that should be burned
+	// - [changeAddr] is the address that change, if there is any, is sent to
+	// Returns:
+	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [returnedOutputs] the outputs that should be immediately returned to the
+	//                     UTXO set
+	// - [stakedOutputs] the outputs that should be locked for the duration of the
+	//                   staking period
+	// - [signers] the proof of ownership of the funds being moved
 	Stake(
 		keys []*crypto.PrivateKeySECP256K1R,
 		amount uint64,
@@ -76,6 +89,7 @@ type SpendingOps interface {
 		error,
 	)
 
+	// authorize an operation on behalf of the named subnet with the provided keys.
 	Authorize(
 		vs txstate.Mutable,
 		subnetID ids.ID,
@@ -90,6 +104,11 @@ type SpendingOps interface {
 type SpendHandler interface {
 	SpendingOps
 
+	// Verify that [tx] is semantically valid.
+	// [db] should not be committed if an error is returned
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpend(
 		utxoDB txstate.UTXOGetter,
 		tx unsigned.Tx,
@@ -100,6 +119,12 @@ type SpendHandler interface {
 		feeAssetID ids.ID,
 	) error
 
+	// Verify that [tx] is semantically valid.
+	// [db] should not be committed if an error is returned
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// [utxos[i]] is the UTXO being consumed by [ins[i]]
+	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpendUTXOs(
 		tx unsigned.Tx,
 		utxosList []*avax.UTXO,
@@ -132,19 +157,6 @@ type handler struct {
 	fx          fx.Fx
 }
 
-// stake the provided amount while deducting the provided fee.
-// Arguments:
-// - [keys] are the owners of the funds
-// - [amount] is the amount of funds that are trying to be staked
-// - [fee] is the amount of AVAX that should be burned
-// - [changeAddr] is the address that change, if there is any, is sent to
-// Returns:
-// - [inputs] the inputs that should be consumed to fund the outputs
-// - [returnedOutputs] the outputs that should be immediately returned to the
-//                     UTXO set
-// - [stakedOutputs] the outputs that should be locked for the duration of the
-//                   staking period
-// - [signers] the proof of ownership of the funds being moved
 func (h *handler) Stake(
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
@@ -384,7 +396,6 @@ func (h *handler) Stake(
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
 
-// authorize an operation on behalf of the named subnet with the provided keys.
 func (h *handler) Authorize(
 	vs txstate.Mutable,
 	subnetID ids.ID,
@@ -428,11 +439,6 @@ func (h *handler) Authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpend(
 	utxoDB txstate.UTXOGetter,
 	tx unsigned.Tx,
@@ -458,12 +464,6 @@ func (h *handler) SemanticVerifySpend(
 	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// [utxos[i]] is the UTXO being consumed by [ins[i]]
-// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpendUTXOs(
 	tx unsigned.Tx,
 	utxosList []*avax.UTXO,

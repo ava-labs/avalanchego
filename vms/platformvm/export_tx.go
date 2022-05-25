@@ -57,7 +57,7 @@ func (tx *StatefulExportTx) Execute(
 	}
 
 	// Verify the flowcheck
-	if err := vm.spendOps.SemanticVerifySpend(
+	if err := vm.spendHandler.SemanticVerifySpend(
 		vs,
 		tx.ExportTx,
 		tx.Ins,

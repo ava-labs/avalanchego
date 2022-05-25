@@ -9,14 +9,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
-func GetCreateBlockchainTxFee(cfg config.Config, t time.Time) uint64 {
+func getCreateBlockchainTxFee(cfg config.Config, t time.Time) uint64 {
 	if t.Before(cfg.ApricotPhase3Time) {
 		return cfg.CreateAssetTxFee
 	}
 	return cfg.CreateBlockchainTxFee
 }
 
-func GetCreateSubnetTxFee(cfg config.Config, t time.Time) uint64 {
+func getCreateSubnetTxFee(cfg config.Config, t time.Time) uint64 {
 	if t.Before(cfg.ApricotPhase3Time) {
 		return cfg.CreateAssetTxFee
 	}
