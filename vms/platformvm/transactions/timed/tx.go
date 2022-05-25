@@ -5,14 +5,10 @@ package timed
 
 import (
 	"time"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 type Tx interface {
-	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
 	Weight() uint64
-	Bytes() []byte
 }

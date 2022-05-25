@@ -129,12 +129,14 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if validator.AddValidatorTx().ID() != addPendingValidatorTx.Unsigned.ID() {
+
+	_, vdrTxID := validator.AddValidatorTx()
+	if vdrTxID != addPendingValidatorTx.ID() {
 		t.Fatalf("Added the wrong tx to the validator set")
 	}
 
 	onCommitPendingStakers := onCommit.PendingStakerChainState()
-	if _, err := onCommitPendingStakers.GetValidatorTx(nodeID); err == nil {
+	if _, _, err := onCommitPendingStakers.GetValidatorTx(nodeID); err == nil {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
@@ -152,11 +154,11 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	}
 
 	onAbortPendingStakers := onAbort.PendingStakerChainState()
-	vdr, err := onAbortPendingStakers.GetValidatorTx(nodeID)
+	_, retrievedTxID, err := onAbortPendingStakers.GetValidatorTx(nodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vdr.ID() != addPendingValidatorTx.Unsigned.ID() {
+	if retrievedTxID != addPendingValidatorTx.ID() {
 		t.Fatalf("Added the wrong tx to the pending validator set")
 	}
 
@@ -360,7 +362,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
-					_, err := pendingStakers.GetValidatorTx(stakerNodeID)
+					_, _, err := pendingStakers.GetValidatorTx(stakerNodeID)
 					assert.NoError(err)
 					assert.False(vm.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
 				case current:

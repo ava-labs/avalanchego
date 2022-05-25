@@ -22,6 +22,8 @@ var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
 // StatefulCreateSubnetTx is an unsigned proposal to create a new subnet
 type StatefulCreateSubnetTx struct {
 	*unsigned.CreateSubnetTx `serialize:"true"`
+
+	txID ids.ID // ID of signed create subnet tx
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
@@ -52,7 +54,7 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	error,
 ) {
 	// Make sure this transaction is well formed.
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
 	}
 
@@ -74,8 +76,7 @@ func (tx *StatefulCreateSubnetTx) Execute(
 	// Consume the UTXOS
 	consumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	produceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddSubnet(stx)
 
@@ -113,12 +114,12 @@ func (vm *VM) newCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
 
-	return tx, utx.SyntacticVerify(vm.ctx)
+	return tx, tx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {

@@ -479,7 +479,7 @@ func (ts *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 }
 
 func (ts *state) AddTx(tx *signed.Tx, status status.Status) {
-	ts.addedTxs[tx.Unsigned.ID()] = &TxStatusImpl{
+	ts.addedTxs[tx.ID()] = &TxStatusImpl{
 		Tx:     tx,
 		Status: status,
 	}
@@ -564,7 +564,9 @@ func (ts *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return currentValidator.AddValidatorTx().StartTime(), nil
+
+	unsignedVdrTx, _ := currentValidator.AddValidatorTx()
+	return unsignedVdrTx.StartTime(), nil
 }
 
 func (ts *state) AddCurrentStaker(tx *signed.Tx, potentialReward uint64) {

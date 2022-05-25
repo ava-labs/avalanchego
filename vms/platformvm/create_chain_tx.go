@@ -28,6 +28,8 @@ const (
 // StatefulCreateChainTx is an unsigned CreateChainTx
 type StatefulCreateChainTx struct {
 	*unsigned.CreateChainTx `serialize:"true"`
+
+	txID ids.ID // ID of signed create subnet tx
 }
 
 func (tx *StatefulCreateChainTx) InputUTXOs() ids.Set { return nil }
@@ -61,7 +63,7 @@ func (tx *StatefulCreateChainTx) Execute(
 		return nil, errWrongNumberOfCredentials
 	}
 
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, err
 	}
 
@@ -106,8 +108,7 @@ func (tx *StatefulCreateChainTx) Execute(
 	// Consume the UTXOS
 	consumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	produceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 	// Attempt to the new chain to the database
 	vs.AddChain(stx)
 
@@ -158,11 +159,11 @@ func (vm *VM) newCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(vm.ctx)
+	return tx, tx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateBlockchainTxFee(t time.Time) uint64 {

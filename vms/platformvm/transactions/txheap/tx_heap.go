@@ -84,8 +84,8 @@ func (h *txHeap) Swap(i, j int) {
 	h.txs[i] = iTx
 	h.txs[j] = jTx
 
-	iTxID := iTx.tx.Unsigned.ID()
-	jTxID := jTx.tx.Unsigned.ID()
+	iTxID := iTx.tx.ID()
+	jTxID := jTx.tx.ID()
 	h.txIDToIndex[iTxID] = i
 	h.txIDToIndex[jTxID] = j
 }
@@ -93,7 +93,7 @@ func (h *txHeap) Swap(i, j int) {
 func (h *txHeap) Push(x interface{}) {
 	tx := x.(*signed.Tx)
 
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	_, exists := h.txIDToIndex[txID]
 	if exists {
 		return
@@ -114,7 +114,7 @@ func (h *txHeap) Pop() interface{} {
 	h.txs = h.txs[:newLen]
 
 	tx := htx.tx
-	txID := tx.Unsigned.ID()
+	txID := tx.ID()
 	delete(h.txIDToIndex, txID)
 	return tx
 }

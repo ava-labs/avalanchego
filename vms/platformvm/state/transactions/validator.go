@@ -5,27 +5,27 @@ package transactions
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
 var _ validatorCache = &validatorImpl{}
 
 type validatorCache interface {
-	Delegators() []*unsigned.AddDelegatorTx
-	SubnetValidators() map[ids.ID]*unsigned.AddSubnetValidatorTx
+	Delegators() []signed.DelegatorAndID
+	SubnetValidators() map[ids.ID]signed.SubnetValidatorAndID
 }
 
 type validatorImpl struct {
 	// sorted in order of next operation, either addition or removal.
-	delegators []*unsigned.AddDelegatorTx
+	delegators []signed.DelegatorAndID
 	// maps subnetID to tx
-	subnets map[ids.ID]*unsigned.AddSubnetValidatorTx
+	subnets map[ids.ID]signed.SubnetValidatorAndID
 }
 
-func (v *validatorImpl) Delegators() []*unsigned.AddDelegatorTx {
+func (v *validatorImpl) Delegators() []signed.DelegatorAndID {
 	return v.delegators
 }
 
-func (v *validatorImpl) SubnetValidators() map[ids.ID]*unsigned.AddSubnetValidatorTx {
+func (v *validatorImpl) SubnetValidators() map[ids.ID]signed.SubnetValidatorAndID {
 	return v.subnets
 }

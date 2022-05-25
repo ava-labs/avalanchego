@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	pchainvalidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -34,6 +34,8 @@ var (
 // StatefulAddValidatorTx is an unsigned addValidatorTx
 type StatefulAddValidatorTx struct {
 	*unsigned.AddValidatorTx `serialize:"true"`
+
+	txID ids.ID // ID of signed add subnet validator tx
 }
 
 // Attempts to verify this transaction with the provided state.
@@ -64,7 +66,7 @@ func (tx *StatefulAddValidatorTx) Execute(
 	error,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+	if err := stx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -121,7 +123,7 @@ func (tx *StatefulAddValidatorTx) Execute(
 		}
 
 		// Ensure this validator isn't about to become a validator.
-		_, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+		_, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is about to become a primary network validator",
@@ -165,15 +167,14 @@ func (tx *StatefulAddValidatorTx) Execute(
 	// Consume the UTXOS
 	consumeInputs(onCommitState, tx.Ins)
 	// Produce the UTXOS
-	txID := tx.ID()
-	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	produceOutputs(onCommitState, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	onAbortState := state.NewVersioned(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, outs)
+	produceOutputs(onAbortState, tx.txID, vm.ctx.AVAXAssetID, outs)
 
 	return onCommitState, onAbortState, nil
 }
@@ -207,7 +208,7 @@ func (vm *VM) newAddValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: pChainValidator.Validator{
+		Validator: pchainvalidator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
@@ -221,9 +222,9 @@ func (vm *VM) newAddValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx := &signed.Tx{Unsigned: utx}
-	if err := tx.Sign(Codec, signers); err != nil {
+	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	if err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(vm.ctx)
+	return tx, tx.SyntacticVerify(vm.ctx)
 }

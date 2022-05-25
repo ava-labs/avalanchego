@@ -28,17 +28,18 @@ var (
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX but no reward.
 type RewardValidatorTx struct {
-	avax.Metadata
-
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true" json:"txID"`
 
 	// Marks if this validator should be rewarded according to this node.
 	ShouldPreferCommit bool
+
+	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
-func (tx *RewardValidatorTx) InitCtx(*snow.Context) {}
-
-func (tx *RewardValidatorTx) InputIDs() ids.Set { return nil }
-
+func (tx *RewardValidatorTx) Initialize(unsignedBytes []byte)     { tx.unsignedBytes = unsignedBytes }
+func (tx *RewardValidatorTx) InitCtx(*snow.Context)               {}
+func (tx *RewardValidatorTx) UnsignedBytes() []byte               { return tx.unsignedBytes }
+func (tx *RewardValidatorTx) InputIDs() ids.Set                   { return nil }
+func (tx *RewardValidatorTx) Outputs() []*avax.TransferableOutput { return nil }
 func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error { return nil }

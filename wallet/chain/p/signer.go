@@ -310,6 +310,6 @@ func (s *signer) sign(tx *signed.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}
-	tx.Unsigned.Initialize(unsignedBytes, signedBytes)
+	tx.Initialize(unsignedBytes, signedBytes)
 	return nil
 }

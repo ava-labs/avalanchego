@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -35,7 +36,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: tx is nil
 	var unsignedTx *unsigned.AddValidatorTx
-	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
+	stx := signed.Tx{
+		Unsigned: unsignedTx,
+	}
+	if err := stx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -57,7 +61,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*unsigned.AddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -89,7 +93,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
 
@@ -115,7 +119,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
 	}
 
@@ -137,7 +141,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*unsigned.AddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
 
@@ -154,7 +158,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.Unsigned.(*unsigned.AddValidatorTx).SyntacticVerify(vm.ctx); err != nil {
+	} else if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }

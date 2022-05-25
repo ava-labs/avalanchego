@@ -23,6 +23,7 @@ var (
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
+	avax.Metadata
 }
 
 // Init sets the FxID fields in the inputs and outputs of this [BaseTx]
@@ -48,6 +49,23 @@ func (t *BaseTx) Init(vm *VM) error {
 	return nil
 }
 
+// UTXOs returns the UTXOs transaction is producing.
+func (t *BaseTx) UTXOs() []*avax.UTXO {
+	txID := t.ID()
+	utxos := make([]*avax.UTXO, len(t.Outs))
+	for i, out := range t.Outs {
+		utxos[i] = &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i),
+			},
+			Asset: avax.Asset{ID: out.AssetID()},
+			Out:   out.Out,
+		}
+	}
+	return utxos
+}
+
 // SyntacticVerify that this transaction is well-formed.
 func (t *BaseTx) SyntacticVerify(
 	ctx *snow.Context,
@@ -60,7 +78,11 @@ func (t *BaseTx) SyntacticVerify(
 	if t == nil {
 		return errNilTx
 	}
-	if err := t.MetadataVerify(ctx); err != nil {
+	if err := t.BaseTxVerify(ctx); err != nil {
+		return err
+	}
+
+	if err := t.Metadata.Verify(); err != nil {
 		return err
 	}
 
