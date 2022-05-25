@@ -21,12 +21,12 @@ import (
 )
 
 var (
-	_ CurrentStaker = &currentStaker{}
+	_ CurrentStakerState = &currentStakerState{}
 
 	ErrNotEnoughValidators = errors.New("not enough validators")
 )
 
-type CurrentStaker interface {
+type CurrentStakerState interface {
 	// The NextStaker value returns the next staker that is going to be removed
 	// using a RewardValidatorTx. Therefore, only AddValidatorTxs and
 	// AddDelegatorTxs will be returned. AddSubnetValidatorTxs are removed using
@@ -40,8 +40,8 @@ type CurrentStaker interface {
 		addDelegators []*ValidatorReward,
 		addSubnetValidators []*signed.Tx,
 		numTxsToRemove int,
-	) (CurrentStaker, error)
-	DeleteNextStaker() (CurrentStaker, error)
+	) (CurrentStakerState, error)
+	DeleteNextStaker() (CurrentStakerState, error)
 
 	// Stakers returns the current stakers on the network sorted in order of the
 	// order of their future removal from the validator set.
@@ -53,19 +53,19 @@ type CurrentStaker interface {
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 }
 
-// currentStaker is a copy on write implementation for versioning
+// currentStakerState is a copy on write implementation for versioning
 // the validator set. None of the slices, maps, or pointers should be modified
 // after initialization.
-type currentStaker struct {
+type currentStakerState struct {
 	// nodeID -> validator
-	ValidatorsByNodeID map[ids.NodeID]*currentValidatorImpl
+	validatorsByNodeID map[ids.NodeID]*currentValidatorImpl
 
 	// txID -> tx
-	ValidatorsByTxID map[ids.ID]*ValidatorReward
+	validatorsByTxID map[ids.ID]*ValidatorReward
 
-	// list of current Validators in order of their removal from the validator
+	// list of current validators in order of their removal from the validator
 	// set
-	Validators []*signed.Tx
+	validators []*signed.Tx
 
 	nextStaker     *ValidatorReward
 	addedStakers   []*ValidatorReward
@@ -77,52 +77,52 @@ type ValidatorReward struct {
 	PotentialReward uint64
 }
 
-func (cs *currentStaker) GetNextStaker() (addStakerTx *signed.Tx, potentialReward uint64, err error) {
+func (cs *currentStakerState) GetNextStaker() (addStakerTx *signed.Tx, potentialReward uint64, err error) {
 	if cs.nextStaker == nil {
 		return nil, 0, database.ErrNotFound
 	}
 	return cs.nextStaker.AddStakerTx, cs.nextStaker.PotentialReward, nil
 }
 
-func (cs *currentStaker) GetValidator(nodeID ids.NodeID) (currentValidator, error) {
-	vdr, exists := cs.ValidatorsByNodeID[nodeID]
+func (cs *currentStakerState) GetValidator(nodeID ids.NodeID) (currentValidator, error) {
+	vdr, exists := cs.validatorsByNodeID[nodeID]
 	if !exists {
 		return nil, database.ErrNotFound
 	}
 	return vdr, nil
 }
 
-func (cs *currentStaker) UpdateStakers(
+func (cs *currentStakerState) UpdateStakers(
 	addValidatorTxs []*ValidatorReward,
 	addDelegatorTxs []*ValidatorReward,
 	addSubnetValidatorTxs []*signed.Tx,
 	numTxsToRemove int,
-) (CurrentStaker, error) {
-	if numTxsToRemove > len(cs.Validators) {
+) (CurrentStakerState, error) {
+	if numTxsToRemove > len(cs.validators) {
 		return nil, ErrNotEnoughValidators
 	}
-	newCS := &currentStaker{
-		ValidatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.ValidatorsByNodeID)+len(addValidatorTxs)),
-		ValidatorsByTxID:   make(map[ids.ID]*ValidatorReward, len(cs.ValidatorsByTxID)+len(addValidatorTxs)+len(addDelegatorTxs)+len(addSubnetValidatorTxs)),
-		Validators:         cs.Validators[numTxsToRemove:], // sorted in order of removal
+	newCS := &currentStakerState{
+		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.validatorsByNodeID)+len(addValidatorTxs)),
+		validatorsByTxID:   make(map[ids.ID]*ValidatorReward, len(cs.validatorsByTxID)+len(addValidatorTxs)+len(addDelegatorTxs)+len(addSubnetValidatorTxs)),
+		validators:         cs.validators[numTxsToRemove:], // sorted in order of removal
 
 		addedStakers:   append(addValidatorTxs, addDelegatorTxs...),
-		deletedStakers: cs.Validators[:numTxsToRemove],
+		deletedStakers: cs.validators[:numTxsToRemove],
 	}
 
-	for nodeID, vdr := range cs.ValidatorsByNodeID {
-		newCS.ValidatorsByNodeID[nodeID] = vdr
+	for nodeID, vdr := range cs.validatorsByNodeID {
+		newCS.validatorsByNodeID[nodeID] = vdr
 	}
 
-	for txID, vdr := range cs.ValidatorsByTxID {
-		newCS.ValidatorsByTxID[txID] = vdr
+	for txID, vdr := range cs.validatorsByTxID {
+		newCS.validatorsByTxID[txID] = vdr
 	}
 
 	if numAdded := len(addValidatorTxs) + len(addDelegatorTxs) + len(addSubnetValidatorTxs); numAdded != 0 {
-		numCurrent := len(newCS.Validators)
+		numCurrent := len(newCS.validators)
 		newSize := numCurrent + numAdded
 		newValidators := make([]*signed.Tx, newSize)
-		copy(newValidators, newCS.Validators)
+		copy(newValidators, newCS.validators)
 		copy(newValidators[numCurrent:], addSubnetValidatorTxs)
 
 		numStart := numCurrent + len(addSubnetValidatorTxs)
@@ -135,30 +135,30 @@ func (cs *currentStaker) UpdateStakers(
 			newValidators[numStart+i] = tx.AddStakerTx
 		}
 
-		SortValidatorsByRemoval(newValidators)
-		newCS.Validators = newValidators
+		sortValidatorsByRemoval(newValidators)
+		newCS.validators = newValidators
 
 		for _, vdr := range addValidatorTxs {
 			txID := vdr.AddStakerTx.ID()
 			switch tx := vdr.AddStakerTx.Unsigned.(type) {
 			case *unsigned.AddValidatorTx:
-				newCS.ValidatorsByNodeID[tx.Validator.NodeID] = &currentValidatorImpl{
+				newCS.validatorsByNodeID[tx.Validator.NodeID] = &currentValidatorImpl{
 					addValidator: signed.ValidatorAndID{
 						UnsignedAddValidatorTx: tx,
 						TxID:                   txID,
 					},
 					potentialReward: vdr.PotentialReward,
 				}
-				newCS.ValidatorsByTxID[vdr.AddStakerTx.ID()] = vdr
+				newCS.validatorsByTxID[vdr.AddStakerTx.ID()] = vdr
 			default:
-				return nil, unsigned.ErrWrongTxType
+				return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx)
 			}
 		}
 
 		for _, vdr := range addDelegatorTxs {
 			switch tx := vdr.AddStakerTx.Unsigned.(type) {
 			case *unsigned.AddDelegatorTx:
-				oldVdr := newCS.ValidatorsByNodeID[tx.Validator.NodeID]
+				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
 				newVdr.delegators = make([]signed.DelegatorAndID, len(oldVdr.delegators)+1)
 				copy(newVdr.delegators, oldVdr.delegators)
@@ -166,12 +166,12 @@ func (cs *currentStaker) UpdateStakers(
 					UnsignedAddDelegatorTx: tx,
 					TxID:                   vdr.AddStakerTx.ID(),
 				}
-				SortDelegatorsByRemoval(newVdr.delegators)
+				sortDelegatorsByRemoval(newVdr.delegators)
 				newVdr.delegatorWeight += tx.Validator.Wght
-				newCS.ValidatorsByNodeID[tx.Validator.NodeID] = &newVdr
-				newCS.ValidatorsByTxID[vdr.AddStakerTx.ID()] = vdr
+				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
+				newCS.validatorsByTxID[vdr.AddStakerTx.ID()] = vdr
 			default:
-				return nil, unsigned.ErrWrongTxType
+				return nil, fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx)
 			}
 		}
 
@@ -179,7 +179,7 @@ func (cs *currentStaker) UpdateStakers(
 			txID := vdr.ID()
 			switch tx := vdr.Unsigned.(type) {
 			case *unsigned.AddSubnetValidatorTx:
-				oldVdr := newCS.ValidatorsByNodeID[tx.Validator.NodeID]
+				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
 				newVdr.subnets = make(map[ids.ID]signed.SubnetValidatorAndID, len(oldVdr.subnets)+1)
 				for subnetID, addTx := range oldVdr.subnets {
@@ -189,27 +189,27 @@ func (cs *currentStaker) UpdateStakers(
 					UnsignedAddSubnetValidator: tx,
 					TxID:                       txID,
 				}
-				newCS.ValidatorsByNodeID[tx.Validator.NodeID] = &newVdr
+				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
-				return nil, unsigned.ErrWrongTxType
+				return nil, fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx)
 			}
 
 			wrappedTx := &ValidatorReward{
 				AddStakerTx: vdr,
 			}
-			newCS.ValidatorsByTxID[vdr.ID()] = wrappedTx
+			newCS.validatorsByTxID[vdr.ID()] = wrappedTx
 			newCS.addedStakers = append(newCS.addedStakers, wrappedTx)
 		}
 	}
 
 	for i := 0; i < numTxsToRemove; i++ {
-		removed := cs.Validators[i]
+		removed := cs.validators[i]
 		removedID := removed.ID()
-		delete(newCS.ValidatorsByTxID, removedID)
+		delete(newCS.validatorsByTxID, removedID)
 
 		switch tx := removed.Unsigned.(type) {
 		case *unsigned.AddSubnetValidatorTx:
-			oldVdr := newCS.ValidatorsByNodeID[tx.Validator.NodeID]
+			oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 			newVdr := *oldVdr
 			newVdr.subnets = make(map[ids.ID]signed.SubnetValidatorAndID, len(oldVdr.subnets)-1)
 			for subnetID, addTx := range oldVdr.subnets {
@@ -217,9 +217,9 @@ func (cs *currentStaker) UpdateStakers(
 					newVdr.subnets[subnetID] = addTx
 				}
 			}
-			newCS.ValidatorsByNodeID[tx.Validator.NodeID] = &newVdr
+			newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 		default:
-			return nil, unsigned.ErrWrongTxType
+			return nil, fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx)
 		}
 	}
 
@@ -227,34 +227,34 @@ func (cs *currentStaker) UpdateStakers(
 	return newCS, nil
 }
 
-func (cs *currentStaker) DeleteNextStaker() (CurrentStaker, error) {
+func (cs *currentStakerState) DeleteNextStaker() (CurrentStakerState, error) {
 	removedTx, _, err := cs.GetNextStaker()
 	if err != nil {
 		return nil, err
 	}
 	removedTxID := removedTx.ID()
 
-	newCS := &currentStaker{
-		ValidatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.ValidatorsByNodeID)),
-		ValidatorsByTxID:   make(map[ids.ID]*ValidatorReward, len(cs.ValidatorsByTxID)-1),
-		Validators:         cs.Validators[1:], // sorted in order of removal
+	newCS := &currentStakerState{
+		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
+		validatorsByTxID:   make(map[ids.ID]*ValidatorReward, len(cs.validatorsByTxID)-1),
+		validators:         cs.validators[1:], // sorted in order of removal
 
 		deletedStakers: []*signed.Tx{removedTx},
 	}
 
 	switch tx := removedTx.Unsigned.(type) {
 	case *unsigned.AddValidatorTx:
-		for nodeID, vdr := range cs.ValidatorsByNodeID {
+		for nodeID, vdr := range cs.validatorsByNodeID {
 			if nodeID != tx.Validator.NodeID {
-				newCS.ValidatorsByNodeID[nodeID] = vdr
+				newCS.validatorsByNodeID[nodeID] = vdr
 			}
 		}
 	case *unsigned.AddDelegatorTx:
-		for nodeID, vdr := range cs.ValidatorsByNodeID {
+		for nodeID, vdr := range cs.validatorsByNodeID {
 			if nodeID != tx.Validator.NodeID {
-				newCS.ValidatorsByNodeID[nodeID] = vdr
+				newCS.validatorsByNodeID[nodeID] = vdr
 			} else {
-				newCS.ValidatorsByNodeID[nodeID] = &currentValidatorImpl{
+				newCS.validatorsByNodeID[nodeID] = &currentValidatorImpl{
 					validatorImpl: validatorImpl{
 						delegators: vdr.delegators[1:], // sorted in order of removal
 						subnets:    vdr.subnets,
@@ -269,12 +269,12 @@ func (cs *currentStaker) DeleteNextStaker() (CurrentStaker, error) {
 			}
 		}
 	default:
-		return nil, unsigned.ErrWrongTxType
+		return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx or *unsigned.AddDelegatorTx but got %T", removedTx.Unsigned)
 	}
 
-	for txID, vdr := range cs.ValidatorsByTxID {
+	for txID, vdr := range cs.validatorsByTxID {
 		if txID != removedTxID {
-			newCS.ValidatorsByTxID[txID] = vdr
+			newCS.validatorsByTxID[txID] = vdr
 		}
 	}
 
@@ -282,36 +282,36 @@ func (cs *currentStaker) DeleteNextStaker() (CurrentStaker, error) {
 	return newCS, nil
 }
 
-func (cs *currentStaker) Stakers() []*signed.Tx {
-	return cs.Validators
+func (cs *currentStakerState) Stakers() []*signed.Tx {
+	return cs.validators
 }
 
-func (cs *currentStaker) Apply(bs Content) {
+func (cs *currentStakerState) Apply(c Content) {
 	for _, added := range cs.addedStakers {
-		bs.AddCurrentStaker(added.AddStakerTx, added.PotentialReward)
+		c.AddCurrentStaker(added.AddStakerTx, added.PotentialReward)
 	}
 	for _, deleted := range cs.deletedStakers {
-		bs.DeleteCurrentStaker(deleted)
+		c.DeleteCurrentStaker(deleted)
 	}
-	bs.SetCurrentStakerChainState(cs)
+	c.SetCurrentStakerChainState(cs)
 
 	// Validator changes should only be applied once.
 	cs.addedStakers = nil
 	cs.deletedStakers = nil
 }
 
-func (cs *currentStaker) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
+func (cs *currentStakerState) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	if subnetID == constants.PrimaryNetworkID {
 		return cs.primaryValidatorSet()
 	}
 	return cs.subnetValidatorSet(subnetID)
 }
 
-func (cs *currentStaker) primaryValidatorSet() (validators.Set, error) {
+func (cs *currentStakerState) primaryValidatorSet() (validators.Set, error) {
 	vdrs := validators.NewSet()
 
 	var err error
-	for nodeID, vdr := range cs.ValidatorsByNodeID {
+	for nodeID, vdr := range cs.validatorsByNodeID {
 		vdrWeight := vdr.addValidator.UnsignedAddValidatorTx.Validator.Wght
 		vdrWeight, err = safemath.Add64(vdrWeight, vdr.delegatorWeight)
 		if err != nil {
@@ -325,10 +325,10 @@ func (cs *currentStaker) primaryValidatorSet() (validators.Set, error) {
 	return vdrs, nil
 }
 
-func (cs *currentStaker) subnetValidatorSet(subnetID ids.ID) (validators.Set, error) {
+func (cs *currentStakerState) subnetValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	vdrs := validators.NewSet()
 
-	for nodeID, vdr := range cs.ValidatorsByNodeID {
+	for nodeID, vdr := range cs.validatorsByNodeID {
 		subnetVDR, exists := vdr.subnets[subnetID]
 		if !exists {
 			continue
@@ -341,8 +341,8 @@ func (cs *currentStaker) subnetValidatorSet(subnetID ids.ID) (validators.Set, er
 	return vdrs, nil
 }
 
-func (cs *currentStaker) GetStaker(txID ids.ID) (tx *signed.Tx, reward uint64, err error) {
-	staker, exists := cs.ValidatorsByTxID[txID]
+func (cs *currentStakerState) GetStaker(txID ids.ID) (tx *signed.Tx, reward uint64, err error) {
+	staker, exists := cs.validatorsByTxID[txID]
 	if !exists {
 		return nil, 0, database.ErrNotFound
 	}
@@ -351,11 +351,11 @@ func (cs *currentStaker) GetStaker(txID ids.ID) (tx *signed.Tx, reward uint64, e
 
 // SetNextStaker to the next staker that will be removed using a
 // RewardValidatorTx.
-func (cs *currentStaker) SetNextStaker() {
-	for _, tx := range cs.Validators {
+func (cs *currentStakerState) SetNextStaker() {
+	for _, tx := range cs.validators {
 		switch tx.Unsigned.(type) {
 		case *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx:
-			cs.nextStaker = cs.ValidatorsByTxID[tx.ID()]
+			cs.nextStaker = cs.validatorsByTxID[tx.ID()]
 			return
 		}
 	}
@@ -435,7 +435,7 @@ func (s innerSortValidatorsByRemoval) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func SortValidatorsByRemoval(s []*signed.Tx) {
+func sortValidatorsByRemoval(s []*signed.Tx) {
 	sort.Sort(innerSortValidatorsByRemoval(s))
 }
 
@@ -468,6 +468,6 @@ func (s innerSortDelegatorsByRemoval) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func SortDelegatorsByRemoval(s []signed.DelegatorAndID) {
+func sortDelegatorsByRemoval(s []signed.DelegatorAndID) {
 	sort.Sort(innerSortDelegatorsByRemoval(s))
 }

@@ -12,7 +12,7 @@ import (
 var _ currentValidator = &currentValidatorImpl{}
 
 type currentValidator interface {
-	validatorCache
+	validator
 
 	AddValidatorTx() (*unsigned.AddValidatorTx, ids.ID)
 

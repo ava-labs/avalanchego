@@ -2182,7 +2182,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	startTime := time.Unix(int64(args.StartTime), 0)
 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	maxStakeAmount, err := service.vm.maxStakeAmount(
+	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
 		args.SubnetID,
 		args.NodeID,
 		startTime,

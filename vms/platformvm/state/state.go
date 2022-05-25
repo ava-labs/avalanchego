@@ -4,7 +4,7 @@
 package state
 
 import (
-	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -16,19 +16,30 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Mutable interface collects all methods updating
+// metadata and transactions state upon blocks execution
 type Mutable interface {
 	transactions.Mutable
 	metadata.Mutable
 }
 
+// Content interface collects all methods to query and mutate
+// all metadata and transactions state. Note this Content
+// is a superset of Mutable
 type Content interface {
 	transactions.Content
 	metadata.Content
 }
 
+// State interface collects Content along with all methods
+// used to initialize metadata and transactions state db
+// upon vm initialization, along with methods to
+// persist updated state.
 type State interface {
 	Content
 
+	// Upon vm initialization, SyncGenesis loads
+	// information from genesis block as marshalled from bytes
 	SyncGenesis(
 		genesisBlkID ids.ID,
 		genesisTimestamp uint64,
@@ -37,6 +48,9 @@ type State interface {
 		genesisValidator []*signed.Tx,
 		genesisChains []*signed.Tx,
 	) error
+
+	// Upon vm initialization, Load pulls
+	// information previously stored on disk
 	Load() error
 
 	Write() error
@@ -44,7 +58,7 @@ type State interface {
 }
 
 func New(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 	cfg *config.Config,
 	ctx *snow.Context,
 	localStake prometheus.Gauge,
@@ -62,7 +76,7 @@ func New(
 }
 
 func NewMetered(
-	baseDB *versiondb.Database,
+	baseDB database.Database,
 	metrics prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,

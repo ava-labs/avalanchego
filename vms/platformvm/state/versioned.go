@@ -43,7 +43,7 @@ type versioned struct {
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO
 
 	// map of txID -> {*transaction.Tx, Status}
-	addedTxs map[ids.ID]*transactions.TxStatusImpl
+	addedTxs map[ids.ID]*transactions.TxAndStatus
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*utxoImpl
@@ -56,8 +56,8 @@ type utxoImpl struct {
 
 func NewVersioned(
 	ps Mutable,
-	current transactions.CurrentStaker,
-	pending transactions.PendingStaker,
+	current transactions.CurrentStakerState,
+	pending transactions.PendingStakerState,
 ) Versioned {
 	return &versioned{
 		parentState:    ps,
@@ -175,12 +175,12 @@ func (vs *versioned) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 
 func (vs *versioned) AddTx(tx *signed.Tx, status status.Status) {
 	txID := tx.ID()
-	txStatus := &transactions.TxStatusImpl{
+	txStatus := &transactions.TxAndStatus{
 		Tx:     tx,
 		Status: status,
 	}
 	if vs.addedTxs == nil {
-		vs.addedTxs = map[ids.ID]*transactions.TxStatusImpl{
+		vs.addedTxs = map[ids.ID]*transactions.TxAndStatus{
 			txID: txStatus,
 		}
 	} else {

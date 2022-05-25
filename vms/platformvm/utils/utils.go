@@ -4,6 +4,8 @@
 package utils
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -16,7 +18,7 @@ import (
 func CreateChain(vmCfg config.Config, utx unsigned.Tx, txID ids.ID) error {
 	unsignedTx, ok := utx.(*unsigned.CreateChainTx)
 	if !ok {
-		return unsigned.ErrWrongTxType
+		return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", utx)
 	}
 
 	if vmCfg.StakingEnabled && // Staking is enabled, so nodes might not validate all chains

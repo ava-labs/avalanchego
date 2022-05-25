@@ -52,11 +52,9 @@ var (
 	_ secp256k1fx.VM       = &VM{}
 	_ validators.State     = &VM{}
 
-	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooEarly = errors.New("start time is before the current chain time")
-	errStartAfterEndTime = errors.New("start time is after the end time")
-	errWrongCacheType    = errors.New("unexpectedly cached type")
+	errInvalidID      = errors.New("invalid ID")
+	errDSCantValidate = errors.New("new blockchain can't be validated by primary network")
+	errWrongCacheType = errors.New("unexpectedly cached type")
 )
 
 const (

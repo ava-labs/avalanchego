@@ -404,7 +404,7 @@ func (h *handler) Authorize(
 	}
 	subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
 	if !ok {
-		return nil, nil, unsigned.ErrWrongTxType
+		return nil, nil, fmt.Errorf("expected tx type *unsigned.CreateSubnetTx but got %T", subnetTx.Unsigned)
 	}
 
 	// Make sure the owners of the subnet match the provided keys

@@ -4,6 +4,7 @@
 package transactions
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,13 +18,13 @@ import (
 	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
-var _ ValidatorState = &validatorStateImpl{}
+var _ ValidatorState = &validatorState{}
 
 type ValidatorState interface {
-	SetCurrentStakerChainState(cs CurrentStaker)
-	CurrentStakerChainState() CurrentStaker
-	SetPendingStakerChainState(ps PendingStaker)
-	PendingStakerChainState() PendingStaker
+	SetCurrentStakerChainState(cs CurrentStakerState)
+	CurrentStakerChainState() CurrentStakerState
+	SetPendingStakerChainState(ps PendingStakerState)
+	PendingStakerChainState() PendingStakerState
 
 	// GetNextStakerChangeTime returns the next time
 	// that a staker set change should occur.
@@ -31,47 +32,46 @@ type ValidatorState interface {
 }
 
 func NewValidatorState(
-	current CurrentStaker,
-	pending PendingStaker,
+	current CurrentStakerState,
+	pending PendingStakerState,
 ) ValidatorState {
-	return &validatorStateImpl{
+	return &validatorState{
 		current: current,
 		pending: pending,
 	}
 }
 
-type validatorStateImpl struct {
-	current CurrentStaker
-	pending PendingStaker
+type validatorState struct {
+	current CurrentStakerState
+	pending PendingStakerState
 }
 
-func (vs *validatorStateImpl) CurrentStakerChainState() CurrentStaker {
+func (vs *validatorState) CurrentStakerChainState() CurrentStakerState {
 	return vs.current
 }
 
-func (vs *validatorStateImpl) PendingStakerChainState() PendingStaker {
+func (vs *validatorState) PendingStakerChainState() PendingStakerState {
 	return vs.pending
 }
 
-func (vs *validatorStateImpl) SetCurrentStakerChainState(cs CurrentStaker) {
+func (vs *validatorState) SetCurrentStakerChainState(cs CurrentStakerState) {
 	vs.current = cs
 }
 
-func (vs *validatorStateImpl) SetPendingStakerChainState(ps PendingStaker) {
+func (vs *validatorState) SetPendingStakerChainState(ps PendingStakerState) {
 	vs.pending = ps
 }
 
-func (vs *validatorStateImpl) GetNextStakerChangeTime() (time.Time, error) {
+func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 	earliest := mockable.MaxTime
 	currentStakers := vs.CurrentStakerChainState()
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
 		nextStakerToRemove := currentStakers[0]
 		staker, ok := nextStakerToRemove.Unsigned.(timed.Tx)
 		if !ok {
-			return time.Time{}, unsigned.ErrWrongTxType
+			return time.Time{}, fmt.Errorf("expected tx type timed.Tx but got %T", nextStakerToRemove.Unsigned)
 		}
-		endTime := staker.EndTime()
-		if endTime.Before(earliest) {
+		if endTime := staker.EndTime(); endTime.Before(earliest) {
 			earliest = endTime
 		}
 	}
@@ -80,17 +80,16 @@ func (vs *validatorStateImpl) GetNextStakerChangeTime() (time.Time, error) {
 		nextStakerToAdd := pendingStakers[0]
 		staker, ok := nextStakerToAdd.Unsigned.(timed.Tx)
 		if !ok {
-			return time.Time{}, unsigned.ErrWrongTxType
+			return time.Time{}, fmt.Errorf("expected tx type timed.Tx but got %T", nextStakerToAdd.Unsigned)
 		}
-		startTime := staker.StartTime()
-		if startTime.Before(earliest) {
+		if startTime := staker.StartTime(); startTime.Before(earliest) {
 			earliest = startTime
 		}
 	}
 	return earliest, nil
 }
 
-func (vs *validatorStateImpl) maxSubnetStakeAmount(
+func (vs *validatorState) maxSubnetStakeAmount(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
 	startTime time.Time,
@@ -128,7 +127,7 @@ func (vs *validatorStateImpl) maxSubnetStakeAmount(
 	return vdrTx.Weight(), nil
 }
 
-func (vs *validatorStateImpl) maxPrimarySubnetStakeAmount(
+func (vs *validatorState) maxPrimarySubnetStakeAmount(
 	nodeID ids.NodeID,
 	startTime time.Time,
 	endTime time.Time,
@@ -151,7 +150,7 @@ func (vs *validatorStateImpl) maxPrimarySubnetStakeAmount(
 		if err != nil {
 			return 0, err
 		}
-		return MaxStakeAmount(
+		return getMaxStakeAmount(
 			currentValidator.Delegators(),
 			pendingValidator.Delegators(),
 			startTime,
@@ -173,7 +172,7 @@ func (vs *validatorStateImpl) maxPrimarySubnetStakeAmount(
 			return 0, nil
 		}
 
-		return MaxStakeAmount(
+		return getMaxStakeAmount(
 			nil,
 			pendingValidator.Delegators(),
 			startTime,
@@ -198,7 +197,7 @@ func CanDelegate(
 	currentStake,
 	maximumStake uint64,
 ) (bool, error) {
-	maxStake, err := MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+	maxStake, err := getMaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
 	if err != nil {
 		return false, err
 	}
@@ -219,7 +218,7 @@ func CanDelegate(
 // * The delegations that will be on this node in the future are [pending]
 // * The start time of all delegations in [pending] are in the future
 // * [pending] is sorted in order of increasing delegation start time
-func MaxStakeAmount(
+func getMaxStakeAmount(
 	current,
 	pending []signed.DelegatorAndID, // sorted by next start time first
 	startTime time.Time,
