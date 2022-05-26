@@ -13,7 +13,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.16
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-network-runner v1.0.6
-	github.com/ava-labs/coreth v0.8.10-rc.5
+	github.com/ava-labs/coreth v0.8.10-rc.7
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/golang-jwt/jwt v3.2.1+incompatible
@@ -51,7 +51,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gonum.org/v1/gonum v0.9.1
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
-	google.golang.org/grpc v1.45.0
+	google.golang.org/grpc v1.46.2
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gotest.tools v2.2.0+incompatible

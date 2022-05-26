@@ -338,7 +338,7 @@ func (ss *stateSyncer) Start(startReqID uint32) error {
 
 	ss.requestID = startReqID
 
-	if !ss.WeightTracker.EnoughConnectedWeight() {
+	if !ss.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -488,11 +488,11 @@ func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion version.Applicat
 		return err
 	}
 
-	if err := ss.WeightTracker.AddWeightForNode(nodeID); err != nil {
+	if err := ss.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if ss.started || !ss.WeightTracker.EnoughConnectedWeight() {
+	if ss.started || !ss.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -505,7 +505,7 @@ func (ss *stateSyncer) Disconnected(nodeID ids.NodeID) error {
 		return err
 	}
 
-	return ss.WeightTracker.RemoveWeightForNode(nodeID)
+	return ss.StartupTracker.Disconnected(nodeID)
 }
 
 func (ss *stateSyncer) Gossip() error { return nil }

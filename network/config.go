@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 // HealthConfig describes parameters for network layer health checks.
@@ -107,13 +107,13 @@ type Config struct {
 	DialerConfig dialer.Config `json:"dialerConfig"`
 	TLSConfig    *tls.Config   `json:"-"`
 
-	Namespace          string              `json:"namespace"`
-	MyNodeID           ids.NodeID          `json:"myNodeID"`
-	MyIP               utils.DynamicIPDesc `json:"myIP"`
-	NetworkID          uint32              `json:"networkID"`
-	MaxClockDifference time.Duration       `json:"maxClockDifference"`
-	PingFrequency      time.Duration       `json:"pingFrequency"`
-	AllowPrivateIPs    bool                `json:"allowPrivateIPs"`
+	Namespace          string            `json:"namespace"`
+	MyNodeID           ids.NodeID        `json:"myNodeID"`
+	MyIPPort           ips.DynamicIPPort `json:"myIP"`
+	NetworkID          uint32            `json:"networkID"`
+	MaxClockDifference time.Duration     `json:"maxClockDifference"`
+	PingFrequency      time.Duration     `json:"pingFrequency"`
+	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
 
 	// CompressionEnabled will compress available outbound messages when set to
 	// true.

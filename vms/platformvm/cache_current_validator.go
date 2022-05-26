@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
@@ -27,7 +26,7 @@ type currentValidatorImpl struct {
 	// delegators are sorted in order of removal.
 	validatorImpl
 
-	addValidator    signed.ValidatorAndID
+	addValidator    ValidatorAndID
 	delegatorWeight uint64
 	potentialReward uint64
 }

@@ -621,12 +621,16 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
 
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
+
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
+		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -816,12 +820,16 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
 
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
+
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
+		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
