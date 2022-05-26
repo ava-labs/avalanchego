@@ -72,6 +72,23 @@ const (
 	chainDBCacheSize        = 2048
 )
 
+// some helper structures useful for storing transactions
+
+type ValidatorAndID struct {
+	UnsignedAddValidatorTx *unsigned.AddValidatorTx
+	TxID                   ids.ID
+}
+
+type SubnetValidatorAndID struct {
+	UnsignedAddSubnetValidator *unsigned.AddSubnetValidatorTx
+	TxID                       ids.ID
+}
+
+type DelegatorAndID struct {
+	UnsignedAddDelegatorTx *unsigned.AddDelegatorTx
+	TxID                   ids.ID
+}
+
 type InternalState interface {
 	MutableState
 	uptime.State
@@ -1325,9 +1342,9 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		cs.validators = append(cs.validators, tx)
 		cs.validatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
-				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
+				subnets: make(map[ids.ID]SubnetValidatorAndID),
 			},
-			addValidator: signed.ValidatorAndID{
+			addValidator: ValidatorAndID{
 				UnsignedAddValidatorTx: addValidatorTx,
 				TxID:                   txID,
 			},
@@ -1375,7 +1392,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			return errDelegatorSubset
 		}
 		vdr.delegatorWeight += addDelegatorTx.Validator.Wght
-		vdr.delegators = append(vdr.delegators, signed.DelegatorAndID{
+		vdr.delegators = append(vdr.delegators, DelegatorAndID{
 			UnsignedAddDelegatorTx: addDelegatorTx,
 			TxID:                   txID,
 		})
@@ -1411,7 +1428,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		if !exists {
 			return errDSValidatorSubset
 		}
-		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = signed.SubnetValidatorAndID{
+		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
 			UnsignedAddSubnetValidator: addSubnetValidatorTx,
 			TxID:                       txID,
 		}
@@ -1435,7 +1452,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 
 func (st *internalStateImpl) loadPendingValidators() error {
 	ps := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID),
+		validatorsByNodeID:      make(map[ids.NodeID]ValidatorAndID),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}
 
@@ -1458,7 +1475,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		}
 
 		ps.validators = append(ps.validators, tx)
-		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = signed.ValidatorAndID{
+		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = ValidatorAndID{
 			UnsignedAddValidatorTx: addValidatorTx,
 			TxID:                   txID,
 		}
@@ -1487,19 +1504,19 @@ func (st *internalStateImpl) loadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID]; exists {
-			vdr.delegators = append(vdr.delegators, signed.DelegatorAndID{
+			vdr.delegators = append(vdr.delegators, DelegatorAndID{
 				UnsignedAddDelegatorTx: addDelegatorTx,
 				TxID:                   txID,
 			})
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
-				delegators: []signed.DelegatorAndID{
+				delegators: []DelegatorAndID{
 					{
 						UnsignedAddDelegatorTx: addDelegatorTx,
 						TxID:                   txID,
 					},
 				},
-				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
+				subnets: make(map[ids.ID]SubnetValidatorAndID),
 			}
 		}
 	}
@@ -1527,13 +1544,13 @@ func (st *internalStateImpl) loadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID]; exists {
-			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = signed.SubnetValidatorAndID{
+			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
 				UnsignedAddSubnetValidator: addSubnetValidatorTx,
 				TxID:                       txID,
 			}
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]signed.SubnetValidatorAndID{
+				subnets: map[ids.ID]SubnetValidatorAndID{
 					addSubnetValidatorTx.Validator.Subnet: {
 						UnsignedAddSubnetValidator: addSubnetValidatorTx,
 						TxID:                       txID,

@@ -113,7 +113,7 @@ func (tx *StatefulAddDelegatorTx) Execute(
 		var (
 			vdrTx                  *unsigned.AddValidatorTx
 			currentDelegatorWeight uint64
-			currentDelegators      []signed.DelegatorAndID
+			currentDelegators      []DelegatorAndID
 		)
 		if err == nil {
 			// This delegator is attempting to delegate to a currently validing
@@ -271,7 +271,7 @@ func (vm *VM) newAddDelegatorTx(
 // [maximumStake].
 func canDelegate(
 	current,
-	pending []signed.DelegatorAndID, // sorted by next start time first
+	pending []DelegatorAndID, // sorted by next start time first
 	new *unsigned.AddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
@@ -299,7 +299,7 @@ func canDelegate(
 // * [pending] is sorted in order of increasing delegation start time
 func maxStakeAmount(
 	current,
-	pending []signed.DelegatorAndID, // sorted by next start time first
+	pending []DelegatorAndID, // sorted by next start time first
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,
@@ -444,7 +444,7 @@ func (vm *VM) maxSubnetStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	var (
-		vdrTxAndID signed.SubnetValidatorAndID
+		vdrTxAndID SubnetValidatorAndID
 		exists     bool
 	)
 	pendingStakers := vm.internalState.PendingStakerChainState()
