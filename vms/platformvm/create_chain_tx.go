@@ -61,7 +61,7 @@ func (tx *StatefulCreateChainTx) Execute(
 ) {
 	// Make sure this transaction is well formed.
 	if len(stx.Creds) == 0 {
-		return nil, errWrongNumberOfCredentials
+		return nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	if err := stx.SyntacticVerify(vm.ctx); err != nil {

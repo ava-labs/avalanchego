@@ -67,7 +67,7 @@ func (tx *StatefulAddSubnetValidatorTx) Execute(
 	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, errStakeTooLong
 	case len(stx.Creds) == 0:
-		return nil, nil, errWrongNumberOfCredentials
+		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()

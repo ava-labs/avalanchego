@@ -68,7 +68,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 	case tx.TxID == ids.Empty:
 		return nil, nil, errInvalidID
 	case len(stx.Creds) != 0:
-		return nil, nil, errWrongNumberOfCredentials
+		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()

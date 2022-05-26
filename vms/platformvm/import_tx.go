@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -19,11 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var (
-	_ StatefulAtomicTx = &StatefulImportTx{}
-
-	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
-)
+var _ StatefulAtomicTx = &StatefulImportTx{}
 
 // StatefulImportTx is an unsigned ImportTx
 type StatefulImportTx struct {
