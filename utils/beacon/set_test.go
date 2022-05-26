@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 func TestSet(t *testing.T) {
@@ -20,15 +20,15 @@ func TestSet(t *testing.T) {
 	id1 := ids.NodeID{1}
 	id2 := ids.NodeID{2}
 
-	ip0 := utils.IPDesc{
+	ip0 := ips.IPPort{
 		IP:   net.IPv4zero,
 		Port: 0,
 	}
-	ip1 := utils.IPDesc{
+	ip1 := ips.IPPort{
 		IP:   net.IPv4zero,
 		Port: 1,
 	}
-	ip2 := utils.IPDesc{
+	ip2 := ips.IPPort{
 		IP:   net.IPv4zero,
 		Port: 2,
 	}

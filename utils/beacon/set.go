@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -25,7 +25,7 @@ type Set interface {
 	Add(Beacon) error
 
 	RemoveByID(ids.NodeID) error
-	RemoveByIP(utils.IPDesc) error
+	RemoveByIP(ips.IPPort) error
 
 	Len() int
 
@@ -89,7 +89,7 @@ func (s *set) RemoveByID(idToRemove ids.NodeID) error {
 	return nil
 }
 
-func (s *set) RemoveByIP(ip utils.IPDesc) error {
+func (s *set) RemoveByIP(ip ips.IPPort) error {
 	indexToRemove, exists := s.ips[ip.String()]
 	if !exists {
 		return errUnknownIP

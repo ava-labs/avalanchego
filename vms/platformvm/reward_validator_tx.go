@@ -64,7 +64,7 @@ func (tx *StatefulRewardValidatorTx) Execute(
 ) {
 	switch {
 	case tx == nil:
-		return nil, nil, errNilTx
+		return nil, nil, unsigned.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return nil, nil, errInvalidID
 	case len(stx.Creds) != 0:

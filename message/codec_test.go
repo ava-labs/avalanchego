@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -105,7 +105,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 				NetworkID:      uint32(0),
 				NodeID:         uint32(1337),
 				MyTime:         uint64(time.Now().Unix()),
-				IP:             utils.IPDesc{IP: net.IPv4(1, 2, 3, 4)},
+				IP:             ips.IPPort{IP: net.IPv4(1, 2, 3, 4)},
 				VersionStr:     "v1.2.3",
 				VersionTime:    uint64(time.Now().Unix()),
 				SigBytes:       []byte{'y', 'e', 'e', 't'},
@@ -115,11 +115,11 @@ func TestCodecPackParseGzip(t *testing.T) {
 		{
 			op: PeerList,
 			fields: map[Field]interface{}{
-				Peers: []utils.IPCertDesc{
+				Peers: []ips.ClaimedIPPort{
 					{
 						Cert:      cert,
-						IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4)},
-						Time:      uint64(time.Now().Unix()),
+						IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4)},
+						Timestamp: uint64(time.Now().Unix()),
 						Signature: make([]byte, 65),
 					},
 				},

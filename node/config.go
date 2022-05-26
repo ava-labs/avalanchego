@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -70,7 +70,7 @@ type APIConfig struct {
 }
 
 type IPConfig struct {
-	IP utils.DynamicIPDesc `json:"ip"`
+	IPPort ips.DynamicIPPort `json:"ip"`
 	// True if we attempted NAT Traversal
 	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
 	// Tries to perform network address translation
@@ -91,9 +91,9 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs             []ids.NodeID   `json:"stateSyncIDs"`
-	StateSyncIPs             []utils.IPDesc `json:"stateSyncIPs"`
-	StateSyncDisableRequests bool           `json:"stateSyncDisableRequests"`
+	StateSyncIDs             []ids.NodeID `json:"stateSyncIDs"`
+	StateSyncIPs             []ips.IPPort `json:"stateSyncIPs"`
+	StateSyncDisableRequests bool         `json:"stateSyncDisableRequests"`
 }
 
 type BootstrapConfig struct {
@@ -117,8 +117,8 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.NodeID   `json:"bootstrapIDs"`
-	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
+	BootstrapIDs []ids.NodeID `json:"bootstrapIDs"`
+	BootstrapIPs []ips.IPPort `json:"bootstrapIPs"`
 }
 
 type DatabaseConfig struct {

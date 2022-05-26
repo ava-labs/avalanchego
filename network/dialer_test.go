@@ -9,7 +9,7 @@ import (
 	"net"
 
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -29,22 +29,22 @@ func newTestDialer() *testDialer {
 	}
 }
 
-func (d *testDialer) NewListener() (utils.DynamicIPDesc, *testListener) {
-	ip := utils.NewDynamicIPDesc(
+func (d *testDialer) NewListener() (ips.DynamicIPPort, *testListener) {
+	ip := ips.NewDynamicIPPort(
 		net.IPv6loopback,
 		uint16(len(d.listeners)),
 	)
-	staticIP := ip.IP()
+	staticIP := ip.IPPort()
 	listener := newTestListener(staticIP)
 	d.AddListener(staticIP, listener)
 	return ip, listener
 }
 
-func (d *testDialer) AddListener(ip utils.IPDesc, listener *testListener) {
+func (d *testDialer) AddListener(ip ips.IPPort, listener *testListener) {
 	d.listeners[ip.String()] = listener
 }
 
-func (d *testDialer) Dial(ctx context.Context, ip utils.IPDesc) (net.Conn, error) {
+func (d *testDialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) {
 	listener, ok := d.listeners[ip.String()]
 	if !ok {
 		return nil, errRefused

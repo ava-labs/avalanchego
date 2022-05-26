@@ -327,9 +327,7 @@ func (s innerSortDelegatorsByAddition) Less(i, j int) bool {
 	}
 
 	// If the end times are the same, then we sort by the txID
-	iTxID := iDel.TxID
-	jTxID := jDel.TxID
-	return bytes.Compare(iTxID[:], jTxID[:]) == -1
+	return bytes.Compare(iDel.TxID[:], jDel.TxID[:]) == -1
 }
 
 func (s innerSortDelegatorsByAddition) Len() int {

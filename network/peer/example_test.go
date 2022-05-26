@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 func ExampleStartTestPeer() {
@@ -20,7 +20,7 @@ func ExampleStartTestPeer() {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	peerIP := utils.IPDesc{
+	peerIP := ips.IPPort{
 		IP:   net.IPv6loopback,
 		Port: 9651,
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -515,9 +516,8 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			msg, err := p.MessageCreator.Ping()
-			p.Log.AssertNoError(err)
-			p.Send(p.onClosingCtx, msg)
+			p.Config.PingMessage.AddRef()
+			p.Send(p.onClosingCtx, p.Config.PingMessage)
 		case <-p.onClosingCtx.Done():
 			return
 		}
@@ -654,7 +654,7 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	peerIP := msg.Get(message.IP).(utils.IPDesc)
+	peerIP := msg.Get(message.IP).(ips.IPPort)
 
 	// handle subnet IDs
 	subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
@@ -707,7 +707,7 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		close(p.onFinishHandshake)
 	}
 
-	ips := msg.Get(message.Peers).([]utils.IPCertDesc)
+	ips := msg.Get(message.Peers).([]ips.ClaimedIPPort)
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))

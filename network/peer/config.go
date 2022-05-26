@@ -44,4 +44,6 @@ type Config struct {
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker tracker.ResourceTracker
+
+	PingMessage message.OutboundMessage
 }
