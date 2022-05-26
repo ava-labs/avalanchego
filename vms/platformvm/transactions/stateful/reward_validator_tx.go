@@ -31,14 +31,13 @@ type RewardValidatorTx struct {
 
 	ID    ids.ID // ID of signed reward validator tx
 	creds []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *RewardValidatorTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
-	_, _, err := tx.Execute(verifier, parentState)
+func (tx *RewardValidatorTx) SemanticVerify(parentState state.Mutable) error {
+	_, _, err := tx.Execute(parentState)
 	return err
 }
 
@@ -48,19 +47,11 @@ func (tx *RewardValidatorTx) SemanticVerify(
 // The next validator to be removed must be the validator specified in this block.
 // The next validator to be removed must be have an end time equal to the current
 //   chain timestamp.
-func (tx *RewardValidatorTx) Execute(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) (
+func (tx *RewardValidatorTx) Execute(parentState state.Mutable) (
 	state.Versioned,
 	state.Versioned,
 	error,
 ) {
-	var (
-		ctx = verifier.Ctx()
-		fx  = verifier.FeatureExtension()
-	)
-
 	switch {
 	case tx == nil:
 		return nil, nil, unsigned.ErrNilTx
@@ -69,6 +60,11 @@ func (tx *RewardValidatorTx) Execute(
 	case len(tx.creds) != 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
+
+	var (
+		ctx = tx.verifier.Ctx()
+		fx  = tx.verifier.FeatureExtension()
+	)
 
 	currentStakers := parentState.CurrentStakerChainState()
 	stakerTx, stakerReward, err := currentStakers.GetNextStaker()
@@ -259,11 +255,11 @@ func (tx *RewardValidatorTx) Execute(
 		return nil, nil, ErrShouldBeDSValidator
 	}
 
-	uptime, err := verifier.CalculateUptimePercentFrom(nodeID, startTime)
+	uptime, err := tx.verifier.CalculateUptimePercentFrom(nodeID, startTime)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate uptime: %w", err)
 	}
-	tx.ShouldPreferCommit = uptime >= verifier.PlatformConfig().UptimePercentage
+	tx.ShouldPreferCommit = uptime >= tx.verifier.PlatformConfig().UptimePercentage
 
 	return onCommitState, onAbortState, nil
 }
@@ -275,6 +271,6 @@ func (tx *RewardValidatorTx) Execute(
 // responsive and correct during the time they are validating.
 // Right now they receive a reward if they're up (but not necessarily
 // correct and responsive) for a sufficient amount of time
-func (tx *RewardValidatorTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
+func (tx *RewardValidatorTx) InitiallyPrefersCommit() bool {
 	return tx.ShouldPreferCommit
 }

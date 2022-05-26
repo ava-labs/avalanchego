@@ -117,7 +117,7 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx, pb.vm.txVerifier)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func (pb *ProposalBlock) Verify() error {
 
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
-	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm.txVerifier, parentState)
+	pb.onCommitState, pb.onAbortState, err = tx.Execute(parentState)
 	if err != nil {
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return err
@@ -157,7 +157,7 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx, pb.vm.txVerifier)
 	if err != nil {
 		return [2]snowman.Block{}, err
 	}
@@ -168,7 +168,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit := proposalTx.InitiallyPrefersCommit(pb.vm.txVerifier)
+	prefersCommit := proposalTx.InitiallyPrefersCommit()
 
 	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
 	if err != nil {

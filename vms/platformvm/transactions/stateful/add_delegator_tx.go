@@ -39,21 +39,20 @@ type AddDelegatorTx struct {
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *AddDelegatorTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
-	clock := verifier.Clock()
+func (tx *AddDelegatorTx) SemanticVerify(parentState state.Mutable) error {
+	clock := tx.verifier.Clock()
 	startTime := tx.StartTime()
 	maxLocalStartTime := clock.Time().Add(MaxFutureStartTime)
 	if startTime.After(maxLocalStartTime) {
 		return ErrFutureStakeTime
 	}
 
-	_, _, err := tx.Execute(verifier, parentState)
+	_, _, err := tx.Execute(parentState)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, ErrFutureStakeTime) {
@@ -63,15 +62,8 @@ func (tx *AddDelegatorTx) SemanticVerify(
 }
 
 // Execute this transaction.
-func (tx *AddDelegatorTx) Execute(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) (
-	state.Versioned,
-	state.Versioned,
-	error,
-) {
-	ctx := verifier.Ctx()
+func (tx *AddDelegatorTx) Execute(parentState state.Mutable) (state.Versioned, state.Versioned, error) {
+	ctx := tx.verifier.Ctx()
 
 	// Verify the tx is well-formed
 	stx := &signed.Tx{
@@ -79,17 +71,17 @@ func (tx *AddDelegatorTx) Execute(
 		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
+	if err := stx.SyntacticVerify(tx.verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
+	case duration < tx.verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
 		return nil, nil, ErrStakeTooShort
-	case duration > verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
+	case duration > tx.verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, ErrStakeTooLong
-	case tx.Validator.Wght < verifier.PlatformConfig().MinDelegatorStake:
+	case tx.Validator.Wght < tx.verifier.PlatformConfig().MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return nil, nil, p_validator.ErrWeightTooSmall
 	}
@@ -101,7 +93,7 @@ func (tx *AddDelegatorTx) Execute(
 	currentStakers := parentState.CurrentStakerChainState()
 	pendingStakers := parentState.PendingStakerChainState()
 
-	if verifier.Bootstrapped() {
+	if tx.verifier.Bootstrapped() {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
@@ -171,8 +163,8 @@ func (tx *AddDelegatorTx) Execute(
 			return nil, nil, api.ErrStakeOverflow
 		}
 
-		if !currentTimestamp.Before(verifier.PlatformConfig().ApricotPhase3Time) {
-			maximumWeight = math.Min64(maximumWeight, verifier.PlatformConfig().MaxValidatorStake)
+		if !currentTimestamp.Before(tx.verifier.PlatformConfig().ApricotPhase3Time) {
+			maximumWeight = math.Min64(maximumWeight, tx.verifier.PlatformConfig().MaxValidatorStake)
 		}
 
 		canDelegate, err := txstate.CanDelegate(
@@ -190,13 +182,13 @@ func (tx *AddDelegatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := verifier.SemanticVerifySpend(
+		if err := tx.verifier.SemanticVerifySpend(
 			parentState,
 			tx,
 			tx.Ins,
 			outs,
 			tx.creds,
-			verifier.PlatformConfig().AddStakerTxFee,
+			tx.verifier.PlatformConfig().AddStakerTxFee,
 			ctx.AVAXAssetID,
 		); err != nil {
 			return nil, nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
@@ -232,7 +224,7 @@ func (tx *AddDelegatorTx) Execute(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *AddDelegatorTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
-	clock := verifier.Clock()
+func (tx *AddDelegatorTx) InitiallyPrefersCommit() bool {
+	clock := tx.verifier.Clock()
 	return tx.StartTime().After(clock.Time())
 }

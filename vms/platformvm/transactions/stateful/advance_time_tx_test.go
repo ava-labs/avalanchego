@@ -34,7 +34,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	}
 
 	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx)
+		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +42,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
+		if _, _, err = vProposalTx.Execute(h.tState); err == nil {
 			t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 		}
 	}
@@ -68,7 +68,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	}
 
 	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx)
+		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
+		if _, _, err = vProposalTx.Execute(h.tState); err == nil {
 			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 		}
 	}
@@ -102,7 +102,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	}
 
 	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx)
+		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +110,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
+		if _, _, err = vProposalTx.Execute(h.tState); err == nil {
 			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 		}
 	}
@@ -140,7 +140,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	verifiableTx, err := MakeStatefulTx(tx)
+	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if !ok {
 		t.Fatal("unexpected tx type")
 	}
-	onCommit, onAbort, err := vProposalTx.Execute(h.txVerifier, h.tState)
+	onCommit, onAbort, err := vProposalTx.Execute(h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				verifiableTx, err := MakeStatefulTx(tx)
+				verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -379,7 +379,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				if !ok {
 					t.Fatal("unexpected tx type")
 				}
-				onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
+				onCommitState, _, err := vProposalTx.Execute(h.tState)
 				assert.NoError(err)
 				onCommitState.Apply(h.tState)
 			}
@@ -488,7 +488,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifiableTx, err := MakeStatefulTx(tx)
+	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,7 +496,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if !ok {
 		t.Fatal("unexpected tx type")
 	}
-	onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
+	onCommitState, _, err := vProposalTx.Execute(h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,7 +565,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			verifiableTx, err := MakeStatefulTx(tx)
+			verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -573,7 +573,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if !ok {
 				t.Fatal("unexpected tx type")
 			}
-			onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
+			onCommitState, _, err := vProposalTx.Execute(h.tState)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -605,11 +605,11 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 	tx, err := h.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
-	verifiableTx, err := MakeStatefulTx(tx)
+	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 	assert.NoError(t, err)
 	vProposalTx, ok := verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
+	onCommit, _, err := vProposalTx.Execute(h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -642,11 +642,11 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Advance Time
 	tx, err = h.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
-	verifiableTx, err = MakeStatefulTx(tx)
+	verifiableTx, err = MakeStatefulTx(tx, h.txVerifier)
 	assert.NoError(t, err)
 	vProposalTx, ok = verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err = vProposalTx.Execute(h.txVerifier, h.tState)
+	onCommit, _, err = vProposalTx.Execute(h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -676,11 +676,11 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 	tx, err := h.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
-	verifiableTx, err := MakeStatefulTx(tx)
+	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 	assert.NoError(t, err)
 	vProposalTx, ok := verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
+	onCommit, _, err := vProposalTx.Execute(h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -712,11 +712,11 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Advance Time
 	tx, err = h.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
-	verifiableTx, err = MakeStatefulTx(tx)
+	verifiableTx, err = MakeStatefulTx(tx, h.txVerifier)
 	assert.NoError(t, err)
 	vProposalTx, ok = verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err = vProposalTx.Execute(h.txVerifier, h.tState)
+	onCommit, _, err = vProposalTx.Execute(h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -742,7 +742,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifiableTx, err := MakeStatefulTx(tx)
+	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -751,13 +751,13 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if vProposalTx.InitiallyPrefersCommit(h.txVerifier) {
+	if vProposalTx.InitiallyPrefersCommit() {
 		t.Fatal("should not prefer to commit this tx because its proposed timestamp is outside of sync bound")
 	}
 
 	// advance wall clock time
 	h.clk.Set(defaultGenesisTime.Add(1 * time.Second))
-	if !vProposalTx.InitiallyPrefersCommit(h.txVerifier) {
+	if !vProposalTx.InitiallyPrefersCommit() {
 		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
 	}
 }

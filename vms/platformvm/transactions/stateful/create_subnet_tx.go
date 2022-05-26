@@ -22,6 +22,8 @@ type CreateSubnetTx struct {
 	txID        ids.ID // ID of signed create subnet tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
@@ -32,30 +34,24 @@ func (tx *CreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *CreateSubnetTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
+func (tx *CreateSubnetTx) SemanticVerify(parentState state.Mutable) error {
 	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, vs)
+	_, err := tx.Execute(vs)
 	return err
 }
 
 // Execute this transaction.
-func (tx *CreateSubnetTx) Execute(
-	verifier TxVerifier,
-	vs state.Versioned,
-) (
+func (tx *CreateSubnetTx) Execute(vs state.Versioned) (
 	func() error,
 	error,
 ) {
 	var (
-		ctx = verifier.Ctx()
-		cfg = *verifier.PlatformConfig()
+		ctx = tx.verifier.Ctx()
+		cfg = *tx.verifier.PlatformConfig()
 	)
 
 	// Make sure this transaction is well formed.
@@ -70,7 +66,7 @@ func (tx *CreateSubnetTx) Execute(
 
 	// Verify the flowcheck
 	createSubnetTxFee := builder.GetCreateSubnetTxFee(cfg, vs.GetTimestamp())
-	if err := verifier.SemanticVerifySpend(
+	if err := tx.verifier.SemanticVerifySpend(
 		vs,
 		tx,
 		tx.Ins,

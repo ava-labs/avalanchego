@@ -27,28 +27,18 @@ type AdvanceTimeTx struct {
 
 	ID    ids.ID // ID of signed advance time tx
 	creds []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *AdvanceTimeTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
-	_, _, err := tx.Execute(verifier, parentState)
+func (tx *AdvanceTimeTx) SemanticVerify(parentState state.Mutable) error {
+	_, _, err := tx.Execute(parentState)
 	return err
 }
 
 // Execute this transaction.
-func (tx *AdvanceTimeTx) Execute(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) (
-	state.Versioned,
-	state.Versioned,
-	error,
-) {
-	clock := verifier.Clock()
-
+func (tx *AdvanceTimeTx) Execute(parentState state.Mutable) (state.Versioned, state.Versioned, error) {
 	switch {
 	case tx == nil:
 		return nil, nil, unsigned.ErrNilTx
@@ -57,7 +47,7 @@ func (tx *AdvanceTimeTx) Execute(
 	}
 
 	txTimestamp := tx.Timestamp()
-	localTimestamp := clock.Time()
+	localTimestamp := tx.verifier.Clock().Time()
 	localTimestampPlusSync := localTimestamp.Add(SyncBound)
 	if localTimestampPlusSync.Before(txTimestamp) {
 		return nil, nil, fmt.Errorf(
@@ -102,14 +92,14 @@ func (tx *AdvanceTimeTx) Execute(
 	// before the new timestamp. [pendingStakers.Stakers()] is sorted in order
 	// of increasing startTime
 pendingStakerLoop:
-	for _, tx := range pendingStakers.Stakers() {
-		switch staker := tx.Unsigned.(type) {
+	for _, stakerTxs := range pendingStakers.Stakers() {
+		switch staker := stakerTxs.Unsigned.(type) {
 		case *unsigned.AddDelegatorTx:
 			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
 			}
 
-			r := verifier.Calculate(
+			r := tx.verifier.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
@@ -120,7 +110,7 @@ pendingStakerLoop:
 			}
 
 			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &txstate.ValidatorReward{
-				AddStakerTx:     tx,
+				AddStakerTx:     stakerTxs,
 				PotentialReward: r,
 			})
 			numToRemoveFromPending++
@@ -129,7 +119,7 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := verifier.Calculate(
+			r := tx.verifier.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
@@ -140,7 +130,7 @@ pendingStakerLoop:
 			}
 
 			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &txstate.ValidatorReward{
-				AddStakerTx:     tx,
+				AddStakerTx:     stakerTxs,
 				PotentialReward: r,
 			})
 			numToRemoveFromPending++
@@ -152,11 +142,11 @@ pendingStakerLoop:
 			// If this staker should already be removed, then we should just
 			// never add them.
 			if staker.EndTime().After(txTimestamp) {
-				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, tx)
+				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, stakerTxs)
 			}
 			numToRemoveFromPending++
 		default:
-			return nil, nil, fmt.Errorf("expected validator but got %T", tx.Unsigned)
+			return nil, nil, fmt.Errorf("expected validator but got %T", stakerTxs.Unsigned)
 		}
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
@@ -204,8 +194,8 @@ currentStakerLoop:
 
 // InitiallyPrefersCommit returns true if the proposed time is at
 // or before the current time plus the synchrony bound
-func (tx *AdvanceTimeTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
-	clock := verifier.Clock()
+func (tx *AdvanceTimeTx) InitiallyPrefersCommit() bool {
+	clock := tx.verifier.Clock()
 	txTimestamp := tx.Timestamp()
 	localTimestamp := clock.Time()
 	localTimestampPlusSync := localTimestamp.Add(SyncBound)

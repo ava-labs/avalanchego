@@ -24,21 +24,20 @@ type AddSubnetValidatorTx struct {
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *AddSubnetValidatorTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
-	clock := verifier.Clock()
+func (tx *AddSubnetValidatorTx) SemanticVerify(parentState state.Mutable) error {
+	clock := tx.verifier.Clock()
 	startTime := tx.StartTime()
 	maxLocalStartTime := clock.Time().Add(MaxFutureStartTime)
 	if startTime.After(maxLocalStartTime) {
 		return ErrFutureStakeTime
 	}
 
-	_, _, err := tx.Execute(verifier, parentState)
+	_, _, err := tx.Execute(parentState)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, ErrFutureStakeTime) {
@@ -48,15 +47,8 @@ func (tx *AddSubnetValidatorTx) SemanticVerify(
 }
 
 // Execute this transaction.
-func (tx *AddSubnetValidatorTx) Execute(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) (
-	state.Versioned,
-	state.Versioned,
-	error,
-) {
-	ctx := verifier.Ctx()
+func (tx *AddSubnetValidatorTx) Execute(parentState state.Mutable) (state.Versioned, state.Versioned, error) {
+	ctx := tx.verifier.Ctx()
 
 	// Verify the tx is well-formed
 	stx := &signed.Tx{
@@ -64,15 +56,15 @@ func (tx *AddSubnetValidatorTx) Execute(
 		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
+	if err := stx.SyntacticVerify(tx.verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
+	case duration < tx.verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
 		return nil, nil, ErrStakeTooShort
-	case duration > verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
+	case duration > tx.verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, ErrStakeTooLong
 	case len(tx.creds) == 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials
@@ -81,7 +73,7 @@ func (tx *AddSubnetValidatorTx) Execute(
 	currentStakers := parentState.CurrentStakerChainState()
 	pendingStakers := parentState.PendingStakerChainState()
 
-	if verifier.Bootstrapped() {
+	if tx.verifier.Bootstrapped() {
 		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
@@ -172,18 +164,18 @@ func (tx *AddSubnetValidatorTx) Execute(
 			)
 		}
 
-		if err := verifier.FeatureExtension().VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+		if err := tx.verifier.FeatureExtension().VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 			return nil, nil, err
 		}
 
 		// Verify the flowcheck
-		if err := verifier.SemanticVerifySpend(
+		if err := tx.verifier.SemanticVerifySpend(
 			parentState,
 			tx,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
-			verifier.PlatformConfig().TxFee,
+			tx.verifier.PlatformConfig().TxFee,
 			ctx.AVAXAssetID,
 		); err != nil {
 			return nil, nil, err
@@ -219,7 +211,7 @@ func (tx *AddSubnetValidatorTx) Execute(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *AddSubnetValidatorTx) InitiallyPrefersCommit(verifier TxVerifier) bool {
-	clock := verifier.Clock()
+func (tx *AddSubnetValidatorTx) InitiallyPrefersCommit() bool {
+	clock := tx.verifier.Clock()
 	return tx.StartTime().After(clock.Time())
 }

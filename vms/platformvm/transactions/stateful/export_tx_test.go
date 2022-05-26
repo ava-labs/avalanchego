@@ -77,9 +77,9 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			verifiableTx, err := MakeStatefulTx(tx)
+			verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
 			assert.NoError(err)
-			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState)
+			err = verifiableTx.SemanticVerify(fakedState)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

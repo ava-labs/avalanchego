@@ -172,7 +172,7 @@ func addSubnet(
 	}
 
 	// store it
-	executableTx, err := MakeStatefulTx(testSubnet1)
+	executableTx, err := MakeStatefulTx(testSubnet1, txVerifier)
 	if err != nil {
 		panic(err)
 	}
@@ -185,7 +185,7 @@ func addSubnet(
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	_, err = vDecisionTx.Execute(txVerifier, versionedState)
+	_, err = vDecisionTx.Execute(versionedState)
 	if err != nil {
 		panic(err)
 	}

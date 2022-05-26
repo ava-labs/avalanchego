@@ -102,7 +102,7 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		txID := tx.ID()
 
-		statefulTx, err := stateful.MakeStatefulTx(tx)
+		statefulTx, err := stateful.MakeStatefulTx(tx, sb.vm.txVerifier)
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func (sb *StandardBlock) Verify() error {
 		// Add UTXOs to batch
 		sb.inputs.Union(inputUTXOs)
 
-		onAccept, err := decisionTx.Execute(sb.vm.txVerifier, sb.onAcceptState)
+		onAccept, err := decisionTx.Execute(sb.onAcceptState)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			return err
@@ -170,7 +170,7 @@ func (sb *StandardBlock) Accept() error {
 	// Set up the shared memory operations
 	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range sb.Txs {
-		statefulTx, err := stateful.MakeStatefulTx(tx)
+		statefulTx, err := stateful.MakeStatefulTx(tx, sb.vm.txVerifier)
 		if err != nil {
 			return err
 		}

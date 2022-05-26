@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
+func MakeStatefulTx(tx *signed.Tx, verifier TxVerifier) (Tx, error) {
 	switch utx := tx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx:
 		return &AddDelegatorTx{
@@ -18,6 +18,7 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 			txID:           tx.ID(),
 			signedBytes:    tx.Bytes(),
 			creds:          tx.Creds,
+			verifier:       verifier,
 		}, nil
 
 	case *unsigned.AddSubnetValidatorTx:
@@ -26,6 +27,7 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 			txID:                 tx.ID(),
 			signedBytes:          tx.Bytes(),
 			creds:                tx.Creds,
+			verifier:             verifier,
 		}, nil
 
 	case *unsigned.AddValidatorTx:
@@ -34,18 +36,21 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 			txID:           tx.ID(),
 			signedBytes:    tx.Bytes(),
 			creds:          tx.Creds,
+			verifier:       verifier,
 		}, nil
 	case *unsigned.AdvanceTimeTx:
 		return &AdvanceTimeTx{
 			AdvanceTimeTx: utx,
 			ID:            tx.ID(),
 			creds:         tx.Creds,
+			verifier:      verifier,
 		}, nil
 	case *unsigned.RewardValidatorTx:
 		return &RewardValidatorTx{
 			RewardValidatorTx: utx,
 			ID:                tx.ID(),
 			creds:             tx.Creds,
+			verifier:          verifier,
 		}, nil
 	case *unsigned.CreateChainTx:
 		return &CreateChainTx{
@@ -53,6 +58,7 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 			txID:          tx.ID(),
 			signedBytes:   tx.Bytes(),
 			creds:         tx.Creds,
+			verifier:      verifier,
 		}, nil
 	case *unsigned.CreateSubnetTx:
 		return &CreateSubnetTx{
@@ -60,12 +66,14 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 			txID:           tx.ID(),
 			signedBytes:    tx.Bytes(),
 			creds:          tx.Creds,
+			verifier:       verifier,
 		}, nil
 	case *unsigned.ImportTx:
 		return &ImportTx{
 			ImportTx: utx,
 			txID:     tx.ID(),
 			creds:    tx.Creds,
+			verifier: verifier,
 		}, nil
 	case *unsigned.ExportTx:
 		return &ExportTx{
@@ -73,6 +81,7 @@ func MakeStatefulTx(tx *signed.Tx) (Tx, error) {
 			txID:        tx.ID(),
 			signedBytes: tx.Bytes(),
 			creds:       tx.Creds,
+			verifier:    verifier,
 		}, nil
 
 	default:

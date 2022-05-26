@@ -26,23 +26,19 @@ type ImportTx struct {
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *ImportTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
-	_, err := tx.AtomicExecute(verifier, parentState)
+func (tx *ImportTx) SemanticVerify(parentState state.Mutable) error {
+	_, err := tx.AtomicExecute(parentState)
 	return err
 }
 
 // Execute this transaction.
-func (tx *ImportTx) Execute(
-	verifier TxVerifier,
-	vs state.Versioned,
-) (func() error, error) {
-	ctx := verifier.Ctx()
+func (tx *ImportTx) Execute(vs state.Versioned) (func() error, error) {
+	ctx := tx.verifier.Ctx()
 
 	stx := &signed.Tx{
 		Unsigned: tx.ImportTx,
@@ -62,7 +58,7 @@ func (tx *ImportTx) Execute(
 		utxosList[index] = utxo
 	}
 
-	if verifier.Bootstrapped() {
+	if tx.verifier.Bootstrapped() {
 		if err := verify.SameSubnet(ctx, tx.SourceChain); err != nil {
 			return nil, err
 		}
@@ -89,13 +85,13 @@ func (tx *ImportTx) Execute(
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := verifier.SemanticVerifySpendUTXOs(
+		if err := tx.verifier.SemanticVerifySpendUTXOs(
 			tx,
 			utxosList,
 			ins,
 			tx.Outs,
 			tx.creds,
-			verifier.PlatformConfig().TxFee,
+			tx.verifier.PlatformConfig().TxFee,
 			ctx.AVAXAssetID,
 		); err != nil {
 			return nil, err
@@ -120,17 +116,14 @@ func (tx *ImportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 }
 
 // [AtomicExecute] to maintain consistency for the standard block.
-func (tx *ImportTx) AtomicExecute(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) (state.Versioned, error) {
+func (tx *ImportTx) AtomicExecute(parentState state.Mutable) (state.Versioned, error) {
 	// Set up the state if this tx is committed
 	newState := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, newState)
+	_, err := tx.Execute(newState)
 	return newState, err
 }
 

@@ -86,7 +86,7 @@ func (m *blockBuilder) Initialize(
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
-	statefulTx, err := stateful.MakeStatefulTx(tx)
+	statefulTx, err := stateful.MakeStatefulTx(tx, m.vm.txVerifier)
 	if err != nil {
 		return fmt.Errorf("unsopported stateful tx, err %w", err)
 	}
@@ -111,7 +111,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	if err := statefulTx.SemanticVerify(m.vm.txVerifier, preferredState); err != nil {
+	if err := statefulTx.SemanticVerify(preferredState); err != nil {
 		m.MarkDropped(txID)
 		return err
 	}

@@ -81,7 +81,7 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx, ab.vm.txVerifier)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept, err := atomicTx.AtomicExecute(ab.vm.txVerifier, parentState)
+	onAccept, err := atomicTx.AtomicExecute(parentState)
 	if err != nil {
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
@@ -157,7 +157,7 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx)
+	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx, ab.vm.txVerifier)
 	if err != nil {
 		return err
 	}

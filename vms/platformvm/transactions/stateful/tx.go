@@ -9,15 +9,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-// unsigned.UnsignedTx is an unsigned transaction
 type Tx interface {
-	unsigned.Tx
-
 	// Attempts to verify this transaction with the provided txstate.
-	SemanticVerify(verifier TxVerifier, parentState state.Mutable) error
+	SemanticVerify(parentState state.Mutable) error
 }
 
 // DecisionTx is an unsigned operation that can be immediately decided
@@ -25,10 +21,7 @@ type DecisionTx interface {
 	Tx
 
 	// Execute this transaction with the provided txstate.
-	Execute(verifier TxVerifier, vs state.Versioned) (
-		onAcceptFunc func() error,
-		err error,
-	)
+	Execute(vs state.Versioned) (onAcceptFunc func() error, err error)
 
 	// To maintain consistency with the Atomic txs
 	InputUTXOs() ids.Set
@@ -42,12 +35,9 @@ type ProposalTx interface {
 	Tx
 
 	// Attempts to verify this transaction with the provided txstate.
-	Execute(verifier TxVerifier, state state.Mutable) (
-		onCommitState state.Versioned,
-		onAbortState state.Versioned,
-		err error,
-	)
-	InitiallyPrefersCommit(verifier TxVerifier) bool
+	Execute(state state.Mutable) (onCommitState, onAbortState state.Versioned, err error)
+
+	InitiallyPrefersCommit() bool
 }
 
 // AtomicTx is an unsigned operation that can be atomically accepted. DEPRECATED
@@ -55,10 +45,7 @@ type AtomicTx interface {
 	DecisionTx
 
 	// Execute this transaction with the provided txstate.
-	AtomicExecute(verifier TxVerifier, parentState state.Mutable) (
-		state.Versioned,
-		error,
-	)
+	AtomicExecute(parentState state.Mutable) (state.Versioned, error)
 
 	// Accept this transaction with the additionally provided state transitions.
 	AtomicAccept(ctx *snow.Context, batch database.Batch) error

@@ -31,6 +31,8 @@ type CreateChainTx struct {
 	txID        ids.ID // ID of signed create chain tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 func (tx *CreateChainTx) InputUTXOs() ids.Set { return nil }
@@ -40,30 +42,24 @@ func (tx *CreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *CreateChainTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
+func (tx *CreateChainTx) SemanticVerify(parentState state.Mutable) error {
 	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, vs)
+	_, err := tx.Execute(vs)
 	return err
 }
 
 // Execute this transaction.
-func (tx *CreateChainTx) Execute(
-	verifier TxVerifier,
-	vs state.Versioned,
-) (
+func (tx *CreateChainTx) Execute(vs state.Versioned) (
 	func() error,
 	error,
 ) {
 	var (
-		ctx = verifier.Ctx()
-		cfg = *verifier.PlatformConfig()
+		ctx = tx.verifier.Ctx()
+		cfg = *tx.verifier.PlatformConfig()
 	)
 
 	// Make sure this transaction is well formed.
@@ -76,7 +72,7 @@ func (tx *CreateChainTx) Execute(
 		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
+	if err := stx.SyntacticVerify(tx.verifier.Ctx()); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +83,7 @@ func (tx *CreateChainTx) Execute(
 
 	// Verify the flowcheck
 	createBlockchainTxFee := builder.GetCreateBlockchainTxFee(cfg, vs.GetTimestamp())
-	if err := verifier.SemanticVerifySpend(
+	if err := tx.verifier.SemanticVerifySpend(
 		vs,
 		tx,
 		tx.Ins,
@@ -113,7 +109,7 @@ func (tx *CreateChainTx) Execute(
 	}
 
 	// Verify that this chain is authorized by the subnet
-	if err := verifier.FeatureExtension().VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+	if err := tx.verifier.FeatureExtension().VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return nil, err
 	}
 
@@ -126,6 +122,6 @@ func (tx *CreateChainTx) Execute(
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { return verifier.CreateChain(tx.CreateChainTx, tx.txID) }
+	onAccept := func() error { return tx.verifier.CreateChain(tx.CreateChainTx, tx.txID) }
 	return onAccept, nil
 }

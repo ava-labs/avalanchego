@@ -26,26 +26,22 @@ type ExportTx struct {
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
+
+	verifier TxVerifier
 }
 
 // InputUTXOs returns an empty set
 func (tx *ExportTx) InputUTXOs() ids.Set { return nil }
 
 // Attempts to verify this transaction with the provided state.
-func (tx *ExportTx) SemanticVerify(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) error {
-	_, err := tx.AtomicExecute(verifier, parentState)
+func (tx *ExportTx) SemanticVerify(parentState state.Mutable) error {
+	_, err := tx.AtomicExecute(parentState)
 	return err
 }
 
 // Execute this transaction.
-func (tx *ExportTx) Execute(
-	verifier TxVerifier,
-	vs state.Versioned,
-) (func() error, error) {
-	ctx := verifier.Ctx()
+func (tx *ExportTx) Execute(vs state.Versioned) (func() error, error) {
+	ctx := tx.verifier.Ctx()
 
 	stx := &signed.Tx{
 		Unsigned: tx.ExportTx,
@@ -60,20 +56,20 @@ func (tx *ExportTx) Execute(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	if verifier.Bootstrapped() {
+	if tx.verifier.Bootstrapped() {
 		if err := verify.SameSubnet(ctx, tx.DestinationChain); err != nil {
 			return nil, err
 		}
 	}
 
 	// Verify the flowcheck
-	if err := verifier.SemanticVerifySpend(
+	if err := tx.verifier.SemanticVerifySpend(
 		vs,
 		tx,
 		tx.Ins,
 		outs,
 		tx.creds,
-		verifier.PlatformConfig().TxFee,
+		tx.verifier.PlatformConfig().TxFee,
 		ctx.AVAXAssetID,
 	); err != nil {
 		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
@@ -118,17 +114,14 @@ func (tx *ExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 }
 
 // Execute this transaction and return the versioned state.
-func (tx *ExportTx) AtomicExecute(
-	verifier TxVerifier,
-	parentState state.Mutable,
-) (state.Versioned, error) {
+func (tx *ExportTx) AtomicExecute(parentState state.Mutable) (state.Versioned, error) {
 	// Set up the state if this tx is committed
 	newState := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, newState)
+	_, err := tx.Execute(newState)
 	return newState, err
 }
 
