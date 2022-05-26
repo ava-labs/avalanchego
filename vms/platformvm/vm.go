@@ -64,7 +64,6 @@ const (
 
 var (
 	errInvalidID      = errors.New("invalid ID")
-	errDSCantValidate = errors.New("new blockchain can't be validated by primary network")
 	errWrongCacheType = errors.New("unexpectedly cached type")
 
 	_ block.ChainVM        = &VM{}

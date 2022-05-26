@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -146,10 +146,10 @@ func (noDynamicIP *NoDynamicIP) Stop() {}
 // Returns a new dynamic IP that resolves and updates [ip] to our public IP every [updateTimeout].
 // Uses [dynamicResolver] to resolve our public ip.
 // Stops updating when Stop() is called.
-func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log logging.Logger, ip *utils.DynamicIPDesc) IPManager {
+func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log logging.Logger, ip ips.DynamicIPPort) IPManager {
 	if resolver.IsResolver() {
 		updater := &DynamicIP{
-			DynamicIPDesc: ip,
+			DynamicIPPort: ip,
 			tickerCloser:  make(chan struct{}),
 			log:           log,
 			updateTimeout: updateTimeout,
@@ -163,7 +163,7 @@ func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log log
 
 // DynamicIP is an IP address that gets periodically updated to our public IP
 type DynamicIP struct {
-	*utils.DynamicIPDesc
+	ips.DynamicIPPort
 	tickerCloser  chan struct{}
 	log           logging.Logger
 	updateTimeout time.Duration
@@ -197,8 +197,8 @@ func (dynamicIP *DynamicIP) update(resolver Resolver) {
 		dynamicIP.log.Warn("Fetch external IP failed %s", err)
 		return
 	}
-	oldIP := dynamicIP.IP().IP
-	dynamicIP.UpdateIP(newIP)
+	oldIP := dynamicIP.IPPort().IP
+	dynamicIP.SetIP(newIP)
 	if !oldIP.Equal(newIP) {
 		dynamicIP.log.Info("ExternalIP updated to %s", newIP)
 	}

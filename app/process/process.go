@@ -135,13 +135,13 @@ func (p *process) Start() error {
 	// Open staking port we want for NAT Traversal to have the external port
 	// (config.IP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
-	if p.config.IP.IP().Port != 0 {
+	if p.config.IPPort.IPPort().Port != 0 {
 		mapper.Map(
 			"TCP",
-			p.config.IP.IP().Port,
-			p.config.IP.IP().Port,
+			p.config.IPPort.IPPort().Port,
+			p.config.IPPort.IPPort().Port,
 			stakingPortName,
-			&p.config.IP,
+			p.config.IPPort,
 			p.config.DynamicUpdateDuration,
 		)
 	}
@@ -165,7 +165,7 @@ func (p *process) Start() error {
 		p.config.DynamicPublicIPResolver,
 		p.config.DynamicUpdateDuration,
 		log,
-		&p.config.IP,
+		p.config.IPPort,
 	)
 
 	if err := p.node.Initialize(&p.config, dbManager, log, logFactory); err != nil {

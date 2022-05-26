@@ -5,6 +5,7 @@ package config
 
 // #nosec G101
 const (
+	DataDirKey                                         = "data-dir"
 	ConfigFileKey                                      = "config-file"
 	ConfigContentKey                                   = "config-file-content"
 	ConfigContentTypeKey                               = "config-file-content-type"

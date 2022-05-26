@@ -9,8 +9,8 @@ import (
 	"errors"
 	"math"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const (
@@ -291,23 +291,23 @@ func (p *Packer) UnpackStr() string {
 }
 
 // PackIP packs an ip port pair to the byte array
-func (p *Packer) PackIP(ip utils.IPDesc) {
+func (p *Packer) PackIP(ip ips.IPPort) {
 	p.PackFixedBytes(ip.IP.To16())
 	p.PackShort(ip.Port)
 }
 
 // UnpackIP unpacks an ip port pair from the byte array
-func (p *Packer) UnpackIP() utils.IPDesc {
+func (p *Packer) UnpackIP() ips.IPPort {
 	ip := p.UnpackFixedBytes(16)
 	port := p.UnpackShort()
-	return utils.IPDesc{
+	return ips.IPPort{
 		IP:   ip,
 		Port: port,
 	}
 }
 
 // PackIPs unpacks an ip port pair slice from the byte array
-func (p *Packer) PackIPs(ips []utils.IPDesc) {
+func (p *Packer) PackIPs(ips []ips.IPPort) {
 	p.PackInt(uint32(len(ips)))
 	for i := 0; i < len(ips) && !p.Errored(); i++ {
 		p.PackIP(ips[i])
@@ -315,9 +315,9 @@ func (p *Packer) PackIPs(ips []utils.IPDesc) {
 }
 
 // UnpackIPs unpacks an ip port pair slice from the byte array
-func (p *Packer) UnpackIPs() []utils.IPDesc {
+func (p *Packer) UnpackIPs() []ips.IPPort {
 	sliceSize := p.UnpackInt()
-	ips := []utils.IPDesc(nil)
+	ips := []ips.IPPort(nil)
 	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
 		ips = append(ips, p.UnpackIP())
 	}
@@ -438,7 +438,7 @@ func TryUnpackStr(packer *Packer) interface{} {
 
 // TryPackIP attempts to pack the value as an ip port pair
 func TryPackIP(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.(utils.IPDesc); ok {
+	if val, ok := valIntf.(ips.IPPort); ok {
 		packer.PackIP(val)
 	} else {
 		packer.Add(errBadType)
@@ -464,38 +464,38 @@ func (p *Packer) UnpackX509Certificate() *x509.Certificate {
 	return cert
 }
 
-func (p *Packer) PackIPCert(ipCert utils.IPCertDesc) {
+func (p *Packer) PackClaimedIPPort(ipCert ips.ClaimedIPPort) {
 	p.PackX509Certificate(ipCert.Cert)
-	p.PackIP(ipCert.IPDesc)
-	p.PackLong(ipCert.Time)
+	p.PackIP(ipCert.IPPort)
+	p.PackLong(ipCert.Timestamp)
 	p.PackBytes(ipCert.Signature)
 }
 
-func (p *Packer) UnpackIPCert() utils.IPCertDesc {
-	var ipCert utils.IPCertDesc
+func (p *Packer) UnpackClaimedIPPort() ips.ClaimedIPPort {
+	var ipCert ips.ClaimedIPPort
 	ipCert.Cert = p.UnpackX509Certificate()
-	ipCert.IPDesc = p.UnpackIP()
-	ipCert.Time = p.UnpackLong()
+	ipCert.IPPort = p.UnpackIP()
+	ipCert.Timestamp = p.UnpackLong()
 	ipCert.Signature = p.UnpackBytes()
 	return ipCert
 }
 
-func TryPackIPCertList(packer *Packer, valIntf interface{}) {
-	if ipCertList, ok := valIntf.([]utils.IPCertDesc); ok {
+func TryPackClaimedIPPortList(packer *Packer, valIntf interface{}) {
+	if ipCertList, ok := valIntf.([]ips.ClaimedIPPort); ok {
 		packer.PackInt(uint32(len(ipCertList)))
 		for _, ipc := range ipCertList {
-			packer.PackIPCert(ipc)
+			packer.PackClaimedIPPort(ipc)
 		}
 	} else {
 		packer.Add(errBadType)
 	}
 }
 
-func TryUnpackIPCertList(packer *Packer) interface{} {
+func TryUnpackClaimedIPPortList(packer *Packer) interface{} {
 	sliceSize := packer.UnpackInt()
-	ips := []utils.IPCertDesc(nil)
+	ips := []ips.ClaimedIPPort(nil)
 	for i := uint32(0); i < sliceSize && !packer.Errored(); i++ {
-		ips = append(ips, packer.UnpackIPCert())
+		ips = append(ips, packer.UnpackClaimedIPPort())
 	}
 	return ips
 }

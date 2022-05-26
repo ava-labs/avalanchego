@@ -22,7 +22,6 @@ import (
 var (
 	_ StatefulProposalTx = &StatefulAddValidatorTx{}
 
-	errNilTx                     = errors.New("tx is nil")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
 	errStakeTooShort             = errors.New("staking period is too short")

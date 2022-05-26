@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -160,7 +160,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config := defaultConfig
 		config.TLSConfig = tlsConfig
 		config.MyNodeID = nodeID
-		config.MyIP = ip
+		config.MyIPPort = ip
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
 		listeners[i] = listener
@@ -260,7 +260,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIP.IP())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -336,13 +336,13 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
 	assert.NoError(err)
 
-	useful := network.Track(utils.IPCertDesc{
+	useful := network.Track(ips.ClaimedIPPort{
 		Cert: tlsCert.Leaf,
-		IPDesc: utils.IPDesc{
+		IPPort: ips.IPPort{
 			IP:   net.IPv4(123, 132, 123, 123),
 			Port: 10000,
 		},
-		Time:      1000,
+		Timestamp: 1000,
 		Signature: nil,
 	})
 	// The signature is wrong so this peer tracking info isn't useful.
