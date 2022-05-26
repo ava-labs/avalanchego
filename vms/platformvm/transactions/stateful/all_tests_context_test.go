@@ -44,7 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
-	pChainGen "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var (
@@ -335,7 +335,7 @@ func defaultKeys() []*crypto.PrivateKeySECP256K1R {
 func initializeState(tState state.State, ctx *snow.Context) {
 	genesisBytes := buildGenesisTest(ctx)
 	utxos, timestamp, initialSupply,
-		validators, chains, err := pChainGen.ExtractGenesisContent(genesisBytes)
+		validators, chains, err := p_genesis.ExtractGenesisContent(genesisBytes)
 	if err != nil {
 		panic(err)
 	}
