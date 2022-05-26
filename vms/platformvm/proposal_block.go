@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var _ Block = &ProposalBlock{}
@@ -124,7 +123,7 @@ func (pb *ProposalBlock) Verify() error {
 	}
 	tx, ok := statefulTx.(stateful.ProposalTx)
 	if !ok {
-		return unsigned.ErrWrongTxType
+		return fmt.Errorf("expected tx type stateful.ProposalTx but got %T", statefulTx)
 	}
 
 	parentIntf, parentErr := pb.parentBlock()
@@ -164,11 +163,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	}
 	proposalTx, ok := statefulTx.(stateful.ProposalTx)
 	if !ok {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"%w, expected UnsignedProposalTx but got %T",
-			unsigned.ErrWrongTxType,
-			pb.Tx.Unsigned,
-		)
+		return [2]snowman.Block{}, fmt.Errorf("expected UnsignedProposalTx but got %T", pb.Tx.Unsigned)
 	}
 
 	blkID := pb.ID()

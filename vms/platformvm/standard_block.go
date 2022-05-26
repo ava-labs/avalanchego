@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var (
@@ -109,7 +108,7 @@ func (sb *StandardBlock) Verify() error {
 		}
 		decisionTx, ok := statefulTx.(stateful.DecisionTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type stateful.DecisionTx but got %T", statefulTx)
 		}
 
 		inputUTXOs := decisionTx.InputUTXOs()
@@ -177,7 +176,7 @@ func (sb *StandardBlock) Accept() error {
 		}
 		decisionTx, ok := statefulTx.(stateful.DecisionTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type stateful.DecisionTx but got %T", statefulTx)
 		}
 
 		// Get the shared memory operations this transaction is performing

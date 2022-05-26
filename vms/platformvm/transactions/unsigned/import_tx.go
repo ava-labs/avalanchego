@@ -16,7 +16,6 @@ import (
 var (
 	_ Tx = &ImportTx{}
 
-	ErrAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
 	ErrWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
 	errNoImportInputs           = errors.New("tx has no imported inputs")
 )

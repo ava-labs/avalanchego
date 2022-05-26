@@ -92,7 +92,7 @@ func (tx *RewardValidatorTx) Execute(
 	currentTime := parentState.GetTimestamp()
 	staker, ok := stakerTx.Unsigned.(timed.Tx)
 	if !ok {
-		return nil, nil, unsigned.ErrWrongTxType
+		return nil, nil, fmt.Errorf("expected tx type timed.Tx but got %T", stakerTx.Unsigned)
 	}
 	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
 		return nil, nil, fmt.Errorf(

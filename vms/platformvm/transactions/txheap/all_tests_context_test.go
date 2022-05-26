@@ -78,7 +78,7 @@ type snLookup struct {
 func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	subnetID, ok := sn.chainsToSubnet[chainID]
 	if !ok {
-		return ids.ID{}, errors.New("")
+		return ids.ID{}, errors.New("missing subnet associated with requested chainID")
 	}
 	return subnetID, nil
 }

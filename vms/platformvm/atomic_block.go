@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 var (
@@ -88,7 +87,7 @@ func (ab *AtomicBlock) Verify() error {
 	}
 	atomicTx, ok := statefulTx.(stateful.AtomicTx)
 	if !ok {
-		return unsigned.ErrWrongTxType
+		return fmt.Errorf("expected tx type stateful.AtomicTx but got %T", statefulTx)
 	}
 	ab.inputs = atomicTx.InputUTXOs()
 
@@ -164,7 +163,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 	atomicTx, ok := statefulTx.(stateful.AtomicTx)
 	if !ok {
-		return unsigned.ErrWrongTxType
+		return fmt.Errorf("expected tx type stateful.AtomicTx but got %T", statefulTx)
 	}
 
 	// Update the state of the chain in the database

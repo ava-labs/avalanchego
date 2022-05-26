@@ -179,7 +179,7 @@ currentStakerLoop:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
 		default:
-			return nil, nil, unsigned.ErrWrongTxType
+			return nil, nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx or *unsigned.AddDelegatorTx but got %T", staker)
 		}
 	}
 	newlyCurrentStakers, err := currentStakers.UpdateStakers(

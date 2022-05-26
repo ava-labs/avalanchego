@@ -15,16 +15,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var _ PendingStaker = &pendingStaker{}
+var _ PendingStakerState = &pendingStakerState{}
 
-// PendingStaker manages the set of stakers (both validators and
+// PendingStakerState manages the set of stakers (both validators and
 // delegators) that are slated to start staking in the future.
-type PendingStaker interface {
+type PendingStakerState interface {
 	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *unsigned.AddValidatorTx, txID ids.ID, err error)
-	GetValidator(nodeID ids.NodeID) validatorCache
+	GetValidator(nodeID ids.NodeID) validator
 
-	AddStaker(addStakerTx *signed.Tx) PendingStaker
-	DeleteStakers(numToRemove int) PendingStaker
+	AddStaker(addStakerTx *signed.Tx) PendingStakerState
+	DeleteStakers(numToRemove int) PendingStakerState
 
 	// Stakers returns the list of pending validators in order of their removal
 	// from the pending staker set
@@ -33,10 +33,10 @@ type PendingStaker interface {
 	Apply(Content)
 }
 
-// pendingStaker is a copy on write implementation for versioning
+// pendingStakerState is a copy on write implementation for versioning
 // the validator set. None of the slices, maps, or pointers should be modified
 // after initialization.
-type pendingStaker struct {
+type pendingStakerState struct {
 	// nodeID -> validator
 	validatorsByNodeID      map[ids.NodeID]signed.ValidatorAndID
 	validatorExtrasByNodeID map[ids.NodeID]*validatorImpl
@@ -49,7 +49,7 @@ type pendingStaker struct {
 	deletedStakers []*signed.Tx
 }
 
-func (ps *pendingStaker) GetValidatorTx(nodeID ids.NodeID) (
+func (ps *pendingStakerState) GetValidatorTx(nodeID ids.NodeID) (
 	addStakerTx *unsigned.AddValidatorTx,
 	txID ids.ID,
 	err error,
@@ -61,15 +61,15 @@ func (ps *pendingStaker) GetValidatorTx(nodeID ids.NodeID) (
 	return vdr.UnsignedAddValidatorTx, vdr.TxID, nil
 }
 
-func (ps *pendingStaker) GetValidator(nodeID ids.NodeID) validatorCache {
+func (ps *pendingStakerState) GetValidator(nodeID ids.NodeID) validator {
 	if vdr, exists := ps.validatorExtrasByNodeID[nodeID]; exists {
 		return vdr
 	}
 	return &validatorImpl{}
 }
 
-func (ps *pendingStaker) AddStaker(addStakerTx *signed.Tx) PendingStaker {
-	newPS := &pendingStaker{
+func (ps *pendingStakerState) AddStaker(addStakerTx *signed.Tx) PendingStakerState {
+	newPS := &pendingStakerState{
 		validators:   make([]*signed.Tx, len(ps.validators)+1),
 		addedStakers: []*signed.Tx{addStakerTx},
 	}
@@ -161,8 +161,8 @@ func (ps *pendingStaker) AddStaker(addStakerTx *signed.Tx) PendingStaker {
 	return newPS
 }
 
-func (ps *pendingStaker) DeleteStakers(numToRemove int) PendingStaker {
-	newPS := &pendingStaker{
+func (ps *pendingStakerState) DeleteStakers(numToRemove int) PendingStakerState {
+	newPS := &pendingStakerState{
 		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID, len(ps.validatorsByNodeID)),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
 		validators:              ps.validators[numToRemove:],
@@ -215,11 +215,11 @@ func (ps *pendingStaker) DeleteStakers(numToRemove int) PendingStaker {
 	return newPS
 }
 
-func (ps *pendingStaker) Stakers() []*signed.Tx {
+func (ps *pendingStakerState) Stakers() []*signed.Tx {
 	return ps.validators
 }
 
-func (ps *pendingStaker) Apply(bs Content) {
+func (ps *pendingStakerState) Apply(bs Content) {
 	for _, added := range ps.addedStakers {
 		bs.AddPendingStaker(added)
 	}

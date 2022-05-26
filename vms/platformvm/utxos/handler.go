@@ -26,7 +26,6 @@ import (
 var (
 	_ SpendHandler = &handler{}
 
-	ErrUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
@@ -63,6 +62,19 @@ func ProduceOutputs(
 
 // TODO: Stake and Authorize be replaced by similar methods in the P-chain wallet
 type SpendingOps interface {
+	// Stake the provided amount while deducting the provided fee.
+	// Arguments:
+	// - [keys] are the owners of the funds
+	// - [amount] is the amount of funds that are trying to be staked
+	// - [fee] is the amount of AVAX that should be burned
+	// - [changeAddr] is the address that change, if there is any, is sent to
+	// Returns:
+	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [returnedOutputs] the outputs that should be immediately returned to the
+	//                     UTXO set
+	// - [stakedOutputs] the outputs that should be locked for the duration of the
+	//                   staking period
+	// - [signers] the proof of ownership of the funds being moved
 	Stake(
 		keys []*crypto.PrivateKeySECP256K1R,
 		amount uint64,
@@ -76,6 +88,7 @@ type SpendingOps interface {
 		error,
 	)
 
+	// authorize an operation on behalf of the named subnet with the provided keys.
 	Authorize(
 		vs txstate.Mutable,
 		subnetID ids.ID,
@@ -90,6 +103,11 @@ type SpendingOps interface {
 type SpendHandler interface {
 	SpendingOps
 
+	// Verify that [tx] is semantically valid.
+	// [db] should not be committed if an error is returned
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpend(
 		utxoDB txstate.UTXOGetter,
 		tx unsigned.Tx,
@@ -100,6 +118,12 @@ type SpendHandler interface {
 		feeAssetID ids.ID,
 	) error
 
+	// Verify that [tx] is semantically valid.
+	// [db] should not be committed if an error is returned
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// [utxos[i]] is the UTXO being consumed by [ins[i]]
+	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpendUTXOs(
 		tx unsigned.Tx,
 		utxosList []*avax.UTXO,
@@ -132,19 +156,6 @@ type handler struct {
 	fx          fx.Fx
 }
 
-// stake the provided amount while deducting the provided fee.
-// Arguments:
-// - [keys] are the owners of the funds
-// - [amount] is the amount of funds that are trying to be staked
-// - [fee] is the amount of AVAX that should be burned
-// - [changeAddr] is the address that change, if there is any, is sent to
-// Returns:
-// - [inputs] the inputs that should be consumed to fund the outputs
-// - [returnedOutputs] the outputs that should be immediately returned to the
-//                     UTXO set
-// - [stakedOutputs] the outputs that should be locked for the duration of the
-//                   staking period
-// - [signers] the proof of ownership of the funds being moved
 func (h *handler) Stake(
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
@@ -384,7 +395,6 @@ func (h *handler) Stake(
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
 
-// authorize an operation on behalf of the named subnet with the provided keys.
 func (h *handler) Authorize(
 	vs txstate.Mutable,
 	subnetID ids.ID,
@@ -404,13 +414,13 @@ func (h *handler) Authorize(
 	}
 	subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
 	if !ok {
-		return nil, nil, unsigned.ErrWrongTxType
+		return nil, nil, fmt.Errorf("expected tx type *unsigned.CreateSubnetTx but got %T", subnetTx.Unsigned)
 	}
 
 	// Make sure the owners of the subnet match the provided keys
 	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, nil, ErrUnknownOwners
+		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
 	}
 
 	// Add the keys to a keychain
@@ -428,11 +438,6 @@ func (h *handler) Authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpend(
 	utxoDB txstate.UTXOGetter,
 	tx unsigned.Tx,
@@ -458,12 +463,6 @@ func (h *handler) SemanticVerifySpend(
 	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// [utxos[i]] is the UTXO being consumed by [ins[i]]
-// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpendUTXOs(
 	tx unsigned.Tx,
 	utxosList []*avax.UTXO,
@@ -509,10 +508,10 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		utxo := utxosList[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return unsigned.ErrAssetIDMismatch
+			return fmt.Errorf("utxo asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
 		}
 		if assetID := input.AssetID(); assetID != feeAssetID {
-			return unsigned.ErrAssetIDMismatch
+			return fmt.Errorf("input asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
 		}
 
 		out := utxo.Out
@@ -555,7 +554,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 
 		owned, ok := out.(fx.Owned)
 		if !ok {
-			return ErrUnknownOwners
+			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
 		ownerBytes, err := unsigned.Codec.Marshal(unsigned.Version, owner)
@@ -577,7 +576,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 
 	for _, out := range outs {
 		if assetID := out.AssetID(); assetID != feeAssetID {
-			return unsigned.ErrAssetIDMismatch
+			return fmt.Errorf("output asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
 		}
 
 		output := out.Output()
@@ -601,7 +600,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 
 		owned, ok := output.(fx.Owned)
 		if !ok {
-			return ErrUnknownOwners
+			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
 		ownerBytes, err := unsigned.Codec.Marshal(unsigned.Version, owner)

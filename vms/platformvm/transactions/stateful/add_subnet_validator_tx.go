@@ -178,7 +178,8 @@ func (tx *AddSubnetValidatorTx) Execute(
 		}
 
 		// Verify the flowcheck
-		if err := verifier.SemanticVerifySpend(parentState,
+		if err := verifier.SemanticVerifySpend(
+			parentState,
 			tx,
 			tx.Ins,
 			tx.Outs,

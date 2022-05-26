@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -519,11 +518,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.CreateSubnetTx but got %T", subnetTx.Unsigned)
 		}
 		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 		if !ok {
-			return utxos.ErrUnknownOwners
+			return fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
 		}
 
 		controlAddrs := make([]string, len(owner.Addrs))
@@ -1804,7 +1803,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			chainID := chainTx.ID()
 			chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
 			if !ok {
-				return unsigned.ErrWrongTxType
+				return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", chainTx.Unsigned)
 			}
 			response.Blockchains = append(response.Blockchains, APIBlockchain{
 				ID:       chainID,
@@ -1823,7 +1822,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		chainID := chainTx.ID()
 		chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
 		if !ok {
-			return unsigned.ErrWrongTxType
+			return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", chainTx.Unsigned)
 		}
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chainID,
