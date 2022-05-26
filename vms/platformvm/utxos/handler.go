@@ -26,7 +26,6 @@ import (
 var (
 	_ SpendHandler = &handler{}
 
-	ErrUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
@@ -421,7 +420,7 @@ func (h *handler) Authorize(
 	// Make sure the owners of the subnet match the provided keys
 	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, nil, ErrUnknownOwners
+		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
 	}
 
 	// Add the keys to a keychain
@@ -555,7 +554,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 
 		owned, ok := out.(fx.Owned)
 		if !ok {
-			return ErrUnknownOwners
+			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
 		ownerBytes, err := unsigned.Codec.Marshal(unsigned.Version, owner)
@@ -601,7 +600,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 
 		owned, ok := output.(fx.Owned)
 		if !ok {
-			return ErrUnknownOwners
+			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
 		ownerBytes, err := unsigned.Codec.Marshal(unsigned.Version, owner)
