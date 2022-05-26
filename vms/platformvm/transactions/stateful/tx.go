@@ -8,7 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
@@ -18,7 +17,7 @@ type Tx interface {
 	unsigned.Tx
 
 	// Attempts to verify this transaction with the provided txstate.
-	SemanticVerify(verifier TxVerifier, parentState state.Mutable, creds []verify.Verifiable) error
+	SemanticVerify(verifier TxVerifier, parentState state.Mutable) error
 }
 
 // DecisionTx is an unsigned operation that can be immediately decided
@@ -26,7 +25,7 @@ type DecisionTx interface {
 	Tx
 
 	// Execute this transaction with the provided txstate.
-	Execute(verifier TxVerifier, vs state.Versioned, creds []verify.Verifiable) (
+	Execute(verifier TxVerifier, vs state.Versioned) (
 		onAcceptFunc func() error,
 		err error,
 	)
@@ -43,7 +42,7 @@ type ProposalTx interface {
 	Tx
 
 	// Attempts to verify this transaction with the provided txstate.
-	Execute(verifier TxVerifier, state state.Mutable, creds []verify.Verifiable) (
+	Execute(verifier TxVerifier, state state.Mutable) (
 		onCommitState state.Versioned,
 		onAbortState state.Versioned,
 		err error,
@@ -56,7 +55,7 @@ type AtomicTx interface {
 	DecisionTx
 
 	// Execute this transaction with the provided txstate.
-	AtomicExecute(verifier TxVerifier, parentState state.Mutable, creds []verify.Verifiable) (
+	AtomicExecute(verifier TxVerifier, parentState state.Mutable) (
 		state.Versioned,
 		error,
 	)

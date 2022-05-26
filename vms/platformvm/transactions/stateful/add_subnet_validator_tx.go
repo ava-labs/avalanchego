@@ -23,13 +23,13 @@ type AddSubnetValidatorTx struct {
 
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
+	creds       []verify.Verifiable
 }
 
 // Attempts to verify this transaction with the provided state.
 func (tx *AddSubnetValidatorTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
 	clock := verifier.Clock()
 	startTime := tx.StartTime()
@@ -38,7 +38,7 @@ func (tx *AddSubnetValidatorTx) SemanticVerify(
 		return ErrFutureStakeTime
 	}
 
-	_, _, err := tx.Execute(verifier, parentState, creds)
+	_, _, err := tx.Execute(verifier, parentState)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, ErrFutureStakeTime) {
@@ -51,7 +51,6 @@ func (tx *AddSubnetValidatorTx) SemanticVerify(
 func (tx *AddSubnetValidatorTx) Execute(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
@@ -62,7 +61,7 @@ func (tx *AddSubnetValidatorTx) Execute(
 	// Verify the tx is well-formed
 	stx := &signed.Tx{
 		Unsigned: tx.AddSubnetValidatorTx,
-		Creds:    creds,
+		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
@@ -75,7 +74,7 @@ func (tx *AddSubnetValidatorTx) Execute(
 		return nil, nil, ErrStakeTooShort
 	case duration > verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, ErrStakeTooLong
-	case len(creds) == 0:
+	case len(tx.creds) == 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
@@ -149,9 +148,9 @@ func (tx *AddSubnetValidatorTx) Execute(
 			)
 		}
 
-		baseTxCredsLen := len(creds) - 1
-		baseTxCreds := creds[:baseTxCredsLen]
-		subnetCred := creds[baseTxCredsLen]
+		baseTxCredsLen := len(tx.creds) - 1
+		baseTxCreds := tx.creds[:baseTxCredsLen]
+		subnetCred := tx.creds[baseTxCredsLen]
 
 		subnetIntf, _, err := parentState.GetTx(tx.Validator.Subnet)
 		if err != nil {

@@ -168,10 +168,9 @@ func TestNewImportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			verifiableTx := ImportTx{
-				ImportTx: unsignedTx,
-			}
-			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState, tx.Creds)
+			verifiableTx, err := MakeStatefulTx(tx)
+			assert.NoError(err)
+			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

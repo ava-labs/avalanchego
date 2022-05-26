@@ -30,6 +30,7 @@ type CreateChainTx struct {
 
 	txID        ids.ID // ID of signed create chain tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
+	creds       []verify.Verifiable
 }
 
 func (tx *CreateChainTx) InputUTXOs() ids.Set { return nil }
@@ -42,14 +43,13 @@ func (tx *CreateChainTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 func (tx *CreateChainTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
 	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, vs, creds)
+	_, err := tx.Execute(verifier, vs)
 	return err
 }
 
@@ -57,7 +57,6 @@ func (tx *CreateChainTx) SemanticVerify(
 func (tx *CreateChainTx) Execute(
 	verifier TxVerifier,
 	vs state.Versioned,
-	creds []verify.Verifiable,
 ) (
 	func() error,
 	error,
@@ -68,13 +67,13 @@ func (tx *CreateChainTx) Execute(
 	)
 
 	// Make sure this transaction is well formed.
-	if len(creds) == 0 {
+	if len(tx.creds) == 0 {
 		return nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	stx := &signed.Tx{
 		Unsigned: tx.CreateChainTx,
-		Creds:    creds,
+		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
@@ -82,9 +81,9 @@ func (tx *CreateChainTx) Execute(
 	}
 
 	// Select the credentials for each purpose
-	baseTxCredsLen := len(creds) - 1
-	baseTxCreds := creds[:baseTxCredsLen]
-	subnetCred := creds[baseTxCredsLen]
+	baseTxCredsLen := len(tx.creds) - 1
+	baseTxCreds := tx.creds[:baseTxCredsLen]
+	subnetCred := tx.creds[baseTxCredsLen]
 
 	// Verify the flowcheck
 	createBlockchainTxFee := builder.GetCreateBlockchainTxFee(cfg, vs.GetTimestamp())

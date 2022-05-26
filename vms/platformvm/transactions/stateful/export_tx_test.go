@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 func TestNewExportTx(t *testing.T) {
@@ -78,12 +77,9 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			uTx, ok := tx.Unsigned.(*unsigned.ExportTx)
-			assert.True(ok)
-			verifiableTx := ExportTx{
-				ExportTx: uTx,
-			}
-			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState, tx.Creds)
+			verifiableTx, err := MakeStatefulTx(tx)
+			assert.NoError(err)
+			err = verifiableTx.SemanticVerify(h.txVerifier, fakedState)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

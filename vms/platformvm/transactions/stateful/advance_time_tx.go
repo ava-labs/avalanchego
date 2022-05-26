@@ -24,16 +24,17 @@ const SyncBound = 10 * time.Second
 
 type AdvanceTimeTx struct {
 	*unsigned.AdvanceTimeTx
-	ID ids.ID // ID of signed advance time tx
+
+	ID    ids.ID // ID of signed advance time tx
+	creds []verify.Verifiable
 }
 
 // Attempts to verify this transaction with the provided state.
 func (tx *AdvanceTimeTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
-	_, _, err := tx.Execute(verifier, parentState, creds)
+	_, _, err := tx.Execute(verifier, parentState)
 	return err
 }
 
@@ -41,7 +42,6 @@ func (tx *AdvanceTimeTx) SemanticVerify(
 func (tx *AdvanceTimeTx) Execute(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
@@ -52,7 +52,7 @@ func (tx *AdvanceTimeTx) Execute(
 	switch {
 	case tx == nil:
 		return nil, nil, unsigned.ErrNilTx
-	case len(creds) != 0:
+	case len(tx.creds) != 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 

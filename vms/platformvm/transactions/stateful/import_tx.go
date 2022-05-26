@@ -25,15 +25,15 @@ type ImportTx struct {
 
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
+	creds       []verify.Verifiable
 }
 
 // Attempts to verify this transaction with the provided state.
 func (tx *ImportTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
-	_, err := tx.AtomicExecute(verifier, parentState, creds)
+	_, err := tx.AtomicExecute(verifier, parentState)
 	return err
 }
 
@@ -41,13 +41,12 @@ func (tx *ImportTx) SemanticVerify(
 func (tx *ImportTx) Execute(
 	verifier TxVerifier,
 	vs state.Versioned,
-	creds []verify.Verifiable,
 ) (func() error, error) {
 	ctx := verifier.Ctx()
 
 	stx := &signed.Tx{
 		Unsigned: tx.ImportTx,
-		Creds:    creds,
+		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	if err := stx.SyntacticVerify(ctx); err != nil {
@@ -95,7 +94,7 @@ func (tx *ImportTx) Execute(
 			utxosList,
 			ins,
 			tx.Outs,
-			creds,
+			tx.creds,
 			verifier.PlatformConfig().TxFee,
 			ctx.AVAXAssetID,
 		); err != nil {
@@ -124,7 +123,6 @@ func (tx *ImportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 func (tx *ImportTx) AtomicExecute(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) (state.Versioned, error) {
 	// Set up the state if this tx is committed
 	newState := state.NewVersioned(
@@ -132,7 +130,7 @@ func (tx *ImportTx) AtomicExecute(
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, newState, creds)
+	_, err := tx.Execute(verifier, newState)
 	return newState, err
 }
 

@@ -38,13 +38,13 @@ type AddValidatorTx struct {
 
 	txID        ids.ID // ID of signed add validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
+	creds       []verify.Verifiable
 }
 
 // Attempts to verify this transaction with the provided state.
 func (tx *AddValidatorTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
 	clock := verifier.Clock()
 	startTime := tx.StartTime()
@@ -53,7 +53,7 @@ func (tx *AddValidatorTx) SemanticVerify(
 		return ErrFutureStakeTime
 	}
 
-	_, _, err := tx.Execute(verifier, parentState, creds)
+	_, _, err := tx.Execute(verifier, parentState)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, ErrFutureStakeTime) {
@@ -66,7 +66,6 @@ func (tx *AddValidatorTx) SemanticVerify(
 func (tx *AddValidatorTx) Execute(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
@@ -77,7 +76,7 @@ func (tx *AddValidatorTx) Execute(
 	// Verify the tx is well-formed
 	stx := &signed.Tx{
 		Unsigned: tx.AddValidatorTx,
-		Creds:    creds,
+		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	if err := stx.SyntacticVerify(verifier.Ctx()); err != nil {
@@ -158,7 +157,7 @@ func (tx *AddValidatorTx) Execute(
 			tx,
 			tx.Ins,
 			outs,
-			creds,
+			tx.creds,
 			verifier.PlatformConfig().AddStakerTxFee,
 			ctx.AVAXAssetID,
 		); err != nil {

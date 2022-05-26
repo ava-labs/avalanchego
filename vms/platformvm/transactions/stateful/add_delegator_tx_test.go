@@ -332,14 +332,11 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
-			uTx, ok := tx.Unsigned.(*unsigned.AddDelegatorTx)
-			if !ok {
-				t.Fatalf("unexpected tx type")
+			verifiableTx, err := MakeStatefulTx(tx)
+			if err != nil {
+				t.Fatal(err)
 			}
-			verifiableTx := AddDelegatorTx{
-				AddDelegatorTx: uTx,
-			}
-			_, _, err = verifiableTx.Execute(freshTH.txVerifier, freshTH.tState, tx.Creds)
+			_, _, err = verifiableTx.(*AddDelegatorTx).Execute(freshTH.txVerifier, freshTH.tState)
 			if err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {

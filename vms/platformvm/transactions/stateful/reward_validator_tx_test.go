@@ -40,11 +40,11 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID); err != nil {
 		t.Fatal(err)
 	} else {
-		verifiableTx := AddValidatorTx{
-			AddValidatorTx: toRemove,
-			txID:           toRemoveTxID,
+		verifiableTx, err := MakeStatefulTx(tx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if _, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 		}
 	}
@@ -56,11 +56,11 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	if tx, err := h.txBuilder.NewRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
 	} else {
-		verifiableTx := AddValidatorTx{
-			AddValidatorTx: toRemove,
-			txID:           toRemoveTxID,
+		verifiableTx, err := MakeStatefulTx(tx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if _, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatalf("should have failed because validator ID is wrong")
 		}
 	}
@@ -78,7 +78,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	verifiableTx := RewardValidatorTx{
 		RewardValidatorTx: uTx,
 	}
-	onCommitState, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommitState, _, err := verifiableTx.Execute(h.txVerifier, h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,10 +137,11 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID); err != nil {
 		t.Fatal(err)
 	} else {
-		verifiableTx := AddValidatorTx{
-			AddValidatorTx: toRemove,
+		verifiableTx, err := MakeStatefulTx(tx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if _, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 		}
 	}
@@ -152,10 +153,11 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	if tx, err := h.txBuilder.NewRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
 	} else {
-		verifiableTx := AddValidatorTx{
-			AddValidatorTx: toRemove,
+		verifiableTx, err := MakeStatefulTx(tx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if _, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatalf("should have failed because validator ID is wrong")
 		}
 	}
@@ -173,7 +175,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	verifiableTx := RewardValidatorTx{
 		RewardValidatorTx: uTx,
 	}
-	_, onAbortState, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	_, onAbortState, err := verifiableTx.Execute(h.txVerifier, h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +281,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	verifiableTx := RewardValidatorTx{
 		RewardValidatorTx: uTx,
 	}
-	onCommitState, _, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommitState, _, err := verifiableTx.Execute(h.txVerifier, h.tState)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -382,7 +384,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	verifiableTx := RewardValidatorTx{
 		RewardValidatorTx: uTx,
 	}
-	_, onAbortState, err := verifiableTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	_, onAbortState, err := verifiableTx.Execute(h.txVerifier, h.tState)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}

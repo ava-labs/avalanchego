@@ -25,6 +25,7 @@ type ExportTx struct {
 
 	txID        ids.ID // ID of signed add subnet validator tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
+	creds       []verify.Verifiable
 }
 
 // InputUTXOs returns an empty set
@@ -34,9 +35,8 @@ func (tx *ExportTx) InputUTXOs() ids.Set { return nil }
 func (tx *ExportTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
-	_, err := tx.AtomicExecute(verifier, parentState, creds)
+	_, err := tx.AtomicExecute(verifier, parentState)
 	return err
 }
 
@@ -44,13 +44,12 @@ func (tx *ExportTx) SemanticVerify(
 func (tx *ExportTx) Execute(
 	verifier TxVerifier,
 	vs state.Versioned,
-	creds []verify.Verifiable,
 ) (func() error, error) {
 	ctx := verifier.Ctx()
 
 	stx := &signed.Tx{
 		Unsigned: tx.ExportTx,
-		Creds:    creds,
+		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	if err := stx.SyntacticVerify(ctx); err != nil {
@@ -73,7 +72,7 @@ func (tx *ExportTx) Execute(
 		tx,
 		tx.Ins,
 		outs,
-		creds,
+		tx.creds,
 		verifier.PlatformConfig().TxFee,
 		ctx.AVAXAssetID,
 	); err != nil {
@@ -122,7 +121,6 @@ func (tx *ExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 func (tx *ExportTx) AtomicExecute(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) (state.Versioned, error) {
 	// Set up the state if this tx is committed
 	newState := state.NewVersioned(
@@ -130,7 +128,7 @@ func (tx *ExportTx) AtomicExecute(
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, newState, creds)
+	_, err := tx.Execute(verifier, newState)
 	return newState, err
 }
 

@@ -165,7 +165,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
 		}
 	}
@@ -193,7 +193,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err != nil {
+		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -244,7 +244,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 		}
 	}
@@ -281,7 +281,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed because validator starts validating primary " +
 				"network before starting to validate primary network")
 		}
@@ -308,7 +308,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed because validator stops validating primary " +
 				"network after stops validating primary network")
 		}
@@ -335,7 +335,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err != nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err != nil {
 			t.Fatalf("should have passed verification")
 		}
 	}
@@ -364,7 +364,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed verification because starts validating at current timestamp")
 		}
 	}
@@ -419,7 +419,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, duplicateSubnetTx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed verification because validator already validating the specified subnet")
 		}
 	}
@@ -454,7 +454,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed verification because validator already validating the specified subnet")
 		}
 	}
@@ -488,7 +488,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed verification because not enough control sigs")
 		}
 	}
@@ -522,7 +522,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed verification because a control sig is invalid")
 		}
 	}
@@ -560,7 +560,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err := vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 		}
 	}

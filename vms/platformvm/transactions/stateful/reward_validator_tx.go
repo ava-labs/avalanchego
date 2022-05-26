@@ -28,16 +28,17 @@ var (
 
 type RewardValidatorTx struct {
 	*unsigned.RewardValidatorTx
-	ID ids.ID // ID of signed reward validator tx
+
+	ID    ids.ID // ID of signed reward validator tx
+	creds []verify.Verifiable
 }
 
 // Attempts to verify this transaction with the provided state.
 func (tx *RewardValidatorTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
-	_, _, err := tx.Execute(verifier, parentState, creds)
+	_, _, err := tx.Execute(verifier, parentState)
 	return err
 }
 
@@ -50,7 +51,6 @@ func (tx *RewardValidatorTx) SemanticVerify(
 func (tx *RewardValidatorTx) Execute(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) (
 	state.Versioned,
 	state.Versioned,
@@ -66,7 +66,7 @@ func (tx *RewardValidatorTx) Execute(
 		return nil, nil, unsigned.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return nil, nil, ErrInvalidID
-	case len(creds) != 0:
+	case len(tx.creds) != 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 

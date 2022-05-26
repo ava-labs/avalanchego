@@ -111,7 +111,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	if err := statefulTx.SemanticVerify(m.vm.txVerifier, preferredState, tx.Creds); err != nil {
+	if err := statefulTx.SemanticVerify(m.vm.txVerifier, preferredState); err != nil {
 		m.MarkDropped(txID)
 		return err
 	}

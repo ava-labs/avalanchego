@@ -124,7 +124,7 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept, err := atomicTx.AtomicExecute(ab.vm.txVerifier, parentState, ab.Tx.Creds)
+	onAccept, err := atomicTx.AtomicExecute(ab.vm.txVerifier, parentState)
 	if err != nil {
 		ab.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)

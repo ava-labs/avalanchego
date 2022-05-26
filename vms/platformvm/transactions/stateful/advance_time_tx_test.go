@@ -42,7 +42,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 		}
 	}
@@ -76,7 +76,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 		}
 	}
@@ -110,7 +110,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds); err == nil {
+		if _, _, err = vProposalTx.Execute(h.txVerifier, h.tState); err == nil {
 			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 		}
 	}
@@ -148,7 +148,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	if !ok {
 		t.Fatal("unexpected tx type")
 	}
-	onCommit, onAbort, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommit, onAbort, err := vProposalTx.Execute(h.txVerifier, h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				if !ok {
 					t.Fatal("unexpected tx type")
 				}
-				onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+				onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
 				assert.NoError(err)
 				onCommitState.Apply(h.tState)
 			}
@@ -496,7 +496,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if !ok {
 		t.Fatal("unexpected tx type")
 	}
-	onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,7 +573,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if !ok {
 				t.Fatal("unexpected tx type")
 			}
-			onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+			onCommitState, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -609,7 +609,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 	vProposalTx, ok := verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommit, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -646,7 +646,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 	vProposalTx, ok = verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommit, _, err = vProposalTx.Execute(h.txVerifier, h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -680,7 +680,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 	vProposalTx, ok := verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err := vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommit, _, err := vProposalTx.Execute(h.txVerifier, h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
@@ -716,7 +716,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 	vProposalTx, ok = verifiableTx.(ProposalTx)
 	assert.True(t, ok)
-	onCommit, _, err = vProposalTx.Execute(h.txVerifier, h.tState, tx.Creds)
+	onCommit, _, err = vProposalTx.Execute(h.txVerifier, h.tState)
 	assert.NoError(t, err)
 	onCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())

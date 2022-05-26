@@ -21,6 +21,7 @@ type CreateSubnetTx struct {
 
 	txID        ids.ID // ID of signed create subnet tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
+	creds       []verify.Verifiable
 }
 
 // InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
@@ -34,14 +35,13 @@ func (tx *CreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 func (tx *CreateSubnetTx) SemanticVerify(
 	verifier TxVerifier,
 	parentState state.Mutable,
-	creds []verify.Verifiable,
 ) error {
 	vs := state.NewVersioned(
 		parentState,
 		parentState.CurrentStakerChainState(),
 		parentState.PendingStakerChainState(),
 	)
-	_, err := tx.Execute(verifier, vs, creds)
+	_, err := tx.Execute(verifier, vs)
 	return err
 }
 
@@ -49,7 +49,6 @@ func (tx *CreateSubnetTx) SemanticVerify(
 func (tx *CreateSubnetTx) Execute(
 	verifier TxVerifier,
 	vs state.Versioned,
-	creds []verify.Verifiable,
 ) (
 	func() error,
 	error,
@@ -62,7 +61,7 @@ func (tx *CreateSubnetTx) Execute(
 	// Make sure this transaction is well formed.
 	stx := &signed.Tx{
 		Unsigned: tx,
-		Creds:    creds,
+		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	if err := stx.SyntacticVerify(ctx); err != nil {
@@ -76,7 +75,7 @@ func (tx *CreateSubnetTx) Execute(
 		tx,
 		tx.Ins,
 		tx.Outs,
-		creds,
+		tx.creds,
 		createSubnetTxFee,
 		ctx.AVAXAssetID,
 	); err != nil {

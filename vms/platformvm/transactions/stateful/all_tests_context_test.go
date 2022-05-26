@@ -185,7 +185,7 @@ func addSubnet(
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	_, err = vDecisionTx.Execute(txVerifier, versionedState, testSubnet1.Creds)
+	_, err = vDecisionTx.Execute(txVerifier, versionedState)
 	if err != nil {
 		panic(err)
 	}

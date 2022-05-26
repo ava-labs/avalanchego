@@ -198,7 +198,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, err := vDecisionTx.Execute(h.txVerifier, vs, tx.Creds); err == nil {
+		if _, err := vDecisionTx.Execute(h.txVerifier, vs); err == nil {
 			t.Fatal("should have errored because a sig is missing")
 		}
 	}
@@ -254,7 +254,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, err = vDecisionTx.Execute(h.txVerifier, vs, tx.Creds); err == nil {
+		if _, err = vDecisionTx.Execute(h.txVerifier, vs); err == nil {
 			t.Fatal("should have failed verification because a sig is invalid")
 		}
 	}
@@ -299,7 +299,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, err := vDecisionTx.Execute(h.txVerifier, vs, tx.Creds); err == nil {
+		if _, err := vDecisionTx.Execute(h.txVerifier, vs); err == nil {
 			t.Fatal("should have failed because subent doesn't exist")
 		}
 	}
@@ -342,7 +342,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		if !ok {
 			t.Fatal("unexpected tx type")
 		}
-		if _, err = vDecisionTx.Execute(h.txVerifier, vs, tx.Creds); err != nil {
+		if _, err = vDecisionTx.Execute(h.txVerifier, vs); err != nil {
 			t.Fatalf("expected tx to pass verification but got error: %v", err)
 		}
 	}
@@ -427,7 +427,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				if !ok {
 					t.Fatal("unexpected tx type")
 				}
-				_, err = vDecisionTx.Execute(h.txVerifier, vs, tx.Creds)
+				_, err = vDecisionTx.Execute(h.txVerifier, vs)
 				assert.Equal(test.expectsError, err != nil)
 			}
 		})

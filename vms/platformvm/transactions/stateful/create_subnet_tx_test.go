@@ -89,7 +89,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				if !ok {
 					t.Fatal("unexpected tx type")
 				}
-				_, err = vDecisionTx.Execute(h.txVerifier, vs, tx.Creds)
+				_, err = vDecisionTx.Execute(h.txVerifier, vs)
 				assert.Equal(test.expectsError, err != nil)
 			}
 		})

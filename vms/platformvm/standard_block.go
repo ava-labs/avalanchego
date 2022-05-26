@@ -119,7 +119,7 @@ func (sb *StandardBlock) Verify() error {
 		// Add UTXOs to batch
 		sb.inputs.Union(inputUTXOs)
 
-		onAccept, err := decisionTx.Execute(sb.vm.txVerifier, sb.onAcceptState, tx.Creds)
+		onAccept, err := decisionTx.Execute(sb.vm.txVerifier, sb.onAcceptState)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			return err
