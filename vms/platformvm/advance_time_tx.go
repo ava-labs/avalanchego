@@ -43,9 +43,9 @@ func (tx *StatefulAdvanceTimeTx) Execute(
 ) {
 	switch {
 	case tx == nil:
-		return nil, nil, errNilTx
+		return nil, nil, unsigned.ErrNilTx
 	case len(stx.Creds) != 0:
-		return nil, nil, errWrongNumberOfCredentials
+		return nil, nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
 	txTimestamp := tx.Timestamp()
