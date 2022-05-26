@@ -28,17 +28,11 @@ package core
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ethereum/go-ethereum/common"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 const (
 	tipBufferSize = 32
@@ -62,12 +56,11 @@ type TrieDB interface {
 func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 	if config.Pruning {
 		return &cappedMemoryTrieWriter{
-			TrieDB:             db,
-			memoryCap:          common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
-			imageCap:           4 * 1024 * 1024,
-			commitInterval:     config.CommitInterval,
-			tipBuffer:          NewBoundedBuffer(tipBufferSize, db.Dereference),
-			randomizedInterval: uint64(rand.Int63n(int64(config.CommitInterval))) + config.CommitInterval,
+			TrieDB:         db,
+			memoryCap:      common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
+			imageCap:       4 * 1024 * 1024,
+			commitInterval: config.CommitInterval,
+			tipBuffer:      NewBoundedBuffer(tipBufferSize, db.Dereference),
 		}
 	} else {
 		return &noPruningTrieWriter{
@@ -81,21 +74,30 @@ type noPruningTrieWriter struct {
 }
 
 func (np *noPruningTrieWriter) InsertTrie(block *types.Block) error {
-	// TODO: make async like [cappedMemoryTrieWriter]
+	// We don't attempt to [Cap] here because we should never have
+	// a significant amount of [TrieDB.Dirties] (we commit each block).
+	np.TrieDB.Reference(block.Root(), common.Hash{})
+	return nil
+}
+
+func (np *noPruningTrieWriter) AcceptTrie(block *types.Block) error {
+	// We don't need to call [Dereference] on the block root at the end of this
+	// function because it is removed from the [TrieDB.Dirties] map in [Commit].
 	return np.TrieDB.Commit(block.Root(), false, nil)
 }
 
-func (np *noPruningTrieWriter) AcceptTrie(block *types.Block) error { return nil }
-
-func (np *noPruningTrieWriter) RejectTrie(block *types.Block) error { return nil }
+func (np *noPruningTrieWriter) RejectTrie(block *types.Block) error {
+	np.TrieDB.Dereference(block.Root())
+	return nil
+}
 
 func (np *noPruningTrieWriter) Shutdown() error { return nil }
 
 type cappedMemoryTrieWriter struct {
 	TrieDB
-	memoryCap                          common.StorageSize
-	imageCap                           common.StorageSize
-	commitInterval, randomizedInterval uint64
+	memoryCap      common.StorageSize
+	imageCap       common.StorageSize
+	commitInterval uint64
 
 	tipBuffer *BoundedBuffer
 }
@@ -124,11 +126,8 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	// (they are no-ops).
 	cm.tipBuffer.Insert(root)
 
-	// Commit this root if we haven't committed an accepted block root within
-	// the desired interval.
-	// Note: a randomized interval is added here to ensure that pruning nodes
-	// do not all only commit at the exact same heights.
-	if height := block.NumberU64(); height%cm.commitInterval == 0 || height%cm.randomizedInterval == 0 {
+	// Commit this root if we have reached the [commitInterval].
+	if block.NumberU64()%cm.commitInterval == 0 {
 		if err := cm.TrieDB.Commit(root, true, nil); err != nil {
 			return fmt.Errorf("failed to commit trie for block %s: %w", block.Hash().Hex(), err)
 		}

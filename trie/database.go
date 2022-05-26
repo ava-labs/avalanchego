@@ -57,6 +57,8 @@ var (
 	memcacheDirtyMissMeter  = metrics.NewRegisteredMeter("trie/memcache/dirty/miss", nil)
 	memcacheDirtyReadMeter  = metrics.NewRegisteredMeter("trie/memcache/dirty/read", nil)
 	memcacheDirtyWriteMeter = metrics.NewRegisteredMeter("trie/memcache/dirty/write", nil)
+	memcacheDirtySizeGauge  = metrics.NewRegisteredGaugeFloat64("trie/memcache/dirty/size", nil)
+	memcacheDirtyNodesGauge = metrics.NewRegisteredGauge("trie/memcache/dirty/nodes", nil)
 
 	memcacheFlushTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/flush/time", nil)
 	memcacheFlushNodesMeter = metrics.NewRegisteredMeter("trie/memcache/flush/nodes", nil)
@@ -66,9 +68,10 @@ var (
 	memcacheGCNodesMeter = metrics.NewRegisteredMeter("trie/memcache/gc/nodes", nil)
 	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/gc/size", nil)
 
-	memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/commit/time", nil)
-	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
-	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
+	memcacheCommitTimeTimer     = metrics.NewRegisteredResettingTimer("trie/memcache/commit/time", nil)
+	memcacheCommitLockTimeTimer = metrics.NewRegisteredResettingTimer("trie/memcache/commit/locktime", nil)
+	memcacheCommitNodesMeter    = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
+	memcacheCommitSizeMeter     = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
 )
 
 // Database is an intermediate write layer between the trie data structures and
@@ -527,6 +530,9 @@ func (db *Database) Dereference(root common.Hash) {
 	db.gcsize += storage - db.dirtiesSize
 	db.gctime += time.Since(start)
 
+	memcacheDirtySizeGauge.Update(float64(db.dirtiesSize))
+	memcacheDirtyNodesGauge.Update(int64(len(db.dirties)))
+
 	memcacheGCTimeTimer.Update(time.Since(start))
 	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
@@ -727,6 +733,9 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	db.flushsize += storage - db.dirtiesSize
 	db.flushtime += time.Since(start)
 
+	memcacheDirtySizeGauge.Update(float64(db.dirtiesSize))
+	memcacheDirtyNodesGauge.Update(int64(len(db.dirties)))
+
 	memcacheFlushTimeTimer.Update(time.Since(start))
 	memcacheFlushSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheFlushNodesMeter.Mark(int64(nodes - len(db.dirties)))
@@ -749,6 +758,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	// data removed from memory cache during commit but not yet in persistent storage).
 	// This is ensured by only uncaching existing data when the database write finalizes.
 	db.dirtiesLock.RLock()
+	lockStart := time.Now()
 	nodes, storage := len(db.dirties), db.dirtiesSize
 	toFlush, err := db.commit(node, make([]flushItem, 0, 128), callback)
 	if err != nil {
@@ -756,6 +766,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 		return err
 	}
 	db.dirtiesLock.RUnlock()
+	lockTime := time.Since(lockStart)
 
 	// Write nodes to disk
 	if err := db.writeFlushItems(toFlush); err != nil {
@@ -765,12 +776,17 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	// Flush all written items from dirites
 	db.dirtiesLock.Lock()
 	defer db.dirtiesLock.Unlock()
+	lockStart = time.Now()
 	for _, item := range toFlush {
 		// [item.rlp] is populated in [writeFlushItems]
 		db.removeFromDirties(item.hash, item.rlp)
 	}
 
+	memcacheDirtySizeGauge.Update(float64(db.dirtiesSize))
+	memcacheDirtyNodesGauge.Update(int64(len(db.dirties)))
+
 	memcacheCommitTimeTimer.Update(time.Since(start))
+	memcacheCommitLockTimeTimer.Update(lockTime + time.Since(lockStart))
 	memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
