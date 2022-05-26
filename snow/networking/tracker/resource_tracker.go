@@ -328,6 +328,7 @@ func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*tracker
 		reg.Register(m.cpuMetric),
 		reg.Register(m.diskReadsMetric),
 		reg.Register(m.diskWritesMetric),
+		reg.Register(m.diskSpaceAvailable),
 	)
 	return m, errs.Err
 }
