@@ -66,7 +66,7 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 			memoryCap:          common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
 			imageCap:           4 * 1024 * 1024,
 			commitInterval:     config.CommitInterval,
-			tipBuffer:          make([]common.Hash, tipBufferSize),
+			tipBuffer:          NewBoundedBuffer(tipBufferSize, db.Dereference),
 			randomizedInterval: uint64(rand.Int63n(int64(config.CommitInterval))) + config.CommitInterval,
 		}
 	} else {
@@ -81,6 +81,7 @@ type noPruningTrieWriter struct {
 }
 
 func (np *noPruningTrieWriter) InsertTrie(block *types.Block) error {
+	// TODO: make async like [cappedMemoryTrieWriter]
 	return np.TrieDB.Commit(block.Root(), false, nil)
 }
 
@@ -96,16 +97,18 @@ type cappedMemoryTrieWriter struct {
 	imageCap                           common.StorageSize
 	commitInterval, randomizedInterval uint64
 
-	lastPos   int
-	tipBuffer []common.Hash
+	tipBuffer *BoundedBuffer
 }
 
 func (cm *cappedMemoryTrieWriter) InsertTrie(block *types.Block) error {
 	cm.TrieDB.Reference(block.Root(), common.Hash{})
 
 	nodes, imgs := cm.TrieDB.Size()
-	if nodes > cm.memoryCap || imgs > cm.imageCap {
-		return cm.TrieDB.Cap(cm.memoryCap - ethdb.IdealBatchSize)
+	if nodes <= cm.memoryCap && imgs <= cm.imageCap {
+		return nil
+	}
+	if err := cm.TrieDB.Cap(cm.memoryCap - ethdb.IdealBatchSize); err != nil {
+		return fmt.Errorf("failed to cap trie for block %s: %w", block.Hash().Hex(), err)
 	}
 
 	return nil
@@ -119,12 +122,7 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	//
 	// Note: It is safe to dereference roots that have been committed to disk
 	// (they are no-ops).
-	nextPos := (cm.lastPos + 1) % tipBufferSize
-	if cm.tipBuffer[nextPos] != (common.Hash{}) {
-		cm.TrieDB.Dereference(cm.tipBuffer[nextPos])
-	}
-	cm.tipBuffer[nextPos] = root
-	cm.lastPos = nextPos
+	cm.tipBuffer.Insert(root)
 
 	// Commit this root if we haven't committed an accepted block root within
 	// the desired interval.
@@ -135,6 +133,7 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 			return fmt.Errorf("failed to commit trie for block %s: %w", block.Hash().Hex(), err)
 		}
 	}
+
 	return nil
 }
 
@@ -146,11 +145,12 @@ func (cm *cappedMemoryTrieWriter) RejectTrie(block *types.Block) error {
 func (cm *cappedMemoryTrieWriter) Shutdown() error {
 	// If [tipBuffer] entry is empty, no need to do any cleanup on
 	// shutdown.
-	if cm.tipBuffer[cm.lastPos] == (common.Hash{}) {
+	last := cm.tipBuffer.Last()
+	if last == (common.Hash{}) {
 		return nil
 	}
 
 	// Attempt to commit last item added to [dereferenceQueue] on shutdown to avoid
 	// re-processing the state on the next startup.
-	return cm.TrieDB.Commit(cm.tipBuffer[cm.lastPos], true, nil)
+	return cm.TrieDB.Commit(last, true, nil)
 }

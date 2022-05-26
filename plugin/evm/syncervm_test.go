@@ -478,7 +478,9 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	if err := syncerVM.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, serverVM.LastAcceptedBlock().Height(), syncerVM.LastAcceptedBlock().Height())
+	assert.Equal(t, serverVM.LastAcceptedBlock().Height(), syncerVM.LastAcceptedBlock().Height(), "block height mismatch between syncer and server")
+	assert.Equal(t, serverVM.LastAcceptedBlock().ID(), syncerVM.LastAcceptedBlock().ID(), "blockID mismatch between syncer and server")
+	assert.True(t, syncerVM.chain.BlockChain().HasState(syncerVM.chain.LastAcceptedBlock().Root()), "unavailable state for last accepted block")
 
 	blocksToBuild := 10
 	txsPerBlock := 10
@@ -585,4 +587,5 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	vm.chain.BlockChain().DrainAcceptorQueue()
 }

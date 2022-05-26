@@ -83,6 +83,7 @@ type Config struct {
 	DiscoveryURLs []string
 
 	Pruning                         bool    // Whether to disable pruning and flush everything to disk
+	AcceptorQueueLimit              int     // Maximum blocks to queue before blocking during acceptance
 	CommitInterval                  uint64  // If pruning is enabled, specified the interval at which to commit an entire trie to disk.
 	PopulateMissingTries            *uint64 // Height at which to start re-populating missing tries on startup.
 	PopulateMissingTriesParallelism int     // Number of concurrent readers to use when re-populating missing tries on startup.
@@ -90,6 +91,7 @@ type Config struct {
 	SnapshotDelayInit               bool    // Whether snapshot tree should be initialized on startup or delayed until explicit call
 	SnapshotAsync                   bool    // Whether to generate the initial snapshot in async mode
 	SnapshotVerify                  bool    // Whether to verify generated snapshots
+	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
 
 	// Whitelist of required block number -> hash values to accept
 	Whitelist map[uint64]common.Hash `toml:"-"`
