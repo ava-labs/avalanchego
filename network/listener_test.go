@@ -7,7 +7,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -17,12 +17,12 @@ var (
 )
 
 type testListener struct {
-	ip      utils.IPDesc
+	ip      ips.IPPort
 	inbound chan net.Conn
 	closed  chan struct{}
 }
 
-func newTestListener(ip utils.IPDesc) *testListener {
+func newTestListener(ip ips.IPPort) *testListener {
 	return &testListener{
 		ip:      ip,
 		inbound: make(chan net.Conn),

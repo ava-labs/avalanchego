@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -61,7 +61,7 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 
 // Map external port [extPort] (exposed to the internet) to internal port [intPort] (where our process is listening)
 // and set [ip]. Does this every [updateTime]. [ip] may be nil.
-func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc, updateTime time.Duration) {
+func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
 	if !m.r.SupportsNAT() {
 		return
 	}
@@ -96,7 +96,7 @@ func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc str
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the mapping from [extPort]
 // to [intPort]] every [updateTime]. Updates [ip] every [updateTime].
-func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip *utils.DynamicIPDesc, updateTime time.Duration) {
+func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
 	updateTimer := time.NewTimer(updateTime)
 
 	m.wg.Add(1)
@@ -128,7 +128,7 @@ func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc 
 	}
 }
 
-func (m *Mapper) updateIP(ip *utils.DynamicIPDesc) {
+func (m *Mapper) updateIP(ip ips.DynamicIPPort) {
 	if ip == nil {
 		return
 	}
@@ -137,8 +137,8 @@ func (m *Mapper) updateIP(ip *utils.DynamicIPDesc) {
 		m.log.Error("failed to get external IP: %s", err)
 		return
 	}
-	oldIP := ip.IP().IP
-	ip.UpdateIP(newIP)
+	oldIP := ip.IPPort().IP
+	ip.SetIP(newIP)
 	if !oldIP.Equal(newIP) {
 		m.log.Info("external IP updated to: %s", newIP)
 	}

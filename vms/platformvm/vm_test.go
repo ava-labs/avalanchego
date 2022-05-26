@@ -2077,6 +2077,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
 	}
 
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
+	beacons.RegisterCallbackListener(startup)
+
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
@@ -2084,7 +2088,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Len(),
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (beacons.Weight()+1)/2),
+		StartupTracker:                 startup,
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
 		Subnet:                         subnet,
