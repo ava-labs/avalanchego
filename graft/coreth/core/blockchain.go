@@ -55,7 +55,7 @@ import (
 )
 
 var (
-	acceptorQueueGauge = metrics.NewRegisteredGauge("blockchain/acceptor-queue/size", nil)
+	acceptorQueueGauge = metrics.NewRegisteredGauge("blockchain/acceptor/queue/size", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
