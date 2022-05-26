@@ -58,13 +58,21 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		t.Fatal(err)
 	}
 
+	peerTracker := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
+	peers.RegisterCallbackListener(startupTracker)
+
+	if err := startupTracker.Connected(peer, version.CurrentApp); err != nil {
+		t.Fatal(err)
+	}
+
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
-		WeightTracker:                  tracker.NewWeightTracker(peers, peers.Weight()/2+1),
+		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		Subnet:                         subnet,
 		Timer:                          &common.TimerTest{},
@@ -103,13 +111,18 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	sampleK := 2
 	alpha := uint64(10)
 	startupAlpha := alpha
+
+	peerTracker := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(peerTracker, startupAlpha)
+	peers.RegisterCallbackListener(startupTracker)
+
 	commonCfg := common.Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
 		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        sampleK,
 		Alpha:                          alpha,
-		WeightTracker:                  tracker.NewWeightTracker(peers, startupAlpha),
+		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		Subnet:                         &common.SubnetTest{},
 		Timer:                          &common.TimerTest{},
@@ -682,47 +695,54 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	requestID := new(uint32)
-	requested := ids.Empty
-	expectedPeerID := peerID
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != expectedPeerID {
-			t.Fatalf("Should have requested block from %s, requested from %s", expectedPeerID, vdr)
-		}
-		switch vtxID {
-		case blkID1, blkID2:
-		default:
-			t.Fatalf("should have requested blk1 or blk2")
-		}
-		*requestID = reqID
-		requested = vtxID
+	requestedVdr := ids.EmptyNodeID
+	requestID := uint32(0)
+	requestedBlock := ids.Empty
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, blkID ids.ID) {
+		requestedVdr = vdr
+		requestID = reqID
+		requestedBlock = blkID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
+	// should request blk2
+	err = bs.ForceAccepted(acceptedIDs)
+	switch {
+	case err != nil:
 		t.Fatal(err)
+	case requestedVdr != peerID:
+		t.Fatal("should have requested from peerID")
+	case requestedBlock != blkID2:
+		t.Fatal("should have requested blk2")
 	}
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
-		t.Fatal(err)
-	} else if requested != blkID1 {
-		t.Fatal("should have requested blk1")
-	}
-
-	// add another vdr to the fetch set to test behavior on empty response
+	// add another two validators to the fetch set to test behavior on empty response
 	newPeerID := ids.GenerateTestNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
-	expectedPeerID = newPeerID
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{}); err != nil { // respond with empty
+	newPeerID = ids.GenerateTestNodeID()
+	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
+
+	if err := bs.Ancestors(peerID, requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
 		t.Fatal(err)
-	} else if requested != blkID1 {
+	} else if requestedBlock != blkID1 {
 		t.Fatal("should have requested blk1")
 	}
 
-	if err := bs.Ancestors(newPeerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
+	peerToBlacklist := requestedVdr
+
+	// respond with empty
+	err = bs.Ancestors(peerToBlacklist, requestID, nil)
+	switch {
+	case err != nil:
 		t.Fatal(err)
-	} else if requested != blkID1 {
-		t.Fatal("should not have requested another block")
+	case requestedVdr == peerToBlacklist:
+		t.Fatal("shouldn't have requested from peerToBlacklist")
+	case requestedBlock != blkID1:
+		t.Fatal("should have requested blk1")
+	}
+
+	if err := bs.Ancestors(requestedVdr, requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
+		t.Fatal(err)
 	}
 
 	switch {
@@ -736,8 +756,8 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		t.Fatalf("Block should be accepted")
 	}
 
-	// check peerID was removed from the fetch set
-	assert.False(t, bs.(*bootstrapper).fetchFrom.Contains(peerID))
+	// check peerToBlacklist was removed from the fetch set
+	assert.False(t, bs.(*bootstrapper).fetchFrom.Contains(peerToBlacklist))
 }
 
 // There are multiple needed blocks and Ancestors returns all at once

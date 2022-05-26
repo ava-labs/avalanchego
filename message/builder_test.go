@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -38,7 +38,7 @@ func init() {
 func TestBuildVersion(t *testing.T) {
 	networkID := uint32(12345)
 	myTime := uint64(time.Now().Unix())
-	ip := utils.IPDesc{
+	ip := ips.IPPort{
 		IP: net.IPv4(1, 2, 3, 4),
 	}
 

@@ -8,17 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
-	host1      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 9651}
-	host2      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 5), Port: 9653}
-	host3      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 6), Port: 9655}
-	host4      = utils.IPDesc{IP: net.IPv4(1, 2, 3, 7), Port: 9657}
-	loopbackIP = utils.IPDesc{IP: net.IPv4(127, 0, 0, 1), Port: 9657}
+	host1      = ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 9651}
+	host2      = ips.IPPort{IP: net.IPv4(1, 2, 3, 5), Port: 9653}
+	host3      = ips.IPPort{IP: net.IPv4(1, 2, 3, 6), Port: 9655}
+	host4      = ips.IPPort{IP: net.IPv4(1, 2, 3, 7), Port: 9657}
+	loopbackIP = ips.IPPort{IP: net.IPv4(127, 0, 0, 1), Port: 9657}
 )
 
 func TestNoInboundConnUpgradeThrottler(t *testing.T) {

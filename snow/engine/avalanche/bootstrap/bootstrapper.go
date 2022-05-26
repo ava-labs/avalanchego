@@ -219,16 +219,16 @@ func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Applicat
 		return err
 	}
 
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
-		b.started = true
-		return b.Startup()
+	if b.started || !b.StartupTracker.ShouldStart() {
+		return nil
 	}
 
-	return nil
+	b.started = true
+	return b.Startup()
 }
 
 func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
@@ -236,7 +236,7 @@ func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
 		return err
 	}
 
-	return b.WeightTracker.RemoveWeightForNode(nodeID)
+	return b.StartupTracker.Disconnected(nodeID)
 }
 
 func (b *bootstrapper) Timeout() error {
@@ -271,7 +271,7 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if !b.WeightTracker.EnoughConnectedWeight() {
+	if !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 

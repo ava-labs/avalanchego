@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -186,22 +187,23 @@ type Node struct {
 // Initialize the networking layer.
 // Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
-	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", n.Config.IP.Port))
+	currentIPPort := n.Config.IPPort.IPPort()
+	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", currentIPPort.Port))
 	if err != nil {
 		return err
 	}
 	// Wrap listener so it will only accept a certain number of incoming connections per second
 	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.ThrottlerConfig.MaxInboundConnsPerSec)
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
-		n.Log.Info("this node's IP is set to: %q", n.Config.IP.IP())
+		n.Log.Info("this node's IP is set to: %q", currentIPPort)
 	} else {
-		ipDesc = utils.IPDesc{
-			IP:   n.Config.IP.IP().IP,
-			Port: ipDesc.Port,
+		ipPort = ips.IPPort{
+			IP:   currentIPPort.IP,
+			Port: ipPort.Port,
 		}
-		n.Log.Info("this node's IP is set to: %q", ipDesc)
+		n.Log.Info("this node's IP is set to: %q", ipPort)
 	}
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
@@ -261,7 +263,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
-	n.Config.NetworkConfig.MyIP = n.Config.IP
+	n.Config.NetworkConfig.MyIPPort = n.Config.IPPort
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.beacons
@@ -890,7 +892,7 @@ func (n *Node) initInfoAPI() error {
 		n.Log,
 		n.chainManager,
 		n.Config.VMManager,
-		&n.Config.NetworkConfig.MyIP,
+		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
 		version.DefaultApplicationParser,
 		primaryValidators,
