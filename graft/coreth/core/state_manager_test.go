@@ -52,14 +52,14 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		)
 
 		assert.NoError(w.InsertTrie(block))
-		assert.Equal(block.Root(), m.LastReference, "should not have referenced block on insert")
+		assert.Equal(block.Root(), m.LastReference, "should have referenced block on insert")
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
 		m.LastReference = common.Hash{}
 
 		w.AcceptTrie(block)
 		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on accept")
-		if i < tipBufferSize {
+		if i <= tipBufferSize {
 			assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		} else {
 			assert.Equal(common.BigToHash(big.NewInt(int64(i-tipBufferSize))), m.LastDereference, "should have dereferenced old block on last accept")

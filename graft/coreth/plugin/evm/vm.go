@@ -425,6 +425,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	vm.ethConfig.Preimages = vm.config.Preimages
 	vm.ethConfig.Pruning = vm.config.Pruning
+	vm.ethConfig.AcceptorQueueLimit = vm.config.AcceptorQueueLimit
 	vm.ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
 	vm.ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
 	vm.ethConfig.AllowMissingTries = vm.config.AllowMissingTries

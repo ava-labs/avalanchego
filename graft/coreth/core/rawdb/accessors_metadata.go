@@ -255,3 +255,24 @@ func HasPruningDisabled(db ethdb.KeyValueStore) (bool, error) {
 func DeletePruningDisabled(db ethdb.KeyValueStore) error {
 	return db.Delete(pruningDisabledKey)
 }
+
+// WriteAcceptorTip writes [hash] as the last accepted block that has been fully processed.
+func WriteAcceptorTip(db ethdb.KeyValueWriter, hash common.Hash) error {
+	return db.Put(acceptorTipKey, hash[:])
+}
+
+// ReadAcceptorTip reads the hash of the last accepted block that was fully processed.
+// If there is no value present (the index is being initialized for the first time), then the
+// empty hash is returned.
+func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
+	has, err := db.Has(acceptorTipKey)
+	// If the index is not present on disk, the [acceptorTipKey] index has not been initialized yet.
+	if !has || err != nil {
+		return common.Hash{}, err
+	}
+	h, err := db.Get(acceptorTipKey)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return common.BytesToHash(h), nil
+}

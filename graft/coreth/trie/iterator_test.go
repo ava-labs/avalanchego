@@ -135,7 +135,7 @@ func TestNodeIteratorCoverage(t *testing.T) {
 	}
 	// Cross check the hashes and the database itself
 	for hash := range hashes {
-		if _, err := db.Node(hash); err != nil {
+		if _, err := db.RawNode(hash); err != nil {
 			t.Errorf("failed to retrieve reported node %x: %v", hash, err)
 		}
 	}

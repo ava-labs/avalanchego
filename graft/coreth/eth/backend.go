@@ -201,6 +201,7 @@ func New(
 			TrieCleanLimit:                  config.TrieCleanCache,
 			TrieDirtyLimit:                  config.TrieDirtyCache,
 			Pruning:                         config.Pruning,
+			AcceptorQueueLimit:              config.AcceptorQueueLimit,
 			CommitInterval:                  config.CommitInterval,
 			PopulateMissingTries:            config.PopulateMissingTries,
 			PopulateMissingTriesParallelism: config.PopulateMissingTriesParallelism,
@@ -209,6 +210,7 @@ func New(
 			SnapshotLimit:                   config.SnapshotCache,
 			SnapshotAsync:                   config.SnapshotAsync,
 			SnapshotVerify:                  config.SnapshotVerify,
+			SkipSnapshotRebuild:             config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
 		}
 	)
