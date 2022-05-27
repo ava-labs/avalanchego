@@ -57,7 +57,7 @@ func Build(
 		},
 		timestamp: timestamp,
 		cert:      cert,
-		proposer:  hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw)),
+		proposer:  ids.NodeIDFromCert(cert),
 	}
 	var blockIntf SignedBlock = block
 

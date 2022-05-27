@@ -40,6 +40,7 @@ import (
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
 
 const (
@@ -98,18 +99,18 @@ type VM struct {
 	db     *versiondb.Database
 
 	typeToFxIndex map[reflect.Type]int
-	fxs           []*parsedFx
+	fxs           []*extensions.ParsedFx
 
 	walletService WalletService
 
 	addressTxsIndexer index.AddressTxsIndexer
 }
 
-func (vm *VM) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	return nil
 }
 
-func (vm *VM) Disconnected(nodeID ids.ShortID) error {
+func (vm *VM) Disconnected(nodeID ids.NodeID) error {
 	return nil
 }
 
@@ -163,18 +164,18 @@ func (vm *VM) Initialize(
 
 	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
 
-	typedFxs := make([]Fx, len(fxs))
-	vm.fxs = make([]*parsedFx, len(fxs))
+	typedFxs := make([]extensions.Fx, len(fxs))
+	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
 	for i, fxContainer := range fxs {
 		if fxContainer == nil {
 			return errIncompatibleFx
 		}
-		fx, ok := fxContainer.Fx.(Fx)
+		fx, ok := fxContainer.Fx.(extensions.Fx)
 		if !ok {
 			return errIncompatibleFx
 		}
 		typedFxs[i] = fx
-		vm.fxs[i] = &parsedFx{
+		vm.fxs[i] = &extensions.ParsedFx{
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
@@ -569,7 +570,7 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 
 // getParsedFx returns the parsedFx object for a given TransferableInput
 // or TransferableOutput object
-func (vm *VM) getParsedFx(val interface{}) (*parsedFx, error) {
+func (vm *VM) getParsedFx(val interface{}) (*extensions.ParsedFx, error) {
 	idx, err := vm.getFx(val)
 	if err != nil {
 		return nil, err
@@ -1042,7 +1043,7 @@ func (vm *VM) selectChangeAddr(defaultAddr ids.ShortID, changeAddr string) (ids.
 	if changeAddr == "" {
 		return defaultAddr, nil
 	}
-	addr, err := vm.ParseLocalAddress(changeAddr)
+	addr, err := avax.ParseServiceAddress(vm, changeAddr)
 	if err != nil {
 		return ids.ShortID{}, fmt.Errorf("couldn't parse changeAddr: %w", err)
 	}
@@ -1062,21 +1063,21 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (vm *VM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (vm *VM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return nil
 }

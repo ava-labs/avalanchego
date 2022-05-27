@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
@@ -24,13 +25,16 @@ const (
 
 func setupDB(t testing.TB) (database.Database, func()) {
 	listener := bufconn.Listen(bufSize)
-	server := grpc.NewServer()
-	rpcdbpb.RegisterDatabaseServer(server, NewServer(memdb.New()))
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			t.Logf("Server exited with error: %v", err)
-		}
-	}()
+	serverCloser := grpcutils.ServerCloser{}
+
+	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
+		server := grpc.NewServer(opts...)
+		rpcdbpb.RegisterDatabaseServer(server, NewServer(memdb.New()))
+		serverCloser.Add(server)
+		return server
+	}
+
+	go grpcutils.Serve(listener, serverFunc)
 
 	dialer := grpc.WithContextDialer(
 		func(context.Context, string) (net.Conn, error) {
@@ -38,8 +42,9 @@ func setupDB(t testing.TB) (database.Database, func()) {
 		},
 	)
 
-	ctx := context.Background()
-	conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
+	dopts := grpcutils.DefaultDialOptions
+	dopts = append(dopts, dialer)
+	conn, err := grpcutils.Dial("", dopts...)
 	if err != nil {
 		t.Fatalf("Failed to dial: %s", err)
 	}
@@ -47,7 +52,7 @@ func setupDB(t testing.TB) (database.Database, func()) {
 	db := NewClient(rpcdbpb.NewDatabaseClient(conn))
 
 	close := func() {
-		server.Stop()
+		serverCloser.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
 	}

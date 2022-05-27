@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -49,7 +48,7 @@ func BuildViper(fs *flag.FlagSet, args []string) (*viper.Viper, error) {
 		}
 
 	case v.IsSet(ConfigFileKey):
-		filename := os.ExpandEnv(v.GetString(ConfigFileKey))
+		filename := GetExpandedArg(v, ConfigFileKey)
 		v.SetConfigFile(filename)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err

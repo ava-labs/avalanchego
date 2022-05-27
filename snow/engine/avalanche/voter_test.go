@@ -14,20 +14,19 @@ import (
 )
 
 func TestVotingFinishesWithAbandonedDep(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
 	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -36,7 +35,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -106,20 +105,19 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 }
 
 func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
 	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -128,7 +126,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -137,7 +135,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr2,
 		vdr3,
@@ -241,20 +239,19 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 }
 
 func TestSharedDependency(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	assert.NoError(t, err)
 	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -263,7 +260,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -272,7 +269,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr2,
 		vdr3,

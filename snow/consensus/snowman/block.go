@@ -31,6 +31,9 @@ type Block interface {
 	// returned.
 	//
 	// It is guaranteed that the Parent has been successfully verified.
+	//
+	// If nil is returned, it is guaranteed that either Accept or Reject will be
+	// called on this block, unless the VM is shut down.
 	Verify() error
 
 	// Bytes returns the binary representation of this block.

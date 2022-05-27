@@ -20,7 +20,7 @@ var (
 
 // Server is a messenger that is managed over RPC.
 type Server struct {
-	messengerpb.UnimplementedMessengerServer
+	messengerpb.UnsafeMessengerServer
 	messenger chan<- common.Message
 }
 

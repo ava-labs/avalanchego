@@ -22,13 +22,13 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
-	vdr2ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
+	vdr2ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
 
 	throttler, err := newInboundMsgByteThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -129,7 +129,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	assert.True(exists)
 	throttler.lock.Unlock()
 
-	nonVdrID := ids.GenerateTestShortID()
+	nonVdrID := ids.GenerateTestNodeID()
 	nonVdrDone := make(chan struct{})
 	go func() {
 		throttler.Acquire(1, nonVdrID)
@@ -239,17 +239,17 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	throttler, err := newInboundMsgByteThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
 	)
 	assert.NoError(err)
-	nonVdrNodeID1 := ids.GenerateTestShortID()
+	nonVdrNodeID1 := ids.GenerateTestNodeID()
 	throttler.Acquire(config.NodeMaxAtLargeBytes, nonVdrNodeID1)
 
 	// Acquiring more should block
@@ -265,7 +265,7 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	}
 
 	// A different non-validator should be able to acquire
-	nonVdrNodeID2 := ids.GenerateTestShortID()
+	nonVdrNodeID2 := ids.GenerateTestNodeID()
 	throttler.Acquire(config.NodeMaxAtLargeBytes, nonVdrNodeID2)
 
 	// Acquiring more should block
@@ -298,20 +298,20 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
-	nonVdrNodeID := ids.GenerateTestShortID()
+	nonVdrNodeID := ids.GenerateTestNodeID()
 
 	maxVdrBytes := config.VdrAllocSize + config.AtLargeAllocSize
 	maxNonVdrBytes := config.AtLargeAllocSize
 	// Test for both validator and non-validator
-	for _, nodeID := range []ids.ShortID{vdr1ID, nonVdrNodeID} {
+	for _, nodeID := range []ids.NodeID{vdr1ID, nonVdrNodeID} {
 		maxBytes := maxVdrBytes
 		if nodeID == nonVdrNodeID {
 			maxBytes = maxNonVdrBytes
 		}
 		throttler, err := newInboundMsgByteThrottler(
-			&logging.Log{},
+			logging.NoLog{},
 			"",
 			prometheus.NewRegistry(),
 			vdrs,

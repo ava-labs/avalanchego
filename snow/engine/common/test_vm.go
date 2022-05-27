@@ -47,13 +47,13 @@ type TestVM struct {
 	ShutdownF             func() error
 	CreateHandlersF       func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF func() (map[string]*HTTPHandler, error)
-	ConnectedF            func(nodeID ids.ShortID, nodeVersion version.Application) error
-	DisconnectedF         func(nodeID ids.ShortID) error
+	ConnectedF            func(nodeID ids.NodeID, nodeVersion version.Application) error
+	DisconnectedF         func(nodeID ids.NodeID) error
 	HealthCheckF          func() (interface{}, error)
-	AppRequestF           func(nodeID ids.ShortID, requestID uint32, deadline time.Time, msg []byte) error
-	AppResponseF          func(nodeID ids.ShortID, requestID uint32, msg []byte) error
-	AppGossipF            func(nodeID ids.ShortID, msg []byte) error
-	AppRequestFailedF     func(nodeID ids.ShortID, requestID uint32) error
+	AppRequestF           func(nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF          func(nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF            func(nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF     func(nodeID ids.NodeID, requestID uint32) error
 	VersionF              func() (string, error)
 }
 
@@ -139,7 +139,7 @@ func (vm *TestVM) HealthCheck() (interface{}, error) {
 	return nil, errHealthCheck
 }
 
-func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (vm *TestVM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	if vm.AppRequestFailedF != nil {
 		return vm.AppRequestFailedF(nodeID, requestID)
 	}
@@ -152,7 +152,7 @@ func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *TestVM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	if vm.AppRequestF != nil {
 		return vm.AppRequestF(nodeID, requestID, deadline, request)
 	}
@@ -165,7 +165,7 @@ func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time
 	return errAppRequest
 }
 
-func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (vm *TestVM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	if vm.AppResponseF != nil {
 		return vm.AppResponseF(nodeID, requestID, response)
 	}
@@ -178,7 +178,7 @@ func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []b
 	return errAppResponse
 }
 
-func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (vm *TestVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	if vm.AppGossipF != nil {
 		return vm.AppGossipF(nodeID, msg)
 	}
@@ -191,7 +191,7 @@ func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return errAppGossip
 }
 
-func (vm *TestVM) Connected(id ids.ShortID, nodeVersion version.Application) error {
+func (vm *TestVM) Connected(id ids.NodeID, nodeVersion version.Application) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(id, nodeVersion)
 	}
@@ -201,7 +201,7 @@ func (vm *TestVM) Connected(id ids.ShortID, nodeVersion version.Application) err
 	return nil
 }
 
-func (vm *TestVM) Disconnected(id ids.ShortID) error {
+func (vm *TestVM) Disconnected(id ids.NodeID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(id)
 	}

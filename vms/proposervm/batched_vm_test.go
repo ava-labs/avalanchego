@@ -6,7 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"crypto"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -548,7 +547,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, fmt.Errorf("Unexpected call to parse unknown block")
+				return nil, errors.New("Unexpected call to parse unknown block")
 			}
 		}
 		return res, nil
@@ -648,7 +647,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, fmt.Errorf("Unexpected call to parse unknown block")
+				return nil, errors.New("Unexpected call to parse unknown block")
 			}
 		}
 		return res, nil
@@ -800,7 +799,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk4.Bytes()):
 				res = append(res, coreBlk4)
 			default:
-				return nil, fmt.Errorf("Unexpected call to parse unknown block")
+				return nil, errors.New("Unexpected call to parse unknown block")
 			}
 		}
 		return res, nil
@@ -876,24 +875,24 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0, false)
+	proVM := New(coreVM, proBlkStartTime, 0)
 
 	valState := &validators.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.ShortID{1}] = uint64(5)
-		res[ids.ShortID{2}] = uint64(6)
-		res[ids.ShortID{3}] = uint64(7)
+		res[ids.NodeID{1}] = uint64(5)
+		res[ids.NodeID{2}] = uint64(6)
+		res[ids.NodeID{3}] = uint64(7)
 		return res, nil
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState

@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -68,7 +69,6 @@ var (
 	_ validators.Connector = &VM{}
 	_ secp256k1fx.VM       = &VM{}
 	_ validators.State     = &VM{}
-	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 type VM struct {
@@ -102,7 +102,7 @@ type VM struct {
 	// ID of the last accepted block
 	lastAcceptedID ids.ID
 
-	fx            Fx
+	fx            fx.Fx
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
@@ -311,7 +311,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 	primaryValidators := primaryValidatorSet.List()
 
-	validatorIDs := make([]ids.ShortID, len(primaryValidators))
+	validatorIDs := make([]ids.NodeID, len(primaryValidators))
 	for i, vdr := range primaryValidators {
 		validatorIDs[i] = vdr.ID()
 	}
@@ -348,7 +348,7 @@ func (vm *VM) Shutdown() error {
 		}
 		primaryValidators := primaryValidatorSet.List()
 
-		validatorIDs := make([]ids.ShortID, len(primaryValidators))
+		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
 			validatorIDs[i] = vdr.ID()
 		}
@@ -463,11 +463,11 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-func (vm *VM) Connected(vdrID ids.ShortID, _ version.Application) error {
+func (vm *VM) Connected(vdrID ids.NodeID, _ version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
-func (vm *VM) Disconnected(vdrID ids.ShortID) error {
+func (vm *VM) Disconnected(vdrID ids.NodeID) error {
 	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
@@ -476,7 +476,7 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
-func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
@@ -487,7 +487,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	}
 
 	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
-		validatorSet, ok := validatorSetIntf.(map[ids.ShortID]uint64)
+		validatorSet, ok := validatorSetIntf.(map[ids.NodeID]uint64)
 		if !ok {
 			return nil, errWrongCacheType
 		}
@@ -512,7 +512,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	}
 	currentValidatorList := currentValidators.List()
 
-	vdrSet := make(map[ids.ShortID]uint64, len(currentValidatorList))
+	vdrSet := make(map[ids.NodeID]uint64, len(currentValidatorList))
 	for _, vdr := range currentValidatorList {
 		vdrSet[vdr.ID()] = vdr.Weight()
 	}

@@ -31,7 +31,7 @@ type currentStakerChainState interface {
 	// AdvanceTimestampTxs.
 	GetNextStaker() (addStakerTx *Tx, potentialReward uint64, err error)
 	GetStaker(txID ids.ID) (tx *Tx, potentialReward uint64, err error)
-	GetValidator(nodeID ids.ShortID) (currentValidator, error)
+	GetValidator(nodeID ids.NodeID) (currentValidator, error)
 
 	UpdateStakers(
 		addValidators []*validatorReward,
@@ -58,7 +58,7 @@ type currentStakerChainStateImpl struct {
 	nextStaker *validatorReward
 
 	// nodeID -> validator
-	validatorsByNodeID map[ids.ShortID]*currentValidatorImpl
+	validatorsByNodeID map[ids.NodeID]*currentValidatorImpl
 
 	// txID -> tx
 	validatorsByTxID map[ids.ID]*validatorReward
@@ -83,7 +83,7 @@ func (cs *currentStakerChainStateImpl) GetNextStaker() (addStakerTx *Tx, potenti
 	return cs.nextStaker.addStakerTx, cs.nextStaker.potentialReward, nil
 }
 
-func (cs *currentStakerChainStateImpl) GetValidator(nodeID ids.ShortID) (currentValidator, error) {
+func (cs *currentStakerChainStateImpl) GetValidator(nodeID ids.NodeID) (currentValidator, error) {
 	vdr, exists := cs.validatorsByNodeID[nodeID]
 	if !exists {
 		return nil, database.ErrNotFound
@@ -101,7 +101,7 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 		return nil, errNotEnoughValidators
 	}
 	newCS := &currentStakerChainStateImpl{
-		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)+len(addValidatorTxs)),
+		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.validatorsByNodeID)+len(addValidatorTxs)),
 		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)+len(addValidatorTxs)+len(addDelegatorTxs)+len(addSubnetValidatorTxs)),
 		validators:         cs.validators[numTxsToRemove:], // sorted in order of removal
 
@@ -223,7 +223,7 @@ func (cs *currentStakerChainStateImpl) DeleteNextStaker() (currentStakerChainSta
 	removedTxID := removedTx.ID()
 
 	newCS := &currentStakerChainStateImpl{
-		validatorsByNodeID: make(map[ids.ShortID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
+		validatorsByNodeID: make(map[ids.NodeID]*currentValidatorImpl, len(cs.validatorsByNodeID)),
 		validatorsByTxID:   make(map[ids.ID]*validatorReward, len(cs.validatorsByTxID)-1),
 		validators:         cs.validators[1:], // sorted in order of removal
 

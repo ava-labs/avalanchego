@@ -4,8 +4,11 @@
 package ids
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShortString(t *testing.T) {
@@ -123,4 +126,37 @@ func TestIsSortedAndUniqueShortIDs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestShortIDMapMarshalling(t *testing.T) {
+	originalMap := map[ShortID]int{
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
+	}
+	mapJSON, err := json.Marshal(originalMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unmarshalledMap map[ShortID]int
+	err = json.Unmarshal(mapJSON, &unmarshalledMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(originalMap) != len(unmarshalledMap) {
+		t.Fatalf("wrong map lengths")
+	}
+	for originalID, num := range originalMap {
+		if unmarshalledMap[originalID] != num {
+			t.Fatalf("map was incorrectly Unmarshalled")
+		}
+	}
+}
+
+func TestShortIDsToStrings(t *testing.T) {
+	shortIDs := []ShortID{{1}, {2}, {2}}
+	expected := []string{"6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp"}
+	shortStrings := ShortIDsToStrings(shortIDs)
+	assert.EqualValues(t, expected, shortStrings)
 }

@@ -10,9 +10,14 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"reflect"
+	"sort"
 	"testing"
 
 	j "encoding/json"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -35,6 +40,46 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
+
+var (
+	_ plugin.Plugin     = &testVMPlugin{}
+	_ plugin.GRPCPlugin = &testVMPlugin{}
+)
+
+// Test_VMServerInterface ensures that the RPCs methods defined by VMServer
+// interface are implemented.
+func Test_VMServerInterface(t *testing.T) {
+	var wantMethods, gotMethods []string
+	pb := reflect.TypeOf((*vmpb.VMServer)(nil)).Elem()
+	for i := 0; i < pb.NumMethod()-1; i++ {
+		wantMethods = append(wantMethods, pb.Method(i).Name)
+	}
+	sort.Strings(wantMethods)
+
+	impl := reflect.TypeOf(&VMServer{})
+	for i := 0; i < impl.NumMethod(); i++ {
+		gotMethods = append(gotMethods, impl.Method(i).Name)
+	}
+	sort.Strings(gotMethods)
+
+	if !reflect.DeepEqual(gotMethods, wantMethods) {
+		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
+	}
+}
+
+// chainVMTestPlugin creates the server plugin needed for the test
+func chainVMTestPlugin(t *testing.T, _ bool) (plugin.Plugin, *gomock.Controller) {
+	// test key is "chainVMTest"
+	ctrl := gomock.NewController(t)
+
+	return NewTestVM(&TestSubnetVM{
+		logger: hclog.New(&hclog.LoggerOptions{
+			Level:      hclog.Trace,
+			Output:     os.Stderr,
+			JSONFormat: true,
+		}),
+	}), ctrl
+}
 
 // Test_VMCreateHandlers tests the Handle and HandleSimple RPCs by creating a plugin and
 // serving the handlers exposed by the subnet. The test then will exercise the service
@@ -61,11 +106,11 @@ func Test_VMCreateHandlers(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			process := helperProcess("vm")
+			process := helperProcess(chainVMTestKey)
 			c := plugin.NewClient(&plugin.ClientConfig{
 				Cmd:              process,
 				HandshakeConfig:  TestHandshake,
-				Plugins:          TestPluginMap,
+				Plugins:          TestClientPluginMap,
 				AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 			})
 			defer c.Kill()
@@ -82,14 +127,12 @@ func Test_VMCreateHandlers(t *testing.T) {
 			assert.NoErrorf(err, "failed to get plugin client: %v", err)
 
 			// Grab the vm implementation.
-			raw, err := client.Dispense("vm")
+			raw, err := client.Dispense(chainVMTestKey)
 			assert.NoErrorf(err, "failed to dispense plugin: %v", err)
 
 			// Get vm client.
 			vm, ok := raw.(*TestVMClient)
-			if !ok {
-				assert.NoError(err)
-			}
+			assert.True(ok)
 
 			// Get the handlers exposed by the subnet vm.
 			handlers, err := vm.CreateHandlers()
@@ -272,6 +315,24 @@ func (vm *TestVMClient) CreateHandlers() (map[string]*common.HTTPHandler, error)
 		}
 	}
 	return handlers, nil
+}
+
+type testVMPlugin struct {
+	plugin.NetRPCUnsupportedPlugin
+	vm TestVM
+}
+
+func NewTestVM(vm *TestSubnetVM) plugin.Plugin {
+	return &testVMPlugin{vm: vm}
+}
+
+func (p *testVMPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+	vmpb.RegisterVMServer(s, NewTestServer(p.vm))
+	return nil
+}
+
+func (p *testVMPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+	return NewTestClient(vmpb.NewVMClient(c)), nil
 }
 
 type TestSubnetVM struct {

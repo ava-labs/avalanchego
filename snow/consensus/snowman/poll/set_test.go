@@ -48,19 +48,19 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
@@ -101,19 +101,19 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
@@ -154,24 +154,24 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
 	assert.True(t, added)
@@ -224,10 +224,10 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 
 	vtxID := ids.ID{1}
 
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2} // k = 2
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -269,10 +269,10 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2} // k = 2
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -308,15 +308,15 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.ShortID{1} // k = 1
+	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(vdr1)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag: (Size = 1)
-            ID[6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
+            ID[NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
         received Bag: (Size = 0)`
 	if !s.Add(0, vdrs) {
 		t.Fatalf("Should have been able to add a new poll")

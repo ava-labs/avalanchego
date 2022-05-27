@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -25,8 +24,8 @@ var (
 type Set interface {
 	Add(Beacon) error
 
-	RemoveByID(ids.ShortID) error
-	RemoveByIP(utils.IPDesc) error
+	RemoveByID(ids.NodeID) error
+	RemoveByIP(ips.IPPort) error
 
 	Len() int
 
@@ -35,14 +34,14 @@ type Set interface {
 }
 
 type set struct {
-	ids     map[ids.ShortID]int
+	ids     map[ids.NodeID]int
 	ips     map[string]int
 	beacons []Beacon
 }
 
 func NewSet() Set {
 	return &set{
-		ids: make(map[ids.ShortID]int),
+		ids: make(map[ids.NodeID]int),
 		ips: make(map[string]int),
 	}
 }
@@ -66,7 +65,7 @@ func (s *set) Add(b Beacon) error {
 	return nil
 }
 
-func (s *set) RemoveByID(idToRemove ids.ShortID) error {
+func (s *set) RemoveByID(idToRemove ids.NodeID) error {
 	indexToRemove, exists := s.ids[idToRemove]
 	if !exists {
 		return errUnknownID
@@ -90,7 +89,7 @@ func (s *set) RemoveByID(idToRemove ids.ShortID) error {
 	return nil
 }
 
-func (s *set) RemoveByIP(ip utils.IPDesc) error {
+func (s *set) RemoveByIP(ip ips.IPPort) error {
 	indexToRemove, exists := s.ips[ip.String()]
 	if !exists {
 		return errUnknownIP
@@ -108,10 +107,10 @@ func (s *set) IDsArg() string {
 		return ""
 	}
 	b := s.beacons[0]
-	_, _ = sb.WriteString(b.ID().PrefixedString(constants.NodeIDPrefix))
+	_, _ = sb.WriteString(b.ID().String())
 	for _, b := range s.beacons[1:] {
 		_, _ = sb.WriteString(",")
-		_, _ = sb.WriteString(b.ID().PrefixedString(constants.NodeIDPrefix))
+		_, _ = sb.WriteString(b.ID().String())
 	}
 	return sb.String()
 }

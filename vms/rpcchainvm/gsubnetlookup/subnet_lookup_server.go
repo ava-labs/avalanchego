@@ -16,7 +16,7 @@ var _ subnetlookuppb.SubnetLookupServer = &Server{}
 
 // Server is a subnet lookup that is managed over RPC.
 type Server struct {
-	subnetlookuppb.UnimplementedSubnetLookupServer
+	subnetlookuppb.UnsafeSubnetLookupServer
 	aliaser snow.SubnetLookup
 }
 

@@ -14,7 +14,7 @@ var _ writerpb.WriterServer = &Server{}
 
 // Server is an http.Handler that is managed over RPC.
 type Server struct {
-	writerpb.UnimplementedWriterServer
+	writerpb.UnsafeWriterServer
 	writer io.Writer
 }
 

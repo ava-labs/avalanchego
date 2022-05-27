@@ -29,7 +29,7 @@ var (
 	errParsedUnknownVertex = errors.New("parsed unknown vertex")
 )
 
-func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -52,7 +52,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestShortID()
+	peer := ids.GenerateTestNodeID()
 	if err := peers.AddWeight(peer, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -66,12 +66,17 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		t.Fatal(err)
 	}
 
+	peerTracker := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
+	peers.RegisterCallbackListener(startupTracker)
+
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
+		StartupTracker:                 startupTracker,
 		Sender:                         sender,
 		Subnet:                         subnet,
 		Timer:                          &common.TimerTest{},
@@ -92,7 +97,6 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		TxBlocked:     txBlocker,
 		Manager:       manager,
 		VM:            vm,
-		WeightTracker: tracker.NewWeightTracker(commonConfig.Beacons, commonConfig.StartupAlpha),
 	}, peer, sender, manager, vm
 }
 
@@ -141,8 +145,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,7 +179,6 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil {
 		t.Fatal(err)
 	}
@@ -241,8 +244,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -262,7 +265,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	requestID := new(uint32)
 	reqVtxID := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		switch {
 		case vdr != peerID:
 			t.Fatalf("Should have requested vertex from %s, requested from %s",
@@ -290,7 +293,6 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	} else if reqVtxID != vtxID0 {
@@ -416,8 +418,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -446,7 +448,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -459,7 +461,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	}
@@ -557,8 +558,8 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -588,7 +589,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -601,7 +602,6 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	}
@@ -675,8 +675,8 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -712,7 +712,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -725,7 +725,6 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		requested = vtxID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	} else if requested != vtxID1 {
@@ -792,8 +791,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -834,14 +833,13 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0 and vtx1
 		t.Fatal(err)
 	}
@@ -920,8 +918,8 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -972,14 +970,13 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx2
 		t.Fatal(err)
 	}
@@ -1088,8 +1085,8 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("unexpected bootstrapper type")
 	}
 
-	startReqID := uint32(0)
-	if err := bs.Start(startReqID); err != nil {
+	vm.CantSetState = false
+	if err := bs.Start(0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1165,14 +1162,13 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
 		requestIDs[vtxID] = reqID
 	}
 
-	vm.CantSetState = false
 	if err := bs.ForceAccepted([]ids.ID{vtxID3, vtxID4}); err != nil { // should request vtx3 and vtx4
 		t.Fatal(err)
 	}

@@ -5,7 +5,7 @@ package pubsub
 
 import (
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -59,7 +59,7 @@ func (c *AddAddresses) parseAddresses() error {
 		c.addressIds = make([][]byte, len(c.Addresses))
 	}
 	for i, addrStr := range c.Addresses {
-		_, _, addrBytes, err := formatting.ParseAddress(addrStr)
+		_, _, addrBytes, err := address.Parse(addrStr)
 		if err != nil {
 			return err
 		}

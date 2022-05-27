@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -64,7 +64,7 @@ type Server interface {
 		port uint16,
 		allowedOrigins []string,
 		shutdownTimeout time.Duration,
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		wrappers ...Wrapper)
 	// Dispatch starts the API server
 	Dispatch() error
@@ -119,7 +119,7 @@ func (s *server) Initialize(
 	port uint16,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	wrappers ...Wrapper,
 ) {
 	s.log = log
@@ -139,7 +139,7 @@ func (s *server) Initialize(
 	s.handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Attach this node's ID as a header
-			w.Header().Set("node-id", nodeID.PrefixedString(constants.NodeIDPrefix))
+			w.Header().Set("node-id", nodeID.String())
 			gzipHandler.ServeHTTP(w, r)
 		},
 	)
@@ -156,11 +156,11 @@ func (s *server) Dispatch() error {
 		return err
 	}
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
 		s.log.Info("HTTP API server listening on %q", listenAddress)
 	} else {
-		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
 	}
 
 	s.srv = &http.Server{Handler: s.handler}
@@ -183,11 +183,11 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 		return err
 	}
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
 		s.log.Info("HTTPS API server listening on %q", listenAddress)
 	} else {
-		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
 	}
 
 	s.srv = &http.Server{Addr: listenAddress, Handler: s.handler}
@@ -289,7 +289,7 @@ func lockMiddleware(handler http.Handler, lockOption common.LockOption, lock *sy
 }
 
 // Reject middleware wraps a handler. If the chain that the context describes is
-// not done bootstrapping, writes back an error.
+// not done state-syncing/bootstrapping, writes back an error.
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if ctx.GetState() != snow.NormalOp {

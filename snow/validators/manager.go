@@ -21,25 +21,25 @@ type Manager interface {
 	Set(ids.ID, Set) error
 
 	// AddWeight adds weight to a given validator on the given subnet
-	AddWeight(ids.ID, ids.ShortID, uint64) error
+	AddWeight(ids.ID, ids.NodeID, uint64) error
 
 	// RemoveWeight removes weight from a given validator on a given subnet
-	RemoveWeight(ids.ID, ids.ShortID, uint64) error
+	RemoveWeight(ids.ID, ids.NodeID, uint64) error
 
 	// GetValidators returns the validator set for the given subnet
 	// Returns false if the subnet doesn't exist
 	GetValidators(ids.ID) (Set, bool)
 
 	// MaskValidator hides the named validator from future samplings
-	MaskValidator(ids.ShortID) error
+	MaskValidator(ids.NodeID) error
 
 	// RevealValidator ensures the named validator is not hidden from future
 	// samplings
-	RevealValidator(ids.ShortID) error
+	RevealValidator(ids.NodeID) error
 
 	// Contains returns true if there is a validator with the specified ID
 	// currently in the set.
-	Contains(ids.ID, ids.ShortID) bool
+	Contains(ids.ID, ids.NodeID) bool
 }
 
 // NewManager returns a new, empty manager
@@ -50,13 +50,13 @@ func NewManager() Manager {
 }
 
 type manager struct {
-	lock sync.Mutex
+	lock sync.RWMutex
 
 	// Key: Subnet ID
 	// Value: The validators that validate the subnet
 	subnetToVdrs map[ids.ID]Set
 
-	maskedVdrs ids.ShortSet
+	maskedVdrs ids.NodeIDSet
 }
 
 func (m *manager) Set(subnetID ids.ID, newSet Set) error {
@@ -71,7 +71,7 @@ func (m *manager) Set(subnetID ids.ID, newSet Set) error {
 	return oldSet.Set(newSet.List())
 }
 
-func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
+func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.NodeID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -88,7 +88,7 @@ func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) e
 	return vdrs.AddWeight(vdrID, weight)
 }
 
-func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
+func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.NodeID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -99,14 +99,14 @@ func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64
 }
 
 func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	vdrs, ok := m.subnetToVdrs[subnetID]
 	return vdrs, ok
 }
 
-func (m *manager) MaskValidator(vdrID ids.ShortID) error {
+func (m *manager) MaskValidator(vdrID ids.NodeID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -123,7 +123,7 @@ func (m *manager) MaskValidator(vdrID ids.ShortID) error {
 	return nil
 }
 
-func (m *manager) RevealValidator(vdrID ids.ShortID) error {
+func (m *manager) RevealValidator(vdrID ids.NodeID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -140,9 +140,9 @@ func (m *manager) RevealValidator(vdrID ids.ShortID) error {
 	return nil
 }
 
-func (m *manager) Contains(subnetID ids.ID, vdrID ids.ShortID) bool {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (m *manager) Contains(subnetID ids.ID, vdrID ids.NodeID) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	vdrs, ok := m.subnetToVdrs[subnetID]
 	if ok {
@@ -152,8 +152,8 @@ func (m *manager) Contains(subnetID ids.ID, vdrID ids.ShortID) bool {
 }
 
 func (m *manager) String() string {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	subnets := make([]ids.ID, 0, len(m.subnetToVdrs))
 	for subnetID := range m.subnetToVdrs {

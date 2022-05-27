@@ -19,6 +19,8 @@ import (
 
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 
+	tspb "google.golang.org/protobuf/types/known/timestamppb"
+
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
@@ -170,4 +172,27 @@ func NewDefaultServer(opts []grpc.ServerOption) *grpc.Server {
 		opts = append(opts, DefaultServerOptions...)
 	}
 	return grpc.NewServer(opts...)
+}
+
+// TimestampAsTime validates timestamppb timestamp and returns time.Time.
+func TimestampAsTime(ts *tspb.Timestamp) (time.Time, error) {
+	if err := ts.CheckValid(); err != nil {
+		return time.Time{}, fmt.Errorf("invalid timestamp: %w", err)
+	}
+	return ts.AsTime(), nil
+}
+
+// TimestampFromTime converts time.Time to a timestamppb timestamp.
+func TimestampFromTime(time time.Time) *tspb.Timestamp {
+	return tspb.New(time)
+}
+
+// EnsureValidResponseCode ensures that the response code is valid otherwise it returns 500.
+func EnsureValidResponseCode(code int) int {
+	// Response code outside of this range is invalid and could panic.
+	// ref. https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+	if code < 100 || code > 599 {
+		return http.StatusInternalServerError
+	}
+	return code
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -35,7 +36,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		} {
 			b, err := formatting.Decode(formatting.CB58, addrStr)
 			gomega.Expect(err).Should(gomega.BeNil())
-			addrMap[addrStr], err = formatting.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], b)
+			addrMap[addrStr], err = address.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], b)
 			gomega.Expect(err).Should(gomega.BeNil())
 		}
 		avmArgs := avm.BuildGenesisArgs{
@@ -134,7 +135,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		hrp := constants.NetworkIDToHRP[constants.UnitTestID]
 		for i, key := range keys {
 			id := key.PublicKey().Address()
-			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			addr, err := address.FormatBech32(hrp, id.Bytes())
 			gomega.Expect(err).Should(gomega.BeNil())
 			genesisUTXOs[i] = platformvm.APIUTXO{
 				Amount:  json.Uint64(50000 * units.MilliAvax),
@@ -145,13 +146,13 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		genesisValidators := make([]platformvm.APIPrimaryValidator, len(keys))
 		for i, key := range keys {
 			id := key.PublicKey().Address()
-			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			addr, err := address.FormatBech32(hrp, id.Bytes())
 			gomega.Expect(err).Should(gomega.BeNil())
 			genesisValidators[i] = platformvm.APIPrimaryValidator{
 				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
-					NodeID:    id.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    ids.NodeID(id),
 				},
 				RewardOwner: &platformvm.APIOwner{
 					Threshold: 1,

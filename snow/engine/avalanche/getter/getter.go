@@ -47,26 +47,36 @@ type getter struct {
 	getAncestorsVtxs metric.Averager
 }
 
-func (gh *getter) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(validatorID ids.NodeID, requestID uint32) error {
+	gh.log.Debug("GetStateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (gh *getter) GetAcceptedStateSummary(validatorID ids.NodeID, requestID uint32, heights []uint64) error {
+	gh.log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+	return nil
+}
+
+func (gh *getter) GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge()
 	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
-func (gh *getter) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-	gh.sender.SendAccepted(validatorID, requestID, acceptedVtxIDs)
+	gh.sender.SendAccepted(nodeID, requestID, acceptedVtxIDs)
 	return nil
 }
 
-func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
-	gh.log.Verbo("GetAncestors(%s, %d, %s) called", validatorID, requestID, vtxID)
+	gh.log.Verbo("GetAncestors(%s, %d, %s) called", nodeID, requestID, vtxID)
 	vertex, err := gh.storage.GetVtx(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		gh.log.Verbo("dropping getAncestors")
@@ -108,14 +118,14 @@ func (gh *getter) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID 
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(validatorID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(nodeID, requestID, ancestorsBytes)
 	return nil
 }
 
-func (gh *getter) Get(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
-		gh.sender.SendPut(validatorID, requestID, vtxID, vtx.Bytes())
+		gh.sender.SendPut(nodeID, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
 }

@@ -12,9 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Test that canceling a context passed into Dial results
@@ -58,7 +59,7 @@ func TestDialerCancelDial(t *testing.T) {
 	setupWg.Wait()
 
 	port, _ := strconv.Atoi(strings.Split(l.Addr().String(), ":")[1])
-	myIP := utils.IPDesc{
+	myIP := ips.IPPort{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: uint16(port),
 	}
