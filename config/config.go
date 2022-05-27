@@ -1077,6 +1077,17 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
+func getDiskSpaceConfig(v *viper.Viper) (requiredAvailableDiskSpace uint64, warningThresholdAvailableDiskSpace uint64, err error) {
+	requiredAvailableDiskSpace = v.GetUint64(SystemTrackerRequiredAvailableDiskSpaceKey)
+	warningThresholdAvailableDiskSpace = v.GetUint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey)
+	switch {
+	case warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace:
+		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
+	default:
+		return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, nil
+	}
+}
+
 func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	vdrAlloc := v.GetFloat64(DiskVdrAllocKey)
 	maxNonVdrUsage := v.GetFloat64(DiskMaxNonVdrUsageKey)
@@ -1262,6 +1273,11 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.SystemTrackerProcessingHalflife = v.GetDuration(SystemTrackerProcessingHalflifeKey)
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
+
+	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getDiskSpaceConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	if err != nil {
