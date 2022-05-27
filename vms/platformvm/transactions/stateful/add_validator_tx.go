@@ -66,12 +66,7 @@ func (tx *AddValidatorTx) Execute(parentState state.Mutable) (state.Versioned, s
 	ctx := tx.verifier.Ctx()
 
 	// Verify the tx is well-formed
-	stx := &signed.Tx{
-		Unsigned: tx.AddValidatorTx,
-		Creds:    tx.creds,
-	}
-	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(tx.verifier.Ctx()); err != nil {
+	if err := tx.SyntacticVerify(tx.verifier.Ctx()); err != nil {
 		return nil, nil, err
 	}
 
@@ -167,6 +162,11 @@ func (tx *AddValidatorTx) Execute(parentState state.Mutable) (state.Versioned, s
 	}
 
 	// Set up the state if this tx is committed
+	stx := &signed.Tx{
+		Unsigned: tx.AddValidatorTx,
+		Creds:    tx.creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	newlyPendingStakers := pendingStakers.AddStaker(stx)
 	onCommitState := state.NewVersioned(parentState, currentStakers, newlyPendingStakers)
 

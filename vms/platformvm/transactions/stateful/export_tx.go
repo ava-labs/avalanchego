@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
@@ -43,12 +42,7 @@ func (tx *ExportTx) SemanticVerify(parentState state.Mutable) error {
 func (tx *ExportTx) Execute(vs state.Versioned) (func() error, error) {
 	ctx := tx.verifier.Ctx()
 
-	stx := &signed.Tx{
-		Unsigned: tx.ExportTx,
-		Creds:    tx.creds,
-	}
-	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(ctx); err != nil {
+	if err := tx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 

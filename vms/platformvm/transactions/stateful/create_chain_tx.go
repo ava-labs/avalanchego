@@ -67,12 +67,7 @@ func (tx *CreateChainTx) Execute(vs state.Versioned) (
 		return nil, unsigned.ErrWrongNumberOfCredentials
 	}
 
-	stx := &signed.Tx{
-		Unsigned: tx.CreateChainTx,
-		Creds:    tx.creds,
-	}
-	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(ctx); err != nil {
+	if err := tx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +112,13 @@ func (tx *CreateChainTx) Execute(vs state.Versioned) (
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
+
 	// Attempt to the new chain to the database
+	stx := &signed.Tx{
+		Unsigned: tx.CreateChainTx,
+		Creds:    tx.creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	vs.AddChain(stx)
 
 	// If this proposal is committed and this node is a member of the

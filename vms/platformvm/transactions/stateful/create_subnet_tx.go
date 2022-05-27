@@ -55,12 +55,7 @@ func (tx *CreateSubnetTx) Execute(vs state.Versioned) (
 	)
 
 	// Make sure this transaction is well formed.
-	stx := &signed.Tx{
-		Unsigned: tx,
-		Creds:    tx.creds,
-	}
-	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(ctx); err != nil {
+	if err := tx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
@@ -82,7 +77,13 @@ func (tx *CreateSubnetTx) Execute(vs state.Versioned) (
 	utxos.ConsumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
 	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
+
 	// Attempt to the new chain to the database
+	stx := &signed.Tx{
+		Unsigned: tx,
+		Creds:    tx.creds,
+	}
+	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
 	vs.AddSubnet(stx)
 
 	return nil, nil

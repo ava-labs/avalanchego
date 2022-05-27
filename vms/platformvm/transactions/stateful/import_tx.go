@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
@@ -23,9 +22,8 @@ var _ AtomicTx = &ImportTx{}
 type ImportTx struct {
 	*unsigned.ImportTx
 
-	txID        ids.ID // ID of signed add subnet validator tx
-	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
-	creds       []verify.Verifiable
+	txID  ids.ID // ID of signed add subnet validator tx
+	creds []verify.Verifiable
 
 	verifier TxVerifier
 }
@@ -40,12 +38,7 @@ func (tx *ImportTx) SemanticVerify(parentState state.Mutable) error {
 func (tx *ImportTx) Execute(vs state.Versioned) (func() error, error) {
 	ctx := tx.verifier.Ctx()
 
-	stx := &signed.Tx{
-		Unsigned: tx.ImportTx,
-		Creds:    tx.creds,
-	}
-	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(ctx); err != nil {
+	if err := tx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
