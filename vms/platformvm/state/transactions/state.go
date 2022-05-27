@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -245,7 +246,7 @@ func NewState(
 
 	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState := avax.NewUTXOState(utxoDB, unsigned.GenCodec)
+	utxoState := avax.NewUTXOState(utxoDB, genesis.Codec)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
 	return &state{
@@ -353,7 +354,7 @@ func NewMeteredTransactionsState(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, unsigned.GenCodec, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, genesis.Codec, metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -534,15 +535,15 @@ func (s *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 	}
 
 	stx := txBytesAndStatus{}
-	if _, err := unsigned.GenCodec.Unmarshal(txBytes, &stx); err != nil {
+	if _, err := genesis.Codec.Unmarshal(txBytes, &stx); err != nil {
 		return nil, status.Unknown, err
 	}
 
 	tx := signed.Tx{}
-	if _, err := unsigned.GenCodec.Unmarshal(stx.Tx, &tx); err != nil {
+	if _, err := genesis.Codec.Unmarshal(stx.Tx, &tx); err != nil {
 		return nil, status.Unknown, err
 	}
-	if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
+	if err := tx.Sign(genesis.Codec, nil); err != nil {
 		return nil, status.Unknown, err
 	}
 
@@ -670,7 +671,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := unsigned.GenCodec.Marshal(unsigned.Version, prefixStruct)
+	prefixBytes, err := genesis.Codec.Marshal(unsigned.Version, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -692,7 +693,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		}
 
 		weightDiff := ValidatorWeightDiff{}
-		_, err = unsigned.GenCodec.Unmarshal(diffIter.Value(), &weightDiff)
+		_, err = genesis.Codec.Unmarshal(diffIter.Value(), &weightDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -1130,7 +1131,7 @@ func (s *state) writeCurrentStakers() (err error) {
 				PotentialReward: potentialReward,
 			}
 
-			vdrBytes, err = unsigned.GenCodec.Marshal(unsigned.Version, vdr)
+			vdrBytes, err = genesis.Codec.Marshal(unsigned.Version, vdr)
 			if err != nil {
 				return
 			}
@@ -1254,7 +1255,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			Height:   s.DataState.GetHeight(),
 			SubnetID: subnetID,
 		}
-		prefixBytes, err = unsigned.GenCodec.Marshal(unsigned.Version, prefixStruct)
+		prefixBytes, err = genesis.Codec.Marshal(unsigned.Version, prefixStruct)
 		if err != nil {
 			return
 		}
@@ -1278,7 +1279,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			}
 
 			var nodeDiffBytes []byte
-			nodeDiffBytes, err = unsigned.GenCodec.Marshal(unsigned.Version, nodeDiff)
+			nodeDiffBytes, err = genesis.Codec.Marshal(unsigned.Version, nodeDiff)
 			if err != nil {
 				return err
 			}
@@ -1353,7 +1354,7 @@ func (s *state) writeUptimes() error {
 		uptime := s.uptimes[nodeID]
 		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
 
-		uptimeBytes, err := unsigned.GenCodec.Marshal(unsigned.Version, uptime)
+		uptimeBytes, err := genesis.Codec.Marshal(unsigned.Version, uptime)
 		if err != nil {
 			return fmt.Errorf("failed to write uptimes with: %w", err)
 		}
@@ -1374,7 +1375,7 @@ func (s *state) writeTXs() error {
 			Status: txStatus.Status,
 		}
 
-		txBytes, err := unsigned.GenCodec.Marshal(unsigned.Version, &stx)
+		txBytes, err := genesis.Codec.Marshal(unsigned.Version, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to write txs with: %w", err)
 		}
@@ -1396,7 +1397,7 @@ func (s *state) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := unsigned.GenCodec.Marshal(unsigned.Version, utxo)
+			utxoBytes, err := genesis.Codec.Marshal(unsigned.Version, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to write reward UTXOs with: %w", err)
 			}

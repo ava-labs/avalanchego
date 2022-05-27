@@ -33,10 +33,15 @@ type Tracker interface {
 	TimeUntilUsage(nodeID ids.NodeID, now time.Time, value float64) time.Duration
 }
 
+type DiskTracker interface {
+	Tracker
+	AvailableDiskBytes() uint64
+}
+
 // ResourceTracker is an interface for tracking peers' usage of resources
 type ResourceTracker interface {
 	CPUTracker() Tracker
-	DiskTracker() Tracker
+	DiskTracker() DiskTracker
 	// Registers that the given node started processing at the given time.
 	StartProcessing(ids.NodeID, time.Time)
 	// Registers that the given node stopped processing at the given time.
@@ -135,6 +140,16 @@ func (t *diskResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
 	return realReadUsage * portionUsageByNode
 }
 
+func (t *diskResourceTracker) AvailableDiskBytes() uint64 {
+	rt := t.t
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+
+	bytesAvailable := rt.resources.AvailableDiskBytes()
+	rt.metrics.diskSpaceAvailable.Set(float64(bytesAvailable))
+	return bytesAvailable
+}
+
 func (t *diskResourceTracker) TotalUsage() float64 {
 	realReadUsage, _ := t.t.resources.DiskUsage()
 	return realReadUsage
@@ -214,7 +229,7 @@ func (rt *resourceTracker) CPUTracker() Tracker {
 	return &cpuResourceTracker{t: rt}
 }
 
-func (rt *resourceTracker) DiskTracker() Tracker {
+func (rt *resourceTracker) DiskTracker() DiskTracker {
 	return &diskResourceTracker{t: rt}
 }
 
@@ -276,6 +291,7 @@ type trackerMetrics struct {
 	cpuMetric            prometheus.Gauge
 	diskReadsMetric      prometheus.Gauge
 	diskWritesMetric     prometheus.Gauge
+	diskSpaceAvailable   prometheus.Gauge
 }
 
 func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*trackerMetrics, error) {
@@ -300,6 +316,11 @@ func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*tracker
 			Name:      "disk_writes",
 			Help:      "Disk writes (bytes/sec) tracked by the resource manager",
 		}),
+		diskSpaceAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "disk_available_space",
+			Help:      "Available space remaining (bytes) on the database volume",
+		}),
 	}
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -307,6 +328,7 @@ func newCPUTrackerMetrics(namespace string, reg prometheus.Registerer) (*tracker
 		reg.Register(m.cpuMetric),
 		reg.Register(m.diskReadsMetric),
 		reg.Register(m.diskWritesMetric),
+		reg.Register(m.diskSpaceAvailable),
 	)
 	return m, errs.Err
 }

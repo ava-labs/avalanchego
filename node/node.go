@@ -929,6 +929,31 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
+	diskSpaceCheck := health.CheckerFunc(func() (interface{}, error) {
+		// confirm that the node has enough disk space to continue operating
+		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
+
+		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
+
+		var err error
+		if availableDiskBytes < n.Config.RequiredAvailableDiskSpace {
+			n.Log.Fatal("Node low on disk space [%d bytes available]. Node shutting down...", availableDiskBytes)
+			go n.Shutdown(1)
+			err = fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
+		} else if availableDiskBytes < n.Config.WarningThresholdAvailableDiskSpace {
+			err = fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
+		}
+
+		return map[string]interface{}{
+			"availableDiskBytes": availableDiskBytes,
+		}, err
+	})
+
+	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck)
+	if err != nil {
+		return fmt.Errorf("couldn't register resource health check: %w", err)
+	}
+
 	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
 	if err != nil {
 		return err
@@ -1046,6 +1071,7 @@ func (n *Node) initVdrs() (validators.Set, error) {
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 	n.resourceManager = resource.NewManager(
+		n.Config.DatabaseConfig.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,

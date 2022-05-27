@@ -6,7 +6,6 @@ package genesis
 import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 // UTXO adds messages to UTXOs
@@ -27,16 +26,16 @@ type Genesis struct {
 
 func New(genesisBytes []byte) (*Genesis, error) {
 	gen := &Genesis{}
-	if _, err := unsigned.GenCodec.Unmarshal(genesisBytes, gen); err != nil {
+	if _, err := Codec.Unmarshal(genesisBytes, gen); err != nil {
 		return nil, err
 	}
 	for _, tx := range gen.Validators {
-		if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
+		if err := tx.Sign(Codec, nil); err != nil {
 			return nil, err
 		}
 	}
 	for _, tx := range gen.Chains {
-		if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
+		if err := tx.Sign(Codec, nil); err != nil {
 			return nil, err
 		}
 	}

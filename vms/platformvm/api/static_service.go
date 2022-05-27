@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/txheap"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
@@ -165,7 +165,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
-	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
+	utxos := make([]*p_genesis.UTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
 		if apiUTXO.Amount == 0 {
 			return errUTXOHasNoValue
@@ -200,7 +200,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if err != nil {
 			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
-		utxos = append(utxos, &genesis.UTXO{
+		utxos = append(utxos, &p_genesis.UTXO{
 			UTXO:    utxo,
 			Message: messageBytes,
 		})
@@ -286,7 +286,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				Shares:       delegationFee,
 			},
 		}
-		if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
+		if err := tx.Sign(p_genesis.Codec, nil); err != nil {
 			return err
 		}
 
@@ -314,7 +314,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				SubnetAuth:  &secp256k1fx.Input{},
 			},
 		}
-		if err := tx.Sign(unsigned.GenCodec, nil); err != nil {
+		if err := tx.Sign(p_genesis.Codec, nil); err != nil {
 			return err
 		}
 
@@ -324,7 +324,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	validatorTxs := vdrs.List()
 
 	// genesis holds the genesis state
-	genesis := genesis.Genesis{
+	genesis := p_genesis.Genesis{
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
@@ -334,7 +334,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := unsigned.GenCodec.Marshal(unsigned.Version, genesis)
+	bytes, err := p_genesis.Codec.Marshal(unsigned.Version, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
