@@ -60,11 +60,14 @@ func (tx *AddSubnetValidatorTx) Execute(parentState state.Mutable) (state.Versio
 		return nil, nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		duration = tx.Validator.Duration()
+		cfg      = tx.verifier.PlatformConfig()
+	)
 	switch {
-	case duration < tx.verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
+	case duration < cfg.MinStakeDuration: // Ensure staking length is not too short
 		return nil, nil, ErrStakeTooShort
-	case duration > tx.verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
+	case duration > cfg.MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, ErrStakeTooLong
 	case len(tx.creds) == 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials

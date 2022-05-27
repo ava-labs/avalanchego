@@ -25,7 +25,6 @@ import (
 var (
 	_ ProposalTx = &AddDelegatorTx{}
 
-	ErrInvalidState  = errors.New("generated output isn't valid state")
 	ErrOverDelegated = errors.New("validator would be over delegated")
 )
 
@@ -75,13 +74,16 @@ func (tx *AddDelegatorTx) Execute(parentState state.Mutable) (state.Versioned, s
 		return nil, nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	var (
+		duration = tx.Validator.Duration()
+		cfg      = tx.verifier.PlatformConfig()
+	)
 	switch {
-	case duration < tx.verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
+	case duration < cfg.MinStakeDuration: // Ensure staking length is not too short
 		return nil, nil, ErrStakeTooShort
-	case duration > tx.verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
+	case duration > cfg.MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, ErrStakeTooLong
-	case tx.Validator.Wght < tx.verifier.PlatformConfig().MinDelegatorStake:
+	case tx.Validator.Wght < cfg.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return nil, nil, p_validator.ErrWeightTooSmall
 	}

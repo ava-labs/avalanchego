@@ -143,7 +143,7 @@ func (tx *RewardValidatorTx) Execute(parentState state.Mutable) (
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, ErrInvalidState
+				return nil, nil, fmt.Errorf("expected verify.State but got %T", outIntf)
 			}
 
 			utxo := &avax.UTXO{
@@ -209,7 +209,7 @@ func (tx *RewardValidatorTx) Execute(parentState state.Mutable) (
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, ErrInvalidState
+				return nil, nil, fmt.Errorf("expected verify.State but got %T", outIntf)
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -234,7 +234,7 @@ func (tx *RewardValidatorTx) Execute(parentState state.Mutable) (
 			}
 			out, ok := outIntf.(verify.State)
 			if !ok {
-				return nil, nil, ErrInvalidState
+				return nil, nil, fmt.Errorf("expected verify.State but got %T", outIntf)
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{

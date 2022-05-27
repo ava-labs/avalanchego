@@ -92,8 +92,8 @@ func (tx *AdvanceTimeTx) Execute(parentState state.Mutable) (state.Versioned, st
 	// before the new timestamp. [pendingStakers.Stakers()] is sorted in order
 	// of increasing startTime
 pendingStakerLoop:
-	for _, stakerTxs := range pendingStakers.Stakers() {
-		switch staker := stakerTxs.Unsigned.(type) {
+	for _, stakerTx := range pendingStakers.Stakers() {
+		switch staker := stakerTx.Unsigned.(type) {
 		case *unsigned.AddDelegatorTx:
 			if staker.StartTime().After(txTimestamp) {
 				break pendingStakerLoop
@@ -110,7 +110,7 @@ pendingStakerLoop:
 			}
 
 			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &txstate.ValidatorReward{
-				AddStakerTx:     stakerTxs,
+				AddStakerTx:     stakerTx,
 				PotentialReward: r,
 			})
 			numToRemoveFromPending++
@@ -130,7 +130,7 @@ pendingStakerLoop:
 			}
 
 			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &txstate.ValidatorReward{
-				AddStakerTx:     stakerTxs,
+				AddStakerTx:     stakerTx,
 				PotentialReward: r,
 			})
 			numToRemoveFromPending++
@@ -142,11 +142,11 @@ pendingStakerLoop:
 			// If this staker should already be removed, then we should just
 			// never add them.
 			if staker.EndTime().After(txTimestamp) {
-				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, stakerTxs)
+				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, stakerTx)
 			}
 			numToRemoveFromPending++
 		default:
-			return nil, nil, fmt.Errorf("expected validator but got %T", stakerTxs.Unsigned)
+			return nil, nil, fmt.Errorf("expected validator but got %T", stakerTx.Unsigned)
 		}
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)

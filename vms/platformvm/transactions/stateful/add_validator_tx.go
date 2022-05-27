@@ -75,20 +75,21 @@ func (tx *AddValidatorTx) Execute(parentState state.Mutable) (state.Versioned, s
 		return nil, nil, err
 	}
 
+	cfg := tx.verifier.PlatformConfig()
 	switch {
-	case tx.Validator.Wght < tx.verifier.PlatformConfig().MinValidatorStake: // Ensure validator is staking at least the minimum amount
+	case tx.Validator.Wght < cfg.MinValidatorStake: // Ensure validator is staking at least the minimum amount
 		return nil, nil, p_validator.ErrWeightTooSmall
-	case tx.Validator.Wght > tx.verifier.PlatformConfig().MaxValidatorStake: // Ensure validator isn't staking too much
+	case tx.Validator.Wght > cfg.MaxValidatorStake: // Ensure validator isn't staking too much
 		return nil, nil, ErrWeightTooLarge
-	case tx.Shares < tx.verifier.PlatformConfig().MinDelegationFee:
+	case tx.Shares < cfg.MinDelegationFee:
 		return nil, nil, ErrInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < tx.verifier.PlatformConfig().MinStakeDuration: // Ensure staking length is not too short
+	case duration < cfg.MinStakeDuration: // Ensure staking length is not too short
 		return nil, nil, ErrStakeTooShort
-	case duration > tx.verifier.PlatformConfig().MaxStakeDuration: // Ensure staking length is not too long
+	case duration > cfg.MaxStakeDuration: // Ensure staking length is not too long
 		return nil, nil, ErrStakeTooLong
 	}
 

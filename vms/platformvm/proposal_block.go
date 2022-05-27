@@ -163,7 +163,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	}
 	proposalTx, ok := statefulTx.(stateful.ProposalTx)
 	if !ok {
-		return [2]snowman.Block{}, fmt.Errorf("expected UnsignedProposalTx but got %T", pb.Tx.Unsigned)
+		return [2]snowman.Block{}, fmt.Errorf("expected stateful.ProposalTx but got %T", statefulTx)
 	}
 
 	blkID := pb.ID()

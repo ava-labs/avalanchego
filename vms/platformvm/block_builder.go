@@ -88,7 +88,7 @@ func (m *blockBuilder) Initialize(
 func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	statefulTx, err := stateful.MakeStatefulTx(tx, m.vm.txVerifier)
 	if err != nil {
-		return fmt.Errorf("unsopported stateful tx, err %w", err)
+		return fmt.Errorf("unsupported stateful tx, err %w", err)
 	}
 
 	txID := tx.ID()

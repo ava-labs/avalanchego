@@ -72,7 +72,7 @@ func (tx *CreateChainTx) Execute(vs state.Versioned) (
 		Creds:    tx.creds,
 	}
 	stx.Initialize(tx.UnsignedBytes(), tx.signedBytes)
-	if err := stx.SyntacticVerify(tx.verifier.Ctx()); err != nil {
+	if err := stx.SyntacticVerify(ctx); err != nil {
 		return nil, err
 	}
 
