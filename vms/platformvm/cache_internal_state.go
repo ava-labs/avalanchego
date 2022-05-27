@@ -23,12 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var (
@@ -1579,24 +1579,23 @@ func (st *internalStateImpl) shouldInit() (bool, error) {
 }
 
 func (st *internalStateImpl) init(genesisBytes []byte) error {
-	utxos, timestamp, initialSupply,
-		validators, chains, err := genesis.ExtractGenesisContent(genesisBytes)
+	genesis, err := p_genesis.New(genesisBytes)
 	if err != nil {
 		return err
 	}
 
 	// Persist UTXOs that exist at genesis
-	for _, utxo := range utxos {
-		st.AddUTXO(utxo)
+	for _, utxo := range genesis.UTXOs {
+		st.AddUTXO(&utxo.UTXO)
 	}
 
 	// Persist the platform chain's timestamp at genesis
-	genesisTime := time.Unix(int64(timestamp), 0)
+	genesisTime := time.Unix(int64(genesis.Timestamp), 0)
 	st.SetTimestamp(genesisTime)
-	st.SetCurrentSupply(initialSupply)
+	st.SetCurrentSupply(genesis.InitialSupply)
 
 	// Persist primary network validator set at genesis
-	for _, vdrTx := range validators {
+	for _, vdrTx := range genesis.Validators {
 		tx, ok := vdrTx.Unsigned.(*unsigned.AddValidatorTx)
 		if !ok {
 			return errWrongTxType
@@ -1621,7 +1620,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		st.SetCurrentSupply(newCurrentSupply)
 	}
 
-	for _, chain := range chains {
+	for _, chain := range genesis.Chains {
 		unsignedChain, ok := chain.Unsigned.(*unsigned.CreateChainTx)
 		if !ok {
 			return errWrongTxType

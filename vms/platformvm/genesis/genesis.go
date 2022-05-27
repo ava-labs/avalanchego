@@ -42,28 +42,3 @@ func New(genesisBytes []byte) (*Genesis, error) {
 	}
 	return gen, nil
 }
-
-func ExtractGenesisContent(genesisBytes []byte) (
-	utxos []*avax.UTXO,
-	timestamp uint64,
-	initialSupply uint64,
-	validators []*signed.Tx,
-	chains []*signed.Tx,
-	err error,
-) {
-	genesis, err := New(genesisBytes)
-	if err != nil {
-		return
-	}
-
-	utxos = make([]*avax.UTXO, 0, len(genesis.UTXOs))
-	for _, utxo := range genesis.UTXOs {
-		utxos = append(utxos, &utxo.UTXO)
-	}
-
-	timestamp = genesis.Timestamp
-	initialSupply = genesis.InitialSupply
-	validators = genesis.Validators
-	chains = genesis.Chains
-	return
-}
