@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/process"
+
+	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
 var (
@@ -31,6 +33,9 @@ type DiskUser interface {
 	// DiskUsage returns the number of bytes per second read from/written to
 	// disk recently.
 	DiskUsage() (read float64, write float64)
+
+	// returns number of bytes available in the db volume
+	AvailableDiskBytes() uint64
 }
 
 type User interface {
@@ -67,16 +72,19 @@ type manager struct {
 	// [writeUsage] is the number of bytes/second written to disk recently.
 	writeUsage float64
 
+	availableDiskBytes uint64
+
 	closeOnce sync.Once
 	onClose   chan struct{}
 }
 
-func NewManager(frequency, cpuHalflife, diskHalflife time.Duration) Manager {
+func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) Manager {
 	m := &manager{
-		processes: make(map[int]*proc),
-		onClose:   make(chan struct{}),
+		processes:          make(map[int]*proc),
+		onClose:            make(chan struct{}),
+		availableDiskBytes: math.MaxUint64,
 	}
-	go m.update(frequency, cpuHalflife, diskHalflife)
+	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
 	return m
 }
 
@@ -92,6 +100,13 @@ func (m *manager) DiskUsage() (float64, float64) {
 	defer m.usageLock.RUnlock()
 
 	return m.readUsage, m.writeUsage
+}
+
+func (m *manager) AvailableDiskBytes() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableDiskBytes
 }
 
 func (m *manager) TrackProcess(pid int) {
@@ -119,7 +134,7 @@ func (m *manager) Shutdown() {
 	})
 }
 
-func (m *manager) update(frequency, cpuHalflife, diskHalflife time.Duration) {
+func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) {
 	ticker := time.NewTicker(frequency)
 	defer ticker.Stop()
 
@@ -133,10 +148,17 @@ func (m *manager) update(frequency, cpuHalflife, diskHalflife time.Duration) {
 		currentScaledReadUsage := newDiskWeight * currentReadUsage
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
+		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
+
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
 		m.readUsage = oldDiskWeight*m.readUsage + currentScaledReadUsage
 		m.writeUsage = oldDiskWeight*m.writeUsage + currentScaledWriteUsage
+
+		if getBytesErr == nil {
+			m.availableDiskBytes = availableBytes
+		}
+
 		m.usageLock.Unlock()
 
 		select {
