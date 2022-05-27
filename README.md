@@ -58,13 +58,13 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 - `BlockGasCost`: surcharge for producing a block faster than the target rate
 
 
-## Run Local Network
+## Create an EVM Subnet on Local 
 
-See [Create an EVM Subnet on Local](https://docs.avax.network/subnets/create-a-local-subnet).
+See [this tutorial](https://docs.avax.network/subnets/create-a-local-subnet).
 
-## Fuji Subnet Deployment
+## Create an EVM Subnet on Fuji Testnet
 
-See [Create an EVM Subnet on Fuji Testnet](https://docs.avax.network/subnets/create-a-fuji-subnet).
+See [this tutorial](https://docs.avax.network/subnets/create-a-fuji-subnet).
 
 
 ## Customize a Subnet
