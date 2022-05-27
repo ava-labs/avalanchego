@@ -61,3 +61,18 @@ func (mr *MockUserMockRecorder) DiskUsage() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiskUsage", reflect.TypeOf((*MockUser)(nil).DiskUsage))
 }
+
+// AvailableDiskBytes mocks base method
+func (m *MockUser) AvailableDiskBytes() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AvailableDiskBytes")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// AvailableDiskBytes indicates an expected call of AvailableDiskBytes
+func (mr *MockUserMockRecorder) AvailableDiskBytes() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableDiskBytes", reflect.TypeOf((*MockUser)(nil).AvailableDiskBytes))
+}
+
