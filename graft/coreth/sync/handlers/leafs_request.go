@@ -65,6 +65,19 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
+	keyLength, err := getKeyLength(leafsRequest.NodeType)
+	if err != nil {
+		// Note: LeafsRequest.Handle checks NodeType's validity so clients cannot cause the server to spam this error
+		log.Error("Failed to get key length for leafs request", "err", err)
+		lrh.stats.IncInvalidLeafsRequest()
+		return nil, nil
+	}
+	if len(leafsRequest.Start) != 0 && len(leafsRequest.Start) != keyLength ||
+		len(leafsRequest.End) != 0 && len(leafsRequest.End) != keyLength {
+		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(leafsRequest.Start), "endLen", len(leafsRequest.End), "expected", keyLength)
+		lrh.stats.IncInvalidLeafsRequest()
+		return nil, nil
+	}
 
 	t, err := trie.New(leafsRequest.Root, lrh.trieDB)
 	if err != nil {
@@ -135,12 +148,6 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		// If [start] in the request is empty, populate it with the appropriate length
 		// key starting at 0.
 		if len(start) == 0 {
-			keyLength, err := getKeyLength(leafsRequest.NodeType)
-			if err != nil {
-				// Note: LeafsRequest.Handle checks NodeType's validity so clients cannot cause the server to spam this error
-				log.Error("Failed to get key length for leafs request", "err", err)
-				return nil, nil
-			}
 			start = bytes.Repeat([]byte{0x00}, keyLength)
 		}
 		// If there is a non-zero number of keys, set [end] for the range proof to the
