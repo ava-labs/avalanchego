@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -11,7 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestT(t *testing.T) {
+	c := NewStaticClient("http://localhost:9650")
+	_, err := c.BuildGenesis(context.Background(), &BuildGenesisArgs{})
+	assert.NoError(t, err)
+}
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	nodeID := ids.NodeID{1, 2, 3}

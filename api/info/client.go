@@ -5,7 +5,6 @@ package info
 
 import (
 	"context"
-	"path"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -36,7 +35,7 @@ type client struct {
 // NewClient returns a new Info API Client
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
-		path.Join(uri, "ext/info"),
+		uri+"/ext/info",
 		"info",
 	)}
 }

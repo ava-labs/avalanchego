@@ -5,7 +5,6 @@ package keystore
 
 import (
 	"context"
-	"path"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -34,7 +33,7 @@ type client struct {
 
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
-		path.Join(uri, "ext/keystore"),
+		uri+"/ext/keystore",
 		"keystore",
 	)}
 }

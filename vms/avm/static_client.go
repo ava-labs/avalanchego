@@ -5,7 +5,6 @@ package avm
 
 import (
 	"context"
-	"path"
 
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -26,7 +25,7 @@ type staticClient struct {
 // NewClient returns an AVM client for interacting with the avm static api
 func NewStaticClient(uri string) StaticClient {
 	return &staticClient{requester: rpc.NewEndpointRequester(
-		path.Join(uri, "ext/vm/avm"),
+		uri+"/ext/vm/avm",
 		"avm",
 	)}
 }

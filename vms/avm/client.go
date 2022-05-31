@@ -5,7 +5,7 @@ package avm
 
 import (
 	"context"
-	"path"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -176,9 +176,9 @@ type client struct {
 
 // NewClient returns an AVM client for interacting with avm [chain]
 func NewClient(uri, chain string) Client {
-	path := path.Join(
+	path := fmt.Sprintf(
+		"%s/ext/%s/%s",
 		uri,
-		"ext",
 		constants.ChainAliasPrefix,
 		chain,
 	)

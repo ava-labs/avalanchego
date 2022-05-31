@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 )
 
@@ -39,7 +40,7 @@ func (e *avalancheEndpointRequester) SendRequest(
 	return SendJSONRequest(
 		ctx,
 		uri,
-		method,
+		fmt.Sprintf("%s.%s", e.base, method),
 		params,
 		reply,
 		options...,
