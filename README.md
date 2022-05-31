@@ -17,7 +17,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 
 ### AvalancheGo Compatibility
 
-```
+```text
 [v0.1.0] AvalancheGo@v1.7.0-v1.7.4
 [v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
 [v0.2.0] AvalancheGo@v1.7.7-v1.7.9
@@ -39,7 +39,7 @@ Full documentation for the C-Chain's API can be found [here.](https://docs.avax.
 
 ## Compatibility
 
-The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix,](https://docs.avax.network/dapps/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask/) [Metamask](https://docs.avax.network/dapps/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask/) and [Truffle.](https://docs.avax.network/dapps/smart-contracts/using-truffle-with-the-avalanche-c-chain/)
+The Subnet EVM is compatible with almost all Ethereum tooling, including [Remix](https://docs.avax.network/dapps/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask/), [Metamask](https://docs.avax.network/dapps/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask/) and [Truffle](https://docs.avax.network/dapps/smart-contracts/using-truffle-with-the-avalanche-c-chain/).
 
 ## Differences Between Subnet EVM and Coreth
 
@@ -57,7 +57,6 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 - `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
 - `BlockGasCost`: surcharge for producing a block faster than the target rate
 
-
 ## Run Local Network
 
 See [Create an EVM Subnet on Local](https://docs.avax.network/subnets/create-a-local-subnet).
@@ -66,10 +65,9 @@ See [Create an EVM Subnet on Local](https://docs.avax.network/subnets/create-a-l
 
 See [Create an EVM Subnet on Fuji Testnet](https://docs.avax.network/subnets/create-a-fuji-subnet).
 
-
 ## Customize a Subnet
 
-- [Genesis](https://docs.avax.network/subnets/customize-a-subnet#genesis) 
+- [Genesis](https://docs.avax.network/subnets/customize-a-subnet#genesis)
 - [Precompile](https://docs.avax.network/subnets/customize-a-subnet#precompiles)
 - [Priority Regossip](https://docs.avax.network/subnets/customize-a-subnet#priority-regossip)
 
@@ -120,7 +118,7 @@ all validators to the WAGMI subnet, and created the WAGMI chain.
 
 ### Network Parameters
 
-```
+```text
 Network ID: 11111
 Chain ID: 11111
 Block Gas Limit: 20,000,000 (2.5x C-Chain)
@@ -131,7 +129,7 @@ Target Block Rate: 2s (Same as C-Chain)
 
 ### Adding to MetaMask
 
-```
+```text
 Network Name: WAGMI
 RPC URL: https://subnets.avax.network/wagmi/wagmi-chain-testnet/rpc
 Chain ID: 11111
@@ -145,7 +143,7 @@ Explorer: https://subnets.avax.network/wagmi/wagmi-chain-testnet/explorer
 
 #### Info
 
-```
+```text
 Address: 0x3Ee7094DADda15810F191DD6AcF7E4FFa37571e4
 IPFS: /ipfs/QmVAuheeidjD2ktdX3sSHMQqSfcjtmca1g9jr7w9GQf7pU
 ```
