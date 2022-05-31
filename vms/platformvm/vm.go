@@ -230,7 +230,6 @@ func (vm *VM) Initialize(
 		&vm.Config,
 		&vm.clock,
 		vm.fx,
-		vm.internalState,
 		vm.uptimeManager,
 		vm.spendHandler,
 		vm.rewards,

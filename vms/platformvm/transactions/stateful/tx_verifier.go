@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 
-	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
@@ -41,7 +40,6 @@ func NewVerifier(
 	cfg *config.Config,
 	clk *mockable.Clock,
 	fx fx.Fx,
-	state txstate.Mutable,
 	timeMan uptime.Manager,
 	utxosMan utxos.SpendHandler,
 	rewards reward.Calculator,
@@ -50,7 +48,6 @@ func NewVerifier(
 		bootstrapped: bootstrapped,
 		Manager:      timeMan,
 		SpendHandler: utxosMan,
-		state:        state,
 		cfg:          cfg,
 		ctx:          ctx,
 		clk:          clk,
@@ -69,8 +66,6 @@ type verifier struct {
 	cfg          *config.Config
 	bootstrapped *utils.AtomicBool
 	fx           fx.Fx
-
-	state txstate.Mutable
 }
 
 func (v *verifier) Clock() *mockable.Clock         { return v.clk }

@@ -130,7 +130,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 
 	txVerifier := NewVerifier(
 		ctx, &isBootstrapped, &cfg, &clk, fx,
-		tState, uptimeMan, utxosMan, rewardsCalc)
+		uptimeMan, utxosMan, rewardsCalc)
 
 	addSubnet(tState, txBuilder, txVerifier)
 
