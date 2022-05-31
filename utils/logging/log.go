@@ -72,43 +72,43 @@ func (l *log) Stop() {
 }
 
 // Should only be called from [Level] functions.
-func (l *log) log(level Level, msg string, ctx ...zap.Field) {
+func (l *log) log(level Level, msg string, fields ...zap.Field) {
 	if ce := l.internalLogger.Check(zapcore.Level(level), msg); ce != nil {
-		ce.Write(ctx...)
+		ce.Write(fields...)
 	}
 }
 
-func (l *log) Fatal(format string, ctx ...zap.Field) {
-	l.log(Fatal, format, ctx...)
+func (l *log) Fatal(msg string, fields ...zap.Field) {
+	l.log(Fatal, msg, fields...)
 }
 
-func (l *log) Error(format string, ctx ...zap.Field) {
-	l.log(Error, format, ctx...)
+func (l *log) Error(msg string, fields ...zap.Field) {
+	l.log(Error, msg, fields...)
 }
 
-func (l *log) Warn(format string, ctx ...zap.Field) {
-	l.log(Warn, format, ctx...)
+func (l *log) Warn(msg string, fields ...zap.Field) {
+	l.log(Warn, msg, fields...)
 }
 
-func (l *log) Info(format string, ctx ...zap.Field) {
-	l.log(Info, format, ctx...)
+func (l *log) Info(msg string, fields ...zap.Field) {
+	l.log(Info, msg, fields...)
 }
 
-func (l *log) Trace(format string, ctx ...zap.Field) {
-	l.log(Trace, format, ctx...)
+func (l *log) Trace(msg string, fields ...zap.Field) {
+	l.log(Trace, msg, fields...)
 }
 
-func (l *log) Debug(format string, ctx ...zap.Field) {
-	l.log(Debug, format, ctx...)
+func (l *log) Debug(msg string, fields ...zap.Field) {
+	l.log(Debug, msg, fields...)
 }
 
-func (l *log) Verbo(format string, ctx ...zap.Field) {
-	l.log(Verbo, format, ctx...)
+func (l *log) Verbo(msg string, fields ...zap.Field) {
+	l.log(Verbo, msg, fields...)
 }
 
 func (l *log) AssertNoError(err error) {
 	if err != nil {
-		l.Fatal("", zap.Error(err))
+		l.Fatal("assertion failed", zap.Error(err))
 	}
 	if l.assertionsEnabled && err != nil {
 		l.Stop()
@@ -116,9 +116,9 @@ func (l *log) AssertNoError(err error) {
 	}
 }
 
-func (l *log) AssertTrue(b bool, msg string, ctx ...zap.Field) {
+func (l *log) AssertTrue(b bool, msg string, fields ...zap.Field) {
 	if !b {
-		l.Fatal(msg, ctx...)
+		l.Fatal(msg, fields...)
 	}
 	if l.assertionsEnabled && !b {
 		l.Stop()
@@ -126,10 +126,10 @@ func (l *log) AssertTrue(b bool, msg string, ctx ...zap.Field) {
 	}
 }
 
-func (l *log) AssertDeferredTrue(f func() bool, msg string, ctx ...zap.Field) {
+func (l *log) AssertDeferredTrue(f func() bool, msg string, fields ...zap.Field) {
 	// Note, the logger will only be notified here if assertions are enabled
 	if l.assertionsEnabled && !f() {
-		l.Fatal(msg, ctx...)
+		l.Fatal(msg, fields...)
 		l.Stop()
 		panic(msg)
 	}

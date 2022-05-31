@@ -12,40 +12,40 @@ import (
 // Logger defines the interface that is used to keep a record of all events that
 // happen to the program
 type Logger interface {
-	io.Writer // For logging pre-formated messages
+	io.Writer // For logging pre-msged messages
 
 	// Log that a fatal error has occurred. The program should likely exit soon
 	// after this is called
-	Fatal(format string, args ...zap.Field)
+	Fatal(msg string, fields ...zap.Field)
 	// Log that an error has occurred. The program should be able to recover
 	// from this error
-	Error(format string, args ...zap.Field)
+	Error(msg string, fields ...zap.Field)
 	// Log that an event has occurred that may indicate a future error or
 	// vulnerability
-	Warn(format string, args ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
 	// Log an event that may be useful for a user to see to measure the progress
 	// of the protocol
-	Info(format string, args ...zap.Field)
+	Info(msg string, fields ...zap.Field)
 	// Log an event that may be useful for understanding the order of the
 	// execution of the protocol
-	Trace(format string, args ...zap.Field)
+	Trace(msg string, fields ...zap.Field)
 	// Log an event that may be useful for a programmer to see when debuging the
 	// execution of the protocol
-	Debug(format string, args ...zap.Field)
+	Debug(msg string, fields ...zap.Field)
 	// Log extremely detailed events that can be useful for inspecting every
 	// aspect of the program
-	Verbo(format string, args ...zap.Field)
+	Verbo(msg string, fields ...zap.Field)
 
 	// If assertions are enabled, will result in a panic if err is non-nil
 	AssertNoError(err error)
 	// If assertions are enabled, will result in a panic if b is false
-	AssertTrue(b bool, format string, args ...zap.Field)
+	AssertTrue(b bool, msg string, fields ...zap.Field)
 	// If assertions are enabled, the function will be called and will result in
 	// a panic the returned value is non-nil
 	AssertDeferredNoError(f func() error)
 	// If assertions are enabled, the function will be called and will result in
 	//  a panic the returned value is false
-	AssertDeferredTrue(f func() bool, format string, args ...zap.Field)
+	AssertDeferredTrue(f func() bool, msg string, fields ...zap.Field)
 
 	// Recovers a panic, logs the error, and rethrows the panic.
 	StopOnPanic()
