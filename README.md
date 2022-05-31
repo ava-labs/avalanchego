@@ -3,7 +3,7 @@
 
 # Subnet EVM
 
-[Avalanche](https://docs.avax.network/learn/platform-overview) is a network composed of multiple blockchains.
+[Avalanche](https://docs.avax.network/overview/getting-started/avalanche-platform) is a network composed of multiple blockchains.
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
 That is, the VM defines the behavior of the blockchain.
 
@@ -57,13 +57,13 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 - `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
 - `BlockGasCost`: surcharge for producing a block faster than the target rate
 
-## Run Local Network
+## Create an EVM Subnet on a Local Network
 
-See [Create an EVM Subnet on Local](https://docs.avax.network/subnets/create-a-local-subnet).
+See [this tutorial](https://docs.avax.network/subnets/create-a-local-subnet).
 
-## Fuji Subnet Deployment
+## Create an EVM Subnet on Fuji Testnet
 
-See [Create an EVM Subnet on Fuji Testnet](https://docs.avax.network/subnets/create-a-fuji-subnet).
+See [this tutorial](https://docs.avax.network/subnets/create-a-fuji-subnet).
 
 ## Customize a Subnet
 
