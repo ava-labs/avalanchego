@@ -265,8 +265,6 @@ else
   echo ""
   echo "use the following command to terminate:"
   echo ""
-  echo "pkill -P ${PID}"
-  echo "kill -2 ${PID}"
-  echo "pkill -9 -f srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
+  echo "pkill -P ${PID} && kill -2 ${PID} && pkill -9 -f srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
   echo ""
 fi
