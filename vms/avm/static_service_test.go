@@ -4,14 +4,12 @@
 package avm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/stretchr/testify/assert"
 )
 
 var addrStrArray = []string{
@@ -22,12 +20,6 @@ var addrStrArray = []string{
 }
 
 var testHRP = constants.NetworkIDToHRP[networkID]
-
-func TestT(t *testing.T) {
-	c := NewStaticClient("http://localhost:9650")
-	_, err := c.BuildGenesis(context.Background(), &BuildGenesisArgs{})
-	assert.NoError(t, err)
-}
 
 func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()
