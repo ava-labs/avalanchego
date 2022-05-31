@@ -13,24 +13,9 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
-var Send JSONRequester = send{}
-
-type JSONRequester interface {
-	JSONRequest(
-		ctx context.Context,
-		uri url.URL,
-		method string,
-		params interface{},
-		reply interface{},
-		options ...Option,
-	) error
-}
-
-type send struct{}
-
-func (send) JSONRequest(
+func SendJSONRequest(
 	ctx context.Context,
-	uri url.URL,
+	uri *url.URL,
 	method string,
 	params interface{},
 	reply interface{},
