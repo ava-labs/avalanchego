@@ -5,6 +5,7 @@ package ipcs
 
 import (
 	"context"
+	"path"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,9 +31,10 @@ type client struct {
 
 // NewClient returns a Client for interacting with the IPCS endpoint
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/ipcs", "ipcs"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		path.Join(uri, "ext/ipcs"),
+		"ipcs",
+	)}
 }
 
 func (c *client) PublishBlockchain(ctx context.Context, blockchainID string, options ...rpc.Option) (*PublishBlockchainReply, error) {

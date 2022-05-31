@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"path"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -213,9 +214,10 @@ type client struct {
 
 // NewClient returns a Client for interacting with the P Chain endpoint
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/P", "platform"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		path.Join(uri, "ext/P"),
+		"platform",
+	)}
 }
 
 func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {

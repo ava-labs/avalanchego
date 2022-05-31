@@ -5,7 +5,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 )
 
@@ -16,14 +15,13 @@ type EndpointRequester interface {
 }
 
 type avalancheEndpointRequester struct {
-	uri, endpoint, base string
+	uri, base string
 }
 
-func NewEndpointRequester(uri, endpoint, base string) EndpointRequester {
+func NewEndpointRequester(uri, base string) EndpointRequester {
 	return &avalancheEndpointRequester{
-		uri:      uri,
-		endpoint: endpoint,
-		base:     base,
+		uri:  uri,
+		base: base,
 	}
 }
 
@@ -34,7 +32,7 @@ func (e *avalancheEndpointRequester) SendRequest(
 	reply interface{},
 	options ...Option,
 ) error {
-	uri, err := url.Parse(fmt.Sprintf("%s%s", e.uri, e.endpoint))
+	uri, err := url.Parse(e.uri)
 	if err != nil {
 		return err
 	}

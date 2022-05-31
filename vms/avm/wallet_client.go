@@ -5,7 +5,7 @@ package avm
 
 import (
 	"context"
-	"fmt"
+	"path"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -52,8 +52,15 @@ type walletClient struct {
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
 func NewWalletClient(uri, chain string) WalletClient {
+	path := path.Join(
+		uri,
+		"ext",
+		constants.ChainAliasPrefix,
+		chain,
+		"wallet",
+	)
 	return &walletClient{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet"),
+		requester: rpc.NewEndpointRequester(path, "wallet"),
 	}
 }
 

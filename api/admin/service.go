@@ -6,6 +6,7 @@ package admin
 import (
 	"errors"
 	"net/http"
+	"path"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -141,7 +142,10 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	}
 
 	reply.Success = true
-	return service.HTTPServer.AddAliasesWithReadLock(constants.ChainAliasPrefix+chainID.String(), constants.ChainAliasPrefix+args.Alias)
+
+	endpoint := path.Join(constants.ChainAliasPrefix, chainID.String())
+	alias := path.Join(constants.ChainAliasPrefix, args.Alias)
+	return service.HTTPServer.AddAliasesWithReadLock(endpoint, alias)
 }
 
 // GetChainAliasesArgs are the arguments for calling GetChainAliases

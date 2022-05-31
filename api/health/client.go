@@ -5,6 +5,7 @@ package health
 
 import (
 	"context"
+	"path"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -32,9 +33,10 @@ type client struct {
 
 // NewClient returns a client to interact with Health API endpoint
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/health", "health"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		path.Join(uri, "ext/health"),
+		"health",
+	)}
 }
 
 func (c *client) Readiness(ctx context.Context, options ...rpc.Option) (*APIHealthReply, error) {

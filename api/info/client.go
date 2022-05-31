@@ -5,6 +5,7 @@ package info
 
 import (
 	"context"
+	"path"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -34,9 +35,10 @@ type client struct {
 
 // NewClient returns a new Info API Client
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/info", "info"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		path.Join(uri, "ext/info"),
+		"info",
+	)}
 }
 
 func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*GetNodeVersionReply, error) {
