@@ -4,8 +4,10 @@ go 1.17
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
+	github.com/ava-labs/avalanche-network-runner-sdk v0.0.0
 	github.com/ava-labs/avalanchego v1.7.11
 	github.com/cespare/cp v0.1.0
+	github.com/creack/pty v1.1.18
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/ethereum/go-ethereum v1.10.16
@@ -21,6 +23,8 @@ require (
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
+	github.com/onsi/ginkgo/v2 v2.1.4
+	github.com/onsi/gomega v1.19.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/rjeczalik/notify v0.9.2
@@ -39,6 +43,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gopkg.in/urfave/cli.v1 v1.20.0
 	gotest.tools v2.2.0+incompatible
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -94,11 +99,11 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
-	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	gonum.org/v1/gonum v0.9.1 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
-	google.golang.org/grpc v1.45.0 // indirect
+	google.golang.org/grpc v1.46.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
