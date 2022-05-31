@@ -78,7 +78,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk, err := service.vm.factory.ToPrivateKey(testPrivateKey)
+	pk, err := testKeyfactory.ToPrivateKey(testPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
