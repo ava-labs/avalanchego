@@ -252,12 +252,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-// Stat returns a particular internal stat of the database.
-func (db *Database) Stat(property string) (string, error) {
-	stat, err := db.DB.GetProperty(property)
-	return stat, updateError(err)
-}
-
 // This comment is basically copy pasted from the underlying levelDB library:
 
 // Compact the underlying DB for the given key range.

@@ -111,14 +111,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(
 	return it
 }
 
-func (db *Database) Stat(stat string) (string, error) {
-	start := db.clock.Time()
-	result, err := db.db.Stat(stat)
-	end := db.clock.Time()
-	db.stat.Observe(float64(end.Sub(start)))
-	return result, err
-}
-
 func (db *Database) Compact(start, limit []byte) error {
 	startTime := db.clock.Time()
 	err := db.db.Compact(start, limit)

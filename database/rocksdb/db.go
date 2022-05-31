@@ -248,11 +248,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-// Stat returns a particular internal stat of the database.
-func (db *Database) Stat(property string) (string, error) {
-	return "", database.ErrNotFound
-}
-
 // Compact the underlying DB for the given key range.
 // Specifically, deleted and overwritten versions are discarded,
 // and the data is rearranged to reduce the cost of operations

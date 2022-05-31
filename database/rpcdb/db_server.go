@@ -67,15 +67,6 @@ func (db *DatabaseServer) Delete(_ context.Context, req *rpcdbpb.DeleteRequest) 
 	return &rpcdbpb.DeleteResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 }
 
-// Stat delegates the Stat call to the managed database and returns the result
-func (db *DatabaseServer) Stat(_ context.Context, req *rpcdbpb.StatRequest) (*rpcdbpb.StatResponse, error) {
-	stat, err := db.db.Stat(req.Property)
-	return &rpcdbpb.StatResponse{
-		Stat: stat,
-		Err:  errorToErrCode[err],
-	}, errorToRPCError(err)
-}
-
 // Compact delegates the Compact call to the managed database and returns the
 // result
 func (db *DatabaseServer) Compact(_ context.Context, req *rpcdbpb.CompactRequest) (*rpcdbpb.CompactResponse, error) {
