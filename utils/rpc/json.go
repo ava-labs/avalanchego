@@ -36,7 +36,7 @@ func SendJSONRequest(
 		bytes.NewBuffer(requestBodyBytes),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %s", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	request.Header = ops.headers
