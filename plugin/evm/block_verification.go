@@ -295,7 +295,7 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 	if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); ethHeader.ExtDataHash != hash {
 		return fmt.Errorf("extra data hash mismatch: have %x, want %x", ethHeader.ExtDataHash, hash)
 	}
-	if headerExtraDataSize := len(ethHeader.Extra); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
+	if headerExtraDataSize := uint64(len(ethHeader.Extra)); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
 		return fmt.Errorf(
 			"expected header ExtraData to be %d but got %d: %w",
 			params.ApricotPhase3ExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
@@ -392,7 +392,7 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 	if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); ethHeader.ExtDataHash != hash {
 		return fmt.Errorf("extra data hash mismatch: have %x, want %x", ethHeader.ExtDataHash, hash)
 	}
-	if headerExtraDataSize := len(ethHeader.Extra); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
+	if headerExtraDataSize := uint64(len(ethHeader.Extra)); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
 		return fmt.Errorf(
 			"expected header ExtraData to be %d but got %d: %w",
 			params.ApricotPhase3ExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
@@ -522,7 +522,7 @@ func (blockValidatorPhase5) SyntacticVerify(b *Block) error {
 	if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); ethHeader.ExtDataHash != hash {
 		return fmt.Errorf("extra data hash mismatch: have %x, want %x", ethHeader.ExtDataHash, hash)
 	}
-	if headerExtraDataSize := len(ethHeader.Extra); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
+	if headerExtraDataSize := uint64(len(ethHeader.Extra)); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
 		return fmt.Errorf(
 			"expected header ExtraData to be %d but got %d: %w",
 			params.ApricotPhase3ExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,

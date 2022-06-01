@@ -51,7 +51,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		initialBaseFee := big.NewInt(params.ApricotPhase3InitialBaseFee)
 		return initialSlice, initialBaseFee, nil
 	}
-	if len(parent.Extra) != params.ApricotPhase3ExtraDataSize {
+	if uint64(len(parent.Extra)) != params.ApricotPhase3ExtraDataSize {
 		return nil, nil, fmt.Errorf("expected length of parent extra data to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra))
 	}
 

@@ -92,6 +92,7 @@ func TestGetCode(t *testing.T) {
 		MaxAttempts:      maxAttempts,
 		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
+		BlockParser:      mockBlockParser,
 	})
 
 	for name, test := range tests {
@@ -154,6 +155,7 @@ func TestGetBlocks(t *testing.T) {
 		MaxAttempts:      1,
 		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
+		BlockParser:      mockBlockParser,
 	})
 
 	blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), message.Codec, handlerstats.NewNoopHandlerStats())
@@ -402,6 +404,7 @@ func TestGetLeafs(t *testing.T) {
 		MaxAttempts:      1,
 		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
+		BlockParser:      mockBlockParser,
 	})
 
 	tests := map[string]struct {
@@ -799,6 +802,7 @@ func TestGetLeafsRetries(t *testing.T) {
 		MaxAttempts:      maxAttempts,
 		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
+		BlockParser:      mockBlockParser,
 	})
 
 	request := message.LeafsRequest{
@@ -853,6 +857,7 @@ func TestStateSyncNodes(t *testing.T) {
 		MaxAttempts:      4,
 		MaxRetryDelay:    1,
 		StateSyncNodeIDs: stateSyncNodes,
+		BlockParser:      mockBlockParser,
 	})
 	mockNetClient.response = [][]byte{{1}, {2}, {3}, {4}}
 
