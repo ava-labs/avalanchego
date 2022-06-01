@@ -77,8 +77,8 @@ github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kd
 github.com/apache/arrow/go/arrow v0.0.0-20191024131854-af6fa24be0db/go.mod h1:VTxUBvSJ3s3eHAg65PNgrsn5BtqCRPdmyXh6rAfdxN0=
 github.com/ava-labs/avalanche-network-runner v1.0.6 h1:hph6/kHOWjgAxiQG8MZO7ZOvPsNzkjvu/cqnCMW0jSw=
 github.com/ava-labs/avalanche-network-runner v1.0.6/go.mod h1:lwuxQh2y0HtmeKASjBC9O1Sip1oiNeFuK6Ma3PxCH4Y=
-github.com/ava-labs/coreth v0.8.10-rc.7 h1:AAltb0z0iZxM4+3KwzYTsB9yM5/uvSCgIZ45OM+jMxA=
-github.com/ava-labs/coreth v0.8.10-rc.7/go.mod h1:O80e8u3YOQeXLMRqy9M3sS3hwty0qDZJ3G2Ne09rN30=
+github.com/ava-labs/coreth v0.8.11-rc.5 h1:RqzvCDf7LmvMWOGZ3y7IyWrwvTgdIZf+dRrHvJqTz7s=
+github.com/ava-labs/coreth v0.8.11-rc.5/go.mod h1:Ky2kfUM/F0qvfZXGJ7peLktHXQ62fSRTSed3YnOzAT0=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
 github.com/aws/aws-sdk-go-v2/credentials v1.1.1/go.mod h1:mM2iIjwl7LULWtS6JCACyInboHirisUUdkBPoTHMOUo=
