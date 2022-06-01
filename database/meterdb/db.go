@@ -30,8 +30,11 @@ func New(
 	registerer prometheus.Registerer,
 	db database.Database,
 ) (*Database, error) {
-	meterDB := &Database{db: db}
-	return meterDB, meterDB.metrics.Initialize(namespace, registerer)
+	metrics, err := newMetrics(namespace, registerer)
+	return &Database{
+		metrics: metrics,
+		db:      db,
+	}, err
 }
 
 func (db *Database) Has(key []byte) (bool, error) {

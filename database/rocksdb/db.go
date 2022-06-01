@@ -55,7 +55,7 @@ type Database struct {
 
 // New returns a wrapped RocksDB object.
 // TODO: use configBytes to config the database options
-func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
+func New(file string, _ []byte, _ logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
 	filter := grocksdb.NewBloomFilter(BitsPerKey)
 
 	blockOptions := grocksdb.NewDefaultBlockBasedTableOptions()

@@ -7,6 +7,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -40,6 +44,9 @@ const (
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	levelDBByteOverhead = 8
+
+	// MetricUpdateFrequency is the frequency to poll the LevelDB metrics
+	MetricUpdateFrequency = 10 * time.Second
 )
 
 var (
@@ -53,7 +60,10 @@ var (
 // in binary-alphabetical order.
 type Database struct {
 	*leveldb.DB
-	closed utils.AtomicBool
+	metrics metrics
+	closed  utils.AtomicBool
+	onClose sync.Once
+	closeCh chan struct{}
 }
 
 type config struct {
@@ -139,16 +149,20 @@ type config struct {
 	// The default value is 6MiB.
 	WriteBuffer      int `json:"writeBuffer"`
 	FilterBitsPerKey int `json:"filterBitsPerKey"`
+
+	// MetricUpdateFrequency is the frequency to poll LevelDB metrics
+	MetricUpdateFrequency time.Duration `json:"MetricUpdateFrequency"`
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
+func New(file string, configBytes []byte, log logging.Logger, namespace string, reg prometheus.Registerer) (database.Database, error) {
 	parsedConfig := config{
 		BlockCacheCapacity:     BlockCacheSize,
 		DisableSeeksCompaction: true,
 		OpenFilesCacheCapacity: HandleCap,
 		WriteBuffer:            WriteBufferSize / 2,
 		FilterBitsPerKey:       BitsPerKey,
+		MetricUpdateFrequency:  MetricUpdateFrequency,
 	}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
@@ -181,9 +195,41 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
 	}
-	return &Database{
-		DB: db,
-	}, err
+	if err != nil {
+		return nil, err
+	}
+
+	wrappedDB := &Database{
+		DB:      db,
+		closeCh: make(chan struct{}),
+	}
+	if parsedConfig.MetricUpdateFrequency > 0 {
+		metrics, err := newMetrics(namespace, reg)
+		if err != nil {
+			// Drop any close error to report the original error
+			_ = db.Close()
+			return nil, err
+		}
+		wrappedDB.metrics = metrics
+		go func() {
+			t := time.NewTicker(parsedConfig.MetricUpdateFrequency)
+			defer t.Stop()
+
+			for {
+				err := wrappedDB.updateMetrics()
+				if !wrappedDB.closed.GetValue() && err != nil {
+					log.Warn("failed to update leveldb metrics: %s", err)
+				}
+
+				select {
+				case <-t.C:
+				case <-wrappedDB.closeCh:
+					return
+				}
+			}
+		}()
+	}
+	return wrappedDB, nil
 }
 
 // Has returns if the key is set in the database
@@ -269,6 +315,9 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 
 func (db *Database) Close() error {
 	db.closed.SetValue(true)
+	db.onClose.Do(func() {
+		close(db.closeCh)
+	})
 	return updateError(db.DB.Close())
 }
 
