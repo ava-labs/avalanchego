@@ -1,5 +1,7 @@
 # Release Notes
 
+## [v0.8.11](https://github.com/ava-labs/coreth/releases/tag/v0.8.11)
+
 ## [v0.8.10](https://github.com/ava-labs/coreth/releases/tag/v0.8.10)
 
 - Add beta support for fast sync
