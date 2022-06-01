@@ -70,6 +70,38 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				assert.EqualValues(t, 1, mockHandlerStats.InvalidLeafsRequestCount)
 			},
 		},
+		"bad start len dropped": {
+			prepareTestFn: func() (context.Context, message.LeafsRequest) {
+				return context.Background(), message.LeafsRequest{
+					Root:     common.Hash{},
+					Start:    bytes.Repeat([]byte{0x00}, common.HashLength+2),
+					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
+					Limit:    maxLeavesLimit,
+					NodeType: message.StateTrieNode,
+				}
+			},
+			assertResponseFn: func(t *testing.T, _ message.LeafsRequest, response []byte, err error) {
+				assert.Nil(t, response)
+				assert.Nil(t, err)
+				assert.EqualValues(t, 1, mockHandlerStats.InvalidLeafsRequestCount)
+			},
+		},
+		"bad end len dropped": {
+			prepareTestFn: func() (context.Context, message.LeafsRequest) {
+				return context.Background(), message.LeafsRequest{
+					Root:     common.Hash{},
+					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
+					End:      bytes.Repeat([]byte{0xff}, common.HashLength-1),
+					Limit:    maxLeavesLimit,
+					NodeType: message.StateTrieNode,
+				}
+			},
+			assertResponseFn: func(t *testing.T, _ message.LeafsRequest, response []byte, err error) {
+				assert.Nil(t, response)
+				assert.Nil(t, err)
+				assert.EqualValues(t, 1, mockHandlerStats.InvalidLeafsRequestCount)
+			},
+		},
 		"empty storage root dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
 				return context.Background(), message.LeafsRequest{
