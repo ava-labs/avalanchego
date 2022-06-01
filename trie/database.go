@@ -866,7 +866,7 @@ func (db *Database) removeFromDirties(hash common.Hash, rlp []byte) {
 	delete(db.dirties, hash)
 	db.dirtiesSize -= common.StorageSize(common.HashLength + int(node.size))
 	if node.children != nil {
-		db.dirtiesSize -= common.StorageSize(cachedNodeChildrenSize + len(node.children)*(common.HashLength+2))
+		db.childrenSize -= common.StorageSize(cachedNodeChildrenSize + len(node.children)*(common.HashLength+2))
 	}
 	// Move the flushed node into the clean cache to prevent insta-reloads
 	if db.cleans != nil {
