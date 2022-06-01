@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -613,7 +615,7 @@ func BenchmarkAtomicTrieIterate(b *testing.B) {
 }
 
 func levelDB(t testing.TB) database.Database {
-	db, err := leveldb.New(t.TempDir(), nil, logging.NoLog{})
+	db, err := leveldb.New(t.TempDir(), nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
