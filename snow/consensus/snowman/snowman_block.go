@@ -21,7 +21,7 @@ type snowmanBlock struct {
 	// less than Alpha votes
 	shouldFalter bool
 
-	// sb is the snowball instance used to decided which child is the canonical
+	// sb is the snowball instance used to decide which child is the canonical
 	// child of this block. If this node has not had a child issued under it,
 	// this value will be nil
 	sb snowball.Consensus

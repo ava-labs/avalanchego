@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -82,9 +81,6 @@ type VM struct {
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
-
-	// Used to create and use keys.
-	factory crypto.FactorySECP256K1R
 
 	blockBuilder blockBuilder
 
