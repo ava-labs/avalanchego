@@ -51,7 +51,6 @@ var (
 	errNoKeys                     = errors.New("user has no keys or funds")
 	errNoPrimaryValidators        = errors.New("no default subnet validators")
 	errNoValidators               = errors.New("no subnet validators")
-	errCorruptedReason            = errors.New("tx validity corrupted")
 	errStartTimeTooSoon           = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
 	errStartTimeTooLate           = errors.New("start time is too far in the future")
 	errTotalOverflow              = errors.New("overflow while calculating total balance")
@@ -1877,13 +1876,7 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 
 type GetTxStatusArgs struct {
 	TxID ids.ID `json:"txID"`
-	// If IncludeReason is false returns a response that looks like:
-	// {
-	// 	"jsonrpc": "2.0",
-	// 	"result": "Dropped",
-	// 	"id": 1
-	// }
-	// If IncludeReason is true returns a response that looks like this:
+	// Returns a response that looks like this:
 	// {
 	// 	"jsonrpc": "2.0",
 	// 	"result": {
@@ -1892,8 +1885,7 @@ type GetTxStatusArgs struct {
 	//  },
 	// 	"id": 1
 	// }
-	// In the latter, "reason" is only present if the status is dropped
-	IncludeReason bool `json:"includeReason"`
+	// "reason" is only present if the status is dropped
 }
 
 type GetTxStatusResponse struct {
@@ -1945,8 +1937,10 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return nil
 	}
 
-	reason, ok := service.vm.droppedTxCache.Get(args.TxID)
-	if !ok {
+	// Note: we check if tx is dropped only after having looked for it
+	// in the database and the mempool, because dropped txs may be re-issued.
+	reason, dropped := service.vm.blockBuilder.GetDropReason(args.TxID)
+	if !dropped {
 		// The tx isn't being tracked by the node.
 		response.Status = status.Unknown
 		return nil
@@ -1954,16 +1948,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The tx was recently dropped because it was invalid.
 	response.Status = status.Dropped
-	if !args.IncludeReason {
-		return nil
-	}
-
-	reasonStr, ok := reason.(string)
-	if !ok {
-		return errCorruptedReason
-	}
-
-	response.Reason = reasonStr
+	response.Reason = reason
 	return nil
 }
 

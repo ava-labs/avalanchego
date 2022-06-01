@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -98,11 +99,31 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	tx := getValidTx(vm, t)
 	txID := tx.ID()
 
-	mempool.MarkDropped(txID)
-	assert.True(mempool.WasDropped(txID))
-
-	// show that re-added tx is not dropped anymore
+	// A tx simply added to mempool is obviously not marked as dropped
 	assert.NoError(mempool.Add(tx))
 	assert.True(mempool.Has(txID))
-	assert.False(mempool.WasDropped(txID))
+	_, isDropped := mempool.GetDropReason(txID)
+	assert.False(isDropped)
+
+	// When a tx is marked as dropped, it is still available to allow re-issuance
+	vm.mempool.MarkDropped(txID, "dropped for testing")
+	assert.True(mempool.Has(txID)) // still available
+	_, isDropped = mempool.GetDropReason(txID)
+	assert.True(isDropped)
+
+	// A previously dropped tx, popped then re-added to mempool,
+	// is not dropped anymore
+	switch tx.UnsignedTx.(type) {
+	case UnsignedProposalTx:
+		mempool.PopProposalTx()
+	case UnsignedDecisionTx:
+		mempool.PopDecisionTxs(math.MaxInt64)
+	default:
+		t.Fatal("unknown tx type")
+	}
+	assert.NoError(mempool.Add(tx))
+
+	assert.True(mempool.Has(txID))
+	_, isDropped = mempool.GetDropReason(txID)
+	assert.False(isDropped)
 }

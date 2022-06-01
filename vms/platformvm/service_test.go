@@ -236,23 +236,11 @@ func TestGetTxStatus(t *testing.T) {
 	}
 	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
 
-	arg := &GetTxStatusArgs{TxID: tx.ID()}
-	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
-
-	var resp GetTxStatusResponse
+	var (
+		arg  = &GetTxStatusArgs{TxID: tx.ID()}
+		resp GetTxStatusResponse
+	)
 	err = service.GetTxStatus(nil, arg, &resp)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case resp.Status != status.Unknown:
-		t.Fatalf("status should be unknown but is %s", resp.Status)
-	case resp.Reason != "":
-		t.Fatalf("reason should be empty but is %s", resp.Reason)
-	}
-
-	resp = GetTxStatusResponse{} // reset
-
-	err = service.GetTxStatus(nil, argIncludeReason, &resp)
 	switch {
 	case err != nil:
 		t.Fatal(err)

@@ -674,7 +674,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
+	if _, dropped := vm.blockBuilder.GetDropReason(blk.Tx.ID()); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }

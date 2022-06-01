@@ -167,13 +167,12 @@ type Client interface {
 	// GetTx returns the byte representation of the transaction corresponding to [txID]
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetTxStatus returns the status of the transaction corresponding to [txID]
-	GetTxStatus(ctx context.Context, txID ids.ID, includeReason bool, options ...rpc.Option) (*GetTxStatusResponse, error)
+	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error)
 	// AwaitTxDecided polls [GetTxStatus] until a status is returned that
 	// implies the tx may be decided.
 	AwaitTxDecided(
 		ctx context.Context,
 		txID ids.ID,
-		includeReason bool,
 		freq time.Duration,
 		options ...rpc.Option,
 	) (*GetTxStatusResponse, error)
@@ -666,21 +665,26 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 	return formatting.Decode(res.Encoding, res.Tx)
 }
 
-func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, includeReason bool, options ...rpc.Option) (*GetTxStatusResponse, error) {
+func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error) {
 	res := new(GetTxStatusResponse)
-	err := c.requester.SendRequest(ctx, "getTxStatus", &GetTxStatusArgs{
-		TxID:          txID,
-		IncludeReason: includeReason,
-	}, res, options...)
+	err := c.requester.SendRequest(
+		ctx,
+		"getTxStatus",
+		&GetTxStatusArgs{
+			TxID: txID,
+		},
+		res,
+		options...,
+	)
 	return res, err
 }
 
-func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, includeReason bool, freq time.Duration, options ...rpc.Option) (*GetTxStatusResponse, error) {
+func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (*GetTxStatusResponse, error) {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 
 	for {
-		res, err := c.GetTxStatus(ctx, txID, includeReason, options...)
+		res, err := c.GetTxStatus(ctx, txID, options...)
 		if err == nil {
 			switch res.Status {
 			case status.Committed, status.Aborted, status.Dropped:
