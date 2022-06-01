@@ -60,8 +60,7 @@ type metrics struct {
 	// total number of seek compactions performed
 	seekCompactions prometheus.Counter
 
-	priorIndex int
-	stats      [2]*leveldb.DBStats
+	priorStats, currentStats *leveldb.DBStats
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
@@ -177,7 +176,8 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			Help:      "total number of seek compactions performed",
 		}),
 
-		stats: [2]*leveldb.DBStats{{}, {}},
+		priorStats:   &leveldb.DBStats{},
+		currentStats: &leveldb.DBStats{},
 	}
 
 	errs := wrappers.Errs{}
@@ -212,12 +212,8 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 func (db *Database) updateMetrics() error {
 	metrics := &db.metrics
 
-	priorIndex := metrics.priorIndex
-	currentIndex := 1 - priorIndex
-	metrics.priorIndex = currentIndex
-
-	currentStats := metrics.stats[currentIndex]
-	priorStats := metrics.stats[priorIndex]
+	priorStats := metrics.priorStats
+	currentStats := metrics.currentStats
 
 	// Retrieve the database stats
 	if err := db.DB.Stats(currentStats); err != nil {
@@ -261,5 +257,13 @@ func (db *Database) updateMetrics() error {
 	metrics.level0Compactions.Add(float64(currentStats.Level0Comp - priorStats.Level0Comp))
 	metrics.nonLevel0Compactions.Add(float64(currentStats.NonLevel0Comp - priorStats.NonLevel0Comp))
 	metrics.seekCompactions.Add(float64(currentStats.SeekComp - priorStats.SeekComp))
+
+	// update the priorStats to update the counters correctly next time this
+	// method is called
+	metrics.priorStats = currentStats
+
+	// update currentStats to a pre-allocated stats struct. This avoids
+	// performing memory allocations for each update
+	metrics.currentStats = priorStats
 	return nil
 }
