@@ -17,29 +17,48 @@ var levelLabels = []string{"level"}
 
 // All of the metrics need
 type metrics struct {
-	writesDelayedCount    prometheus.Counter // cumulative
-	writesDelayedDuration prometheus.Counter // cumulative
-	writeIsDelayed        prometheus.Gauge
+	// total number of writes that have been delayed due to compaction
+	writesDelayedCount prometheus.Counter
+	// total amount of time that writes that have been delayed due to compaction
+	writesDelayedDuration prometheus.Counter
+	// set to 1 if there is currently at least one write that is being delayed
+	// due to compaction
+	writeIsDelayed prometheus.Gauge
 
+	// number of currently alive snapshots
 	aliveSnapshots prometheus.Gauge
+	// number of currently alive iterators
 	aliveIterators prometheus.Gauge
 
-	ioWrite prometheus.Counter // cumulative
-	ioRead  prometheus.Counter // cumulative
+	// total amount of data written
+	ioWrite prometheus.Counter
+	// total amount of data read
+	ioRead prometheus.Counter
 
+	// total number of bytes of cached data blocks
 	blockCacheSize prometheus.Gauge
-	openTables     prometheus.Gauge
+	// current number of open tables
+	openTables prometheus.Gauge
 
+	// number of tables per level
 	levelTableCount *prometheus.GaugeVec
-	levelSize       *prometheus.GaugeVec
-	levelDuration   *prometheus.CounterVec // cumulative
-	levelReads      *prometheus.CounterVec // cumulative
-	levelWrites     *prometheus.CounterVec // cumulative
+	// size of each level
+	levelSize *prometheus.GaugeVec
+	// amount of time spent compacting each level
+	levelDuration *prometheus.CounterVec
+	// amount of bytes read while compacting each level
+	levelReads *prometheus.CounterVec
+	// amount of bytes written while compacting each level
+	levelWrites *prometheus.CounterVec
 
-	memCompactions       prometheus.Counter // cumulative
-	level0Compactions    prometheus.Counter // cumulative
-	nonLevel0Compactions prometheus.Counter // cumulative
-	seekCompactions      prometheus.Counter // cumulative
+	// total number memory compactions performed
+	memCompactions prometheus.Counter
+	// total number of level 0 compactions performed
+	level0Compactions prometheus.Counter
+	// total number of non-level 0 compactions performed
+	nonLevel0Compactions prometheus.Counter
+	// total number of seek compactions performed
+	seekCompactions prometheus.Counter
 
 	priorIndex int
 	stats      [2]*leveldb.DBStats
