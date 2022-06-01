@@ -87,9 +87,7 @@ type AdaptiveTimeoutManager interface {
 	TimeoutDuration() time.Duration
 	// Registers a timeout for the item with the given [id].
 	// If the timeout occurs before the item is Removed, [timeoutHandler] is called.
-	// Returns the time at which the timeout will fire if it is not first
-	// removed by calling [Remove].
-	Put(id ids.ID, op message.Op, timeoutHandler func()) time.Time
+	Put(id ids.ID, op message.Op, timeoutHandler func())
 	// Remove the timeout associated with [id].
 	// Its timeout handler will not be called.
 	Remove(id ids.ID)
@@ -169,6 +167,7 @@ func NewAdaptiveTimeoutManager(
 func (tm *adaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
+
 	return tm.currentTimeout
 }
 
@@ -176,14 +175,15 @@ func (tm *adaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
 
 func (tm *adaptiveTimeoutManager) Stop() { tm.timer.Stop() }
 
-func (tm *adaptiveTimeoutManager) Put(id ids.ID, op message.Op, timeoutHandler func()) time.Time {
+func (tm *adaptiveTimeoutManager) Put(id ids.ID, op message.Op, timeoutHandler func()) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
-	return tm.put(id, op, timeoutHandler)
+
+	tm.put(id, op, timeoutHandler)
 }
 
 // Assumes [tm.lock] is held
-func (tm *adaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) time.Time {
+func (tm *adaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) {
 	now := tm.clock.Time()
 	tm.remove(id, now)
 
@@ -198,12 +198,12 @@ func (tm *adaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) 
 	heap.Push(&tm.timeoutQueue, timeout)
 
 	tm.setNextTimeoutTime()
-	return timeout.deadline
 }
 
 func (tm *adaptiveTimeoutManager) Remove(id ids.ID) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
+
 	tm.remove(id, tm.clock.Time())
 }
 
@@ -235,6 +235,7 @@ func (tm *adaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 func (tm *adaptiveTimeoutManager) timeout() {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
+
 	now := tm.clock.Time()
 	for {
 		// getNextTimeoutHandler returns nil once there is nothing left to remove
@@ -255,6 +256,7 @@ func (tm *adaptiveTimeoutManager) timeout() {
 func (tm *adaptiveTimeoutManager) ObserveLatency(latency time.Duration) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
+
 	tm.observeLatencyAndUpdateTimeout(latency, tm.clock.Time())
 }
 
