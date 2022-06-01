@@ -40,7 +40,7 @@ type Manager interface {
 		op message.Op,
 		requestID ids.ID,
 		timeoutHandler func(),
-	) (time.Time, bool)
+	)
 	// Registers that we would have sent a request to a validator but they
 	// are unreachable because they are benched or because of network conditions
 	// (e.g. we're not connected), so we didn't send the query. For the sake
@@ -122,13 +122,13 @@ func (m *manager) RegisterRequest(
 	op message.Op,
 	requestID ids.ID,
 	timeoutHandler func(),
-) (time.Time, bool) {
+) {
 	newTimeoutHandler := func() {
 		// If this request timed out, tell the benchlist manager
 		m.benchlistMgr.RegisterFailure(chainID, nodeID)
 		timeoutHandler()
 	}
-	return m.tm.Put(requestID, op, newTimeoutHandler), true
+	m.tm.Put(requestID, op, newTimeoutHandler)
 }
 
 // RegisterResponse registers that we received a response from [nodeID]
