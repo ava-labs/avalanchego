@@ -52,8 +52,14 @@ type walletClient struct {
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
 func NewWalletClient(uri, chain string) WalletClient {
+	path := fmt.Sprintf(
+		"%s/ext/%s/%s/wallet",
+		uri,
+		constants.ChainAliasPrefix,
+		chain,
+	)
 	return &walletClient{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet"),
+		requester: rpc.NewEndpointRequester(path, "wallet"),
 	}
 }
 

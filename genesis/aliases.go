@@ -4,6 +4,8 @@
 package genesis
 
 import (
+	"path"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -15,11 +17,11 @@ import (
 // Aliases returns the default aliases based on the network ID
 func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, error) {
 	apiAliases := map[string][]string{
-		constants.ChainAliasPrefix + constants.PlatformChainID.String(): {
+		path.Join(constants.ChainAliasPrefix, constants.PlatformChainID.String()): {
 			"P",
 			"platform",
-			constants.ChainAliasPrefix + "P",
-			constants.ChainAliasPrefix + "platform",
+			path.Join(constants.ChainAliasPrefix, "P"),
+			path.Join(constants.ChainAliasPrefix, "platform"),
 		},
 	}
 	chainAliases := map[ids.ID][]string{
@@ -35,13 +37,25 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
+		chainID := chain.ID()
+		endpoint := path.Join(constants.ChainAliasPrefix, chainID.String())
 		switch uChain.VMID {
 		case constants.AVMID:
-			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "avm"}
-			chainAliases[chain.ID()] = GetXChainAliases()
+			apiAliases[endpoint] = []string{
+				"X",
+				"avm",
+				path.Join(constants.ChainAliasPrefix, "X"),
+				path.Join(constants.ChainAliasPrefix, "avm"),
+			}
+			chainAliases[chainID] = GetXChainAliases()
 		case constants.EVMID:
-			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
-			chainAliases[chain.ID()] = GetCChainAliases()
+			apiAliases[endpoint] = []string{
+				"C",
+				"evm",
+				path.Join(constants.ChainAliasPrefix, "C"),
+				path.Join(constants.ChainAliasPrefix, "evm"),
+			}
+			chainAliases[chainID] = GetCChainAliases()
 		}
 	}
 	return apiAliases, chainAliases, nil
