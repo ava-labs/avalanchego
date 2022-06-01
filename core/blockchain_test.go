@@ -22,18 +22,20 @@ import (
 
 var (
 	archiveConfig = &CacheConfig{
-		TrieCleanLimit: 256,
-		TrieDirtyLimit: 256,
-		Pruning:        false, // Archive mode
-		SnapshotLimit:  256,
+		TrieCleanLimit:     256,
+		TrieDirtyLimit:     256,
+		Pruning:            false, // Archive mode
+		SnapshotLimit:      256,
+		AcceptorQueueLimit: 64,
 	}
 
 	pruningConfig = &CacheConfig{
-		TrieCleanLimit: 256,
-		TrieDirtyLimit: 256,
-		Pruning:        true, // Enable pruning
-		CommitInterval: 4096,
-		SnapshotLimit:  256,
+		TrieCleanLimit:     256,
+		TrieDirtyLimit:     256,
+		Pruning:            true, // Enable pruning
+		CommitInterval:     4096,
+		SnapshotLimit:      256,
+		AcceptorQueueLimit: 64,
 	}
 )
 
@@ -80,10 +82,11 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 		return createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        false, // Archive mode
-				SnapshotLimit:  0,     // Disable snapshots
+				TrieCleanLimit:     256,
+				TrieDirtyLimit:     256,
+				Pruning:            false, // Archive mode
+				SnapshotLimit:      0,     // Disable snapshots
+				AcceptorQueueLimit: 64,
 			},
 			chainConfig,
 			lastAcceptedHash,
@@ -112,11 +115,12 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 		return createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				CommitInterval: 4096,
-				SnapshotLimit:  0, // Disable snapshots
+				TrieCleanLimit:     256,
+				TrieDirtyLimit:     256,
+				Pruning:            true, // Enable pruning
+				CommitInterval:     4096,
+				SnapshotLimit:      0, // Disable snapshots
+				AcceptorQueueLimit: 64,
 			},
 			chainConfig,
 			lastAcceptedHash,
@@ -159,11 +163,12 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				CommitInterval: 4096,
-				SnapshotLimit:  0, // Disable snapshots
+				TrieCleanLimit:     256,
+				TrieDirtyLimit:     256,
+				Pruning:            true, // Enable pruning
+				CommitInterval:     4096,
+				SnapshotLimit:      0, // Disable snapshots
+				AcceptorQueueLimit: 64,
 			},
 			chainConfig,
 			lastAcceptedHash,
@@ -192,11 +197,12 @@ func TestEnableSnapshots(t *testing.T) {
 		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
-				TrieCleanLimit: 256,
-				TrieDirtyLimit: 256,
-				Pruning:        true, // Enable pruning
-				CommitInterval: 4096,
-				SnapshotLimit:  snapLimit, // Disable snapshots
+				TrieCleanLimit:     256,
+				TrieDirtyLimit:     256,
+				Pruning:            true, // Enable pruning
+				CommitInterval:     4096,
+				SnapshotLimit:      snapLimit,
+				AcceptorQueueLimit: 64,
 			},
 			chainConfig,
 			lastAcceptedHash,
@@ -256,7 +262,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 			return nil, fmt.Errorf("offline pruning failed (%s, %d): %w", tempDir, 256, err)
 		}
 
-		targetRoot := blockchain.LastConsensusAcceptedBlock().Root()
+		targetRoot := blockchain.LastAcceptedBlock().Root()
 		if err := pruner.Prune(targetRoot); err != nil {
 			return nil, fmt.Errorf("failed to prune blockchain with target root: %s due to: %w", targetRoot, err)
 		}
@@ -347,6 +353,7 @@ func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 			SnapshotLimit:                   256,
 			PopulateMissingTries:            &startHeight, // Starting point for re-populating.
 			PopulateMissingTriesParallelism: parallelism,
+			AcceptorQueueLimit:              64,
 		},
 		gspec.Config,
 		lastAcceptedHash,
