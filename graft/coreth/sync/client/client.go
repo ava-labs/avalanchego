@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var (
@@ -73,6 +72,7 @@ type client struct {
 	stateSyncNodes   []ids.NodeID
 	stateSyncNodeIdx uint32
 	stats            stats.ClientSyncerStats
+	blockParser      EthBlockParser
 }
 
 type ClientConfig struct {
@@ -82,6 +82,11 @@ type ClientConfig struct {
 	MaxAttempts      uint8
 	MaxRetryDelay    time.Duration
 	StateSyncNodeIDs []ids.NodeID
+	BlockParser      EthBlockParser
+}
+
+type EthBlockParser interface {
+	ParseEthBlock(b []byte) (*types.Block, error)
 }
 
 func NewClient(config *ClientConfig) *client {
@@ -92,6 +97,7 @@ func NewClient(config *ClientConfig) *client {
 		maxAttempts:    config.MaxAttempts,
 		maxRetryDelay:  config.MaxRetryDelay,
 		stateSyncNodes: config.StateSyncNodeIDs,
+		blockParser:    config.BlockParser,
 	}
 }
 
@@ -188,7 +194,7 @@ func (c *client) GetBlocks(hash common.Hash, height uint64, parents uint16) ([]*
 		Parents: parents,
 	}
 
-	data, err := c.get(req, parseBlocks)
+	data, err := c.get(req, c.parseBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("could not get blocks (%s) due to %w", hash, err)
 	}
@@ -200,7 +206,7 @@ func (c *client) GetBlocks(hash common.Hash, height uint64, parents uint16) ([]*
 // assumes req is of type message.BlockRequest
 // returns types.Blocks as interface{}
 // returns a non-nil error if the request should be retried
-func parseBlocks(codec codec.Manager, req message.Request, data []byte) (interface{}, int, error) {
+func (c *client) parseBlocks(codec codec.Manager, req message.Request, data []byte) (interface{}, int, error) {
 	var response message.BlockResponse
 	if _, err := codec.Unmarshal(data, &response); err != nil {
 		return nil, 0, fmt.Errorf("%s: %w", errUnmarshalResponse, err)
@@ -219,8 +225,8 @@ func parseBlocks(codec codec.Manager, req message.Request, data []byte) (interfa
 	// attempt to decode blocks
 	blocks := make(types.Blocks, len(response.Blocks))
 	for i, blkBytes := range response.Blocks {
-		block := new(types.Block)
-		if err := rlp.DecodeBytes(blkBytes, block); err != nil {
+		block, err := c.blockParser.ParseEthBlock(blkBytes)
+		if err != nil {
 			return nil, 0, fmt.Errorf("%s: %w", errUnmarshalResponse, err)
 		}
 
