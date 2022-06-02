@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -827,6 +828,18 @@ func (n *Node) initMetricsAPI() error {
 	}
 
 	if err := n.MetricsGatherer.Register(constants.PlatformName, n.MetricsRegisterer); err != nil {
+		return err
+	}
+
+	// Current state of process metrics.
+	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
+	if err := n.MetricsRegisterer.Register(processCollector); err != nil {
+		return err
+	}
+
+	// Go process metrics using debug.GCStats.
+	goCollector := collectors.NewGoCollector()
+	if err := n.MetricsRegisterer.Register(goCollector); err != nil {
 		return err
 	}
 
