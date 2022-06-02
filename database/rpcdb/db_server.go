@@ -19,10 +19,22 @@ var errUnknownIterator = errors.New("unknown iterator")
 // DatabaseServer is a database that is managed over RPC.
 type DatabaseServer struct {
 	rpcdbpb.UnsafeDatabaseServer
-	lock    sync.Mutex
-	db      database.Database
-	batches map[int64]database.Batch
 
+	db database.Database
+
+	// batchLock protects [batches] from concurrent modifications. Note that
+	// [batchLock] does not protect the actual Batch. Batches are documented as
+	// not being safe for concurrent use. Therefore, it is up to the client to
+	// respect this invariant.
+	batchLock sync.Mutex
+	batches   map[int64]database.Batch
+
+	// iteratorLock protects [nextIteratorID] and [iterators] from concurrent
+	// modifications. Similarly to [batchLock], [iteratorLock] does not protect
+	// the actual Iterator. Iterators are documented as not being safe for
+	// concurrent use. Therefore, it is up to the client to respect this
+	// invariant.
+	iteratorLock   sync.RWMutex
 	nextIteratorID uint64
 	iterators      map[uint64]database.Iterator
 }
@@ -90,13 +102,13 @@ func (db *DatabaseServer) Close(context.Context, *rpcdbpb.CloseRequest) (*rpcdbp
 // WriteBatch takes in a set of key-value pairs and atomically writes them to
 // the internal database
 func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbpb.WriteBatchRequest) (*rpcdbpb.WriteBatchResponse, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
+	db.batchLock.Lock()
 	batch, exists := db.batches[req.Id]
 	if !exists {
 		batch = db.db.NewBatch()
+		db.batches[req.Id] = batch
 	}
+	db.batchLock.Unlock()
 
 	for _, put := range req.Puts {
 		if err := batch.Put(put.Key, put.Value); err != nil {
@@ -117,11 +129,13 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbpb.WriteBatchR
 	}
 
 	if req.Continues {
-		db.batches[req.Id] = batch
 		return &rpcdbpb.WriteBatchResponse{}, nil
 	}
 
+	db.batchLock.Lock()
 	delete(db.batches, req.Id)
+	db.batchLock.Unlock()
+
 	err := batch.Write()
 	return &rpcdbpb.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 }
@@ -129,23 +143,22 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbpb.WriteBatchR
 // NewIteratorWithStartAndPrefix allocates an iterator and returns the iterator
 // ID
 func (db *DatabaseServer) NewIteratorWithStartAndPrefix(_ context.Context, req *rpcdbpb.NewIteratorWithStartAndPrefixRequest) (*rpcdbpb.NewIteratorWithStartAndPrefixResponse, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	it := db.db.NewIteratorWithStartAndPrefix(req.Start, req.Prefix)
+
+	db.iteratorLock.Lock()
+	defer db.iteratorLock.Unlock()
 
 	id := db.nextIteratorID
-	it := db.db.NewIteratorWithStartAndPrefix(req.Start, req.Prefix)
 	db.iterators[id] = it
-
 	db.nextIteratorID++
 	return &rpcdbpb.NewIteratorWithStartAndPrefixResponse{Id: id}, nil
 }
 
 // IteratorNext attempts to call next on the requested iterator
 func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbpb.IteratorNextRequest) (*rpcdbpb.IteratorNextResponse, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
+	db.iteratorLock.RLock()
 	it, exists := db.iterators[req.Id]
+	db.iteratorLock.RUnlock()
 	if !exists {
 		return nil, errUnknownIterator
 	}
@@ -168,10 +181,9 @@ func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbpb.IteratorN
 
 // IteratorError attempts to report any errors that occurred during iteration
 func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbpb.IteratorErrorRequest) (*rpcdbpb.IteratorErrorResponse, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
+	db.iteratorLock.RLock()
 	it, exists := db.iterators[req.Id]
+	db.iteratorLock.RUnlock()
 	if !exists {
 		return nil, errUnknownIterator
 	}
@@ -181,15 +193,15 @@ func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbpb.Iterator
 
 // IteratorRelease attempts to release the resources allocated to an iterator
 func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbpb.IteratorReleaseRequest) (*rpcdbpb.IteratorReleaseResponse, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
+	db.iteratorLock.Lock()
 	it, exists := db.iterators[req.Id]
 	if !exists {
+		db.iteratorLock.Unlock()
 		return &rpcdbpb.IteratorReleaseResponse{Err: 0}, nil
 	}
-
 	delete(db.iterators, req.Id)
+	db.iteratorLock.Unlock()
+
 	err := it.Error()
 	it.Release()
 	return &rpcdbpb.IteratorReleaseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
