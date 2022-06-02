@@ -30,8 +30,11 @@ func New(
 	registerer prometheus.Registerer,
 	db database.Database,
 ) (*Database, error) {
-	meterDB := &Database{db: db}
-	return meterDB, meterDB.metrics.Initialize(namespace, registerer)
+	metrics, err := newMetrics(namespace, registerer)
+	return &Database{
+		metrics: metrics,
+		db:      db,
+	}, err
 }
 
 func (db *Database) Has(key []byte) (bool, error) {
@@ -109,14 +112,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(
 	end := db.clock.Time()
 	db.newIterator.Observe(float64(end.Sub(startTime)))
 	return it
-}
-
-func (db *Database) Stat(stat string) (string, error) {
-	start := db.clock.Time()
-	result, err := db.db.Stat(stat)
-	end := db.clock.Time()
-	db.stat.Observe(float64(end.Sub(start)))
-	return result, err
 }
 
 func (db *Database) Compact(start, limit []byte) error {

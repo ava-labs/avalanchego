@@ -67,13 +67,11 @@ func (db *DatabaseServer) Delete(_ context.Context, req *rpcdbpb.DeleteRequest) 
 	return &rpcdbpb.DeleteResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 }
 
-// Stat delegates the Stat call to the managed database and returns the result
+// TODO: Delete this after we update the downstream dependencies
 func (db *DatabaseServer) Stat(_ context.Context, req *rpcdbpb.StatRequest) (*rpcdbpb.StatResponse, error) {
-	stat, err := db.db.Stat(req.Property)
 	return &rpcdbpb.StatResponse{
-		Stat: stat,
-		Err:  errorToErrCode[err],
-	}, errorToRPCError(err)
+		Err: errorToErrCode[database.ErrNotFound],
+	}, nil
 }
 
 // Compact delegates the Compact call to the managed database and returns the

@@ -26,6 +26,7 @@ type DatabaseClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	// TODO: Delete this after we update the downstream dependencies
 	Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error)
 	Compact(ctx context.Context, in *CompactRequest, opts ...grpc.CallOption) (*CompactResponse, error)
 	Close(ctx context.Context, in *CloseRequest, opts ...grpc.CallOption) (*CloseResponse, error)
@@ -160,6 +161,7 @@ type DatabaseServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Put(context.Context, *PutRequest) (*PutResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	// TODO: Delete this after we update the downstream dependencies
 	Stat(context.Context, *StatRequest) (*StatResponse, error)
 	Compact(context.Context, *CompactRequest) (*CompactResponse, error)
 	Close(context.Context, *CloseRequest) (*CloseResponse, error)

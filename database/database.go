@@ -51,12 +51,6 @@ type KeyValueReaderWriterDeleter interface {
 	KeyValueDeleter
 }
 
-// Stater wraps the Stat method of a backing data store.
-type Stater interface {
-	// Stat returns a particular internal stat of the database.
-	Stat(property string) (string, error)
-}
-
 // Compacter wraps the Compact method of a backing data store.
 type Compacter interface {
 	// Compact the underlying DB for the given key range.
@@ -77,7 +71,6 @@ type Database interface {
 	KeyValueReaderWriterDeleter
 	Batcher
 	Iteratee
-	Stater
 	Compacter
 	io.Closer
 }
