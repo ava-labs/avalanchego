@@ -33,7 +33,6 @@ type Database struct {
 	OnNewIteratorWithStart          func([]byte) database.Iterator
 	OnNewIteratorWithPrefix         func([]byte) database.Iterator
 	OnNewIteratorWithStartAndPrefix func([]byte, []byte) database.Iterator
-	OnStat                          func(string) (string, error)
 	OnCompact                       func([]byte, []byte) error
 	OnClose                         func() error
 }
@@ -102,13 +101,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		return nil
 	}
 	return db.OnNewIteratorWithStartAndPrefix(start, prefix)
-}
-
-func (db *Database) Stat(stat string) (string, error) {
-	if db.OnStat == nil {
-		return "", errNoFunction
-	}
-	return db.OnStat(stat)
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {
