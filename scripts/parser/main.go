@@ -70,5 +70,5 @@ func main() {
 	color.Yellow("Network Name: Local EVM")
 	color.Yellow("RPC URL: %s%s/rpc", o.URIs[0], o.Endpoint)
 	color.Yellow("Chain ID: %s", os.Args[2])
-	color.Yellow("Curreny Symbol: LEVM")
+	color.Yellow("Currency Symbol: LEVM")
 }
