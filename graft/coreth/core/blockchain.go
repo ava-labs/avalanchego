@@ -105,7 +105,8 @@ const (
 // that's resident in a blockchain.
 type CacheConfig struct {
 	TrieCleanLimit                  int     // Memory allowance (MB) to use for caching trie nodes in memory
-	TrieDirtyLimit                  int     // Memory limit (MB) at which to start flushing dirty trie nodes to disk
+	TrieDirtyLimit                  int     // Memory limit (MB) at which to block on insert and force a flush of dirty trie nodes to disk
+	TrieDirtyCommitTarget           int     // Memory limit (MB) to target for the dirties cache before invoking commit
 	CommitInterval                  uint64  // Commit the trie every [CommitInterval] blocks.
 	Pruning                         bool    // Whether to disable trie write caching and GC altogether (archive node)
 	AcceptorQueueLimit              int     // Blocks to queue before blocking during acceptance
@@ -121,12 +122,13 @@ type CacheConfig struct {
 }
 
 var DefaultCacheConfig = &CacheConfig{
-	TrieCleanLimit:     256,
-	TrieDirtyLimit:     256,
-	Pruning:            true,
-	CommitInterval:     4096,
-	AcceptorQueueLimit: 64, // Provides 2 minutes of buffer (2s block target) for a commit delay
-	SnapshotLimit:      256,
+	TrieCleanLimit:        256,
+	TrieDirtyLimit:        256,
+	TrieDirtyCommitTarget: 20, // 20% overhead in memory counting (this targets 16 MB)
+	Pruning:               true,
+	CommitInterval:        4096,
+	AcceptorQueueLimit:    64, // Provides 2 minutes of buffer (2s block target) for a commit delay
+	SnapshotLimit:         256,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
