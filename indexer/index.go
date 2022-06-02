@@ -246,19 +246,19 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 }
 
 // Returns database.ErrNotFound if the container is not indexed as accepted
-func (i *index) GetIndex(ID ids.ID) (uint64, error) {
+func (i *index) GetIndex(id ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return database.GetUInt64(i.containerToIndex, ID[:])
+	return database.GetUInt64(i.containerToIndex, id[:])
 }
 
-func (i *index) GetContainerByID(ID ids.ID) (Container, error) {
+func (i *index) GetContainerByID(id ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	// Read index from database
-	indexBytes, err := i.containerToIndex.Get(ID[:])
+	indexBytes, err := i.containerToIndex.Get(id[:])
 	if err != nil {
 		return Container{}, err
 	}
