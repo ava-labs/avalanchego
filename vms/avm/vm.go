@@ -5,11 +5,12 @@ package avm
 
 import (
 	"container/list"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -39,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
@@ -140,7 +141,7 @@ func (vm *VM) Initialize(
 ) error {
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
-		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
+		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
 			return err
 		}
 		ctx.Log.Info("VM config initialized %+v", avmConfig)
@@ -291,7 +292,7 @@ func (vm *VM) Version() (string, error) {
 }
 
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	codec := cjson.NewCodec()
+	codec := json.NewCodec()
 
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
@@ -320,7 +321,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 
 func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
-	codec := cjson.NewCodec()
+	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 
