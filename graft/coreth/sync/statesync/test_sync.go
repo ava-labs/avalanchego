@@ -5,12 +5,9 @@ package statesync
 
 import (
 	"bytes"
-	cryptoRand "crypto/rand"
-	"math/big"
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/snapshot"
@@ -92,7 +89,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, serverTrieDB, clientTri
 }
 
 func fillAccountsWithStorage(t *testing.T, serverTrieDB *trie.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	newRoot, _ := trie.FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := rand.Read(codeBytes)
 		if err != nil {
@@ -105,65 +102,10 @@ func fillAccountsWithStorage(t *testing.T, serverTrieDB *trie.Database, root com
 
 		// now create state trie
 		numKeys := 16
-		account.Root, _, _ = trie.GenerateTrie(t, serverTrieDB, numKeys, wrappers.LongLen+1)
+		account.Root, _, _ = trie.GenerateTrie(t, serverTrieDB, numKeys, common.HashLength)
 		return account
 	})
 	return newRoot
-}
-
-// FillAccounts adds [numAccounts] randomly generated accounts to the secure trie at [root] and commits it to [trieDB].
-// [onAccount] is called if non-nil (so the caller can modify the account before it is stored in the secure trie).
-// returns the new trie root and a map of funded keys to StateAccount structs.
-func FillAccounts(
-	t *testing.T, trieDB *trie.Database, root common.Hash, numAccounts int,
-	onAccount func(*testing.T, int, types.StateAccount) types.StateAccount,
-) (common.Hash, map[*keystore.Key]*types.StateAccount) {
-	var (
-		minBalance  = big.NewInt(3000000000000000000)
-		randBalance = big.NewInt(1000000000000000000)
-		maxNonce    = 10
-		accounts    = make(map[*keystore.Key]*types.StateAccount, numAccounts)
-	)
-
-	tr, err := trie.NewSecure(root, trieDB)
-	if err != nil {
-		t.Fatalf("error opening trie: %v", err)
-	}
-
-	for i := 0; i < numAccounts; i++ {
-		acc := types.StateAccount{
-			Nonce:    uint64(rand.Intn(maxNonce)),
-			Balance:  new(big.Int).Add(minBalance, randBalance),
-			CodeHash: types.EmptyCodeHash[:],
-			Root:     types.EmptyRootHash,
-		}
-		if onAccount != nil {
-			acc = onAccount(t, i, acc)
-		}
-
-		accBytes, err := rlp.EncodeToBytes(acc)
-		if err != nil {
-			t.Fatalf("failed to rlp encode account: %v", err)
-		}
-
-		key, err := keystore.NewKey(cryptoRand.Reader)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = tr.TryUpdate(key.Address[:], accBytes); err != nil {
-			t.Fatalf("error updating trie with account, address=%s, err=%v", key.Address, err)
-		}
-		accounts[key] = &acc
-	}
-
-	newRoot, _, err := tr.Commit(nil)
-	if err != nil {
-		t.Fatalf("error committing trie: %v", err)
-	}
-	if err := trieDB.Commit(newRoot, false, nil); err != nil {
-		t.Fatalf("error committing trieDB: %v", err)
-	}
-	return newRoot, accounts
 }
 
 // FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
@@ -181,7 +123,7 @@ func FillAccountsWithOverlappingStorage(
 		storageRoots = append(storageRoots, storageRoot)
 	}
 	storageRootIndex := 0
-	return FillAccounts(t, trieDB, root, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
+	return trie.FillAccounts(t, trieDB, root, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
 		switch i % 3 {
 		case 0: // unmodified account
 		case 1: // account with overlapping storage root

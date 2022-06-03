@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"golang.org/x/sync/errgroup"
@@ -40,6 +41,7 @@ type OnSyncFailure func(error) error
 // LeafSyncTask represents a complete task to be completed by the leaf syncer.
 type LeafSyncTask struct {
 	Root          common.Hash      // Root of the trie to sync
+	Account       common.Hash      // Account hash of the trie to sync (only applicable to storage tries)
 	Start         []byte           // Starting key to request new leaves
 	NodeType      message.NodeType // Specifies the message type (atomic/state trie) for the leaf syncer to send
 	OnStart       OnStart          // Callback when tasks begins, returns true if work can be skipped
@@ -115,6 +117,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task *LeafSyncTask) e
 
 		leafsResponse, err := c.client.GetLeafs(message.LeafsRequest{
 			Root:     root,
+			Account:  task.Account,
 			Start:    start,
 			End:      nil, // will request until the end of the trie
 			Limit:    defaultLeafRequestLimit,
@@ -147,7 +150,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task *LeafSyncTask) e
 		// Update start to be one bit past the last returned key for the next request.
 		// Note: since more was true, this cannot cause an overflow.
 		start = leafsResponse.Keys[len(leafsResponse.Keys)-1]
-		IncrOne(start)
+		utils.IncrOne(start)
 	}
 }
 
@@ -221,18 +224,4 @@ func (c *CallbackLeafSyncer) addTasks(ctx context.Context, tasks []*LeafSyncTask
 		}
 	}
 	return nil
-}
-
-// IncrOne increments bytes value by one
-func IncrOne(bytes []byte) {
-	index := len(bytes) - 1
-	for index >= 0 {
-		if bytes[index] < 255 {
-			bytes[index]++
-			break
-		} else {
-			bytes[index] = 0
-			index--
-		}
-	}
 }

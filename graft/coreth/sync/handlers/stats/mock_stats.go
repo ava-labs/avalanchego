@@ -30,9 +30,16 @@ type MockHandlerStats struct {
 	InvalidLeafsRequestCount,
 	LeafsReturnedSum,
 	MissingRootCount,
-	TrieErrorCount uint32
+	TrieErrorCount,
+	ProofErrorCount,
+	SnapshotReadErrorCount,
+	SnapshotReadAttemptCount,
+	SnapshotReadSuccessCount,
+	SnapshotSegmentValidCount,
+	SnapshotSegmentInvalidCount uint32
 	ProofKeysReturned int64
 	LeafsReadTime,
+	SnapshotReadTime,
 	GenerateRangeProofTime,
 	LeafRequestProcessingTimeSum time.Duration
 }
@@ -55,10 +62,17 @@ func (m *MockHandlerStats) Reset() {
 	m.LeafsReturnedSum = 0
 	m.MissingRootCount = 0
 	m.TrieErrorCount = 0
-	m.LeafRequestProcessingTimeSum = 0
+	m.ProofErrorCount = 0
+	m.SnapshotReadErrorCount = 0
+	m.SnapshotReadAttemptCount = 0
+	m.SnapshotReadSuccessCount = 0
+	m.SnapshotSegmentValidCount = 0
+	m.SnapshotSegmentInvalidCount = 0
 	m.ProofKeysReturned = 0
-	m.GenerateRangeProofTime = 0
 	m.LeafsReadTime = 0
+	m.SnapshotReadTime = 0
+	m.GenerateRangeProofTime = 0
+	m.LeafRequestProcessingTimeSum = 0
 }
 
 func (m *MockHandlerStats) IncBlockRequest() {
@@ -157,6 +171,12 @@ func (m *MockHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) 
 	m.GenerateRangeProofTime += duration
 }
 
+func (m *MockHandlerStats) UpdateSnapshotReadTime(duration time.Duration) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.SnapshotReadTime += duration
+}
+
 func (m *MockHandlerStats) UpdateRangeProofKeysReturned(numProofKeys int64) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -173,4 +193,40 @@ func (m *MockHandlerStats) IncTrieError() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.TrieErrorCount++
+}
+
+func (m *MockHandlerStats) IncProofError() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.ProofErrorCount++
+}
+
+func (m *MockHandlerStats) IncSnapshotReadError() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.SnapshotReadErrorCount++
+}
+
+func (m *MockHandlerStats) IncSnapshotReadAttempt() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.SnapshotReadAttemptCount++
+}
+
+func (m *MockHandlerStats) IncSnapshotReadSuccess() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.SnapshotReadSuccessCount++
+}
+
+func (m *MockHandlerStats) IncSnapshotSegmentValid() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.SnapshotSegmentValidCount++
+}
+
+func (m *MockHandlerStats) IncSnapshotSegmentInvalid() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.SnapshotSegmentInvalidCount++
 }

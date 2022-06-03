@@ -375,15 +375,16 @@ func TestGetBlocks(t *testing.T) {
 	}
 }
 
-func buildGetter(blocks []*types.Block) func(hash common.Hash, height uint64) *types.Block {
-	return func(blockHash common.Hash, blockHeight uint64) *types.Block {
-		requestedBlock := blocks[blockHeight]
-		if requestedBlock.Hash() != blockHash {
-			fmt.Printf("ERROR height=%d, hash=%s, parentHash=%s, reqHash=%s\n", blockHeight, blockHash, requestedBlock.ParentHash(), requestedBlock.Hash())
-			return nil
-		}
-
-		return requestedBlock
+func buildGetter(blocks []*types.Block) handlers.BlockProvider {
+	return &handlers.TestBlockProvider{
+		GetBlockFn: func(blockHash common.Hash, blockHeight uint64) *types.Block {
+			requestedBlock := blocks[blockHeight]
+			if requestedBlock.Hash() != blockHash {
+				fmt.Printf("ERROR height=%d, hash=%s, parentHash=%s, reqHash=%s\n", blockHeight, blockHash, requestedBlock.ParentHash(), requestedBlock.Hash())
+				return nil
+			}
+			return requestedBlock
+		},
 	}
 }
 
@@ -396,7 +397,7 @@ func TestGetLeafs(t *testing.T) {
 	largeTrieRoot, largeTrieKeys, _ := trie.GenerateTrie(t, trieDB, 100_000, common.HashLength)
 	smallTrieRoot, _, _ := trie.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
 
-	handler := handlers.NewLeafsRequestHandler(trieDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	client := NewClient(&ClientConfig{
 		NetworkClient:    &mockNetwork{},
 		Codec:            message.Codec,
@@ -611,21 +612,11 @@ func TestGetLeafs(t *testing.T) {
 				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
 					t.Fatal(err)
 				}
-				leafResponse.Keys = leafResponse.Keys[1:]
-				leafResponse.Vals = leafResponse.Vals[1:]
-
-				tr, err := trie.New(largeTrieRoot, trieDB)
+				modifiedRequest := request
+				modifiedRequest.Start = leafResponse.Keys[1]
+				modifiedResponse, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 2, modifiedRequest)
 				if err != nil {
-					t.Fatal(err)
-				}
-				leafResponse.ProofKeys, leafResponse.ProofVals, err = handlers.GenerateRangeProof(tr, leafResponse.Keys[0], leafResponse.Keys[len(leafResponse.Keys)-1])
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)
-				if err != nil {
-					t.Fatal(err)
+					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
 				return modifiedResponse
 			},
@@ -791,7 +782,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	trieDB := trie.NewDatabase(memorydb.New())
 	root, _, _ := trie.GenerateTrie(t, trieDB, 100_000, common.HashLength)
 
-	handler := handlers.NewLeafsRequestHandler(trieDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	mockNetClient := &mockNetwork{}
 
 	const maxAttempts = 8

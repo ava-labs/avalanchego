@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/peer"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
@@ -26,17 +25,17 @@ const parentLimit = uint16(64)
 // BlockRequestHandler is a peer.RequestHandler for message.BlockRequest
 // serving requested blocks starting at specified hash
 type BlockRequestHandler struct {
-	stats   stats.BlockRequestHandlerStats
-	network peer.Network
-	getter  func(common.Hash, uint64) *types.Block
-	codec   codec.Manager
+	stats         stats.BlockRequestHandlerStats
+	network       peer.Network
+	blockProvider BlockProvider
+	codec         codec.Manager
 }
 
-func NewBlockRequestHandler(getter func(common.Hash, uint64) *types.Block, codec codec.Manager, handlerStats stats.BlockRequestHandlerStats) *BlockRequestHandler {
+func NewBlockRequestHandler(blockProvider BlockProvider, codec codec.Manager, handlerStats stats.BlockRequestHandlerStats) *BlockRequestHandler {
 	return &BlockRequestHandler{
-		getter: getter,
-		codec:  codec,
-		stats:  handlerStats,
+		blockProvider: blockProvider,
+		codec:         codec,
+		stats:         handlerStats,
 	}
 }
 
@@ -75,7 +74,7 @@ func (b *BlockRequestHandler) OnBlockRequest(ctx context.Context, nodeID ids.Nod
 			break
 		}
 
-		block := b.getter(hash, height)
+		block := b.blockProvider.GetBlock(hash, height)
 		if block == nil {
 			b.stats.IncMissingBlockHash()
 			break
