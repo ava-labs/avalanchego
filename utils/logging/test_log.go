@@ -23,27 +23,27 @@ type NoLog struct{}
 
 func (NoLog) Write([]byte) (int, error) { return 0, errNoLoggerWrite }
 
-func (NoLog) Fatal(format string, args ...zap.Field) {}
+func (NoLog) Fatal(string, ...zap.Field) {}
 
-func (NoLog) Error(format string, args ...zap.Field) {}
+func (NoLog) Error(string, ...zap.Field) {}
 
-func (NoLog) Warn(format string, args ...zap.Field) {}
+func (NoLog) Warn(string, ...zap.Field) {}
 
-func (NoLog) Info(format string, args ...zap.Field) {}
+func (NoLog) Info(string, ...zap.Field) {}
 
-func (NoLog) Trace(format string, args ...zap.Field) {}
+func (NoLog) Trace(string, ...zap.Field) {}
 
-func (NoLog) Debug(format string, args ...zap.Field) {}
+func (NoLog) Debug(string, ...zap.Field) {}
 
-func (NoLog) Verbo(format string, args ...zap.Field) {}
+func (NoLog) Verbo(string, ...zap.Field) {}
 
 func (NoLog) AssertNoError(error) {}
 
-func (NoLog) AssertTrue(b bool, format string, args ...zap.Field) {}
+func (NoLog) AssertTrue(bool, string, ...zap.Field) {}
 
-func (NoLog) AssertDeferredTrue(f func() bool, format string, args ...zap.Field) {}
+func (NoLog) AssertDeferredTrue(func() bool, string, ...zap.Field) {}
 
-func (NoLog) AssertDeferredNoError(f func() error) {}
+func (NoLog) AssertDeferredNoError(func() error) {}
 
 func (NoLog) StopOnPanic() {}
 
