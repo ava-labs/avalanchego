@@ -15,7 +15,7 @@ import (
 	"sort"
 	"testing"
 
-	j "encoding/json"
+	stdjson "encoding/json"
 
 	"github.com/golang/mock/gomock"
 
@@ -33,12 +33,12 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (
@@ -92,7 +92,7 @@ func Test_VMCreateHandlers(t *testing.T) {
 		Params:  []string{},
 		ID:      "1",
 	}
-	pingBody, err := j.Marshal(pr)
+	pingBody, err := stdjson.Marshal(pr)
 	assert.NoError(err)
 
 	scenarios := []struct {
@@ -190,7 +190,7 @@ func testHTTPPingRequest(target, endpoint string, payload []byte) error {
 		return err
 	}
 	var ping testResult
-	err = j.Unmarshal(pb, &ping)
+	err = stdjson.Unmarshal(pb, &ping)
 	if err != nil {
 		return err
 	}
@@ -381,8 +381,8 @@ func (p *PingService) Ping(_ *http.Request, _ *struct{}, reply *PingReply) (err 
 
 func getTestRPCServer() (*gorillarpc.Server, error) {
 	server := gorillarpc.NewServer()
-	server.RegisterCodec(cjson.NewCodec(), "application/json")
-	server.RegisterCodec(cjson.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	if err := server.RegisterService(&PingService{}, "subnet"); err != nil {
 		return nil, fmt.Errorf("failed to create rpc server %v", err)
 	}

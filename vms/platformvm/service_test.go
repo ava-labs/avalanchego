@@ -5,11 +5,12 @@ package platformvm
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"testing"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/golang/mock/gomock"
 
@@ -24,13 +25,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
@@ -91,7 +92,7 @@ func defaultAddress(t *testing.T, service *Service) {
 func TestAddValidator(t *testing.T) {
 	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
-	bytes, err := json.Marshal(&args)
+	bytes, err := stdjson.Marshal(&args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,11 +105,11 @@ func TestAddValidator(t *testing.T) {
 func TestCreateBlockchainArgsParsing(t *testing.T) {
 	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
-	err := json.Unmarshal([]byte(jsonString), &args)
+	err := stdjson.Unmarshal([]byte(jsonString), &args)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = json.Marshal(args.GenesisData); err != nil {
+	if _, err = stdjson.Marshal(args.GenesisData); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -116,7 +117,7 @@ func TestCreateBlockchainArgsParsing(t *testing.T) {
 func TestExportKey(t *testing.T) {
 	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","address":"` + testAddress + `"}`
 	args := ExportKeyArgs{}
-	err := json.Unmarshal([]byte(jsonString), &args)
+	err := stdjson.Unmarshal([]byte(jsonString), &args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +145,7 @@ func TestExportKey(t *testing.T) {
 func TestImportKey(t *testing.T) {
 	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
 	args := ImportKeyArgs{}
-	err := json.Unmarshal([]byte(jsonString), &args)
+	err := stdjson.Unmarshal([]byte(jsonString), &args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,10 +421,10 @@ func TestGetBalance(t *testing.T) {
 		if err := service.GetBalance(nil, &request, &reply); err != nil {
 			t.Fatal(err)
 		}
-		if reply.Balance != cjson.Uint64(defaultBalance) {
+		if reply.Balance != json.Uint64(defaultBalance) {
 			t.Fatalf("Wrong balance. Expected %d ; Returned %d", defaultBalance, reply.Balance)
 		}
-		if reply.Unlocked != cjson.Uint64(defaultBalance) {
+		if reply.Unlocked != json.Uint64(defaultBalance) {
 			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", defaultBalance, reply.Unlocked)
 		}
 		if reply.LockedStakeable != 0 {
