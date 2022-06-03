@@ -42,7 +42,7 @@ func testSync(t *testing.T, test syncTest) {
 		ctx = test.ctx
 	}
 	clientDB, serverTrieDB, root := test.prepareForTest(t)
-	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverTrieDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverTrieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverTrieDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
 	mockClient := statesyncclient.NewMockClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
 	// Set intercept functions for the mock client
@@ -101,14 +101,14 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 1000, nil)
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 1000, nil)
 				return memorydb.New(), serverTrieDB, root
 			},
 		},
 		"accounts with code": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 1000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 1000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
 						_, err := rand.Read(codeBytes)
@@ -135,7 +135,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 1000, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 1000, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
 					if i%5 == 0 {
 						account.Root, _, _ = trie.GenerateTrie(t, serverTrieDB, 16, common.HashLength)
 					}
@@ -155,7 +155,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch leafs": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 100, nil)
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 100, nil)
 				return memorydb.New(), serverTrieDB, root
 			},
 			GetLeafsIntercept: func(_ message.LeafsRequest, _ message.LeafsResponse) (message.LeafsResponse, error) {
@@ -237,7 +237,7 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 	serverTrieDB := trie.NewDatabase(memorydb.New())
 
 	largeStorageRoot, _, _ := trie.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
-	root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 2000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 2000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		// Set the root for a single account
 		if index == 10 {
 			account.Root = largeStorageRoot
@@ -275,14 +275,14 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 
 	largeStorageRoot1, _, _ := trie.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
 	largeStorageRoot2, _, _ := trie.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
-	root1, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 2000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	root1, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 2000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		// Set the root for a single account
 		if index == 10 {
 			account.Root = largeStorageRoot1
 		}
 		return account
 	})
-	root2, _ := FillAccounts(t, serverTrieDB, root1, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	root2, _ := trie.FillAccounts(t, serverTrieDB, root1, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		if index == 20 {
 			account.Root = largeStorageRoot2
 		}
@@ -320,7 +320,7 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 	serverTrieDB := trie.NewDatabase(memorydb.New())
 
 	largeStorageRoot, _, _ := trie.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
-	root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		// Set the root for 2 successive accounts
 		if index == 10 || index == 11 {
 			account.Root = largeStorageRoot
@@ -357,7 +357,7 @@ func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing
 	serverTrieDB := trie.NewDatabase(memorydb.New())
 
 	largeStorageRoot, _, _ := trie.GenerateTrie(t, serverTrieDB, 2000, common.HashLength)
-	root, _ := FillAccounts(t, serverTrieDB, common.Hash{}, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 100, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		if index == 10 || index == 90 {
 			account.Root = largeStorageRoot
 		}

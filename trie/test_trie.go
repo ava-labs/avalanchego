@@ -4,13 +4,18 @@
 package trie
 
 import (
+	cryptoRand "crypto/rand"
 	"encoding/binary"
+	"math/big"
 	"math/rand"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/coreth/accounts/keystore"
+	"github.com/ava-labs/coreth/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -123,4 +128,59 @@ func CorruptTrie(t *testing.T, trieDB *Database, root common.Hash, n int) {
 	if err := batch.Write(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// FillAccounts adds [numAccounts] randomly generated accounts to the secure trie at [root] and commits it to [trieDB].
+// [onAccount] is called if non-nil (so the caller can modify the account before it is stored in the secure trie).
+// returns the new trie root and a map of funded keys to StateAccount structs.
+func FillAccounts(
+	t *testing.T, trieDB *Database, root common.Hash, numAccounts int,
+	onAccount func(*testing.T, int, types.StateAccount) types.StateAccount,
+) (common.Hash, map[*keystore.Key]*types.StateAccount) {
+	var (
+		minBalance  = big.NewInt(3000000000000000000)
+		randBalance = big.NewInt(1000000000000000000)
+		maxNonce    = 10
+		accounts    = make(map[*keystore.Key]*types.StateAccount, numAccounts)
+	)
+
+	tr, err := NewSecure(root, trieDB)
+	if err != nil {
+		t.Fatalf("error opening trie: %v", err)
+	}
+
+	for i := 0; i < numAccounts; i++ {
+		acc := types.StateAccount{
+			Nonce:    uint64(rand.Intn(maxNonce)),
+			Balance:  new(big.Int).Add(minBalance, randBalance),
+			CodeHash: types.EmptyCodeHash[:],
+			Root:     types.EmptyRootHash,
+		}
+		if onAccount != nil {
+			acc = onAccount(t, i, acc)
+		}
+
+		accBytes, err := rlp.EncodeToBytes(acc)
+		if err != nil {
+			t.Fatalf("failed to rlp encode account: %v", err)
+		}
+
+		key, err := keystore.NewKey(cryptoRand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = tr.TryUpdate(key.Address[:], accBytes); err != nil {
+			t.Fatalf("error updating trie with account, address=%s, err=%v", key.Address, err)
+		}
+		accounts[key] = &acc
+	}
+
+	newRoot, _, err := tr.Commit(nil)
+	if err != nil {
+		t.Fatalf("error committing trie: %v", err)
+	}
+	if err := trieDB.Commit(newRoot, false, nil); err != nil {
+		t.Fatalf("error committing trieDB: %v", err)
+	}
+	return newRoot, accounts
 }

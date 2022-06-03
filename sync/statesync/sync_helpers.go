@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
-	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -102,7 +102,7 @@ func restoreMainTrieProgressFromSnapshot(db ethdb.Iteratee, tr *TrieProgress) er
 		// since lastKey is already added to the stack trie,
 		// we should start syncing from the next key.
 		tr.startFrom = lastKey
-		syncclient.IncrOne(tr.startFrom)
+		utils.IncrOne(tr.startFrom)
 	}
 	return it.Error()
 }
@@ -136,7 +136,7 @@ func restoreStorageTrieProgressFromSnapshot(db ethdb.Iteratee, tr *TrieProgress,
 		// since lastKey is already added to the stack trie,
 		// we should start syncing from the next key.
 		tr.startFrom = lastKey
-		syncclient.IncrOne(tr.startFrom)
+		utils.IncrOne(tr.startFrom)
 	}
 	return it.Error()
 }

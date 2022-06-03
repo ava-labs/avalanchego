@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
@@ -16,6 +17,19 @@ import (
 )
 
 var _ message.RequestHandler = &syncHandler{}
+
+type BlockProvider interface {
+	GetBlock(common.Hash, uint64) *types.Block
+}
+
+type SnapshotProvider interface {
+	Snapshots() *snapshot.Tree
+}
+
+type SyncDataProvider interface {
+	BlockProvider
+	SnapshotProvider
+}
 
 type syncHandler struct {
 	stateTrieLeafsRequestHandler  *LeafsRequestHandler
@@ -26,16 +40,16 @@ type syncHandler struct {
 
 // NewSyncHandler constructs the handler for serving state sync.
 func NewSyncHandler(
-	getBlock func(common.Hash, uint64) *types.Block,
+	provider SyncDataProvider,
 	evmTrieDB *trie.Database,
 	atomicTrieDB *trie.Database,
 	networkCodec codec.Manager,
 	stats stats.HandlerStats,
 ) message.RequestHandler {
 	return &syncHandler{
-		stateTrieLeafsRequestHandler:  NewLeafsRequestHandler(evmTrieDB, networkCodec, stats),
-		atomicTrieLeafsRequestHandler: NewLeafsRequestHandler(atomicTrieDB, networkCodec, stats),
-		blockRequestHandler:           NewBlockRequestHandler(getBlock, networkCodec, stats),
+		stateTrieLeafsRequestHandler:  NewLeafsRequestHandler(evmTrieDB, provider, networkCodec, stats),
+		atomicTrieLeafsRequestHandler: NewLeafsRequestHandler(atomicTrieDB, nil, networkCodec, stats),
+		blockRequestHandler:           NewBlockRequestHandler(provider, networkCodec, stats),
 		codeRequestHandler:            NewCodeRequestHandler(evmTrieDB.DiskDB(), networkCodec, stats),
 	}
 }

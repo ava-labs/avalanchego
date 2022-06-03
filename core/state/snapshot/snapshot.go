@@ -912,6 +912,21 @@ func (t *Tree) DiskRoot() common.Hash {
 	return t.diskRoot()
 }
 
+func (t *Tree) DiskAccountIterator(seek common.Hash) AccountIterator {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.disklayer().AccountIterator(seek)
+}
+
+func (t *Tree) DiskStorageIterator(account common.Hash, seek common.Hash) StorageIterator {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	it, _ := t.disklayer().StorageIterator(account, seek)
+	return it
+}
+
 // NewTestTree creates a *Tree with a pre-populated diskLayer
 func NewTestTree(diskdb ethdb.KeyValueStore, blockHash, root common.Hash) *Tree {
 	base := &diskLayer{
