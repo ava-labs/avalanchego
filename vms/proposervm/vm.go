@@ -302,7 +302,7 @@ func (vm *VM) repair(indexerState state.State) error {
 			}
 			if !shouldRepair {
 				vm.ctx.Log.Info("block height index was successfully verified")
-				vm.hIndexer.MarkRepaired()
+				vm.hIndexer.MarkRepaired(true)
 				return vm.repairAcceptedChainByHeight()
 			}
 		case block.ErrIndexIncomplete:
@@ -367,7 +367,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		}
 		if !shouldRepair {
 			vm.ctx.Log.Info("block height indexing is already complete")
-			vm.hIndexer.MarkRepaired()
+			vm.hIndexer.MarkRepaired(true)
 			return
 		}
 
