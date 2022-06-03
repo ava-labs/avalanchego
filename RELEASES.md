@@ -1,5 +1,48 @@
 # Release Notes
 
+## [v1.7.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.12)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### State Sync
+
+- Fixed proposervm state summary acceptance to only accept state summaries with heights higher than the locally last accepted block
+- Fixed proposervm state summary serving to only respond to requests after height indexing has finished
+- Improved C-chain state sync leaf request serving by optimistically reading leaves from snapshot
+- Refactored C-chain state sync block fetching
+
+### Networking
+
+- Reduced default peerlist and accepted frontier gossipping
+- Increased the default at-large outbound buffer size to 32 MiB
+
+### Metrics
+
+- Added leveldb metrics
+- Added process and golang metrics for the avalanchego binary
+- Added available disk space health check
+  - Ensured that the disk space will not be fully utilized by shutting down the node if there is a critically low amount of free space remaining
+- Improved C-chain state sync metrics
+
+### Performance
+
+- Added C-chain acceptor queue within `core/blockchain.go`
+- Removed rpcdb locking when committing batches and using iterators
+- Capped C-chain TrieDB dirties cache size during block acceptance to reduce commit size at 4096 block interval
+
+### Cleanup
+
+- Refactored the avm to utilize the external txs package
+- Unified platformvm dropped tx handling
+- Clarified snowman child block acceptance calls
+- Fixed small consensus typos
+- Reduced minor duplicated code in consensus
+- Moved the platformvm key factory out of the VM into the test file
+- Removed unused return values from the timeout manager
+- Removed weird json rpc private interface
+- Standardized json imports
+- Added vm factory interface checks
+
 ## [v1.7.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.11)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
