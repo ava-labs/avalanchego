@@ -7,16 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -79,12 +76,17 @@ type BuildGenesisReply struct {
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	manager, err := staticCodec()
+	parser, err := txs.NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+		&nftfx.Fx{},
+		&propertyfx.Fx{},
+	})
 	if err != nil {
 		return err
 	}
 
 	g := Genesis{}
+	genesisCodec := parser.GenesisCodec()
 	for assetAlias, assetDefinition := range args.GenesisData {
 		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
 		if err != nil {
@@ -92,8 +94,8 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		}
 		asset := GenesisAsset{
 			Alias: assetAlias,
-			CreateAssetTx: CreateAssetTx{
-				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			CreateAssetTx: txs.CreateAssetTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 					Memo:         assetMemo,
@@ -104,7 +106,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 		}
 		if len(assetDefinition.InitialState) > 0 {
-			initialState := &InitialState{
+			initialState := &txs.InitialState{
 				FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
 			}
 			for assetType, initialStates := range assetDefinition.InitialState {
@@ -170,7 +172,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					return errUnknownAssetType
 				}
 			}
-			initialState.Sort(manager)
+			initialState.Sort(genesisCodec)
 			asset.States = append(asset.States, initialState)
 		}
 		asset.Sort()
@@ -178,7 +180,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 	g.Sort()
 
-	b, err := manager.Marshal(codecVersion, &g)
+	b, err := genesisCodec.Marshal(txs.CodecVersion, &g)
 	if err != nil {
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
@@ -189,35 +191,4 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 	reply.Encoding = args.Encoding
 	return nil
-}
-
-func staticCodec() (codec.Manager, error) {
-	c := linearcodec.NewCustomMaxLength(1 << 20)
-	manager := codec.NewManager(math.MaxInt32)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&nftfx.MintOutput{}),
-		c.RegisterType(&nftfx.TransferOutput{}),
-		c.RegisterType(&nftfx.MintOperation{}),
-		c.RegisterType(&nftfx.TransferOperation{}),
-		c.RegisterType(&nftfx.Credential{}),
-		c.RegisterType(&propertyfx.MintOutput{}),
-		c.RegisterType(&propertyfx.OwnedOutput{}),
-		c.RegisterType(&propertyfx.MintOperation{}),
-		c.RegisterType(&propertyfx.BurnOperation{}),
-		c.RegisterType(&propertyfx.Credential{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	return manager, errs.Err
 }

@@ -7,19 +7,17 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -28,7 +26,6 @@ import (
 
 const (
 	defaultEncoding    = formatting.Hex
-	codecVersion       = 0
 	configChainIDAlias = "X"
 )
 
@@ -536,47 +533,28 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 }
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	c := linearcodec.NewCustomMaxLength(1 << 20)
-	m := codec.NewManager(math.MaxInt32)
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&avm.BaseTx{}),
-		c.RegisterType(&avm.CreateAssetTx{}),
-		c.RegisterType(&avm.OperationTx{}),
-		c.RegisterType(&avm.ImportTx{}),
-		c.RegisterType(&avm.ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		m.RegisterCodec(codecVersion, c),
-	)
-	if errs.Errored() {
-		return ids.ID{}, errs.Err
+	parser, err := txs.NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
+	if err != nil {
+		return ids.Empty, err
 	}
 
+	genesisCodec := parser.GenesisCodec()
 	genesis := avm.Genesis{}
-	if _, err := m.Unmarshal(avmGenesisBytes, &genesis); err != nil {
-		return ids.ID{}, err
+	if _, err := genesisCodec.Unmarshal(avmGenesisBytes, &genesis); err != nil {
+		return ids.Empty, err
 	}
 
 	if len(genesis.Txs) == 0 {
-		return ids.ID{}, errNoTxs
+		return ids.Empty, errNoTxs
 	}
 	genesisTx := genesis.Txs[0]
 
-	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
-	unsignedBytes, err := m.Marshal(codecVersion, tx.UnsignedTx)
-	if err != nil {
-		return ids.ID{}, err
+	tx := txs.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
+	if err := parser.InitializeGenesisTx(&tx); err != nil {
+		return ids.Empty, err
 	}
-	signedBytes, err := m.Marshal(codecVersion, &tx)
-	if err != nil {
-		return ids.ID{}, err
-	}
-	tx.Initialize(unsignedBytes, signedBytes)
-
 	return tx.ID(), nil
 }
 
