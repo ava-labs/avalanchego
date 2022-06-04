@@ -171,7 +171,7 @@ func NewHandlerStats(enabled bool) HandlerStats {
 		return NewNoopHandlerStats()
 	}
 	return &handlerStats{
-		// initialise block request stats
+		// initialize block request stats
 		blockRequest:               metrics.GetOrRegisterCounter("block_request_count", nil),
 		missingBlockHash:           metrics.GetOrRegisterCounter("block_request_missing_block_hash", nil),
 		blocksReturned:             metrics.GetOrRegisterHistogram("block_request_total_blocks", nil, metrics.NewExpDecaySample(1028, 0.015)),
@@ -185,23 +185,23 @@ func NewHandlerStats(enabled bool) HandlerStats {
 		codeReadDuration:         metrics.GetOrRegisterTimer("code_request_read_time", nil),
 		codeBytesReturned:        metrics.GetOrRegisterHistogram("code_request_bytes_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
 
-		// initialise leafs request stats
+		// initialize leafs request stats
 		leafsRequest:               metrics.GetOrRegisterCounter("leafs_request_count", nil),
 		invalidLeafsRequest:        metrics.GetOrRegisterCounter("leafs_request_invalid", nil),
 		leafsRequestProcessingTime: metrics.GetOrRegisterTimer("leafs_request_processing_time", nil),
 		leafsReturned:              metrics.GetOrRegisterHistogram("leafs_request_total_leafs", nil, metrics.NewExpDecaySample(1028, 0.015)),
-		leafsReadTime:              metrics.GetOrRegisterTimer("leafs_read_time", nil),
-		snapshotReadTime:           metrics.GetOrRegisterTimer("snapshot_read_time", nil),
-		generateRangeProofTime:     metrics.GetOrRegisterTimer("generate_range_proof_time", nil),
-		proofKeysReturned:          metrics.GetOrRegisterHistogram("proof_keys_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
+		leafsReadTime:              metrics.GetOrRegisterTimer("leafs_request_read_time", nil),
+		snapshotReadTime:           metrics.GetOrRegisterTimer("leafs_request_snapshot_read_time", nil),
+		generateRangeProofTime:     metrics.GetOrRegisterTimer("leafs_request_generate_range_proof_time", nil),
+		proofKeysReturned:          metrics.GetOrRegisterHistogram("leafs_request_proof_keys_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
 		missingRoot:                metrics.GetOrRegisterCounter("leafs_request_missing_root", nil),
 		trieError:                  metrics.GetOrRegisterCounter("leafs_request_trie_error", nil),
 		proofError:                 metrics.GetOrRegisterCounter("leafs_request_proof_error", nil),
-		snapshotReadError:          metrics.GetOrRegisterCounter("snapshot_read_error", nil),
-		snapshotReadAttempt:        metrics.GetOrRegisterCounter("snapshot_read_attempt", nil),
-		snapshotReadSuccess:        metrics.GetOrRegisterCounter("snapshot_read_success", nil),
-		snapshotSegmentValid:       metrics.GetOrRegisterCounter("snapshot_segment_valid", nil),
-		snapshotSegmentInvalid:     metrics.GetOrRegisterCounter("snapshot_segment_invalid", nil),
+		snapshotReadError:          metrics.GetOrRegisterCounter("leafs_request_snapshot_read_error", nil),
+		snapshotReadAttempt:        metrics.GetOrRegisterCounter("leafs_request_snapshot_read_attempt", nil),
+		snapshotReadSuccess:        metrics.GetOrRegisterCounter("leafs_request_snapshot_read_success", nil),
+		snapshotSegmentValid:       metrics.GetOrRegisterCounter("leafs_request_snapshot_segment_valid", nil),
+		snapshotSegmentInvalid:     metrics.GetOrRegisterCounter("leafs_request_snapshot_segment_invalid", nil),
 	}
 }
 
