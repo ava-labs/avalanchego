@@ -2,6 +2,12 @@
 
 ## [v0.8.11](https://github.com/ava-labs/coreth/releases/tag/v0.8.11)
 
+- Improve state sync leaf request serving by optimistically reading leaves from snapshot
+- Add acceptor queue within `core/blockchain.go`
+- Cap size of TrieDB dirties cache during block acceptance to reduce commit size at 4096 block interval
+- Refactor state sync block fetching
+- Improve state sync metrics
+
 ## [v0.8.10](https://github.com/ava-labs/coreth/releases/tag/v0.8.10)
 
 - Add beta support for fast sync
