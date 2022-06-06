@@ -6,6 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"crypto"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,14 +28,27 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-type fullVM struct {
-	*block.TestVM
-	*block.TestHeightIndexedVM
-	*block.TestStateSyncableVM
+func stopHeightReindexing(t *testing.T, coreVM *fullVM, dbMan manager.Manager) {
+	rawDB := dbMan.Current().Database
+	prefixDB := prefixdb.New(dbPrefix, rawDB)
+	db := versiondb.New(prefixDB)
+	vmState := state.New(db)
+
+	if err := vmState.SetIndexHasReset(); err != nil {
+		t.Fatal("could not preload key to vm state")
+	}
+	if err := vmState.Commit(); err != nil {
+		t.Fatal("could not commit preloaded key")
+	}
+	if err := db.Commit(); err != nil {
+		t.Fatal("could not commit preloaded key")
+	}
+
+	coreVM.VerifyHeightIndexF = func() error { return nil }
 }
 
-func helperBuildStateSyncTestObjects(t *testing.T) (fullVM, *VM) {
-	innerVM := fullVM{
+func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
+	innerVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{
 				T: t,
@@ -51,16 +65,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (fullVM, *VM) {
 	// Preload DB with key showing height index has been purged of rejected blocks
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
-	rawDB := dbManager.Current().Database
-	prefixDB := prefixdb.New(dbPrefix, rawDB)
-	vmDB := versiondb.New(prefixDB)
-	vmState := state.New(vmDB)
-	if err := vmState.SetIndexHasReset(); err != nil {
-		t.Fatal("could not preload key to vm state")
-	}
-	if err := vmDB.Commit(); err != nil {
-		t.Fatal("could not commit preloaded key")
-	}
+	stopHeightReindexing(t, innerVM, dbManager)
 
 	// load innerVM expectations
 	innerGenesisBlk := &snowman.TestBlock{
@@ -101,7 +106,7 @@ func TestStateSyncEnabled(t *testing.T) {
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 
 	// ProposerVM State Sync disabled if innerVM State sync is disabled
-	vm.hIndexer.MarkRepaired()
+	vm.hIndexer.MarkRepaired(true)
 	innerVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
 	enabled, err := vm.StateSyncEnabled()
 	assert.NoError(err)
@@ -157,7 +162,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	assert.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
 
 	// Post fork summary case
-	vm.hIndexer.MarkRepaired()
+	vm.hIndexer.MarkRepaired(true)
 	assert.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
@@ -239,7 +244,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	assert.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
 
 	// Post fork summary case
-	vm.hIndexer.MarkRepaired()
+	vm.hIndexer.MarkRepaired(true)
 	assert.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
@@ -324,7 +329,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	assert.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
 
 	// Post fork summary case
-	vm.hIndexer.MarkRepaired()
+	vm.hIndexer.MarkRepaired(true)
 	assert.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
@@ -394,7 +399,7 @@ func TestParseStateSummary(t *testing.T) {
 	assert.True(bytes.Equal(summary.Bytes(), parsedSummary.Bytes()))
 
 	// Get a post fork block than parse it
-	vm.hIndexer.MarkRepaired()
+	vm.hIndexer.MarkRepaired(true)
 	assert.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
@@ -450,7 +455,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
 
-	vm.hIndexer.MarkRepaired()
+	vm.hIndexer.MarkRepaired(true)
 	assert.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
 	// store post fork block associated with summary
@@ -502,4 +507,112 @@ func TestStateSummaryAccept(t *testing.T) {
 	accepted, err = summary.Accept()
 	assert.NoError(err)
 	assert.False(accepted)
+}
+
+func TestStateSummaryAcceptOlderBlock(t *testing.T) {
+	assert := assert.New(t)
+
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	reqHeight := uint64(1969)
+
+	innerSummary := &block.TestStateSummary{
+		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		HeightV: reqHeight,
+		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
+	}
+
+	vm.hIndexer.MarkRepaired(true)
+	assert.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
+
+	// Set the last accepted block height to be higher that the state summary
+	// we are going to attempt to accept
+	vm.lastAcceptedHeight = innerSummary.Height() + 1
+
+	// store post fork block associated with summary
+	innerBlk := &snowman.TestBlock{
+		BytesV:     []byte{1},
+		TimestampV: vm.Time(),
+		HeightV:    innerSummary.Height(),
+	}
+	innerVM.GetStateSummaryF = func(h uint64) (block.StateSummary, error) {
+		assert.True(h == reqHeight)
+		return innerSummary, nil
+	}
+	innerVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		assert.True(bytes.Equal(b, innerBlk.Bytes()))
+		return innerBlk, nil
+	}
+
+	slb, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk.Timestamp(),
+		100, // pChainHeight,
+		vm.ctx.StakingCertLeaf,
+		innerBlk.Bytes(),
+		vm.ctx.ChainID,
+		vm.ctx.StakingLeafSigner,
+	)
+	assert.NoError(err)
+	proBlk := &postForkBlock{
+		SignedBlock: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+			status:   choices.Accepted,
+		},
+	}
+	assert.NoError(vm.storePostForkBlock(proBlk))
+
+	summary, err := vm.GetStateSummary(reqHeight)
+	assert.NoError(err)
+
+	// test Accept skipped
+	innerSummary.AcceptF = func() (bool, error) { return true, nil }
+	accepted, err := summary.Accept()
+	assert.NoError(err)
+	assert.False(accepted)
+}
+
+func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
+	assert := assert.New(t)
+
+	// Note: by default proVM is built such that heightIndex will be considered complete
+	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	assert.NoError(proVM.VerifyHeightIndex())
+
+	// let coreVM be always ready to serve summaries
+	summaryHeight := uint64(2022)
+	coreStateSummary := &block.TestStateSummary{
+		T:       t,
+		IDV:     ids.ID{'a', 'a', 'a', 'a'},
+		HeightV: summaryHeight,
+		BytesV:  []byte{'c', 'o', 'r', 'e', 'S', 'u', 'm', 'm', 'a', 'r', 'y'},
+	}
+	coreVM.GetLastStateSummaryF = func() (block.StateSummary, error) {
+		return coreStateSummary, nil
+	}
+	coreVM.GetStateSummaryF = func(height uint64) (block.StateSummary, error) {
+		if height != summaryHeight {
+			return nil, fmt.Errorf("requested unexpected summary")
+		}
+		return coreStateSummary, nil
+	}
+
+	// set height index to reindexing
+	proVM.hIndexer.MarkRepaired(false)
+	assert.ErrorIs(proVM.VerifyHeightIndex(), block.ErrIndexIncomplete)
+
+	_, err := proVM.GetLastStateSummary()
+	assert.ErrorIs(err, block.ErrIndexIncomplete)
+
+	_, err = proVM.GetStateSummary(summaryHeight)
+	assert.ErrorIs(err, block.ErrIndexIncomplete)
+
+	// declare height index complete
+	proVM.hIndexer.MarkRepaired(true)
+	assert.NoError(proVM.VerifyHeightIndex())
+
+	summary, err := proVM.GetLastStateSummary()
+	assert.NoError(err)
+	assert.True(summary.Height() == summaryHeight)
 }

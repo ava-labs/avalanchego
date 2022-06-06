@@ -118,7 +118,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 		return fmt.Errorf("unsopported stateful tx, err %w", err)
 	}
 	if err := statefulTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
-		m.MarkDropped(txID)
+		m.MarkDropped(txID, err.Error())
 		return err
 	}
 
@@ -359,7 +359,7 @@ func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 			startTime,
 		)
 
-		m.vm.droppedTxCache.Put(txID, errMsg) // cache tx as dropped
+		m.vm.blockBuilder.MarkDropped(txID, errMsg) // cache tx as dropped
 		m.vm.ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 	}
 	return false

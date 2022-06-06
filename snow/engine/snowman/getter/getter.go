@@ -58,6 +58,9 @@ func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) e
 		return nil
 	}
 
+	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
+	// nodes, including those disabling state sync to serve state summaries if
+	// these are available
 	if gh.ssVM == nil {
 		gh.log.Debug("state sync not supported. Dropping GetStateSummaryFrontier(%s, %d)", nodeID, requestID)
 		return nil
@@ -87,6 +90,9 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, h
 		return nil
 	}
 
+	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
+	// nodes, including those disabling state sync to serve state summaries if
+	// these are available
 	if gh.ssVM == nil {
 		gh.log.Debug("state sync not supported. Dropping GetAcceptedStateSummary(%s, %d)",
 			nodeID, requestID)

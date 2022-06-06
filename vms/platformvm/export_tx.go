@@ -24,7 +24,7 @@ var _ StatefulAtomicTx = &StatefulExportTx{}
 type StatefulExportTx struct {
 	*unsigned.ExportTx `serialize:"true"`
 
-	txID ids.ID // ID of signed create subnet tx
+	txID ids.ID // ID of signed export tx
 }
 
 // InputUTXOs returns an empty set

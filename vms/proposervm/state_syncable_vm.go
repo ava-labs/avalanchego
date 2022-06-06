@@ -78,7 +78,7 @@ func (vm *VM) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
 		StateSummary: statelessSummary,
 		innerSummary: innerSummary,
 		block:        block,
-		state:        vm.State,
+		vm:           vm,
 	}, nil
 }
 
@@ -95,7 +95,14 @@ func (vm *VM) GetStateSummary(height uint64) (block.StateSummary, error) {
 	return vm.buildStateSummary(innerSummary)
 }
 
+// Note: building state summary requires a well formed height index.
 func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSummary, error) {
+	// if vm implements Snowman++, a block height index must be available
+	// to support state sync
+	if err := vm.VerifyHeightIndex(); err != nil {
+		return nil, fmt.Errorf("could not build state summary: %w", err)
+	}
+
 	forkHeight, err := vm.GetForkHeight()
 	switch err {
 	case nil:
@@ -105,6 +112,11 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	case database.ErrNotFound:
 		// fork has not been reached since there is not fork height
 		// just return innerSummary
+		vm.ctx.Log.Debug(
+			"built pre-fork summary, ID: %s, height: %d",
+			innerSummary.ID(),
+			innerSummary.Height(),
+		)
 		return innerSummary, nil
 	default:
 		return nil, err
@@ -123,10 +135,19 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	}
 
 	statelessSummary, err := summary.Build(forkHeight, block.Bytes(), innerSummary.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	vm.ctx.Log.Debug(
+		"built post-fork summary, ID: %s, height: %d",
+		statelessSummary.ID(),
+		forkHeight,
+	)
 	return &stateSummary{
 		StateSummary: statelessSummary,
 		innerSummary: innerSummary,
 		block:        block,
-		state:        vm.State,
-	}, err
+		vm:           vm,
+	}, nil
 }

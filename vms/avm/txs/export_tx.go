@@ -54,6 +54,9 @@ func (t *ExportTx) SyntacticVerify(
 	if err := t.BaseTxVerify(ctx); err != nil {
 		return err
 	}
+	if err := t.Metadata.Verify(); err != nil {
+		return err
+	}
 
 	return avax.VerifyTx(
 		txFee,
