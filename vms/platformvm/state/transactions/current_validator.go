@@ -14,6 +14,8 @@ var _ currentValidator = &currentValidatorImpl{}
 type currentValidator interface {
 	validator
 
+	// return unsigned.AddValidatorTx content along with
+	// the ID of its signed.Tx
 	AddValidatorTx() (*unsigned.AddValidatorTx, ids.ID)
 
 	// Weight of delegations to this validator. Doesn't include the stake

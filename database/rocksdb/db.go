@@ -15,6 +15,8 @@ import (
 
 	"github.com/linxGnu/grocksdb"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
@@ -55,7 +57,7 @@ type Database struct {
 
 // New returns a wrapped RocksDB object.
 // TODO: use configBytes to config the database options
-func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
+func New(file string, _ []byte, _ logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
 	filter := grocksdb.NewBloomFilter(BitsPerKey)
 
 	blockOptions := grocksdb.NewDefaultBlockBasedTableOptions()
@@ -246,11 +248,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		db:     db,
 		prefix: prefix,
 	}
-}
-
-// Stat returns a particular internal stat of the database.
-func (db *Database) Stat(property string) (string, error) {
-	return "", database.ErrNotFound
 }
 
 // Compact the underlying DB for the given key range.

@@ -10,10 +10,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -34,7 +35,7 @@ func (w *WalletService) decided(txID ids.ID) {
 }
 
 func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
-	tx, err := w.vm.parsePrivateTx(txBytes)
+	tx, err := w.vm.parser.Parse(txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -59,7 +60,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 	}
 
 	for e := w.pendingTxOrdering.Front(); e != nil; e = e.Next() {
-		tx := e.Value.(*Tx)
+		tx := e.Value.(*txs.Tx)
 		for _, inputUTXO := range tx.InputUTXOs() {
 			if inputUTXO.Symbolic() {
 				continue
@@ -231,16 +232,18 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, w.vm.codec)
 
-	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	codec := w.vm.parser.Codec()
+	avax.SortTransferableOutputs(outs, codec)
+
+	tx := txs.Tx{UnsignedTx: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,
 		BlockchainID: w.vm.ctx.ChainID,
 		Outs:         outs,
 		Ins:          ins,
 		Memo:         memoBytes,
 	}}}
-	if err := tx.SignSECP256K1Fx(w.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(codec, keys); err != nil {
 		return err
 	}
 

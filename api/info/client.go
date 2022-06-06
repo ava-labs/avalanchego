@@ -34,9 +34,10 @@ type client struct {
 
 // NewClient returns a new Info API Client
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/info", "info"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		uri+"/ext/info",
+		"info",
+	)}
 }
 
 func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*GetNodeVersionReply, error) {
