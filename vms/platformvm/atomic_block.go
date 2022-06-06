@@ -71,10 +71,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
-	var (
-		blkID = ab.ID()
-		txID  = ab.Tx.ID()
-	)
+	blkID := ab.ID()
 
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
 		return err
@@ -125,6 +122,7 @@ func (ab *AtomicBlock) Verify() error {
 
 	onAccept, err := atomicTx.AtomicExecute(ab.vm, parentState, &ab.Tx)
 	if err != nil {
+		txID := ab.Tx.ID()
 		ab.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}

@@ -25,7 +25,7 @@ var _ StatefulAtomicTx = &StatefulImportTx{}
 type StatefulImportTx struct {
 	*unsigned.ImportTx `serialize:"true"`
 
-	txID ids.ID // ID of signed create subnet tx
+	txID ids.ID // ID of signed import tx
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds

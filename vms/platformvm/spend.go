@@ -403,10 +403,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		utxo := utxos[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return unsigned.ErrAssetIDMismatch
+			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
 		}
 		if assetID := input.AssetID(); assetID != feeAssetID {
-			return unsigned.ErrAssetIDMismatch
+			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
 		}
 
 		out := utxo.Out
@@ -471,7 +471,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	for _, out := range outs {
 		if assetID := out.AssetID(); assetID != feeAssetID {
-			return unsigned.ErrAssetIDMismatch
+			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
 		}
 
 		output := out.Output()
