@@ -18,11 +18,10 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 const (
@@ -257,7 +256,7 @@ func (a *auth) ChangePassword(oldPW, newPW string) error {
 
 func (a *auth) CreateHandler() (http.Handler, error) {
 	server := rpc.NewServer()
-	codec := cjson.NewCodec()
+	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	return server, server.RegisterService(

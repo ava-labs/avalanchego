@@ -74,7 +74,7 @@ func FetchState(ctx context.Context, uri string, addrs ids.ShortSet) (p.Context,
 		{
 			id:     xCTX.BlockchainID(),
 			client: xClient,
-			codec:  x.Codec,
+			codec:  x.Parser.Codec(),
 		},
 	}
 	for _, destinationChain := range chains {

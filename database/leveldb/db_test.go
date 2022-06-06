@@ -6,6 +6,8 @@ package leveldb
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -13,7 +15,7 @@ import (
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
-		db, err := New(folder, nil, logging.NoLog{})
+		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 		if err != nil {
 			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
 		}
@@ -34,7 +36,7 @@ func BenchmarkInterface(b *testing.B) {
 		for _, bench := range database.Benchmarks {
 			folder := b.TempDir()
 
-			db, err := New(folder, nil, logging.NoLog{})
+			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 			if err != nil {
 				b.Fatal(err)
 			}

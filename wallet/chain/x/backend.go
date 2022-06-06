@@ -9,7 +9,7 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -29,7 +29,7 @@ type Backend interface {
 	BuilderBackend
 	SignerBackend
 
-	AcceptTx(ctx stdcontext.Context, tx *avm.Tx) error
+	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type backend struct {
@@ -48,17 +48,18 @@ func NewBackend(ctx Context, chainID ids.ID, utxos ChainUTXOs) Backend {
 	}
 }
 
-func (b *backend) AcceptTx(ctx stdcontext.Context, tx *avm.Tx) error {
+// TODO: implement txs.Visitor here
+func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 	switch utx := tx.UnsignedTx.(type) {
-	case *avm.BaseTx, *avm.CreateAssetTx, *avm.OperationTx:
-	case *avm.ImportTx:
+	case *txs.BaseTx, *txs.CreateAssetTx, *txs.OperationTx:
+	case *txs.ImportTx:
 		for _, input := range utx.ImportedIns {
 			utxoID := input.UTXOID.InputID()
 			if err := b.RemoveUTXO(ctx, utx.SourceChain, utxoID); err != nil {
 				return err
 			}
 		}
-	case *avm.ExportTx:
+	case *txs.ExportTx:
 		txID := tx.ID()
 		for i, out := range utx.ExportedOuts {
 			err := b.AddUTXO(

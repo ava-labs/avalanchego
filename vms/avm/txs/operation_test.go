@@ -27,20 +27,20 @@ func (o *testOperable) Outs() []verify.State { return o.Outputs }
 func TestOperationVerifyNil(t *testing.T) {
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(CodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
 	op := (*Operation)(nil)
 	if err := op.Verify(m); err == nil {
-		t.Fatalf("Should have errored due to nil operation")
+		t.Fatalf("Should have erred due to nil operation")
 	}
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(CodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,14 +48,14 @@ func TestOperationVerifyEmpty(t *testing.T) {
 		Asset: avax.Asset{ID: ids.Empty},
 	}
 	if err := op.Verify(m); err == nil {
-		t.Fatalf("Should have errored due to empty operation")
+		t.Fatalf("Should have erred due to empty operation")
 	}
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(CodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,14 +74,14 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 		Op: &testOperable{},
 	}
 	if err := op.Verify(m); err == nil {
-		t.Fatalf("Should have errored due to unsorted utxoIDs")
+		t.Fatalf("Should have erred due to unsorted utxoIDs")
 	}
 }
 
 func TestOperationVerify(t *testing.T) {
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(CodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -108,7 +108,7 @@ func TestOperationSorting(t *testing.T) {
 	}
 
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(CodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 

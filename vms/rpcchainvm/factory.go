@@ -16,26 +16,22 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
+	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 var (
 	errWrongVM = errors.New("wrong vm type")
 
-	_ Factory = &factory{}
+	_ vms.Factory = &factory{}
 )
-
-type Factory interface {
-	// New returns an instance of a virtual machine.
-	New(*snow.Context) (interface{}, error)
-}
 
 type factory struct {
 	path           string
 	processTracker resource.ProcessTracker
 }
 
-func NewFactory(path string, processTracker resource.ProcessTracker) Factory {
+func NewFactory(path string, processTracker resource.ProcessTracker) vms.Factory {
 	return &factory{
 		path:           path,
 		processTracker: processTracker,

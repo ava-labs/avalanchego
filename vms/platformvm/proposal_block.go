@@ -140,7 +140,7 @@ func (pb *ProposalBlock) Verify() error {
 
 	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
 	if err != nil {
-		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
+		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
 	pb.onCommitState.AddTx(&pb.Tx, status.Committed)

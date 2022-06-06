@@ -66,12 +66,6 @@ func (db *Database) Delete(key []byte) error {
 	return db.handleError(db.Database.Delete(key))
 }
 
-// Stat returns a particular internal stat of the database.
-func (db *Database) Stat(property string) (string, error) {
-	stat, err := db.Database.Stat(property)
-	return stat, db.handleError(err)
-}
-
 func (db *Database) Compact(start []byte, limit []byte) error {
 	return db.handleError(db.Database.Compact(start, limit))
 }

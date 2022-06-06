@@ -6,10 +6,13 @@ package nftfx
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
-// ID that this Fx uses when labeled
 var (
+	_ vms.Factory = &Factory{}
+
+	// ID that this Fx uses when labeled
 	ID = ids.ID{'n', 'f', 't', 'f', 'x'}
 )
 
