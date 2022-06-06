@@ -20,6 +20,7 @@ var _ pendingStakerChainState = &pendingStakerChainStateImpl{}
 // pendingStakerChainState manages the set of stakers (both validators and
 // delegators) that are slated to start staking in the future.
 type pendingStakerChainState interface {
+	// return unsigned.AddValidatorTx content along with the ID of its signed.Tx
 	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *unsigned.AddValidatorTx, txID ids.ID, err error)
 	GetValidator(nodeID ids.NodeID) validator
 

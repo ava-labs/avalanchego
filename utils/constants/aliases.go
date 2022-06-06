@@ -5,8 +5,8 @@ package constants
 
 const (
 	// ChainAliasPrefix denotes a prefix for an alias that belongs to a blockchain ID.
-	ChainAliasPrefix string = "bc/"
+	ChainAliasPrefix string = "bc"
 
-	// VMAliasPrefix ddenotes a prefix for an alias that belongs to a VM ID.
-	VMAliasPrefix string = "vm/"
+	// VMAliasPrefix denotes a prefix for an alias that belongs to a VM ID.
+	VMAliasPrefix string = "vm"
 )

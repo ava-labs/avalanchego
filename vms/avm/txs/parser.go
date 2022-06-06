@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
 
-const codecVersion = 0
+const CodecVersion = 0
 
 var _ Parser = &parser{}
 
@@ -27,6 +27,9 @@ type Parser interface {
 
 	Parse(bytes []byte) (*Tx, error)
 	ParseGenesis(bytes []byte) (*Tx, error)
+
+	InitializeTx(tx *Tx) error
+	InitializeGenesisTx(tx *Tx) error
 }
 
 type parser struct {
@@ -62,14 +65,14 @@ func NewCustomParser(
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
-		cm.RegisterCodec(codecVersion, c),
+		cm.RegisterCodec(CodecVersion, c),
 
 		gc.RegisterType(&BaseTx{}),
 		gc.RegisterType(&CreateAssetTx{}),
 		gc.RegisterType(&OperationTx{}),
 		gc.RegisterType(&ImportTx{}),
 		gc.RegisterType(&ExportTx{}),
-		gcm.RegisterCodec(codecVersion, gc),
+		gcm.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
 		return nil, errs.Err
@@ -100,6 +103,8 @@ func (p *parser) Codec() codec.Manager                   { return p.cm }
 func (p *parser) GenesisCodec() codec.Manager            { return p.gcm }
 func (p *parser) Parse(bytes []byte) (*Tx, error)        { return parse(p.cm, bytes) }
 func (p *parser) ParseGenesis(bytes []byte) (*Tx, error) { return parse(p.gcm, bytes) }
+func (p *parser) InitializeTx(tx *Tx) error              { return initializeTx(p.cm, tx) }
+func (p *parser) InitializeGenesisTx(tx *Tx) error       { return initializeTx(p.gcm, tx) }
 
 func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
 	tx := &Tx{}
@@ -107,15 +112,27 @@ func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	if parsedVersion != codecVersion {
-		return nil, fmt.Errorf("expected codec version %d but got %d", codecVersion, parsedVersion)
+	if parsedVersion != CodecVersion {
+		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
 	}
 
-	unsignedBytes, err := cm.Marshal(codecVersion, tx)
+	unsignedBytes, err := cm.Marshal(CodecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
 	}
 	tx.UnsignedTx.Initialize(unsignedBytes, bytes)
-
 	return tx, nil
+}
+
+func initializeTx(cm codec.Manager, tx *Tx) error {
+	unsignedBytes, err := cm.Marshal(CodecVersion, tx.UnsignedTx)
+	if err != nil {
+		return err
+	}
+	signedBytes, err := cm.Marshal(CodecVersion, &tx)
+	if err != nil {
+		return err
+	}
+	tx.UnsignedTx.Initialize(unsignedBytes, signedBytes)
+	return nil
 }

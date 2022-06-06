@@ -5,14 +5,9 @@ package process
 
 import (
 	"fmt"
-	"path/filepath"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/app"
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -20,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -77,31 +71,6 @@ func (p *process) Start() error {
 	fdLimit := p.config.FdLimit
 	if err := ulimit.Set(fdLimit, log); err != nil {
 		log.Fatal("failed to set fd-limit: %s", err)
-		logFactory.Close()
-		return err
-	}
-
-	// start the db manager
-	var dbManager manager.Manager
-	switch p.config.DatabaseConfig.Name {
-	case rocksdb.Name:
-		path := filepath.Join(p.config.DatabaseConfig.Path, rocksdb.Name)
-		dbManager, err = manager.NewRocksDB(path, p.config.DatabaseConfig.Config, log, version.CurrentDatabase)
-	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(p.config.DatabaseConfig.Path, p.config.DatabaseConfig.Config, log, version.CurrentDatabase)
-	case memdb.Name:
-		dbManager = manager.NewMemDB(version.CurrentDatabase)
-	default:
-		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s, %s}",
-			p.config.DatabaseConfig.Name,
-			leveldb.Name,
-			rocksdb.Name,
-			memdb.Name,
-		)
-	}
-	if err != nil {
-		log.Fatal("couldn't create %q db manager at %s: %s", p.config.DatabaseConfig.Name, p.config.DatabaseConfig.Path, err)
 		logFactory.Close()
 		return err
 	}
@@ -168,13 +137,10 @@ func (p *process) Start() error {
 		p.config.IPPort,
 	)
 
-	if err := p.node.Initialize(&p.config, dbManager, log, logFactory); err != nil {
+	if err := p.node.Initialize(&p.config, log, logFactory); err != nil {
 		log.Fatal("error initializing node: %s", err)
 		mapper.UnmapAllPorts()
 		externalIPUpdater.Stop()
-		if err := dbManager.Close(); err != nil {
-			log.Warn("failed to close the node's DB: %s", err)
-		}
 		log.Stop()
 		logFactory.Close()
 		return err
@@ -194,9 +160,6 @@ func (p *process) Start() error {
 		defer func() {
 			mapper.UnmapAllPorts()
 			externalIPUpdater.Stop()
-			if err := dbManager.Close(); err != nil {
-				log.Warn("failed to close the node's DB: %s", err)
-			}
 
 			// If [p.node.Dispatch()] panics, then we should log the panic and
 			// then re-raise the panic. This is why the above defer is broken

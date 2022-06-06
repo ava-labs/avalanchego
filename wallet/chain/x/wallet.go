@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -61,7 +62,7 @@ type Wallet interface {
 	//
 	// - [operations] specifies the state changes to perform.
 	IssueOperationTx(
-		operations []*avm.Operation,
+		operations []*txs.Operation,
 		options ...common.Option,
 	) (ids.ID, error)
 
@@ -132,13 +133,13 @@ type Wallet interface {
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
-		utx avm.UnsignedTx,
+		utx txs.UnsignedTx,
 		options ...common.Option,
 	) (ids.ID, error)
 
 	// IssueTx issues the signed tx.
 	IssueTx(
-		tx *avm.Tx,
+		tx *txs.Tx,
 		options ...common.Option,
 	) (ids.ID, error)
 }
@@ -194,7 +195,7 @@ func (w *wallet) IssueCreateAssetTx(
 }
 
 func (w *wallet) IssueOperationTx(
-	operations []*avm.Operation,
+	operations []*txs.Operation,
 	options ...common.Option,
 ) (ids.ID, error) {
 	utx, err := w.builder.NewOperationTx(operations, options...)
@@ -276,7 +277,7 @@ func (w *wallet) IssueExportTx(
 }
 
 func (w *wallet) IssueUnsignedTx(
-	utx avm.UnsignedTx,
+	utx txs.UnsignedTx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)
@@ -290,7 +291,7 @@ func (w *wallet) IssueUnsignedTx(
 }
 
 func (w *wallet) IssueTx(
-	tx *avm.Tx,
+	tx *txs.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)
