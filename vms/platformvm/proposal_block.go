@@ -108,10 +108,7 @@ func (pb *ProposalBlock) setBaseState() {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	var (
-		blkID = pb.ID()
-		txID  = pb.Tx.ID()
-	)
+	blkID := pb.ID()
 
 	if err := pb.CommonBlock.Verify(); err != nil {
 		return err
@@ -141,7 +138,8 @@ func (pb *ProposalBlock) Verify() error {
 	parentState := parent.onAccept()
 	pb.onCommitState, pb.onAbortState, err = tx.Execute(parentState)
 	if err != nil {
-		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
+		txID := pb.Tx.ID()
+		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
 	pb.onCommitState.AddTx(&pb.Tx, status.Committed)

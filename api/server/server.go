@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
 	"time"
 
@@ -215,7 +216,7 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := constants.ChainAliasPrefix + ctx.ChainID.String()
+	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
 
 	// Register each endpoint
 	for extension, handler := range handlers {

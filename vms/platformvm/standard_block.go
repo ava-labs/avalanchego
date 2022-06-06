@@ -121,7 +121,7 @@ func (sb *StandardBlock) Verify() error {
 
 		onAccept, err := decisionTx.Execute(sb.onAcceptState)
 		if err != nil {
-			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
+			sb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
 		}
 

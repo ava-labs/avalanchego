@@ -61,7 +61,7 @@ func setupCodec() codec.Manager {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
-		m.RegisterCodec(codecVersion, c),
+		m.RegisterCodec(CodecVersion, c),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -98,14 +98,13 @@ func TestTxNil(t *testing.T) {
 	ctx := NewContext(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(codecVersion, c); err != nil {
+	if err := m.RegisterCodec(CodecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
 	tx := (*Tx)(nil)
-
 	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
-		t.Fatalf("Should have errored due to nil tx")
+		t.Fatalf("Should have erred due to nil tx")
 	}
 }
 
@@ -114,7 +113,7 @@ func TestTxEmpty(t *testing.T) {
 	c := setupCodec()
 	tx := &Tx{}
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
-		t.Fatalf("Should have errored due to nil tx")
+		t.Fatalf("Should have erred due to nil tx")
 	}
 }
 

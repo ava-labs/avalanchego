@@ -22,7 +22,7 @@ var _ AtomicTx = &ImportTx{}
 type ImportTx struct {
 	*unsigned.ImportTx
 
-	txID  ids.ID // ID of signed add subnet validator tx
+	txID  ids.ID // ID of signed import tx
 	creds []verify.Verifiable
 
 	verifier TxVerifier

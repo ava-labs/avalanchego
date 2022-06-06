@@ -22,7 +22,7 @@ var _ AtomicTx = &ExportTx{}
 type ExportTx struct {
 	*unsigned.ExportTx
 
-	txID        ids.ID // ID of signed add subnet validator tx
+	txID        ids.ID // ID of signed export tx
 	signedBytes []byte // signed Tx bytes, needed to recreate signed.Tx
 	creds       []verify.Verifiable
 

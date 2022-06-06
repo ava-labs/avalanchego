@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -52,8 +52,14 @@ type walletClient struct {
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
 func NewWalletClient(uri, chain string) WalletClient {
+	path := fmt.Sprintf(
+		"%s/ext/%s/%s/wallet",
+		uri,
+		constants.ChainAliasPrefix,
+		chain,
+	)
 	return &walletClient{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet"),
+		requester: rpc.NewEndpointRequester(path, "wallet"),
 	}
 }
 
@@ -101,7 +107,7 @@ func (c *walletClient) Send(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
 		SendOutput: SendOutput{
-			Amount:  cjson.Uint64(amount),
+			Amount:  json.Uint64(amount),
 			AssetID: assetID,
 			To:      to.String(),
 		},
@@ -122,7 +128,7 @@ func (c *walletClient) SendMultiple(
 	res := &api.JSONTxID{}
 	serviceOutputs := make([]SendOutput, len(outputs))
 	for i, output := range outputs {
-		serviceOutputs[i].Amount = cjson.Uint64(output.Amount)
+		serviceOutputs[i].Amount = json.Uint64(output.Amount)
 		serviceOutputs[i].AssetID = output.AssetID
 		serviceOutputs[i].To = output.To.String()
 	}

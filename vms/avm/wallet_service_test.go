@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
@@ -18,11 +19,11 @@ import (
 // 2) the VM
 // 3) The wallet service that wraps the VM
 // 4) atomic memory to use in tests
-func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *Tx) {
+func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *txs.Tx) {
 	var genesisBytes []byte
 	var vm *VM
 	var m *atomic.Memory
-	var genesisTx *Tx
+	var genesisTx *txs.Tx
 	if isAVAXAsset {
 		genesisBytes, _, vm, m = GenesisVM(t)
 		genesisTx = GetAVAXTxFromGenesisTest(genesisBytes, t)
@@ -40,7 +41,7 @@ func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atom
 // 2) the VM
 // 3) The wallet service that wraps the VM
 // 4) atomic memory to use in tests
-func setupWSWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *Tx) {
+func setupWSWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *txs.Tx) {
 	genesisBytes, vm, ws, m, tx := setupWS(t, isAVAXAsset)
 
 	// Import the initially funded private keys

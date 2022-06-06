@@ -151,16 +151,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Stat(stat string) (string, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	if db.mem == nil {
-		return "", database.ErrClosed
-	}
-	return db.db.Stat(stat)
-}
-
 func (db *Database) Compact(start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()

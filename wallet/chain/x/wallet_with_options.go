@@ -5,7 +5,7 @@ package x
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -63,7 +63,7 @@ func (w *walletWithOptions) IssueCreateAssetTx(
 }
 
 func (w *walletWithOptions) IssueOperationTx(
-	operations []*avm.Operation,
+	operations []*txs.Operation,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueOperationTx(
@@ -143,7 +143,7 @@ func (w *walletWithOptions) IssueExportTx(
 }
 
 func (w *walletWithOptions) IssueUnsignedTx(
-	utx avm.UnsignedTx,
+	utx txs.UnsignedTx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueUnsignedTx(
@@ -153,7 +153,7 @@ func (w *walletWithOptions) IssueUnsignedTx(
 }
 
 func (w *walletWithOptions) IssueTx(
-	tx *avm.Tx,
+	tx *txs.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueTx(

@@ -56,9 +56,7 @@ var (
 )
 
 const (
-	droppedTxCacheSize     = 64
-	validatorSetsCacheSize = 64
-
+	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
@@ -97,14 +95,6 @@ type VM struct {
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped utils.AtomicBool
-
-	// Contains the IDs of transactions recently dropped because they failed
-	// verification. These txs may be re-issued and put into accepted blocks, so
-	// check the database to see if it was later committed/aborted before
-	// reporting that it's dropped.
-	// Key: Tx ID
-	// Value: String repr. of the verification error
-	droppedTxCache cache.LRU
 
 	// Maps caches for each subnet that is currently whitelisted.
 	// Key: Subnet ID
@@ -162,7 +152,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 
