@@ -221,8 +221,10 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 
 	var voteStack []votes
 	if voteBag.Len() >= ts.params.Alpha {
-		// If there is no way for an alpha majority to occur, there is no need
-		// to perform any traversals.
+		// Since we received at least alpha votes, it's possible that
+		// we reached an alpha majority on a processing block.
+		// We must perform the traversals to calculate all block
+		// that reached an alpha majority.
 
 		// Populates [ts.kahnNodes] and [ts.leaves]
 		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
@@ -464,7 +466,7 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 
 		// Only accept when you are finalized and the head.
 		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
-			if err := ts.accept(parentBlock); err != nil {
+			if err := ts.acceptPreferredChild(parentBlock); err != nil {
 				return ids.ID{}, err
 			}
 
@@ -522,10 +524,13 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	return newPreferred, nil
 }
 
-// accept the preferred child of the provided snowman block. By accepting the
+// Accepts the preferred child of the provided snowman block. By accepting the
 // preferred child, all other children will be rejected. When these children are
 // rejected, all their descendants will be rejected.
-func (ts *Topological) accept(n *snowmanBlock) error {
+//
+// We accept a block once its parent's snowball instance has finalized
+// with it as the preference.
+func (ts *Topological) acceptPreferredChild(n *snowmanBlock) error {
 	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
 
@@ -583,10 +588,10 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 // Takes in a list of rejected ids and rejects all descendants of these IDs
 func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
-	// the rejected array is treated as a queue, with the next element at index
+	// the rejected array is treated as a stack, with the next element at index
 	// 0 and the last element at the end of the slice.
 	for len(rejected) > 0 {
-		// pop the rejected ID off the queue
+		// pop the rejected ID off the stack
 		newRejectedSize := len(rejected) - 1
 		rejectedID := rejected[newRejectedSize]
 		rejected = rejected[:newRejectedSize]
@@ -601,7 +606,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			}
 			ts.Latency.Rejected(childID, ts.pollNumber)
 
-			// add the newly rejected block to the end of the queue
+			// add the newly rejected block to the end of the stack
 			rejected = append(rejected, childID)
 		}
 	}

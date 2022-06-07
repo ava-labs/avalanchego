@@ -68,11 +68,11 @@ func (vers *innerSortState) Less(i, j int) bool {
 	iVer := vers.vers[i]
 	jVer := vers.vers[j]
 
-	iBytes, err := vers.codec.Marshal(codecVersion, &iVer)
+	iBytes, err := vers.codec.Marshal(CodecVersion, &iVer)
 	if err != nil {
 		return false
 	}
-	jBytes, err := vers.codec.Marshal(codecVersion, &jVer)
+	jBytes, err := vers.codec.Marshal(CodecVersion, &jVer)
 	if err != nil {
 		return false
 	}

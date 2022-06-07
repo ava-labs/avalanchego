@@ -107,7 +107,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	n.vm.ctx.Lock.Lock()
 	defer n.vm.ctx.Lock.Unlock()
 
-	if n.mempool.WasDropped(txID) {
+	if _, dropped := n.mempool.GetDropReason(txID); dropped {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}

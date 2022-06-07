@@ -178,7 +178,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

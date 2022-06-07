@@ -355,7 +355,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	validatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	assert.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -519,7 +519,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			key, err := vm.factory.NewPrivateKey()
+			key, err := testKeyfactory.NewPrivateKey()
 			assert.NoError(err)
 
 			id := key.PublicKey().Address()

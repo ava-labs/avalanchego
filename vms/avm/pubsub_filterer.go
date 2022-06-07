@@ -6,16 +6,17 @@ package avm
 import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/pubsub"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var _ pubsub.Filterer = &filterer{}
 
 type filterer struct {
-	tx *Tx
+	tx *txs.Tx
 }
 
-func NewPubSubFilterer(tx *Tx) pubsub.Filterer {
+func NewPubSubFilterer(tx *txs.Tx) pubsub.Filterer {
 	return &filterer{tx: tx}
 }
 

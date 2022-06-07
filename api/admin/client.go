@@ -38,9 +38,10 @@ type client struct {
 
 // NewClient returns a new Info API Client
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/admin", "admin"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		uri+"/ext/admin",
+		"admin",
+	)}
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) (bool, error) {

@@ -459,9 +459,7 @@ func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) 
 
 func getStateSyncConfig(v *viper.Viper) (node.StateSyncConfig, error) {
 	var (
-		config = node.StateSyncConfig{
-			StateSyncDisableRequests: v.GetBool(StateSyncDisableRequests),
-		}
+		config       = node.StateSyncConfig{}
 		stateSyncIPs = strings.Split(v.GetString(StateSyncIPsKey), ",")
 		stateSyncIDs = strings.Split(v.GetString(StateSyncIDsKey), ",")
 	)

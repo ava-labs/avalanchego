@@ -103,6 +103,9 @@ var (
 
 	xChainID = ids.Empty.Prefix(0)
 	cChainID = ids.Empty.Prefix(1)
+
+	// Used to create and use keys.
+	testKeyfactory crypto.FactorySECP256K1R
 )
 
 var (
@@ -553,7 +556,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -633,7 +636,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(-syncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := vm.factory.NewPrivateKey()
+	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -671,7 +674,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
+	if _, dropped := vm.blockBuilder.GetDropReason(blk.Tx.ID()); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }
@@ -689,7 +692,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := vm.factory.NewPrivateKey()
+	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create valid tx
@@ -2095,7 +2098,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	assert.NoError(t, err)
 
 	bootstrapConfig := bootstrap.Config{
@@ -2494,7 +2497,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newValidatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	assert.NoError(err)
 
 	nodeID := ids.NodeID(key.PublicKey().Address())

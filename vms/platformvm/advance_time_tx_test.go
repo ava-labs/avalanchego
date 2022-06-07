@@ -44,7 +44,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
-	nodeIDKey, _ := vm.factory.NewPrivateKey()
+	nodeIDKey, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(nodeIDKey.PublicKey().Address())
 	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)
@@ -97,7 +97,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
-	nodeIDKey, _ := vm.factory.NewPrivateKey()
+	nodeIDKey, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(nodeIDKey.PublicKey().Address())
 	addPendingValidatorTx, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)
@@ -537,7 +537,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
-	nodeIDKey, _ := vm.factory.NewPrivateKey()
+	nodeIDKey, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(nodeIDKey.PublicKey().Address())
 	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)
@@ -600,7 +600,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
-	nodeIDKey, _ := vm.factory.NewPrivateKey()
+	nodeIDKey, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(nodeIDKey.PublicKey().Address())
 	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)

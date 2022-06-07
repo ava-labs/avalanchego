@@ -94,7 +94,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	handler.Start(false)
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	select {
 	case <-ticker.C:
@@ -167,7 +167,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
 	handler.Push(msg)
 
-	ticker := time.NewTicker(20 * time.Millisecond)
+	ticker := time.NewTicker(time.Second)
 	select {
 	case <-ticker.C:
 		t.Fatalf("Handler shutdown timed out before calling toClose")
@@ -228,7 +228,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	inMsg := mc.InternalFailedRequest(message.GetFailed, nodeID, chainID, reqID)
 	handler.Push(inMsg)
 
-	ticker := time.NewTicker(20 * time.Millisecond)
+	ticker := time.NewTicker(time.Second)
 	select {
 	case <-ticker.C:
 		t.Fatalf("Handler shutdown timed out before calling toClose")

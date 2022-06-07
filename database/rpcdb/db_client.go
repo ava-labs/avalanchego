@@ -119,17 +119,6 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 	}
 }
 
-// Stat attempts to return the statistic of this database
-func (db *DatabaseClient) Stat(property string) (string, error) {
-	resp, err := db.client.Stat(context.Background(), &rpcdbpb.StatRequest{
-		Property: property,
-	})
-	if err != nil {
-		return "", err
-	}
-	return resp.Stat, errCodeToError[resp.Err]
-}
-
 // Compact attempts to optimize the space utilization in the provided range
 func (db *DatabaseClient) Compact(start, limit []byte) error {
 	resp, err := db.client.Compact(context.Background(), &rpcdbpb.CompactRequest{

@@ -30,13 +30,15 @@ import (
 )
 
 var (
-	_ block.ChainVM              = &expandedCoreVM{}
-	_ block.HeightIndexedChainVM = &expandedCoreVM{}
+	_ block.ChainVM              = &fullVM{}
+	_ block.HeightIndexedChainVM = &fullVM{}
+	_ block.StateSyncableVM      = &fullVM{}
 )
 
-type expandedCoreVM struct {
-	block.TestVM
-	block.TestHeightIndexedVM
+type fullVM struct {
+	*block.TestVM
+	*block.TestHeightIndexedVM
+	*block.TestStateSyncableVM
 }
 
 var (
@@ -65,7 +67,7 @@ func initTestProposerVM(
 	proBlkStartTime time.Time,
 	minPChainHeight uint64,
 ) (
-	*expandedCoreVM,
+	*fullVM,
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
@@ -82,13 +84,16 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := &expandedCoreVM{
-		TestVM: block.TestVM{
+	coreVM := &fullVM{
+		TestVM: &block.TestVM{
 			TestVM: common.TestVM{
 				T: t,
 			},
 		},
-		TestHeightIndexedVM: block.TestHeightIndexedVM{
+		TestHeightIndexedVM: &block.TestHeightIndexedVM{
+			T: t,
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
 		},
 	}
@@ -140,8 +145,11 @@ func initTestProposerVM(
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+
+	// pre-insert resetOccurred key to make VM not spinning height reindexing
+	stopHeightReindexing(t, coreVM, dummyDBManager)
+
 	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}

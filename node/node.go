@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -31,8 +32,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -401,9 +405,43 @@ func (n *Node) Dispatch() error {
  ******************************************************************************
  */
 
-func (n *Node) initDatabase(dbManager manager.Manager) error {
-	n.DBManager = dbManager
-	n.DB = dbManager.Current().Database
+func (n *Node) initDatabase() error {
+	// start the db manager
+	var (
+		dbManager manager.Manager
+		err       error
+	)
+	switch n.Config.DatabaseConfig.Name {
+	case rocksdb.Name:
+		path := filepath.Join(n.Config.DatabaseConfig.Path, rocksdb.Name)
+		dbManager, err = manager.NewRocksDB(path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+	case leveldb.Name:
+		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+	case memdb.Name:
+		dbManager = manager.NewMemDB(version.CurrentDatabase)
+	default:
+		err = fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s, %s}",
+			n.Config.DatabaseConfig.Name,
+			leveldb.Name,
+			rocksdb.Name,
+			memdb.Name,
+		)
+	}
+	if err != nil {
+		return err
+	}
+
+	meterDBManager, err := dbManager.NewMeterDBManager("db", n.MetricsRegisterer)
+	if err != nil {
+		return err
+	}
+
+	n.DBManager = meterDBManager
+
+	currentDB := dbManager.Current()
+	n.Log.Info("current database version: %s", currentDB.Version)
+	n.DB = currentDB.Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -662,7 +700,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
-		StateSyncDisableRequests:                n.Config.StateSyncDisableRequests,
 	})
 
 	// Notify the API server when new chains are created
@@ -793,13 +830,19 @@ func (n *Node) initMetricsAPI() error {
 		return err
 	}
 
-	n.Log.Info("initializing metrics API")
-
-	meterDBManager, err := n.DBManager.NewMeterDBManager("db", n.MetricsRegisterer)
-	if err != nil {
+	// Current state of process metrics.
+	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
+	if err := n.MetricsRegisterer.Register(processCollector); err != nil {
 		return err
 	}
-	n.DBManager = meterDBManager
+
+	// Go process metrics using debug.GCStats.
+	goCollector := collectors.NewGoCollector()
+	if err := n.MetricsRegisterer.Register(goCollector); err != nil {
+		return err
+	}
+
+	n.Log.Info("initializing metrics API")
 
 	return n.APIServer.AddRoute(
 		&common.HTTPHandler{
@@ -1112,7 +1155,6 @@ func (n *Node) initDiskTargeter(
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
-	dbManager manager.Manager,
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) error {
@@ -1125,22 +1167,23 @@ func (n *Node) Initialize(
 
 	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID)
-	n.Log.Info("current database version: %s", dbManager.Current().Version)
-
-	if err := n.initDatabase(dbManager); err != nil { // Set up the node's database
-		return fmt.Errorf("problem initializing database: %w", err)
-	}
 
 	if err = n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
-	// Start HTTP APIs
+
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
 	}
+
 	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
 	}
+
+	if err := n.initDatabase(); err != nil { // Set up the node's database
+		return fmt.Errorf("problem initializing database: %w", err)
+	}
+
 	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
 		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
@@ -1279,6 +1322,13 @@ func (n *Node) shutdown() {
 	// Make sure all plugin subprocesses are killed
 	n.Log.Info("cleaning up plugin subprocesses")
 	plugin.CleanupClients()
+
+	if n.DBManager != nil {
+		if err := n.DBManager.Close(); err != nil {
+			n.Log.Warn("error during DB shutdown: %s", err)
+		}
+	}
+
 	n.DoneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }

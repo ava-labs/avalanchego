@@ -114,6 +114,7 @@ service Database {
   rpc Get(GetRequest) returns (GetResponse);
   rpc Put(PutRequest) returns (PutResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
+  // TODO: Delete this after we update the downstream dependencies
   rpc Stat(StatRequest) returns (StatResponse);
   rpc Compact(CompactRequest) returns (CompactResponse);
   rpc Close(CloseRequest) returns (CloseResponse);

@@ -32,9 +32,10 @@ type client struct {
 }
 
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/keystore", "keystore"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		uri+"/ext/keystore",
+		"keystore",
+	)}
 }
 
 func (c *client) CreateUser(ctx context.Context, user api.UserPass, options ...rpc.Option) (bool, error) {
