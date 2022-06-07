@@ -30,10 +30,10 @@ type TrieProgress struct {
 
 	// used for ETA calculations
 	startTime time.Time
-	eta       *syncETA
+	eta       SyncETA
 }
 
-func NewTrieProgress(db ethdb.Batcher, batchSize int, eta *syncETA) *TrieProgress {
+func NewTrieProgress(db ethdb.Batcher, batchSize int, eta SyncETA) *TrieProgress {
 	batch := db.NewBatch()
 	return &TrieProgress{
 		batch:     batch,
@@ -84,7 +84,7 @@ type stateSyncer struct {
 	client    syncclient.Client
 
 	// pointer to ETA struct, shared with all TrieProgress structs
-	eta *syncETA
+	eta SyncETA
 }
 
 type EVMStateSyncerConfig struct {
@@ -95,7 +95,7 @@ type EVMStateSyncerConfig struct {
 }
 
 func NewEVMStateSyncer(config *EVMStateSyncerConfig) (*stateSyncer, error) {
-	eta := &syncETA{}
+	eta := NewSyncEta(config.Root)
 	progressMarker, err := loadProgress(config.DB, config.Root)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,6 @@ func (s *stateSyncer) Start(ctx context.Context) {
 		OnFinish:      s.onFinish,
 		OnSyncFailure: s.onSyncFailure,
 	}
-	s.eta.mainTrieRoot = s.progressMarker.Root
 
 	storageTasks := make([]*syncclient.LeafSyncTask, 0, len(s.progressMarker.StorageTries))
 	for storageRoot, storageTrieProgress := range s.progressMarker.StorageTries {
@@ -211,7 +210,7 @@ func (s *stateSyncer) handleLeafs(root common.Hash, keys [][]byte, values [][]by
 	}
 	if len(keys) > 0 {
 		// notify progress for eta calculations on the last key
-		mainTrie.eta.notifyProgress(root, mainTrie.startTime, mainTrie.startFrom, keys[len(keys)-1])
+		mainTrie.eta.NotifyProgress(root, mainTrie.startTime, mainTrie.startFrom, keys[len(keys)-1])
 	}
 	return tasks, nil
 }
@@ -241,7 +240,7 @@ func (tp *StorageTrieProgress) handleLeafs(root common.Hash, keys [][]byte, valu
 	}
 	if len(keys) > 0 {
 		// notify progress for eta calculations on the last key
-		tp.eta.notifyProgress(root, tp.startTime, tp.startFrom, keys[len(keys)-1])
+		tp.eta.NotifyProgress(root, tp.startTime, tp.startFrom, keys[len(keys)-1])
 	}
 	return nil, nil // storage tries never add new tasks to the leaf syncer
 }
@@ -355,7 +354,7 @@ func (s *stateSyncer) onFinish(root common.Hash) error {
 	if err := removeInProgressStorageTrie(s.db, root, storageTrieProgress); err != nil {
 		return err
 	}
-	s.eta.notifyTrieSynced(root, storageTrieProgress.Skipped)
+	s.eta.RemoveSyncedTrie(root, storageTrieProgress.Skipped)
 	return s.checkAllDone()
 }
 
