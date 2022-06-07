@@ -184,6 +184,8 @@ func (rb *responseBuilder) handleRequest(ctx context.Context) error {
 		} else if done {
 			return nil
 		}
+		// reset the proof if we will iterate the trie further
+		rb.response.ProofVals = nil
 	}
 
 	if len(rb.response.Keys) < int(rb.limit) {
@@ -215,8 +217,9 @@ func (rb *responseBuilder) handleRequest(ctx context.Context) error {
 	return nil
 }
 
-// fillFromSnapshot reads data from snapshot and returns true if the response is complete
-// (otherwise the trie must be iterated further and a range proof may be needed)
+// fillFromSnapshot reads data from snapshot and returns true if the response is complete.
+// Otherwise, the caller should attempt to iterate the trie and determine if a range proof
+// should be added to the response.
 func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	snapshotReadStart := time.Now()
 	rb.stats.IncSnapshotReadAttempt()
@@ -225,7 +228,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	// modified since the requested root. If this assumption can be verified with
 	// range proofs and data from the trie, we can skip iterating the trie as
 	// an optimization.
-	snapKeys, snapVals, more, err := rb.readLeafsFromSnapshot(ctx)
+	snapKeys, snapVals, err := rb.readLeafsFromSnapshot(ctx)
 	// Update read snapshot time here, so that we include the case that an error occurred.
 	rb.stats.UpdateSnapshotReadTime(time.Since(snapshotReadStart))
 	if err != nil {
@@ -234,7 +237,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	}
 
 	// Check if the entire range read from the snapshot is valid according to the trie.
-	proof, ok, err := rb.isRangeValid(snapKeys, snapVals, false)
+	proof, ok, more, err := rb.isRangeValid(snapKeys, snapVals, false)
 	if err != nil {
 		rb.stats.IncProofError()
 		return false, err
@@ -253,7 +256,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 			return false, err
 		}
 		rb.stats.IncSnapshotReadSuccess()
-		return true, nil
+		return !more, nil
 	}
 	// The data from the snapshot could not be validated as a whole. It is still likely
 	// most of the data from the snapshot is useable, so we try to validate smaller
@@ -261,7 +264,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 	hasGap := false
 	for i := 0; i < len(snapKeys); i += segmentLen {
 		segmentEnd := math.Min(i+segmentLen, len(snapKeys))
-		proof, ok, err := rb.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
+		proof, ok, _, err := rb.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
 		if err != nil {
 			rb.stats.IncProofError()
 			return false, err
@@ -334,8 +337,8 @@ func (rb *responseBuilder) generateRangeProof(start []byte, keys [][]byte) (*mem
 }
 
 // verifyRangeProof verifies the provided range proof with [keys/vals], starting at [start].
-// Returns nil on success.
-func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) error {
+// Returns a boolean indicating if there are more leaves to the right of the last key in the trie and a nil error if the range proof is successfully verified.
+func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) (bool, error) {
 	startTime := time.Now()
 	defer func() { rb.proofTime += time.Since(startTime) }()
 
@@ -347,8 +350,7 @@ func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, p
 	if len(keys) > 0 {
 		end = keys[len(keys)-1]
 	}
-	_, err := trie.VerifyRangeProof(rb.request.Root, start, end, keys, vals, proof)
-	return err
+	return trie.VerifyRangeProof(rb.request.Root, start, end, keys, vals, proof)
 }
 
 // iterateVals returns the values contained in [db]
@@ -372,7 +374,8 @@ func iterateVals(db *memorydb.Database) ([][]byte, error) {
 // part of the trie. If [hasGap] is true, the range is validated independent of the
 // existing response. If [hasGap] is false, the range proof begins at a key which
 // guarantees the range can be appended to the response.
-func (rb *responseBuilder) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, error) {
+// Additionally returns a boolean indicating if there are more leaves in the trie.
+func (rb *responseBuilder) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, bool, error) {
 	var startKey []byte
 	if hasGap {
 		startKey = keys[0]
@@ -382,9 +385,10 @@ func (rb *responseBuilder) isRangeValid(keys, vals [][]byte, hasGap bool) (*memo
 
 	proof, err := rb.generateRangeProof(startKey, keys)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
-	return proof, rb.verifyRangeProof(keys, vals, startKey, proof) == nil, nil
+	more, proofErr := rb.verifyRangeProof(keys, vals, startKey, proof)
+	return proof, proofErr == nil, more, nil
 }
 
 // nextKey returns the nextKey that could potentially be part of the response.
@@ -444,13 +448,11 @@ func getKeyLength(nodeType message.NodeType) (int, error) {
 
 // readLeafsFromSnapshot iterates the storage snapshot of the requested account
 // (or the main account trie if account is empty). Returns up to [rb.limit] key/value
-// pairs with for keys that are in the request's range (inclusive), and a boolean
-// indicating if there are more keys in the snapshot.
-func (rb *responseBuilder) readLeafsFromSnapshot(ctx context.Context) ([][]byte, [][]byte, bool, error) {
+// pairs for keys that are in the request's range (inclusive).
+func (rb *responseBuilder) readLeafsFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error) {
 	var (
 		snapIt    ethdb.Iterator
 		startHash = common.BytesToHash(rb.request.Start)
-		more      = false
 		keys      = make([][]byte, 0, rb.limit)
 		vals      = make([][]byte, 0, rb.limit)
 	)
@@ -465,18 +467,16 @@ func (rb *responseBuilder) readLeafsFromSnapshot(ctx context.Context) ([][]byte,
 	for snapIt.Next() {
 		// if we're at the end, break this loop
 		if len(rb.request.End) > 0 && bytes.Compare(snapIt.Key(), rb.request.End) > 0 {
-			more = true
 			break
 		}
 		// If we've returned enough data or run out of time, set the more flag and exit
 		// this flag will determine if the proof is generated or not
 		if len(keys) >= int(rb.limit) || ctx.Err() != nil {
-			more = true
 			break
 		}
 
 		keys = append(keys, snapIt.Key())
 		vals = append(vals, snapIt.Value())
 	}
-	return keys, vals, more, snapIt.Error()
+	return keys, vals, snapIt.Error()
 }
