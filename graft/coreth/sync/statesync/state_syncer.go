@@ -77,11 +77,12 @@ type stateSyncer struct {
 	progressMarker *StateSyncProgress
 	numThreads     int
 
-	syncer    *syncclient.CallbackLeafSyncer
-	trieDB    *trie.Database
-	db        ethdb.Database
-	batchSize int
-	client    syncclient.Client
+	syncer     *syncclient.CallbackLeafSyncer
+	codeSyncer *codeSyncer
+	trieDB     *trie.Database
+	db         ethdb.Database
+	batchSize  int
+	client     syncclient.Client
 
 	// pointer to ETA struct, shared with all TrieProgress structs
 	eta SyncETA
@@ -126,6 +127,7 @@ func NewEVMStateSyncer(config *EVMStateSyncerConfig) (*stateSyncer, error) {
 		db:             config.DB,
 		numThreads:     defaultNumThreads,
 		syncer:         syncclient.NewCallbackLeafSyncer(config.Client),
+		codeSyncer:     newCodeSyncer(config.DB, config.Client),
 		eta:            eta,
 	}, nil
 }
@@ -153,7 +155,9 @@ func (s *stateSyncer) Start(ctx context.Context) {
 			OnSyncFailure: s.onSyncFailure,
 		})
 	}
+	// Start the leaf syncer and code syncer goroutines.
 	s.syncer.Start(ctx, s.numThreads, rootTask, storageTasks...)
+	s.codeSyncer.start(ctx)
 }
 
 func (s *stateSyncer) handleLeafs(root common.Hash, keys [][]byte, values [][]byte) ([]*syncclient.LeafSyncTask, error) {
@@ -190,12 +194,9 @@ func (s *stateSyncer) handleLeafs(root common.Hash, keys [][]byte, values [][]by
 		// check if this account has code and fetch it
 		codeHash := common.BytesToHash(acc.CodeHash)
 		if codeHash != (common.Hash{}) && codeHash != types.EmptyCodeHash && !rawdb.HasCodeWithPrefix(s.db, codeHash) {
-			codeBytes, err := s.client.GetCode([]common.Hash{codeHash})
-			if err != nil {
-				return nil, fmt.Errorf("error getting code bytes for code hash [%s] from network: %w", codeHash, err)
+			if err := s.codeSyncer.addCode(codeHash); err != nil {
+				return nil, err
 			}
-			// Note: GetCode returns an error if codeBytes length is not 1, so referencing codeBytes[0] is safe.
-			rawdb.WriteCode(mainTrie.batch, codeHash, codeBytes[0])
 		}
 
 		// write account snapshot

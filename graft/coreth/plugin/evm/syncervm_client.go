@@ -6,7 +6,6 @@ package evm
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -31,17 +30,9 @@ const (
 	// State sync fetches [parentsToGet] parents of the block it syncs to.
 	// The last 256 block hashes are necessary to support the BLOCKHASH opcode.
 	parentsToGet = 256
-
-	// maximum number of retry attempts for a single state sync request
-	maxRetryAttempts = uint8(32)
 )
 
-var (
-	// maximum delay in between successive requests
-	defaultMaxRetryDelay = 10 * time.Second
-
-	stateSyncSummaryKey = []byte("stateSyncSummary")
-)
+var stateSyncSummaryKey = []byte("stateSyncSummary")
 
 // stateSyncClientConfig defines the options and dependencies needed to construct a StateSyncerClient
 type stateSyncClientConfig struct {
@@ -262,7 +253,7 @@ func (client *stateSyncerClient) syncBlocks(ctx context.Context, fromHash common
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		blocks, err := client.client.GetBlocks(nextHash, nextHeight, parentsPerRequest)
+		blocks, err := client.client.GetBlocks(ctx, nextHash, nextHeight, parentsPerRequest)
 		if err != nil {
 			log.Warn("could not get blocks from peer", "err", err, "nextHash", nextHash, "remaining", i+1)
 			return err

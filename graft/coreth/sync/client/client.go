@@ -5,9 +5,9 @@ package statesyncclient
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sync/atomic"
 	"time"
 
@@ -31,13 +31,16 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const (
+	failedRequestSleepInterval = 10 * time.Millisecond
+)
+
 var (
 	StateSyncVersion          = version.NewDefaultApplication(constants.PlatformName, 1, 7, 13)
 	errEmptyResponse          = errors.New("empty response")
 	errTooManyBlocks          = errors.New("response contains more blocks than requested")
 	errHashMismatch           = errors.New("hash does not match expected value")
 	errInvalidRangeProof      = errors.New("failed to verify range proof")
-	errExceededRetryLimit     = errors.New("exceeded request retry limit")
 	errTooManyLeaves          = errors.New("response contains more than requested leaves")
 	errUnmarshalResponse      = errors.New("failed to unmarshal response")
 	errInvalidCodeResponseLen = errors.New("number of code bytes in response does not match requested hashes")
@@ -45,17 +48,18 @@ var (
 )
 var _ Client = &client{}
 
-// Client is a state sync client that synchronously fetches data from the network
+// Client synchronously fetches data from the network to fulfill state sync requests.
+// Repeatedly requests failed requests until the context to the request is expired.
 type Client interface {
 	// GetLeafs synchronously sends given request, returning parsed *LeafsResponse or error
-	GetLeafs(request message.LeafsRequest) (message.LeafsResponse, error)
+	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
 
 	// GetBlocks synchronously retrieves blocks starting with specified common.Hash and height up to specified parents
 	// specified range from height to height-parents is inclusive
-	GetBlocks(blockHash common.Hash, height uint64, parents uint16) ([]*types.Block, error)
+	GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, parents uint16) ([]*types.Block, error)
 
 	// GetCode synchronously retrieves code associated with the given hashes
-	GetCode(hashes []common.Hash) ([][]byte, error)
+	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
 }
 
 // parseResponseFn parses given response bytes in context of specified request
@@ -67,8 +71,6 @@ type parseResponseFn func(codec codec.Manager, request message.Request, response
 type client struct {
 	networkClient    peer.NetworkClient
 	codec            codec.Manager
-	maxAttempts      uint8
-	maxRetryDelay    time.Duration
 	stateSyncNodes   []ids.NodeID
 	stateSyncNodeIdx uint32
 	stats            stats.ClientSyncerStats
@@ -79,8 +81,6 @@ type ClientConfig struct {
 	NetworkClient    peer.NetworkClient
 	Codec            codec.Manager
 	Stats            stats.ClientSyncerStats
-	MaxAttempts      uint8
-	MaxRetryDelay    time.Duration
 	StateSyncNodeIDs []ids.NodeID
 	BlockParser      EthBlockParser
 }
@@ -94,8 +94,6 @@ func NewClient(config *ClientConfig) *client {
 		networkClient:  config.NetworkClient,
 		codec:          config.Codec,
 		stats:          config.Stats,
-		maxAttempts:    config.MaxAttempts,
-		maxRetryDelay:  config.MaxRetryDelay,
 		stateSyncNodes: config.StateSyncNodeIDs,
 		blockParser:    config.BlockParser,
 	}
@@ -106,9 +104,8 @@ func NewClient(config *ClientConfig) *client {
 // - response bytes could not be unmarshalled to [message.LeafsResponse]
 // - response keys do not correspond to the requested range.
 // - response does not contain a valid merkle proof.
-// Returns error if retries have been exceeded
-func (c *client) GetLeafs(req message.LeafsRequest) (message.LeafsResponse, error) {
-	data, err := c.get(req, parseLeafsResponse)
+func (c *client) GetLeafs(ctx context.Context, req message.LeafsRequest) (message.LeafsResponse, error) {
+	data, err := c.get(ctx, req, parseLeafsResponse)
 	if err != nil {
 		return message.LeafsResponse{}, err
 	}
@@ -185,14 +182,14 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	return leafsResponse, len(leafsResponse.Keys), nil
 }
 
-func (c *client) GetBlocks(hash common.Hash, height uint64, parents uint16) ([]*types.Block, error) {
+func (c *client) GetBlocks(ctx context.Context, hash common.Hash, height uint64, parents uint16) ([]*types.Block, error) {
 	req := message.BlockRequest{
 		Hash:    hash,
 		Height:  height,
 		Parents: parents,
 	}
 
-	data, err := c.get(req, c.parseBlocks)
+	data, err := c.get(ctx, req, c.parseBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("could not get blocks (%s) due to %w", hash, err)
 	}
@@ -240,10 +237,10 @@ func (c *client) parseBlocks(codec codec.Manager, req message.Request, data []by
 	return blocks, len(blocks), nil
 }
 
-func (c *client) GetCode(hashes []common.Hash) ([][]byte, error) {
+func (c *client) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
 	req := message.NewCodeRequest(hashes)
 
-	data, err := c.get(req, parseCode)
+	data, err := c.get(ctx, req, parseCode)
 	if err != nil {
 		return nil, fmt.Errorf("could not get code (%s): %w", req, err)
 	}
@@ -281,12 +278,12 @@ func parseCode(codec codec.Manager, req message.Request, data []byte) (interface
 	return response.Data, totalBytes, nil
 }
 
-// get submits given request and blockingly returns with either a parsed response object or error
-// retry is made if there is a network error or if the [parseResponseFn] returns a non-nil error
-// returns parsed struct as interface{} returned by parseResponseFn
-// retries given request for maximum of [attempts] times with maximum delay of [maxRetryDelay] between attempts
+// get submits given request and blockingly returns with either a parsed response object or an error
+// if [ctx] expires before the client can successfully retrieve a valid response.
+// Retries if there is a network error or if the [parseResponseFn] returns an error indicating an invalid response.
+// Returns the parsed interface returned from [parseFn].
 // Thread safe
-func (c *client) get(request message.Request, parseFn parseResponseFn) (interface{}, error) {
+func (c *client) get(ctx context.Context, request message.Request, parseFn parseResponseFn) (interface{}, error) {
 	// marshal the request into requestBytes
 	requestBytes, err := message.RequestToBytes(c.codec, request)
 	if err != nil {
@@ -300,16 +297,19 @@ func (c *client) get(request message.Request, parseFn parseResponseFn) (interfac
 	var (
 		responseIntf interface{}
 		numElements  int
+		lastErr      error
 	)
-	// Loop until we run out of attempts or receive a valid response.
-	for attempt := uint8(0); attempt < c.maxAttempts; attempt++ {
-		// If this is a retry attempt, wait for random duration to ensure
-		// that we do not spin through the maximum attempts during a period
-		// where the node may not be well connected to the network.
-		if attempt > 0 {
-			randTime := rand.Int63n(c.maxRetryDelay.Nanoseconds())
-			time.Sleep(time.Duration(randTime))
+	// Loop until the context is cancelled or we get a valid response.
+	for attempt := 0; ; attempt++ {
+		// If the context has finished, return the context error early.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			if lastErr != nil {
+				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %s", attempt, lastErr, ctxErr)
+			} else {
+				return nil, ctxErr
+			}
 		}
+
 		metric.IncRequested()
 
 		var (
@@ -337,10 +337,12 @@ func (c *client) get(request message.Request, parseFn parseResponseFn) (interfac
 			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", ctx...)
 			metric.IncFailed()
+			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
 			responseIntf, numElements, err = parseFn(c.codec, request, response)
 			if err != nil {
+				lastErr = err
 				log.Info("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
@@ -351,7 +353,4 @@ func (c *client) get(request message.Request, parseFn parseResponseFn) (interfac
 			return responseIntf, nil
 		}
 	}
-
-	// we only get this far if we've run out of attempts
-	return nil, fmt.Errorf("%s (%d): %w", errExceededRetryLimit, c.maxAttempts, err)
 }

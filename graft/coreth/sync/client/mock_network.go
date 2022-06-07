@@ -23,6 +23,7 @@ type mockNetwork struct {
 
 	// response mocking for RequestAny and Request calls
 	response       [][]byte
+	callback       func() // callback is called prior to processing each mock call
 	requestErr     []error
 	nodesRequested []ids.NodeID
 }
@@ -52,6 +53,10 @@ func (t *mockNetwork) processMock(request []byte) ([]byte, error) {
 	t.request = request
 	t.numCalls++
 
+	if t.callback != nil {
+		t.callback()
+	}
+
 	response := t.response[0]
 	if len(t.response) > 1 {
 		t.response = t.response[1:]
@@ -72,15 +77,17 @@ func (t *mockNetwork) Gossip([]byte) error {
 	panic("not implemented") // we don't care about this function for this test
 }
 
-func (t *mockNetwork) mockResponse(times uint8, response []byte) {
+func (t *mockNetwork) mockResponse(times uint8, callback func(), response []byte) {
 	t.response = make([][]byte, times)
 	for i := uint8(0); i < times; i++ {
 		t.response[i] = response
 	}
+	t.callback = callback
 	t.numCalls = 0
 }
 
-func (t *mockNetwork) mockResponses(responses ...[]byte) {
+func (t *mockNetwork) mockResponses(callback func(), responses ...[]byte) {
 	t.response = responses
+	t.callback = callback
 	t.numCalls = 0
 }
