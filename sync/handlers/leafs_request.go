@@ -139,7 +139,7 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	defer func() {
 		lrh.stats.UpdateLeafsRequestProcessingTime(time.Since(startTime))
 		lrh.stats.UpdateLeafsReturned(uint16(len(leafsResponse.Keys)))
-		lrh.stats.UpdateRangeProofKeysReturned(int64(len(leafsResponse.ProofKeys)))
+		lrh.stats.UpdateRangeProofValsReturned(int64(len(leafsResponse.ProofVals)))
 		lrh.stats.UpdateGenerateRangeProofTime(responseBuilder.proofTime)
 		lrh.stats.UpdateReadLeafsTime(responseBuilder.trieReadTime)
 	}()
@@ -158,7 +158,7 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		return nil, nil
 	}
 
-	log.Debug("handled leafsRequest", "time", time.Since(startTime), "leafs", len(leafsResponse.Keys), "proofLen", len(leafsResponse.ProofKeys))
+	log.Debug("handled leafsRequest", "time", time.Since(startTime), "leafs", len(leafsResponse.Keys), "proofLen", len(leafsResponse.ProofVals))
 	return responseBytes, nil
 }
 
@@ -207,7 +207,7 @@ func (rb *responseBuilder) handleRequest(ctx context.Context) error {
 	}
 	defer proof.Close() // closing memdb does not error
 
-	rb.response.ProofKeys, rb.response.ProofVals, err = iterateKeyVals(proof)
+	rb.response.ProofVals, err = iterateVals(proof)
 	if err != nil {
 		rb.stats.IncProofError()
 		return err
@@ -247,7 +247,7 @@ func (rb *responseBuilder) fillFromSnapshot(ctx context.Context) (bool, error) {
 			rb.stats.IncSnapshotReadSuccess()
 			return true, nil
 		}
-		rb.response.ProofKeys, rb.response.ProofVals, err = iterateKeyVals(proof)
+		rb.response.ProofVals, err = iterateVals(proof)
 		if err != nil {
 			rb.stats.IncProofError()
 			return false, err
@@ -351,23 +351,21 @@ func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, p
 	return err
 }
 
-// iterateKeyVals returns the key-value pairs contained in [db]
-func iterateKeyVals(db *memorydb.Database) ([][]byte, [][]byte, error) {
+// iterateVals returns the values contained in [db]
+func iterateVals(db *memorydb.Database) ([][]byte, error) {
 	if db == nil {
-		return nil, nil, nil
+		return nil, nil
 	}
 	// iterate db into [][]byte and return
 	it := db.NewIterator(nil, nil)
 	defer it.Release()
 
-	keys := make([][]byte, 0, db.Len())
 	vals := make([][]byte, 0, db.Len())
 	for it.Next() {
-		keys = append(keys, it.Key())
 		vals = append(vals, it.Value())
 	}
 
-	return keys, vals, it.Error()
+	return vals, it.Error()
 }
 
 // isRangeValid generates and verifies a range proof, returning true if keys/vals are

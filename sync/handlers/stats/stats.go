@@ -40,7 +40,7 @@ type LeafsRequestHandlerStats interface {
 	UpdateReadLeafsTime(duration time.Duration)
 	UpdateSnapshotReadTime(duration time.Duration)
 	UpdateGenerateRangeProofTime(duration time.Duration)
-	UpdateRangeProofKeysReturned(numProofKeys int64)
+	UpdateRangeProofValsReturned(numProofVals int64)
 	IncMissingRoot()
 	IncTrieError()
 	IncProofError()
@@ -74,7 +74,7 @@ type handlerStats struct {
 	leafsReadTime              metrics.Timer
 	snapshotReadTime           metrics.Timer
 	generateRangeProofTime     metrics.Timer
-	proofKeysReturned          metrics.Histogram
+	proofValsReturned          metrics.Histogram
 	missingRoot                metrics.Counter
 	trieError                  metrics.Counter
 	proofError                 metrics.Counter
@@ -153,8 +153,8 @@ func (h *handlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {
 	h.generateRangeProofTime.Update(duration)
 }
 
-func (h *handlerStats) UpdateRangeProofKeysReturned(numProofKeys int64) {
-	h.proofKeysReturned.Update(numProofKeys)
+func (h *handlerStats) UpdateRangeProofValsReturned(numProofVals int64) {
+	h.proofValsReturned.Update(numProofVals)
 }
 
 func (h *handlerStats) IncMissingRoot()            { h.missingRoot.Inc(1) }
@@ -193,7 +193,7 @@ func NewHandlerStats(enabled bool) HandlerStats {
 		leafsReadTime:              metrics.GetOrRegisterTimer("leafs_request_read_time", nil),
 		snapshotReadTime:           metrics.GetOrRegisterTimer("leafs_request_snapshot_read_time", nil),
 		generateRangeProofTime:     metrics.GetOrRegisterTimer("leafs_request_generate_range_proof_time", nil),
-		proofKeysReturned:          metrics.GetOrRegisterHistogram("leafs_request_proof_keys_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
+		proofValsReturned:          metrics.GetOrRegisterHistogram("leafs_request_proof_vals_returned", nil, metrics.NewExpDecaySample(1028, 0.015)),
 		missingRoot:                metrics.GetOrRegisterCounter("leafs_request_missing_root", nil),
 		trieError:                  metrics.GetOrRegisterCounter("leafs_request_trie_error", nil),
 		proofError:                 metrics.GetOrRegisterCounter("leafs_request_proof_error", nil),
@@ -230,7 +230,7 @@ func (n *noopHandlerStats) UpdateLeafsReturned(uint16)                          
 func (n *noopHandlerStats) UpdateReadLeafsTime(duration time.Duration)          {}
 func (n *noopHandlerStats) UpdateSnapshotReadTime(duration time.Duration)       {}
 func (n *noopHandlerStats) UpdateGenerateRangeProofTime(duration time.Duration) {}
-func (n *noopHandlerStats) UpdateRangeProofKeysReturned(numProofKeys int64)     {}
+func (n *noopHandlerStats) UpdateRangeProofValsReturned(numProofVals int64)     {}
 func (n *noopHandlerStats) IncMissingRoot()                                     {}
 func (n *noopHandlerStats) IncTrieError()                                       {}
 func (n *noopHandlerStats) IncProofError()                                      {}

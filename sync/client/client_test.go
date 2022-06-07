@@ -737,8 +737,7 @@ func TestGetLeafs(t *testing.T) {
 				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
 					t.Fatal(err)
 				}
-				// Remove the proof keys
-				leafResponse.ProofKeys = nil
+				// Remove the proof
 				leafResponse.ProofVals = nil
 
 				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)

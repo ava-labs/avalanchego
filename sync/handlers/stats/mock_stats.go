@@ -37,7 +37,7 @@ type MockHandlerStats struct {
 	SnapshotReadSuccessCount,
 	SnapshotSegmentValidCount,
 	SnapshotSegmentInvalidCount uint32
-	ProofKeysReturned int64
+	ProofValsReturned int64
 	LeafsReadTime,
 	SnapshotReadTime,
 	GenerateRangeProofTime,
@@ -68,7 +68,7 @@ func (m *MockHandlerStats) Reset() {
 	m.SnapshotReadSuccessCount = 0
 	m.SnapshotSegmentValidCount = 0
 	m.SnapshotSegmentInvalidCount = 0
-	m.ProofKeysReturned = 0
+	m.ProofValsReturned = 0
 	m.LeafsReadTime = 0
 	m.SnapshotReadTime = 0
 	m.GenerateRangeProofTime = 0
@@ -177,10 +177,10 @@ func (m *MockHandlerStats) UpdateSnapshotReadTime(duration time.Duration) {
 	m.SnapshotReadTime += duration
 }
 
-func (m *MockHandlerStats) UpdateRangeProofKeysReturned(numProofKeys int64) {
+func (m *MockHandlerStats) UpdateRangeProofValsReturned(numProofVals int64) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	m.ProofKeysReturned += numProofKeys
+	m.ProofValsReturned += numProofVals
 }
 
 func (m *MockHandlerStats) IncMissingRoot() {
