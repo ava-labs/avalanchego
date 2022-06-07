@@ -620,11 +620,7 @@ func (vm *VM) initializeStateSyncServer() {
 		SyncableInterval: vm.config.StateSyncCommitInterval,
 	})
 
-	if !vm.config.StateSyncDisableRequests {
-		// if state sync requests are disabled, do not initialize app request handlers
-		// this leaves the default no-op implementation in place.
-		vm.setAppRequestHandlers()
-	}
+	vm.setAppRequestHandlers()
 }
 
 func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
