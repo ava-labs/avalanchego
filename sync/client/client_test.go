@@ -29,8 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const maxAttempts = 5
-
 func TestGetCode(t *testing.T) {
 	mockNetClient := &mockNetwork{}
 
@@ -89,14 +87,14 @@ func TestGetCode(t *testing.T) {
 		NetworkClient:    mockNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
-		MaxAttempts:      maxAttempts,
-		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
 		BlockParser:      mockBlockParser,
 	})
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			codeHashes, res, expectedCode := test.setupRequest()
 
 			responseBytes, err := message.Codec.Marshal(message.Version, res)
@@ -105,17 +103,24 @@ func TestGetCode(t *testing.T) {
 			}
 			// Dirty hack required because the client will re-request if it encounters
 			// an error.
+			attempted := false
 			if test.expectedErr == nil {
-				mockNetClient.mockResponse(1, responseBytes)
+				mockNetClient.mockResponse(1, nil, responseBytes)
 			} else {
-				mockNetClient.mockResponse(maxAttempts, responseBytes)
+				mockNetClient.mockResponse(2, func() {
+					// Cancel before the second attempt is processed.
+					if attempted {
+						cancel()
+					}
+					attempted = true
+				}, responseBytes)
 			}
 
-			codeBytes, err := stateSyncClient.GetCode(codeHashes)
+			codeBytes, err := stateSyncClient.GetCode(ctx, codeHashes)
 			// If we expect an error, assert that one occurred and return
 			if test.expectedErr != nil {
 				assert.ErrorIs(t, err, test.expectedErr)
-				assert.Equal(t, uint(maxAttempts), mockNetClient.numCalls)
+				assert.EqualValues(t, 2, mockNetClient.numCalls)
 				return
 			}
 			// Otherwise, assert there was no error and that the result is as expected
@@ -152,8 +157,6 @@ func TestGetBlocks(t *testing.T) {
 		NetworkClient:    mockNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
-		MaxAttempts:      1,
-		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
 		BlockParser:      mockBlockParser,
 	})
@@ -355,10 +358,23 @@ func TestGetBlocks(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			responseBytes := test.getResponse(t, test.request)
-			mockNetClient.mockResponse(1, responseBytes)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			blockResponse, err := stateSyncClient.GetBlocks(test.request.Hash, test.request.Height, test.request.Parents)
+			responseBytes := test.getResponse(t, test.request)
+			if len(test.expectedErr) == 0 {
+				mockNetClient.mockResponse(1, nil, responseBytes)
+			} else {
+				attempted := false
+				mockNetClient.mockResponse(2, func() {
+					if attempted {
+						cancel()
+					}
+					attempted = true
+				}, responseBytes)
+			}
+
+			blockResponse, err := stateSyncClient.GetBlocks(ctx, test.request.Hash, test.request.Height, test.request.Parents)
 			if len(test.expectedErr) != 0 {
 				if err == nil {
 					t.Fatalf("Expected error: %s, but found no error", test.expectedErr)
@@ -402,8 +418,6 @@ func TestGetLeafs(t *testing.T) {
 		NetworkClient:    &mockNetwork{},
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
-		MaxAttempts:      1,
-		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
 		BlockParser:      mockBlockParser,
 	})
@@ -789,8 +803,6 @@ func TestGetLeafsRetries(t *testing.T) {
 		NetworkClient:    mockNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
-		MaxAttempts:      maxAttempts,
-		MaxRetryDelay:    1,
 		StateSyncNodeIDs: nil,
 		BlockParser:      mockBlockParser,
 	})
@@ -802,11 +814,14 @@ func TestGetLeafsRetries(t *testing.T) {
 		Limit:    defaultLeafRequestLimit,
 		NodeType: message.StateTrieNode,
 	}
-	goodResponse, responseErr := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
-	assert.NoError(t, responseErr)
-	mockNetClient.mockResponse(1, goodResponse)
 
-	res, err := client.GetLeafs(request)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	goodResponse, responseErr := handler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
+	assert.NoError(t, responseErr)
+	mockNetClient.mockResponse(1, nil, goodResponse)
+
+	res, err := client.GetLeafs(ctx, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -815,20 +830,26 @@ func TestGetLeafsRetries(t *testing.T) {
 
 	// Succeeds within the allotted number of attempts
 	invalidResponse := []byte("invalid response")
-	mockNetClient.mockResponses(invalidResponse, invalidResponse, goodResponse)
+	mockNetClient.mockResponses(nil, invalidResponse, invalidResponse, goodResponse)
 
-	res, err = client.GetLeafs(request)
+	res, err = client.GetLeafs(ctx, request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 1024, len(res.Keys))
 	assert.Equal(t, 1024, len(res.Vals))
 
-	// Test that we hit the retry limit
-	mockNetClient.mockResponse(maxAttempts, invalidResponse)
-	_, err = client.GetLeafs(request)
+	// Test that GetLeafs stops after the context is cancelled
+	numAttempts := 0
+	mockNetClient.mockResponse(maxAttempts, func() {
+		numAttempts++
+		if numAttempts >= maxAttempts {
+			cancel()
+		}
+	}, invalidResponse)
+	_, err = client.GetLeafs(ctx, request)
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), errExceededRetryLimit.Error()))
+	assert.True(t, strings.Contains(err.Error(), context.Canceled.Error()))
 }
 
 func TestStateSyncNodes(t *testing.T) {
@@ -844,15 +865,22 @@ func TestStateSyncNodes(t *testing.T) {
 		NetworkClient:    mockNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
-		MaxAttempts:      4,
-		MaxRetryDelay:    1,
 		StateSyncNodeIDs: stateSyncNodes,
 		BlockParser:      mockBlockParser,
 	})
-	mockNetClient.response = [][]byte{{1}, {2}, {3}, {4}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	attempt := 0
+	responses := [][]byte{{1}, {2}, {3}, {4}}
+	mockNetClient.mockResponses(func() {
+		attempt++
+		if attempt >= 4 {
+			cancel()
+		}
+	}, responses...)
 
 	// send some request, doesn't matter what it is because we're testing the interaction with state sync nodes here
-	response, err := client.GetLeafs(message.LeafsRequest{})
+	response, err := client.GetLeafs(ctx, message.LeafsRequest{})
 	assert.Error(t, err)
 	assert.Empty(t, response)
 

@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -31,7 +32,6 @@ import (
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/peer"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/statesync"
 	"github.com/ava-labs/coreth/trie"
@@ -39,11 +39,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
-
-func init() {
-	// Set the max retry delay to 1 for these tests.
-	defaultMaxRetryDelay = 1
-}
 
 func TestSkipStateSync(t *testing.T) {
 	rand.Seed(1)
@@ -95,11 +90,17 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 				if err := syncerVM.AppRequestFailed(nodeID, requestID); err != nil {
 					panic(err)
 				}
+				cancel := syncerVM.StateSyncClient.(*stateSyncerClient).cancel
+				if cancel != nil {
+					cancel()
+				} else {
+					t.Fatal("state sync client not populated correctly")
+				}
 			} else {
 				syncerVM.AppResponse(nodeID, requestID, response)
 			}
 		},
-		expectedErr: peer.ErrRequestFailed,
+		expectedErr: context.Canceled,
 	}
 	vmSetup := createSyncServerAndClientVMs(t, test)
 	defer vmSetup.Teardown(t)

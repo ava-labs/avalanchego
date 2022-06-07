@@ -56,8 +56,8 @@ func NewMockClient(
 	}
 }
 
-func (ml *MockClient) GetLeafs(request message.LeafsRequest) (message.LeafsResponse, error) {
-	response, err := ml.leafsHandler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+func (ml *MockClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {
+	response, err := ml.leafsHandler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 	if err != nil {
 		return message.LeafsResponse{}, err
 	}
@@ -79,12 +79,12 @@ func (ml *MockClient) LeavesReceived() int32 {
 	return atomic.LoadInt32(&ml.leavesReceived)
 }
 
-func (ml *MockClient) GetCode(hashes []common.Hash) ([][]byte, error) {
+func (ml *MockClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
 	if ml.codesHandler == nil {
 		panic("no code handler for mock client")
 	}
 	request := message.CodeRequest{Hashes: hashes}
-	response, err := ml.codesHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+	response, err := ml.codesHandler.OnCodeRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (ml *MockClient) CodeReceived() int32 {
 	return atomic.LoadInt32(&ml.codeReceived)
 }
 
-func (ml *MockClient) GetBlocks(blockHash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
+func (ml *MockClient) GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
 	if ml.blocksHandler == nil {
 		panic("no blocks handler for mock client")
 	}
@@ -116,7 +116,7 @@ func (ml *MockClient) GetBlocks(blockHash common.Hash, height uint64, numParents
 		Height:  height,
 		Parents: numParents,
 	}
-	response, err := ml.blocksHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+	response, err := ml.blocksHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 	if err != nil {
 		return nil, err
 	}

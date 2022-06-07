@@ -585,8 +585,6 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 				NetworkClient:    vm.client,
 				Codec:            vm.networkCodec,
 				Stats:            stats.NewClientSyncerStats(),
-				MaxAttempts:      maxRetryAttempts,
-				MaxRetryDelay:    defaultMaxRetryDelay,
 				StateSyncNodeIDs: stateSyncIDs,
 				BlockParser:      vm,
 			},

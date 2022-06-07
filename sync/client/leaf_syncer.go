@@ -59,7 +59,7 @@ type CallbackLeafSyncer struct {
 }
 
 type LeafClient interface {
-	GetLeafs(message.LeafsRequest) (message.LeafsResponse, error)
+	GetLeafs(context.Context, message.LeafsRequest) (message.LeafsResponse, error)
 }
 
 // NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
@@ -109,13 +109,11 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task *LeafSyncTask) e
 
 	for {
 		// If [ctx] has finished, return early.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 
-		leafsResponse, err := c.client.GetLeafs(message.LeafsRequest{
+		leafsResponse, err := c.client.GetLeafs(ctx, message.LeafsRequest{
 			Root:     root,
 			Account:  task.Account,
 			Start:    start,
