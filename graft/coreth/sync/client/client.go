@@ -52,6 +52,7 @@ var _ Client = &client{}
 // Repeatedly requests failed requests until the context to the request is expired.
 type Client interface {
 	// GetLeafs synchronously sends given request, returning parsed *LeafsResponse or error
+	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
 
 	// GetBlocks synchronously retrieves blocks starting with specified common.Hash and height up to specified parents
