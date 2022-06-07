@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 
+	"github.com/ava-labs/coreth/peer/stats"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -76,6 +77,7 @@ type network struct {
 	requestHandler                message.RequestHandler             // maps request type => handler
 	gossipHandler                 message.GossipHandler              // maps gossip type => handler
 	peers                         map[ids.NodeID]version.Application // maps nodeID => version.Version
+	stats                         stats.RequestHandlerStats          // Provide request handler metrics
 }
 
 func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID, maxActiveRequests int64) Network {
@@ -88,6 +90,7 @@ func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID
 		activeRequests:                semaphore.NewWeighted(maxActiveRequests),
 		gossipHandler:                 message.NoopMempoolGossipHandler{},
 		requestHandler:                message.NoopRequestHandler{},
+		stats:                         stats.NewRequestHandlerStats(),
 	}
 }
 
@@ -186,6 +189,7 @@ func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 
 	// calculate how much time is left until the deadline
 	timeTillDeadline := time.Until(deadline)
+	n.stats.UpdateTimeUntilDeadline(timeTillDeadline)
 
 	// bufferedDeadline is half the time till actual deadline so that the message has a reasonable chance
 	// of completing its processing and sending the response to the peer.
@@ -196,6 +200,7 @@ func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
 		// Drop the request if we already missed the deadline to respond.
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "req", req)
+		n.stats.IncDeadlineDroppedRequest()
 		return nil
 	}
 
