@@ -210,7 +210,6 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Len(t, leafsResponse.Keys, 500)
 				assert.Len(t, leafsResponse.Vals, 500)
-				assert.Len(t, leafsResponse.ProofKeys, 0)
 				assert.Len(t, leafsResponse.ProofVals, 0)
 			},
 		},
@@ -422,7 +421,6 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 
 				assert.EqualValues(t, 500, len(leafsResponse.Keys))
 				assert.EqualValues(t, 500, len(leafsResponse.Vals))
-				assert.Empty(t, leafsResponse.ProofKeys)
 				assert.Empty(t, leafsResponse.ProofVals)
 				assert.EqualValues(t, 1, mockHandlerStats.LeafsRequestCount)
 				assert.EqualValues(t, len(leafsResponse.Keys), mockHandlerStats.LeafsReturnedSum)
@@ -621,11 +619,12 @@ func assertRangeProofIsValid(t *testing.T, request *message.LeafsRequest, respon
 	}
 
 	var proof ethdb.Database
-	if len(response.ProofKeys) > 0 {
+	if len(response.ProofVals) > 0 {
 		proof = memorydb.New()
 		defer proof.Close()
-		for i, proofKey := range response.ProofKeys {
-			if err := proof.Put(proofKey, response.ProofVals[i]); err != nil {
+		for _, proofVal := range response.ProofVals {
+			proofKey := crypto.Keccak256(proofVal)
+			if err := proof.Put(proofKey, proofVal); err != nil {
 				t.Fatal(err)
 			}
 		}

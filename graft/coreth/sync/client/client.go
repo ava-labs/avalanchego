@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	StateSyncVersion          = version.NewDefaultApplication(constants.PlatformName, 1, 7, 12)
+	StateSyncVersion          = version.NewDefaultApplication(constants.PlatformName, 1, 7, 13)
 	errEmptyResponse          = errors.New("empty response")
 	errTooManyBlocks          = errors.New("response contains more blocks than requested")
 	errHashMismatch           = errors.New("hash does not match expected value")
@@ -139,21 +139,19 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	}
 
 	// An empty response (no more keys) requires a merkle proof
-	if len(leafsResponse.Keys) == 0 && len(leafsResponse.ProofKeys) == 0 {
+	if len(leafsResponse.Keys) == 0 && len(leafsResponse.ProofVals) == 0 {
 		return nil, 0, fmt.Errorf("empty key response must include merkle proof")
 	}
 
 	var proof ethdb.Database
-	// Populate proof when ProofKeys are present in the response. Its ok to pass it as nil to the trie.VerifyRangeProof
+	// Populate proof when ProofVals are present in the response. Its ok to pass it as nil to the trie.VerifyRangeProof
 	// function as it will assert that all the leaves belonging to the specified root are present.
-	if len(leafsResponse.ProofKeys) > 0 {
-		if len(leafsResponse.ProofKeys) != len(leafsResponse.ProofVals) {
-			return nil, 0, fmt.Errorf("mismatch in length of proof keys (%d)/vals (%d)", len(leafsResponse.ProofKeys), len(leafsResponse.ProofVals))
-		}
+	if len(leafsResponse.ProofVals) > 0 {
 		proof = memorydb.New()
 		defer proof.Close()
-		for i, proofKey := range leafsResponse.ProofKeys {
-			if err := proof.Put(proofKey, leafsResponse.ProofVals[i]); err != nil {
+		for _, proofVal := range leafsResponse.ProofVals {
+			proofKey := crypto.Keccak256(proofVal)
+			if err := proof.Put(proofKey, proofVal); err != nil {
 				return nil, 0, err
 			}
 		}
