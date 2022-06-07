@@ -9,17 +9,18 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -46,7 +47,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	vm.T = t
 	engCfg.VM = vm
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
+	snowGetHandler, err := getter.New(vm, commonCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
