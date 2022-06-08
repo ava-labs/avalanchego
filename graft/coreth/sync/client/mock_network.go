@@ -91,3 +91,5 @@ func (t *mockNetwork) mockResponses(callback func(), responses ...[]byte) {
 	t.callback = callback
 	t.numCalls = 0
 }
+
+func (t *mockNetwork) TrackBandwidth(ids.NodeID, float64) {}

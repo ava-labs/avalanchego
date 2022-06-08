@@ -33,6 +33,8 @@ import (
 
 const (
 	failedRequestSleepInterval = 10 * time.Millisecond
+
+	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
 var (
@@ -338,6 +340,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			ctx = append(ctx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", ctx...)
 			metric.IncFailed()
+			c.networkClient.TrackBandwidth(nodeID, 0)
 			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
@@ -345,10 +348,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if err != nil {
 				lastErr = err
 				log.Info("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
+				c.networkClient.TrackBandwidth(nodeID, 0)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
 			}
+
+			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
+			c.networkClient.TrackBandwidth(nodeID, bandwidth)
 			metric.IncSucceeded()
 			metric.UpdateReceived(int64(numElements))
 			return responseIntf, nil
