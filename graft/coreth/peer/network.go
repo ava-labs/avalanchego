@@ -136,7 +136,7 @@ func (n *network) Request(nodeID ids.NodeID, request []byte, responseHandler mes
 	return n.request(nodeID, request, responseHandler)
 }
 
-// request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingResponseHandlerMap]
+// request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
 // so that it can be invoked when the network receives either a response or failure message.
 // Assumes [nodeID] is never [self] since we guarantee [self] will not be added to the [peers] map.
 // Releases active requests semaphore if there was an error in sending the request
@@ -158,7 +158,7 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	// send app request to the peer
 	// on failure: release the activeRequests slot, mark message as processed and return fatal error
 	// Send app request to [nodeID].
-	// On failure, release the slot from active requests and [outstandingResponseHandlerMap].
+	// On failure, release the slot from active requests and [outstandingRequestHandlers].
 	if err := n.appSender.SendAppRequest(nodeIDs, requestID, request); err != nil {
 		n.activeRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
