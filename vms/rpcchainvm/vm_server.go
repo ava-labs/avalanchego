@@ -13,6 +13,9 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
@@ -54,6 +57,8 @@ type VMServer struct {
 	hVM  block.HeightIndexedChainVM
 	ssVM block.StateSyncableVM
 
+	processMetrics prometheus.Gatherer
+
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
 
@@ -93,6 +98,23 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	if err != nil {
 		return nil, err
 	}
+
+	registerer := prometheus.NewRegistry()
+
+	// Current state of process metrics
+	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
+	if err := registerer.Register(processCollector); err != nil {
+		return nil, err
+	}
+
+	// Go process metrics using debug.GCStats
+	goCollector := collectors.NewGoCollector()
+	if err := registerer.Register(goCollector); err != nil {
+		return nil, err
+	}
+
+	// Register metrics for each Go plugin processes
+	vm.processMetrics = registerer
 
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
@@ -500,7 +522,21 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
+	// Gather metrics registered to snow context Gatherer. These
+	// metrics are defined by the underlying vm implementation.
 	mfs, err := vm.ctx.Metrics.Gather()
+	if err != nil {
+		return nil, err
+	}
+
+	// Gather metrics registered by rpcchainvm server Gatherer. These
+	// metrics are collected for each Go plugin process.
+	pluginMetrics, err := vm.processMetrics.Gather()
+	if err != nil {
+		return nil, err
+	}
+	mfs = append(mfs, pluginMetrics...)
+
 	return &vmpb.GatherResponse{MetricFamilies: mfs}, err
 }
 
