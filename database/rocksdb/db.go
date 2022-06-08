@@ -295,6 +295,13 @@ func (db *Database) isClosed() bool {
 	return db.db == nil
 }
 
+func (db *Database) HealthCheck() (interface{}, error) {
+	if db.isClosed() {
+		return nil, database.ErrClosed
+	}
+	return nil, nil
+}
+
 // batch is a wrapper around a levelDB batch to contain sizes.
 type batch struct {
 	batch *grocksdb.WriteBatch

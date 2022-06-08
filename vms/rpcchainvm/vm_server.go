@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,6 +57,7 @@ type VMServer struct {
 	ssVM block.StateSyncableVM
 
 	processMetrics prometheus.Gatherer
+	dbManager      manager.Manager
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -145,6 +145,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
+	vm.dbManager = dbManager
 
 	clientConn, err := grpcutils.Dial(req.ServerAddr)
 	if err != nil {
@@ -424,58 +425,40 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequ
 	return &emptypb.Empty{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(ctx context.Context, req *vmpb.HealthRequest) (*vmpb.HealthResponse, error) {
-	// Perform health checks for vm client gRPC servers
-	err := vm.grpcHealthChecks(ctx, req.GrpcChecks)
+func (vm *VMServer) Health(ctx context.Context, req *emptypb.Empty) (*vmpb.HealthResponse, error) {
+	vmHealth, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-
-	details, err := vm.vm.HealthCheck()
+	dbHealth, err := vm.healthChecks()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-
-	// Try to stringify the details
-	detailsStr := "couldn't parse health check details to string"
-	switch details := details.(type) {
-	case nil:
-		detailsStr = ""
-	case string:
-		detailsStr = details
-	case map[string]string:
-		asJSON, err := json.Marshal(details)
-		if err != nil {
-			detailsStr = string(asJSON)
-		}
-	case []byte:
-		detailsStr = string(details)
+	report := map[string]interface{}{
+		"database": dbHealth,
+		"health":   vmHealth,
 	}
 
+	details, err := json.Marshal(report)
 	return &vmpb.HealthResponse{
-		Details: detailsStr,
-	}, nil
+		Details: details,
+	}, err
 }
 
-func (vm *VMServer) grpcHealthChecks(ctx context.Context, checks map[string]string) error {
-	var errs []error
-	for name, address := range checks {
-		clientConn, err := grpcutils.Dial(address)
+func (vm *VMServer) healthChecks() (interface{}, error) {
+	details := make(map[string]interface{}, len(vm.dbManager.GetDatabases()))
+
+	// Check Database health
+	for _, client := range vm.dbManager.GetDatabases() {
+		// Shared gRPC client don't close
+		health, err := client.Database.HealthCheck()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("grpc health check failed to dial: %q address: %s: %w", name, address, err))
-			continue
+			return nil, fmt.Errorf("failed to check db health %q: %w", client.Version.String(), err)
 		}
-		client := grpc_health_v1.NewHealthClient(clientConn)
-		_, err = client.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
-		if err != nil {
-			errs = append(errs, fmt.Errorf("grpc health check failed for %q address: %s: %w", name, address, err))
-		}
-		err = clientConn.Close()
-		if err != nil {
-			errs = append(errs, err)
-		}
+		details[client.Version.String()] = health
 	}
-	return wrappers.NewAggregate(errs)
+
+	return details, nil
 }
 
 func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionResponse, error) {

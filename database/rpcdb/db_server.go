@@ -4,10 +4,12 @@
 package rpcdb
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 
-	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/database"
 
@@ -90,6 +92,19 @@ func (db *DatabaseServer) Compact(_ context.Context, req *rpcdbpb.CompactRequest
 func (db *DatabaseServer) Close(context.Context, *rpcdbpb.CloseRequest) (*rpcdbpb.CloseResponse, error) {
 	err := db.db.Close()
 	return &rpcdbpb.CloseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+}
+
+// HealthCheck performs a heath check against the underlying database.
+func (db *DatabaseServer) HealthCheck(context.Context, *emptypb.Empty) (*rpcdbpb.HealthCheckResponse, error) {
+	health, err := db.db.HealthCheck()
+	if err != nil {
+		return &rpcdbpb.HealthCheckResponse{}, err
+	}
+
+	details, err := json.Marshal(health)
+	return &rpcdbpb.HealthCheckResponse{
+		Details: details,
+	}, err
 }
 
 // WriteBatch takes in a set of key-value pairs and atomically writes them to

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package rpcdb;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/rpcdb";
 
 message HasRequest {
@@ -100,6 +102,10 @@ message IteratorReleaseResponse {
   uint32 err = 1;
 }
 
+message HealthCheckResponse {
+  bytes details = 1;
+}
+
 service Database {
   rpc Has(HasRequest) returns (HasResponse);
   rpc Get(GetRequest) returns (GetResponse);
@@ -107,6 +113,7 @@ service Database {
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc Compact(CompactRequest) returns (CompactResponse);
   rpc Close(CloseRequest) returns (CloseResponse);
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
 
   rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
 
