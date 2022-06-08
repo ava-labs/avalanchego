@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // e2e implements the e2e tests.
-package e2e_test
+package e2e
 
 import (
 	"flag"
@@ -12,6 +12,7 @@ import (
 	_ "github.com/ava-labs/subnet-evm/tests/e2e/ping"
 	"github.com/ava-labs/subnet-evm/tests/e2e/runner"
 	_ "github.com/ava-labs/subnet-evm/tests/e2e/solidity"
+	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -95,6 +96,10 @@ func init() {
 	)
 }
 
+func GetOutputPath() string {
+	return outputPath
+}
+
 const vmName = "subnetevm"
 
 var vmID ids.ID
@@ -112,13 +117,13 @@ func init() {
 
 var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(mode).Should(gomega.Or(gomega.Equal("test"), gomega.Equal("run")))
+	utils.SetOutputFile(outputPath)
 
 	runner.InitializeRunner(execPath, gRPCEp, networkRunnerLogLevel)
-	// runner.StartNetwork(vmID, vmName, genesisPath, pluginDir)
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	// runner.ShutdownCluster()
+	runner.ShutdownCluster()
 })
 
 // var _ = ginkgo.Describe("[RPC server]", func() {

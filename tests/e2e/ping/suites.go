@@ -11,11 +11,11 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/ava-labs/subnet-evm/tests/e2e"
 	"github.com/ava-labs/subnet-evm/tests/e2e/runner"
+	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 )
 
-var _ = e2e.DescribeLocal("[Ping]", func() {
+var _ = utils.DescribeLocal("[Ping]", func() {
 	ginkgo.It("can ping network-runner RPC server", func() {
 		runnerCli := runner.GetClient()
 		gomega.Expect(runnerCli).ShouldNot(gomega.BeNil())

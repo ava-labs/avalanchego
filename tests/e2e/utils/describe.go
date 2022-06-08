@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package e2e
+package utils
 
 import (
 	ginkgo "github.com/onsi/ginkgo/v2"

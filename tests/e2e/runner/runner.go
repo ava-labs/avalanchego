@@ -8,6 +8,7 @@ import (
 
 	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 
 	// "github.com/influxdata/influxdb/client"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -148,7 +149,7 @@ func getClusterInfo(blockchainId string, logsDir string) clusterInfo {
 		PID:      pid,
 		LogsDir:  logsDir,
 	}
-	// gomega.Expect(ci.Save(outputPath)).Should(gomega.BeNil())
+	gomega.Expect(ci.Save(utils.GetOutputPath())).Should(gomega.BeNil())
 	return ci
 }
 
