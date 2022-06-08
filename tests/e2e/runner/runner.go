@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ava-labs/avalanche-network-runner/client"
+	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
 	"github.com/ava-labs/avalanchego/ids"
 
 	// "github.com/influxdata/influxdb/client"
@@ -28,7 +28,7 @@ var (
 	// outputPath string
 
 	// mode string
-	cli client.Client
+	cli runner_sdk.Client
 )
 
 type clusterInfo struct {
@@ -48,7 +48,7 @@ func (ci clusterInfo) Save(p string) error {
 	return os.WriteFile(p, ob, fsModeWrite)
 }
 
-func GetClient() client.Client {
+func GetClient() runner_sdk.Client {
 	return cli
 }
 
@@ -56,7 +56,7 @@ func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel str
 	execPath = execPath_
 
 	var err error
-	cli, err = client.New(client.Config{
+	cli, err = runner_sdk.New(runner_sdk.Config{
 		LogLevel:    networkRunnerLogLevel,
 		Endpoint:    grpcEp,
 		DialTimeout: 10 * time.Second,
@@ -64,15 +64,16 @@ func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel str
 	gomega.Expect(err).Should(gomega.BeNil())
 }
 
-func startRunner(vmId ids.ID, vmName string, genesisPath string, pluginDir string) {
+func startRunner(vmName string, genesisPath string, pluginDir string) {
 	ginkgo.By("calling start API via network runner", func() {
 		outf("{{green}}sending 'start' with binary path:{{/}} %q\n", execPath)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		resp, err := cli.Start(
 			ctx,
 			execPath,
-			client.WithPluginDir(pluginDir),
-			client.WithCustomVMs(map[string]string{
+			runner_sdk.WithLogLevel(logLevel),
+			runner_sdk.WithPluginDir(pluginDir),
+			runner_sdk.WithCustomVMs(map[string]string{
 				vmName: genesisPath,
 			}))
 		cancel()
@@ -151,7 +152,7 @@ func getClusterInfo(blockchainId string, logsDir string) clusterInfo {
 }
 
 func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir string) clusterInfo {
-	startRunner(vmId, vmName, genesisPath, pluginDir)
+	startRunner(vmName, genesisPath, pluginDir)
 
 	// TODO: network runner health should imply custom VM healthiness
 	// or provide a separate API for custom VM healthiness
