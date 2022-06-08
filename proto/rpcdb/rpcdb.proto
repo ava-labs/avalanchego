@@ -39,15 +39,6 @@ message DeleteResponse {
   uint32 err = 1;
 }
 
-message StatRequest {
-  string property = 1;
-}
-
-message StatResponse {
-  string stat = 1;
-  uint32 err = 2;
-}
-
 message CompactRequest {
   bytes start = 1;
   bytes limit = 2;
@@ -114,8 +105,6 @@ service Database {
   rpc Get(GetRequest) returns (GetResponse);
   rpc Put(PutRequest) returns (PutResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
-  // TODO: Delete this after we update the downstream dependencies
-  rpc Stat(StatRequest) returns (StatResponse);
   rpc Compact(CompactRequest) returns (CompactResponse);
   rpc Close(CloseRequest) returns (CloseResponse);
 
