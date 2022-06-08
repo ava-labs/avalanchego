@@ -118,7 +118,7 @@ var _ = ginkgo.BeforeSuite(func() {
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	runner.ShutdownCluster()
+	// runner.ShutdownCluster()
 })
 
 // var _ = ginkgo.Describe("[RPC server]", func() {

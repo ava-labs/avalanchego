@@ -29,36 +29,6 @@ var _ = e2e.DescribePrecompile("[TX Allow List]", func() {
 			panic(err)
 		}
 		runner.StartNetwork(vmID, vmName, "/tmp/genesis.json", "/tmp/avalanchego-v1.7.11/plugins")
-
-		// runnerCli := e2e.GetRunnerClient()
-		// gomega.Expect(runnerCli).ShouldNot(gomega.BeNil())
-
-		// execPath := e2e.GetExecPath()
-		// logLevel := e2e.GetLogLevel()
-
-		// tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", execPath)
-		// ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		// resp, err := runnerCli.Start(ctx, execPath, runner_client.WithLogLevel(logLevel))
-		// cancel()
-		// gomega.Expect(err).Should(gomega.BeNil())
-		// tests.Outf("{{green}}successfully started network-runner :{{/}} %+v\n", resp.ClusterInfo.NodeNames)
-
-		// // start is async, so wait some time for cluster health
-		// time.Sleep(time.Minute)
-
-		// ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-		// _, err = runnerCli.Health(ctx)
-		// cancel()
-		// gomega.Expect(err).Should(gomega.BeNil())
-
-		// var uriSlice []string
-		// ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-		// uriSlice, err = runnerCli.URIs(ctx)
-		// cancel()
-		// gomega.Expect(err).Should(gomega.BeNil())
-		// e2e.SetURIs(uriSlice)
-
-		// gomega.Expect(err).Should(gomega.BeNil())
 	})
 
 	ginkgo.AfterAll(func() {
@@ -80,8 +50,12 @@ var _ = e2e.DescribePrecompile("[TX Allow List]", func() {
 
 	ginkgo.It("hardhat tests", func() {
 		tests.Outf("{{green}}run hardhat{{/}}\n")
-		out, err := exec.Command("ls").Output()
-		gomega.Expect(err).Should(gomega.BeNil())
+		cmd := exec.Command("npx hardhat run scripts/testAllowList.ts --network subnet")
+		cmd.Dir = "./contract-examples"
+		out, err := cmd.Output()
+		fmt.Println("About to print output")
 		fmt.Println(string(out))
+		fmt.Println("Printed output")
+		gomega.Expect(err).Should(gomega.BeNil())
 	})
 })
