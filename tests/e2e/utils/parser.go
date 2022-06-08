@@ -37,16 +37,6 @@ const (
 	HARDHAT_CONFIG = "contract-examples/hardhat.config.ts"
 )
 
-var outputFile string
-
-func SetOutputFile(filepath string) {
-	outputFile = filepath
-}
-
-func GetOutputPath() string {
-	return outputFile
-}
-
 func updateHardhat(rpc string) {
 	input, err := ioutil.ReadFile(HARDHAT_CONFIG)
 	if err != nil {

@@ -217,7 +217,7 @@ export default {
     // Data here may be overwritten without warning.
     subnet: {
       //"http://{ip}:{port}/ext/bc/{chainID}/rpc
-      url: "http://127.0.0.1:15274/ext/bc/yXKj7WYy1qnywRE4ytUvUNDxYerBPsFFscE175XS41AJQmMTf/rpc",
+      url: "http://127.0.0.1:10963/ext/bc/2pT6C5NgKGjxbtYV57B4azFWhiNDp8ueAgHLXwFi9RcoT6uuZH/rpc",
       chainId: 99999,
       accounts: [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",

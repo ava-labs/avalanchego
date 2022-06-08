@@ -6,6 +6,7 @@ package e2e
 
 import (
 	"flag"
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -118,12 +119,18 @@ func init() {
 var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(mode).Should(gomega.Or(gomega.Equal("test"), gomega.Equal("run")))
 	utils.SetOutputFile(outputPath)
+	utils.SetPluginDir(pluginDir)
 
 	runner.InitializeRunner(execPath, gRPCEp, networkRunnerLogLevel)
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	runner.ShutdownCluster()
+	// if cluster is running, shut it down
+	running := runner.IsRunnerUp()
+	fmt.Println("Cluster running status:", running)
+	if running {
+		runner.ShutdownCluster()
+	}
 })
 
 // var _ = ginkgo.Describe("[RPC server]", func() {

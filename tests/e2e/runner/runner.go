@@ -191,3 +191,11 @@ func outf(format string, args ...interface{}) {
 	s := formatter.F(format, args...)
 	fmt.Fprint(formatter.ColorableStdOut, s)
 }
+
+func IsRunnerUp() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	_, err := cli.Health(ctx)
+	cancel()
+	// gomega.Expect(err).Should(gomega.BeNil())
+	return err == nil
+}
