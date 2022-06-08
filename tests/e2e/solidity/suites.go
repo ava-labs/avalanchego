@@ -28,7 +28,7 @@ var _ = e2e.DescribePrecompile("[TX Allow List]", func() {
 		if err != nil {
 			panic(err)
 		}
-		runner.StartNetwork(vmID, vmName, "/tmp/genesis.json", "/tmp/avalanchego-v1.7.10/plugins")
+		runner.StartNetwork(vmID, vmName, "/tmp/genesis.json", "/tmp/avalanchego-v1.7.11/plugins")
 
 		// runnerCli := e2e.GetRunnerClient()
 		// gomega.Expect(runnerCli).ShouldNot(gomega.BeNil())

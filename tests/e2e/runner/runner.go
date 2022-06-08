@@ -65,6 +65,7 @@ func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel str
 }
 
 func startRunner(vmName string, genesisPath string, pluginDir string) {
+	fmt.Println("Args", vmName, genesisPath, pluginDir)
 	ginkgo.By("calling start API via network runner", func() {
 		outf("{{green}}sending 'start' with binary path:{{/}} %q\n", execPath)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -152,15 +153,19 @@ func getClusterInfo(blockchainId string, logsDir string) clusterInfo {
 }
 
 func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir string) clusterInfo {
+	fmt.Println("Starting network")
 	startRunner(vmName, genesisPath, pluginDir)
 
 	// TODO: network runner health should imply custom VM healthiness
 	// or provide a separate API for custom VM healthiness
 	// "start" is async, so wait some time for cluster health
+	fmt.Println("About to sleep")
 	time.Sleep(2 * time.Minute)
 	checkRunnerHealth()
 
+	fmt.Println("Health checked")
 	blockchainId, logsDir := waitForCustomVm(vmId)
+	fmt.Println("Got custom vm")
 
 	cluster := getClusterInfo(blockchainId, logsDir)
 
