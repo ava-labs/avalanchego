@@ -57,12 +57,10 @@ jobs:
       - name: Use Node.js 14.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
-      - name: Install yarn
-        uses: borales/actions-yarn@v3.0.0
-        with:
-          cmd: install
-          working-directory: ./contract-examples
+          node-version: '14'
+          cache: 'yarn'
+          cache-dependency-path: contract-examples/yarn.lock
+      - run: yarn install
       - name: Run e2e tests
         shell: bash
         run: E2E=true scripts/run.sh 1.7.13 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
