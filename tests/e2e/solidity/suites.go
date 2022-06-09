@@ -26,6 +26,9 @@ func runHardhatTests(test string) {
 	cmd.Dir = "./contract-examples"
 	out, err := cmd.Output()
 	fmt.Println(string(out))
+	if err != nil {
+		fmt.Println(err)
+	}
 	gomega.Expect(err).Should(gomega.BeNil())
 }
 
