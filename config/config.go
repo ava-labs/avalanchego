@@ -54,7 +54,10 @@ const (
 )
 
 var (
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		DynamicUpdateDurationKey:   fmt.Sprintf("replaced by %q", PublicIPResolutionFreqKey),
+		DynamicPublicIPResolverKey: fmt.Sprintf("replaced by %q", PublicIPResolutionServiceKey),
+	}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -553,47 +556,81 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 }
 
 func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
-	config := node.IPConfig{}
-	// Resolves our public IP, or does nothing
-	config.DynamicPublicIPResolver = dynamicip.NewResolver(v.GetString(DynamicPublicIPResolverKey))
-	config.DynamicUpdateDuration = v.GetDuration(DynamicUpdateDurationKey)
-	if config.DynamicUpdateDuration < 0 {
-		return node.IPConfig{}, fmt.Errorf("%q must be <= 0", DynamicUpdateDurationKey)
+	// If both deprecated and current flag are given,
+	// override deprecated flag value with new flag value.
+	ipResolutionService := v.GetString(DynamicPublicIPResolverKey)
+	if v.IsSet(PublicIPResolutionServiceKey) {
+		ipResolutionService = v.GetString(PublicIPResolutionServiceKey)
 	}
 
-	var (
-		ip  net.IP
-		err error
-	)
-	publicIP := v.GetString(PublicIPKey)
-	switch {
-	case config.DynamicPublicIPResolver.IsResolver():
-		// User specified to use dynamic IP resolution; don't use NAT traversal
-		config.Nat = nat.NewNoRouter()
-		ip, err = dynamicip.FetchExternalIP(config.DynamicPublicIPResolver)
-		if err != nil {
-			return node.IPConfig{}, fmt.Errorf("dynamic ip address fetch failed: %w", err)
-		}
-	case publicIP == "":
-		// User didn't specify a public IP to use; try with NAT traversal
-		config.AttemptedNATTraversal = true
-		config.Nat = nat.GetRouter()
-		ip, err = config.Nat.ExternalIP()
-		if err != nil {
-			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
-		}
-	default:
-		// User specified a public IP to use; don't use NAT
-		config.Nat = nat.NewNoRouter()
-		ip = net.ParseIP(publicIP)
+	ipResolutionFreq := v.GetDuration(DynamicUpdateDurationKey)
+	if v.IsSet(PublicIPResolutionFreqKey) {
+		ipResolutionService = v.GetString(PublicIPResolutionFreqKey)
 	}
-	if ip == nil {
-		return node.IPConfig{}, fmt.Errorf("invalid IP Address %s", publicIP)
+	if ipResolutionFreq <= 0 {
+		return node.IPConfig{}, fmt.Errorf("%q must be > 0", PublicIPResolutionFreqKey)
 	}
 
 	stakingPort := uint16(v.GetUint(StakingPortKey))
-	config.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
-	return config, nil
+	publicIP := v.GetString(PublicIPKey)
+
+	if publicIP != "" && ipResolutionService != "" {
+		return node.IPConfig{}, fmt.Errorf("only one of --%s and --%s/--%s can be given", PublicIPKey, DynamicPublicIPResolverKey, PublicIPResolutionServiceKey)
+	}
+
+	if publicIP != "" {
+		// User specified a specific public IP to use.
+		ip := net.ParseIP(publicIP)
+		if ip == nil {
+			return node.IPConfig{}, fmt.Errorf("invalid IP Address %s", publicIP)
+		}
+		return node.IPConfig{
+			IPPort:           ips.NewDynamicIPPort(ip, stakingPort),
+			IPUpdater:        dynamicip.NewNoUpdater(),
+			IPResolutionFreq: ipResolutionFreq,
+			Nat:              nat.NewNoRouter(),
+		}, nil
+	}
+	if ipResolutionService != "" {
+		// User specified to use dynamic IP resolution.
+		resolver, err := dynamicip.NewResolver(dynamicip.ResolverName(ipResolutionService))
+		if err != nil {
+			return node.IPConfig{}, fmt.Errorf("couldn't create IP resolver: %w", err)
+		}
+
+		// Use that to resolve our public IP.
+		ip, err := resolver.Resolve()
+		if err != nil {
+			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
+		}
+		ipPort := ips.NewDynamicIPPort(ip, stakingPort)
+
+		return node.IPConfig{
+			IPPort: ipPort,
+			IPUpdater: dynamicip.NewUpdater(
+				ipPort,
+				resolver,
+				ipResolutionFreq,
+			),
+			IPResolutionFreq: ipResolutionFreq,
+			Nat:              nat.NewNoRouter(),
+		}, nil
+	}
+
+	// User didn't specify a public IP to use, and they didn't specify a public IP resolution
+	// service to use. Try to resolve public IP with NAT traversal.
+	nat := nat.GetRouter()
+	ip, err := nat.ExternalIP()
+	if err != nil {
+		return node.IPConfig{}, fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
+	}
+	return node.IPConfig{
+		Nat:                   nat,
+		AttemptedNATTraversal: true,
+		IPPort:                ips.NewDynamicIPPort(ip, stakingPort),
+		IPUpdater:             dynamicip.NewNoUpdater(),
+		IPResolutionFreq:      ipResolutionFreq,
+	}, nil
 }
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
