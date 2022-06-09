@@ -31,9 +31,6 @@ type DecisionTx interface {
 type ProposalTx interface {
 	Tx
 
-	// Attempts to verify this transaction with the provided txstate.
-	Execute(state state.Mutable) (onCommitState, onAbortState state.Versioned, err error)
-
 	InitiallyPrefersCommit() bool
 }
 

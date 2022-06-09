@@ -184,18 +184,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should've errored because start time too early")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should've errored because start time too early")
 	}
 
 	// Case: Validator's start time too far in the future
@@ -210,18 +200,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should've errored because start time too far in the future")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should've errored because start time too far in the future")
 	}
 
 	// Case: Validator already validating primary network
@@ -236,18 +216,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should've errored because validator already validating")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should've errored because validator already validating")
 	}
 
 	// Case: Validator in pending validator set of primary network
@@ -279,15 +249,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
+		if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
 			t.Fatal("should have failed because validator in pending validator set")
 		}
 	}
@@ -316,15 +278,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 		// Now preFundedKeys[0] has no funds
 
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
+		if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
 			t.Fatal("should have failed because tx fee paying key has no funds")
 		}
 	}

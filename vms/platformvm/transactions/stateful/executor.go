@@ -43,11 +43,8 @@ type Executor interface {
 	) error
 
 	ExecuteProposal(
+		stx *signed.Tx,
 		parentState state.Mutable,
-		utx unsigned.Tx,
-		txID ids.ID,
-		signedBytes []byte,
-		creds []verify.Verifiable,
 	) (state.Versioned, state.Versioned, error)
 
 	ExecuteDecision(
@@ -120,7 +117,7 @@ func (e *executor) SemanticVerify(
 			return ErrFutureStakeTime
 		}
 
-		_, _, err := e.ExecuteProposal(parentState, utx, txID, signedBytes, creds)
+		_, _, err := e.ExecuteProposal(stx, parentState)
 		// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 		// issued before this transaction is issued.
 		if errors.Is(err, ErrFutureStakeTime) {
@@ -130,7 +127,7 @@ func (e *executor) SemanticVerify(
 
 	case *unsigned.AdvanceTimeTx,
 		*unsigned.RewardValidatorTx:
-		_, _, err := e.ExecuteProposal(parentState, utx, txID, signedBytes, creds)
+		_, _, err := e.ExecuteProposal(stx, parentState)
 		return err
 
 	case *unsigned.CreateChainTx,
@@ -159,13 +156,16 @@ func (e *executor) SemanticVerify(
 }
 
 func (e *executor) ExecuteProposal(
+	stx *signed.Tx,
 	parentState state.Mutable,
-	utx unsigned.Tx,
-	txID ids.ID,
-	signedBytes []byte,
-	creds []verify.Verifiable,
 ) (state.Versioned, state.Versioned, error) {
-	switch utx := utx.(type) {
+	var (
+		txID        = stx.ID()
+		creds       = stx.Creds
+		signedBytes = stx.Bytes()
+	)
+
+	switch utx := stx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx:
 		return e.executeAddDelegator(parentState, utx, txID, signedBytes, creds)
 	case *unsigned.AddValidatorTx:
@@ -175,7 +175,7 @@ func (e *executor) ExecuteProposal(
 	case *unsigned.AdvanceTimeTx:
 		return e.executeAdvanceTime(parentState, utx, creds)
 	case *unsigned.RewardValidatorTx:
-		return e.executeRewardValidator(parentState, utx, txID, creds)
+		return e.executeRewardValidator(parentState, utx, creds)
 	default:
 		return nil, nil, fmt.Errorf("expected proposal tx but got %T", utx)
 	}
@@ -822,13 +822,12 @@ currentStakerLoop:
 func (e *executor) executeRewardValidator(
 	parentState state.Mutable,
 	utx *unsigned.RewardValidatorTx,
-	txID ids.ID,
 	creds []verify.Verifiable,
 ) (state.Versioned, state.Versioned, error) {
 	switch {
 	case utx == nil:
 		return nil, nil, unsigned.ErrNilTx
-	case txID == ids.Empty:
+	case utx.TxID == ids.Empty:
 		return nil, nil, ErrInvalidID
 	case len(creds) != 0:
 		return nil, nil, unsigned.ErrWrongNumberOfCredentials
@@ -844,10 +843,10 @@ func (e *executor) executeRewardValidator(
 	}
 
 	stakerID := stakerTx.ID()
-	if stakerID != txID {
+	if stakerID != utx.TxID {
 		return nil, nil, fmt.Errorf(
 			"attempting to remove TxID: %s. Should be removing %s",
-			txID,
+			utx.TxID,
 			stakerID,
 		)
 	}
@@ -861,7 +860,7 @@ func (e *executor) executeRewardValidator(
 	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
 		return nil, nil, fmt.Errorf(
 			"attempting to remove TxID: %s before their end time %s",
-			txID,
+			utx.TxID,
 			endTime,
 		)
 	}
@@ -893,7 +892,7 @@ func (e *executor) executeRewardValidator(
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        utx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
 				Asset: avax.Asset{ID: e.ctx.AVAXAssetID},
@@ -916,7 +915,7 @@ func (e *executor) executeRewardValidator(
 
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        utx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: e.ctx.AVAXAssetID},
@@ -924,7 +923,7 @@ func (e *executor) executeRewardValidator(
 			}
 
 			onCommitState.AddUTXO(utxo)
-			onCommitState.AddRewardUTXO(txID, utxo)
+			onCommitState.AddRewardUTXO(utx.TxID, utxo)
 		}
 
 		// Handle reward preferences
@@ -935,7 +934,7 @@ func (e *executor) executeRewardValidator(
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        utx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
 				Asset: avax.Asset{ID: e.ctx.AVAXAssetID},
@@ -981,7 +980,7 @@ func (e *executor) executeRewardValidator(
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        utx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: e.ctx.AVAXAssetID},
@@ -989,7 +988,7 @@ func (e *executor) executeRewardValidator(
 			}
 
 			onCommitState.AddUTXO(utxo)
-			onCommitState.AddRewardUTXO(txID, utxo)
+			onCommitState.AddRewardUTXO(utx.TxID, utxo)
 
 			offset++
 		}
@@ -1006,7 +1005,7 @@ func (e *executor) executeRewardValidator(
 			}
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        utx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
 				Asset: avax.Asset{ID: e.ctx.AVAXAssetID},
@@ -1014,7 +1013,7 @@ func (e *executor) executeRewardValidator(
 			}
 
 			onCommitState.AddUTXO(utxo)
-			onCommitState.AddRewardUTXO(txID, utxo)
+			onCommitState.AddRewardUTXO(utx.TxID, utxo)
 		}
 
 		nodeID = uStakerTx.Validator.ID()

@@ -114,18 +114,9 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx, pb.vm.txVerifier)
+	parentIntf, err := pb.parentBlock()
 	if err != nil {
 		return err
-	}
-	tx, ok := statefulTx.(stateful.ProposalTx)
-	if !ok {
-		return fmt.Errorf("expected tx type stateful.ProposalTx but got %T", statefulTx)
-	}
-
-	parentIntf, parentErr := pb.parentBlock()
-	if parentErr != nil {
-		return parentErr
 	}
 
 	// The parent of a proposal block (ie this block) must be a decision block
@@ -136,7 +127,7 @@ func (pb *ProposalBlock) Verify() error {
 
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
-	pb.onCommitState, pb.onAbortState, err = tx.Execute(parentState)
+	pb.onCommitState, pb.onAbortState, err = pb.vm.txExecutor.ExecuteProposal(&pb.Tx, parentState)
 	if err != nil {
 		txID := pb.Tx.ID()
 		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped

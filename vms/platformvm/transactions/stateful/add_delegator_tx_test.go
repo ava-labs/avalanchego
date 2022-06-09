@@ -332,11 +332,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
-			verifiableTx, err := MakeStatefulTx(tx, freshTH.txVerifier)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, _, err = verifiableTx.(*AddDelegatorTx).Execute(freshTH.tState)
+			_, _, err = freshTH.txExecutor.ExecuteProposal(tx, freshTH.tState)
 			if err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {

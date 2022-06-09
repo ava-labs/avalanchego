@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -18,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
@@ -39,14 +38,8 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState); err == nil {
-			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
 	// Advance chain timestamp to time that next validator leaves
@@ -55,14 +48,8 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := h.txBuilder.NewRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState); err == nil {
-			t.Fatalf("should have failed because validator ID is wrong")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
 	// Case 3: Happy path
@@ -71,11 +58,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-	if err != nil {
-		t.Fatal(err)
-	}
-	onCommitState, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState)
+	onCommitState, _, err := h.txExecutor.ExecuteProposal(tx, h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,14 +116,8 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	// Case 1: Chain timestamp is wrong
 	if tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState); err == nil {
-			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
 	// Advance chain timestamp to time that next validator leaves
@@ -149,14 +126,8 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	// Case 2: Wrong validator
 	if tx, err := h.txBuilder.NewRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState); err == nil {
-			t.Fatalf("should have failed because validator ID is wrong")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
 	// Case 3: Happy path
@@ -165,11 +136,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, onAbortState, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState)
+	_, onAbortState, err := h.txExecutor.ExecuteProposal(tx, h.tState)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,11 +236,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-	if err != nil {
-		t.Fatal(err)
-	}
-	onCommitState, _, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState)
+	onCommitState, _, err := h.txExecutor.ExecuteProposal(tx, h.tState)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -370,11 +333,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, onAbortState, err := verifiableTx.(*RewardValidatorTx).Execute(h.tState)
+	_, onAbortState, err := h.txExecutor.ExecuteProposal(tx, h.tState)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
