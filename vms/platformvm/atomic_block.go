@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 )
 
 var (
@@ -79,16 +78,7 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx, ab.vm.txVerifier)
-	if err != nil {
-		return err
-	}
-	atomicTx, ok := statefulTx.(stateful.AtomicTx)
-	if !ok {
-		return fmt.Errorf("expected tx type stateful.AtomicTx but got %T", statefulTx)
-	}
-	ab.inputs = atomicTx.InputUTXOs()
-
+	ab.inputs = ab.vm.txExecutor.InputUTXOs(ab.Tx.Unsigned)
 	parentIntf, err := ab.parentBlock()
 	if err != nil {
 		return err
@@ -160,15 +150,6 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx, ab.vm.txVerifier)
-	if err != nil {
-		return err
-	}
-	atomicTx, ok := statefulTx.(stateful.AtomicTx)
-	if !ok {
-		return fmt.Errorf("expected tx type stateful.AtomicTx but got %T", statefulTx)
-	}
-
 	// Update the state of the chain in the database
 	ab.onAcceptState.Apply(ab.vm.internalState)
 
@@ -182,7 +163,7 @@ func (ab *AtomicBlock) Accept() error {
 		)
 	}
 
-	if err := atomicTx.AtomicAccept(ab.vm.ctx, batch); err != nil {
+	if err := ab.vm.txExecutor.AtomicAccept(&ab.Tx, ab.vm.ctx, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			txID,

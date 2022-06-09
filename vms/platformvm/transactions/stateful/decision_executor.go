@@ -6,8 +6,10 @@ package stateful
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -21,11 +23,22 @@ import (
 
 var _ DecisionExecutor = &decisionExecutor{}
 
+const (
+	MaxNameLen    = 128
+	MaxGenesisLen = units.MiB
+)
+
 type DecisionExecutor interface {
 	ExecuteDecision(
 		stx *signed.Tx,
 		vs state.Versioned,
 	) (func() error, error)
+
+	// To maintain consistency with the Atomic txs
+	InputUTXOs(utx unsigned.Tx) ids.Set
+
+	// AtomicOperations provides the requests to be written to shared memory.
+	AtomicOperations(stx *signed.Tx) (ids.ID, *atomic.Requests, error)
 
 	semanticVerifyDecision(
 		stx *signed.Tx,
@@ -58,6 +71,72 @@ func (de *decisionExecutor) ExecuteDecision(
 		return de.executeImport(vs, utx, txID, creds)
 	default:
 		return nil, fmt.Errorf("expected decision tx but got %T", utx)
+	}
+}
+
+func (de *decisionExecutor) InputUTXOs(utx unsigned.Tx) ids.Set {
+	switch tx := utx.(type) {
+	case *unsigned.CreateChainTx:
+		return nil
+	case *unsigned.CreateSubnetTx:
+		// InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
+		return nil
+	case *unsigned.ExportTx:
+		return nil
+	case *unsigned.ImportTx:
+		set := ids.NewSet(len(tx.ImportedInputs))
+		for _, in := range tx.ImportedInputs {
+			set.Add(in.InputID())
+		}
+		return set
+	default:
+		panic("TODO ABENEGIA FIND A BETTER WAY TO HANDLE THIS")
+	}
+}
+
+func (de *decisionExecutor) AtomicOperations(stx *signed.Tx) (ids.ID, *atomic.Requests, error) {
+	switch tx := stx.Unsigned.(type) {
+	case *unsigned.CreateChainTx:
+		return ids.ID{}, nil, nil
+	case *unsigned.CreateSubnetTx:
+		return ids.ID{}, nil, nil
+	case *unsigned.ExportTx:
+		elems := make([]*atomic.Element, len(tx.ExportedOutputs))
+		for i, out := range tx.ExportedOutputs {
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        stx.ID(),
+					OutputIndex: uint32(len(tx.Outs) + i),
+				},
+				Asset: avax.Asset{ID: out.AssetID()},
+				Out:   out.Out,
+			}
+
+			utxoBytes, err := unsigned.Codec.Marshal(unsigned.Version, utxo)
+			if err != nil {
+				return ids.ID{}, nil, fmt.Errorf("failed to marshal UTXO: %w", err)
+			}
+			utxoID := utxo.InputID()
+			elem := &atomic.Element{
+				Key:   utxoID[:],
+				Value: utxoBytes,
+			}
+			if out, ok := utxo.Out.(avax.Addressable); ok {
+				elem.Traits = out.Addresses()
+			}
+
+			elems[i] = elem
+		}
+		return tx.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
+	case *unsigned.ImportTx:
+		utxoIDs := make([][]byte, len(tx.ImportedInputs))
+		for i, in := range tx.ImportedInputs {
+			utxoID := in.InputID()
+			utxoIDs[i] = utxoID[:]
+		}
+		return tx.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
+	default:
+		panic("TODO ABENEGIA FIND A BETTER WAY TO HANDLE THIS")
 	}
 }
 

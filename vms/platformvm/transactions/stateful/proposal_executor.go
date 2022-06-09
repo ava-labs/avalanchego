@@ -908,7 +908,7 @@ func (pe *proposalExecutor) InitiallyPrefersCommit(utx unsigned.Tx) bool {
 		// correct and responsive) for a sufficient amount of time
 		return tx.ShouldPreferCommit
 	}
-	panic("FIND A BETTER WAY TO HANDLE THIS")
+	panic("TODO ABENEGIA FIND A BETTER WAY TO HANDLE THIS")
 }
 
 func (pe *proposalExecutor) semanticVerifyProposal(stx *signed.Tx, parentState state.Mutable) error {
