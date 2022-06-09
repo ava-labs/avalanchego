@@ -11,16 +11,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	utils_math "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
-	bandwidthHalflife = 1 * time.Minute
+	bandwidthHalflife = 5 * time.Minute
 
 	// controls how eagerly we connect to new peers vs. using
 	// peers with known good response bandwidth.
-	desiredMinTrackedPeers = 10
-	newPeerConnectFactor   = 0.1
+	desiredMinResponsivePeers = 20
+	newPeerConnectFactor      = 0.1
+
+	// controls how often we prefer a random responsive peer over the most
+	// performant peer.
+	randomPeerProbability = 0.2
 )
 
 // information we track on a given peer
@@ -34,43 +39,63 @@ type peerInfo struct {
 // to new peers with an exponentially decaying probability.
 // Note: is not thread safe, caller must handle synchronization.
 type peerTracker struct {
-	peers         map[ids.NodeID]*peerInfo // all peers we are connected to
-	trackedPeers  ids.NodeIDSet            // peers that we have sent a request to
-	bandwidthHeap utils_math.AveragerHeap  // tracks bandwidth peers are responding with
+	peers                  map[ids.NodeID]*peerInfo // all peers we are connected to
+	numTrackedPeers        metrics.Gauge
+	trackedPeers           ids.NodeIDSet // peers that we have sent a request to
+	numResponsivePeers     metrics.Gauge
+	responsivePeers        ids.NodeIDSet           // peers that responded to the last request they were sent
+	bandwidthHeap          utils_math.AveragerHeap // tracks bandwidth peers are responding with
+	averageBandwidthMetric metrics.GaugeFloat64
+	averageBandwidth       utils_math.Averager
 }
 
 func NewPeerTracker() *peerTracker {
 	return &peerTracker{
-		peers: make(map[ids.NodeID]*peerInfo),
-		// TODO: use a gauge to record the size of [trackedPeers]
-		trackedPeers:  make(ids.NodeIDSet),
-		bandwidthHeap: utils_math.NewMaxAveragerHeap(),
+		peers:                  make(map[ids.NodeID]*peerInfo),
+		numTrackedPeers:        metrics.GetOrRegisterGauge("net_tracked_peers", nil),
+		trackedPeers:           make(ids.NodeIDSet),
+		numResponsivePeers:     metrics.GetOrRegisterGauge("net_responsive_peers", nil),
+		responsivePeers:        make(ids.NodeIDSet),
+		bandwidthHeap:          utils_math.NewMaxAveragerHeap(),
+		averageBandwidthMetric: metrics.GetOrRegisterGaugeFloat64("net_average_bandwidth", nil),
+		averageBandwidth:       utils_math.NewAverager(0, bandwidthHalflife, time.Now()),
 	}
 }
 
 // shouldTrackNewPeer returns true if we are not connected to enough peers.
-// otherwise returns true probabilisitically based on the number of tracked peers.
+// otherwise returns true probabilistically based on the number of tracked peers.
 func (p *peerTracker) shouldTrackNewPeer() bool {
-	numTrackedPeers := len(p.trackedPeers)
-	if numTrackedPeers < desiredMinTrackedPeers {
+	numResponsivePeers := p.responsivePeers.Len()
+	if numResponsivePeers < desiredMinResponsivePeers {
 		return true
 	}
-	if numTrackedPeers >= len(p.peers) {
+	if len(p.trackedPeers) >= len(p.peers) {
 		// already tracking all the peers
 		return false
 	}
-	if _, averager, ok := p.bandwidthHeap.Peek(); ok && averager.Read() == 0 {
-		// if the best peer has a capacity of 0, we should try to add another peer
-		return true
-	}
-	newPeerProbability := math.Exp(-float64(numTrackedPeers) * newPeerConnectFactor)
+	newPeerProbability := math.Exp(-float64(numResponsivePeers) * newPeerConnectFactor)
 	return rand.Float64() < newPeerProbability
+}
+
+// getResponsivePeer returns a random [ids.NodeID] of a peer that has responded
+// to a request.
+func (p *peerTracker) getResponsivePeer() (ids.NodeID, utils_math.Averager, bool) {
+	nodeID, ok := p.responsivePeers.Peek()
+	if !ok {
+		return ids.NodeID{}, nil, false
+	}
+	averager, ok := p.bandwidthHeap.Remove(nodeID)
+	if ok {
+		return nodeID, averager, true
+	}
+	peer := p.peers[nodeID]
+	return nodeID, peer.bandwidth, true
 }
 
 func (p *peerTracker) GetAnyPeer(minVersion version.Application) (ids.NodeID, bool) {
 	if p.shouldTrackNewPeer() {
 		for nodeID := range p.peers {
-			// if minVersion is specified and peer's verion is less, skip
+			// if minVersion is specified and peer's version is less, skip
 			if minVersion != nil && p.peers[nodeID].version.Compare(minVersion) < 0 {
 				continue
 			}
@@ -82,9 +107,20 @@ func (p *peerTracker) GetAnyPeer(minVersion version.Application) (ids.NodeID, bo
 			return nodeID, true
 		}
 	}
-	nodeID, averager, ok := p.bandwidthHeap.Pop()
+	var (
+		nodeID   ids.NodeID
+		ok       bool
+		random   bool
+		averager utils_math.Averager
+	)
+	if rand.Float64() < randomPeerProbability {
+		random = true
+		nodeID, averager, ok = p.getResponsivePeer()
+	} else {
+		nodeID, averager, ok = p.bandwidthHeap.Pop()
+	}
 	if ok {
-		log.Debug("peer tracking: popping peer", "nodeID", nodeID, "bandwidth", averager.Read())
+		log.Debug("peer tracking: popping peer", "nodeID", nodeID, "bandwidth", averager.Read(), "random", random)
 		return nodeID, true
 	}
 	// if no nodes found in the bandwidth heap, return a tracked node at random
@@ -93,6 +129,7 @@ func (p *peerTracker) GetAnyPeer(minVersion version.Application) (ids.NodeID, bo
 
 func (p *peerTracker) TrackPeer(nodeID ids.NodeID) {
 	p.trackedPeers.Add(nodeID)
+	p.numTrackedPeers.Update(int64(p.trackedPeers.Len()))
 }
 
 func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
@@ -103,12 +140,22 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 		return
 	}
 
+	now := time.Now()
 	if peer.bandwidth == nil {
-		peer.bandwidth = utils_math.NewAverager(bandwidth, bandwidthHalflife, time.Now())
+		peer.bandwidth = utils_math.NewAverager(bandwidth, bandwidthHalflife, now)
 	} else {
-		peer.bandwidth.Observe(bandwidth, time.Now())
+		peer.bandwidth.Observe(bandwidth, now)
 	}
 	p.bandwidthHeap.Add(nodeID, peer.bandwidth)
+
+	if bandwidth == 0 {
+		p.responsivePeers.Remove(nodeID)
+	} else {
+		p.responsivePeers.Add(nodeID)
+		p.averageBandwidth.Observe(bandwidth, now)
+		p.averageBandwidthMetric.Update(p.averageBandwidth.Read())
+	}
+	p.numResponsivePeers.Update(int64(p.responsivePeers.Len()))
 }
 
 // Connected should be called when [nodeID] connects to this node
@@ -136,8 +183,11 @@ func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion version.Applicati
 
 // Disconnected should be called when [nodeID] disconnects from this node
 func (p *peerTracker) Disconnected(nodeID ids.NodeID) {
-	_, _ = p.bandwidthHeap.Remove(nodeID)
+	p.bandwidthHeap.Remove(nodeID)
 	p.trackedPeers.Remove(nodeID)
+	p.numTrackedPeers.Update(int64(p.trackedPeers.Len()))
+	p.responsivePeers.Remove(nodeID)
+	p.numResponsivePeers.Update(int64(p.responsivePeers.Len()))
 	delete(p.peers, nodeID)
 }
 
