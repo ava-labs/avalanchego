@@ -4,6 +4,7 @@
 package stateful
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -33,6 +34,8 @@ type ProposalExecutor interface {
 	) (state.Versioned, state.Versioned, error)
 
 	InitiallyPrefersCommit(utx unsigned.Tx) bool
+
+	semanticVerifyProposal(stx *signed.Tx, parentState state.Mutable) error
 }
 
 type proposalExecutor struct {
@@ -906,4 +909,32 @@ func (pe *proposalExecutor) InitiallyPrefersCommit(utx unsigned.Tx) bool {
 		return tx.ShouldPreferCommit
 	}
 	panic("FIND A BETTER WAY TO HANDLE THIS")
+}
+
+func (pe *proposalExecutor) semanticVerifyProposal(stx *signed.Tx, parentState state.Mutable) error {
+	switch utx := stx.Unsigned.(type) {
+	case *unsigned.AddDelegatorTx,
+		*unsigned.AddValidatorTx,
+		*unsigned.AddSubnetValidatorTx:
+		startTime := utx.(timed.Tx).StartTime()
+		maxLocalStartTime := pe.clk.Time().Add(MaxFutureStartTime)
+		if startTime.After(maxLocalStartTime) {
+			return ErrFutureStakeTime
+		}
+
+		_, _, err := pe.ExecuteProposal(stx, parentState)
+		// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
+		// issued before this transaction is issued.
+		if errors.Is(err, ErrFutureStakeTime) {
+			return nil
+		}
+		return err
+
+	case *unsigned.AdvanceTimeTx,
+		*unsigned.RewardValidatorTx:
+		_, _, err := pe.ExecuteProposal(stx, parentState)
+		return err
+	default:
+		return fmt.Errorf("tx type %T could not be semantically verified", utx)
+	}
 }
