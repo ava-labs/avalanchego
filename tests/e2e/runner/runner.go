@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 
-	// "github.com/influxdata/influxdb/client"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/onsi/gomega"
@@ -18,17 +17,9 @@ import (
 )
 
 var (
-	// networkRunnerLogLevel string
-	// gRPCEp                string
-	// gRPCGatewayEp         string
-
 	execPath string
-	// pluginDir string
 	logLevel string
 
-	// outputPath string
-
-	// mode string
 	cli runner_sdk.Client
 )
 
@@ -142,7 +133,6 @@ func getClusterInfo(blockchainId string, logsDir string) clusterInfo {
 	}
 
 	pid := os.Getpid()
-	// outf("{{blue}}{{bold}}writing output %q with PID %d{{/}}\n", outputPath, pid)
 	ci := clusterInfo{
 		URIs:     uris,
 		Endpoint: fmt.Sprintf("/ext/bc/%s", blockchainId),
@@ -169,10 +159,6 @@ func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir stri
 	fmt.Println("Got custom vm")
 
 	cluster := getClusterInfo(blockchainId, logsDir)
-
-	// b, err := os.ReadFile(outputPath)
-	// gomega.Expect(err).Should(gomega.BeNil())
-	// outf("\n{{blue}}$ cat %s:{{/}}\n%s\n", outputPath, string(b))
 	return cluster
 }
 
@@ -196,6 +182,5 @@ func IsRunnerUp() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	_, err := cli.Health(ctx)
 	cancel()
-	// gomega.Expect(err).Should(gomega.BeNil())
 	return err == nil
 }

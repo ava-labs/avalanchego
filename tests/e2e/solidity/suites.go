@@ -22,7 +22,7 @@ var vmId ids.ID
 const vmName = "subnetevm"
 
 func runHardhatTests(test string) {
-	cmd := exec.Command("npx", "hardhat", "run", test, "--network", "subnet")
+	cmd := exec.Command("npx", "hardhat", "test", test, "--network", "subnet")
 	cmd.Dir = "./contract-examples"
 	out, err := cmd.Output()
 	fmt.Println(string(out))
@@ -45,21 +45,10 @@ var _ = utils.DescribePrecompile("[TX Allow List]", func() {
 		}
 	})
 
-	ginkgo.AfterEach(func() {
-		// runner.ShutdownCluster()
-	})
-
 	ginkgo.It("tx allow list", func() {
 		startSubnet("./tests/e2e/genesis/tx_allow_list_genesis.json")
 		running := runner.IsRunnerUp()
 		fmt.Println("Cluster running status:", running)
-		runHardhatTests("./scripts/testAllowList.ts")
+		runHardhatTests("./test/ExampleTxAllowList.ts")
 	})
-
-	// ginkgo.It("tx allow list2", func() {
-	// 	startSubnet("./tests/e2e/genesis/tx_allow_list_genesis.json")
-	// 	running := runner.IsRunnerUp()
-	// 	fmt.Println("Cluster running status:", running)
-	// 	runHardhatTests("./scripts/testAllowList.ts")
-	// })
 })

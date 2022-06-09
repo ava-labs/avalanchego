@@ -103,7 +103,6 @@ server \
 --log-level debug \
 --port=":12342" \
 --grpc-gateway-port=":12343" 2> /dev/null &
-PID=${!}
 
 
 #################################
@@ -122,8 +121,6 @@ echo "running e2e tests"
 --mode=${MODE}
 
 EXIT_CODE=$?
-
-kill -9 ${PID}
 
 sleep 5
 
