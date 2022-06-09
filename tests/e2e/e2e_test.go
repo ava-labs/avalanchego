@@ -131,36 +131,3 @@ var _ = ginkgo.AfterSuite(func() {
 		runner.ShutdownCluster()
 	}
 })
-
-// var _ = ginkgo.Describe("[RPC server]", func() {
-// 	ginkgo.It("can curl eth_blockNumber in every endpoint", func() {
-// 		for _, ep := range subnetEVMRPCEps {
-// 			matchedLine, err := tests.CURLPost(ep, `{
-// 	"jsonrpc": "2.0",
-// 	"method": "eth_blockNumber",
-// 	"params": [],
-// 	"id": 1
-// }`, `{"jsonrpc":"2.0","id":1,"result":"0x0"}`)
-// 			gomega.Expect(err).Should(gomega.BeNil())
-// 			outf("{{cyan}}%q returned{{/}}: %s\n", ep, matchedLine)
-// 		}
-// 	})
-
-// 	ginkgo.It("can TODO", func() {
-// 		if mode != modeTest {
-// 			ginkgo.Skip("mode is not 'test'; skipping...")
-// 		}
-
-// 		// TODO: e2e tests specific for subnet-evm
-// 	})
-// })
-
-// Outputs to stdout.
-//
-// e.g.,
-//   Out("{{green}}{{bold}}hi there %q{{/}}", "aa")
-//   Out("{{magenta}}{{bold}}hi therea{{/}} {{cyan}}{{underline}}b{{/}}")
-//
-// ref.
-// https://github.com/onsi/ginkgo/blob/v2.0.0/formatter/formatter.go#L52-L73
-//
