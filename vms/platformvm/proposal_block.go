@@ -147,7 +147,7 @@ func (pb *ProposalBlock) Verify() error {
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit := pb.vm.txExecutor.ProposalInitiallyPrefersCommit(pb.Tx.Unsigned)
+	prefersCommit := pb.vm.txExecutor.InitiallyPrefersCommit(pb.Tx.Unsigned)
 
 	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
 	if err != nil {
