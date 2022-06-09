@@ -14,6 +14,9 @@ var _ ethdb.Database = &Database{}
 // Database implements ethdb.Database
 type Database struct{ database.Database }
 
+// Stat implements ethdb.Database
+func (db Database) Stat(string) (string, error) { return "", database.ErrNotFound }
+
 // NewBatch implements ethdb.Database
 func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()} }
 
