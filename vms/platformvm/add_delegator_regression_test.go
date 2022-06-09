@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +27,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	validatorStartTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := testKeyfactory.NewPrivateKey()
@@ -64,7 +64,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(assert, firstAdvanceTimeBlock)
 
-	firstDelegatorStartTime := validatorStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
@@ -98,7 +98,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
 
-	vm.clock.Set(secondDelegatorStartTime.Add(-10 * stateful.SyncBound))
+	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -142,7 +142,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	validatorStartTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 

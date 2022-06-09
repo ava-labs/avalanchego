@@ -24,8 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -41,7 +41,7 @@ const (
 
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
-	minAddStakerDelay = 2 * stateful.SyncBound
+	minAddStakerDelay = 2 * executor.SyncBound
 )
 
 var (
@@ -926,7 +926,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(stateful.MaxFutureStartTime)
+	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1030,7 +1030,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(stateful.MaxFutureStartTime)
+	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1132,7 +1132,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(stateful.MaxFutureStartTime)
+	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {

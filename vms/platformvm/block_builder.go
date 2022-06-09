@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 )
 
@@ -204,7 +204,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(stateful.MaxFutureStartTime)
+	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
 		m.AddProposalTx(tx)
 
@@ -332,7 +332,7 @@ func (m *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	now := m.vm.clock.Time()
-	syncTime := now.Add(stateful.SyncBound)
+	syncTime := now.Add(executor.SyncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
 		startTime := tx.Unsigned.(timed.Tx).StartTime()

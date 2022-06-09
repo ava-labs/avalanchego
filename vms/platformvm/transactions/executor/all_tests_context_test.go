@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"errors"
@@ -83,7 +83,6 @@ type testHelpersCollection struct {
 	utxosMan       utxos.SpendHandler
 	txBuilder      builder.TxBuilder
 	txExecutor     Executor
-	txVerifier     TxVerifier
 }
 
 // TODO ABENEGIA: snLookup currently duplicated in vm_test.go
@@ -129,10 +128,6 @@ func newTestHelpersCollection() *testHelpersCollection {
 		tState, atomicUtxosMan,
 		utxosMan, rewardsCalc)
 
-	txVerifier := NewVerifier(
-		ctx, &isBootstrapped, &cfg, &clk, fx,
-		uptimeMan, utxosMan, rewardsCalc)
-
 	txExecutor := NewExecutor(&cfg, ctx, &isBootstrapped, &clk, fx, utxosMan, uptimeMan, rewardsCalc)
 
 	addSubnet(tState, txBuilder, txExecutor)
@@ -149,7 +144,6 @@ func newTestHelpersCollection() *testHelpersCollection {
 		uptimeMan:      uptimeMan,
 		utxosMan:       utxosMan,
 		txBuilder:      txBuilder,
-		txVerifier:     txVerifier,
 		txExecutor:     txExecutor,
 	}
 }

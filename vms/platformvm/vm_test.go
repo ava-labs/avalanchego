@@ -51,8 +51,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -555,7 +555,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
@@ -635,7 +635,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-stateful.SyncBound).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-executor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -691,7 +691,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -769,7 +769,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	startTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -804,7 +804,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -887,7 +887,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -1358,7 +1358,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
@@ -2517,7 +2517,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	newValidatorStartTime := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	key, err := testKeyfactory.NewPrivateKey()
@@ -2748,7 +2748,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.internalState.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(stateful.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
@@ -2936,7 +2936,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlkStatus = importBlk.Status()
 	assert.Equal(choices.Processing, importBlkStatus)
 
-	newValidatorStartTime1 := newValidatorStartTime0.Add(stateful.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
 
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())

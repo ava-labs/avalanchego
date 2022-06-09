@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -109,9 +109,7 @@ type VM struct {
 	recentlyAccepted *window.Window
 
 	txBuilder  builder.TxBuilder
-	txVerifier stateful.TxVerifier
-
-	txExecutor stateful.Executor
+	txExecutor executor.Executor
 }
 
 // Initialize this blockchain.
@@ -211,18 +209,7 @@ func (vm *VM) Initialize(
 		vm.rewards,
 	)
 
-	vm.txVerifier = stateful.NewVerifier(
-		vm.ctx,
-		&vm.bootstrapped,
-		&vm.Config,
-		&vm.clock,
-		vm.fx,
-		vm.uptimeManager,
-		vm.spendHandler,
-		vm.rewards,
-	)
-
-	vm.txExecutor = stateful.NewExecutor(
+	vm.txExecutor = executor.NewExecutor(
 		&vm.Config,
 		vm.ctx,
 		&vm.bootstrapped,
