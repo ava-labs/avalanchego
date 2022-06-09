@@ -430,7 +430,7 @@ func (vm *VMServer) Health(ctx context.Context, req *emptypb.Empty) (*vmpb.Healt
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-	dbHealth, err := vm.healthChecks()
+	dbHealth, err := vm.dbHealthChecks()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
@@ -445,7 +445,7 @@ func (vm *VMServer) Health(ctx context.Context, req *emptypb.Empty) (*vmpb.Healt
 	}, err
 }
 
-func (vm *VMServer) healthChecks() (interface{}, error) {
+func (vm *VMServer) dbHealthChecks() (interface{}, error) {
 	details := make(map[string]interface{}, len(vm.dbManager.GetDatabases()))
 
 	// Check Database health
