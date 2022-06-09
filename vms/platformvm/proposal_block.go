@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 )
 
 var _ Block = &ProposalBlock{}
@@ -146,18 +145,9 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	statefulTx, err := stateful.MakeStatefulTx(&pb.Tx, pb.vm.txVerifier)
-	if err != nil {
-		return [2]snowman.Block{}, err
-	}
-	proposalTx, ok := statefulTx.(stateful.ProposalTx)
-	if !ok {
-		return [2]snowman.Block{}, fmt.Errorf("expected stateful.ProposalTx but got %T", statefulTx)
-	}
-
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit := proposalTx.InitiallyPrefersCommit()
+	prefersCommit := pb.vm.txExecutor.ProposalInitiallyPrefersCommit(pb.Tx.Unsigned)
 
 	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
 	if err != nil {

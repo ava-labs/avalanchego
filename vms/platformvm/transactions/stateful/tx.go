@@ -23,13 +23,6 @@ type DecisionTx interface {
 	AtomicOperations() (ids.ID, *atomic.Requests, error)
 }
 
-// ProposalTx is an unsigned operation that can be proposed
-type ProposalTx interface {
-	Tx
-
-	InitiallyPrefersCommit() bool
-}
-
 // AtomicTx is an unsigned operation that can be atomically accepted. DEPRECATED
 type AtomicTx interface {
 	DecisionTx

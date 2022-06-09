@@ -33,7 +33,30 @@ import (
 	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
-var _ Executor = &executor{}
+var (
+	_ Executor = &executor{}
+
+	ErrOverDelegated             = errors.New("validator would be over delegated")
+	ErrWeightTooLarge            = errors.New("weight of this validator is too large")
+	ErrStakeTooShort             = errors.New("staking period is too short")
+	ErrStakeTooLong              = errors.New("staking period is too long")
+	ErrFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	ErrInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	ErrInvalidID                 = errors.New("invalid ID")
+	ErrShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
+)
+
+const (
+	// maxValidatorWeightFactor is the maximum factor of the validator stake
+	// that is allowed to be placed on a validator.
+	maxValidatorWeightFactor uint64 = 5
+
+	// Maximum future start time for staking/delegating
+	MaxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	// SyncBound is the synchrony bound used for safe decision making
+	SyncBound = 10 * time.Second
+)
 
 type Executor interface {
 	// Attempts to verify this transaction with the provided txstate.
@@ -56,6 +79,8 @@ type Executor interface {
 		stx *signed.Tx,
 		vs state.Versioned,
 	) (func() error, error)
+
+	ProposalInitiallyPrefersCommit(utx unsigned.Tx) bool
 }
 
 func NewExecutor(
@@ -814,6 +839,10 @@ currentStakerLoop:
 	return onCommitState, onAbortState, nil
 }
 
+// The current validating set must have at least one member.
+// The next validator to be removed must be the validator specified in this block.
+// The next validator to be removed must be have an end time equal to the current
+// chain timestamp.
 func (e *executor) executeRewardValidator(
 	parentState state.Mutable,
 	utx *unsigned.RewardValidatorTx,
@@ -1236,4 +1265,30 @@ func (e *executor) executeImport(
 	utxos.ConsumeInputs(vs, utx.Ins)
 	utxos.ProduceOutputs(vs, txID, e.ctx.AVAXAssetID, utx.Outs)
 	return nil, nil
+}
+
+func (e *executor) ProposalInitiallyPrefersCommit(utx unsigned.Tx) bool {
+	switch tx := utx.(type) {
+	case *unsigned.AddDelegatorTx:
+		return tx.StartTime().After(e.clk.Time())
+	case *unsigned.AddValidatorTx:
+		return tx.StartTime().After(e.clk.Time())
+	case *unsigned.AddSubnetValidatorTx:
+		return tx.StartTime().After(e.clk.Time())
+	case *unsigned.AdvanceTimeTx:
+		txTimestamp := tx.Timestamp()
+		localTimestamp := e.clk.Time()
+		localTimestampPlusSync := localTimestamp.Add(SyncBound)
+		return !txTimestamp.After(localTimestampPlusSync)
+	case *unsigned.RewardValidatorTx:
+		// InitiallyPrefersCommit returns true if this node thinks the validator
+		// should receive a staking reward.
+		//
+		// TODO: A validator should receive a reward only if they are sufficiently
+		// responsive and correct during the time they are validating.
+		// Right now they receive a reward if they're up (but not necessarily
+		// correct and responsive) for a sufficient amount of time
+		return tx.ShouldPreferCommit
+	}
+	panic("FIND A BETTER WAY TO HANDLE THIS")
 }
