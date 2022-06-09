@@ -48,18 +48,13 @@ type Executor interface {
 	) (state.Versioned, state.Versioned, error)
 
 	ExecuteDecision(
+		stx *signed.Tx,
 		vs state.Versioned,
-		utx unsigned.Tx,
-		txID ids.ID,
-		signedBytes []byte,
-		creds []verify.Verifiable,
 	) (func() error, error)
 
 	ExecuteAtomicTx(
+		stx *signed.Tx,
 		vs state.Versioned,
-		utx unsigned.Tx,
-		txID ids.ID,
-		creds []verify.Verifiable,
 	) (func() error, error)
 }
 
@@ -101,12 +96,6 @@ func (e *executor) SemanticVerify(
 	stx *signed.Tx,
 	parentState state.Mutable,
 ) error {
-	var (
-		txID        = stx.ID()
-		creds       = stx.Creds
-		signedBytes = stx.Bytes()
-	)
-
 	switch utx := stx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx,
 		*unsigned.AddValidatorTx,
@@ -137,7 +126,7 @@ func (e *executor) SemanticVerify(
 			parentState.CurrentStakerChainState(),
 			parentState.PendingStakerChainState(),
 		)
-		_, err := e.ExecuteDecision(vs, utx, txID, signedBytes, creds)
+		_, err := e.ExecuteDecision(stx, vs)
 		return err
 
 	case *unsigned.ExportTx,
@@ -147,7 +136,7 @@ func (e *executor) SemanticVerify(
 			parentState.CurrentStakerChainState(),
 			parentState.PendingStakerChainState(),
 		)
-		_, err := e.ExecuteAtomicTx(vs, utx, txID, creds)
+		_, err := e.ExecuteAtomicTx(stx, vs)
 		return err
 
 	default:
@@ -182,13 +171,16 @@ func (e *executor) ExecuteProposal(
 }
 
 func (e *executor) ExecuteDecision(
+	stx *signed.Tx,
 	vs state.Versioned,
-	utx unsigned.Tx,
-	txID ids.ID,
-	signedBytes []byte,
-	creds []verify.Verifiable,
 ) (func() error, error) {
-	switch utx := utx.(type) {
+	var (
+		txID        = stx.ID()
+		creds       = stx.Creds
+		signedBytes = stx.Bytes()
+	)
+
+	switch utx := stx.Unsigned.(type) {
 	case *unsigned.CreateChainTx:
 		return e.executeCreateChain(vs, utx, txID, signedBytes, creds)
 	case *unsigned.CreateSubnetTx:
@@ -203,12 +195,15 @@ func (e *executor) ExecuteDecision(
 }
 
 func (e *executor) ExecuteAtomicTx(
+	stx *signed.Tx,
 	vs state.Versioned,
-	utx unsigned.Tx,
-	txID ids.ID,
-	creds []verify.Verifiable,
 ) (func() error, error) {
-	switch utx := utx.(type) {
+	var (
+		txID  = stx.ID()
+		creds = stx.Creds
+	)
+
+	switch utx := stx.Unsigned.(type) {
 	case *unsigned.ExportTx:
 		return e.executeExport(vs, utx, txID, creds)
 	case *unsigned.ImportTx:
