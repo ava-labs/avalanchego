@@ -99,7 +99,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		return dummyBlk, nil
 	}
 
-	bsIntf, err := New(vm, config, false /*StateSyncDisableRequests*/)
+	bsIntf, err := New(vm, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestFilterAccepted(t *testing.T) {
 		return blk1, nil
 	}
 
-	bsIntf, err := New(vm, config, false /*StateSyncDisableRequests*/)
+	bsIntf, err := New(vm, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,79 +198,4 @@ func TestFilterAccepted(t *testing.T) {
 	if acceptedSet.Contains(blkID2) {
 		t.Fatalf("Blk shouldn't be accepted")
 	}
-}
-
-func TestDisabledGetStateSummaryFrontier(t *testing.T) {
-	assert := assert.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	vm, sender, config := testSetup(t, ctrl)
-	getterIntf, err := New(vm, config, false /*StateSyncDisableRequests*/)
-	assert.NoError(err)
-
-	getter, ok := getterIntf.(*getter)
-	assert.True(ok)
-
-	summary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
-		HeightV: uint64(2022),
-		BytesV:  []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'},
-	}
-	vm.MockStateSyncableVM.EXPECT().GetLastStateSummary().Return(summary, nil).AnyTimes()
-
-	frontierSent := false
-	sender.SendStateSummaryFrontierF = func(ni ids.NodeID, u uint32, b []byte) {
-		frontierSent = true
-	}
-
-	// enabled serving state summary frontiers
-	nodeID := ids.NodeID{'n', 'o', 'd', 'e', 'I', 'D'}
-	reqID := uint32(2022)
-	assert.NoError(getter.GetStateSummaryFrontier(nodeID, reqID))
-	assert.True(frontierSent)
-
-	// disabled serving state summary frontiers
-	frontierSent = false
-	getter.stateSyncDisabled = true
-	assert.NoError(getter.GetStateSummaryFrontier(nodeID, reqID))
-	assert.False(frontierSent)
-}
-
-func TestDisabledGetAcceptedStateSummary(t *testing.T) {
-	assert := assert.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	vm, sender, config := testSetup(t, ctrl)
-	getterIntf, err := New(vm, config, false /*StateSyncDisableRequests*/)
-	assert.NoError(err)
-
-	getter, ok := getterIntf.(*getter)
-	assert.True(ok)
-
-	summary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
-		HeightV: uint64(2022),
-		BytesV:  []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'},
-	}
-	vm.MockStateSyncableVM.EXPECT().GetStateSummary(gomock.Any()).Return(summary, nil).AnyTimes()
-
-	summaryVoteSent := false
-	sender.SendAcceptedStateSummaryF = func(validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-		summaryVoteSent = true
-	}
-
-	// enabled serving state summary frontiers
-	nodeID := ids.NodeID{'n', 'o', 'd', 'e', 'I', 'D'}
-	reqID := uint32(2022)
-	heights := []uint64{1492, 1789}
-	assert.NoError(getter.GetAcceptedStateSummary(nodeID, reqID, heights))
-	assert.True(summaryVoteSent)
-
-	// disabled serving state summary frontiers
-	summaryVoteSent = false
-	getter.stateSyncDisabled = true
-	assert.NoError(getter.GetAcceptedStateSummary(nodeID, reqID, heights))
-	assert.False(summaryVoteSent)
 }

@@ -782,6 +782,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 	rawDiffDB := prefixdb.New(prefixBytes, st.validatorDiffsDB)
 	diffDB := linkeddb.NewDefault(rawDiffDB)
 	diffIter := diffDB.NewIterator()
+	defer diffIter.Release()
 
 	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 	for diffIter.Next() {
@@ -800,7 +801,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 	}
 
 	st.validatorDiffsCache.Put(prefixStr, weightDiffs)
-	return weightDiffs, nil
+	return weightDiffs, diffIter.Error()
 }
 
 func (st *internalStateImpl) Abort() {

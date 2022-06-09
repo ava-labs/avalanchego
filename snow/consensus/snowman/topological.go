@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -15,6 +16,8 @@ import (
 )
 
 var (
+	errDuplicateAdd = errors.New("duplicate block add")
+
 	_ Factory   = &TopologicalFactory{}
 	_ Consensus = &Topological{}
 )
@@ -132,6 +135,16 @@ func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
 func (ts *Topological) Add(blk Block) error {
 	blkID := blk.ID()
+
+	// Make sure a block is not inserted twice. This enforces the invariant that
+	// blocks are always added in topological order. Essentially, a block that
+	// is being added should never have a child that was already added.
+	// Additionally, this prevents any edge cases that may occur due to adding
+	// different blocks with the same ID.
+	if ts.Decided(blk) || ts.Processing(blkID) {
+		return errDuplicateAdd
+	}
+
 	ts.Latency.Issued(blkID, ts.pollNumber)
 
 	parentID := blk.Parent()
