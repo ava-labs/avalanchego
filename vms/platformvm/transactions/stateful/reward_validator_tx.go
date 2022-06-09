@@ -35,12 +35,6 @@ type RewardValidatorTx struct {
 	verifier TxVerifier
 }
 
-// Attempts to verify this transaction with the provided state.
-func (tx *RewardValidatorTx) SemanticVerify(parentState state.Mutable) error {
-	_, _, err := tx.Execute(parentState)
-	return err
-}
-
 // Execute this transaction.
 //
 // The current validating set must have at least one member.

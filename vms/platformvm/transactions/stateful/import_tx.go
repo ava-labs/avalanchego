@@ -28,12 +28,6 @@ type ImportTx struct {
 	verifier TxVerifier
 }
 
-// Attempts to verify this transaction with the provided state.
-func (tx *ImportTx) SemanticVerify(parentState state.Mutable) error {
-	_, err := tx.AtomicExecute(parentState)
-	return err
-}
-
 // Execute this transaction.
 func (tx *ImportTx) Execute(vs state.Versioned) (func() error, error) {
 	ctx := tx.verifier.Ctx()

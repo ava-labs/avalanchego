@@ -32,12 +32,6 @@ type ExportTx struct {
 // InputUTXOs returns an empty set
 func (tx *ExportTx) InputUTXOs() ids.Set { return nil }
 
-// Attempts to verify this transaction with the provided state.
-func (tx *ExportTx) SemanticVerify(parentState state.Mutable) error {
-	_, err := tx.AtomicExecute(parentState)
-	return err
-}
-
 // Execute this transaction.
 func (tx *ExportTx) Execute(vs state.Versioned) (func() error, error) {
 	ctx := tx.verifier.Ctx()

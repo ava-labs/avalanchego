@@ -38,11 +38,8 @@ var _ Executor = &executor{}
 type Executor interface {
 	// Attempts to verify this transaction with the provided txstate.
 	SemanticVerify(
+		stx *signed.Tx,
 		parentState state.Mutable,
-		utx unsigned.Tx,
-		txID ids.ID,
-		signedBytes []byte,
-		creds []verify.Verifiable,
 	) error
 
 	ExecuteProposal(
@@ -104,13 +101,16 @@ type executor struct {
 
 // Attempts to verify this transaction with the provided txstate.
 func (e *executor) SemanticVerify(
+	stx *signed.Tx,
 	parentState state.Mutable,
-	utx unsigned.Tx,
-	txID ids.ID,
-	signedBytes []byte,
-	creds []verify.Verifiable,
 ) error {
-	switch utx := utx.(type) {
+	var (
+		txID        = stx.ID()
+		creds       = stx.Creds
+		signedBytes = stx.Bytes()
+	)
+
+	switch utx := stx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx,
 		*unsigned.AddValidatorTx,
 		*unsigned.AddSubnetValidatorTx:

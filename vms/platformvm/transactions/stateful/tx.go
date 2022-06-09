@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-type Tx interface {
-	// Attempts to verify this transaction with the provided txstate.
-	SemanticVerify(parentState state.Mutable) error
-}
+type Tx interface{}
 
 // DecisionTx is an unsigned operation that can be immediately decided
 type DecisionTx interface {

@@ -33,17 +33,6 @@ func (tx *CreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 	return ids.ID{}, nil, nil
 }
 
-// Attempts to verify this transaction with the provided state.
-func (tx *CreateSubnetTx) SemanticVerify(parentState state.Mutable) error {
-	vs := state.NewVersioned(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
-	_, err := tx.Execute(vs)
-	return err
-}
-
 // Execute this transaction.
 func (tx *CreateSubnetTx) Execute(vs state.Versioned) (
 	func() error,

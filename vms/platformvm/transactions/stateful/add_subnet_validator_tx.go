@@ -4,7 +4,6 @@
 package stateful
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -26,24 +25,6 @@ type AddSubnetValidatorTx struct {
 	creds       []verify.Verifiable
 
 	verifier TxVerifier
-}
-
-// Attempts to verify this transaction with the provided state.
-func (tx *AddSubnetValidatorTx) SemanticVerify(parentState state.Mutable) error {
-	clock := tx.verifier.Clock()
-	startTime := tx.StartTime()
-	maxLocalStartTime := clock.Time().Add(MaxFutureStartTime)
-	if startTime.After(maxLocalStartTime) {
-		return ErrFutureStakeTime
-	}
-
-	_, _, err := tx.Execute(parentState)
-	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
-	// issued before this transaction is issued.
-	if errors.Is(err, ErrFutureStakeTime) {
-		return nil
-	}
-	return err
 }
 
 // Execute this transaction.

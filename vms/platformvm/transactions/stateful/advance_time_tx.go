@@ -31,12 +31,6 @@ type AdvanceTimeTx struct {
 	verifier TxVerifier
 }
 
-// Attempts to verify this transaction with the provided state.
-func (tx *AdvanceTimeTx) SemanticVerify(parentState state.Mutable) error {
-	_, _, err := tx.Execute(parentState)
-	return err
-}
-
 // Execute this transaction.
 func (tx *AdvanceTimeTx) Execute(parentState state.Mutable) (state.Versioned, state.Versioned, error) {
 	switch {

@@ -82,6 +82,7 @@ type testHelpersCollection struct {
 	uptimeMan      uptime.Manager
 	utxosMan       utxos.SpendHandler
 	txBuilder      builder.TxBuilder
+	txExecutor     Executor
 	txVerifier     TxVerifier
 }
 
@@ -132,6 +133,8 @@ func newTestHelpersCollection() *testHelpersCollection {
 		ctx, &isBootstrapped, &cfg, &clk, fx,
 		uptimeMan, utxosMan, rewardsCalc)
 
+	txExecutor := NewExecutor(&cfg, ctx, &isBootstrapped, &clk, fx, utxosMan, uptimeMan, rewardsCalc)
+
 	addSubnet(tState, txBuilder, txVerifier)
 
 	return &testHelpersCollection{
@@ -147,6 +150,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 		utxosMan:       utxosMan,
 		txBuilder:      txBuilder,
 		txVerifier:     txVerifier,
+		txExecutor:     txExecutor,
 	}
 }
 
