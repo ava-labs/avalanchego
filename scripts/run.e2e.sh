@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# e.g.,
-#
-# run without e2e tests
-# ./scripts/run.sh 1.7.11 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
-#
-# run without e2e tests with DEBUG log level
-# AVALANCHE_LOG_LEVEL=DEBUG ./scripts/run.sh 1.7.11 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
-#
-# run with e2e tests
-# E2E=true ./scripts/run.sh 1.7.11 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+# run with
+# ./scripts/run.sh 1.7.11
 if ! [[ "$0" =~ scripts/run.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -24,16 +16,12 @@ if [[ -z "${VERSION}" ]]; then
 fi
 
 GENESIS_ADDRESS=0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
-
-
-MODE="test"
-
+NETWORK_RUNNER_VERSION=1.0.16
 
 AVALANCHE_LOG_LEVEL=${AVALANCHE_LOG_LEVEL:-INFO}
 
 echo "Running with:"
 echo VERSION: ${VERSION}
-echo MODE: ${MODE}
 echo GENESIS_ADDRESS: ${GENESIS_ADDRESS}
 echo AVALANCHE_LOG_LEVEL: ${AVALANCHE_LOG_LEVEL}
 
@@ -53,9 +41,7 @@ rm -rf /tmp/avalanchego-v${VERSION}
 rm -f ${DOWNLOAD_PATH}
 
 echo "downloading avalanchego ${VERSION} at ${DOWNLOAD_URL}"
-echo "Made it 1"
 curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
-echo "Made it 2"
 
 echo "extracting downloaded avalanchego"
 if [[ ${GOOS} == "linux" ]]; then
@@ -88,7 +74,6 @@ find /tmp/avalanchego-v${VERSION}
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: use "go install -v github.com/ava-labs/avalanche-network-runner/cmd/avalanche-network-runner@v${NETWORK_RUNNER_VERSION}"
-NETWORK_RUNNER_VERSION=1.0.16
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
@@ -103,7 +88,6 @@ curl -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
 
 echo "extracting downloaded avalanche-network-runner"
 tar xzvf ${DOWNLOAD_PATH} -C /tmp
-/tmp/avalanche-network-runner -h
 
 #################################
 echo "building e2e.test"
@@ -120,6 +104,7 @@ server \
 --port=":12342" \
 --grpc-gateway-port=":12343" 2> /dev/null &
 PID=${!}
+
 
 #################################
 # By default, it runs all e2e test cases!

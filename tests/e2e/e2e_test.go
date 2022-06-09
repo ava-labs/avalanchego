@@ -117,7 +117,6 @@ func init() {
 }
 
 var _ = ginkgo.BeforeSuite(func() {
-	gomega.Expect(mode).Should(gomega.Or(gomega.Equal("test"), gomega.Equal("run")))
 	utils.SetOutputFile(outputPath)
 	utils.SetPluginDir(pluginDir)
 

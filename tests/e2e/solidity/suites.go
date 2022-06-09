@@ -46,21 +46,7 @@ var _ = utils.DescribePrecompile("[TX Allow List]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		runner.ShutdownCluster()
-		// if e2e.GetRunnerGRPCEndpoint() != "" {
-		// 	runnerCli := e2e.GetRunnerClient()
-		// 	gomega.Expect(runnerCli).ShouldNot(gomega.BeNil())
-
-		// 	tests.Outf("{{red}}shutting down network-runner cluster{{/}}\n")
-		// 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		// 	_, err := runnerCli.Stop(ctx)
-		// 	cancel()
-		// 	gomega.Expect(err).Should(gomega.BeNil())
-
-		// 	tests.Outf("{{red}}shutting down network-runner client{{/}}\n")
-		// 	err = e2e.CloseRunnerClient()
-		// 	gomega.Expect(err).Should(gomega.BeNil())
-		// }
+		// runner.ShutdownCluster()
 	})
 
 	ginkgo.It("tx allow list", func() {
@@ -70,10 +56,10 @@ var _ = utils.DescribePrecompile("[TX Allow List]", func() {
 		runHardhatTests("./scripts/testAllowList.ts")
 	})
 
-	ginkgo.It("tx allow list2", func() {
-		startSubnet("./tests/e2e/genesis/tx_allow_list_genesis.json")
-		running := runner.IsRunnerUp()
-		fmt.Println("Cluster running status:", running)
-		runHardhatTests("./scripts/testAllowList.ts")
-	})
+	// ginkgo.It("tx allow list2", func() {
+	// 	startSubnet("./tests/e2e/genesis/tx_allow_list_genesis.json")
+	// 	running := runner.IsRunnerUp()
+	// 	fmt.Println("Cluster running status:", running)
+	// 	runHardhatTests("./scripts/testAllowList.ts")
+	// })
 })
