@@ -22,13 +22,29 @@ var vmId ids.ID
 const vmName = "subnetevm"
 
 func runHardhatTests(test string) {
-	cmd := exec.Command("npx", "hardhat", "test", test, "--network", "subnet")
-	cmd.Dir = "./contract-examples"
-	out, err := cmd.Output()
+	cmd2 := exec.Command("ls")
+	cmd2.Dir = "./contract-examples"
+	out, err := cmd2.Output()
 	fmt.Println(string(out))
 	if err != nil {
 		fmt.Println(err)
 	}
+	gomega.Expect(err).Should(gomega.BeNil())
+
+	cmd3 := exec.Command("npx", "--version")
+	cmd3.Dir = "./contract-examples"
+	out, err = cmd3.Output()
+	fmt.Println(string(out))
+	if err != nil {
+		fmt.Println(err)
+	}
+	gomega.Expect(err).Should(gomega.BeNil())
+
+	cmd := exec.Command("npx", "hardhat", "test", test, "--network", "subnet")
+	cmd.Dir = "./contract-examples"
+	out, err = cmd.Output()
+	fmt.Println(string(out))
+	fmt.Println("Printing error:", err)
 	gomega.Expect(err).Should(gomega.BeNil())
 }
 
