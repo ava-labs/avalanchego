@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
+	p_utils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var _ TxVerifier = &verifier{}
@@ -75,5 +75,5 @@ func (v *verifier) Bootstrapped() bool             { return v.bootstrapped.GetVa
 func (v *verifier) FeatureExtension() fx.Fx        { return v.fx }
 
 func (v *verifier) CreateChain(tx unsigned.Tx, txID ids.ID) error {
-	return platformutils.CreateChain(*v.cfg, tx, txID)
+	return p_utils.CreateChain(*v.cfg, tx, txID)
 }

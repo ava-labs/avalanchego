@@ -110,6 +110,8 @@ type VM struct {
 
 	txBuilder  builder.TxBuilder
 	txVerifier stateful.TxVerifier
+
+	txExecutor stateful.Executor
 }
 
 // Initialize this blockchain.
@@ -217,6 +219,17 @@ func (vm *VM) Initialize(
 		vm.fx,
 		vm.uptimeManager,
 		vm.spendHandler,
+		vm.rewards,
+	)
+
+	vm.txExecutor = stateful.NewExecutor(
+		&vm.Config,
+		vm.ctx,
+		&vm.bootstrapped,
+		&vm.clock,
+		vm.fx,
+		vm.spendHandler,
+		vm.uptimeManager,
 		vm.rewards,
 	)
 
