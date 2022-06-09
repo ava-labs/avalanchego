@@ -80,18 +80,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			{ // test execute
-				verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-				if err != nil {
-					t.Fatal(err)
-				}
-				vDecisionTx, ok := verifiableTx.(DecisionTx)
-				if !ok {
-					t.Fatal("unexpected tx type")
-				}
-				_, err = vDecisionTx.Execute(vs)
-				assert.Equal(test.expectsError, err != nil)
-			}
+			_, err = h.txExecutor.ExecuteDecision(tx, vs)
+			assert.Equal(test.expectsError, err != nil)
 		})
 	}
 }

@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var _ AtomicTx = &ExportTx{}
@@ -31,44 +29,6 @@ type ExportTx struct {
 
 // InputUTXOs returns an empty set
 func (tx *ExportTx) InputUTXOs() ids.Set { return nil }
-
-// Execute this transaction.
-func (tx *ExportTx) Execute(vs state.Versioned) (func() error, error) {
-	ctx := tx.verifier.Ctx()
-
-	if err := tx.SyntacticVerify(ctx); err != nil {
-		return nil, err
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
-
-	if tx.verifier.Bootstrapped() {
-		if err := verify.SameSubnet(ctx, tx.DestinationChain); err != nil {
-			return nil, err
-		}
-	}
-
-	// Verify the flowcheck
-	if err := tx.verifier.SemanticVerifySpend(
-		vs,
-		tx,
-		tx.Ins,
-		outs,
-		tx.creds,
-		tx.verifier.PlatformConfig().TxFee,
-		ctx.AVAXAssetID,
-	); err != nil {
-		return nil, fmt.Errorf("failed semanticVerifySpend: %w", err)
-	}
-
-	// Consume the UTXOS
-	utxos.ConsumeInputs(vs, tx.Ins)
-	// Produce the UTXOS
-	utxos.ProduceOutputs(vs, tx.txID, ctx.AVAXAssetID, tx.Outs)
-	return nil, nil
-}
 
 // AtomicOperations returns the shared memory requests
 func (tx *ExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
@@ -99,18 +59,6 @@ func (tx *ExportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
 		elems[i] = elem
 	}
 	return tx.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
-}
-
-// Execute this transaction and return the versioned state.
-func (tx *ExportTx) AtomicExecute(parentState state.Mutable) (state.Versioned, error) {
-	// Set up the state if this tx is committed
-	newState := state.NewVersioned(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
-	_, err := tx.Execute(newState)
-	return newState, err
 }
 
 // Accept this transaction.

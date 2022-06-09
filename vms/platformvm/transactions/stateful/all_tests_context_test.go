@@ -135,7 +135,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 
 	txExecutor := NewExecutor(&cfg, ctx, &isBootstrapped, &clk, fx, utxosMan, uptimeMan, rewardsCalc)
 
-	addSubnet(tState, txBuilder, txVerifier)
+	addSubnet(tState, txBuilder, txExecutor)
 
 	return &testHelpersCollection{
 		isBootstrapped: &isBootstrapped,
@@ -157,7 +157,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 func addSubnet(
 	tState state.State,
 	txBuilder builder.TxBuilder,
-	txVerifier TxVerifier,
+	txExecutor Executor,
 ) {
 	// Create a subnet
 	var err error
@@ -176,20 +176,12 @@ func addSubnet(
 	}
 
 	// store it
-	executableTx, err := MakeStatefulTx(testSubnet1, txVerifier)
-	if err != nil {
-		panic(err)
-	}
-	vDecisionTx, ok := executableTx.(DecisionTx)
-	if !ok {
-		panic(errors.New("unexpected tx type"))
-	}
 	versionedState := state.NewVersioned(
 		tState,
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	_, err = vDecisionTx.Execute(versionedState)
+	_, err = txExecutor.ExecuteDecision(testSubnet1, versionedState)
 	if err != nil {
 		panic(err)
 	}

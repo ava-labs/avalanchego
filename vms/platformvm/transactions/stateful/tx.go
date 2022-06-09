@@ -8,7 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 type Tx interface{}
@@ -16,9 +15,6 @@ type Tx interface{}
 // DecisionTx is an unsigned operation that can be immediately decided
 type DecisionTx interface {
 	Tx
-
-	// Execute this transaction with the provided txstate.
-	Execute(vs state.Versioned) (onAcceptFunc func() error, err error)
 
 	// To maintain consistency with the Atomic txs
 	InputUTXOs() ids.Set
@@ -37,9 +33,6 @@ type ProposalTx interface {
 // AtomicTx is an unsigned operation that can be atomically accepted. DEPRECATED
 type AtomicTx interface {
 	DecisionTx
-
-	// Execute this transaction with the provided txstate.
-	AtomicExecute(parentState state.Mutable) (state.Versioned, error)
 
 	// Accept this transaction with the additionally provided state transitions.
 	AtomicAccept(ctx *snow.Context, batch database.Batch) error

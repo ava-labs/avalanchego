@@ -189,18 +189,8 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vDecisionTx, ok := verifiableTx.(DecisionTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, err := vDecisionTx.Execute(vs); err == nil {
-			t.Fatal("should have errored because a sig is missing")
-		}
+	if _, err := h.txExecutor.ExecuteDecision(tx, vs); err == nil {
+		t.Fatal("should have errored because a sig is missing")
 	}
 }
 
@@ -245,18 +235,8 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vDecisionTx, ok := verifiableTx.(DecisionTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, err = vDecisionTx.Execute(vs); err == nil {
-			t.Fatal("should have failed verification because a sig is invalid")
-		}
+	if _, err = h.txExecutor.ExecuteDecision(tx, vs); err == nil {
+		t.Fatal("should have failed verification because a sig is invalid")
 	}
 }
 
@@ -290,18 +270,8 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	)
 
 	tx.Unsigned.(*unsigned.CreateChainTx).SubnetID = ids.GenerateTestID()
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vDecisionTx, ok := verifiableTx.(DecisionTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, err := vDecisionTx.Execute(vs); err == nil {
-			t.Fatal("should have failed because subent doesn't exist")
-		}
+	if _, err := h.txExecutor.ExecuteDecision(tx, vs); err == nil {
+		t.Fatal("should have failed because subent doesn't exist")
 	}
 }
 
@@ -333,18 +303,8 @@ func TestCreateChainTxValid(t *testing.T) {
 		h.tState.PendingStakerChainState(),
 	)
 
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vDecisionTx, ok := verifiableTx.(DecisionTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, err = vDecisionTx.Execute(vs); err != nil {
-			t.Fatalf("expected tx to pass verification but got error: %v", err)
-		}
+	if _, err = h.txExecutor.ExecuteDecision(tx, vs); err != nil {
+		t.Fatalf("expected tx to pass verification but got error: %v", err)
 	}
 }
 
@@ -418,18 +378,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			{ // test execute
-				verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-				if err != nil {
-					t.Fatal(err)
-				}
-				vDecisionTx, ok := verifiableTx.(DecisionTx)
-				if !ok {
-					t.Fatal("unexpected tx type")
-				}
-				_, err = vDecisionTx.Execute(vs)
-				assert.Equal(test.expectsError, err != nil)
-			}
+			_, err = h.txExecutor.ExecuteDecision(tx, vs)
+			assert.Equal(test.expectsError, err != nil)
 		})
 	}
 }
