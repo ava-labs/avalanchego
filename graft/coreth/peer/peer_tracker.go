@@ -34,14 +34,14 @@ type peerInfo struct {
 // to new peers with an exponentially decaying probability.
 // Note: is not thread safe, caller must handle synchronization.
 type peerTracker struct {
-	peers         map[ids.NodeID]peerInfo // all peers we are connected to
-	trackedPeers  ids.NodeIDSet           // peers that we have sent a request to
-	bandwidthHeap utils_math.AveragerHeap // tracks bandwidth peers are responding with
+	peers         map[ids.NodeID]*peerInfo // all peers we are connected to
+	trackedPeers  ids.NodeIDSet            // peers that we have sent a request to
+	bandwidthHeap utils_math.AveragerHeap  // tracks bandwidth peers are responding with
 }
 
 func NewPeerTracker() *peerTracker {
 	return &peerTracker{
-		peers: make(map[ids.NodeID]peerInfo),
+		peers: make(map[ids.NodeID]*peerInfo),
 		// TODO: use a gauge to record the size of [trackedPeers]
 		trackedPeers:  make(ids.NodeIDSet),
 		bandwidthHeap: utils_math.NewMaxAveragerHeap(),
@@ -96,8 +96,8 @@ func (p *peerTracker) TrackPeer(nodeID ids.NodeID) {
 }
 
 func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
-	peer, exists := p.peers[nodeID]
-	if !exists {
+	peer := p.peers[nodeID]
+	if peer == nil {
 		// we're not connected to this peer, nothing to do here
 		log.Debug("tracking bandwidth for untracked peer", "nodeID", nodeID)
 		return
@@ -113,12 +113,12 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 
 // Connected should be called when [nodeID] connects to this node
 func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion version.Application) {
-	if peer, exists := p.peers[nodeID]; exists {
+	if peer := p.peers[nodeID]; peer != nil {
 		// Peer is already connected, update the version if it has changed.
 		// Log a warning message since the consensus engine should never call Connected on a peer
 		// that we have already marked as Connected.
 		if nodeVersion.Compare(peer.version) != 0 {
-			p.peers[nodeID] = peerInfo{
+			p.peers[nodeID] = &peerInfo{
 				version:   nodeVersion,
 				bandwidth: peer.bandwidth,
 			}
@@ -129,7 +129,7 @@ func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion version.Applicati
 		return
 	}
 
-	p.peers[nodeID] = peerInfo{
+	p.peers[nodeID] = &peerInfo{
 		version: nodeVersion,
 	}
 }
