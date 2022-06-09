@@ -121,7 +121,11 @@ echo "running e2e tests"
 --output-path=/tmp/avalanchego-v${VERSION}/output.yaml \
 --mode=${MODE}
 
+EXIT_CODE=$?
+
 kill -9 ${PID}
+
+sleep 5
 
 if [[ ${EXIT_CODE} -gt 0 ]]; then
   echo "FAILURE with exit code ${EXIT_CODE}"
