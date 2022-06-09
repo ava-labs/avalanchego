@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -21,24 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
-var (
-	_ Executor = &executor{}
-
-	ErrOverDelegated             = errors.New("validator would be over delegated")
-	ErrWeightTooLarge            = errors.New("weight of this validator is too large")
-	ErrStakeTooShort             = errors.New("staking period is too short")
-	ErrStakeTooLong              = errors.New("staking period is too long")
-	ErrFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
-	ErrInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
-	ErrInvalidID                 = errors.New("invalid ID")
-	ErrShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
-)
+var _ Executor = &executor{}
 
 const (
-	// maxValidatorWeightFactor is the maximum factor of the validator stake
-	// that is allowed to be placed on a validator.
-	maxValidatorWeightFactor uint64 = 5
-
 	// Maximum future start time for staking/delegating
 	MaxFutureStartTime = 24 * 7 * 2 * time.Hour
 
