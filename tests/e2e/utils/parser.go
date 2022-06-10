@@ -38,7 +38,6 @@ type rpcFile struct {
 }
 
 const (
-	HARDHAT_CONFIG   = "contract-examples/hardhat.config.ts"
 	DYNAMIC_RPC_FILE = "contract-examples/dynamic_rpc.json"
 )
 
