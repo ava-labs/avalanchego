@@ -147,8 +147,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty")
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")                                                        // Deprecated
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates") // Deprecated
-	fs.Duration(PublicIPResolutionFreqKey, 5*time.Minute, "Frequency at which we resolve/update our public IP and renew NAT mappings, if applicable")
-	fs.String(PublicIPResolutionServiceKey, "", "If 'ifconfigco', 'opendns' or 'ifconfigme' uses that service to periodically resolve/update our public IP")
+	fs.Duration(PublicIPResolutionFreqKey, 5*time.Minute, "Frequency at which this node resolves/updates its public IP and renew NAT mappings, if applicable")
+	fs.String(PublicIPResolutionServiceKey, "", "Only acceptable values are 'ifconfigco', 'opendns' or 'ifconfigme'. When provided, the node will use that service to periodically resolve/update its public IP")
 
 	// Inbound Connection Throttling
 	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, 10*time.Second, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
