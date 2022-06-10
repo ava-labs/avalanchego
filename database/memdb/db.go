@@ -157,6 +157,13 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return nil
 }
 
+func (db *Database) HealthCheck() (interface{}, error) {
+	if db.isClosed() {
+		return nil, database.ErrClosed
+	}
+	return nil, nil
+}
+
 type keyValue struct {
 	key    []byte
 	value  []byte

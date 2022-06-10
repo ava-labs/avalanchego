@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -111,7 +110,7 @@ func (p *process) Start() error {
 			p.config.IPPort.IPPort().Port,
 			stakingPortName,
 			p.config.IPPort,
-			p.config.DynamicUpdateDuration,
+			p.config.IPResolutionFreq,
 		)
 	}
 
@@ -125,22 +124,19 @@ func (p *process) Start() error {
 			p.config.HTTPPort,
 			httpPortName,
 			nil,
-			p.config.DynamicUpdateDuration,
+			p.config.IPResolutionFreq,
 		)
 	}
 
-	// Regularly updates our public IP (or does nothing, if configured that way)
-	externalIPUpdater := dynamicip.NewDynamicIPManager(
-		p.config.DynamicPublicIPResolver,
-		p.config.DynamicUpdateDuration,
-		log,
-		p.config.IPPort,
-	)
+	// Regularly update our public IP.
+	// Note that if the node config said to not dynamically resolve and
+	// update our public IP, [p.config.IPUdater] is a no-op implementation.
+	go p.config.IPUpdater.Dispatch(log)
 
 	if err := p.node.Initialize(&p.config, log, logFactory); err != nil {
 		log.Fatal("error initializing node: %s", err)
 		mapper.UnmapAllPorts()
-		externalIPUpdater.Stop()
+		p.config.IPUpdater.Stop()
 		log.Stop()
 		logFactory.Close()
 		return err
@@ -159,7 +155,7 @@ func (p *process) Start() error {
 		}()
 		defer func() {
 			mapper.UnmapAllPorts()
-			externalIPUpdater.Stop()
+			p.config.IPUpdater.Stop()
 
 			// If [p.node.Dispatch()] panics, then we should log the panic and
 			// then re-raise the panic. This is why the above defer is broken
