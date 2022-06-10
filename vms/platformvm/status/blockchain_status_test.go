@@ -15,6 +15,7 @@ func TestBlockchainStatusJSON(t *testing.T) {
 	assert := assert.New(t)
 
 	statuses := []BlockchainStatus{
+		UnknownChain,
 		Validating,
 		Created,
 		Preferred,
@@ -54,6 +55,7 @@ func TestBlockchainStatusVerify(t *testing.T) {
 	assert := assert.New(t)
 
 	statuses := []BlockchainStatus{
+		UnknownChain,
 		Validating,
 		Created,
 		Preferred,
@@ -72,6 +74,7 @@ func TestBlockchainStatusVerify(t *testing.T) {
 func TestBlockchainStatusString(t *testing.T) {
 	assert := assert.New(t)
 
+	assert.Equal("Unknown", UnknownChain.String())
 	assert.Equal("Validating", Validating.String())
 	assert.Equal("Created", Created.String())
 	assert.Equal("Preferred", Preferred.String())

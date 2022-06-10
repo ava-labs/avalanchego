@@ -189,8 +189,7 @@ type ManagerConfig struct {
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
 
-	StateSyncBeacons         []ids.NodeID
-	StateSyncDisableRequests bool
+	StateSyncBeacons []ids.NodeID
 }
 
 type manager struct {
@@ -842,7 +841,7 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg, m.StateSyncDisableRequests)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}

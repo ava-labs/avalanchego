@@ -40,7 +40,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
-		HeightV: 0,
+		HeightV: 1,
 	})
 
 	for i := 1; i < numColors; i++ {

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -284,7 +286,7 @@ func (h *handler) dispatchSync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue)
+		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue, h.metrics.expired)
 		if !ok {
 			return
 		}
@@ -311,7 +313,7 @@ func (h *handler) dispatchAsync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue)
+		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue, h.metrics.asyncExpired)
 		if !ok {
 			return
 		}
@@ -673,7 +675,7 @@ func (h *handler) getEngine() (common.Engine, error) {
 	}
 }
 
-func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, bool) {
+func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter) (message.InboundMessage, bool) {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
@@ -688,7 +690,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, b
 				"Dropping message from %s due to timeout: %s",
 				msg.NodeID(), msg,
 			)
-			h.metrics.expired.Inc()
+			expired.Inc()
 			msg.OnFinishedHandling()
 			continue
 		}

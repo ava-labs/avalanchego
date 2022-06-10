@@ -5,6 +5,7 @@ package rpcchainvm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -96,8 +97,6 @@ type VMClient struct {
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
 
-	grpcHealthChecks map[string]string
-
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
 
 	ctx *snow.Context
@@ -106,8 +105,7 @@ type VMClient struct {
 // NewClient returns a VM connected to a remote VM
 func NewClient(client vmpb.VMClient) *VMClient {
 	return &VMClient{
-		client:           client,
-		grpcHealthChecks: make(map[string]string),
+		client: client,
 	}
 }
 
@@ -162,8 +160,6 @@ func (vm *VMClient) Initialize(
 			return err
 		}
 		serverAddr := serverListener.Addr().String()
-		// Register gRPC server for health checks
-		vm.grpcHealthChecks[fmt.Sprintf("database-%s", dbVersion)] = serverAddr
 
 		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
 		vm.ctx.Log.Info("grpc: serving database version: %s on: %s", dbVersion, serverAddr)
@@ -186,9 +182,6 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 	serverAddr := serverListener.Addr().String()
-
-	// Register gRPC server for health checks
-	vm.grpcHealthChecks["vm"] = serverAddr
 
 	go grpcutils.Serve(serverListener, vm.getInitServer)
 	vm.ctx.Log.Info("grpc: serving vm services on: %s", serverAddr)
@@ -539,13 +532,12 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 }
 
 func (vm *VMClient) HealthCheck() (interface{}, error) {
-	resp, err := vm.client.Health(context.Background(), &vmpb.HealthRequest{
-		GrpcChecks: vm.grpcHealthChecks,
-	})
+	health, err := vm.client.Health(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		vm.ctx.Log.Warn("health check failed: %v", err)
+		return nil, fmt.Errorf("health check failed: %w", err)
 	}
-	return resp, err
+
+	return json.RawMessage(health.Details), nil
 }
 
 func (vm *VMClient) Version() (string, error) {
