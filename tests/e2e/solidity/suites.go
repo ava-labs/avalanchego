@@ -30,7 +30,8 @@ func runHardhatTests(test string) {
 }
 
 func startSubnet(genesisPath string) error {
-	runner.StartNetwork(vmId, vmName, genesisPath, utils.GetPluginDir())
+	_, err := runner.StartNetwork(vmId, vmName, genesisPath, utils.GetPluginDir())
+	gomega.Expect(err).Should(gomega.BeNil())
 	return utils.UpdateHardhatConfig()
 }
 

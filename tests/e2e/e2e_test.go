@@ -120,7 +120,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	utils.SetOutputFile(outputPath)
 	utils.SetPluginDir(pluginDir)
 
-	runner.InitializeRunner(execPath, gRPCEp, networkRunnerLogLevel)
+	err := runner.InitializeRunner(execPath, gRPCEp, networkRunnerLogLevel)
+	gomega.Expect(err).Should(gomega.BeNil())
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -128,6 +129,7 @@ var _ = ginkgo.AfterSuite(func() {
 	running := runner.IsRunnerUp()
 	fmt.Println("Cluster running status:", running)
 	if running {
-		runner.ShutdownCluster()
+		err := runner.ShutdownCluster()
+		gomega.Expect(err).Should(gomega.BeNil())
 	}
 })

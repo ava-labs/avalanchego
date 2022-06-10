@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -9,10 +10,8 @@ import (
 	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/formatter"
-	"github.com/onsi/gomega"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -44,7 +43,7 @@ func GetClient() runner_sdk.Client {
 	return cli
 }
 
-func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel string) {
+func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel string) error {
 	execPath = execPath_
 
 	var err error
@@ -53,36 +52,37 @@ func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel str
 		Endpoint:    grpcEp,
 		DialTimeout: 10 * time.Second,
 	})
-	gomega.Expect(err).Should(gomega.BeNil())
+	return err
 }
 
-func startRunner(vmName string, genesisPath string, pluginDir string) {
-	fmt.Println("Args", vmName, genesisPath, pluginDir)
-	ginkgo.By("calling start API via network runner", func() {
-		outf("{{green}}sending 'start' with binary path:{{/}} %q\n", execPath)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		resp, err := cli.Start(
-			ctx,
-			execPath,
-			runner_sdk.WithLogLevel(logLevel),
-			runner_sdk.WithPluginDir(pluginDir),
-			runner_sdk.WithCustomVMs(map[string]string{
-				vmName: genesisPath,
-			}))
-		cancel()
-		gomega.Expect(err).Should(gomega.BeNil())
-		outf("{{green}}successfully started:{{/}} %+v\n", resp.ClusterInfo.NodeNames)
-	})
+func startRunner(vmName string, genesisPath string, pluginDir string) error {
+	fmt.Println("calling start API via network runner")
+	outf("{{green}}sending 'start' with binary path:{{/}} %q\n", execPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	resp, err := cli.Start(
+		ctx,
+		execPath,
+		runner_sdk.WithLogLevel(logLevel),
+		runner_sdk.WithPluginDir(pluginDir),
+		runner_sdk.WithCustomVMs(map[string]string{
+			vmName: genesisPath,
+		}))
+	cancel()
+	if err != nil {
+		return err
+	}
+	outf("{{green}}successfully started:{{/}} %+v\n", resp.ClusterInfo.NodeNames)
+	return nil
 }
 
-func checkRunnerHealth() {
+func checkRunnerHealth() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	_, err := cli.Health(ctx)
 	cancel()
-	gomega.Expect(err).Should(gomega.BeNil())
+	return err
 }
 
-func waitForCustomVm(vmId ids.ID) (string, string) {
+func WaitForCustomVm(vmId ids.ID) (string, string, error) {
 	blockchainID, logsDir := "", ""
 
 	// wait up to 5-minute for custom VM installation
@@ -99,7 +99,10 @@ done:
 		cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		resp, err := cli.Status(cctx)
 		ccancel()
-		gomega.Expect(err).Should(gomega.BeNil())
+		if err != nil {
+			cancel()
+			return "", "", err
+		}
 
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
@@ -110,19 +113,29 @@ done:
 			break done
 		}
 	}
-	gomega.Expect(ctx.Err()).Should(gomega.BeNil())
+	err := ctx.Err()
+	if err != nil {
+		cancel()
+		return "", "", err
+	}
 	cancel()
 
-	gomega.Expect(blockchainID).Should(gomega.Not(gomega.BeEmpty()))
-	gomega.Expect(logsDir).Should(gomega.Not(gomega.BeEmpty()))
-	return blockchainID, logsDir
+	if blockchainID == "" {
+		return "", "", errors.New("BlockchainId not found")
+	}
+	if logsDir == "" {
+		return "", "", errors.New("logsDir not found")
+	}
+	return blockchainID, logsDir, nil
 }
 
-func getClusterInfo(blockchainId string, logsDir string) clusterInfo {
+func GetClusterInfo(blockchainId string, logsDir string) (clusterInfo, error) {
 	cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	uris, err := cli.URIs(cctx)
 	ccancel()
-	gomega.Expect(err).Should(gomega.BeNil())
+	if err != nil {
+		return clusterInfo{}, err
+	}
 	outf("{{blue}}avalanche HTTP RPCs URIs:{{/}} %q\n", uris)
 
 	subnetEVMRPCEps := make([]string, 0)
@@ -139,11 +152,14 @@ func getClusterInfo(blockchainId string, logsDir string) clusterInfo {
 		PID:      pid,
 		LogsDir:  logsDir,
 	}
-	gomega.Expect(ci.Save(utils.GetOutputPath())).Should(gomega.BeNil())
-	return ci
+	err = ci.Save(utils.GetOutputPath())
+	if err != nil {
+		return clusterInfo{}, err
+	}
+	return ci, nil
 }
 
-func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir string) clusterInfo {
+func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir string) (clusterInfo, error) {
 	fmt.Println("Starting network")
 	startRunner(vmName, genesisPath, pluginDir)
 
@@ -155,22 +171,30 @@ func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir stri
 	checkRunnerHealth()
 
 	fmt.Println("Health checked")
-	blockchainId, logsDir := waitForCustomVm(vmId)
+	blockchainId, logsDir, err := WaitForCustomVm(vmId)
+	if err != nil {
+		return clusterInfo{}, err
+	}
 	fmt.Println("Got custom vm")
 
-	cluster := getClusterInfo(blockchainId, logsDir)
-	return cluster
+	return GetClusterInfo(blockchainId, logsDir)
 }
 
-func ShutdownCluster() {
+func ShutdownCluster() error {
 	outf("{{red}}shutting down cluster{{/}}\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	_, err := cli.Stop(ctx)
 	cancel()
-	gomega.Expect(err).Should(gomega.BeNil())
+	if err != nil {
+		return err
+	}
 
 	outf("{{red}}shutting down client{{/}}\n")
-	gomega.Expect(cli.Close()).Should(gomega.BeNil())
+	err = cli.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func outf(format string, args ...interface{}) {

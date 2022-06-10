@@ -8,6 +8,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/subnet-evm/tests/e2e/runner"
+	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 	"github.com/fatih/color"
 	"gopkg.in/yaml.v2"
 )
@@ -33,9 +36,33 @@ type output struct {
 }
 
 func main() {
-	if len(os.Args) != 4 {
-		panic("missing args <yaml> <chainID> <address>")
+	if len(os.Args) != 8 {
+		panic("missing args <yaml> <chainID> <address> <avalanchego-path> <plugin-dir> <grpc-endpoint> <genesis-path>")
 	}
+
+	b := make([]byte, 32)
+	vmName := "subnetevm"
+	copy(b, []byte(vmName))
+	var err error
+	vmId, err := ids.ToID(b)
+	if err != nil {
+		panic(err)
+	}
+	utils.SetOutputFile(os.Args[1])
+	utils.SetPluginDir(os.Args[5])
+	err = runner.InitializeRunner(os.Args[4], os.Args[6], "info")
+	if err != nil {
+		panic(err)
+	}
+	_, err = runner.StartNetwork(vmId, vmName, os.Args[7], os.Args[5])
+	if err != nil {
+		panic(err)
+	}
+	blockchainId, logsDir, err := runner.WaitForCustomVm(vmId)
+	if err != nil {
+		panic(err)
+	}
+	runner.GetClusterInfo(blockchainId, logsDir)
 
 	yamlFile, err := ioutil.ReadFile(os.Args[1])
 	if err != nil {
