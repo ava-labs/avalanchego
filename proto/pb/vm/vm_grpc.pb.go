@@ -35,7 +35,7 @@ type VMClient interface {
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*GetBlockResponse, error)
 	SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
+	Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
 	Version(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VersionResponse, error)
 	AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -169,7 +169,7 @@ func (c *vMClient) SetPreference(ctx context.Context, in *SetPreferenceRequest, 
 	return out, nil
 }
 
-func (c *vMClient) Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error) {
+func (c *vMClient) Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error) {
 	out := new(HealthResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/Health", in, out, opts...)
 	if err != nil {
@@ -365,7 +365,7 @@ type VMServer interface {
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
 	GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error)
 	SetPreference(context.Context, *SetPreferenceRequest) (*emptypb.Empty, error)
-	Health(context.Context, *HealthRequest) (*HealthResponse, error)
+	Health(context.Context, *emptypb.Empty) (*HealthResponse, error)
 	Version(context.Context, *emptypb.Empty) (*VersionResponse, error)
 	AppRequest(context.Context, *AppRequestMsg) (*emptypb.Empty, error)
 	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error)
@@ -430,7 +430,7 @@ func (UnimplementedVMServer) GetBlock(context.Context, *GetBlockRequest) (*GetBl
 func (UnimplementedVMServer) SetPreference(context.Context, *SetPreferenceRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPreference not implemented")
 }
-func (UnimplementedVMServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
+func (UnimplementedVMServer) Health(context.Context, *emptypb.Empty) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
 func (UnimplementedVMServer) Version(context.Context, *emptypb.Empty) (*VersionResponse, error) {
@@ -702,7 +702,7 @@ func _VM_SetPreference_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _VM_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HealthRequest)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -714,7 +714,7 @@ func _VM_Health_Handler(srv interface{}, ctx context.Context, dec func(interface
 		FullMethod: "/vm.VM/Health",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).Health(ctx, req.(*HealthRequest))
+		return srv.(VMServer).Health(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }

@@ -4,9 +4,11 @@
 package rpcdb
 
 import (
+	"context"
+	"encoding/json"
 	"sync/atomic"
 
-	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
@@ -139,6 +141,15 @@ func (db *DatabaseClient) Close() error {
 		return err
 	}
 	return errCodeToError[resp.Err]
+}
+
+func (db *DatabaseClient) HealthCheck() (interface{}, error) {
+	health, err := db.client.HealthCheck(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(health.Details), nil
 }
 
 type keyValue struct {

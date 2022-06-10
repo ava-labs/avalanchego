@@ -684,6 +684,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 	rawDiffDB := prefixdb.New(prefixBytes, s.validatorDiffsDB)
 	diffDB := linkeddb.NewDefault(rawDiffDB)
 	diffIter := diffDB.NewIterator()
+	defer diffIter.Release()
 
 	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 	for diffIter.Next() {
@@ -702,7 +703,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 	}
 
 	s.validatorDiffsCache.Put(prefixStr, weightDiffs)
-	return weightDiffs, nil
+	return weightDiffs, diffIter.Error()
 }
 
 func (s *state) MaxStakeAmount(

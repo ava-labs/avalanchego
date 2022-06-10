@@ -700,7 +700,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
-		StateSyncDisableRequests:                n.Config.StateSyncDisableRequests,
 	})
 
 	// Notify the API server when new chains are created
@@ -971,6 +970,12 @@ func (n *Node) initHealthAPI() error {
 	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
+	}
+
+	// TODO: add database health to liveness check
+	err = healthChecker.RegisterHealthCheck("database", n.DB)
+	if err != nil {
+		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
 
 	diskSpaceCheck := health.CheckerFunc(func() (interface{}, error) {
