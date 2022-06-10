@@ -4,9 +4,9 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"strings"
 
 	"github.com/fatih/color"
 	"gopkg.in/yaml.v2"
@@ -33,47 +33,44 @@ type output struct {
 	URIs     []string `yaml:"uris"`
 }
 
-const (
-	HARDHAT_CONFIG = "contract-examples/hardhat.config.ts"
-)
-
-func updateHardhat(rpc string) {
-	input, err := ioutil.ReadFile(HARDHAT_CONFIG)
-	if err != nil {
-		panic(err)
-	}
-
-	lines := strings.Split(string(input), "\n")
-
-	inSubnet := false
-	for i, line := range lines {
-		if strings.Contains(line, "subnet") {
-			inSubnet = true
-		} else if inSubnet && strings.Contains(line, "url:") {
-			lines[i] = "      url: \"" + rpc + "\","
-			break
-		}
-	}
-	output := strings.Join(lines, "\n")
-	err = ioutil.WriteFile(HARDHAT_CONFIG, []byte(output), 0644)
-	if err != nil {
-		panic(err)
-	}
+type rpcFile struct {
+	Rpc string `json:"rpc"`
 }
 
-func UpdateHardhatConfig() {
+const (
+	HARDHAT_CONFIG   = "contract-examples/hardhat.config.ts"
+	DYNAMIC_RPC_FILE = "contract-examples/dynamic_rpc.json"
+)
+
+func writeRPC(rpcUrl string) error {
+	rpcFileData := rpcFile{
+		Rpc: rpcUrl,
+	}
+
+	file, err := json.MarshalIndent(rpcFileData, "", " ")
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(DYNAMIC_RPC_FILE, file, 0644)
+	return err
+}
+
+func UpdateHardhatConfig() error {
 	yamlFile, err := ioutil.ReadFile(outputFile)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	var o output
 	if err := yaml.Unmarshal(yamlFile, &o); err != nil {
-		panic(err)
+		return err
 	}
 
-	// color.Green("\n")
 	color.Yellow("Updating hardhat config with RPC URL: %s%s/rpc", o.URIs[0], o.Endpoint)
 
 	rpc := fmt.Sprintf("%s%s/rpc", o.URIs[0], o.Endpoint)
-	updateHardhat(rpc)
+	if err = writeRPC(rpc); err != nil {
+		return err
+	}
+	return nil
 }

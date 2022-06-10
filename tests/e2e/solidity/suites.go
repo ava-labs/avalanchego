@@ -29,9 +29,9 @@ func runHardhatTests(test string) {
 	gomega.Expect(err).Should(gomega.BeNil())
 }
 
-func startSubnet(genesisPath string) {
+func startSubnet(genesisPath string) error {
 	runner.StartNetwork(vmId, vmName, genesisPath, utils.GetPluginDir())
-	utils.UpdateHardhatConfig()
+	return utils.UpdateHardhatConfig()
 }
 
 var _ = utils.DescribePrecompile("[TX Allow List]", func() {
@@ -46,9 +46,10 @@ var _ = utils.DescribePrecompile("[TX Allow List]", func() {
 	})
 
 	ginkgo.It("tx allow list", func() {
-		startSubnet("./tests/e2e/genesis/tx_allow_list_genesis.json")
+		err := startSubnet("./tests/e2e/genesis/tx_allow_list_genesis.json")
+		gomega.Expect(err).Should(gomega.BeNil())
 		running := runner.IsRunnerUp()
-		fmt.Println("Cluster running status:", running)
+		gomega.Expect(running).Should(gomega.BeTrue())
 		runHardhatTests("./test/ExampleTxAllowList.ts")
 	})
 })
