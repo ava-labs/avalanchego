@@ -243,34 +243,14 @@ if [[ ${E2E} == true ]]; then
 
   EXIT_CODE=$?
 else
-  # /tmp/avalanche-network-runner control start \
-  # --endpoint="0.0.0.0:12342" \
-  # --avalanchego-path=/tmp/avalanchego-v${VERSION}/avalanchego \
-  # --plugin-dir=${AVALANCHEGO_PLUGIN_DIR} \
-  # --custom-vms '{"subnetevm":"/tmp/genesis.json"}' &
-  # PID=${!}
-  # sleep 30
-
-  go run scripts/parser/main.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID $GENESIS_ADDRESS /tmp/avalanchego-v${VERSION}/avalanchego ${AVALANCHEGO_PLUGIN_DIR} "0.0.0.0:12342" "/tmp/genesis.json"
-
-  # while [[ ! -s /tmp/avalanchego-v${VERSION}/output.yaml ]]; do
-  #   echo "waiting for local cluster on PID ${PID}"
-  #   sleep 5
-  #   # wait up to 5-minute
-  #   ((c++)) && ((c==60)) && break
-  # done
+  go run scripts/parser/main.go \
+    /tmp/avalanchego-v${VERSION}/output.yaml \
+    $CHAIN_ID $GENESIS_ADDRESS \
+    /tmp/avalanchego-v${VERSION}/avalanchego \
+    ${AVALANCHEGO_PLUGIN_DIR} \
+    "0.0.0.0:12342" \
+    "/tmp/genesis.json"
 fi
-
-#################################
-# e.g., print out MetaMask endpoints
-# if [ -f "/tmp/avalanchego-v${VERSION}/output.yaml" ] && [ ${E2E} != true ]; then
-#   echo "cluster is ready!"
-#   go run scripts/parser/main.go /tmp/avalanchego-v${VERSION}/output.yaml $CHAIN_ID $GENESIS_ADDRESS
-# else
-#   echo "cluster is not ready in time... terminating ${PID}"
-#   kill ${PID}
-#   exit 255
-# fi
 
 #################################
 if [[ ${MODE} == "test" ]]; then
