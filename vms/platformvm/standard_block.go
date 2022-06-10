@@ -101,7 +101,10 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		txID := tx.ID()
 
-		inputUTXOs := sb.vm.txExecutor.InputUTXOs(tx.Unsigned)
+		inputUTXOs, err := sb.vm.txExecutor.InputUTXOs(tx.Unsigned)
+		if err != nil {
+			return err
+		}
 		// ensure it doesn't overlap with current input batch
 		if sb.inputs.Overlaps(inputUTXOs) {
 			return errConflictingBatchTxs

@@ -85,7 +85,7 @@ type testHelpersCollection struct {
 	txExecutor     Executor
 }
 
-// TODO ABENEGIA: snLookup currently duplicated in vm_test.go
+// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
 }

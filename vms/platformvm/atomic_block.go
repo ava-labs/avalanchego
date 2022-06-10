@@ -74,11 +74,16 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 func (ab *AtomicBlock) Verify() error {
 	blkID := ab.ID()
 
-	if err := ab.CommonDecisionBlock.Verify(); err != nil {
+	err := ab.CommonDecisionBlock.Verify()
+	if err != nil {
 		return err
 	}
 
-	ab.inputs = ab.vm.txExecutor.InputUTXOs(ab.Tx.Unsigned)
+	ab.inputs, err = ab.vm.txExecutor.InputUTXOs(ab.Tx.Unsigned)
+	if err != nil {
+		return err
+	}
+
 	parentIntf, err := ab.parentBlock()
 	if err != nil {
 		return err

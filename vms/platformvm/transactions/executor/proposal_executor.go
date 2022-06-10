@@ -50,7 +50,7 @@ type ProposalExecutor interface {
 		parentState state.Mutable,
 	) (state.Versioned, state.Versioned, error)
 
-	InitiallyPrefersCommit(utx unsigned.Tx) bool
+	InitiallyPrefersCommit(utx unsigned.Tx) (bool, error)
 
 	semanticVerifyProposal(stx *signed.Tx, parentState state.Mutable) error
 }
@@ -902,19 +902,19 @@ func (pe *proposalExecutor) executeRewardValidator(
 	return onCommitState, onAbortState, nil
 }
 
-func (pe *proposalExecutor) InitiallyPrefersCommit(utx unsigned.Tx) bool {
+func (pe *proposalExecutor) InitiallyPrefersCommit(utx unsigned.Tx) (bool, error) {
 	switch tx := utx.(type) {
 	case *unsigned.AddDelegatorTx:
-		return tx.StartTime().After(pe.clk.Time())
+		return tx.StartTime().After(pe.clk.Time()), nil
 	case *unsigned.AddValidatorTx:
-		return tx.StartTime().After(pe.clk.Time())
+		return tx.StartTime().After(pe.clk.Time()), nil
 	case *unsigned.AddSubnetValidatorTx:
-		return tx.StartTime().After(pe.clk.Time())
+		return tx.StartTime().After(pe.clk.Time()), nil
 	case *unsigned.AdvanceTimeTx:
 		txTimestamp := tx.Timestamp()
 		localTimestamp := pe.clk.Time()
 		localTimestampPlusSync := localTimestamp.Add(SyncBound)
-		return !txTimestamp.After(localTimestampPlusSync)
+		return !txTimestamp.After(localTimestampPlusSync), nil
 	case *unsigned.RewardValidatorTx:
 		// InitiallyPrefersCommit returns true if this node thinks the validator
 		// should receive a staking reward.
@@ -923,9 +923,9 @@ func (pe *proposalExecutor) InitiallyPrefersCommit(utx unsigned.Tx) bool {
 		// responsive and correct during the time they are validating.
 		// Right now they receive a reward if they're up (but not necessarily
 		// correct and responsive) for a sufficient amount of time
-		return tx.ShouldPreferCommit
+		return tx.ShouldPreferCommit, nil
 	}
-	panic("TODO ABENEGIA FIND A BETTER WAY TO HANDLE THIS")
+	return false, fmt.Errorf("expected proposal transaction but got %T", utx)
 }
 
 func (pe *proposalExecutor) semanticVerifyProposal(stx *signed.Tx, parentState state.Mutable) error {

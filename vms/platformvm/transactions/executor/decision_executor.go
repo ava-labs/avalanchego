@@ -35,7 +35,7 @@ type DecisionExecutor interface {
 	) (func() error, error)
 
 	// To maintain consistency with the Atomic txs
-	InputUTXOs(utx unsigned.Tx) ids.Set
+	InputUTXOs(utx unsigned.Tx) (ids.Set, error)
 
 	// AtomicOperations provides the requests to be written to shared memory.
 	AtomicOperations(stx *signed.Tx) (ids.ID, *atomic.Requests, error)
@@ -74,23 +74,23 @@ func (de *decisionExecutor) ExecuteDecision(
 	}
 }
 
-func (de *decisionExecutor) InputUTXOs(utx unsigned.Tx) ids.Set {
+func (de *decisionExecutor) InputUTXOs(utx unsigned.Tx) (ids.Set, error) {
 	switch tx := utx.(type) {
 	case *unsigned.CreateChainTx:
-		return nil
+		return nil, nil
 	case *unsigned.CreateSubnetTx:
 		// InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
-		return nil
+		return nil, nil
 	case *unsigned.ExportTx:
-		return nil
+		return nil, nil
 	case *unsigned.ImportTx:
 		set := ids.NewSet(len(tx.ImportedInputs))
 		for _, in := range tx.ImportedInputs {
 			set.Add(in.InputID())
 		}
-		return set
+		return set, nil
 	default:
-		panic("TODO ABENEGIA FIND A BETTER WAY TO HANDLE THIS")
+		return nil, fmt.Errorf("expected decision transaction but got %T", utx)
 	}
 }
 
@@ -136,7 +136,7 @@ func (de *decisionExecutor) AtomicOperations(stx *signed.Tx) (ids.ID, *atomic.Re
 		}
 		return tx.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
 	default:
-		panic("TODO ABENEGIA FIND A BETTER WAY TO HANDLE THIS")
+		return ids.ID{}, nil, fmt.Errorf("expected proposal transaction but got %T", tx)
 	}
 }
 

@@ -665,13 +665,23 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h.txExecutor.InitiallyPrefersCommit(tx.Unsigned) {
+
+	initiallyPreferred, err := h.txExecutor.InitiallyPrefersCommit(tx.Unsigned)
+	if err != nil {
+		t.Fatal("could not pick initially preferred")
+	}
+	if initiallyPreferred {
 		t.Fatal("should not prefer to commit this tx because its proposed timestamp is outside of sync bound")
 	}
 
 	// advance wall clock time
 	h.clk.Set(defaultGenesisTime.Add(1 * time.Second))
-	if !h.txExecutor.InitiallyPrefersCommit(tx.Unsigned) {
+
+	initiallyPreferred, err = h.txExecutor.InitiallyPrefersCommit(tx.Unsigned)
+	if err != nil {
+		t.Fatal("could not pick initially preferred")
+	}
+	if !initiallyPreferred {
 		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
 	}
 }
