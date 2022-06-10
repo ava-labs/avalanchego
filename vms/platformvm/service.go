@@ -1631,6 +1631,8 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 	}
 	if preferred {
 		reply.Status = status.Preferred
+	} else {
+		reply.Status = status.UnknownChain
 	}
 	return nil
 }

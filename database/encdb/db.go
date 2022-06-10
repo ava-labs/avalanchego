@@ -161,6 +161,16 @@ func (db *Database) isClosed() bool {
 	return db.db == nil
 }
 
+func (db *Database) HealthCheck() (interface{}, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.db == nil {
+		return nil, database.ErrClosed
+	}
+	return db.db.HealthCheck()
+}
+
 type keyValue struct {
 	key    []byte
 	value  []byte

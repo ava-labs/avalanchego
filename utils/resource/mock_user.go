@@ -75,4 +75,3 @@ func (mr *MockUserMockRecorder) AvailableDiskBytes() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableDiskBytes", reflect.TypeOf((*MockUser)(nil).AvailableDiskBytes))
 }
-
