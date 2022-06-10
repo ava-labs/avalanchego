@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
@@ -77,9 +77,7 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-			assert.NoError(err)
-			err = verifiableTx.SemanticVerify(fakedState)
+			err = h.txExecutor.SemanticVerify(tx, fakedState)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

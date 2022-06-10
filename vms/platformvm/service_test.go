@@ -30,8 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -315,8 +315,8 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*signed.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
-					uint64(service.vm.clock.Time().Add(stateful.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(stateful.SyncBound).Add(defaultMinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(executor.SyncBound).Unix()),
+					uint64(service.vm.clock.Time().Add(executor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,

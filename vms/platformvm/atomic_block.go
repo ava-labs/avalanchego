@@ -9,9 +9,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 )
 
 var (
@@ -74,19 +74,15 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 func (ab *AtomicBlock) Verify() error {
 	blkID := ab.ID()
 
-	if err := ab.CommonDecisionBlock.Verify(); err != nil {
-		return err
-	}
-
-	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx, ab.vm.txVerifier)
+	err := ab.CommonDecisionBlock.Verify()
 	if err != nil {
 		return err
 	}
-	atomicTx, ok := statefulTx.(stateful.AtomicTx)
-	if !ok {
-		return fmt.Errorf("expected tx type stateful.AtomicTx but got %T", statefulTx)
+
+	ab.inputs, err = ab.vm.txExecutor.InputUTXOs(ab.Tx.Unsigned)
+	if err != nil {
+		return err
 	}
-	ab.inputs = atomicTx.InputUTXOs()
 
 	parentIntf, err := ab.parentBlock()
 	if err != nil {
@@ -121,8 +117,12 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept, err := atomicTx.AtomicExecute(parentState)
-	if err != nil {
+	onAccept := state.NewVersioned(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
+	if _, err = ab.vm.txExecutor.ExecuteAtomicTx(&ab.Tx, onAccept); err != nil {
 		txID := ab.Tx.ID()
 		ab.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
@@ -155,15 +155,6 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
 	}
 
-	statefulTx, err := stateful.MakeStatefulTx(&ab.Tx, ab.vm.txVerifier)
-	if err != nil {
-		return err
-	}
-	atomicTx, ok := statefulTx.(stateful.AtomicTx)
-	if !ok {
-		return fmt.Errorf("expected tx type stateful.AtomicTx but got %T", statefulTx)
-	}
-
 	// Update the state of the chain in the database
 	ab.onAcceptState.Apply(ab.vm.internalState)
 
@@ -177,7 +168,7 @@ func (ab *AtomicBlock) Accept() error {
 		)
 	}
 
-	if err := atomicTx.AtomicAccept(ab.vm.ctx, batch); err != nil {
+	if err := ab.vm.txExecutor.AtomicAccept(&ab.Tx, ab.vm.ctx, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			txID,

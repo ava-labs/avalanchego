@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"errors"
@@ -82,10 +82,10 @@ type testHelpersCollection struct {
 	uptimeMan      uptime.Manager
 	utxosMan       utxos.SpendHandler
 	txBuilder      builder.TxBuilder
-	txVerifier     TxVerifier
+	txExecutor     Executor
 }
 
-// TODO ABENEGIA: snLookup currently duplicated in vm_test.go
+// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
 }
@@ -128,11 +128,9 @@ func newTestHelpersCollection() *testHelpersCollection {
 		tState, atomicUtxosMan,
 		utxosMan, rewardsCalc)
 
-	txVerifier := NewVerifier(
-		ctx, &isBootstrapped, &cfg, &clk, fx,
-		uptimeMan, utxosMan, rewardsCalc)
+	txExecutor := NewExecutor(&cfg, ctx, &isBootstrapped, &clk, fx, utxosMan, uptimeMan, rewardsCalc)
 
-	addSubnet(tState, txBuilder, txVerifier)
+	addSubnet(tState, txBuilder, txExecutor)
 
 	return &testHelpersCollection{
 		isBootstrapped: &isBootstrapped,
@@ -146,14 +144,14 @@ func newTestHelpersCollection() *testHelpersCollection {
 		uptimeMan:      uptimeMan,
 		utxosMan:       utxosMan,
 		txBuilder:      txBuilder,
-		txVerifier:     txVerifier,
+		txExecutor:     txExecutor,
 	}
 }
 
 func addSubnet(
 	tState state.State,
 	txBuilder builder.TxBuilder,
-	txVerifier TxVerifier,
+	txExecutor Executor,
 ) {
 	// Create a subnet
 	var err error
@@ -172,20 +170,12 @@ func addSubnet(
 	}
 
 	// store it
-	executableTx, err := MakeStatefulTx(testSubnet1, txVerifier)
-	if err != nil {
-		panic(err)
-	}
-	vDecisionTx, ok := executableTx.(DecisionTx)
-	if !ok {
-		panic(errors.New("unexpected tx type"))
-	}
 	versionedState := state.NewVersioned(
 		tState,
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	_, err = vDecisionTx.Execute(versionedState)
+	_, err = txExecutor.ExecuteDecision(testSubnet1, versionedState)
 	if err != nil {
 		panic(err)
 	}

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
@@ -156,18 +156,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
 	}
 
 	// Case: Proposed validator currently validating primary network
@@ -184,18 +174,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err = vProposalTx.Execute(h.tState); err != nil {
-			t.Fatal(err)
-		}
+	} else if _, _, err = h.txExecutor.ExecuteProposal(tx, h.tState); err != nil {
+		t.Fatal(err)
 	}
 
 	// Add a validator to pending validator set of primary network
@@ -235,18 +215,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err = vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
-		}
+	} else if _, _, err = h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
 	h.tState.AddCurrentStaker(addDSTx, 0)
@@ -272,19 +242,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed because validator starts validating primary " +
-				"network before starting to validate primary network")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed because validator starts validating primary " +
+			"network before starting to validate primary network")
 	}
 
 	// Case: Proposed validator is pending validator of primary network
@@ -299,19 +259,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err = vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed because validator stops validating primary " +
-				"network after stops validating primary network")
-		}
+	} else if _, _, err = h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed because validator stops validating primary " +
+			"network after stops validating primary network")
 	}
 
 	// Case: Proposed validator is pending validator of primary network
@@ -326,18 +276,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err != nil {
-			t.Fatalf("should have passed verification")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err != nil {
+		t.Fatalf("should have passed verification")
 	}
 
 	// Case: Proposed validator start validating at/before current timestamp
@@ -355,18 +295,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed verification because starts validating at current timestamp")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed verification because starts validating at current timestamp")
 	}
 
 	// reset the timestamp
@@ -397,7 +327,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
-	duplicateSubnetTx, err := h.txBuilder.NewAddSubnetValidatorTx(
+	if duplicateSubnetTx, err := h.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
@@ -405,23 +335,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(duplicateSubnetTx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed verification because validator already validating the specified subnet")
-		}
+	} else if _, _, err := h.txExecutor.ExecuteProposal(duplicateSubnetTx, h.tState); err == nil {
+		t.Fatal("should have failed verification because validator already validating the specified subnet")
 	}
 
 	h.tState.DeleteCurrentStaker(subnetTx)
@@ -445,18 +362,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed verification because validator already validating the specified subnet")
-		}
+	if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed verification because validator already validating the specified subnet")
 	}
 
 	// Case: Too few signatures
@@ -479,16 +386,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
-
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
+		if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
 			t.Fatal("should have failed verification because not enough control sigs")
 		}
 	}
@@ -514,15 +412,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
+		if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
 			t.Fatal("should have failed verification because a control sig is invalid")
 		}
 	}
@@ -551,18 +441,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	{ // test execute
-		verifiableTx, err := MakeStatefulTx(tx, h.txVerifier)
-		if err != nil {
-			t.Fatal(err)
-		}
-		vProposalTx, ok := verifiableTx.(ProposalTx)
-		if !ok {
-			t.Fatal("unexpected tx type")
-		}
-		if _, _, err := vProposalTx.Execute(h.tState); err == nil {
-			t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
-		}
+	if _, _, err := h.txExecutor.ExecuteProposal(tx, h.tState); err == nil {
+		t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 	}
 }
 

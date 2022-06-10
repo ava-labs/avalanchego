@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/stateful"
 )
 
 var (
@@ -102,16 +101,10 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		txID := tx.ID()
 
-		statefulTx, err := stateful.MakeStatefulTx(tx, sb.vm.txVerifier)
+		inputUTXOs, err := sb.vm.txExecutor.InputUTXOs(tx.Unsigned)
 		if err != nil {
 			return err
 		}
-		decisionTx, ok := statefulTx.(stateful.DecisionTx)
-		if !ok {
-			return fmt.Errorf("expected tx type stateful.DecisionTx but got %T", statefulTx)
-		}
-
-		inputUTXOs := decisionTx.InputUTXOs()
 		// ensure it doesn't overlap with current input batch
 		if sb.inputs.Overlaps(inputUTXOs) {
 			return errConflictingBatchTxs
@@ -119,7 +112,7 @@ func (sb *StandardBlock) Verify() error {
 		// Add UTXOs to batch
 		sb.inputs.Union(inputUTXOs)
 
-		onAccept, err := decisionTx.Execute(sb.onAcceptState)
+		onAccept, err := sb.vm.txExecutor.ExecuteDecision(tx, sb.onAcceptState)
 		if err != nil {
 			sb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
@@ -170,17 +163,8 @@ func (sb *StandardBlock) Accept() error {
 	// Set up the shared memory operations
 	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range sb.Txs {
-		statefulTx, err := stateful.MakeStatefulTx(tx, sb.vm.txVerifier)
-		if err != nil {
-			return err
-		}
-		decisionTx, ok := statefulTx.(stateful.DecisionTx)
-		if !ok {
-			return fmt.Errorf("expected tx type stateful.DecisionTx but got %T", statefulTx)
-		}
-
 		// Get the shared memory operations this transaction is performing
-		chainID, txRequests, err := decisionTx.AtomicOperations()
+		chainID, txRequests, err := sb.vm.txExecutor.AtomicOperations(tx)
 		if err != nil {
 			return err
 		}

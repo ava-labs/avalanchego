@@ -39,7 +39,7 @@ type TxBuilder interface {
 	DecisionsTxBuilder
 	ProposalsTxBuilder
 
-	ResetAtomicUTXOManager(aum avax.AtomicUTXOManager) // useful for UTs. TODO ABENEGIA: consider find a way to drop this
+	ResetAtomicUTXOManager(aum avax.AtomicUTXOManager) // useful for UTs. TODO: consider find a way to drop this
 }
 
 type AtomicTxBuilder interface {
