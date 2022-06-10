@@ -193,6 +193,16 @@ func (db *Database) isClosed() bool {
 	return db.db == nil
 }
 
+func (db *Database) HealthCheck() (interface{}, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.db == nil {
+		return nil, database.ErrClosed
+	}
+	return db.db.HealthCheck()
+}
+
 // Return a copy of [key], prepended with this db's prefix.
 // The returned slice should be put back in the pool
 // when it's done being used.

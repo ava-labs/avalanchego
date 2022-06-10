@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package rpcdb;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/rpcdb";
 
 message HasRequest {
@@ -37,15 +39,6 @@ message DeleteRequest {
 
 message DeleteResponse {
   uint32 err = 1;
-}
-
-message StatRequest {
-  string property = 1;
-}
-
-message StatResponse {
-  string stat = 1;
-  uint32 err = 2;
 }
 
 message CompactRequest {
@@ -109,15 +102,18 @@ message IteratorReleaseResponse {
   uint32 err = 1;
 }
 
+message HealthCheckResponse {
+  bytes details = 1;
+}
+
 service Database {
   rpc Has(HasRequest) returns (HasResponse);
   rpc Get(GetRequest) returns (GetResponse);
   rpc Put(PutRequest) returns (PutResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
-  // TODO: Delete this after we update the downstream dependencies
-  rpc Stat(StatRequest) returns (StatResponse);
   rpc Compact(CompactRequest) returns (CompactResponse);
   rpc Close(CloseRequest) returns (CloseResponse);
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
 
   rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
 

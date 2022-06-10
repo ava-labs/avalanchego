@@ -37,7 +37,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	nonStateSyncableVM := &block.TestVM{
 		TestVM: common.TestVM{T: t},
 	}
-	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg, false /*StateSyncDisableRequests*/)
+	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
 	assert.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
@@ -59,7 +59,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 			T: t,
 		},
 	}
-	dummyGetter, err = getter.New(fullVM, *commonCfg, false /*StateSyncDisableRequests*/)
+	dummyGetter, err = getter.New(fullVM, *commonCfg)
 	assert.NoError(err)
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)

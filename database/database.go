@@ -9,6 +9,8 @@ package database
 
 import (
 	"io"
+
+	"github.com/ava-labs/avalanchego/api/health"
 )
 
 // KeyValueReader wraps the Has and Get method of a backing data store.
@@ -73,4 +75,5 @@ type Database interface {
 	Iteratee
 	Compacter
 	io.Closer
+	health.Checker
 }

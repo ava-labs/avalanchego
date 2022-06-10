@@ -70,15 +70,13 @@ type APIConfig struct {
 }
 
 type IPConfig struct {
-	IPPort ips.DynamicIPPort `json:"ip"`
+	IPPort           ips.DynamicIPPort `json:"ip"`
+	IPUpdater        dynamicip.Updater `json:"-"`
+	IPResolutionFreq time.Duration     `json:"ipResolutionFrequency"`
 	// True if we attempted NAT Traversal
 	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
 	// Tries to perform network address translation
 	Nat nat.Router `json:"-"`
-	// Dynamic Update duration for IP or NAT traversal
-	DynamicUpdateDuration time.Duration `json:"dynamicUpdateDuration"`
-	// Tries to resolve our IP from an external source
-	DynamicPublicIPResolver dynamicip.Resolver `json:"-"`
 }
 
 type StakingConfig struct {
@@ -91,9 +89,8 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs             []ids.NodeID `json:"stateSyncIDs"`
-	StateSyncIPs             []ips.IPPort `json:"stateSyncIPs"`
-	StateSyncDisableRequests bool         `json:"stateSyncDisableRequests"`
+	StateSyncIDs []ids.NodeID `json:"stateSyncIDs"`
+	StateSyncIPs []ips.IPPort `json:"stateSyncIPs"`
 }
 
 type BootstrapConfig struct {

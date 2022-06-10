@@ -48,6 +48,10 @@ func TestCorruption(t *testing.T) {
 
 			return corruptableBatch.Write()
 		},
+		"corrupted healthcheck": func(db database.Database) error {
+			_, err := db.HealthCheck()
+			return err
+		},
 	}
 	baseDB := memdb.New()
 	// wrap this db

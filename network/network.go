@@ -594,6 +594,10 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 }
 
 func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
+	if n.config.MyNodeID == nodeID {
+		return subnetID == constants.PrimaryNetworkID || n.config.WhitelistedSubnets.Contains(subnetID)
+	}
+
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 

@@ -329,6 +329,13 @@ func (db *Database) Close() error {
 	return updateError(db.DB.Close())
 }
 
+func (db *Database) HealthCheck() (interface{}, error) {
+	if db.closed.GetValue() {
+		return nil, database.ErrClosed
+	}
+	return nil, nil
+}
+
 // batch is a wrapper around a levelDB batch to contain sizes.
 type batch struct {
 	leveldb.Batch

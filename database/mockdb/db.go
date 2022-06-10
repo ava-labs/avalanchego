@@ -35,6 +35,7 @@ type Database struct {
 	OnNewIteratorWithStartAndPrefix func([]byte, []byte) database.Iterator
 	OnCompact                       func([]byte, []byte) error
 	OnClose                         func() error
+	OnHealthCheck                   func() (interface{}, error)
 }
 
 // New returns a new mock database
@@ -115,4 +116,11 @@ func (db *Database) Close() error {
 		return errNoFunction
 	}
 	return db.OnClose()
+}
+
+func (db *Database) HealthCheck() (interface{}, error) {
+	if db.OnHealthCheck == nil {
+		return nil, errNoFunction
+	}
+	return db.OnHealthCheck()
 }
