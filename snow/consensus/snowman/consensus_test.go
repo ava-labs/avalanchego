@@ -13,6 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -48,6 +50,7 @@ var (
 		RecordPollInvalidVoteTest,
 		RecordPollTransitiveVotingTest,
 		RecordPollDivergedVotingTest,
+		RecordPollDivergedVotingWithNoConflictingBitTest,
 		RecordPollChangePreferredChainTest,
 		MetricsProcessingErrorTest,
 		MetricsAcceptedErrorTest,
@@ -57,6 +60,8 @@ var (
 		ErrorOnRejectSiblingTest,
 		ErrorOnTransitiveRejectionTest,
 		RandomizedConsistencyTest,
+		ErrorOnAddDecidedBlock,
+		ErrorOnAddDuplicateBlockID,
 	}
 )
 
@@ -994,6 +999,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
+	assert := assert.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
@@ -1006,13 +1012,12 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
-		t.Fatal(err)
-	}
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight)
+	assert.NoError(err)
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x0f}, // 0b1111
+			IDV:     ids.ID{0x0f}, // 1111
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
@@ -1020,7 +1025,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	}
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x08}, // 0b1000
+			IDV:     ids.ID{0x08}, // 0001
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
@@ -1028,7 +1033,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	}
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.ID{0x01}, // 0b0001
+			IDV:     ids.ID{0x01}, // 1000
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
@@ -1043,39 +1048,168 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		HeightV: block2.HeightV + 1,
 	}
 
-	if err := sm.Add(block0); err != nil {
-		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
-		t.Fatal(err)
-	}
+	err = sm.Add(block0)
+	assert.NoError(err)
 
+	err = sm.Add(block1)
+	assert.NoError(err)
+
+	// The first bit is contested as either 0 or 1. When voting for [block0] and
+	// when the first bit is 1, the following bits have been decided to follow
+	// the 255 remaining bits of [block0].
 	votes0 := ids.Bag{}
 	votes0.Add(block0.ID())
-	if err := sm.RecordPoll(votes0); err != nil {
-		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
-		t.Fatal(err)
-	}
+	err = sm.RecordPoll(votes0)
+	assert.NoError(err)
 
-	// dep2 is already rejected.
+	// Although we are adding in [block2] here - the underlying snowball
+	// instance has already decided it is rejected. Snowman doesn't actually
+	// know that though, because that is an implementation detail of the
+	// Snowball trie that is used.
+	err = sm.Add(block2)
+	assert.NoError(err)
 
-	if err := sm.Add(block3); err != nil {
-		t.Fatal(err)
-	} else if status := block0.Status(); status == choices.Accepted {
-		t.Fatalf("Shouldn't be accepted yet")
-	}
+	// Because [block2] is effectively rejected, [block3] is also effectively
+	// rejected.
+	err = sm.Add(block3)
+	assert.NoError(err)
 
-	// Transitively increases dep2. However, dep2 shares the first bit with
-	// dep0. Because dep2 is already rejected, this will accept dep0.
+	assert.Equal(block0.ID(), sm.Preference())
+	assert.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
+	assert.Equal(choices.Processing, block1.Status(), "should not be rejected yet")
+	assert.Equal(choices.Processing, block2.Status(), "should not be rejected yet")
+	assert.Equal(choices.Processing, block3.Status(), "should not be rejected yet")
+
+	// Current graph structure:
+	//       G
+	//     /   \
+	//    *     |
+	//   / \    |
+	//  0   2   1
+	//      |
+	//      3
+	// Tail = 0
+
+	// Transitively votes for [block2] by voting for its child [block3].
+	// Because [block2] shares the first bit with [block0] and the following
+	// bits have been finalized for [block0], the voting results in accepting
+	// [block0]. When [block0] is accepted, [block1] and [block2] are rejected
+	// as conflicting. [block2]'s child, [block3], is then rejected
+	// transitively.
 	votes3 := ids.Bag{}
 	votes3.Add(block3.ID())
-	if err := sm.RecordPoll(votes3); err != nil {
-		t.Fatal(err)
-	} else if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if status := block0.Status(); status != choices.Accepted {
-		t.Fatalf("Should be accepted")
+	err = sm.RecordPoll(votes3)
+	assert.NoError(err)
+
+	assert.True(sm.Finalized(), "finalized too late")
+	assert.Equal(choices.Accepted, block0.Status(), "should be accepted")
+	assert.Equal(choices.Rejected, block1.Status())
+	assert.Equal(choices.Rejected, block2.Status())
+	assert.Equal(choices.Rejected, block3.Status())
+}
+
+func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+	assert := assert.New(t)
+
+	ctx := snow.DefaultConsensusContextTest()
+	params := snowball.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
+	assert.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+
+	block0 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{0x06}, // 0110
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	block1 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{0x08}, // 0001
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	block2 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{0x01}, // 1000
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	block3 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1),
+			StatusV: choices.Processing,
+		},
+		ParentV: block2.IDV,
+		HeightV: block2.HeightV + 1,
+	}
+
+	assert.NoError(sm.Add(block0))
+	assert.NoError(sm.Add(block1))
+
+	// When voting for [block0], we end up finalizing the first bit as 0. The
+	// second bit is contested as either 0 or 1. For when the second bit is 1,
+	// the following bits have been decided to follow the 254 remaining bits of
+	// [block0].
+	votes0 := ids.Bag{}
+	votes0.Add(block0.ID())
+	assert.NoError(sm.RecordPoll(votes0))
+
+	// Although we are adding in [block2] here - the underlying snowball
+	// instance has already decided it is rejected. Snowman doesn't actually
+	// know that though, because that is an implementation detail of the
+	// Snowball trie that is used.
+	assert.NoError(sm.Add(block2))
+
+	// Because [block2] is effectively rejected, [block3] is also effectively
+	// rejected.
+	assert.NoError(sm.Add(block3))
+
+	assert.Equal(block0.ID(), sm.Preference())
+	assert.Equal(choices.Processing, block0.Status(), "should not be decided yet")
+	assert.Equal(choices.Processing, block1.Status(), "should not be decided yet")
+	assert.Equal(choices.Processing, block2.Status(), "should not be decided yet")
+	assert.Equal(choices.Processing, block3.Status(), "should not be decided yet")
+
+	// Current graph structure:
+	//       G
+	//     /   \
+	//    *     |
+	//   / \    |
+	//  0   1   2
+	//          |
+	//          3
+	// Tail = 0
+
+	// Transitively votes for [block2] by voting for its child [block3]. Because
+	// [block2] doesn't share any processing bits with [block0] or [block1], the
+	// votes are over only rejected bits. Therefore, the votes for [block2] are
+	// dropped. Although the votes for [block3] are still applied, [block3] will
+	// only be marked as accepted after [block2] is marked as accepted; which
+	// will never happen.
+	votes3 := ids.Bag{}
+	votes3.Add(block3.ID())
+	assert.NoError(sm.RecordPoll(votes3))
+
+	assert.False(sm.Finalized(), "finalized too early")
+	assert.Equal(choices.Processing, block0.Status())
+	assert.Equal(choices.Processing, block1.Status())
+	assert.Equal(choices.Processing, block2.Status())
+	assert.Equal(choices.Processing, block3.Status())
 }
 
 func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
@@ -1522,4 +1656,70 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	if !n.Agreement() {
 		t.Fatalf("Network agreed on inconsistent values")
 	}
+}
+
+func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
+	sm := factory.New()
+	assert := assert.New(t)
+
+	ctx := snow.DefaultConsensusContextTest()
+	params := snowball.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	assert.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+
+	block0 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{0x03}, // 0b0011
+			StatusV: choices.Accepted,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	assert.ErrorIs(sm.Add(block0), errDuplicateAdd)
+}
+
+func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
+	sm := factory.New()
+	assert := assert.New(t)
+
+	ctx := snow.DefaultConsensusContextTest()
+	params := snowball.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	assert.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+
+	block0 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{0x03}, // 0b0011
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	block1 := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.ID{0x03}, // 0b0011, same as block0
+			StatusV: choices.Processing,
+		},
+		ParentV: block0.IDV,
+		HeightV: block0.HeightV + 1,
+	}
+
+	assert.NoError(sm.Add(block0))
+	assert.ErrorIs(sm.Add(block1), errDuplicateAdd)
 }

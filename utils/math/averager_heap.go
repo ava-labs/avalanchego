@@ -16,10 +16,12 @@ var (
 
 // AveragerHeap maintains a heap of the averagers.
 type AveragerHeap interface {
-	// Add will do nothing if [nodeID] is already in the heap
-	Add(nodeID ids.NodeID, averager Averager)
+	// Add the average to the heap. If [nodeID] is already in the heap, the
+	// average will be replaced and the old average will be returned. If there
+	// was not an old average, false will be returned.
+	Add(nodeID ids.NodeID, averager Averager) (Averager, bool)
 	// Remove attempts to remove the average that was added with the provided
-	// [nodeID], if none is contained in the heap, [false] will be returned
+	// [nodeID], if none is contained in the heap, [false] will be returned.
 	Remove(nodeID ids.NodeID) (Averager, bool)
 	// Pop attempts to remove the node with either the largest or smallest
 	// average, depending on if this is a max heap or a min heap, respectively.
@@ -64,15 +66,19 @@ func NewMaxAveragerHeap() AveragerHeap {
 	}}
 }
 
-func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) {
-	if _, exists := h.b.nodeIDToEntry[nodeID]; exists {
-		return
+func (h averagerHeap) Add(nodeID ids.NodeID, averager Averager) (Averager, bool) {
+	if e, exists := h.b.nodeIDToEntry[nodeID]; exists {
+		oldAverager := e.averager
+		e.averager = averager
+		heap.Fix(h.b, e.index)
+		return oldAverager, true
 	}
 
 	heap.Push(h.b, &averagerHeapEntry{
 		nodeID:   nodeID,
 		averager: averager,
 	})
+	return nil, false
 }
 
 func (h averagerHeap) Remove(nodeID ids.NodeID) (Averager, bool) {

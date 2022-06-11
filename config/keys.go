@@ -37,6 +37,8 @@ const (
 	PublicIPKey                                        = "public-ip"
 	DynamicUpdateDurationKey                           = "dynamic-update-duration"
 	DynamicPublicIPResolverKey                         = "dynamic-public-ip"
+	PublicIPResolutionFreqKey                          = "public-ip-resolution-frequency"
+	PublicIPResolutionServiceKey                       = "public-ip-resolution-service"
 	InboundConnUpgradeThrottlerCooldownKey             = "inbound-connection-throttling-cooldown"
 	InboundThrottlerMaxConnsPerSecKey                  = "inbound-connection-throttling-max-conns-per-sec"
 	OutboundConnectionThrottlingRps                    = "outbound-connection-throttling-rps"

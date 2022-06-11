@@ -972,6 +972,12 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
+	// TODO: add database health to liveness check
+	err = healthChecker.RegisterHealthCheck("database", n.DB)
+	if err != nil {
+		return fmt.Errorf("couldn't register database health check: %w", err)
+	}
+
 	diskSpaceCheck := health.CheckerFunc(func() (interface{}, error) {
 		// confirm that the node has enough disk space to continue operating
 		// if there is too little disk space remaining, first report unhealthy and then shutdown the node

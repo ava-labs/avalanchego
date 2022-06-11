@@ -51,7 +51,8 @@ func TestAveragerHeap(t *testing.T) {
 		l := test.h.Len()
 		assert.Zero(l)
 
-		test.h.Add(n1, test.a[1])
+		_, ok = test.h.Add(n1, test.a[1])
+		assert.False(ok)
 
 		n, a, ok := test.h.Peek()
 		assert.True(ok)
@@ -61,13 +62,18 @@ func TestAveragerHeap(t *testing.T) {
 		l = test.h.Len()
 		assert.Equal(1, l)
 
-		test.h.Add(n1, test.a[1])
+		a, ok = test.h.Add(n1, test.a[1])
+		assert.True(ok)
+		assert.Equal(test.a[1], a)
 
 		l = test.h.Len()
 		assert.Equal(1, l)
 
-		test.h.Add(n0, test.a[0])
-		test.h.Add(n2, test.a[2])
+		_, ok = test.h.Add(n0, test.a[0])
+		assert.False(ok)
+
+		_, ok = test.h.Add(n2, test.a[2])
+		assert.False(ok)
 
 		n, a, ok = test.h.Pop()
 		assert.True(ok)
@@ -89,5 +95,14 @@ func TestAveragerHeap(t *testing.T) {
 
 		l = test.h.Len()
 		assert.Equal(1, l)
+
+		a, ok = test.h.Add(n2, test.a[0])
+		assert.True(ok)
+		assert.Equal(test.a[2], a)
+
+		n, a, ok = test.h.Pop()
+		assert.True(ok)
+		assert.Equal(n2, n)
+		assert.Equal(test.a[0], a)
 	}
 }

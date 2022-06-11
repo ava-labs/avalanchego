@@ -46,6 +46,9 @@ func TestDefaultError(t *testing.T) {
 	if err := db.Compact([]byte{}, []byte{}); err == nil {
 		t.Fatal("should have errored")
 	}
+	if _, err := db.HealthCheck(); err == nil {
+		t.Fatal("should have errored")
+	}
 }
 
 // Assert that mocking works for Get
