@@ -4,6 +4,8 @@
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
 
+State Sync v0.1 (v1.7.11) and v0.2 (v1.7.12) are not compatible with State Sync v0.3 (v1.7.13). When the majority of stake upgrades, old clients will no longer be able to State Sync. In addition, v1.7.13 modifies the VM interface, so you’ll need to update your Custom VM dependency.
+
 ### State Sync
 
 - Added peer bandwidth tracking to optimize `coreth` state sync message routing
