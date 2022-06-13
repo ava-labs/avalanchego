@@ -43,16 +43,12 @@ func TestServiceCreateUser(t *testing.T) {
 	s := service{ks: ks.(*keystore)}
 
 	{
-		reply := api.EmptyReply{}
-		expected := api.EmptyReply{}
-		if err := s.CreateUser(nil, &api.UserPass{
+		err := s.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
-		}, &reply); err != nil {
+		}, &api.EmptyReply{})
+		if err != nil {
 			t.Fatal(err)
-		}
-		if reply != expected {
-			t.Fatalf("Should have received an empty response")
 		}
 	}
 
@@ -152,35 +148,23 @@ func TestServiceCreateDuplicate(t *testing.T) {
 	s := service{ks: ks.(*keystore)}
 
 	{
-		reply := api.EmptyReply{}
-		expected := api.EmptyReply{}
-
-		if err := s.CreateUser(nil, &api.UserPass{
+		err := s.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
-		}, &reply); err != nil {
+		}, &api.EmptyReply{})
+		if err != nil {
 			t.Fatal(err)
-		}
-		if reply != expected {
-			t.Fatalf("Should have received an empty response")
 		}
 	}
 
 	{
-		reply := api.EmptyReply{}
-		expected := api.EmptyReply{}
-
-		if err := s.CreateUser(nil, &api.UserPass{
+		err := s.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
-		}, &reply); err == nil {
+		}, &api.EmptyReply{})
+		if err == nil {
 			t.Fatalf("Should have errored due to the username already existing")
 		}
-
-		if reply != expected {
-			t.Fatalf("Should have received an empty response")
-		}
-
 	}
 }
 
@@ -207,17 +191,12 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 	s := service{ks: ks.(*keystore)}
 
 	{
-		reply := api.EmptyReply{}
-		expected := api.EmptyReply{}
-
-		if err := s.CreateUser(nil, &api.UserPass{
+		err := s.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
-		}, &reply); err != nil {
+		}, &api.EmptyReply{})
+		if err != nil {
 			t.Fatal(err)
-		}
-		if reply != expected {
-			t.Fatalf("Should have received an empty response")
 		}
 	}
 
