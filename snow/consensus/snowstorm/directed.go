@@ -6,6 +6,8 @@ package snowstorm
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -29,10 +31,11 @@ func (DirectedFactory) New() Consensus { return &Directed{} }
 // Directed is an implementation of a multi-color, non-transitive, snowball
 // instance
 type Directed struct {
-	// metrics that describe this consensus instance
-	metrics.Latency
 	metrics.Polls
-	whitelistTxMetrics metrics.Latency
+	metrics.Latency
+	whitelistTxLatency metrics.Latency
+	numVirtuousTxs     prometheus.Gauge
+	numRogueTxs        prometheus.Gauge
 
 	// context that this consensus instance is executing in
 	ctx *snow.ConsensusContext
@@ -99,23 +102,39 @@ func (dg *Directed) Initialize(
 	dg.ctx = ctx
 	dg.params = params
 
-	latencyMetrics, err := metrics.NewLatency("txs", "transaction(s)", ctx.Log, "", ctx.Registerer)
-	if err != nil {
-		return fmt.Errorf("failed to create latency metrics: %w", err)
-	}
-	dg.Latency = latencyMetrics
-
-	whitelistTxMetrics, err := metrics.NewLatency("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer)
-	if err != nil {
-		return fmt.Errorf("failed to create whitelist tx metrics: %w", err)
-	}
-	dg.whitelistTxMetrics = whitelistTxMetrics
-
-	pollsMetrics, err := metrics.NewPolls("", ctx.Registerer)
+	var err error
+	dg.Polls, err = metrics.NewPolls("", ctx.Registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create poll metrics: %w", err)
 	}
-	dg.Polls = pollsMetrics
+
+	dg.Latency, err = metrics.NewLatency("txs", "transaction(s)", ctx.Log, "", ctx.Registerer)
+	if err != nil {
+		return fmt.Errorf("failed to create latency metrics: %w", err)
+	}
+
+	dg.whitelistTxLatency, err = metrics.NewLatency("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer)
+	if err != nil {
+		return fmt.Errorf("failed to create whitelist tx metrics: %w", err)
+	}
+
+	dg.numVirtuousTxs = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "virtuous_tx_processing",
+		Help: "Number of currently processing virtuous transaction(s)",
+	})
+	err = ctx.Registerer.Register(dg.numVirtuousTxs)
+	if err != nil {
+		return fmt.Errorf("failed to create virtuous tx metrics: %w", err)
+	}
+
+	dg.numRogueTxs = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "rogue_tx_processing",
+		Help: "Number of currently processing rogue transaction(s)",
+	})
+	err = ctx.Registerer.Register(dg.numRogueTxs)
+	if err != nil {
+		return fmt.Errorf("failed to create rogue tx metrics: %w", err)
+	}
 
 	dg.txs = make(map[ids.ID]*directedTx)
 	dg.utxos = make(map[ids.ID]ids.Set)
@@ -174,7 +193,7 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	// Notify the metrics that this transaction is being issued.
 	if tx.HasWhitelist() {
 		dg.ctx.Log.Info("whitelist tx successfully issued %s", txID)
-		dg.whitelistTxMetrics.Issued(txID, dg.pollNumber)
+		dg.whitelistTxLatency.Issued(txID, dg.pollNumber)
 	} else {
 		dg.Latency.Issued(txID, dg.pollNumber)
 	}
@@ -326,7 +345,6 @@ func (dg *Directed) Add(tx Tx) error {
 
 	// Mark this transaction as rogue if it had any conflicts registered above
 	txNode.rogue = txNode.outs.Len() != 0
-
 	if !txNode.rogue {
 		// If this tx is currently virtuous, add it to the virtuous sets
 		dg.virtuous.Add(txID)
@@ -341,7 +359,12 @@ func (dg *Directed) Add(tx Tx) error {
 
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
-	return dg.registerRejector(tx)
+	err := dg.registerRejector(tx)
+
+	numVirtuous := dg.virtuous.Len()
+	dg.numVirtuousTxs.Set(float64(numVirtuous))
+	dg.numRogueTxs.Set(float64(len(dg.txs) - numVirtuous))
+	return err
 }
 
 // addEdge between the [src] and [dst] txs to represent a conflict.
@@ -372,10 +395,14 @@ func (dg *Directed) addEdge(src, dst *directedTx) {
 }
 
 func (dg *Directed) Remove(txID ids.ID) error {
-	s := ids.Set{
+	err := dg.reject(ids.Set{
 		txID: struct{}{},
-	}
-	return dg.reject(s)
+	})
+
+	numVirtuous := dg.virtuous.Len()
+	dg.numVirtuousTxs.Set(float64(numVirtuous))
+	dg.numRogueTxs.Set(float64(len(dg.txs) - numVirtuous))
+	return err
 }
 
 func (dg *Directed) Issued(tx Tx) bool {
@@ -451,6 +478,10 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			dg.Successful()
 		}
 	}
+
+	numVirtuous := dg.virtuous.Len()
+	dg.numVirtuousTxs.Set(float64(numVirtuous))
+	dg.numRogueTxs.Set(float64(len(dg.txs) - numVirtuous))
 	return changed, dg.errs.Err
 }
 
@@ -626,7 +657,7 @@ func (dg *Directed) acceptTx(tx Tx) error {
 	// Update the metrics to account for this transaction's acceptance
 	if tx.HasWhitelist() {
 		dg.ctx.Log.Info("whitelist tx accepted %s", txID)
-		dg.whitelistTxMetrics.Accepted(txID, dg.pollNumber)
+		dg.whitelistTxLatency.Accepted(txID, dg.pollNumber)
 	} else {
 		// just regular tx
 		dg.Latency.Accepted(txID, dg.pollNumber)
@@ -656,7 +687,7 @@ func (dg *Directed) rejectTx(tx Tx) error {
 	// Update the metrics to account for this transaction's rejection
 	if tx.HasWhitelist() {
 		dg.ctx.Log.Info("whitelist tx rejected %s", txID)
-		dg.whitelistTxMetrics.Rejected(txID, dg.pollNumber)
+		dg.whitelistTxLatency.Rejected(txID, dg.pollNumber)
 	} else {
 		dg.Latency.Rejected(txID, dg.pollNumber)
 	}
