@@ -30,11 +30,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
@@ -106,13 +107,18 @@ type Manager interface {
 
 // ChainParameters defines the chain being created
 type ChainParameters struct {
-	ID          ids.ID   // The ID of the chain being created
-	SubnetID    ids.ID   // ID of the subnet that validates this chain
-	GenesisData []byte   // The genesis data of this chain's ledger
-	VMAlias     string   // The ID of the vm this chain is running
-	FxAliases   []string // The IDs of the feature extensions this chain is running
-
-	CustomBeacons validators.Set // Should only be set if the default beacons can't be used.
+	// The ID of the chain being created.
+	ID ids.ID
+	// ID of the subnet that validates this chain.
+	SubnetID ids.ID
+	// The genesis data of this chain's ledger.
+	GenesisData []byte
+	// The ID of the vm this chain is running.
+	VMAlias string
+	// The IDs of the feature extensions this chain is running.
+	FxAliases []string
+	// Should only be set if the default beacons can't be used.
+	CustomBeacons validators.Set
 }
 
 type chain struct {
@@ -136,15 +142,15 @@ type ManagerConfig struct {
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents              *triggers.EventDispatcher
-	ConsensusEvents             *triggers.EventDispatcher
+	DecisionAcceptorGroup       snow.AcceptorGroup
+	ConsensusAcceptorGroup      snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.Creator    // message creator, shared with network
 	Router                      router.Router      // Routes incoming messages to the appropriate chain
 	Net                         network.Network    // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	Validators                  validators.Manager // Validators validating on this chain
-	NodeID                      ids.ShortID        // The ID of this node
+	NodeID                      ids.NodeID         // The ID of this node
 	NetworkID                   uint32             // ID of the network this node is connected to
 	Server                      server.Server      // Handles HTTP API calls
 	Keystore                    keystore.Keystore
@@ -180,7 +186,10 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	ResetProposerVMHeightIndex bool
+	// Tracks CPU/disk usage caused by each peer.
+	ResourceTracker timetracker.ResourceTracker
+
+	StateSyncBeacons []ids.NodeID
 }
 
 type manager struct {
@@ -298,28 +307,21 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// handler is started.
 	m.ManagerConfig.Router.AddChain(chain.Handler)
 
-	ctx := chain.Handler.Context()
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
-	// Notify the bootstrapper that it has started executing.
-	err = chain.Handler.Bootstrapper().Start(0)
-
-	// Tell the chain to start processing messages.
-	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
-
-	// If startup errored, then shutdown the chain with the fatal error.
-	if err != nil {
-		chain.Handler.StopWithError(err)
-	}
-
-	// Register bootstrapped health checks after P chain is started.
+	// Register bootstrapped health checks after P chain has been added to
+	// chains.
+	//
+	// Note: Registering this after the chain has been tracked prevents a race
+	//       condition between the health check and adding the first chain to
+	//       the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
 			chain.Handler.StopWithError(err)
 		}
 	}
+
+	// Tell the chain to start processing messages.
+	// If the X, P, or C Chain panics, do not attempt to recover
+	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
 }
 
 // Create a chain
@@ -373,14 +375,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
 		},
-		DecisionDispatcher:  m.DecisionEvents,
-		ConsensusDispatcher: m.ConsensusEvents,
-		Registerer:          consensusMetrics,
+		DecisionAcceptor:  m.DecisionAcceptorGroup,
+		ConsensusAcceptor: m.ConsensusAcceptorGroup,
+		Registerer:        consensusMetrics,
 	}
-	// We set the state to bootstrapping here because bootstrapping is the first
-	// state, and failing to initialize the state before it's first access would
-	// cause a panic.
-	ctx.SetState(snow.Bootstrapping)
+	// We set the state to Initializing here because failing to set the state
+	// before it's first access would cause a panic.
+	ctx.SetState(snow.Initializing)
 
 	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
 		if sbConfigs.ValidatorOnly {
@@ -563,7 +564,7 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -613,17 +614,22 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
+		m.ResourceTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
+
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
+		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -681,20 +687,7 @@ func (m *manager) createAvalancheChain(
 	// Register health check for this chain
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	// Grab the context lock before calling the chain's health check
-	check := health.CheckerFunc(func() (interface{}, error) {
-		ctx.Lock.Lock()
-		defer ctx.Lock.Unlock()
-		switch ctx.GetState() {
-		case snow.Bootstrapping:
-			return bootstrapper.HealthCheck()
-		case snow.NormalOp:
-			return engine.HealthCheck()
-		default:
-			return nil, fmt.Errorf("unknown state; could not check health")
-		}
-	})
-	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -757,7 +750,7 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	if err := m.ConsensusEvents.RegisterChain(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -789,7 +782,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight, m.ResetProposerVMHeightIndex)
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)
@@ -820,17 +813,22 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
+		m.ResourceTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
+
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
+		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -848,31 +846,13 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	// create bootstrap gear
-	bootstrapCfg := smbootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-		Bootstrapped:  m.unblockChains,
-	}
-	bootstrapper, err := smbootstrap.New(
-		bootstrapCfg,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
-	}
-	handler.SetBootstrapper(bootstrapper)
-
-	// create engine gear
+	// Create engine, bootstrapper and state-syncer in this order,
+	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:           bootstrapCfg.Ctx,
+		Ctx:           commonCfg.Ctx,
 		AllGetsServer: snowGetHandler,
-		VM:            bootstrapCfg.VM,
-		Sender:        bootstrapCfg.Sender,
+		VM:            vm,
+		Sender:        commonCfg.Sender,
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     &smcon.Topological{},
@@ -883,22 +863,43 @@ func (m *manager) createSnowmanChain(
 	}
 	handler.SetConsensus(engine)
 
+	// create bootstrap gear
+	bootstrapCfg := smbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+		Bootstrapped:  m.unblockChains,
+	}
+	bootstrapper, err := smbootstrap.New(
+		bootstrapCfg,
+		engine.Start,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
+	}
+	handler.SetBootstrapper(bootstrapper)
+
+	// create state sync gear
+	stateSyncCfg, err := syncer.NewConfig(
+		commonCfg,
+		m.StateSyncBeacons,
+		snowGetHandler,
+		vm,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
+	}
+	stateSyncer := syncer.New(
+		stateSyncCfg,
+		bootstrapper.Start,
+	)
+	handler.SetStateSyncer(stateSyncer)
+
 	// Register health checks
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	check := health.CheckerFunc(func() (interface{}, error) {
-		ctx.Lock.Lock()
-		defer ctx.Lock.Unlock()
-		switch ctx.GetState() {
-		case snow.Bootstrapping:
-			return bootstrapper.HealthCheck()
-		case snow.NormalOp:
-			return engine.HealthCheck()
-		default:
-			return nil, fmt.Errorf("unknown state; could not check health")
-		}
-	})
-	if err := m.Health.RegisterHealthCheck(chainAlias, check); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 

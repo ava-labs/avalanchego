@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 var _ AddressManager = &addressManager{}
@@ -57,7 +57,7 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 }
 
 func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
+	chainIDAlias, hrp, addrBytes, err := address.Parse(addrStr)
 	if err != nil {
 		return ids.ID{}, ids.ShortID{}, err
 	}
@@ -93,7 +93,7 @@ func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string
 		return "", err
 	}
 	hrp := constants.GetHRP(a.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+	return address.Format(chainIDAlias, hrp, addr.Bytes())
 }
 
 func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
@@ -102,6 +102,35 @@ func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, err
 		addr, err := a.ParseLocalAddress(addrStr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
+		}
+		addrs.Add(addr)
+	}
+	return addrs, nil
+}
+
+// ParseServiceAddress get address ID from address string, being it either localized (using address manager,
+// doing also components validations), or not localized.
+// If both attempts fail, reports error from localized address parsing
+func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) {
+	addr, err := ids.ShortFromString(addrStr)
+	if err == nil {
+		return addr, nil
+	}
+
+	addr, err = a.ParseLocalAddress(addrStr)
+	if err != nil {
+		return addr, fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
+	}
+	return addr, nil
+}
+
+// ParseServiceAddress get addresses IDs from addresses strings, being them either localized or not
+func ParseServiceAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
+	addrs := ids.NewShortSet(len(addrStrs))
+	for _, addrStr := range addrStrs {
+		addr, err := ParseServiceAddress(a, addrStr)
+		if err != nil {
+			return nil, err
 		}
 		addrs.Add(addr)
 	}

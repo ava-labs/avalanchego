@@ -42,10 +42,12 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 	b := &bootstrapper{
 		Config: config,
 
-		PutHandler:   common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler: common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler: common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:   common.NewNoOpAppHandler(config.Ctx.Log),
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
+		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
 
 		processedCache:           &cache.LRU{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
@@ -83,6 +85,8 @@ type bootstrapper struct {
 	Config
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
@@ -121,7 +125,7 @@ func (b *bootstrapper) Clear() error {
 
 // Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
+func (b *bootstrapper) Ancestors(vdr ids.NodeID, requestID uint32, vtxs [][]byte) error {
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no vertices", vdr, requestID)
@@ -200,7 +204,7 @@ func (b *bootstrapper) Ancestors(vdr ids.ShortID, requestID uint32, vtxs [][]byt
 	return b.process(processVertices...)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) error {
 	vtxID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
@@ -210,29 +214,29 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(vtxID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if err := b.WeightTracker.AddWeightForNode(nodeID); err != nil {
+	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if b.WeightTracker.EnoughConnectedWeight() && !b.started {
-		b.started = true
-		return b.Startup()
+	if b.started || !b.StartupTracker.ShouldStart() {
+		return nil
 	}
 
-	return nil
+	b.started = true
+	return b.Startup()
 }
 
-func (b *bootstrapper) Disconnected(nodeID ids.ShortID) error {
+func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
 	if err := b.VM.Disconnected(nodeID); err != nil {
 		return err
 	}
 
-	return b.WeightTracker.RemoveWeightForNode(nodeID)
+	return b.StartupTracker.Disconnected(nodeID)
 }
 
 func (b *bootstrapper) Timeout() error {
@@ -244,7 +248,7 @@ func (b *bootstrapper) Timeout() error {
 	if !b.Config.Subnet.IsBootstrapped() {
 		return b.Restart(true)
 	}
-	return b.finish()
+	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 
 func (b *bootstrapper) Gossip() error { return nil }
@@ -256,14 +260,18 @@ func (b *bootstrapper) Shutdown() error {
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-func (b *bootstrapper) Context() *snow.ConsensusContext { return b.Config.Ctx }
-
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("Starting bootstrap...")
+
 	b.Ctx.SetState(snow.Bootstrapping)
+	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
+			err)
+	}
+
 	b.Config.SharedCfg.RequestID = startReqID
 
-	if !b.WeightTracker.EnoughConnectedWeight() {
+	if !b.StartupTracker.ShouldStart() {
 		return nil
 	}
 
@@ -435,11 +443,6 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
-	}
-
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -476,7 +479,7 @@ func (b *bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.VtxBlocked.PendingJobs())
 	}
 
-	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionAcceptor)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -486,7 +489,7 @@ func (b *bootstrapper) checkFinish() error {
 	} else {
 		b.Ctx.Log.Debug("executing vertex state transitions...")
 	}
-	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusAcceptor)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -521,16 +524,5 @@ func (b *bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	return b.finish()
-}
-
-// Finish bootstrapping
-func (b *bootstrapper) finish() error {
-	if err := b.VM.SetState(snow.NormalOp); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
-			err)
-	}
-
-	// Start consensus
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }

@@ -305,7 +305,7 @@ func (s *state) MissingJobIDs() ([]ids.ID, error) {
 		}
 		missingIDs = append(missingIDs, missingID)
 	}
-	return missingIDs, nil
+	return missingIDs, iterator.Error()
 }
 
 func (s *state) getDependentsDB(dependency ids.ID) linkeddb.LinkedDB {

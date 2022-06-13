@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -15,6 +16,8 @@ import (
 )
 
 var (
+	errDuplicateAdd = errors.New("duplicate block add")
+
 	_ Factory   = &TopologicalFactory{}
 	_ Consensus = &Topological{}
 )
@@ -131,34 +134,26 @@ func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
 func (ts *Topological) Add(blk Block) error {
-	parentID := blk.Parent()
-
 	blkID := blk.ID()
-	blkBytes := blk.Bytes()
 
-	// Notify anyone listening that this block was issued.
-	if err := ts.ctx.DecisionDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
-		return err
+	// Make sure a block is not inserted twice. This enforces the invariant that
+	// blocks are always added in topological order. Essentially, a block that
+	// is being added should never have a child that was already added.
+	// Additionally, this prevents any edge cases that may occur due to adding
+	// different blocks with the same ID.
+	if ts.Decided(blk) || ts.Processing(blkID) {
+		return errDuplicateAdd
 	}
-	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
-		return err
-	}
+
 	ts.Latency.Issued(blkID, ts.pollNumber)
 
+	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
 		if err := blk.Reject(); err != nil {
-			return err
-		}
-
-		// Notify anyone listening that this block was rejected.
-		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
-			return err
-		}
-		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
 			return err
 		}
 		ts.Latency.Rejected(blkID, ts.pollNumber)
@@ -239,8 +234,10 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 
 	var voteStack []votes
 	if voteBag.Len() >= ts.params.Alpha {
-		// If there is no way for an alpha majority to occur, there is no need
-		// to perform any traversals.
+		// Since we received at least alpha votes, it's possible that
+		// we reached an alpha majority on a processing block.
+		// We must perform the traversals to calculate all block
+		// that reached an alpha majority.
 
 		// Populates [ts.kahnNodes] and [ts.leaves]
 		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
@@ -482,7 +479,7 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 
 		// Only accept when you are finalized and the head.
 		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
-			if err := ts.accept(parentBlock); err != nil {
+			if err := ts.acceptPreferredChild(parentBlock); err != nil {
 				return ids.ID{}, err
 			}
 
@@ -540,10 +537,13 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	return newPreferred, nil
 }
 
-// accept the preferred child of the provided snowman block. By accepting the
+// Accepts the preferred child of the provided snowman block. By accepting the
 // preferred child, all other children will be rejected. When these children are
 // rejected, all their descendants will be rejected.
-func (ts *Topological) accept(n *snowmanBlock) error {
+//
+// We accept a block once its parent's snowball instance has finalized
+// with it as the preference.
+func (ts *Topological) acceptPreferredChild(n *snowmanBlock) error {
 	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
 
@@ -551,12 +551,12 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be
-	// called before child.Accept to honor EventDispatcher.Accept's invariant.
-	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+	// Note that DecisionAcceptor.Accept / ConsensusAcceptor.Accept must be
+	// called before child.Accept to honor Acceptor.Accept's invariant.
+	if err := ts.ctx.DecisionAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
-	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
+	if err := ts.ctx.ConsensusAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
 
@@ -589,15 +589,6 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		if err := child.Reject(); err != nil {
 			return err
 		}
-
-		// Notify anyone listening that this block was rejected.
-		bytes := child.Bytes()
-		if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-			return err
-		}
-		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-			return err
-		}
 		ts.Latency.Rejected(childID, ts.pollNumber)
 
 		// Track which blocks have been directly rejected
@@ -610,10 +601,10 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 
 // Takes in a list of rejected ids and rejects all descendants of these IDs
 func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
-	// the rejected array is treated as a queue, with the next element at index
+	// the rejected array is treated as a stack, with the next element at index
 	// 0 and the last element at the end of the slice.
 	for len(rejected) > 0 {
-		// pop the rejected ID off the queue
+		// pop the rejected ID off the stack
 		newRejectedSize := len(rejected) - 1
 		rejectedID := rejected[newRejectedSize]
 		rejected = rejected[:newRejectedSize]
@@ -626,18 +617,9 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			if err := child.Reject(); err != nil {
 				return err
 			}
-
-			// Notify anyone listening that this block was rejected.
-			bytes := child.Bytes()
-			if err := ts.ctx.DecisionDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-				return err
-			}
-			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
-				return err
-			}
 			ts.Latency.Rejected(childID, ts.pollNumber)
 
-			// add the newly rejected block to the end of the queue
+			// add the newly rejected block to the end of the stack
 			rejected = append(rejected, childID)
 		}
 	}

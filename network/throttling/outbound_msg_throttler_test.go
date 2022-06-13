@@ -24,12 +24,12 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
-	vdr2ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
+	vdr2ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -102,7 +102,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	acquired = throttlerIntf.Acquire(msg, vdr2ID)
 	assert.False(acquired)
 	// Should also fail for non-validators
-	acquired = throttlerIntf.Acquire(msg, ids.GenerateTestShortID())
+	acquired = throttlerIntf.Acquire(msg, ids.GenerateTestNodeID())
 	assert.False(acquired)
 
 	// Release config.MaxAtLargeBytes+1 (1025) bytes
@@ -120,7 +120,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 
 	// Non-validator should be able to take the rest of the at-large bytes
 	// nonVdrID at-large bytes used: 513
-	nonVdrID := ids.GenerateTestShortID()
+	nonVdrID := ids.GenerateTestNodeID()
 	msg = testMsgWithSize(config.AtLargeAllocSize/2 + 1)
 	acquired = throttlerIntf.Acquire(msg, nonVdrID)
 	assert.True(acquired)
@@ -167,10 +167,10 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -178,7 +178,7 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	)
 	assert.NoError(err)
 	throttler := throttlerIntf.(*outboundMsgThrottler)
-	nonVdrNodeID1 := ids.GenerateTestShortID()
+	nonVdrNodeID1 := ids.GenerateTestNodeID()
 	msg := testMsgWithSize(config.NodeMaxAtLargeBytes)
 	acquired := throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	assert.True(acquired)
@@ -189,7 +189,7 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	assert.False(acquired)
 
 	// A different non-validator should be able to acquire
-	nonVdrNodeID2 := ids.GenerateTestShortID()
+	nonVdrNodeID2 := ids.GenerateTestNodeID()
 	msg = testMsgWithSize(config.NodeMaxAtLargeBytes)
 	acquired = throttlerIntf.Acquire(msg, nonVdrNodeID2)
 	assert.True(acquired)
@@ -213,10 +213,10 @@ func TestBypassThrottling(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -224,7 +224,7 @@ func TestBypassThrottling(t *testing.T) {
 	)
 	assert.NoError(err)
 	throttler := throttlerIntf.(*outboundMsgThrottler)
-	nonVdrNodeID1 := ids.GenerateTestShortID()
+	nonVdrNodeID1 := ids.GenerateTestNodeID()
 	msg := message.NewTestMsg(message.AppGossip, make([]byte, config.NodeMaxAtLargeBytes), true)
 	acquired := throttlerIntf.Acquire(msg, nonVdrNodeID1)
 	assert.True(acquired)

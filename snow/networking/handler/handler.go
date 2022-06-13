@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -15,14 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/uptime"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
-	cpuHalflife           = 15 * time.Second
 	threadPoolSize        = 2
 	numDispatchersToClose = 3
 )
@@ -31,12 +31,18 @@ var _ Handler = &handler{}
 
 type Handler interface {
 	common.Timer
+	health.Checker
+
 	Context() *snow.ConsensusContext
-	IsValidator(nodeID ids.ShortID) bool
+	IsValidator(nodeID ids.NodeID) bool
+
+	SetStateSyncer(engine common.StateSyncer)
+	StateSyncer() common.StateSyncer
 	SetBootstrapper(engine common.BootstrapableEngine)
 	Bootstrapper() common.BootstrapableEngine
 	SetConsensus(engine common.Engine)
 	Consensus() common.Engine
+
 	SetOnStopped(onStopped func())
 	Start(recoverPanic bool)
 	Push(msg message.InboundMessage)
@@ -62,14 +68,16 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
+	stateSyncer  common.StateSyncer
 	bootstrapper common.BootstrapableEngine
 	engine       common.Engine
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
 	onStopped func()
 
-	// Tracks CPU time spent processing messages from each node
-	cpuTracker tracker.TimeTracker
+	// Tracks cpu/disk usage caused by each peer.
+	resourceTracker tracker.ResourceTracker
+
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
 	syncMessageQueue MessageQueue
@@ -96,33 +104,34 @@ func New(
 	msgFromVMChan <-chan common.Message,
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
+	resourceTracker tracker.ResourceTracker,
 ) (Handler, error) {
 	h := &handler{
-		ctx:             ctx,
-		mc:              mc,
-		validators:      validators,
-		msgFromVMChan:   msgFromVMChan,
-		preemptTimeouts: preemptTimeouts,
-		gossipFrequency: gossipFrequency,
-
-		cpuTracker:       tracker.NewCPUTracker(uptime.ContinuousFactory{}, cpuHalflife),
+		ctx:              ctx,
+		mc:               mc,
+		validators:       validators,
+		msgFromVMChan:    msgFromVMChan,
+		preemptTimeouts:  preemptTimeouts,
+		gossipFrequency:  gossipFrequency,
 		asyncMessagePool: worker.NewPool(threadPoolSize),
 		timeouts:         make(chan struct{}, 1),
-
-		closingChan: make(chan struct{}),
-		closed:      make(chan struct{}),
+		closingChan:      make(chan struct{}),
+		closed:           make(chan struct{}),
+		resourceTracker:  resourceTracker,
 	}
 
 	var err error
+
 	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	cpuTracker := resourceTracker.CPUTracker()
+	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, h.cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
@@ -131,11 +140,14 @@ func New(
 
 func (h *handler) Context() *snow.ConsensusContext { return h.ctx }
 
-func (h *handler) IsValidator(nodeID ids.ShortID) bool {
+func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 	return !h.ctx.IsValidatorOnly() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)
 }
+
+func (h *handler) SetStateSyncer(engine common.StateSyncer) { h.stateSyncer = engine }
+func (h *handler) StateSyncer() common.StateSyncer          { return h.stateSyncer }
 
 func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
 func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
@@ -145,7 +157,42 @@ func (h *handler) Consensus() common.Engine          { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
+func (h *handler) selectStartingGear() (common.Engine, error) {
+	if h.stateSyncer == nil {
+		return h.bootstrapper, nil
+	}
+
+	stateSyncEnabled, err := h.stateSyncer.IsEnabled()
+	if err != nil {
+		return nil, err
+	}
+
+	if !stateSyncEnabled {
+		return h.bootstrapper, nil
+	}
+
+	// drop bootstrap state from previous runs
+	// before starting state sync
+	return h.stateSyncer, h.bootstrapper.Clear()
+}
+
 func (h *handler) Start(recoverPanic bool) {
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
+
+	gear, err := h.selectStartingGear()
+	if err != nil {
+		h.ctx.Log.Error("chain failed to select starting gear with: %s", err)
+		h.shutdown()
+		return
+	}
+
+	if err := gear.Start(0); err != nil {
+		h.ctx.Log.Error("chain failed to start with %s", err)
+		h.shutdown()
+		return
+	}
+
 	if recoverPanic {
 		go h.ctx.Log.RecoverAndExit(h.dispatchSync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the sync dispatcher")
@@ -161,6 +208,17 @@ func (h *handler) Start(recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
 	}
+}
+
+func (h *handler) HealthCheck() (interface{}, error) {
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
+
+	engine, err := h.getEngine()
+	if err != nil {
+		return nil, err
+	}
+	return engine.HealthCheck()
 }
 
 // Push the message onto the handler's queue
@@ -228,7 +286,7 @@ func (h *handler) dispatchSync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue)
+		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue, h.metrics.expired)
 		if !ok {
 			return
 		}
@@ -255,7 +313,7 @@ func (h *handler) dispatchAsync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue)
+		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue, h.metrics.asyncExpired)
 		if !ok {
 			return
 		}
@@ -307,7 +365,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime)
+	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	defer func() {
 		h.ctx.Lock.Unlock()
@@ -316,7 +374,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime)
+		h.resourceTracker.StopProcessing(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling sync message: %s", op)
@@ -328,21 +386,64 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	}
 
 	switch op {
+	case message.GetStateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return engine.GetStateSummaryFrontier(nodeID, reqID)
+
+	case message.StateSummaryFrontier:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summary := msg.Get(message.SummaryBytes).([]byte)
+		return engine.StateSummaryFrontier(nodeID, reqID, summary)
+
+	case message.GetStateSummaryFrontierFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return engine.GetStateSummaryFrontierFailed(nodeID, reqID)
+
+	case message.GetAcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaryHeights, err := getSummaryHeights(msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s, %d): %s",
+				op,
+				nodeID,
+				reqID,
+				err,
+			)
+			return nil
+		}
+		return engine.GetAcceptedStateSummary(nodeID, reqID, summaryHeights)
+
+	case message.AcceptedStateSummary:
+		reqID := msg.Get(message.RequestID).(uint32)
+		summaryIDs, err := getIDs(message.SummaryIDs, msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s, %d): %s",
+				op,
+				nodeID,
+				reqID,
+				err,
+			)
+			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+		}
+		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
+
+	case message.GetAcceptedStateSummaryFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return engine.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
@@ -354,15 +455,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return nil
 		}
@@ -370,15 +467,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
-		containerIDs, err := getContainerIDs(msg)
+		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.GetAcceptedFailed(nodeID, reqID)
 		}
@@ -431,15 +524,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
-		votes, err := getContainerIDs(msg)
+		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug(
-				"Malformed message %s from (%s%s, %d): %s",
-				op,
-				constants.NodeIDPrefix,
-				nodeID,
-				reqID,
-				err,
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
 			)
 			return engine.QueryFailed(nodeID, reqID)
 		}
@@ -458,10 +547,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	default:
 		return fmt.Errorf(
-			"attempt to submit unhandled sync msg %s from %s%s",
-			op,
-			constants.NodeIDPrefix,
-			nodeID,
+			"attempt to submit unhandled sync msg %s from %s",
+			op, nodeID,
 		)
 	}
 }
@@ -486,13 +573,13 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	h.cpuTracker.StartCPU(nodeID, startTime)
+	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.StopCPU(nodeID, endTime)
+		h.resourceTracker.StopProcessing(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling async message: %s", op)
@@ -524,10 +611,8 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	default:
 		return fmt.Errorf(
-			"attempt to submit unhandled async msg %s from %s%s",
-			op,
-			constants.NodeIDPrefix,
-			nodeID,
+			"attempt to submit unhandled async msg %s from %s",
+			op, nodeID,
 		)
 	}
 }
@@ -579,6 +664,8 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 func (h *handler) getEngine() (common.Engine, error) {
 	state := h.ctx.GetState()
 	switch state {
+	case snow.StateSyncing:
+		return h.stateSyncer, nil
 	case snow.Bootstrapping:
 		return h.bootstrapper, nil
 	case snow.NormalOp:
@@ -588,7 +675,7 @@ func (h *handler) getEngine() (common.Engine, error) {
 	}
 }
 
-func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, bool) {
+func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter) (message.InboundMessage, bool) {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
@@ -600,12 +687,10 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, b
 		// If this message's deadline has passed, don't process it.
 		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
 			h.ctx.Log.Verbo(
-				"Dropping message from %s%s due to timeout: %s",
-				constants.NodeIDPrefix,
-				msg.NodeID(),
-				msg,
+				"Dropping message from %s due to timeout: %s",
+				msg.NodeID(), msg,
 			)
-			h.metrics.expired.Inc()
+			expired.Inc()
 			msg.OnFinishedHandling()
 			continue
 		}
@@ -623,17 +708,24 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	currentEngine, err := h.getEngine()
-	if err == nil {
-		if err := currentEngine.Shutdown(); err != nil {
-			h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+	h.shutdown()
+}
+
+func (h *handler) shutdown() {
+	defer func() {
+		if h.onStopped != nil {
+			go h.onStopped()
 		}
-	} else {
-		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		close(h.closed)
+	}()
+
+	currentEngine, err := h.getEngine()
+	if err != nil {
+		h.ctx.Log.Error("Error while fetching current engine during shutdown: %s", err)
+		return
 	}
 
-	if h.onStopped != nil {
-		go h.onStopped()
+	if err := currentEngine.Shutdown(); err != nil {
+		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
-	close(h.closed)
 }

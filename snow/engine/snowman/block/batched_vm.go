@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -54,7 +55,12 @@ func GetAncestors(
 	// RemoteVM did not work, try local logic
 	startTime := time.Now()
 	blk, err := vm.GetBlock(blkID)
-	if err != nil {
+	if err == database.ErrNotFound {
+		// special case ErrNotFound as an empty response: this signals
+		// the client to avoid contacting this node for further ancestors
+		// as they may have been pruned or unavailable due to state-sync.
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
 

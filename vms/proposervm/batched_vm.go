@@ -24,8 +24,7 @@ func (vm *VM) GetAncestors(
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
+	if vm.bVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
@@ -65,7 +64,7 @@ func (vm *VM) GetAncestors(
 	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
 	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
-	innerBytes, err := rVM.GetAncestors(blkID, preMaxBlocksNum, preMaxBlocksSize, preMaxBlocksRetrivalTime)
+	innerBytes, err := vm.bVM.GetAncestors(blkID, preMaxBlocksNum, preMaxBlocksSize, preMaxBlocksRetrivalTime)
 	if err != nil {
 		if len(res) == 0 {
 			return nil, err
@@ -77,8 +76,7 @@ func (vm *VM) GetAncestors(
 }
 
 func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
-	rVM, ok := vm.ChainVM.(block.BatchedChainVM)
-	if !ok {
+	if vm.bVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
@@ -117,7 +115,7 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	innerBlockBytes = append(innerBlockBytes, blks[blocksIndex:]...)
 
 	// parse all inner blocks at once
-	innerBlks, err := rVM.BatchedParseBlock(innerBlockBytes)
+	innerBlks, err := vm.bVM.BatchedParseBlock(innerBlockBytes)
 	if err != nil {
 		return nil, err
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Interface compliance
 var _ Client = &client{}
 
 // Client interface for Avalanche Indexer API Endpoint
@@ -40,12 +39,15 @@ type client struct {
 	requester rpc.EndpointRequester
 }
 
-// NewClient creates a client that can interact with an index via HTTP API calls.
-// [host] is the host to make API calls to (e.g. http://1.2.3.4:9650).
-// [endpoint] is the path to the index endpoint (e.g. /ext/index/C/block or /ext/index/X/tx).
-func NewClient(host, endpoint string) Client {
+// NewClient creates a client that can interact with an index via HTTP API
+// calls.
+// [uri] is the path to make API calls to.
+// For example:
+//   - http://1.2.3.4:9650/ext/index/C/block
+//   - http://1.2.3.4:9650/ext/index/X/tx
+func NewClient(uri string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(host, endpoint, "index"),
+		requester: rpc.NewEndpointRequester(uri, "index"),
 	}
 }
 

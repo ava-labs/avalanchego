@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -65,6 +66,12 @@ func (mc *mockClient) SendRequest(ctx context.Context, method string, params int
 		*p = *response
 	case *LoadVMsReply:
 		response := mc.response.(*LoadVMsReply)
+		*p = *response
+	case *GetLoggerLevelReply:
+		response := mc.response.(*GetLoggerLevelReply)
+		*p = *response
+	case *interface{}:
+		response := mc.response.(*interface{})
 		*p = *response
 	default:
 		panic("illegal type")
@@ -254,4 +261,156 @@ func TestReloadInstalledVMs(t *testing.T) {
 
 		assert.EqualError(t, err, "some error")
 	})
+}
+
+func TestSetLoggerLevel(t *testing.T) {
+	type test struct {
+		name            string
+		logLevel        string
+		displayLevel    string
+		serviceErr      bool
+		clientShouldErr bool
+	}
+	tests := []test{
+		{
+			name:            "Happy path",
+			logLevel:        "INFO",
+			displayLevel:    "INFO",
+			serviceErr:      false,
+			clientShouldErr: false,
+		},
+		{
+			name:            "Service errors",
+			logLevel:        "INFO",
+			displayLevel:    "INFO",
+			serviceErr:      true,
+			clientShouldErr: true,
+		},
+		{
+			name:            "Invalid log level",
+			logLevel:        "invalid",
+			displayLevel:    "INFO",
+			serviceErr:      false,
+			clientShouldErr: true,
+		},
+		{
+			name:            "Invalid display level",
+			logLevel:        "INFO",
+			displayLevel:    "invalid",
+			serviceErr:      false,
+			clientShouldErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			var err error
+			if tt.serviceErr {
+				err = errors.New("some error")
+			}
+			mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: !tt.serviceErr}, err)}
+			success, err := mockClient.SetLoggerLevel(
+				context.Background(),
+				"",
+				tt.logLevel,
+				tt.displayLevel,
+			)
+			if tt.clientShouldErr {
+				assert.False(success)
+				assert.Error(err)
+			} else {
+				assert.True(success)
+				assert.NoError(err)
+			}
+		})
+	}
+}
+
+func TestGetLoggerLevel(t *testing.T) {
+	type test struct {
+		name            string
+		loggerName      string
+		serviceResponse map[string]LogAndDisplayLevels
+		serviceErr      bool
+		clientShouldErr bool
+	}
+	tests := []test{
+		{
+			name:       "Happy Path",
+			loggerName: "foo",
+			serviceResponse: map[string]LogAndDisplayLevels{
+				"foo": {LogLevel: logging.Info, DisplayLevel: logging.Info},
+			},
+			serviceErr:      false,
+			clientShouldErr: false,
+		},
+		{
+			name:            "service errors",
+			loggerName:      "foo",
+			serviceResponse: nil,
+			serviceErr:      true,
+			clientShouldErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			var err error
+			if tt.serviceErr {
+				err = errors.New("some error")
+			}
+			mockClient := client{requester: NewMockClient(&GetLoggerLevelReply{LoggerLevels: tt.serviceResponse}, err)}
+			res, err := mockClient.GetLoggerLevel(
+				context.Background(),
+				tt.loggerName,
+			)
+			if tt.clientShouldErr {
+				assert.Error(err)
+				return
+			}
+			assert.NoError(err)
+			assert.EqualValues(tt.serviceResponse, res)
+		})
+	}
+}
+
+func TestGetConfig(t *testing.T) {
+	type test struct {
+		name             string
+		serviceErr       bool
+		clientShouldErr  bool
+		expectedResponse interface{}
+	}
+	var resp interface{} = "response"
+	tests := []test{
+		{
+			name:             "Happy path",
+			serviceErr:       false,
+			clientShouldErr:  false,
+			expectedResponse: &resp,
+		},
+		{
+			name:             "service errors",
+			serviceErr:       true,
+			clientShouldErr:  true,
+			expectedResponse: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			var err error
+			if tt.serviceErr {
+				err = errors.New("some error")
+			}
+			mockClient := client{requester: NewMockClient(tt.expectedResponse, err)}
+			res, err := mockClient.GetConfig(context.Background())
+			if tt.clientShouldErr {
+				assert.Error(err)
+				return
+			}
+			assert.NoError(err)
+			assert.EqualValues("response", res)
+		})
+	}
 }

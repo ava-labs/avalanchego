@@ -4,16 +4,25 @@
 package state
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
 	cacheSize = 8192 // max cache entries
+
+	deleteBatchSize = 8192
+
+	// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
+	// to ensure the async indexing does not bottleneck the node.
+	sleepDurationMultiplier = 5
 )
 
 var (
@@ -33,12 +42,14 @@ type HeightIndexGetter interface {
 	// Fork height is stored when the first post-fork block/option is accepted.
 	// Before that, fork height won't be found.
 	GetForkHeight() (uint64, error)
-	GetIndexResetRequired() (bool, error)
+	IsIndexEmpty() (bool, error)
+	HasIndexReset() (bool, error)
 }
 
 type HeightIndexWriter interface {
 	SetBlockIDAtHeight(height uint64, blkID ids.ID) error
 	SetForkHeight(height uint64) error
+	SetIndexHasReset() error
 }
 
 // A checkpoint is the blockID of the next block to be considered
@@ -60,7 +71,7 @@ type HeightIndex interface {
 	HeightIndexBatchSupport
 
 	// ResetHeightIndex deletes all index DB entries
-	ResetHeightIndex() error
+	ResetHeightIndex(logging.Logger, versiondb.Commitable) error
 }
 
 type heightIndex struct {
@@ -83,16 +94,26 @@ func NewHeightIndex(db database.Database, commitable versiondb.Commitable) Heigh
 	}
 }
 
-func (hi *heightIndex) GetIndexResetRequired() (bool, error) {
-	resetOccurred, err := hi.metadataDB.Has(resetOccurredKey)
-	return !resetOccurred, err
+func (hi *heightIndex) IsIndexEmpty() (bool, error) {
+	heightsIsEmpty, err := database.IsEmpty(hi.heightDB)
+	if err != nil {
+		return false, err
+	}
+	if !heightsIsEmpty {
+		return false, nil
+	}
+	return database.IsEmpty(hi.metadataDB)
 }
 
-func (hi *heightIndex) setIndexResetHasOccurred() error {
+func (hi *heightIndex) HasIndexReset() (bool, error) {
+	return hi.metadataDB.Has(resetOccurredKey)
+}
+
+func (hi *heightIndex) SetIndexHasReset() error {
 	return hi.metadataDB.Put(resetOccurredKey, nil)
 }
 
-func (hi *heightIndex) ResetHeightIndex() error {
+func (hi *heightIndex) ResetHeightIndex(log logging.Logger, baseDB versiondb.Commitable) error {
 	var (
 		itHeight   = hi.heightDB.NewIterator()
 		itMetadata = hi.metadataDB.NewIterator()
@@ -106,9 +127,38 @@ func (hi *heightIndex) ResetHeightIndex() error {
 	hi.heightsCache.Flush()
 
 	// clear heightDB
+	deleteCount := 0
+	processingStart := time.Now()
 	for itHeight.Next() {
 		if err := hi.heightDB.Delete(itHeight.Key()); err != nil {
 			return err
+		}
+
+		deleteCount++
+		if deleteCount%deleteBatchSize == 0 {
+			if err := hi.Commit(); err != nil {
+				return err
+			}
+			if err := baseDB.Commit(); err != nil {
+				return err
+			}
+
+			log.Info("Deleted %d height entries", deleteCount)
+
+			// every deleteBatchSize ops, sleep to avoid clogging the node on this
+			processingDuration := time.Since(processingStart)
+			// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
+			// to ensure the indexing does not bottleneck the node.
+			time.Sleep(processingDuration * sleepDurationMultiplier)
+			processingStart = time.Now()
+
+			if err := itHeight.Error(); err != nil {
+				return err
+			}
+
+			// release iterator so underlying db does not hold on to the previous state
+			itHeight.Release()
+			itHeight = hi.heightDB.NewIterator()
 		}
 	}
 
@@ -119,16 +169,23 @@ func (hi *heightIndex) ResetHeightIndex() error {
 		}
 	}
 
-	if err := hi.setIndexResetHasOccurred(); err != nil {
-		return err
-	}
-
 	errs := wrappers.Errs{}
 	errs.Add(
 		itHeight.Error(),
 		itMetadata.Error(),
 	)
-	return errs.Err
+	if errs.Errored() {
+		return errs.Err
+	}
+
+	if err := hi.SetIndexHasReset(); err != nil {
+		return err
+	}
+
+	if err := hi.Commit(); err != nil {
+		return err
+	}
+	return baseDB.Commit()
 }
 
 func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {

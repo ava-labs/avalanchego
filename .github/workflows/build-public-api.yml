@@ -43,3 +43,5 @@ jobs:
           ./.github/workflows/update-ami.py
         env:
           TAG: ${{ steps.get_version.outputs.VERSION }}
+          PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
+          ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}

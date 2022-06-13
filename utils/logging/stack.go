@@ -4,11 +4,10 @@
 package logging
 
 import (
-	"bytes"
-	"fmt"
 	"runtime"
-	"strconv"
 )
+
+// TODO: remove when we transition to support structured logging
 
 // Stacktrace can print the current stacktrace
 type Stacktrace struct {
@@ -19,16 +18,4 @@ func (st Stacktrace) String() string {
 	buf := make([]byte, 1<<16)
 	n := runtime.Stack(buf, st.Global)
 	return string(buf[:n])
-}
-
-// RoutineID can print the current goroutine ID
-type RoutineID struct{}
-
-func (RoutineID) String() string {
-	b := make([]byte, 64)
-	b = b[:runtime.Stack(b, false)]
-	b = bytes.TrimPrefix(b, []byte("goroutine "))
-	b = b[:bytes.IndexByte(b, ' ')]
-	n, _ := strconv.ParseUint(string(b), 10, 64)
-	return fmt.Sprintf("Goroutine: %d", n)
 }

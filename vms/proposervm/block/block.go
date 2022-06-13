@@ -14,6 +14,8 @@ import (
 )
 
 var (
+	_ SignedBlock = &statelessBlock{}
+
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
 	errMissingProposer    = errors.New("expected proposer but one was provided")
 )
@@ -32,7 +34,7 @@ type SignedBlock interface {
 
 	PChainHeight() uint64
 	Timestamp() time.Time
-	Proposer() ids.ShortID
+	Proposer() ids.NodeID
 
 	Verify(shouldHaveProposer bool, chainID ids.ID) error
 }
@@ -52,7 +54,7 @@ type statelessBlock struct {
 	id        ids.ID
 	timestamp time.Time
 	cert      *x509.Certificate
-	proposer  ids.ShortID
+	proposer  ids.NodeID
 	bytes     []byte
 }
 
@@ -81,13 +83,13 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 		return err
 	}
 	b.cert = cert
-	b.proposer = hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw))
+	b.proposer = ids.NodeIDFromCert(cert)
 	return nil
 }
 
-func (b *statelessBlock) PChainHeight() uint64  { return b.StatelessBlock.PChainHeight }
-func (b *statelessBlock) Timestamp() time.Time  { return b.timestamp }
-func (b *statelessBlock) Proposer() ids.ShortID { return b.proposer }
+func (b *statelessBlock) PChainHeight() uint64 { return b.StatelessBlock.PChainHeight }
+func (b *statelessBlock) Timestamp() time.Time { return b.timestamp }
+func (b *statelessBlock) Proposer() ids.NodeID { return b.proposer }
 
 func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	if !shouldHaveProposer {

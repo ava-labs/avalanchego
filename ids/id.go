@@ -16,9 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const nullStr = "null"
+
 var (
 	// Empty is a useful all zero value
-	Empty            = ID{}
+	Empty = ID{}
+
 	errMissingQuotes = errors.New("first and last characters should be quotes")
 )
 
@@ -49,7 +52,7 @@ func (id ID) MarshalJSON() ([]byte, error) {
 
 func (id *ID) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == "null" { // If "null", do nothing
+	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
 		return errMissingQuotes

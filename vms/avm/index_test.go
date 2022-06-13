@@ -5,6 +5,7 @@ package avm
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -65,7 +67,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
-		if err := signTX(vm.codec, tx, key); err != nil {
+		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
 			t.Fatal(err)
 		}
 
@@ -80,7 +82,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 		// issue transaction
 		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but errored: %s", err)
+			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 		}
 
 		ctx.Lock.Unlock()
@@ -158,7 +160,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
-		if err := signTX(vm.codec, tx, key); err != nil {
+		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
 			t.Fatal(err)
 		}
 
@@ -173,7 +175,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 
 		// issue transaction
 		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but errored: %s", err)
+			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 		}
 
 		ctx.Lock.Unlock()
@@ -255,7 +257,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	tx := buildTX(utxoID, txAssetID, addrs...)
 
 	// sign the transaction
-	if err := signTX(vm.codec, tx, key); err != nil {
+	if err := signTX(vm.parser.Codec(), tx, key); err != nil {
 		t.Fatal(err)
 	}
 
@@ -317,7 +319,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
-		if err := signTX(vm.codec, tx, key); err != nil {
+		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
 			t.Fatal(err)
 		}
 
@@ -332,7 +334,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 
 		// issue transaction
 		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but errored: %s", err)
+			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 		}
 
 		ctx.Lock.Unlock()
@@ -487,13 +489,13 @@ func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortI
 	}
 }
 
-func signTX(codec codec.Manager, tx *Tx, key *crypto.PrivateKeySECP256K1R) error {
+func signTX(codec codec.Manager, tx *txs.Tx, key *crypto.PrivateKeySECP256K1R) error {
 	return tx.SignSECP256K1Fx(codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
 }
 
-func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *Tx {
-	return &Tx{
-		UnsignedTx: &BaseTx{
+func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
+	return &txs.Tx{
+		UnsignedTx: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
@@ -522,7 +524,7 @@ func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *
 
 func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message, config Config) *VM {
 	vm := &VM{}
-	avmConfigBytes, err := BuildAvmConfigBytes(config)
+	avmConfigBytes, err := json.Marshal(config)
 	assert.NoError(t, err)
 	appSender := &common.SenderTest{T: t}
 	if err := vm.Initialize(

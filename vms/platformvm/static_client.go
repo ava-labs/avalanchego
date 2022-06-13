@@ -24,9 +24,10 @@ type staticClient struct {
 
 // NewClient returns a platformvm client for interacting with the platformvm static api
 func NewStaticClient(uri string) StaticClient {
-	return &staticClient{
-		requester: rpc.NewEndpointRequester(uri, "/ext/vm/avm", "avm"),
-	}
+	return &staticClient{requester: rpc.NewEndpointRequester(
+		uri+"/ext/vm/platform",
+		"platform",
+	)}
 }
 
 func (c *staticClient) BuildGenesis(ctx context.Context, args *BuildGenesisArgs, options ...rpc.Option) (resp *BuildGenesisReply, err error) {

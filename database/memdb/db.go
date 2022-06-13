@@ -147,8 +147,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Stat(property string) (string, error) { return "", database.ErrNotFound }
-
 func (db *Database) Compact(start []byte, limit []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -157,6 +155,13 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		return database.ErrClosed
 	}
 	return nil
+}
+
+func (db *Database) HealthCheck() (interface{}, error) {
+	if db.isClosed() {
+		return nil, database.ErrClosed
+	}
+	return nil, nil
 }
 
 type keyValue struct {

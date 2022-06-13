@@ -31,7 +31,7 @@ var (
 
 // Server is an http.ResponseWriter that is managed over RPC.
 type Server struct {
-	responsewriterpb.UnimplementedWriterServer
+	responsewriterpb.UnsafeWriterServer
 	writer http.ResponseWriter
 }
 
@@ -68,7 +68,7 @@ func (s *Server) WriteHeader(ctx context.Context, req *responsewriterpb.WriteHea
 	for _, header := range req.Headers {
 		headers[header.Key] = header.Values
 	}
-	s.writer.WriteHeader(int(req.StatusCode))
+	s.writer.WriteHeader(grpcutils.EnsureValidResponseCode(int(req.StatusCode)))
 	return &emptypb.Empty{}, nil
 }
 

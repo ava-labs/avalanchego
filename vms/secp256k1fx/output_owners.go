@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -145,5 +145,5 @@ func formatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
 	}
 
 	hrp := constants.GetHRP(ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+	return address.Format(chainIDAlias, hrp, addr.Bytes())
 }

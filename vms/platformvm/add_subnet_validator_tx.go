@@ -11,10 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -29,7 +30,7 @@ type UnsignedAddSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The validator
-	Validator SubnetValidator `serialize:"true" json:"validator"`
+	Validator pChainValidator.SubnetValidator `serialize:"true" json:"validator"`
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
@@ -131,7 +132,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 		if err != nil && err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -160,7 +161,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Execute(
 				}
 				return nil, nil, fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
-					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+					tx.Validator.NodeID,
 					err,
 				)
 			}
@@ -255,7 +256,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 	weight, // Sampling weight of the new validator
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they top delegating
-	nodeID ids.ShortID, // ID of the node validating
+	nodeID ids.NodeID, // ID of the node validating
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 	changeAddr ids.ShortID, // Address to send change to, if there is any
@@ -279,8 +280,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		Validator: SubnetValidator{
-			Validator: Validator{
+		Validator: pChainValidator.SubnetValidator{
+			Validator: pChainValidator.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,

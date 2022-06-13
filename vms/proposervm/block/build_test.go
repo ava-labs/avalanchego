@@ -67,7 +67,7 @@ func TestBuildUnsigned(t *testing.T) {
 	assert.Equal(pChainHeight, builtBlock.PChainHeight())
 	assert.Equal(timestamp, builtBlock.Timestamp())
 	assert.Equal(innerBlockBytes, builtBlock.Block())
-	assert.Equal(ids.ShortEmpty, builtBlock.Proposer())
+	assert.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
 	err = builtBlock.Verify(false, ids.Empty)
 	assert.NoError(err)
