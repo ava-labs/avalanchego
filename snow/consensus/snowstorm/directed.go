@@ -209,14 +209,14 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 
 func (dg *Directed) IsVirtuous(tx Tx) bool {
 	txID := tx.ID()
-	// If the tx is currently processing, we should just return if was
+	// If the tx is currently processing, we should just return whether it was
 	// registered as rogue or not.
 	if node, exists := dg.txs[txID]; exists {
 		return !node.rogue
 	}
 
-	// The tx isn't processing, so we need to check to see if it conflicts with
-	// any of the other txs that are currently processing.
+	// The tx isn't processing, so we need to check if it conflicts with any of
+	// the other txs that are currently processing.
 	for _, utxoID := range tx.InputIDs() {
 		if _, exists := dg.utxos[utxoID]; exists {
 			// A currently processing tx names the same input as the provided
@@ -234,7 +234,9 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	if node, exists := dg.txs[tx.ID()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
-		// Only bother to call Union, which will do a memory allocation, if ins or outs are non-empty.
+		//
+		// Only bother to call Union, which will do a memory allocation, if ins
+		// or outs are non-empty.
 		if node.ins.Len() > 0 || node.outs.Len() > 0 {
 			conflicts.Union(node.ins)
 			conflicts.Union(node.outs)
@@ -266,8 +268,8 @@ func (dg *Directed) Add(tx Tx) error {
 			otherNode := dg.txs[otherID]
 
 			// The [otherNode] should be preferred over [txNode] because a newly
-			// issued transaction's confidence is always 0 and times are broken
-			// by first issued.
+			// issued transaction's confidence is always 0 and ties are broken
+			// by the issuance order ("other_node" was issued before "tx_node").
 			dg.addEdge(txNode, otherNode)
 		}
 	}
@@ -284,8 +286,9 @@ func (dg *Directed) Add(tx Tx) error {
 			// [otherID] is not whitelisted by [whitelist]
 			if !whitelist.Contains(otherID) {
 				// The [otherNode] should be preferred over [txNode] because a
-				// newly issued transaction's confidence is always 0 and times
-				// are broken by first issued.
+				// newly issued transaction's confidence is always 0 and ties
+				// are broken by the issuance order ("other_node" was issued
+				// before "tx_node").
 				dg.addEdge(txNode, otherNode)
 			}
 		}
@@ -308,9 +311,9 @@ func (dg *Directed) Add(tx Tx) error {
 			conflict := dg.txs[conflictIDKey]
 
 			// Add all the txs that spend this UTXO to this txs conflicts. These
-			// conflicting txs must be preferred over this tx. We know this because
-			// this tx currently has a bias of 0 and the tie goes to the tx whose
-			// bias was updated first.
+			// conflicting txs must be preferred over this tx. We know this
+			// because this tx currently has a bias of 0 and the tie goes to the
+			// tx whose bias was updated first.
 			dg.addEdge(txNode, conflict)
 		}
 
@@ -321,7 +324,7 @@ func (dg *Directed) Add(tx Tx) error {
 		dg.utxos[inputID] = spenders
 	}
 
-	// Mark this transaction as rogue if had any conflicts registered above
+	// Mark this transaction as rogue if it had any conflicts registered above
 	txNode.rogue = txNode.outs.Len() != 0
 
 	if !txNode.rogue {
@@ -412,13 +415,13 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			continue
 		}
 
-		txNode.RecordSuccessfulPoll(dg.pollNumber)
+		txNode.recordSuccessfulPoll(dg.pollNumber)
 
 		// If the tx should be accepted, then we should defer its acceptance
 		// until its dependencies are decided. If this tx was already marked to
 		// be accepted, we shouldn't register it again.
 		if !txNode.pendingAccept &&
-			txNode.Finalized(dg.params.BetaVirtuous, dg.params.BetaRogue) {
+			txNode.finalized(dg.params.BetaVirtuous, dg.params.BetaRogue) {
 			// Mark that this tx is pending acceptance so acceptance is only
 			// registered once.
 			txNode.pendingAccept = true
@@ -457,7 +460,7 @@ func (dg *Directed) String() string {
 		nodes = append(nodes, &snowballNode{
 			txID:               txNode.tx.ID(),
 			numSuccessfulPolls: txNode.numSuccessfulPolls,
-			confidence:         txNode.Confidence(dg.pollNumber),
+			confidence:         txNode.getConfidence(dg.pollNumber),
 		})
 	}
 	return consensusString(nodes)
@@ -658,11 +661,11 @@ func (dg *Directed) rejectTx(tx Tx) error {
 		dg.Latency.Rejected(txID, dg.pollNumber)
 	}
 
-	// If there is a tx that was accepted pending on this tx, the ancestor
-	// tx can't be accepted.
+	// If there is a tx that was accepted pending on this tx, the ancestor tx
+	// can't be accepted.
 	dg.pendingAccept.Abandon(txID)
-	// If there is a tx that was issued pending on this tx, the ancestor tx
-	// must be rejected.
+	// If there is a tx that was issued pending on this tx, the ancestor tx must
+	// be rejected.
 	dg.pendingReject.Fulfill(txID)
 	return nil
 }
