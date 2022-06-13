@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -26,9 +27,9 @@ type DatabaseClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
-	Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error)
 	Compact(ctx context.Context, in *CompactRequest, opts ...grpc.CallOption) (*CompactResponse, error)
 	Close(ctx context.Context, in *CloseRequest, opts ...grpc.CallOption) (*CloseResponse, error)
+	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 	WriteBatch(ctx context.Context, in *WriteBatchRequest, opts ...grpc.CallOption) (*WriteBatchResponse, error)
 	NewIteratorWithStartAndPrefix(ctx context.Context, in *NewIteratorWithStartAndPrefixRequest, opts ...grpc.CallOption) (*NewIteratorWithStartAndPrefixResponse, error)
 	IteratorNext(ctx context.Context, in *IteratorNextRequest, opts ...grpc.CallOption) (*IteratorNextResponse, error)
@@ -80,15 +81,6 @@ func (c *databaseClient) Delete(ctx context.Context, in *DeleteRequest, opts ...
 	return out, nil
 }
 
-func (c *databaseClient) Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error) {
-	out := new(StatResponse)
-	err := c.cc.Invoke(ctx, "/rpcdb.Database/Stat", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *databaseClient) Compact(ctx context.Context, in *CompactRequest, opts ...grpc.CallOption) (*CompactResponse, error) {
 	out := new(CompactResponse)
 	err := c.cc.Invoke(ctx, "/rpcdb.Database/Compact", in, out, opts...)
@@ -101,6 +93,15 @@ func (c *databaseClient) Compact(ctx context.Context, in *CompactRequest, opts .
 func (c *databaseClient) Close(ctx context.Context, in *CloseRequest, opts ...grpc.CallOption) (*CloseResponse, error) {
 	out := new(CloseResponse)
 	err := c.cc.Invoke(ctx, "/rpcdb.Database/Close", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *databaseClient) HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
+	out := new(HealthCheckResponse)
+	err := c.cc.Invoke(ctx, "/rpcdb.Database/HealthCheck", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -160,9 +161,9 @@ type DatabaseServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Put(context.Context, *PutRequest) (*PutResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
-	Stat(context.Context, *StatRequest) (*StatResponse, error)
 	Compact(context.Context, *CompactRequest) (*CompactResponse, error)
 	Close(context.Context, *CloseRequest) (*CloseResponse, error)
+	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
 	WriteBatch(context.Context, *WriteBatchRequest) (*WriteBatchResponse, error)
 	NewIteratorWithStartAndPrefix(context.Context, *NewIteratorWithStartAndPrefixRequest) (*NewIteratorWithStartAndPrefixResponse, error)
 	IteratorNext(context.Context, *IteratorNextRequest) (*IteratorNextResponse, error)
@@ -187,14 +188,14 @@ func (UnimplementedDatabaseServer) Put(context.Context, *PutRequest) (*PutRespon
 func (UnimplementedDatabaseServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
-func (UnimplementedDatabaseServer) Stat(context.Context, *StatRequest) (*StatResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Stat not implemented")
-}
 func (UnimplementedDatabaseServer) Compact(context.Context, *CompactRequest) (*CompactResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Compact not implemented")
 }
 func (UnimplementedDatabaseServer) Close(context.Context, *CloseRequest) (*CloseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
+}
+func (UnimplementedDatabaseServer) HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
 }
 func (UnimplementedDatabaseServer) WriteBatch(context.Context, *WriteBatchRequest) (*WriteBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteBatch not implemented")
@@ -296,24 +297,6 @@ func _Database_Delete_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Database_Stat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StatRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DatabaseServer).Stat(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/rpcdb.Database/Stat",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DatabaseServer).Stat(ctx, req.(*StatRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Database_Compact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CompactRequest)
 	if err := dec(in); err != nil {
@@ -346,6 +329,24 @@ func _Database_Close_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DatabaseServer).Close(ctx, req.(*CloseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Database_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DatabaseServer).HealthCheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/rpcdb.Database/HealthCheck",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DatabaseServer).HealthCheck(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -464,16 +465,16 @@ var Database_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Database_Delete_Handler,
 		},
 		{
-			MethodName: "Stat",
-			Handler:    _Database_Stat_Handler,
-		},
-		{
 			MethodName: "Compact",
 			Handler:    _Database_Compact_Handler,
 		},
 		{
 			MethodName: "Close",
 			Handler:    _Database_Close_Handler,
+		},
+		{
+			MethodName: "HealthCheck",
+			Handler:    _Database_HealthCheck_Handler,
 		},
 		{
 			MethodName: "WriteBatch",

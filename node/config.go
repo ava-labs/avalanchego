@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -70,15 +70,13 @@ type APIConfig struct {
 }
 
 type IPConfig struct {
-	IP utils.DynamicIPDesc `json:"ip"`
+	IPPort           ips.DynamicIPPort `json:"ip"`
+	IPUpdater        dynamicip.Updater `json:"-"`
+	IPResolutionFreq time.Duration     `json:"ipResolutionFrequency"`
 	// True if we attempted NAT Traversal
 	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
 	// Tries to perform network address translation
 	Nat nat.Router `json:"-"`
-	// Dynamic Update duration for IP or NAT traversal
-	DynamicUpdateDuration time.Duration `json:"dynamicUpdateDuration"`
-	// Tries to resolve our IP from an external source
-	DynamicPublicIPResolver dynamicip.Resolver `json:"-"`
 }
 
 type StakingConfig struct {
@@ -91,9 +89,8 @@ type StakingConfig struct {
 }
 
 type StateSyncConfig struct {
-	StateSyncIDs             []ids.NodeID   `json:"stateSyncIDs"`
-	StateSyncIPs             []utils.IPDesc `json:"stateSyncIPs"`
-	StateSyncDisableRequests bool           `json:"stateSyncDisableRequests"`
+	StateSyncIDs []ids.NodeID `json:"stateSyncIDs"`
+	StateSyncIPs []ips.IPPort `json:"stateSyncIPs"`
 }
 
 type BootstrapConfig struct {
@@ -117,8 +114,8 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.NodeID   `json:"bootstrapIDs"`
-	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
+	BootstrapIDs []ids.NodeID `json:"bootstrapIDs"`
+	BootstrapIPs []ips.IPPort `json:"bootstrapIPs"`
 }
 
 type DatabaseConfig struct {
@@ -205,14 +202,27 @@ type Config struct {
 	// VM management
 	VMManager vms.Manager `json:"-"`
 
-	// Frequency to check the real CPU utilization of tracked processes.
-	// More frequent checks --> CPU usage metrics are more accurate, but more
+	// Halflife to use for the processing requests tracker.
+	// Larger halflife --> usage metrics change more slowly.
+	SystemTrackerProcessingHalflife time.Duration `json:"systemTrackerProcessingHalflife"`
+
+	// Frequency to check the real resource usage of tracked processes.
+	// More frequent checks --> usage metrics are more accurate, but more
 	// expensive to track
-	CPUTrackerFrequency time.Duration `json:"cpuTrackerFrequency"`
+	SystemTrackerFrequency time.Duration `json:"systemTrackerFrequency"`
 
-	// Halflife to use for the CPU tracker.
-	// Larger halflife --> CPU usage metrics change more slowly.
-	CPUTrackerHalflife time.Duration `json:"cpuTrackerHalflife"`
+	// Halflife to use for the cpu tracker.
+	// Larger halflife --> cpu usage metrics change more slowly.
+	SystemTrackerCPUHalflife time.Duration `json:"systemTrackerCPUHalflife"`
 
-	CPUTargeterConfig tracker.CPUTargeterConfig `json:"cpuTargeterConfig"`
+	// Halflife to use for the disk tracker.
+	// Larger halflife --> disk usage metrics change more slowly.
+	SystemTrackerDiskHalflife time.Duration `json:"systemTrackerDiskHalflife"`
+
+	CPUTargeterConfig tracker.TargeterConfig `json:"cpuTargeterConfig"`
+
+	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
+
+	RequiredAvailableDiskSpace         uint64 `json:"requiredAvailableDiskSpace"`
+	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
 }

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
 	"time"
 
@@ -21,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -156,11 +157,11 @@ func (s *server) Dispatch() error {
 		return err
 	}
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
 		s.log.Info("HTTP API server listening on %q", listenAddress)
 	} else {
-		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
 	}
 
 	s.srv = &http.Server{Handler: s.handler}
@@ -183,11 +184,11 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 		return err
 	}
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
 		s.log.Info("HTTPS API server listening on %q", listenAddress)
 	} else {
-		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
 	}
 
 	s.srv = &http.Server{Addr: listenAddress, Handler: s.handler}
@@ -215,7 +216,7 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := constants.ChainAliasPrefix + ctx.ChainID.String()
+	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
 
 	// Register each endpoint
 	for extension, handler := range handlers {

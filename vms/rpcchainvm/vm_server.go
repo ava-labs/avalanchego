@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -54,6 +56,9 @@ type VMServer struct {
 	hVM  block.HeightIndexedChainVM
 	ssVM block.StateSyncableVM
 
+	processMetrics prometheus.Gatherer
+	dbManager      manager.Manager
+
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
 
@@ -94,6 +99,23 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		return nil, err
 	}
 
+	registerer := prometheus.NewRegistry()
+
+	// Current state of process metrics
+	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
+	if err := registerer.Register(processCollector); err != nil {
+		return nil, err
+	}
+
+	// Go process metrics using debug.GCStats
+	goCollector := collectors.NewGoCollector()
+	if err := registerer.Register(goCollector); err != nil {
+		return nil, err
+	}
+
+	// Register metrics for each Go plugin processes
+	vm.processMetrics = registerer
+
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
 	for i, vDBReq := range req.DbServers {
@@ -123,6 +145,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
+	vm.dbManager = dbManager
 
 	clientConn, err := grpcutils.Dial(req.ServerAddr)
 	if err != nil {
@@ -402,58 +425,40 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequ
 	return &emptypb.Empty{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(ctx context.Context, req *vmpb.HealthRequest) (*vmpb.HealthResponse, error) {
-	// Perform health checks for vm client gRPC servers
-	err := vm.grpcHealthChecks(ctx, req.GrpcChecks)
+func (vm *VMServer) Health(ctx context.Context, req *emptypb.Empty) (*vmpb.HealthResponse, error) {
+	vmHealth, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-
-	details, err := vm.vm.HealthCheck()
+	dbHealth, err := vm.dbHealthChecks()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-
-	// Try to stringify the details
-	detailsStr := "couldn't parse health check details to string"
-	switch details := details.(type) {
-	case nil:
-		detailsStr = ""
-	case string:
-		detailsStr = details
-	case map[string]string:
-		asJSON, err := json.Marshal(details)
-		if err != nil {
-			detailsStr = string(asJSON)
-		}
-	case []byte:
-		detailsStr = string(details)
+	report := map[string]interface{}{
+		"database": dbHealth,
+		"health":   vmHealth,
 	}
 
+	details, err := json.Marshal(report)
 	return &vmpb.HealthResponse{
-		Details: detailsStr,
-	}, nil
+		Details: details,
+	}, err
 }
 
-func (vm *VMServer) grpcHealthChecks(ctx context.Context, checks map[string]string) error {
-	var errs []error
-	for name, address := range checks {
-		clientConn, err := grpcutils.Dial(address)
+func (vm *VMServer) dbHealthChecks() (interface{}, error) {
+	details := make(map[string]interface{}, len(vm.dbManager.GetDatabases()))
+
+	// Check Database health
+	for _, client := range vm.dbManager.GetDatabases() {
+		// Shared gRPC client don't close
+		health, err := client.Database.HealthCheck()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("grpc health check failed to dial: %q address: %s: %w", name, address, err))
-			continue
+			return nil, fmt.Errorf("failed to check db health %q: %w", client.Version.String(), err)
 		}
-		client := grpc_health_v1.NewHealthClient(clientConn)
-		_, err = client.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
-		if err != nil {
-			errs = append(errs, fmt.Errorf("grpc health check failed for %q address: %s: %w", name, address, err))
-		}
-		err = clientConn.Close()
-		if err != nil {
-			errs = append(errs, err)
-		}
+		details[client.Version.String()] = health
 	}
-	return wrappers.NewAggregate(errs)
+
+	return details, nil
 }
 
 func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionResponse, error) {
@@ -500,7 +505,21 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
+	// Gather metrics registered to snow context Gatherer. These
+	// metrics are defined by the underlying vm implementation.
 	mfs, err := vm.ctx.Metrics.Gather()
+	if err != nil {
+		return nil, err
+	}
+
+	// Gather metrics registered by rpcchainvm server Gatherer. These
+	// metrics are collected for each Go plugin process.
+	pluginMetrics, err := vm.processMetrics.Gather()
+	if err != nil {
+		return nil, err
+	}
+	mfs = append(mfs, pluginMetrics...)
+
 	return &vmpb.GatherResponse{MetricFamilies: mfs}, err
 }
 

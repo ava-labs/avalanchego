@@ -23,11 +23,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -71,10 +71,13 @@ var (
 				RefillRate:   units.MiB,
 				MaxBurstSize: constants.DefaultMaxMessageSize,
 			},
-			CPUThrottlerConfig: throttling.CPUThrottlerConfig{
+			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
 				MaxRecheckDelay: 50 * time.Millisecond,
 			},
 			MaxProcessingMsgsPerNode: 100,
+			DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: 50 * time.Millisecond,
+			},
 		},
 		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 			VdrAllocSize:        1 * units.GiB,
@@ -112,38 +115,35 @@ var (
 		RequireValidatorToConnect: false,
 
 		MaximumInboundMessageTimeout: 30 * time.Second,
-		CPUTracker:                   newDefaultCPUTracker(),
+		ResourceTracker:              newDefaultResourceTracker(),
 		CPUTargeter:                  nil, // Set in init
+		DiskTargeter:                 nil, // Set in init
 	}
 )
 
 func init() {
-	defaultConfig.CPUTargeter = newDefaultCPUTargeter(defaultConfig.CPUTracker)
+	defaultConfig.CPUTargeter = newDefaultTargeter(defaultConfig.ResourceTracker.CPUTracker())
+	defaultConfig.DiskTargeter = newDefaultTargeter(defaultConfig.ResourceTracker.DiskTracker())
 }
 
-func newDefaultCPUTargeter(cpuTracker tracker.TimeTracker) tracker.CPUTargeter {
-	cpuTargeter, err := tracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&tracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: 0.5,
+func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
+	return tracker.NewTargeter(
+		&tracker.TargeterConfig{
+			VdrAlloc:           10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
 		},
 		validators.NewSet(),
-		cpuTracker,
+		t,
 	)
-	if err != nil {
-		panic(err)
-	}
-	return cpuTargeter
 }
 
-func newDefaultCPUTracker() tracker.TimeTracker {
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+func newDefaultResourceTracker() tracker.ResourceTracker {
+	tracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		panic(err)
 	}
-	return cpuTracker
+	return tracker
 }
 
 func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
@@ -160,7 +160,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config := defaultConfig
 		config.TLSConfig = tlsConfig
 		config.MyNodeID = nodeID
-		config.MyIP = ip
+		config.MyIPPort = ip
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
 		listeners[i] = listener
@@ -260,7 +260,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIP.IP())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -336,13 +336,13 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
 	assert.NoError(err)
 
-	useful := network.Track(utils.IPCertDesc{
+	useful := network.Track(ips.ClaimedIPPort{
 		Cert: tlsCert.Leaf,
-		IPDesc: utils.IPDesc{
+		IPPort: ips.IPPort{
 			IP:   net.IPv4(123, 132, 123, 123),
 			Port: 10000,
 		},
-		Time:      1000,
+		Timestamp: 1000,
 		Signature: nil,
 	})
 	// The signature is wrong so this peer tracking info isn't useful.

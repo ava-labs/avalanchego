@@ -71,7 +71,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case VersionTime:
 		return wrappers.TryPackLong
 	case Peers:
-		return wrappers.TryPackIPCertList
+		return wrappers.TryPackClaimedIPPortList
 	case TrackedSubnets:
 		return wrappers.TryPackHashes
 	case Uptime:
@@ -121,7 +121,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case VersionTime:
 		return wrappers.TryUnpackLong
 	case Peers:
-		return wrappers.TryUnpackIPCertList
+		return wrappers.TryUnpackClaimedIPPortList
 	case TrackedSubnets:
 		return wrappers.TryUnpackHashes
 	case Uptime:

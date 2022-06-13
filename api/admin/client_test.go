@@ -134,7 +134,6 @@ func TestLockProfile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %s", err)
 		}
-
 	}
 }
 
@@ -151,7 +150,6 @@ func TestAlias(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %s", err)
 		}
-
 	}
 }
 
@@ -168,7 +166,6 @@ func TestAliasChain(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %s", err)
 		}
-
 	}
 }
 
@@ -206,7 +203,6 @@ func TestStacktrace(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %s", err)
 		}
-
 	}
 }
 
@@ -285,18 +281,16 @@ func TestSetLoggerLevel(t *testing.T) {
 			if tt.serviceErr {
 				err = errors.New("some error")
 			}
-			mockClient := client{requester: NewMockClient(api.SuccessResponse{Success: !tt.serviceErr}, err)}
-			success, err := mockClient.SetLoggerLevel(
+			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, err)}
+			err = mockClient.SetLoggerLevel(
 				context.Background(),
 				"",
 				tt.logLevel,
 				tt.displayLevel,
 			)
 			if tt.clientShouldErr {
-				assert.False(success)
 				assert.Error(err)
 			} else {
-				assert.True(success)
 				assert.NoError(err)
 			}
 		})

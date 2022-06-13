@@ -152,6 +152,10 @@ func (hi *heightIndex) ResetHeightIndex(log logging.Logger, baseDB versiondb.Com
 			time.Sleep(processingDuration * sleepDurationMultiplier)
 			processingStart = time.Now()
 
+			if err := itHeight.Error(); err != nil {
+				return err
+			}
+
 			// release iterator so underlying db does not hold on to the previous state
 			itHeight.Release()
 			itHeight = hi.heightDB.NewIterator()

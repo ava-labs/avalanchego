@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -73,12 +75,9 @@ type handler struct {
 	// down. If it is nil then it is skipped.
 	onStopped func()
 
-	// Tracks CPU usage caused by each peer.
-	cpuTracker tracker.TimeTracker
+	// Tracks cpu/disk usage caused by each peer.
+	resourceTracker tracker.ResourceTracker
 
-	// Specifies how much CPU usage each peer can cause before
-	// we rate-limit them.
-	cpuTargeter tracker.CPUTargeter
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
 	syncMessageQueue MessageQueue
@@ -105,8 +104,7 @@ func New(
 	msgFromVMChan <-chan common.Message,
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
-	cpuTracker tracker.TimeTracker,
-	cpuTargeter tracker.CPUTargeter,
+	resourceTracker tracker.ResourceTracker,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -119,8 +117,7 @@ func New(
 		timeouts:         make(chan struct{}, 1),
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
-		cpuTracker:       cpuTracker,
-		cpuTargeter:      cpuTargeter,
+		resourceTracker:  resourceTracker,
 	}
 
 	var err error
@@ -129,11 +126,12 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, h.cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	cpuTracker := resourceTracker.CPUTracker()
+	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, h.cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
@@ -288,7 +286,7 @@ func (h *handler) dispatchSync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue)
+		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue, h.metrics.expired)
 		if !ok {
 			return
 		}
@@ -315,7 +313,7 @@ func (h *handler) dispatchAsync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue)
+		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue, h.metrics.asyncExpired)
 		if !ok {
 			return
 		}
@@ -367,10 +365,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	// Determine what portion of CPU usage should be attributed to the validator
-	// CPU allocation and at-large CPU allocation.
-	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
-	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
+	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	defer func() {
 		h.ctx.Lock.Unlock()
@@ -379,7 +374,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.DecCPU(nodeID, endTime, atLargeCPUPortion)
+		h.resourceTracker.StopProcessing(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling sync message: %s", op)
@@ -578,16 +573,13 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		startTime = h.clock.Time()
 	)
-	// Determine what portion of CPU usage should be attributed to the validator
-	// CPU allocation and at-large CPU allocation.
-	_, _, atLargeCPUPortion := h.cpuTargeter.TargetCPUUsage(nodeID)
-	h.cpuTracker.IncCPU(nodeID, startTime, atLargeCPUPortion)
+	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (
 			endTime   = h.clock.Time()
 			histogram = h.metrics.messages[op]
 		)
-		h.cpuTracker.DecCPU(nodeID, endTime, atLargeCPUPortion)
+		h.resourceTracker.StopProcessing(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("Finished handling async message: %s", op)
@@ -683,7 +675,7 @@ func (h *handler) getEngine() (common.Engine, error) {
 	}
 }
 
-func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, bool) {
+func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter) (message.InboundMessage, bool) {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
@@ -698,7 +690,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue) (message.InboundMessage, b
 				"Dropping message from %s due to timeout: %s",
 				msg.NodeID(), msg,
 			)
-			h.metrics.expired.Inc()
+			expired.Inc()
 			msg.OnFinishedHandling()
 			continue
 		}

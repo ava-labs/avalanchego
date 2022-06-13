@@ -26,7 +26,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 	}
 
 	// Case: Validator in pending validator set of primary network
-	key2, err := vm.factory.NewPrivateKey()
+	key2, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

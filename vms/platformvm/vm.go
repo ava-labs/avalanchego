@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -44,12 +43,11 @@ import (
 )
 
 const (
-	droppedTxCacheSize     = 64
-	validatorSetsCacheSize = 64
-
 	// MaxValidatorWeightFactor is the maximum factor of the validator stake
 	// that is allowed to be placed on a validator.
 	MaxValidatorWeightFactor uint64 = 5
+
+	validatorSetsCacheSize = 64
 
 	// Maximum future start time for staking/delegating
 	maxFutureStartTime = 24 * 7 * 2 * time.Hour
@@ -81,9 +79,6 @@ type VM struct {
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
 
-	// Used to create and use keys.
-	factory crypto.FactorySECP256K1R
-
 	blockBuilder blockBuilder
 
 	uptimeManager uptime.Manager
@@ -107,14 +102,6 @@ type VM struct {
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped utils.AtomicBool
-
-	// Contains the IDs of transactions recently dropped because they failed
-	// verification. These txs may be re-issued and put into accepted blocks, so
-	// check the database to see if it was later committed/aborted before
-	// reporting that it's dropped.
-	// Key: Tx ID
-	// Value: String repr. of the verification error
-	droppedTxCache cache.LRU
 
 	// Maps caches for each subnet that is currently whitelisted.
 	// Key: Subnet ID
@@ -169,7 +156,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
 	vm.currentBlocks = make(map[ids.ID]Block)
 

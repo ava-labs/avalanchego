@@ -5,6 +5,7 @@ package rpcchainvm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -36,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/cpu"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -81,10 +82,10 @@ const (
 // VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
-	client     vmpb.VMClient
-	proc       *plugin.Client
-	pid        int
-	cpuTracker cpu.ProcessTracker
+	client         vmpb.VMClient
+	proc           *plugin.Client
+	pid            int
+	processTracker resource.ProcessTracker
 
 	messenger    *messenger.Server
 	keystore     *gkeystore.Server
@@ -96,8 +97,6 @@ type VMClient struct {
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
 
-	grpcHealthChecks map[string]string
-
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
 
 	ctx *snow.Context
@@ -106,18 +105,17 @@ type VMClient struct {
 // NewClient returns a VM connected to a remote VM
 func NewClient(client vmpb.VMClient) *VMClient {
 	return &VMClient{
-		client:           client,
-		grpcHealthChecks: make(map[string]string),
+		client: client,
 	}
 }
 
 // SetProcess gives ownership of the server process to the client.
-func (vm *VMClient) SetProcess(ctx *snow.Context, proc *plugin.Client, cpuTracker cpu.ProcessTracker) {
+func (vm *VMClient) SetProcess(ctx *snow.Context, proc *plugin.Client, processTracker resource.ProcessTracker) {
 	vm.ctx = ctx
 	vm.proc = proc
-	vm.cpuTracker = cpuTracker
+	vm.processTracker = processTracker
 	vm.pid = proc.ReattachConfig().Pid
-	cpuTracker.TrackProcess(vm.pid)
+	processTracker.TrackProcess(vm.pid)
 }
 
 func (vm *VMClient) Initialize(
@@ -162,8 +160,6 @@ func (vm *VMClient) Initialize(
 			return err
 		}
 		serverAddr := serverListener.Addr().String()
-		// Register gRPC server for health checks
-		vm.grpcHealthChecks[fmt.Sprintf("database-%s", dbVersion)] = serverAddr
 
 		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
 		vm.ctx.Log.Info("grpc: serving database version: %s on: %s", dbVersion, serverAddr)
@@ -186,9 +182,6 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 	serverAddr := serverListener.Addr().String()
-
-	// Register gRPC server for health checks
-	vm.grpcHealthChecks["vm"] = serverAddr
 
 	go grpcutils.Serve(serverListener, vm.getInitServer)
 	vm.ctx.Log.Info("grpc: serving vm services on: %s", serverAddr)
@@ -372,7 +365,7 @@ func (vm *VMClient) Shutdown() error {
 	}
 
 	vm.proc.Kill()
-	vm.cpuTracker.UntrackProcess(vm.pid)
+	vm.processTracker.UntrackProcess(vm.pid)
 	return errs.Err
 }
 
@@ -539,13 +532,12 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 }
 
 func (vm *VMClient) HealthCheck() (interface{}, error) {
-	resp, err := vm.client.Health(context.Background(), &vmpb.HealthRequest{
-		GrpcChecks: vm.grpcHealthChecks,
-	})
+	health, err := vm.client.Health(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		vm.ctx.Log.Warn("health check failed: %v", err)
+		return nil, fmt.Errorf("health check failed: %w", err)
 	}
-	return resp, err
+
+	return json.RawMessage(health.Details), nil
 }
 
 func (vm *VMClient) Version() (string, error) {

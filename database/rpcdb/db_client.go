@@ -4,9 +4,11 @@
 package rpcdb
 
 import (
+	"context"
+	"encoding/json"
 	"sync/atomic"
 
-	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
@@ -119,17 +121,6 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 	}
 }
 
-// Stat attempts to return the statistic of this database
-func (db *DatabaseClient) Stat(property string) (string, error) {
-	resp, err := db.client.Stat(context.Background(), &rpcdbpb.StatRequest{
-		Property: property,
-	})
-	if err != nil {
-		return "", err
-	}
-	return resp.Stat, errCodeToError[resp.Err]
-}
-
 // Compact attempts to optimize the space utilization in the provided range
 func (db *DatabaseClient) Compact(start, limit []byte) error {
 	resp, err := db.client.Compact(context.Background(), &rpcdbpb.CompactRequest{
@@ -150,6 +141,15 @@ func (db *DatabaseClient) Close() error {
 		return err
 	}
 	return errCodeToError[resp.Err]
+}
+
+func (db *DatabaseClient) HealthCheck() (interface{}, error) {
+	health, err := db.client.HealthCheck(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(health.Details), nil
 }
 
 type keyValue struct {

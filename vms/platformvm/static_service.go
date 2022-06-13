@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -179,12 +180,12 @@ func (g *Genesis) Initialize() error {
 }
 
 // beck32ToID takes bech32 address and produces a shortID
-func bech32ToID(address string) (ids.ShortID, error) {
-	_, addr, err := formatting.ParseBech32(address)
+func bech32ToID(addrStr string) (ids.ShortID, error) {
+	_, addrBytes, err := address.ParseBech32(addrStr)
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	return ids.ToShortID(addr)
+	return ids.ToShortID(addrBytes)
 }
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)

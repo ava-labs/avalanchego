@@ -18,13 +18,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const maxMessageToSend = 1024
 
 // StartTestPeer provides a simple interface to create a peer that has finished
 // the p2p handshake.
@@ -42,7 +44,7 @@ import (
 //   peer.
 func StartTestPeer(
 	ctx context.Context,
-	ip utils.IPDesc,
+	ip ips.IPPort,
 	networkID uint32,
 	router router.InboundHandler,
 ) (Peer, error) {
@@ -84,25 +86,30 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	ipDesc := utils.IPDesc{
+	ipPort := ips.IPPort{
 		IP:   net.IPv6zero,
 		Port: 0,
 	}
-	cpuTracker, err := tracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
+
+	pingMessage, err := mc.Ping()
+	if err != nil {
+		return nil, err
+	}
+
 	peer := Start(
 		&Config{
-			Metrics:              metrics,
-			MessageCreator:       mc,
-			Log:                  logging.NoLog{},
-			InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
-			OutboundMsgThrottler: throttling.NewNoOutboundThrottler(),
+			Metrics:             metrics,
+			MessageCreator:      mc,
+			Log:                 logging.NoLog{},
+			InboundMsgThrottler: throttling.NewNoInboundThrottler(),
 			Network: NewTestNetwork(
 				mc,
 				networkID,
-				ipDesc,
+				ipPort,
 				version.CurrentApp,
 				tlsCert.PrivateKey.(crypto.Signer),
 				ids.Set{},
@@ -117,11 +124,17 @@ func StartTestPeer(
 			PingFrequency:        constants.DefaultPingFrequency,
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
-			CPUTracker:           cpuTracker,
+			ResourceTracker:      resourceTracker,
+			PingMessage:          pingMessage,
 		},
 		conn,
 		cert,
 		peerID,
+		NewBlockingMessageQueue(
+			metrics,
+			logging.NoLog{},
+			maxMessageToSend,
+		),
 	)
 	return peer, peer.AwaitReady(ctx)
 }

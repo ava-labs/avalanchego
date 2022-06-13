@@ -2446,16 +2446,19 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	_, bootCfg, engCfg := DefaultConfig()
 
 	vals := validators.NewSet()
-	wt := tracker.NewWeightTracker(vals, 0)
-	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = wt
-	engCfg.Validators = vals
-
 	vdr := ids.GenerateTestNodeID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
 		t.Fatal(err)
 	}
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, 0)
+	vals.RegisterCallbackListener(startup)
+
+	bootCfg.Beacons = vals
+	bootCfg.Validators = vals
+	bootCfg.StartupTracker = startup
+	engCfg.Validators = vals
 
 	bootCfg.SampleK = vals.Len()
 
@@ -2721,15 +2724,19 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
-	engCfg.Validators = vals
-
 	vdr := ids.GenerateTestNodeID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
 		t.Fatal(err)
 	}
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, 0)
+	vals.RegisterCallbackListener(startup)
+
+	bootCfg.Beacons = vals
+	bootCfg.Validators = vals
+	bootCfg.StartupTracker = startup
+	engCfg.Validators = vals
 
 	bootCfg.SampleK = vals.Len()
 
@@ -2880,15 +2887,19 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
-	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
-	bootCfg.WeightTracker = tracker.NewWeightTracker(vals, 0)
-	engCfg.Validators = vals
-
 	vdr := ids.GenerateTestNodeID()
 	if err := vals.AddWeight(vdr, 1); err != nil {
 		t.Fatal(err)
 	}
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, 0)
+	vals.RegisterCallbackListener(startup)
+
+	bootCfg.Beacons = vals
+	bootCfg.Validators = vals
+	bootCfg.StartupTracker = startup
+	engCfg.Validators = vals
 
 	bootCfg.SampleK = vals.Len()
 

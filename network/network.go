@@ -27,8 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -76,7 +76,7 @@ type Network interface {
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this ID.
-	ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc)
+	ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort)
 
 	// PeerInfo returns information about peers. If [nodeIDs] is empty, returns
 	// info about all peers that have finished the handshake. Otherwise, returns
@@ -98,6 +98,8 @@ type network struct {
 	// Signs my IP so I can send my signed IP address to other nodes in Version
 	// messages
 	ipSigner *ipSigner
+
+	outboundMsgThrottler throttling.OutboundMsgThrottler
 
 	// Limits the number of connection attempts based on IP.
 	inboundConnUpgradeThrottler throttling.InboundConnUpgradeThrottler
@@ -168,8 +170,9 @@ func NewNetwork(
 		metricsRegisterer,
 		primaryNetworkValidators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		config.CPUTracker,
+		config.ResourceTracker,
 		config.CPUTargeter,
+		config.DiskTargeter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
@@ -196,6 +199,11 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
+	pingMessge, err := msgCreator.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("initializing common ping message failed with: %w", err)
+	}
+
 	peerConfig := &peer.Config{
 		ReadBufferSize:       config.PeerReadBufferSize,
 		WriteBufferSize:      config.PeerWriteBufferSize,
@@ -203,7 +211,6 @@ func NewNetwork(
 		MessageCreator:       msgCreator,
 		Log:                  log,
 		InboundMsgThrottler:  inboundMsgThrottler,
-		OutboundMsgThrottler: outboundMsgThrottler,
 		Network:              nil, // This is set below.
 		Router:               router,
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
@@ -214,15 +221,16 @@ func NewNetwork(
 		PingFrequency:        config.PingFrequency,
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
-		CPUTracker:           config.CPUTracker,
-		CPUTargeter:          config.CPUTargeter,
+		ResourceTracker:      config.ResourceTracker,
+		PingMessage:          pingMessge,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
-		config:     config,
-		peerConfig: peerConfig,
-		metrics:    metrics,
-		ipSigner:   newIPSigner(&config.MyIP, &peerConfig.Clock, config.TLSKey),
+		config:               config,
+		peerConfig:           peerConfig,
+		metrics:              metrics,
+		ipSigner:             newIPSigner(config.MyIPPort, &peerConfig.Clock, config.TLSKey),
+		outboundMsgThrottler: outboundMsgThrottler,
 
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(log, config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
@@ -370,27 +378,27 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(ip utils.IPCertDesc) bool {
-	nodeID := ids.NodeIDFromCert(ip.Cert)
+func (n *network) Track(claimedIPPort ips.ClaimedIPPort) bool {
+	nodeID := ids.NodeIDFromCert(claimedIPPort.Cert)
 
 	// Verify that we do want to attempt to make a connection to this peer
 	// before verifying that the IP has been correctly signed.
 	//
 	// This check only improves performance, as the values are recalculated once
 	// the lock is grabbed before actually attempting to connect to the peer.
-	if !n.shouldTrack(nodeID, ip) {
+	if !n.shouldTrack(nodeID, claimedIPPort) {
 		return false
 	}
 
 	signedIP := peer.SignedIP{
 		IP: peer.UnsignedIP{
-			IP:        ip.IPDesc,
-			Timestamp: ip.Time,
+			IP:        claimedIPPort.IPPort,
+			Timestamp: claimedIPPort.Timestamp,
 		},
-		Signature: ip.Signature,
+		Signature: claimedIPPort.Signature,
 	}
 
-	if err := signedIP.Verify(ip.Cert); err != nil {
+	if err := signedIP.Verify(claimedIPPort.Cert); err != nil {
 		n.peerConfig.Log.Debug("signature verification failed for %s: %s", nodeID, err)
 		return false
 	}
@@ -408,21 +416,21 @@ func (n *network) Track(ip utils.IPCertDesc) bool {
 	tracked, isTracked := n.trackedIPs[nodeID]
 	switch {
 	case isTracked:
-		if tracked.ip.Timestamp >= ip.Time {
+		if tracked.ip.Timestamp >= claimedIPPort.Timestamp {
 			return false
 		}
 		// Stop tracking the old IP and instead start tracking new one.
 		tracked := tracked.trackNewIP(&peer.UnsignedIP{
-			IP:        ip.IPDesc,
-			Timestamp: ip.Time,
+			IP:        claimedIPPort.IPPort,
+			Timestamp: claimedIPPort.Timestamp,
 		})
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
 		return true
 	case n.wantsConnection(nodeID):
 		tracked := newTrackedIP(&peer.UnsignedIP{
-			IP:        ip.IPDesc,
-			Timestamp: ip.Time,
+			IP:        claimedIPPort.IPPort,
+			Timestamp: claimedIPPort.Timestamp,
 		})
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
@@ -511,9 +519,9 @@ func (n *network) Dispatch() error {
 		// peers attempts to connect to one our IP aliases (that they
 		// aren't yet aware is an alias).
 		remoteAddr := conn.RemoteAddr().String()
-		ip, err := utils.ToIPDesc(remoteAddr)
+		ip, err := ips.ToIPPort(remoteAddr)
 		if err != nil {
-			errs.Add(fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err))
+			errs.Add(fmt.Errorf("unable to convert remote address %s to IP: %w", remoteAddr, err))
 			break
 		}
 
@@ -560,7 +568,7 @@ func (n *network) wantsConnection(nodeID ids.NodeID) bool {
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
-func (n *network) ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc) {
+func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
@@ -586,6 +594,10 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip utils.IPDesc) {
 }
 
 func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
+	if n.config.MyNodeID == nodeID {
+		return subnetID == constants.PrimaryNetworkID || n.config.WhitelistedSubnets.Contains(subnetID)
+	}
+
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
@@ -594,10 +606,10 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 		return false
 	}
 	trackedSubnets := peer.TrackedSubnets()
-	return trackedSubnets.Contains(subnetID)
+	return subnetID == constants.PrimaryNetworkID || trackedSubnets.Contains(subnetID)
 }
 
-func (n *network) sampleValidatorIPs() []utils.IPCertDesc {
+func (n *network) sampleValidatorIPs() []ips.ClaimedIPPort {
 	n.peersLock.RLock()
 	peers := n.connectedPeers.Sample(
 		int(n.config.PeerListNumValidatorIPs),
@@ -608,14 +620,14 @@ func (n *network) sampleValidatorIPs() []utils.IPCertDesc {
 	)
 	n.peersLock.RUnlock()
 
-	sampledIPs := make([]utils.IPCertDesc, len(peers))
+	sampledIPs := make([]ips.ClaimedIPPort, len(peers))
 	for i, peer := range peers {
-		ip := peer.IP()
-		sampledIPs[i] = utils.IPCertDesc{
+		peerIP := peer.IP()
+		sampledIPs[i] = ips.ClaimedIPPort{
 			Cert:      peer.Cert(),
-			IPDesc:    ip.IP.IP,
-			Time:      ip.IP.Timestamp,
-			Signature: ip.Signature,
+			IPPort:    peerIP.IP.IP,
+			Timestamp: peerIP.IP.Timestamp,
+			Signature: peerIP.Signature,
 		}
 	}
 	return sampledIPs
@@ -646,7 +658,7 @@ func (n *network) getPeers(
 		}
 
 		trackedSubnets := peer.TrackedSubnets()
-		if !trackedSubnets.Contains(subnetID) {
+		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
@@ -681,7 +693,7 @@ func (n *network) samplePeers(
 		func(p peer.Peer) bool {
 			// Only return peers that are tracking [subnetID]
 			trackedSubnets := p.TrackedSubnets()
-			if !trackedSubnets.Contains(subnetID) {
+			if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
 				return false
 			}
 
@@ -715,7 +727,7 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.NodeI
 		// Add a reference to the message so that if it is sent, it won't be
 		// collected until it is done being processed.
 		msg.AddRef()
-		if peer.Send(msg) {
+		if peer.Send(n.onCloseCtx, msg) {
 			sentTo.Add(peer.ID())
 
 			// TODO: move send fail rate calculations into the peer metrics
@@ -775,11 +787,11 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	n.metrics.markDisconnected(peer)
 }
 
-func (n *network) shouldTrack(nodeID ids.NodeID, ip utils.IPCertDesc) bool {
-	if !n.config.AllowPrivateIPs && ip.IPDesc.IP.IsPrivate() {
+func (n *network) shouldTrack(nodeID ids.NodeID, ip ips.ClaimedIPPort) bool {
+	if !n.config.AllowPrivateIPs && ip.IPPort.IP.IsPrivate() {
 		n.peerConfig.Log.Verbo(
 			"dropping suggested connected to %s because the ip (%s) is private",
-			nodeID, ip.IPDesc,
+			nodeID, ip.IPPort,
 		)
 		return false
 	}
@@ -797,7 +809,7 @@ func (n *network) shouldTrack(nodeID ids.NodeID, ip utils.IPCertDesc) bool {
 
 	tracked, isTracked := n.trackedIPs[nodeID]
 	if isTracked {
-		return tracked.ip.Timestamp < ip.Time
+		return tracked.ip.Timestamp < ip.Timestamp
 	}
 	return n.wantsConnection(nodeID)
 }
@@ -982,7 +994,18 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 
 	n.peerConfig.Log.Verbo("starting handshake with %s", nodeID)
 
-	peer := peer.Start(n.peerConfig, tlsConn, cert, nodeID)
+	peer := peer.Start(
+		n.peerConfig,
+		tlsConn,
+		cert,
+		nodeID,
+		peer.NewThrottledMessageQueue(
+			n.peerConfig.Metrics,
+			nodeID,
+			n.peerConfig.Log,
+			n.outboundMsgThrottler,
+		),
+	)
 	n.connectingPeers.Add(peer)
 	return nil
 }

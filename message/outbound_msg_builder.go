@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var _ OutboundMsgBuilder = &outMsgBuilder{}
@@ -19,7 +19,7 @@ type OutboundMsgBuilder interface {
 	Version(
 		networkID uint32,
 		myTime uint64,
-		ip utils.IPDesc,
+		ip ips.IPPort,
 		myVersion string,
 		myVersionTime uint64,
 		sig []byte,
@@ -27,7 +27,7 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 
 	PeerList(
-		peers []utils.IPCertDesc,
+		peers []ips.ClaimedIPPort,
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
@@ -167,7 +167,7 @@ func NewOutboundBuilder(c Codec, enableCompression bool) OutboundMsgBuilder {
 func (b *outMsgBuilder) Version(
 	networkID uint32,
 	myTime uint64,
-	ip utils.IPDesc,
+	ip ips.IPPort,
 	myVersion string,
 	myVersionTime uint64,
 	sig []byte,
@@ -195,7 +195,7 @@ func (b *outMsgBuilder) Version(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{

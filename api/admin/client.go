@@ -26,7 +26,7 @@ type Client interface {
 	GetChainAliases(ctx context.Context, chainID string, options ...rpc.Option) ([]string, error)
 	Stacktrace(context.Context, ...rpc.Option) error
 	LoadVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error)
-	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) (bool, error)
+	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) error
 	GetLoggerLevel(ctx context.Context, loggerName string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error)
 }
@@ -38,9 +38,10 @@ type client struct {
 
 // NewClient returns a new Info API Client
 func NewClient(uri string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri, "/ext/admin", "admin"),
-	}
+	return &client{requester: rpc.NewEndpointRequester(
+		uri+"/ext/admin",
+		"admin",
+	)}
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
@@ -111,9 +112,9 @@ func (c *client) SetLoggerLevel(
 	logLevel,
 	displayLevel string,
 	options ...rpc.Option,
-) (bool, error) {
+) error {
 	var (
-		res             = &api.SuccessResponse{}
+		res             = &api.EmptyReply{}
 		logLevelArg     logging.Level
 		displayLevelArg logging.Level
 		err             error
@@ -121,26 +122,20 @@ func (c *client) SetLoggerLevel(
 	if len(logLevel) > 0 {
 		logLevelArg, err = logging.ToLevel(logLevel)
 		if err != nil {
-			return false, fmt.Errorf("couldn't parse %q to log level", logLevel)
+			return fmt.Errorf("couldn't parse %q to log level", logLevel)
 		}
 	}
 	if len(displayLevel) > 0 {
 		displayLevelArg, err = logging.ToLevel(displayLevel)
 		if err != nil {
-			return false, fmt.Errorf("couldn't parse %q to log level", displayLevel)
+			return fmt.Errorf("couldn't parse %q to log level", displayLevel)
 		}
 	}
-	err = c.requester.SendRequest(
-		ctx,
-		"setLoggerLevel",
-		&SetLoggerLevelArgs{
-			LoggerName:   loggerName,
-			LogLevel:     &logLevelArg,
-			DisplayLevel: &displayLevelArg,
-		},
-		res,
-		options...)
-	return res.Success, err
+	return c.requester.SendRequest(ctx, "setLoggerLevel", &SetLoggerLevelArgs{
+		LoggerName:   loggerName,
+		LogLevel:     &logLevelArg,
+		DisplayLevel: &displayLevelArg,
+	}, res, options...)
 }
 
 func (c *client) GetLoggerLevel(

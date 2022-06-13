@@ -36,12 +36,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/cpu"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -102,6 +103,9 @@ var (
 
 	xChainID = ids.Empty.Prefix(0)
 	cChainID = ids.Empty.Prefix(1)
+
+	// Used to create and use keys.
+	testKeyfactory crypto.FactorySECP256K1R
 )
 
 var (
@@ -165,7 +169,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -178,7 +182,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -240,7 +244,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +257,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := formatting.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -479,7 +483,7 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		_, addrBytes, err := formatting.ParseBech32(utxo.Address)
+		_, addrBytes, err := address.ParseBech32(utxo.Address)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -499,7 +503,7 @@ func TestGenesis(t *testing.T) {
 		} else if out.Amount() != uint64(utxo.Amount) {
 			id := keys[0].PublicKey().Address()
 			hrp := constants.NetworkIDToHRP[testNetworkID]
-			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			addr, err := address.FormatBech32(hrp, id.Bytes())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -552,7 +556,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -632,7 +636,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(-syncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := vm.factory.NewPrivateKey()
+	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -670,7 +674,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
+	if _, dropped := vm.blockBuilder.GetDropReason(blk.Tx.ID()); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }
@@ -688,7 +692,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := vm.factory.NewPrivateKey()
+	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create valid tx
@@ -2074,6 +2078,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
 	}
 
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
+	beacons.RegisterCallbackListener(startup)
+
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
@@ -2081,7 +2089,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Len(),
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (beacons.Weight()+1)/2),
+		StartupTracker:                 startup,
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
 		Subnet:                         subnet,
@@ -2090,7 +2098,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg, false /*StateSyncDisableRequests*/)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	assert.NoError(t, err)
 
 	bootstrapConfig := bootstrap.Config{
@@ -2101,18 +2109,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	cpuTracker, err := timetracker.NewCPUTracker(prometheus.NewRegistry(), cpu.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
-	cpuTargeter, err := timetracker.NewCPUTargeter(
-		prometheus.NewRegistry(),
-		&timetracker.CPUTargeterConfig{
-			VdrCPUAlloc:           1000,
-			AtLargeCPUAlloc:       1000,
-			PeerMaxAtLargePortion: .5,
-		},
-		vdrs,
-		cpuTracker,
-	)
+	cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	assert.NoError(t, err)
 	handler, err := handler.New(
 		mc,
@@ -2122,20 +2119,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		nil,
 		time.Hour,
 		cpuTracker,
-		cpuTargeter,
 	)
 	assert.NoError(t, err)
-
-	bootstrapper, err := bootstrap.New(
-		bootstrapConfig,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler.SetBootstrapper(bootstrapper)
 
 	engineConfig := smeng.Config{
 		Ctx:           bootstrapConfig.Ctx,
@@ -2160,6 +2145,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler.SetConsensus(engine)
+
+	bootstrapper, err := bootstrap.New(
+		bootstrapConfig,
+		engine.Start,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.SetBootstrapper(bootstrapper)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
@@ -2503,7 +2497,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newValidatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
-	key, err := vm.factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	assert.NoError(err)
 
 	nodeID := ids.NodeID(key.PublicKey().Address())

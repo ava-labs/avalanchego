@@ -186,14 +186,10 @@ type ManagerConfig struct {
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
 
-	// Tracks CPU usage caused by each peer.
-	CPUTracker timetracker.TimeTracker
-	// Specifies how much CPU usage each peer can cause before
-	// we rate-limit them.
-	CPUTargeter timetracker.CPUTargeter
+	// Tracks CPU/disk usage caused by each peer.
+	ResourceTracker timetracker.ResourceTracker
 
-	StateSyncBeacons         []ids.NodeID
-	StateSyncDisableRequests bool
+	StateSyncBeacons []ids.NodeID
 }
 
 type manager struct {
@@ -618,19 +614,22 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
-		m.CPUTracker,
-		m.CPUTargeter,
+		m.ResourceTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
+
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
+		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -814,19 +813,22 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
-		m.CPUTracker,
-		m.CPUTargeter,
+		m.ResourceTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
+
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
 		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, (3*bootstrapWeight+3)/4),
+		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         sender,
 		Subnet:                         sb,
@@ -839,7 +841,7 @@ func (m *manager) createSnowmanChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	snowGetHandler, err := snowgetter.New(vm, commonCfg, m.StateSyncDisableRequests)
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}

@@ -5,8 +5,11 @@ package platformvm
 
 import (
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
+
+var _ vms.Factory = &Factory{}
 
 // Factory can create new instances of the Platform Chain
 type Factory struct {

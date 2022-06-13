@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -35,7 +35,7 @@ type InboundConnUpgradeThrottler interface {
 	// Must only be called after [Dispatch] has been called.
 	// If [ip] is a local IP, this method always returns true.
 	// Must not be called after [Stop] has been called.
-	ShouldUpgrade(ip utils.IPDesc) bool
+	ShouldUpgrade(ip ips.IPPort) bool
 }
 
 type InboundConnUpgradeThrottlerConfig struct {
@@ -69,9 +69,9 @@ func NewInboundConnUpgradeThrottler(log logging.Logger, config InboundConnUpgrad
 // noInboundConnUpgradeThrottler upgrades all inbound connections
 type noInboundConnUpgradeThrottler struct{}
 
-func (*noInboundConnUpgradeThrottler) Dispatch()                       {}
-func (*noInboundConnUpgradeThrottler) Stop()                           {}
-func (*noInboundConnUpgradeThrottler) ShouldUpgrade(utils.IPDesc) bool { return true }
+func (*noInboundConnUpgradeThrottler) Dispatch()                     {}
+func (*noInboundConnUpgradeThrottler) Stop()                         {}
+func (*noInboundConnUpgradeThrottler) ShouldUpgrade(ips.IPPort) bool { return true }
 
 type ipAndTime struct {
 	ip                string
@@ -97,7 +97,7 @@ type inboundConnUpgradeThrottler struct {
 }
 
 // Returns whether we should upgrade an inbound connection from [ipStr].
-func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
+func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip ips.IPPort) bool {
 	if ip.IP.IsLoopback() {
 		// Don't rate-limit loopback IPs
 		return true
