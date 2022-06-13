@@ -1,5 +1,161 @@
 # Release Notes
 
+## [v1.7.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.13)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### State Sync
+
+- Added peer bandwidth tracking to optimize `coreth` state sync message routing
+- Fixed `coreth` leaf request handler bug to ensure the handler delivers a valid range proof
+- Removed redundant proof keys from `coreth` leafs response message format
+- Improved `coreth` state sync request retry logic
+- Improved `coreth` state sync handler metrics
+- Improved `coreth` state sync ETA
+- Added `avalanche_{chainID}_handler_async_expired` metric
+
+### Miscellaneous
+
+- Fixed `platform.getCurrentValidators` API to correctly mark a node as connected to itself on subnets.
+- Fixed `platform.getBlockchainStatus` to correctly report `Unknown` for blockchains that are not managed by the `P-Chain`
+- Added process metrics by default in the `rpcchainvm#Server`
+- Added `Database` health checks
+- Removed the deprecated `Database.Stat` call from the `rpcdb#Server`
+- Added fail fast logic to duplicated Snowman additions to avoid undefined behavior
+- Added additional testing around Snowman diverged voting tests
+- Deprecated `--dynamic-update-duration` and `--dynamic-public-ip` CLI flags
+- Added `--public-ip-resolution-frequency` and `--public-ip-resolution-service` to replace `--dynamic-update-duration` and `--dynamic-public-ip`, respectively
+
+## [v1.7.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.12)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+### State Sync
+
+- Fixed proposervm state summary acceptance to only accept state summaries with heights higher than the locally last accepted block
+- Fixed proposervm state summary serving to only respond to requests after height indexing has finished
+- Improved C-chain state sync leaf request serving by optimistically reading leaves from snapshot
+- Refactored C-chain state sync block fetching
+
+### Networking
+
+- Reduced default peerlist and accepted frontier gossipping
+- Increased the default at-large outbound buffer size to 32 MiB
+
+### Metrics
+
+- Added leveldb metrics
+- Added process and golang metrics for the avalanchego binary
+- Added available disk space health check
+  - Ensured that the disk space will not be fully utilized by shutting down the node if there is a critically low amount of free space remaining
+- Improved C-chain state sync metrics
+
+### Performance
+
+- Added C-chain acceptor queue within `core/blockchain.go`
+- Removed rpcdb locking when committing batches and using iterators
+- Capped C-chain TrieDB dirties cache size during block acceptance to reduce commit size at 4096 block interval
+
+### Cleanup
+
+- Refactored the avm to utilize the external txs package
+- Unified platformvm dropped tx handling
+- Clarified snowman child block acceptance calls
+- Fixed small consensus typos
+- Reduced minor duplicated code in consensus
+- Moved the platformvm key factory out of the VM into the test file
+- Removed unused return values from the timeout manager
+- Removed weird json rpc private interface
+- Standardized json imports
+- Added vm factory interface checks
+
+## [v1.7.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.11)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
+
+**The first startup of the C-Chain will cause an increase in CPU and IO usage due to an index update. This index update runs in the background and does not impact restart time.**
+
+### State Sync
+
+- Added state syncer engine to facilitate VM state syncing, rather than full historical syncing
+- Added `GetStateSummaryFrontier`, `StateSummaryFrontier`, `GetAcceptedStateSummary`, `AcceptedStateSummary` as P2P messages
+- Updated `Ancestors` message specification to expect an empty response if the container is unknown
+- Added `--state-sync-ips` and `--state-sync-ids` flags to allow manual overrides of which nodes to query for accepted state summaries
+- Updated networking library to permanently track all manually tracked peers, rather than just beacons
+- Added state sync support to the `metervm`
+- Added state sync support to the `proposervm`
+- Added state sync support to the `rpcchainvm`
+- Added beta state sync support to `coreth`
+
+### ProposerVM
+
+- Prevented rejected blocks from overwriting the `proposervm` height index
+- Optimized `proposervm` block rewind to utilize the height index if available
+- Ensured `proposervm` height index is marked as repaired in `Initialize` if it is fully repaired on startup
+- Removed `--reset-proposervm-height-index`. The height index will be reset upon first restart
+- Optimized `proposervm` height index resetting to periodically flush deletions
+
+### Bug Fixes
+
+- Fixed IPC message issuance and restructured consensus event callbacks to be checked at compile time
+- Fixed `coreth` metrics initialization
+- Fixed bootstrapping startup logic to correctly startup if initially connected to enough stake
+- Fixed `coreth` panic during metrics collection
+- Fixed panic on concurrent map read/write in P-chain wallet SDK
+- Fixed `rpcchainvm` panic by sanitizing http response codes
+- Fixed incorrect JSON tag on `platformvm.BaseTx`
+- Fixed `AppRequest`, `AppResponse`, and `AppGossip` stringers used in logging
+
+### API/Client
+
+- Supported client implementations pointing to non-standard URIs
+- Introduced `ids.NodeID` type to standardize logging and simplify API service and client implementations
+- Changed client implementations to use standard types rather than `string`s wherever possible
+- Added `subnetID` as an argument to `platform.getTotalStake`
+- Added `connected` to the subnet validators in responses to `platform.getCurrentValidators` and `platform.getPendingValidators`
+- Add missing `admin` API client methods
+- Improved `indexer` API client implementation to avoid encoding edge cases
+
+### Networking
+
+- Added `--snow-mixed-query-num-push-vdr` and `--snow-mixed-query-num-push-non-vdr` to allow parameterization of sending push queries
+  - By default, non-validators now send only pull queries, not push queries.
+  - By default, validators now send both pull queries and push queries upon inserting a container into consensus. Previously, nodes sent only push queries.
+- Added metrics to track the amount of over gossipping of `peerlist` messages
+- Added custom message queueing support to outbound `Peer` messages
+- Reused `Ping` messages to avoid needless memory allocations
+
+### Logging
+
+- Replaced AvalancheGo's internal logger with [uber-go/zap](https://github.com/uber-go/zap).
+- Replaced AvalancheGo's log rotation with [lumberjack](https://github.com/natefinch/lumberjack).
+- Renamed `log-display-highlight` to `log-format` and added `json` option.
+- Added `log-rotater-max-size`, `log-rotater-max-files`, `log-rotater-max-age`, `log-rotater-compress-enabled` options for log rotation.
+
+### Miscellaneous
+
+- Added `--data-dir` flag to easily move all default file locations to a custom location
+- Standardized RPC specification of timestamp fields
+- Logged health checks whenever a failing health check is queried
+- Added callback support for the validator set manager
+- Increased `coreth` trie tip buffer size to 32
+- Added CPU usage metrics for AvalancheGo and all sub-processes
+- Added Disk IO usage metrics for AvalancheGo and all sub-processes
+
+### Cleanup
+
+- Refactored easily separable `platformvm` files into separate smaller packages
+- Simplified default version parsing
+- Fixed various typos
+- Converted some structs to interfaces to better support mocked testing
+- Refactored IP utils
+
+### Documentation
+
+- Increased recommended disk size to 1 TB
+- Updated issue template
+- Documented additional `snowman.Block` invariants
+
 ## [v1.7.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.10)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.

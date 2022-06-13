@@ -50,7 +50,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	}
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 
 	// create a tx
 	tx := getValidTx(vm, t)
@@ -108,10 +108,10 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	// create a tx and mark as invalid
 	tx := getValidTx(vm, t)
 	txID := tx.ID()
-	vm.mempool.MarkDropped(txID)
+	vm.mempool.MarkDropped(txID, "dropped for testing")
 
 	// show that the invalid tx is not requested
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	msg := message.Tx{
 		Tx: tx.Bytes(),
 	}

@@ -108,7 +108,7 @@ func TestBenchlistAdd(t *testing.T) {
 	b.clock.Set(now)
 
 	benched := false
-	benchable.BenchedF = func(ids.ID, ids.ShortID) {
+	benchable.BenchedF = func(ids.ID, ids.NodeID) {
 		benched = true
 	}
 	b.lock.Unlock()
@@ -286,7 +286,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
-	benchedIDs := []ids.ShortID{vdr0.ID(), vdr1.ID(), vdr4.ID()}
+	benchedIDs := []ids.NodeID{vdr0.ID(), vdr1.ID(), vdr4.ID()}
 	for _, benchedVdr := range b.benchedQueue {
 		assert.Contains(t, benchedIDs, benchedVdr.validatorID)
 		assert.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
@@ -321,7 +321,7 @@ func TestBenchlistRemove(t *testing.T) {
 	benchable := &TestBenchable{
 		T:             t,
 		CantUnbenched: true,
-		UnbenchedF: func(ids.ID, ids.ShortID) {
+		UnbenchedF: func(ids.ID, ids.NodeID) {
 			count++
 		},
 	}
@@ -378,7 +378,7 @@ func TestBenchlistRemove(t *testing.T) {
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
-	benchedIDs := []ids.ShortID{vdr0.ID(), vdr1.ID(), vdr2.ID()}
+	benchedIDs := []ids.NodeID{vdr0.ID(), vdr1.ID(), vdr2.ID()}
 	for _, benchedVdr := range b.benchedQueue {
 		assert.Contains(t, benchedIDs, benchedVdr.validatorID)
 		assert.True(t, !benchedVdr.benchedUntil.Before(minEndTime))

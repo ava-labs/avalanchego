@@ -25,22 +25,22 @@ var (
 // consistently failing queries on a benchlist to prevent waiting up to
 // the full network timeout for their responses.
 type Manager interface {
-	// RegisterResponse registers that we receive a request response from [validatorID]
+	// RegisterResponse registers that we receive a request response from [nodeID]
 	// regarding [chainID] within the timeout
-	RegisterResponse(chainID ids.ID, validatorID ids.ShortID)
-	// RegisterFailure registers that a request to [validatorID] regarding
+	RegisterResponse(chainID ids.ID, nodeID ids.NodeID)
+	// RegisterFailure registers that a request to [nodeID] regarding
 	// [chainID] timed out
-	RegisterFailure(chainID ids.ID, validatorID ids.ShortID)
+	RegisterFailure(chainID ids.ID, nodeID ids.NodeID)
 	// RegisterChain registers a new chain with metrics under [namespace]
 	RegisterChain(ctx *snow.ConsensusContext) error
-	// IsBenched returns true if messages to [validatorID] regarding chain [chainID]
+	// IsBenched returns true if messages to [nodeID] regarding chain [chainID]
 	// should not be sent over the network and should immediately fail.
 	// Returns false if such messages should be sent, or if the chain is unknown.
-	IsBenched(validatorID ids.ShortID, chainID ids.ID) bool
+	IsBenched(nodeID ids.NodeID, chainID ids.ID) bool
 	// GetBenched returns an array of chainIDs where the specified
-	// [validatorID] is benched. If called on an id.ShortID that does
+	// [nodeID] is benched. If called on an id.ShortID that does
 	// not map to a validator, it will return an empty array.
-	GetBenched(validatorID ids.ShortID) []ids.ID
+	GetBenched(nodeID ids.NodeID) []ids.ID
 }
 
 // Config defines the configuration for a benchlist
@@ -76,9 +76,9 @@ func NewManager(config *Config) Manager {
 	}
 }
 
-// IsBenched returns true if messages to [validatorID] regarding [chainID]
+// IsBenched returns true if messages to [nodeID] regarding [chainID]
 // should not be sent over the network and should immediately fail.
-func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
+func (m *manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
@@ -86,20 +86,20 @@ func (m *manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	if !exists {
 		return false
 	}
-	isBenched := benchlist.IsBenched(validatorID)
+	isBenched := benchlist.IsBenched(nodeID)
 	return isBenched
 }
 
 // GetBenched returns an array of chainIDs where the specified
-// [validatorID] is benched. If called on an id.ShortID that does
+// [nodeID] is benched. If called on an id.ShortID that does
 // not map to a validator, it will return an empty array.
-func (m *manager) GetBenched(validatorID ids.ShortID) []ids.ID {
+func (m *manager) GetBenched(nodeID ids.NodeID) []ids.ID {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	benched := []ids.ID{}
 	for chainID, benchlist := range m.chainBenchlists {
-		if !benchlist.IsBenched(validatorID) {
+		if !benchlist.IsBenched(nodeID) {
 			continue
 		}
 		benched = append(benched, chainID)
@@ -148,7 +148,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	return nil
 }
 
-func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
+func (m *manager) RegisterResponse(chainID ids.ID, nodeID ids.NodeID) {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
@@ -156,10 +156,10 @@ func (m *manager) RegisterResponse(chainID ids.ID, validatorID ids.ShortID) {
 	if !exists {
 		return
 	}
-	benchlist.RegisterResponse(validatorID)
+	benchlist.RegisterResponse(nodeID)
 }
 
-func (m *manager) RegisterFailure(chainID ids.ID, validatorID ids.ShortID) {
+func (m *manager) RegisterFailure(chainID ids.ID, nodeID ids.NodeID) {
 	m.lock.RLock()
 	benchlist, exists := m.chainBenchlists[chainID]
 	m.lock.RUnlock()
@@ -167,7 +167,7 @@ func (m *manager) RegisterFailure(chainID ids.ID, validatorID ids.ShortID) {
 	if !exists {
 		return
 	}
-	benchlist.RegisterFailure(validatorID)
+	benchlist.RegisterFailure(nodeID)
 }
 
 type noBenchlist struct{}
@@ -176,7 +176,7 @@ type noBenchlist struct{}
 func NewNoBenchlist() Manager { return &noBenchlist{} }
 
 func (noBenchlist) RegisterChain(*snow.ConsensusContext) error { return nil }
-func (noBenchlist) RegisterResponse(ids.ID, ids.ShortID)       {}
-func (noBenchlist) RegisterFailure(ids.ID, ids.ShortID)        {}
-func (noBenchlist) IsBenched(ids.ShortID, ids.ID) bool         { return false }
-func (noBenchlist) GetBenched(ids.ShortID) []ids.ID            { return []ids.ID{} }
+func (noBenchlist) RegisterResponse(ids.ID, ids.NodeID)        {}
+func (noBenchlist) RegisterFailure(ids.ID, ids.NodeID)         {}
+func (noBenchlist) IsBenched(ids.NodeID, ids.ID) bool          { return false }
+func (noBenchlist) GetBenched(ids.NodeID) []ids.ID             { return []ids.ID{} }

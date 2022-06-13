@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 func TestAddAddressesParseAddresses(t *testing.T) {
@@ -22,7 +22,7 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	hrp := constants.GetHRP(5)
 
 	addrID := ids.ShortID{1}
-	addrStr, err := formatting.FormatAddress(chainAlias, hrp, addrID[:])
+	addrStr, err := address.Format(chainAlias, hrp, addrID[:])
 	assert.NoError(err)
 
 	msg := &AddAddresses{JSONAddresses: api.JSONAddresses{

@@ -11,14 +11,15 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -40,11 +41,11 @@ type UnsignedAddValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator Validator `serialize:"true" json:"validator"`
+	Validator pChainValidator.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner Owner `serialize:"true" json:"rewardsOwner"`
+	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
 	Shares uint32 `serialize:"true" json:"shares"`
@@ -192,13 +193,13 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is already a primary network validator",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 			)
 		}
 		if err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -208,13 +209,13 @@ func (tx *UnsignedAddValidatorTx) Execute(
 		if err == nil {
 			return nil, nil, fmt.Errorf(
 				"%s is about to become a primary network validator",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 			)
 		}
 		if err != database.ErrNotFound {
 			return nil, nil, fmt.Errorf(
 				"failed to find whether %s is about to become a validator: %w",
-				tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+				tx.Validator.NodeID,
 				err,
 			)
 		}
@@ -264,7 +265,7 @@ func (vm *VM) newAddValidatorTx(
 	stakeAmt, // Amount the validator stakes
 	startTime, // Unix time they start validating
 	endTime uint64, // Unix time they stop validating
-	nodeID ids.ShortID, // ID of the node we want to validate with
+	nodeID ids.NodeID, // ID of the node we want to validate with
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
@@ -282,7 +283,7 @@ func (vm *VM) newAddValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: Validator{
+		Validator: pChainValidator.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,

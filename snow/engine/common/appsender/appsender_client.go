@@ -23,7 +23,7 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, request []byte) error {
+func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -42,7 +42,7 @@ func (c *Client) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, request 
 	return err
 }
 
-func (c *Client) SendAppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	_, err := c.client.SendAppResponse(
 		context.Background(),
 		&appsenderpb.SendAppResponseMsg{
@@ -64,7 +64,7 @@ func (c *Client) SendAppGossip(msg []byte) error {
 	return err
 }
 
-func (c *Client) SendAppGossipSpecific(nodeIDs ids.ShortSet, msg []byte) error {
+func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {

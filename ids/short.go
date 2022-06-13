@@ -40,7 +40,6 @@ func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 	if !strings.HasPrefix(idStr, prefix) {
 		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
 	}
-
 	return ShortFromString(strings.TrimPrefix(idStr, prefix))
 }
 
@@ -54,7 +53,7 @@ func (id ShortID) MarshalJSON() ([]byte, error) {
 
 func (id *ShortID) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == "null" { // If "null", do nothing
+	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
 		return errMissingQuotes
@@ -74,6 +73,10 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (id *ShortID) UnmarshalText(text []byte) error {
+	return id.UnmarshalJSON(text)
+}
+
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
 func (id ShortID) Bytes() []byte { return id[:] }
@@ -91,6 +94,10 @@ func (id ShortID) String() string {
 // PrefixedString returns the String representation with a prefix added
 func (id ShortID) PrefixedString(prefix string) string {
 	return prefix + id.String()
+}
+
+func (id ShortID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
 }
 
 type sortShortIDData []ShortID
@@ -121,4 +128,14 @@ func IsUniqueShortIDs(ids []ShortID) bool {
 	set := ShortSet{}
 	set.Add(ids...)
 	return set.Len() == len(ids)
+}
+
+// ShortIDsToStrings converts an array of shortIDs to an array of their string
+// representations
+func ShortIDsToStrings(ids []ShortID) []string {
+	idStrs := make([]string, len(ids))
+	for i, id := range ids {
+		idStrs[i] = id.String()
+	}
+	return idStrs
 }

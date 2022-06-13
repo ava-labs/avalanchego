@@ -88,16 +88,23 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(uint64) (ids.ID, error))
 		}
 
 		acceptedID, err := getBlockIDAtHeight(blkHeight)
-		if err != nil {
+		switch err {
+		case nil:
+			if acceptedID == blk.ID() {
+				internalBlk.SetStatus(choices.Accepted)
+				return choices.Accepted, nil
+			}
+			internalBlk.SetStatus(choices.Rejected)
+			return choices.Rejected, nil
+		case database.ErrNotFound:
+			// Not found can happen if chain history is missing. In this case,
+			// the block may have been accepted or rejected, it isn't possible
+			// to know here.
+			internalBlk.SetStatus(choices.Processing)
+			return choices.Processing, nil
+		default:
 			return choices.Unknown, fmt.Errorf("failed to get accepted blkID at height %d", blkHeight)
 		}
-		if acceptedID == blk.ID() {
-			internalBlk.SetStatus(choices.Accepted)
-			return choices.Accepted, nil
-		}
-
-		internalBlk.SetStatus(choices.Rejected)
-		return choices.Rejected, nil
 	}
 }
 

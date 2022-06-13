@@ -13,10 +13,10 @@ import (
 )
 
 func TestSetSet(t *testing.T) {
-	vdr0 := NewValidator(ids.ShortEmpty, 1)
-	vdr1 := NewValidator(ids.ShortID{0xFF}, math.MaxInt64-1)
+	vdr0 := NewValidator(ids.EmptyNodeID, 1)
+	vdr1 := NewValidator(ids.NodeID{0xFF}, math.MaxInt64-1)
 	// Should be discarded, because it has a weight of 0
-	vdr2 := NewValidator(ids.ShortID{0xAA}, 0)
+	vdr2 := NewValidator(ids.NodeID{0xAA}, 0)
 
 	s := NewSet()
 	err := s.Set([]Validator{vdr0, vdr1, vdr2})
@@ -38,8 +38,8 @@ func TestSetSet(t *testing.T) {
 }
 
 func TestSamplerSample(t *testing.T) {
-	vdr0 := ids.GenerateTestShortID()
-	vdr1 := ids.GenerateTestShortID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
@@ -76,8 +76,8 @@ func TestSamplerSample(t *testing.T) {
 }
 
 func TestSamplerDuplicate(t *testing.T) {
-	vdr0 := ids.GenerateTestShortID()
-	vdr1 := ids.GenerateTestShortID()
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
@@ -96,7 +96,7 @@ func TestSamplerDuplicate(t *testing.T) {
 }
 
 func TestSamplerContains(t *testing.T) {
-	vdr := ids.GenerateTestShortID()
+	vdr := ids.GenerateTestNodeID()
 
 	s := NewSet()
 	err := s.AddWeight(vdr, 1)
@@ -113,8 +113,8 @@ func TestSamplerContains(t *testing.T) {
 }
 
 func TestSamplerString(t *testing.T) {
-	vdr0 := ids.ShortEmpty
-	vdr1 := ids.ShortID{
+	vdr0 := ids.EmptyNodeID
+	vdr1 := ids.NodeID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	}
@@ -127,16 +127,16 @@ func TestSamplerString(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-		"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
-		"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
+		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
+		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 	result := s.String()
 	assert.Equal(t, expected, result, "wrong string returned")
 }
 
 func TestSetWeight(t *testing.T) {
-	vdr0 := ids.ShortID{1}
+	vdr0 := ids.NodeID{1}
 	weight0 := uint64(93)
-	vdr1 := ids.ShortID{2}
+	vdr1 := ids.NodeID{2}
 	weight1 := uint64(123)
 
 	s := NewSet()
@@ -152,13 +152,13 @@ func TestSetWeight(t *testing.T) {
 }
 
 func TestSetSubsetWeight(t *testing.T) {
-	vdr0 := ids.ShortID{1}
+	vdr0 := ids.NodeID{1}
 	weight0 := uint64(93)
-	vdr1 := ids.ShortID{2}
+	vdr1 := ids.NodeID{2}
 	weight1 := uint64(123)
-	vdr2 := ids.ShortID{3}
+	vdr2 := ids.NodeID{3}
 	weight2 := uint64(810)
-	subset := ids.ShortSet{}
+	subset := ids.NodeIDSet{}
 	subset.Add(vdr0)
 	subset.Add(vdr1)
 
@@ -180,8 +180,8 @@ func TestSetSubsetWeight(t *testing.T) {
 }
 
 func TestSamplerMasked(t *testing.T) {
-	vdr0 := ids.ShortEmpty
-	vdr1 := ids.ShortID{
+	vdr0 := ids.EmptyNodeID
+	vdr1 := ids.NodeID{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	}
@@ -195,7 +195,7 @@ func TestSamplerMasked(t *testing.T) {
 
 	{
 		expected := "Validator Set: (Size = 1, SampleableWeight = 1, Weight = 1)\n" +
-			"    Validator[0]:        111111111111111111116DBWJs, 1/1"
+			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
@@ -205,8 +205,8 @@ func TestSamplerMasked(t *testing.T) {
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
-			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
+			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
+			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
@@ -216,8 +216,8 @@ func TestSamplerMasked(t *testing.T) {
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
+			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
+			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
@@ -227,8 +227,8 @@ func TestSamplerMasked(t *testing.T) {
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
-			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
+			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
+			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
@@ -238,8 +238,8 @@ func TestSamplerMasked(t *testing.T) {
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
+			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
+			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
@@ -249,9 +249,170 @@ func TestSamplerMasked(t *testing.T) {
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-			"    Validator[0]:        111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
+			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
+			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
 		assert.Equal(t, expected, result, "wrong string returned")
 	}
+}
+
+var _ SetCallbackListener = &callbackListener{}
+
+type callbackListener struct {
+	t         *testing.T
+	onWeight  func(ids.NodeID, uint64, uint64)
+	onAdd     func(ids.NodeID, uint64)
+	onRemoved func(ids.NodeID, uint64)
+}
+
+func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, weight uint64) {
+	if c.onAdd != nil {
+		c.onAdd(nodeID, weight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+	if c.onRemoved != nil {
+		c.onRemoved(nodeID, weight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func (c *callbackListener) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+	if c.onWeight != nil {
+		c.onWeight(nodeID, oldWeight, newWeight)
+	} else {
+		c.t.Fail()
+	}
+}
+
+func TestSetAddWeightCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(1)
+	weight1 := uint64(93)
+
+	s := NewSet()
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	callcount := 0
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			callcount++
+		},
+		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+			assert.Equal(t, vdr0, nodeID)
+			assert.Equal(t, weight0, oldWeight)
+			assert.Equal(t, weight0+weight1, newWeight)
+			callcount++
+		},
+	})
+	err = s.AddWeight(vdr0, weight1)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, callcount)
+}
+
+func TestSetRemoveWeightCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(93)
+	weight1 := uint64(92)
+
+	s := NewSet()
+	callcount := 0
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			callcount++
+		},
+		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
+			assert.Equal(t, vdr0, nodeID)
+			assert.Equal(t, weight0, oldWeight)
+			assert.Equal(t, weight0-weight1, newWeight)
+			callcount++
+		},
+	})
+	err = s.RemoveWeight(vdr0, weight1)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, callcount)
+}
+
+func TestSetValidatorRemovedCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(93)
+
+	s := NewSet()
+	callcount := 0
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			callcount++
+		},
+		onRemoved: func(nodeID ids.NodeID, weight uint64) {
+			assert.Equal(t, vdr0, nodeID)
+			assert.Equal(t, weight0, weight)
+			callcount++
+		},
+	})
+	err = s.RemoveWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, callcount)
+}
+
+func TestSetValidatorSetCallback(t *testing.T) {
+	vdr0 := ids.NodeID{1}
+	weight0 := uint64(93)
+	vdr1 := ids.NodeID{2}
+	weight1 := uint64(94)
+	vdr2 := ids.NodeID{3}
+	weight2 := uint64(95)
+
+	s := NewSet()
+	err := s.AddWeight(vdr0, weight0)
+	assert.NoError(t, err)
+	err = s.AddWeight(vdr1, weight1)
+	assert.NoError(t, err)
+
+	newValidators := []Validator{&validator{nodeID: vdr0, weight: weight0}, &validator{nodeID: vdr2, weight: weight2}}
+	callcount := 0
+	s.RegisterCallbackListener(&callbackListener{
+		t: t,
+		onAdd: func(nodeID ids.NodeID, weight uint64) {
+			if nodeID == vdr0 {
+				assert.Equal(t, weight0, weight)
+			}
+			if nodeID == vdr1 {
+				assert.Equal(t, weight1, weight)
+			}
+			if nodeID == vdr2 {
+				assert.Equal(t, weight2, weight)
+			}
+			callcount++
+		},
+		onRemoved: func(nodeID ids.NodeID, weight uint64) {
+			assert.Equal(t, vdr1, nodeID)
+			assert.Equal(t, weight1, weight)
+			callcount++
+		},
+	})
+
+	err = s.Set(newValidators)
+	assert.NoError(t, err)
+	assert.Equal(t, 4, callcount)
 }

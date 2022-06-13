@@ -14,8 +14,8 @@ import (
 type Set interface {
 	fmt.Stringer
 
-	Add(requestID uint32, vdrs ids.ShortBag) bool
-	Vote(requestID uint32, vdr ids.ShortID, votes []ids.ID) []ids.UniqueBag
+	Add(requestID uint32, vdrs ids.NodeIDBag) bool
+	Vote(requestID uint32, vdr ids.NodeID, votes []ids.ID) []ids.UniqueBag
 	Len() int
 }
 
@@ -23,12 +23,12 @@ type Set interface {
 type Poll interface {
 	formatting.PrefixedStringer
 
-	Vote(vdr ids.ShortID, votes []ids.ID)
+	Vote(vdr ids.NodeID, votes []ids.ID)
 	Finished() bool
 	Result() ids.UniqueBag
 }
 
 // Factory creates a new Poll
 type Factory interface {
-	New(vdrs ids.ShortBag) Poll
+	New(vdrs ids.NodeIDBag) Poll
 }

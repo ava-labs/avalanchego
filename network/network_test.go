@@ -20,11 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -68,7 +71,13 @@ var (
 				RefillRate:   units.MiB,
 				MaxBurstSize: constants.DefaultMaxMessageSize,
 			},
+			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: 50 * time.Millisecond,
+			},
 			MaxProcessingMsgsPerNode: 100,
+			DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: 50 * time.Millisecond,
+			},
 		},
 		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 			VdrAllocSize:        1 * units.GiB,
@@ -81,6 +90,7 @@ var (
 		ThrottleRps:       100,
 		ConnectionTimeout: time.Second,
 	}
+
 	defaultConfig = Config{
 		HealthConfig:         defaultHealthConfig,
 		PeerListGossipConfig: defaultPeerListGossipConfig,
@@ -105,14 +115,42 @@ var (
 		RequireValidatorToConnect: false,
 
 		MaximumInboundMessageTimeout: 30 * time.Second,
+		ResourceTracker:              newDefaultResourceTracker(),
+		CPUTargeter:                  nil, // Set in init
+		DiskTargeter:                 nil, // Set in init
 	}
 )
 
-func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.ShortID, []*Config) {
+func init() {
+	defaultConfig.CPUTargeter = newDefaultTargeter(defaultConfig.ResourceTracker.CPUTracker())
+	defaultConfig.DiskTargeter = newDefaultTargeter(defaultConfig.ResourceTracker.DiskTracker())
+}
+
+func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
+	return tracker.NewTargeter(
+		&tracker.TargeterConfig{
+			VdrAlloc:           10,
+			MaxNonVdrUsage:     10,
+			MaxNonVdrNodeUsage: 10,
+		},
+		validators.NewSet(),
+		t,
+	)
+}
+
+func newDefaultResourceTracker() tracker.ResourceTracker {
+	tracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	if err != nil {
+		panic(err)
+	}
+	return tracker
+}
+
+func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
-		nodeIDs   = make([]ids.ShortID, count)
+		nodeIDs   = make([]ids.NodeID, count)
 		configs   = make([]*Config, count)
 	)
 	for i := 0; i < count; i++ {
@@ -122,7 +160,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config := defaultConfig
 		config.TLSConfig = tlsConfig
 		config.MyNodeID = nodeID
-		config.MyIP = ip
+		config.MyIPPort = ip
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
 		listeners[i] = listener
@@ -144,7 +182,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.ShortID, []Network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
 	assert := assert.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -175,7 +213,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		config.Beacons = beacons
 		config.Validators = vdrs
 
-		var connected ids.ShortSet
+		var connected ids.NodeIDSet
 		net, err := NewNetwork(
 			config,
 			msgCreator,
@@ -185,7 +223,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			dialer,
 			&testHandler{
 				InboundHandler: handlers[i],
-				ConnectedF: func(nodeID ids.ShortID, _ version.Application) {
+				ConnectedF: func(nodeID ids.NodeID, _ version.Application) {
 					t.Logf("%s connected to %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -200,7 +238,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 						close(onAllConnected)
 					}
 				},
-				DisconnectedF: func(nodeID ids.ShortID) {
+				DisconnectedF: func(nodeID ids.NodeID) {
 					t.Logf("%s disconnected from %s", config.MyNodeID, nodeID)
 
 					globalLock.Lock()
@@ -222,7 +260,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIP.IP())
+			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.IPPort())
 		}
 
 		go func(net Network) {
@@ -274,7 +312,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	assert.NoError(err)
 
-	toSend := ids.ShortSet{}
+	toSend := ids.NodeIDSet{}
 	toSend.Add(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, false)
 	assert.EqualValues(toSend, sentTo)
@@ -298,15 +336,17 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
 	assert.NoError(err)
 
-	network.Track(utils.IPCertDesc{
+	useful := network.Track(ips.ClaimedIPPort{
 		Cert: tlsCert.Leaf,
-		IPDesc: utils.IPDesc{
+		IPPort: ips.IPPort{
 			IP:   net.IPv4(123, 132, 123, 123),
 			Port: 10000,
 		},
-		Time:      1000,
+		Timestamp: 1000,
 		Signature: nil,
 	})
+	// The signature is wrong so this peer tracking info isn't useful.
+	assert.False(useful)
 
 	network.peersLock.RLock()
 	assert.Empty(network.trackedIPs)

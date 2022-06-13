@@ -22,13 +22,24 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
+
+var (
+	_ block.ChainVM              = &fullVM{}
+	_ block.HeightIndexedChainVM = &fullVM{}
+	_ block.StateSyncableVM      = &fullVM{}
+)
+
+type fullVM struct {
+	*block.TestVM
+	*block.TestHeightIndexedVM
+	*block.TestStateSyncableVM
+}
 
 var (
 	pTestCert *tls.Certificate
@@ -56,7 +67,7 @@ func initTestProposerVM(
 	proBlkStartTime time.Time,
 	minPChainHeight uint64,
 ) (
-	*block.TestVM,
+	*fullVM,
 	*validators.TestState,
 	*VM,
 	*snowman.TestBlock,
@@ -73,8 +84,16 @@ func initTestProposerVM(
 	}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &fullVM{
+		TestVM: &block.TestVM{
+			TestVM: common.TestVM{
+				T: t,
+			},
+		},
+		TestHeightIndexedVM: &block.TestHeightIndexedVM{
+			T: t,
+		},
+		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
 		},
 	}
@@ -103,31 +122,34 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight, false)
+	proVM := New(coreVM, proBlkStartTime, minPChainHeight)
 
 	valState := &validators.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.ShortID{1}] = uint64(5)
-		res[ids.ShortID{2}] = uint64(6)
-		res[ids.ShortID{3}] = uint64(7)
+		res[ids.NodeID{1}] = uint64(5)
+		res[ids.NodeID{2}] = uint64(6)
+		res[ids.NodeID{3}] = uint64(7)
 		return res, nil
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+
+	// pre-insert resetOccurred key to make VM not spinning height reindexing
+	stopHeightReindexing(t, coreVM, dummyDBManager)
+
 	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
@@ -839,21 +861,21 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		return map[ids.ShortID]uint64{
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		return map[ids.NodeID]uint64{
 			{1}: 100,
 		}, nil
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
@@ -1121,8 +1143,8 @@ func TestInnerVMRollback(t *testing.T) {
 		T: t,
 	}
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		return map[ids.ShortID]uint64{
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		return map[ids.NodeID]uint64{
 			{1}: 100,
 		}, nil
 	}
@@ -1149,7 +1171,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
@@ -1169,7 +1191,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
@@ -1247,11 +1269,20 @@ func TestInnerVMRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fetchedBlock, err := proVM.GetBlock(parsedBlock.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := fetchedBlock.Status(); status != choices.Accepted {
+		t.Fatalf("unexpected status %s. Expected %s", status, choices.Accepted)
+	}
+
 	// Restart the node and have the inner VM rollback state.
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(coreVM, time.Time{}, 0, false)
+	proVM = New(coreVM, time.Time{}, 0)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
@@ -1279,8 +1310,8 @@ func TestInnerVMRollback(t *testing.T) {
 func TestBuildBlockDuringWindow(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		return map[ids.ShortID]uint64{
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		return map[ids.NodeID]uint64{
 			proVM.ctx.NodeID: 10,
 		}, nil
 	}
@@ -1775,24 +1806,24 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.ShortID{1}] = uint64(5)
-		res[ids.ShortID{2}] = uint64(6)
-		res[ids.ShortID{3}] = uint64(7)
+		res[ids.NodeID{1}] = uint64(5)
+		res[ids.NodeID{2}] = uint64(6)
+		res[ids.NodeID{3}] = uint64(7)
 		return res, nil
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
@@ -1953,24 +1984,24 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, false)
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.ShortID{1}] = uint64(5)
-		res[ids.ShortID{2}] = uint64(6)
-		res[ids.ShortID{3}] = uint64(7)
+		res[ids.NodeID{1}] = uint64(5)
+		res[ids.NodeID{2}] = uint64(6)
+		res[ids.NodeID{3}] = uint64(7)
 		return res, nil
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState

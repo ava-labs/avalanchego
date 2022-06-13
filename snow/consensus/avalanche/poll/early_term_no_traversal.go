@@ -24,7 +24,7 @@ func NewEarlyTermNoTraversalFactory(alpha int) Factory {
 	return &earlyTermNoTraversalFactory{alpha: alpha}
 }
 
-func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortBag) Poll {
+func (f *earlyTermNoTraversalFactory) New(vdrs ids.NodeIDBag) Poll {
 	return &earlyTermNoTraversalPoll{
 		polled: vdrs,
 		alpha:  f.alpha,
@@ -36,12 +36,12 @@ func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortBag) Poll {
 // It terminates as quickly as it can without performing any DAG traversals.
 type earlyTermNoTraversalPoll struct {
 	votes  ids.UniqueBag
-	polled ids.ShortBag
+	polled ids.NodeIDBag
 	alpha  int
 }
 
 // Vote registers a response for this poll
-func (p *earlyTermNoTraversalPoll) Vote(vdr ids.ShortID, votes []ids.ID) {
+func (p *earlyTermNoTraversalPoll) Vote(vdr ids.NodeID, votes []ids.ID) {
 	count := p.polled.Count(vdr)
 	// make sure that a validator can't respond multiple times
 	p.polled.Remove(vdr)

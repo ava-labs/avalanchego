@@ -18,8 +18,8 @@ var _ pendingStakerChainState = &pendingStakerChainStateImpl{}
 // pendingStakerChainState manages the set of stakers (both validators and
 // delegators) that are slated to start staking in the future.
 type pendingStakerChainState interface {
-	GetValidatorTx(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error)
-	GetValidator(nodeID ids.ShortID) validator
+	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *UnsignedAddValidatorTx, err error)
+	GetValidator(nodeID ids.NodeID) validator
 
 	AddStaker(addStakerTx *Tx) pendingStakerChainState
 	DeleteStakers(numToRemove int) pendingStakerChainState
@@ -36,8 +36,8 @@ type pendingStakerChainState interface {
 // after initialization.
 type pendingStakerChainStateImpl struct {
 	// nodeID -> validator
-	validatorsByNodeID      map[ids.ShortID]*UnsignedAddValidatorTx
-	validatorExtrasByNodeID map[ids.ShortID]*validatorImpl
+	validatorsByNodeID      map[ids.NodeID]*UnsignedAddValidatorTx
+	validatorExtrasByNodeID map[ids.NodeID]*validatorImpl
 
 	// list of pending validators in order of their removal from the pending
 	// staker set
@@ -47,7 +47,7 @@ type pendingStakerChainStateImpl struct {
 	deletedStakers []*Tx
 }
 
-func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error) {
+func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.NodeID) (addStakerTx *UnsignedAddValidatorTx, err error) {
 	vdr, exists := ps.validatorsByNodeID[nodeID]
 	if !exists {
 		return nil, database.ErrNotFound
@@ -55,7 +55,7 @@ func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.ShortID) (addSt
 	return vdr, nil
 }
 
-func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.ShortID) validator {
+func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.NodeID) validator {
 	if vdr, exists := ps.validatorExtrasByNodeID[nodeID]; exists {
 		return vdr
 	}
@@ -75,7 +75,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 	case *UnsignedAddValidatorTx:
 		newPS.validatorExtrasByNodeID = ps.validatorExtrasByNodeID
 
-		newPS.validatorsByNodeID = make(map[ids.ShortID]*UnsignedAddValidatorTx, len(ps.validatorsByNodeID)+1)
+		newPS.validatorsByNodeID = make(map[ids.NodeID]*UnsignedAddValidatorTx, len(ps.validatorsByNodeID)+1)
 		for nodeID, vdr := range ps.validatorsByNodeID {
 			newPS.validatorsByNodeID[nodeID] = vdr
 		}
@@ -83,7 +83,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 	case *UnsignedAddDelegatorTx:
 		newPS.validatorsByNodeID = ps.validatorsByNodeID
 
-		newPS.validatorExtrasByNodeID = make(map[ids.ShortID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
+		newPS.validatorExtrasByNodeID = make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
 		for nodeID, vdr := range ps.validatorExtrasByNodeID {
 			if nodeID != tx.Validator.NodeID {
 				newPS.validatorExtrasByNodeID[nodeID] = vdr
@@ -109,7 +109,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 	case *UnsignedAddSubnetValidatorTx:
 		newPS.validatorsByNodeID = ps.validatorsByNodeID
 
-		newPS.validatorExtrasByNodeID = make(map[ids.ShortID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
+		newPS.validatorExtrasByNodeID = make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
 		for nodeID, vdr := range ps.validatorExtrasByNodeID {
 			if nodeID != tx.Validator.NodeID {
 				newPS.validatorExtrasByNodeID[nodeID] = vdr
@@ -142,8 +142,8 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerC
 
 func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingStakerChainState {
 	newPS := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.ShortID]*UnsignedAddValidatorTx, len(ps.validatorsByNodeID)),
-		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
+		validatorsByNodeID:      make(map[ids.NodeID]*UnsignedAddValidatorTx, len(ps.validatorsByNodeID)),
+		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
 		validators:              ps.validators[numToRemove:],
 
 		deletedStakers: ps.validators[:numToRemove],

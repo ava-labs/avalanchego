@@ -106,7 +106,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (func(id ids.ID) 
 			}
 		}
 
-		return ids.ID{}, fmt.Errorf("could not find accepted block at height %d", height)
+		return ids.ID{}, database.ErrNotFound
 	}
 
 	return getBlock, parseBlk, getAcceptedBlockIDAtHeight
@@ -846,4 +846,35 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	checkProcessingBlock(t, chainState, builtBlk)
 
 	assert.Error(t, chainState.SetLastAcceptedBlock(resetBlk), "should have errored resetting chain state with processing block")
+}
+
+func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
+	testBlks := NewTestBlocks(3)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+	blk1 := testBlks[1]
+	blk2 := testBlks[2]
+	blk2.SetStatus(choices.Accepted)
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	chainState := NewState(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
+		LastAcceptedBlock:   blk2,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
+	})
+
+	parsedBlk1, err := chainState.ParseBlock(blk1.Bytes())
+	if err != nil {
+		t.Fatalf("Failed to parse blk1 due to: %s", err)
+	}
+
+	if blk1.Height() != parsedBlk1.Height() {
+		t.Fatalf("Parsed blk1 reported incorrect height. Expected %d got %d", blk1.Height(), parsedBlk1.Height())
+	}
 }

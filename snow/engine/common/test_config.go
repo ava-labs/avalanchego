@@ -19,11 +19,16 @@ func DefaultConfigTest() Config {
 	}
 
 	beacons := validators.NewSet()
+
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, 0)
+	beacons.RegisterCallbackListener(startupTracker)
+
 	return Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
 		Validators:                     validators.NewSet(),
 		Beacons:                        beacons,
-		WeightTracker:                  tracker.NewWeightTracker(beacons, 0),
+		StartupTracker:                 startupTracker,
 		Sender:                         &SenderTest{},
 		Bootstrapable:                  &BootstrapableTest{},
 		Subnet:                         subnet,

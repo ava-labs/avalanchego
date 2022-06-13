@@ -4,15 +4,102 @@
 package throttling
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
+
+func TestInboundMsgByteThrottlerCancelContextDeadlock(t *testing.T) {
+	assert := assert.New(t)
+	config := MsgByteThrottlerConfig{
+		VdrAllocSize:        1,
+		AtLargeAllocSize:    1,
+		NodeMaxAtLargeBytes: 1,
+	}
+	vdrs := validators.NewSet()
+	vdr := ids.GenerateTestNodeID()
+	assert.NoError(vdrs.AddWeight(vdr, 1))
+
+	throttler, err := newInboundMsgByteThrottler(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		vdrs,
+		config,
+	)
+	assert.NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	nodeID := ids.GenerateTestNodeID()
+	release := throttler.Acquire(ctx, 2, nodeID)
+	release()
+}
+
+func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
+	assert := assert.New(t)
+	config := MsgByteThrottlerConfig{
+		VdrAllocSize:        1024,
+		AtLargeAllocSize:    512,
+		NodeMaxAtLargeBytes: 1024,
+	}
+	vdrs := validators.NewSet()
+	vdr1ID := ids.GenerateTestNodeID()
+	vdr2ID := ids.GenerateTestNodeID()
+	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
+	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
+
+	throttler, err := newInboundMsgByteThrottler(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		vdrs,
+		config,
+	)
+	assert.NoError(err)
+
+	throttler.Acquire(context.Background(), config.VdrAllocSize, vdr1ID)
+
+	// Trying to take more bytes for node should block
+	vdr2Done := make(chan struct{})
+	vdr2Context, vdr2ContextCancelFunction := context.WithCancel(context.Background())
+	go func() {
+		throttler.Acquire(vdr2Context, config.VdrAllocSize, vdr2ID)
+		vdr2Done <- struct{}{}
+	}()
+	select {
+	case <-vdr2Done:
+		t.Fatal("should block on acquiring any more bytes")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// ensure the throttler has recorded that vdr2 is waiting
+	throttler.lock.Lock()
+	assert.Len(throttler.nodeToWaitingMsgIDs, 1)
+	assert.Len(throttler.nodeToWaitingMsgIDs[vdr2ID], 1)
+	assert.EqualValues(1, throttler.waitingToAcquire.Len())
+	_, exists := throttler.waitingToAcquire.Get(throttler.nodeToWaitingMsgIDs[vdr2ID][0])
+	assert.True(exists)
+	throttler.lock.Unlock()
+
+	// cancel should cause vdr2's acquire to unblock
+	vdr2ContextCancelFunction()
+
+	select {
+	case <-vdr2Done:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("channel should signal because ctx was cancelled")
+	}
+}
 
 func TestInboundMsgByteThrottler(t *testing.T) {
 	assert := assert.New(t)
@@ -22,13 +109,13 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
-	vdr2ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
+	vdr2ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
 
 	throttler, err := newInboundMsgByteThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
@@ -47,7 +134,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// Take from at-large allocation.
 	// Should return immediately.
-	throttler.Acquire(1, vdr1ID)
+	throttler.Acquire(context.Background(), 1, vdr1ID)
 	assert.EqualValues(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
 	assert.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
@@ -55,7 +142,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	assert.EqualValues(1, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Release the bytes
-	throttler.Release(1, vdr1ID)
+	throttler.release(&msgMetadata{msgSize: 1}, vdr1ID)
 	assert.EqualValues(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
 	assert.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
@@ -63,7 +150,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
 	// Should return immediately.
-	throttler.Acquire(config.AtLargeAllocSize+1, vdr1ID)
+	throttler.Acquire(context.Background(), config.AtLargeAllocSize+1, vdr1ID)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 1
 	assert.EqualValues(0, throttler.remainingAtLargeBytes)
 	assert.EqualValues(config.VdrAllocSize-1, throttler.remainingVdrBytes)
@@ -74,7 +161,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// The other validator should be able to acquire half the validator allocation.
 	// Should return immediately.
-	throttler.Acquire(config.AtLargeAllocSize/2, vdr2ID)
+	throttler.Acquire(context.Background(), config.AtLargeAllocSize/2, vdr2ID)
 	// vdr2 at-large bytes used: 0. Validator bytes used: 512
 	assert.EqualValues(config.VdrAllocSize/2-1, throttler.remainingVdrBytes)
 	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], 1)
@@ -86,7 +173,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// vdr1 should be able to acquire the rest of the validator allocation
 	// Should return immediately.
-	throttler.Acquire(config.VdrAllocSize/2-1, vdr1ID)
+	throttler.Acquire(context.Background(), config.VdrAllocSize/2-1, vdr1ID)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 512
 	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], config.VdrAllocSize/2)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 1)
@@ -95,7 +182,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	// Trying to take more bytes for either node should block
 	vdr1Done := make(chan struct{})
 	go func() {
-		throttler.Acquire(1, vdr1ID)
+		throttler.Acquire(context.Background(), 1, vdr1ID)
 		vdr1Done <- struct{}{}
 	}()
 	select {
@@ -113,7 +200,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	vdr2Done := make(chan struct{})
 	go func() {
-		throttler.Acquire(1, vdr2ID)
+		throttler.Acquire(context.Background(), 1, vdr2ID)
 		vdr2Done <- struct{}{}
 	}()
 	select {
@@ -129,10 +216,10 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	assert.True(exists)
 	throttler.lock.Unlock()
 
-	nonVdrID := ids.GenerateTestShortID()
+	nonVdrID := ids.GenerateTestNodeID()
 	nonVdrDone := make(chan struct{})
 	go func() {
-		throttler.Acquire(1, nonVdrID)
+		throttler.Acquire(context.Background(), 1, nonVdrID)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -151,7 +238,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	// Release config.MaxAtLargeBytes+1 bytes
 	// When the choice exists, bytes should be given back to the validator allocation
 	// rather than the at-large allocation.
-	throttler.Release(config.AtLargeAllocSize+1, vdr1ID)
+	throttler.release(&msgMetadata{msgSize: config.AtLargeAllocSize + 1}, vdr1ID)
 
 	// The Acquires that blocked above should have returned
 	<-vdr1Done
@@ -170,7 +257,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	assert.EqualValues(0, throttler.waitingToAcquire.Len())
 
 	// Non-validator should be able to take the rest of the at-large bytes
-	throttler.Acquire(config.AtLargeAllocSize/2-2, nonVdrID)
+	throttler.Acquire(context.Background(), config.AtLargeAllocSize/2-2, nonVdrID)
 	assert.EqualValues(0, throttler.remainingAtLargeBytes)
 	assert.EqualValues(config.AtLargeAllocSize/2-1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 	assert.Len(throttler.nodeToWaitingMsgIDs, 0)
@@ -178,7 +265,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// But should block on subsequent Acquires
 	go func() {
-		throttler.Acquire(1, nonVdrID)
+		throttler.Acquire(context.Background(), 1, nonVdrID)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -195,8 +282,8 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	throttler.lock.Unlock()
 
 	// Release all of vdr2's messages
-	throttler.Release(config.AtLargeAllocSize/2, vdr2ID)
-	throttler.Release(1, vdr2ID)
+	throttler.release(&msgMetadata{msgSize: config.AtLargeAllocSize / 2}, vdr2ID)
+	throttler.release(&msgMetadata{msgSize: 1}, vdr2ID)
 
 	<-nonVdrDone
 
@@ -208,8 +295,8 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	assert.EqualValues(0, throttler.waitingToAcquire.Len())
 
 	// Release all of vdr1's messages
-	throttler.Release(1, vdr1ID)
-	throttler.Release(config.AtLargeAllocSize/2-1, vdr1ID)
+	throttler.release(&msgMetadata{msgSize: 1}, vdr1ID)
+	throttler.release(&msgMetadata{msgSize: config.AtLargeAllocSize/2 - 1}, vdr1ID)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
 	assert.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
 	assert.EqualValues(config.AtLargeAllocSize/2, throttler.remainingAtLargeBytes)
@@ -218,9 +305,9 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	assert.EqualValues(0, throttler.waitingToAcquire.Len())
 
 	// Release nonVdr's messages
-	throttler.Release(1, nonVdrID)
-	throttler.Release(1, nonVdrID)
-	throttler.Release(config.AtLargeAllocSize/2-2, nonVdrID)
+	throttler.release(&msgMetadata{msgSize: 1}, nonVdrID)
+	throttler.release(&msgMetadata{msgSize: 1}, nonVdrID)
+	throttler.release(&msgMetadata{msgSize: config.AtLargeAllocSize/2 - 2}, nonVdrID)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
 	assert.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
 	assert.EqualValues(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
@@ -239,23 +326,23 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	throttler, err := newInboundMsgByteThrottler(
-		&logging.Log{},
+		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
 	)
 	assert.NoError(err)
-	nonVdrNodeID1 := ids.GenerateTestShortID()
-	throttler.Acquire(config.NodeMaxAtLargeBytes, nonVdrNodeID1)
+	nonVdrNodeID1 := ids.GenerateTestNodeID()
+	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes, nonVdrNodeID1)
 
 	// Acquiring more should block
 	nonVdrDone := make(chan struct{})
 	go func() {
-		throttler.Acquire(1, nonVdrNodeID1)
+		throttler.Acquire(context.Background(), 1, nonVdrNodeID1)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -265,12 +352,12 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	}
 
 	// A different non-validator should be able to acquire
-	nonVdrNodeID2 := ids.GenerateTestShortID()
-	throttler.Acquire(config.NodeMaxAtLargeBytes, nonVdrNodeID2)
+	nonVdrNodeID2 := ids.GenerateTestNodeID()
+	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes, nonVdrNodeID2)
 
 	// Acquiring more should block
 	go func() {
-		throttler.Acquire(1, nonVdrNodeID1)
+		throttler.Acquire(context.Background(), 1, nonVdrNodeID1)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -280,7 +367,7 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	}
 
 	// Validator should only be able to take [MaxAtLargeBytes]
-	throttler.Acquire(config.NodeMaxAtLargeBytes+1, vdr1ID)
+	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes+1, vdr1ID)
 	assert.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 	assert.EqualValues(1, throttler.nodeToVdrBytesUsed[vdr1ID])
 	assert.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
@@ -298,20 +385,20 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
-	vdr1ID := ids.GenerateTestShortID()
+	vdr1ID := ids.GenerateTestNodeID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
-	nonVdrNodeID := ids.GenerateTestShortID()
+	nonVdrNodeID := ids.GenerateTestNodeID()
 
 	maxVdrBytes := config.VdrAllocSize + config.AtLargeAllocSize
 	maxNonVdrBytes := config.AtLargeAllocSize
 	// Test for both validator and non-validator
-	for _, nodeID := range []ids.ShortID{vdr1ID, nonVdrNodeID} {
+	for _, nodeID := range []ids.NodeID{vdr1ID, nonVdrNodeID} {
 		maxBytes := maxVdrBytes
 		if nodeID == nonVdrNodeID {
 			maxBytes = maxNonVdrBytes
 		}
 		throttler, err := newInboundMsgByteThrottler(
-			&logging.Log{},
+			logging.NoLog{},
 			"",
 			prometheus.NewRegistry(),
 			vdrs,
@@ -319,14 +406,14 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 		)
 		assert.NoError(err)
 		// node uses up all but 1 byte
-		throttler.Acquire(maxBytes-1, nodeID)
+		throttler.Acquire(context.Background(), maxBytes-1, nodeID)
 		// node uses the last byte
-		throttler.Acquire(1, nodeID)
+		throttler.Acquire(context.Background(), 1, nodeID)
 
 		// First message wants to acquire a lot of bytes
 		done := make(chan struct{})
 		go func() {
-			throttler.Acquire(maxBytes-1, nodeID)
+			throttler.Acquire(context.Background(), maxBytes-1, nodeID)
 			done <- struct{}{}
 		}()
 		select {
@@ -337,7 +424,7 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 
 		// Next message only wants to acquire 1 byte
 		go func() {
-			throttler.Acquire(1, nodeID)
+			throttler.Acquire(context.Background(), 1, nodeID)
 			done <- struct{}{}
 		}()
 		select {
@@ -347,7 +434,7 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 		}
 
 		// Release 1 byte
-		throttler.Release(1, nodeID)
+		throttler.release(&msgMetadata{msgSize: 1}, nodeID)
 		// Byte should have gone toward first message
 		assert.EqualValues(2, throttler.waitingToAcquire.Len())
 		assert.Len(throttler.nodeToWaitingMsgIDs[nodeID], 2)
@@ -365,7 +452,7 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 		}
 
 		// Release the rest of the bytes
-		throttler.Release(maxBytes-1, nodeID)
+		throttler.release(&msgMetadata{msgSize: maxBytes - 1}, nodeID)
 		// Both should be done acquiring now
 		<-done
 		<-done

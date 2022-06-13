@@ -22,7 +22,7 @@ func TestLockedCalculator(t *testing.T) {
 	assert.NotNil(t)
 
 	// Should still error because ctx is nil
-	nodeID := ids.GenerateTestShortID()
+	nodeID := ids.GenerateTestNodeID()
 	_, _, err := lc.CalculateUptime(nodeID)
 	assert.EqualValues(errNotReady, err)
 	_, err = lc.CalculateUptimePercent(nodeID)

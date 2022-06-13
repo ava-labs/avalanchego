@@ -9,10 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewDefaultVersionParser(t *testing.T) {
-	p := NewDefaultParser()
-
-	v, err := p.Parse("v1.2.3")
+func TestDefaultVersionParser(t *testing.T) {
+	v, err := DefaultParser.Parse("v1.2.3")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
@@ -29,15 +27,13 @@ func TestNewDefaultVersionParser(t *testing.T) {
 		"v1.2.z",
 	}
 	for _, badVersion := range badVersions {
-		_, err := p.Parse(badVersion)
+		_, err := DefaultParser.Parse(badVersion)
 		assert.Error(t, err)
 	}
 }
 
-func TestNewDefaultApplicationParser(t *testing.T) {
-	p := NewDefaultApplicationParser()
-
-	v, err := p.Parse("avalanche/1.2.3")
+func TestDefaultApplicationParser(t *testing.T) {
+	v, err := DefaultApplicationParser.Parse("avalanche/1.2.3")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, v)
@@ -57,7 +53,7 @@ func TestNewDefaultApplicationParser(t *testing.T) {
 		"avalanche/0.0.z",
 	}
 	for _, badVersion := range badVersions {
-		_, err := p.Parse(badVersion)
+		_, err := DefaultApplicationParser.Parse(badVersion)
 		assert.Error(t, err)
 	}
 }

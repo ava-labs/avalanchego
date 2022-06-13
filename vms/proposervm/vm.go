@@ -41,18 +41,23 @@ var (
 	_ block.ChainVM              = &VM{}
 	_ block.BatchedChainVM       = &VM{}
 	_ block.HeightIndexedChainVM = &VM{}
+	_ block.StateSyncableVM      = &VM{}
 
 	dbPrefix = []byte("proposervm")
 )
 
 type VM struct {
 	block.ChainVM
+	bVM  block.BatchedChainVM
+	hVM  block.HeightIndexedChainVM
+	ssVM block.StateSyncableVM
+
 	activationTime      time.Time
 	minimumPChainHeight uint64
 
 	state.State
-	resetHeightIndexOngoing utils.AtomicBool
 	hIndexer                indexer.HeightIndexer
+	resetHeightIndexOngoing utils.AtomicBool
 
 	proposer.Windower
 	tree.Tree
@@ -68,29 +73,36 @@ type VM struct {
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
-	bootstrapped   bool
+	consensusState snow.State
 	context        context.Context
 	onShutdown     func()
 
-	// lastAcceptedOptionTime is set to the last accepted PostForkBlock's
-	// timestamp if the last accepted block has been a PostForkOption block
-	// since having initialized the VM.
+	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp
+	// if the last accepted block has been a PostForkOption block since having
+	// initialized the VM.
 	lastAcceptedTime time.Time
+
+	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
+	lastAcceptedHeight uint64
 }
 
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
-	resetHeightIndex bool,
 ) *VM {
-	proVM := &VM{
-		ChainVM:             vm,
+	bVM, _ := vm.(block.BatchedChainVM)
+	hVM, _ := vm.(block.HeightIndexedChainVM)
+	ssVM, _ := vm.(block.StateSyncableVM)
+	return &VM{
+		ChainVM: vm,
+		bVM:     bVM,
+		hVM:     hVM,
+		ssVM:    ssVM,
+
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 	}
-	proVM.resetHeightIndexOngoing.SetValue(resetHeightIndex)
-	return proVM
 }
 
 func (vm *VM) Initialize(
@@ -142,105 +154,11 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repairAcceptedChain(); err != nil {
+	if err := vm.repair(indexerState); err != nil {
 		return err
 	}
 
-	if err := vm.setLastAcceptedOptionTime(); err != nil {
-		return err
-	}
-
-	// check and possibly rebuild height index
-	innerHVM, ok := vm.ChainVM.(block.HeightIndexedChainVM)
-	if !ok {
-		return nil // nothing else to do
-	}
-
-	indexResetRequired, err := vm.State.GetIndexResetRequired()
-	if err != nil {
-		return fmt.Errorf("retrieving value of required index reset failed with: %w", err)
-	}
-
-	if indexResetRequired {
-		vm.resetHeightIndexOngoing.SetValue(true)
-	}
-
-	// asynchronously rebuild height index, if needed
-	go func() {
-		// If index reset has been requested, carry it out first
-		if vm.resetHeightIndexOngoing.GetValue() {
-			if err := indexerState.ResetHeightIndex(); err != nil {
-				vm.ctx.Log.Error("block height indexing reset failed with: %s", err)
-				return
-			}
-			if err := indexerState.Commit(); err != nil {
-				vm.ctx.Log.Error("block height indexing reset commit failed with: %s", err)
-				return
-			}
-			if err := vm.Commit(); err != nil {
-				vm.ctx.Log.Error("block height indexing reset atomic commit failed with: %s", err)
-				return
-			}
-
-			vm.ctx.Log.Info("block height indexing reset finished")
-			vm.resetHeightIndexOngoing.SetValue(false)
-		}
-
-		// Poll until the underlying chain's index is complete or shutdown is
-		// called.
-		ticker := time.NewTicker(checkIndexedFrequency)
-		defer ticker.Stop()
-		for {
-			// The underlying VM expects the lock to be held here.
-			vm.ctx.Lock.Lock()
-			err := innerHVM.VerifyHeightIndex()
-			vm.ctx.Lock.Unlock()
-
-			if err == nil {
-				// innerVM indexing complete. Let re-index this machine
-				break
-			}
-			if err != block.ErrIndexIncomplete {
-				vm.ctx.Log.Error("block height indexing failed with: %s", err)
-				return
-			}
-
-			// innerVM index is incomplete. Wait for completion and retry
-			select {
-			case <-vm.context.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-
-		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
-		if err != nil {
-			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
-			return
-		}
-		if !shouldRepair {
-			vm.ctx.Log.Info("block height indexing is already complete")
-			vm.hIndexer.MarkRepaired()
-			return
-		}
-
-		err = vm.hIndexer.RepairHeightIndex(vm.context)
-		if err == nil {
-			vm.ctx.Log.Info("block height indexing finished")
-			return
-		}
-
-		// Note that we don't check if `err` is `context.Canceled` here because
-		// repairing the height index may have returned a non-standard error
-		// due to the chain shutting down.
-		if vm.context.Err() == nil {
-			// The context wasn't closed, so the chain hasn't been shutdown.
-			// This must have been an unexpected error.
-			vm.ctx.Log.Error("block height indexing failed: %s", err)
-		}
-	}()
-
-	return nil
+	return vm.setLastAcceptedMetadata()
 }
 
 // shutdown ops then propagate shutdown to innerVM
@@ -253,9 +171,25 @@ func (vm *VM) Shutdown() error {
 	return vm.ChainVM.Shutdown()
 }
 
-func (vm *VM) SetState(state snow.State) error {
-	vm.bootstrapped = (state == snow.NormalOp)
-	return vm.ChainVM.SetState(state)
+func (vm *VM) SetState(newState snow.State) error {
+	if err := vm.ChainVM.SetState(newState); err != nil {
+		return err
+	}
+
+	oldState := vm.consensusState
+	vm.consensusState = newState
+	if oldState != snow.StateSyncing {
+		return nil
+	}
+
+	// When finishing StateSyncing, if state sync has failed or was skipped,
+	// repairAcceptedChainByHeight rolls back the chain to the previously last
+	// accepted block. If state sync has completed successfully, this call is a
+	// no-op.
+	if err := vm.repairAcceptedChainByHeight(); err != nil {
+		return err
+	}
+	return vm.setLastAcceptedMetadata()
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -329,7 +263,133 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	return lastAccepted, err
 }
 
-func (vm *VM) repairAcceptedChain() error {
+func (vm *VM) repair(indexerState state.State) error {
+	// check and possibly rebuild height index
+	if vm.hVM == nil {
+		return vm.repairAcceptedChainByIteration()
+	}
+
+	indexIsEmpty, err := vm.State.IsIndexEmpty()
+	if err != nil {
+		return err
+	}
+	if indexIsEmpty {
+		if err := vm.State.SetIndexHasReset(); err != nil {
+			return err
+		}
+		if err := vm.State.Commit(); err != nil {
+			return err
+		}
+	} else {
+		indexWasReset, err := vm.State.HasIndexReset()
+		if err != nil {
+			return fmt.Errorf("retrieving value of required index reset failed with: %w", err)
+		}
+
+		if !indexWasReset {
+			vm.resetHeightIndexOngoing.SetValue(true)
+		}
+	}
+
+	if !vm.resetHeightIndexOngoing.GetValue() {
+		// We are not going to wipe the height index
+		switch vm.hVM.VerifyHeightIndex() {
+		case nil:
+			// We are not going to wait for the height index to be repaired.
+			shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+			if err != nil {
+				return err
+			}
+			if !shouldRepair {
+				vm.ctx.Log.Info("block height index was successfully verified")
+				vm.hIndexer.MarkRepaired(true)
+				return vm.repairAcceptedChainByHeight()
+			}
+		case block.ErrIndexIncomplete:
+		default:
+			return err
+		}
+	}
+
+	if err := vm.repairAcceptedChainByIteration(); err != nil {
+		return err
+	}
+
+	// asynchronously rebuild height index, if needed
+	go func() {
+		// If index reset has been requested, carry it out first
+		if vm.resetHeightIndexOngoing.GetValue() {
+			vm.ctx.Log.Info("block height indexing reset started")
+
+			if err := indexerState.ResetHeightIndex(vm.ctx.Log, vm); err != nil {
+				vm.ctx.Log.Error("block height indexing reset failed with: %s", err)
+				return
+			}
+
+			vm.ctx.Log.Info("block height indexing reset finished")
+			vm.resetHeightIndexOngoing.SetValue(false)
+		}
+
+		// Poll until the underlying chain's index is complete or shutdown is
+		// called.
+		ticker := time.NewTicker(checkIndexedFrequency)
+		defer ticker.Stop()
+		for {
+			// The underlying VM expects the lock to be held here.
+			vm.ctx.Lock.Lock()
+			err := vm.hVM.VerifyHeightIndex()
+			vm.ctx.Lock.Unlock()
+
+			if err == nil {
+				// innerVM indexing complete. Let re-index this machine
+				break
+			}
+			if err != block.ErrIndexIncomplete {
+				vm.ctx.Log.Error("block height indexing failed with: %s", err)
+				return
+			}
+
+			// innerVM index is incomplete. Wait for completion and retry
+			select {
+			case <-vm.context.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+
+		vm.ctx.Lock.Lock()
+		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+		vm.ctx.Lock.Unlock()
+
+		if err != nil {
+			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
+			return
+		}
+		if !shouldRepair {
+			vm.ctx.Log.Info("block height indexing is already complete")
+			vm.hIndexer.MarkRepaired(true)
+			return
+		}
+
+		err = vm.hIndexer.RepairHeightIndex(vm.context)
+		if err == nil {
+			vm.ctx.Log.Info("block height indexing finished")
+			return
+		}
+
+		// Note that we don't check if `err` is `context.Canceled` here because
+		// repairing the height index may have returned a non-standard error
+		// due to the chain shutting down.
+		if vm.context.Err() == nil {
+			// The context wasn't closed, so the chain hasn't been shutdown.
+			// This must have been an unexpected error.
+			vm.ctx.Log.Error("block height indexing failed: %s", err)
+		}
+	}()
+	return nil
+}
+
+func (vm *VM) repairAcceptedChainByIteration() error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block isn't indexed yet, then the underlying
@@ -399,29 +459,94 @@ func (vm *VM) repairAcceptedChain() error {
 	}
 }
 
-func (vm *VM) setLastAcceptedOptionTime() error {
-	lastAcceptedID, err := vm.GetLastAccepted()
+func (vm *VM) repairAcceptedChainByHeight() error {
+	innerLastAcceptedID, err := vm.ChainVM.LastAccepted()
+	if err != nil {
+		return err
+	}
+	innerLastAccepted, err := vm.ChainVM.GetBlock(innerLastAcceptedID)
+	if err != nil {
+		return err
+	}
+	proLastAcceptedID, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
-		// If the last accepted block wasn't a PostFork block, then we don't
-		// initialize the time.
+		// If the last accepted block isn't indexed yet, then the underlying
+		// chain is the only chain and there is nothing to repair.
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	lastAccepted, _, err := vm.State.GetBlock(lastAcceptedID)
+	proLastAccepted, err := vm.getPostForkBlock(proLastAcceptedID)
 	if err != nil {
 		return err
 	}
 
-	if _, ok := lastAccepted.(statelessblock.SignedBlock); ok {
+	proLastAcceptedHeight := proLastAccepted.Height()
+	innerLastAcceptedHeight := innerLastAccepted.Height()
+	if proLastAcceptedHeight < innerLastAcceptedHeight {
+		return fmt.Errorf("proposervm height index (%d) should never be lower than the inner height index (%d)", proLastAcceptedHeight, innerLastAcceptedHeight)
+	}
+	if proLastAcceptedHeight == innerLastAcceptedHeight {
+		// There is nothing to repair - as the heights match
+		return nil
+	}
+
+	// The inner vm must be behind the proposer vm, so we must roll the proposervm back.
+	forkHeight, err := vm.State.GetForkHeight()
+	if err != nil {
+		return err
+	}
+
+	if forkHeight > innerLastAcceptedHeight {
+		// We are rolling back past the fork, so we should just forget about all of our proposervm indices.
+
+		if err := vm.State.DeleteLastAccepted(); err != nil {
+			return err
+		}
+		return vm.db.Commit()
+	}
+
+	newProLastAcceptedID, err := vm.State.GetBlockIDAtHeight(innerLastAcceptedHeight)
+	if err != nil {
+		return err
+	}
+
+	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
+		return err
+	}
+	return vm.db.Commit()
+}
+
+func (vm *VM) setLastAcceptedMetadata() error {
+	lastAcceptedID, err := vm.GetLastAccepted()
+	if err == database.ErrNotFound {
+		// If the last accepted block wasn't a PostFork block, then we don't
+		// initialize the metadata.
+		vm.lastAcceptedHeight = 0
+		vm.lastAcceptedTime = time.Time{}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	lastAccepted, err := vm.getPostForkBlock(lastAcceptedID)
+	if err != nil {
+		return err
+	}
+
+	// Set the last accepted height
+	vm.lastAcceptedHeight = lastAccepted.Height()
+
+	if _, ok := lastAccepted.getStatelessBlk().(statelessblock.SignedBlock); ok {
 		// If the last accepted block wasn't a PostForkOption, then we don't
 		// initialize the time.
 		return nil
 	}
 
-	acceptedParent, err := vm.getPostForkBlock(lastAccepted.ParentID())
+	acceptedParent, err := vm.getPostForkBlock(lastAccepted.Parent())
 	if err != nil {
 		return err
 	}

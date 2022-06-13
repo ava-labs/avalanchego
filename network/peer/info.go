@@ -13,7 +13,7 @@ import (
 type Info struct {
 	IP             string     `json:"ip"`
 	PublicIP       string     `json:"publicIP,omitempty"`
-	ID             string     `json:"nodeID"`
+	ID             ids.NodeID `json:"nodeID"`
 	Version        string     `json:"version"`
 	LastSent       time.Time  `json:"lastSent"`
 	LastReceived   time.Time  `json:"lastReceived"`
