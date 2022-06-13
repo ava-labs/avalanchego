@@ -42,6 +42,8 @@ func (c *convincer) Update() {
 	}
 	c.sent = true
 
+	// TODO: once everyone supports ChitsV2 - we should be sending that message
+	// type here.
 	pref := []ids.ID{c.consensus.Preference()}
 	c.sender.SendChits(c.vdr, c.requestID, pref)
 }
