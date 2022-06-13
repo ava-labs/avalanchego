@@ -10,14 +10,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var errUnknownBlockType = errors.New("unknown block type")
+var (
+	_ stateless.Metrics = &metrics{}
+
+	errUnknownBlockType = errors.New("unknown block type")
+)
 
 type metrics struct {
 	percentConnected       prometheus.Gauge
@@ -189,22 +194,25 @@ func (m *metrics) Initialize(
 	return errs.Err
 }
 
-func (m *metrics) AcceptBlock(b snowman.Block) error {
+func (m *metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
+func (m *metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
+
+func (m *metrics) RegisterBlock(b stateless.Block) error {
 	switch b := b.(type) {
-	case *AbortBlock:
+	case *stateless.AbortBlock:
 		m.numAbortBlocks.Inc()
-	case *AtomicBlock:
+	case *stateless.AtomicBlock:
 		m.numAtomicBlocks.Inc()
-		return m.AcceptTx(&b.Tx)
-	case *CommitBlock:
+		return m.acceptTx(&b.Tx)
+	case *stateless.CommitBlock:
 		m.numCommitBlocks.Inc()
-	case *ProposalBlock:
+	case *stateless.ProposalBlock:
 		m.numProposalBlocks.Inc()
-		return m.AcceptTx(&b.Tx)
-	case *StandardBlock:
+		return m.acceptTx(&b.Tx)
+	case *stateless.StandardBlock:
 		m.numStandardBlocks.Inc()
 		for _, tx := range b.Txs {
-			if err := m.AcceptTx(tx); err != nil {
+			if err := m.acceptTx(tx); err != nil {
 				return err
 			}
 		}
@@ -214,7 +222,7 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 	return nil
 }
 
-func (m *metrics) AcceptTx(tx *signed.Tx) error {
+func (m *metrics) acceptTx(tx *signed.Tx) error {
 	switch tx.Unsigned.(type) {
 	case *unsigned.AddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()
@@ -235,7 +243,7 @@ func (m *metrics) AcceptTx(tx *signed.Tx) error {
 	case *unsigned.RewardValidatorTx:
 		m.numRewardValidatorTxs.Inc()
 	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
+		return fmt.Errorf("%w: %T", mempool.ErrUnknownTxType, tx.Unsigned)
 	}
 	return nil
 }

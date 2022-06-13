@@ -170,7 +170,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	vm.mempool.RemoveDecisionTxs([]*signed.Tx{tx})
-	err = vm.mempool.AddVerifiedTx(tx)
+	err = vm.mempool.Add(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 
 	assert.True(gossipedBytes == nil)

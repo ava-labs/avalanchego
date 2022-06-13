@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 
 	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -33,8 +34,8 @@ const blockCacheSize = 2048
 type InternalState interface {
 	state.Content
 
-	GetBlock(blockID ids.ID) (Block, error)
-	AddBlock(block Block)
+	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
+	AddStatelessBlock(block stateless.Block, status choices.Status)
 
 	Abort()
 	Commit() error
@@ -98,13 +99,14 @@ type internalStateImpl struct {
 
 	state.State
 
-	addedBlocks map[ids.ID]Block // map of blockID -> Block
-	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
+	blockCache  cache.Cacher        // cache of blockID -> Block, if the entry is nil, it is not in the database
 	blockDB     database.Database
 }
 
 type stateBlk struct {
-	Blk    []byte         `serialize:"true"`
+	Blk    stateless.Block
+	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
 }
 
@@ -114,7 +116,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 	return &internalStateImpl{
 		vm:          vm,
 		baseDB:      baseDB,
-		addedBlocks: make(map[ids.ID]Block),
+		addedBlocks: make(map[ids.ID]stateBlk),
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 	}
 }
@@ -222,44 +224,48 @@ func NewMeteredInternalState(vm *VM, db database.Database, genesis []byte, metri
 	return is, nil
 }
 
-func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
-	if blk, exists := st.addedBlocks[blockID]; exists {
-		return blk, nil
+func (st *internalStateImpl) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+	if blkState, exists := st.addedBlocks[blockID]; exists {
+		return blkState.Blk, blkState.Status, nil
 	}
 	if blkIntf, cached := st.blockCache.Get(blockID); cached {
 		if blkIntf == nil {
-			return nil, database.ErrNotFound
+			return nil, choices.Processing, database.ErrNotFound // status does not matter here
 		}
-		return blkIntf.(Block), nil
+
+		blkState := blkIntf.(stateBlk)
+		return blkState.Blk, blkState.Status, nil
 	}
 
 	blkBytes, err := st.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		st.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
+		return nil, choices.Processing, database.ErrNotFound // status does not matter here
 	} else if err != nil {
-		return nil, err
+		return nil, choices.Processing, err // status does not matter here
 	}
 
-	blkStatus := stateBlk{}
-	if _, err := GenesisCodec.Unmarshal(blkBytes, &blkStatus); err != nil {
-		return nil, err
+	blkState := stateBlk{}
+	if _, err := stateless.Codec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, err // status does not matter here
 	}
 
-	var blk Block
-	if _, err := GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
-		return nil, err
+	statelessBlk, err := stateless.Parse(blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, err // status does not matter here
 	}
-	if err := blk.initialize(st.vm, blkStatus.Blk, blkStatus.Status, blk); err != nil {
-		return nil, err
-	}
+	blkState.Blk = statelessBlk
 
-	st.blockCache.Put(blockID, blk)
-	return blk, nil
+	st.blockCache.Put(blockID, blkState)
+	return statelessBlk, blkState.Status, nil
 }
 
-func (st *internalStateImpl) AddBlock(block Block) {
-	st.addedBlocks[block.ID()] = block
+func (st *internalStateImpl) AddStatelessBlock(block stateless.Block, status choices.Status) {
+	st.addedBlocks[block.ID()] = stateBlk{
+		Blk:    block,
+		Bytes:  block.Bytes(),
+		Status: status,
+	}
 }
 
 func (st *internalStateImpl) Abort() {
@@ -305,21 +311,20 @@ func (st *internalStateImpl) writeBlocks() (err error) {
 		}
 	}()
 
-	for blkID, blk := range st.addedBlocks {
-		var btxBytes []byte
-		blkID := blkID
+	for blkID, stateBlk := range st.addedBlocks {
+		var (
+			btxBytes []byte
+			blkID    = blkID
+			sblk     = stateBlk
+		)
 
-		sblk := stateBlk{
-			Blk:    blk.Bytes(),
-			Status: blk.Status(),
-		}
-		btxBytes, err = GenesisCodec.Marshal(CodecVersion, &sblk)
+		btxBytes, err = stateless.Codec.Marshal(stateless.Version, &sblk)
 		if err != nil {
 			return
 		}
 
 		delete(st.addedBlocks, blkID)
-		st.blockCache.Put(blkID, blk)
+		st.blockCache.Put(blkID, stateBlk)
 		if err = st.blockDB.Put(blkID[:], btxBytes); err != nil {
 			return
 		}
@@ -332,12 +337,11 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	// do genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := st.vm.newCommitBlock(genesisID, 0, true)
+	genesisBlock, err := stateless.NewCommitBlock(genesisID, 0)
 	if err != nil {
 		return err
 	}
-	genesisBlock.status = choices.Accepted
-	st.AddBlock(genesisBlock)
+	st.AddStatelessBlock(genesisBlock, choices.Accepted)
 	st.SetLastAccepted(genesisBlock.ID())
 
 	utxos, timestamp, initialSupply,

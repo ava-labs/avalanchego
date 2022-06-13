@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
@@ -32,11 +33,7 @@ func init() {
 	errs := wrappers.Errs{}
 	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
-			c.RegisterType(&ProposalBlock{}),
-			c.RegisterType(&AbortBlock{}),
-			c.RegisterType(&CommitBlock{}),
-			c.RegisterType(&StandardBlock{}),
-			c.RegisterType(&AtomicBlock{}),
+			stateless.RegisterBlockTypes(c),
 			unsigned.RegisterUnsignedTxsTypes(c),
 		)
 	}

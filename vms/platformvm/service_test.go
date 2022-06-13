@@ -12,8 +12,6 @@ import (
 
 	stdjson "encoding/json"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -268,7 +267,7 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*StandardBlock); !ok {
+	} else if blk, ok := block.(*p_block.StandardBlock); !ok {
 		t.Fatalf("should be *StandardBlock but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -364,10 +363,10 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else if err := block.Accept(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if blk, ok := block.(*ProposalBlock); ok { // For proposal blocks, commit them
+			} else if blk, ok := block.(*p_block.ProposalBlock); ok { // For proposal blocks, commit them
 				if options, err := blk.Options(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if commit, ok := options[0].(*CommitBlock); !ok {
+				} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
 					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 				} else if err := commit.Verify(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -773,17 +772,15 @@ func TestGetBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
 			service := defaultService(t)
 
-			block, err := service.vm.newStandardBlock(ids.GenerateTestID(), 1234, nil)
+			block, err := p_block.NewStandardBlock(service.vm.blkVerifier, ids.GenerateTestID(), 1234, nil)
 			if err != nil {
 				t.Fatal("couldn't create block: %w", err)
 			}
-			internalState := NewMockInternalState(ctrl)
-			internalState.EXPECT().GetBlock(block.ID()).Times(1).Return(block, nil)
 
-			service.vm.internalState = internalState
+			statelessBlk := block.StandardBlock
+			service.vm.blkVerifier.AddStatelessBlock(statelessBlk, block.Status())
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),

@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 const (
@@ -82,7 +83,7 @@ func (service *Service) GetHeight(r *http.Request, args *struct{}, response *Get
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	lastAccepted, err := service.vm.getBlock(lastAcceptedID)
+	lastAccepted, err := service.vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -1655,23 +1656,24 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	blockIntf, err := service.vm.getBlock(blockID)
+	blockIntf, err := service.vm.blkVerifier.GetStatefulBlock(blockID)
 	if err != nil {
 		return false, err
 	}
 
-	block, ok := blockIntf.(decision)
+	block, ok := blockIntf.(p_block.Decision)
 	if !ok {
-		parentBlockIntf, err := blockIntf.parentBlock()
+		parentBlkID := blockIntf.Parent()
+		parentBlockIntf, err := service.vm.GetBlock(parentBlkID)
 		if err != nil {
 			return false, err
 		}
-		block, ok = parentBlockIntf.(decision)
+		block, ok = parentBlockIntf.(p_block.Decision)
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
 	}
-	state := block.onAccept()
+	state := block.OnAccept()
 
 	tx, _, err := state.GetTx(chainID)
 	if err == database.ErrNotFound {
@@ -1923,12 +1925,12 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	block, ok := preferred.(decision)
+	block, ok := preferred.(p_block.Decision)
 	if !ok {
-		return errInvalidBlockType
+		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
 
-	onAccept := block.onAccept()
+	onAccept := block.OnAccept()
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.

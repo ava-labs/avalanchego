@@ -33,15 +33,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
@@ -63,6 +66,8 @@ const (
 
 type VM struct {
 	Factory
+	blockBuilder
+
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
@@ -70,8 +75,6 @@ type VM struct {
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
-
-	blockBuilder blockBuilder
 
 	uptimeManager uptime.Manager
 
@@ -87,9 +90,6 @@ type VM struct {
 	// ID of the preferred block
 	preferred ids.ID
 
-	// ID of the last accepted block
-	lastAcceptedID ids.ID
-
 	fx            fx.Fx
 	codecRegistry codec.Registry
 
@@ -103,13 +103,14 @@ type VM struct {
 
 	// Key: block ID
 	// Value: the block
-	currentBlocks map[ids.ID]Block
+	currentBlocks map[ids.ID]p_block.Block
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder  builder.TxBuilder
-	txExecutor executor.Executor
+	txBuilder   builder.TxBuilder
+	txExecutor  executor.Executor
+	blkVerifier p_block.Verifier
 }
 
 // Initialize this blockchain.
@@ -124,10 +125,20 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	var err error
 	ctx.Log.Verbo("initializing platform chain")
 
 	registerer := prometheus.NewRegistry()
+	vm.ctx = ctx
 	if err := ctx.Metrics.Register(registerer); err != nil {
+		return err
+	}
+
+	vm.dbManager = dbManager
+
+	vm.codecRegistry = linearcodec.NewDefault()
+	vm.fx = &secp256k1fx.Fx{}
+	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
 
@@ -136,60 +147,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Initialize the utility to parse addresses
-	vm.AddressManager = avax.NewAddressManager(ctx)
-
-	// Initialize the utility to fetch atomic UTXOs
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
-
-	vm.fx = &secp256k1fx.Fx{}
-
-	vm.ctx = ctx
-	vm.dbManager = dbManager
-
-	vm.codecRegistry = linearcodec.NewDefault()
-	if err := vm.fx.Initialize(vm); err != nil {
-		return err
-	}
-
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
-	vm.currentBlocks = make(map[ids.ID]Block)
-
-	if err := vm.blockBuilder.Initialize(vm, toEngine, registerer); err != nil {
-		return fmt.Errorf(
-			"failed to initialize the block builder: %w",
-			err,
-		)
-	}
-	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
-	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-
-	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
-	if err != nil {
-		return err
-	}
-	vm.internalState = is
-	vm.spendHandler = utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
-
-	// Initialize the utility to track validator uptimes
-	vm.uptimeManager = uptime.NewManager(is)
-	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
-
-	if err := vm.updateValidators(); err != nil {
-		return fmt.Errorf(
-			"failed to initialize validator sets: %w",
-			err,
-		)
-	}
-
-	// Create all of the chains that the database says exist
-	if err := vm.initBlockchains(); err != nil {
-		return fmt.Errorf(
-			"failed to initialize blockchains: %w",
-			err,
-		)
-	}
-
 	vm.recentlyAccepted = window.New(
 		window.Config{
 			Clock:   &vm.clock,
@@ -197,6 +155,23 @@ func (vm *VM) Initialize(
 			TTL:     recentlyAcceptedWindowTTL,
 		},
 	)
+
+	vm.rewards = reward.NewCalculator(vm.RewardConfig)
+	vm.currentBlocks = make(map[ids.ID]p_block.Block)
+	if vm.internalState, err = NewMeteredInternalState(
+		vm,
+		vm.dbManager.Current().Database,
+		genesisBytes,
+		registerer,
+	); err != nil {
+		return err
+	}
+
+	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
+	vm.spendHandler = utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
+	vm.uptimeManager = uptime.NewManager(vm.internalState)
+	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
 	vm.txBuilder = builder.NewTxBuilder(
 		vm.ctx,
@@ -220,11 +195,52 @@ func (vm *VM) Initialize(
 		vm.rewards,
 	)
 
-	vm.lastAcceptedID = is.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
+	// Note: there is a circular dependency among mempool and blkBuilder
+	// which is broken by mean of vm
+	mempool, err := mempool.NewMempool("mempool", registerer, vm)
+	if err != nil {
+		return fmt.Errorf("failed to create mempool: %w", err)
+	}
+	vm.blkVerifier = NewBlockVerifier(
+		mempool,
+		vm.internalState,
+		vm.txExecutor,
+		&vm.metrics,
+		vm.recentlyAccepted,
+	)
+
+	if err := vm.blockBuilder.Initialize(
+		mempool,
+		vm,
+		toEngine,
+		registerer,
+	); err != nil {
+		return fmt.Errorf(
+			"failed to initialize the block builder: %w",
+			err,
+		)
+	}
+	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
+
+	if err := vm.updateValidators(); err != nil {
+		return fmt.Errorf(
+			"failed to initialize validator sets: %w",
+			err,
+		)
+	}
+
+	// Create all of the chains that the database says exist
+	if err := vm.initBlockchains(); err != nil {
+		return fmt.Errorf(
+			"failed to initialize blockchains: %w",
+			err,
+		)
+	}
 
 	// Build off the most recently accepted block
-	return vm.SetPreference(vm.lastAcceptedID)
+	lastAcceptedID := vm.internalState.GetLastAccepted()
+	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+	return vm.SetPreference(lastAcceptedID)
 }
 
 // Create all chains that exist that this node validates.
@@ -352,36 +368,28 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.BuildBlock() }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	var blk Block
-	if _, err := Codec.Unmarshal(b, &blk); err != nil {
-		return nil, err
-	}
-	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
+	statelessBlk, err := stateless.Parse(b)
+	if err != nil {
 		return nil, err
 	}
 
 	// TODO: remove this to make ParseBlock stateless
-	if block, err := vm.GetBlock(blk.ID()); err == nil {
+	if block, err := vm.GetBlock(statelessBlk.ID()); err == nil {
 		// If we have seen this block before, return it with the most up-to-date
 		// info
 		return block, nil
 	}
-	return blk, nil
+
+	return p_block.MakeStateful(statelessBlk, vm.blkVerifier, choices.Processing)
 }
 
-func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) { return vm.getBlock(blkID) }
-
-func (vm *VM) getBlock(blkID ids.ID) (Block, error) {
-	// If block is in memory, return it.
-	if blk, exists := vm.currentBlocks[blkID]; exists {
-		return blk, nil
-	}
-	return vm.internalState.GetBlock(blkID)
+func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	return vm.blkVerifier.GetStatefulBlock(blkID)
 }
 
 // LastAccepted returns the block most recently accepted
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	return vm.lastAcceptedID, nil
+	return vm.internalState.GetLastAccepted(), nil
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
@@ -391,12 +399,12 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 		return nil
 	}
 	vm.preferred = blkID
-	vm.blockBuilder.ResetTimer()
+	vm.blockBuilder.ResetBlockTimer()
 	return nil
 }
 
-func (vm *VM) Preferred() (Block, error) {
-	return vm.getBlock(vm.preferred)
+func (vm *VM) Preferred() (p_block.Block, error) {
+	return vm.blkVerifier.GetStatefulBlock(vm.preferred)
 }
 
 func (vm *VM) Version() (string, error) {
@@ -565,7 +573,7 @@ func (vm *VM) GetMinimumHeight() (uint64, error) {
 
 // GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
-	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
+	lastAccepted, err := vm.GetBlock(vm.internalState.GetLastAccepted())
 	if err != nil {
 		return 0, err
 	}

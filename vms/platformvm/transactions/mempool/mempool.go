@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package mempool
 
 import (
 	"errors"
@@ -19,6 +19,10 @@ import (
 )
 
 const (
+	// TargetTxSize is the maximum number of bytes a transaction can use to be
+	// allowed into the mempool.
+	TargetTxSize = 64 * units.KiB
+
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 64
 
@@ -29,15 +33,27 @@ const (
 )
 
 var (
-	errUnknownTxType = errors.New("unknown transaction type")
-	errDuplicatedTx  = errors.New("duplicated transaction")
-	errConflictingTx = errors.New("conflicting transaction")
-	errMempoolFull   = errors.New("mempool is full")
+	ErrUnknownTxType     = errors.New("unknown transaction type")
+	ErrDuplicatedTx      = errors.New("duplicated transaction")
+	ErrConflictingTx     = errors.New("conflicting transaction")
+	ErrTxTooBig          = errors.New("tx too big")
+	ErrMempoolFull       = errors.New("mempool is full")
+	ErrCorruptedReason   = errors.New("tx validity corrupted")
+	ErrMempoolReentrancy = errors.New("mempool reentrancy")
 
 	_ Mempool = &mempool{}
 )
 
+type BlockTimer interface {
+	ResetBlockTimer()
+}
+
 type Mempool interface {
+	// we may want to be able to stop valid transactions
+	// from entering the mempool, e.g. during blocks creation
+	EnableAdding()
+	DisableAdding()
+
 	Add(tx *signed.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *signed.Tx
@@ -65,6 +81,9 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
+	// Transactions that have not been put into blocks yet
+	dropIncoming bool
+
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
@@ -77,9 +96,15 @@ type mempool struct {
 	droppedTxIDs *cache.LRU
 
 	consumedUTXOs ids.Set
+
+	blkTimer BlockTimer
 }
 
-func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, error) {
+func NewMempool(
+	namespace string,
+	registerer prometheus.Registerer,
+	blkTimer BlockTimer,
+) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "bytes_available",
@@ -125,22 +150,36 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 		unknownTxs:           unknownTxs,
 		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
+		dropIncoming:         false, // enable tx adding by default
+		blkTimer:             blkTimer,
 	}, nil
 }
 
+func (m *mempool) EnableAdding()  { m.dropIncoming = false }
+func (m *mempool) DisableAdding() { m.dropIncoming = true }
+
 func (m *mempool) Add(tx *signed.Tx) error {
+	if m.dropIncoming {
+		return ErrMempoolReentrancy
+	}
+
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
-		return errDuplicatedTx
+		return ErrDuplicatedTx
 	}
-	if txBytes := tx.Bytes(); len(txBytes) > m.bytesAvailable {
-		return errMempoolFull
+
+	txBytes := tx.Bytes()
+	if len(txBytes) > TargetTxSize {
+		return ErrTxTooBig
+	}
+	if len(txBytes) > m.bytesAvailable {
+		return ErrMempoolFull
 	}
 
 	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
-		return errConflictingTx
+		return ErrConflictingTx
 	}
 
 	switch tx.Unsigned.(type) {
@@ -153,7 +192,7 @@ func (m *mempool) Add(tx *signed.Tx) error {
 		m.AddDecisionTx(tx)
 	default:
 		m.unknownTxs.Inc()
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
+		return fmt.Errorf("%w: %T", ErrUnknownTxType, tx.Unsigned)
 	}
 
 	// Mark these UTXOs as consumed in the mempool
@@ -161,6 +200,8 @@ func (m *mempool) Add(tx *signed.Tx) error {
 
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
+
+	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 

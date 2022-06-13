@@ -40,6 +40,11 @@ type Executor interface {
 		stx *signed.Tx,
 		parentState state.Mutable,
 	) error
+
+	Ctx() *snow.Context
+	PchainConfig() *config.Config
+	Clock() *mockable.Clock
+	Bootstrapped() bool
 }
 
 func NewExecutor(
@@ -52,7 +57,7 @@ func NewExecutor(
 	timeMan uptime.Manager,
 	rewards reward.Calculator,
 ) Executor {
-	components := &components{
+	components := components{
 		cfg:          cfg,
 		ctx:          ctx,
 		bootstrapped: bootstrapped,
@@ -63,11 +68,12 @@ func NewExecutor(
 		rewards:      rewards,
 	}
 
-	pe := proposalExecutor{components: components}
-	de := decisionExecutor{components: components}
+	pe := proposalExecutor{components: &components}
+	de := decisionExecutor{components: &components}
 	ae := atomicExecutor{decisionExecutor: &de}
 
 	return &executor{
+		components:       components,
 		proposalExecutor: pe,
 		decisionExecutor: de,
 		atomicExecutor:   ae,
@@ -86,6 +92,7 @@ type components struct {
 }
 
 type executor struct {
+	components
 	proposalExecutor
 	decisionExecutor
 	atomicExecutor
@@ -116,3 +123,8 @@ func (e *executor) SemanticVerify(
 		return fmt.Errorf("tx type %T could not be semantically verified", utx)
 	}
 }
+
+func (e *executor) Ctx() *snow.Context           { return e.ctx }
+func (e *executor) PchainConfig() *config.Config { return e.cfg }
+func (e *executor) Clock() *mockable.Clock       { return e.clk }
+func (e *executor) Bootstrapped() bool           { return e.bootstrapped.GetValue() }

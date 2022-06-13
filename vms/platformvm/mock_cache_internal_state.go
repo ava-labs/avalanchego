@@ -10,7 +10,9 @@ import (
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
+	choices "github.com/ava-labs/avalanchego/snow/choices"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	stateless "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	transactions "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	signed "github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -50,18 +52,6 @@ func (m *MockInternalState) Abort() {
 func (mr *MockInternalStateMockRecorder) Abort() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Abort", reflect.TypeOf((*MockInternalState)(nil).Abort))
-}
-
-// AddBlock mocks base method.
-func (m *MockInternalState) AddBlock(block Block) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddBlock", block)
-}
-
-// AddBlock indicates an expected call of AddBlock.
-func (mr *MockInternalStateMockRecorder) AddBlock(block interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddBlock", reflect.TypeOf((*MockInternalState)(nil).AddBlock), block)
 }
 
 // AddChain mocks base method.
@@ -110,6 +100,18 @@ func (m *MockInternalState) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 func (mr *MockInternalStateMockRecorder) AddRewardUTXO(txID, utxo interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRewardUTXO", reflect.TypeOf((*MockInternalState)(nil).AddRewardUTXO), txID, utxo)
+}
+
+// AddStatelessBlock mocks base method.
+func (m *MockInternalState) AddStatelessBlock(block stateless.Block, status choices.Status) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddStatelessBlock", block, status)
+}
+
+// AddStatelessBlock indicates an expected call of AddStatelessBlock.
+func (mr *MockInternalStateMockRecorder) AddStatelessBlock(block, status interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockInternalState)(nil).AddStatelessBlock), block, status)
 }
 
 // AddSubnet mocks base method.
@@ -255,21 +257,6 @@ func (mr *MockInternalStateMockRecorder) DoneInit() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DoneInit", reflect.TypeOf((*MockInternalState)(nil).DoneInit))
 }
 
-// GetBlock mocks base method.
-func (m *MockInternalState) GetBlock(blockID ids.ID) (Block, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlock", blockID)
-	ret0, _ := ret[0].(Block)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBlock indicates an expected call of GetBlock.
-func (mr *MockInternalStateMockRecorder) GetBlock(blockID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockInternalState)(nil).GetBlock), blockID)
-}
-
 // GetChains mocks base method.
 func (m *MockInternalState) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 	m.ctrl.T.Helper()
@@ -370,6 +357,22 @@ func (m *MockInternalState) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 func (mr *MockInternalStateMockRecorder) GetStartTime(nodeID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartTime", reflect.TypeOf((*MockInternalState)(nil).GetStartTime), nodeID)
+}
+
+// GetStatelessBlock mocks base method.
+func (m *MockInternalState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
+	ret0, _ := ret[0].(stateless.Block)
+	ret1, _ := ret[1].(choices.Status)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetStatelessBlock indicates an expected call of GetStatelessBlock.
+func (mr *MockInternalStateMockRecorder) GetStatelessBlock(blockID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockInternalState)(nil).GetStatelessBlock), blockID)
 }
 
 // GetSubnets mocks base method.

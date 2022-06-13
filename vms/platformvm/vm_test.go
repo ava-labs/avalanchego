@@ -61,6 +61,7 @@ import (
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 var (
@@ -475,7 +476,7 @@ func TestGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if genesisBlock, err := vm.getBlock(genesisBlockID); err != nil {
+	if genesisBlock, err := vm.GetBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
 	} else if genesisBlock.Status() != choices.Accepted {
 		t.Fatal("genesis block should be accepted")
@@ -592,16 +593,16 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*CommitBlock)
+	commit, ok := options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
-	_, ok = options[1].(*AbortBlock)
+	_, ok = options[1].(*p_block.AbortBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
@@ -661,7 +662,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
+	blk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -725,13 +726,13 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
+	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -838,15 +839,15 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*CommitBlock)
+	commit, ok := options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -854,7 +855,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -921,21 +922,21 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*CommitBlock)
+	commit, ok := options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAccept().GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := commit.OnAccept().GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -983,15 +984,15 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*CommitBlock)
+	commit, ok := options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -999,7 +1000,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1024,15 +1025,15 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block = blk.(*ProposalBlock)
+	block = blk.(*p_block.ProposalBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*CommitBlock)
+	commit, ok = options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1040,7 +1041,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1082,12 +1083,12 @@ func TestRewardValidatorReject(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
+	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1095,7 +1096,7 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1115,18 +1116,18 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block = blk.(*ProposalBlock)
+	block = blk.(*p_block.ProposalBlock)
 	if options, err := block.Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
+	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := commit.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1168,12 +1169,12 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
+	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1181,7 +1182,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1201,18 +1202,18 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block = blk.(*ProposalBlock)
-	if options, err := blk.(*ProposalBlock).Options(); err != nil { // Assert preferences are correct
+	block = blk.(*p_block.ProposalBlock)
+	if options, err := blk.(*p_block.ProposalBlock).Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
+	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := commit.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1384,15 +1385,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block := blk.(*ProposalBlock)
+	block := blk.(*p_block.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*CommitBlock)
+	commit, ok := options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil { // Accept the block
 		t.Fatal(err)
@@ -1400,7 +1401,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1432,15 +1433,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block = blk.(*ProposalBlock)
+	block = blk.(*p_block.ProposalBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*CommitBlock)
+	commit, ok = options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1448,7 +1449,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1488,15 +1489,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block = blk.(*ProposalBlock)
+	block = blk.(*p_block.ProposalBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*CommitBlock)
+	commit, ok = options[0].(*p_block.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
+	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1504,7 +1505,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.OnAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1671,7 +1672,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	blk, err := vm.newAtomicBlock(preferredID, preferredHeight+1, tx)
+	blk, err := p_block.NewAtomicBlock(vm.blkVerifier, preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1748,7 +1749,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(firstVM.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1870,7 +1871,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(firstVM.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1999,7 +2000,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2279,7 +2280,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2300,7 +2301,12 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, *secondAdvanceTimeTx)
+	secondAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		firstOption.ID(),
+		firstOption.(p_block.Block).Height()+1,
+		*secondAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2472,15 +2478,15 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx0})
+	addSubnetBlk0, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx0})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx1})
+	addSubnetBlk1, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*signed.Tx{addSubnetTx2})
+	addSubnetBlk2, err := p_block.NewStandardBlock(vm.blkVerifier, addSubnetBlk1.ID(), preferredHeight+2, []*signed.Tx{addSubnetTx2})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2545,7 +2551,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *addValidatorTx)
+	addValidatorProposalBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk.Verify()
@@ -2556,7 +2562,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*CommitBlock)
+	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*p_block.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit.Verify()
@@ -2564,7 +2570,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that the new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit.onAccept()
+		onAccept := addValidatorProposalCommit.OnAccept()
 		pendingStakers := onAccept.PendingStakerChainState()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID)
@@ -2613,7 +2619,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
+	importBlk, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2674,7 +2680,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	advanceTimeProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeProposalBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk.Verify()
@@ -2687,7 +2693,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*CommitBlock)
+	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*p_block.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -2773,7 +2779,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, *addValidatorTx0)
+	addValidatorProposalBlk0, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx0)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk0.Verify()
@@ -2784,7 +2790,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*CommitBlock)
+	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*p_block.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -2792,7 +2798,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that first new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit0.onAccept()
+		onAccept := addValidatorProposalCommit0.OnAccept()
 		pendingStakers := onAccept.PendingStakerChainState()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
@@ -2810,7 +2816,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx0)
+	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx0)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk0.Verify()
@@ -2823,7 +2829,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*CommitBlock)
+	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*p_block.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -2831,7 +2837,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the first new validator is now in the current validator set.
 	{
-		onAccept := advanceTimeProposalCommit0.onAccept()
+		onAccept := advanceTimeProposalCommit0.OnAccept()
 		currentStakers := onAccept.CurrentStakerChainState()
 		_, err = currentStakers.GetValidator(nodeID0)
 		assert.NoError(err)
@@ -2886,7 +2892,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
+	importBlk, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2958,7 +2964,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	addValidatorProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, *addValidatorTx1)
+	addValidatorProposalBlk1, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx1)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk1.Verify()
@@ -2969,7 +2975,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*CommitBlock)
+	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*p_block.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -2977,7 +2983,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit1.onAccept()
+		onAccept := addValidatorProposalCommit1.OnAccept()
 		pendingStakers := onAccept.PendingStakerChainState()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
@@ -2995,7 +3001,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	advanceTimeProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx1)
+	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx1)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk1.Verify()
@@ -3008,7 +3014,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*CommitBlock)
+	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*p_block.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()
@@ -3016,7 +3022,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator is now in the current validator set.
 	{
-		onAccept := advanceTimeProposalCommit1.onAccept()
+		onAccept := advanceTimeProposalCommit1.OnAccept()
 		currentStakers := onAccept.CurrentStakerChainState()
 		_, err := currentStakers.GetValidator(nodeID1)
 		assert.NoError(err)
