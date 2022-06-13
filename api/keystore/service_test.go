@@ -233,16 +233,12 @@ func TestServiceExportImport(t *testing.T) {
 		s := service{ks: ks.(*keystore)}
 
 		{
-			reply := api.EmptyReply{}
-			expected := api.EmptyReply{}
-			if err := s.CreateUser(nil, &api.UserPass{
+			err := s.CreateUser(nil, &api.UserPass{
 				Username: "bob",
 				Password: strongPassword,
-			}, &reply); err != nil {
+			}, &api.EmptyReply{})
+			if err != nil {
 				t.Fatal(err)
-			}
-			if reply != expected {
-				t.Fatalf("Should have received an empty response")
 			}
 		}
 
@@ -275,54 +271,42 @@ func TestServiceExportImport(t *testing.T) {
 		newS := service{ks: newKS.(*keystore)}
 
 		{
-			reply := api.EmptyReply{}
-			expected := api.EmptyReply{}
-			if err := newS.ImportUser(nil, &ImportUserArgs{
+			err := newS.ImportUser(nil, &ImportUserArgs{
 				UserPass: api.UserPass{
 					Username: "bob",
 					Password: "",
 				},
 				User: exportReply.User,
-			}, &reply); err == nil {
+			}, &api.EmptyReply{})
+			if err == nil {
 				t.Fatal("Should have errored due to incorrect password")
-			}
-			if reply != expected {
-				t.Fatalf("Should have received an empty response")
 			}
 		}
 
 		{
-			reply := api.EmptyReply{}
-			expected := api.EmptyReply{}
-			if err := newS.ImportUser(nil, &ImportUserArgs{
+			err := newS.ImportUser(nil, &ImportUserArgs{
 				UserPass: api.UserPass{
 					Username: "",
 					Password: "strongPassword",
 				},
 				User: exportReply.User,
-			}, &reply); err == nil {
+			}, &api.EmptyReply{})
+			if err == nil {
 				t.Fatal("Should have errored due to empty username")
-			}
-			if reply != expected {
-				t.Fatalf("Should have received an empty response")
 			}
 		}
 
 		{
-			reply := api.EmptyReply{}
-			expected := api.EmptyReply{}
-			if err := newS.ImportUser(nil, &ImportUserArgs{
+			err := newS.ImportUser(nil, &ImportUserArgs{
 				UserPass: api.UserPass{
 					Username: "bob",
 					Password: strongPassword,
 				},
 				User:     exportReply.User,
 				Encoding: encoding,
-			}, &reply); err != nil {
+			}, &api.EmptyReply{})
+			if err != nil {
 				t.Fatal(err)
-			}
-			if reply != expected {
-				t.Fatalf("Should have received an empty response")
 			}
 		}
 
