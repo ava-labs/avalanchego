@@ -106,11 +106,13 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
+
+	addSubnetValidatorTx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
+	input.SigIndices[0] = input.SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err == nil {
+	addSubnetValidatorTx.syntacticallyVerified = false
+	if err = addSubnetValidatorTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because sig indices weren't unique")
 	}
 
@@ -382,11 +384,13 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove a signature
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
-		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if _, _, err = tx.UnsignedTx.(UnsignedProposalTx).Execute(vm, vm.internalState, tx); err == nil {
+
+	addSubnetValidatorTx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
+	input.SigIndices = input.SigIndices[1:]
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	addSubnetValidatorTx.syntacticallyVerified = false
+	if _, _, err = addSubnetValidatorTx.Execute(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}
 
