@@ -29,9 +29,9 @@ type StandardBlock struct {
 	*stateless.StandardBlock
 	*decisionBlock
 
-	// Inputs are the atomic Inputs that are consumed by this block's atomic
+	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transactions
-	Inputs ids.Set
+	inputs ids.Set
 }
 
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
@@ -78,7 +78,7 @@ func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
 	if sb.status == choices.Accepted {
 		return false, nil
 	}
-	if sb.Inputs.Overlaps(s) {
+	if sb.inputs.Overlaps(s) {
 		return true, nil
 	}
 	parent, err := sb.parentBlock()
@@ -118,7 +118,7 @@ func (sb *StandardBlock) Verify() error {
 	)
 
 	// clear inputs so that multiple [Verify] calls can be made
-	sb.Inputs.Clear()
+	sb.inputs.Clear()
 
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
@@ -129,11 +129,11 @@ func (sb *StandardBlock) Verify() error {
 			return err
 		}
 		// ensure it doesn't overlap with current input batch
-		if sb.Inputs.Overlaps(inputUTXOs) {
+		if sb.inputs.Overlaps(inputUTXOs) {
 			return errConflictingBatchTxs
 		}
 		// Add UTXOs to batch
-		sb.Inputs.Union(inputUTXOs)
+		sb.inputs.Union(inputUTXOs)
 
 		onAccept, err := sb.verifier.ExecuteDecision(tx, sb.onAcceptState)
 		if err != nil {
@@ -147,9 +147,9 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
-	if sb.Inputs.Len() > 0 {
+	if sb.inputs.Len() > 0 {
 		// ensure it doesnt conflict with the parent block
-		conflicts, err := parentIntf.conflicts(sb.Inputs)
+		conflicts, err := parentIntf.conflicts(sb.inputs)
 		if err != nil {
 			return err
 		}

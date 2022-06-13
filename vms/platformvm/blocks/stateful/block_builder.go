@@ -1,14 +1,12 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -17,31 +15,49 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
+	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+)
+
+var (
+	_ mempool.BlockTimer = &blockBuilder{}
+	_ BlockBuilder       = &blockBuilder{}
+
+	errEndOfTime       = errors.New("program time is suspiciously far in the future")
+	errNoPendingBlocks = errors.New("no pending blocks")
 )
 
 // TargetBlockSize is maximum number of transaction bytes to place into a
 // StandardBlock
 const TargetBlockSize = 128 * units.KiB
 
-var (
-	_ mempool.BlockTimer = &blockBuilder{}
+type BlockBuilder interface {
+	mempool.Mempool
+	mempool.BlockTimer
+	Network
 
-	errEndOfTime       = errors.New("program time is suspiciously far in the future")
-	errNoPendingBlocks = errors.New("no pending blocks")
-)
+	StartTimer()
+	SetPreference(blockID ids.ID) error
+	Preferred() (Block, error)
+	AddUnverifiedTx(tx *signed.Tx) error
+	BuildBlock() (snowman.Block, error)
+	Shutdown()
+}
 
 // blockBuilder implements a simple blockBuilder to convert txs into valid blocks
 type blockBuilder struct {
 	mempool.Mempool
+	Network
 
-	// TODO: factor out VM into separable interfaces
-	vm *VM
+	txBuilder   p_tx_builder.Builder
+	blkVerifier Verifier
+
+	// ID of the preferred block to build on top of
+	preferredBlockID ids.ID
 
 	// channel to send messages to the consensus engine
 	toEngine chan<- common.Message
@@ -50,32 +66,55 @@ type blockBuilder struct {
 	// the validator set. When it goes off ResetTimer() is called, potentially
 	// triggering creation of a new block.
 	timer *timer.Timer
-
-	// Transactions that have not been put into blocks yet
-	dropIncoming bool
 }
 
 // Initialize this builder.
-func (b *blockBuilder) Initialize(
+func NewBlockBuilder(
 	mempool mempool.Mempool,
-	vm *VM,
+	txBuilder p_tx_builder.Builder,
+	blkVerifier Verifier,
 	toEngine chan<- common.Message,
-	registerer prometheus.Registerer,
-) error {
-	b.vm = vm
-	b.toEngine = toEngine
-	b.Mempool = mempool
+	appSender common.AppSender,
+) BlockBuilder {
+	blkBuilder := &blockBuilder{
+		Mempool:     mempool,
+		txBuilder:   txBuilder,
+		blkVerifier: blkVerifier,
+		toEngine:    toEngine,
+	}
 
-	b.vm.ctx.Log.Verbo("initializing platformVM mempool")
+	blkBuilder.timer = timer.NewTimer(
+		func() {
+			blkVerifier.Ctx().Lock.Lock()
+			defer blkVerifier.Ctx().Lock.Unlock()
 
-	b.timer = timer.NewTimer(func() {
-		b.vm.ctx.Lock.Lock()
-		defer b.vm.ctx.Lock.Unlock()
+			blkBuilder.resetTimer()
+		},
+	)
 
-		b.resetTimer()
-	})
-	go b.vm.ctx.Log.RecoverAndPanic(b.timer.Dispatch)
+	blkBuilder.Network = NewNetwork(
+		blkVerifier.Ctx(),
+		blkBuilder,
+		blkVerifier.PchainConfig().ApricotPhase4Time,
+		appSender,
+	)
+	return blkBuilder
+}
+
+func (b *blockBuilder) StartTimer() { b.timer.Dispatch() }
+
+func (b *blockBuilder) SetPreference(blockID ids.ID) error {
+	if blockID == b.preferredBlockID {
+		// If the preference didn't change, then this is a noop
+		return nil
+	}
+	b.preferredBlockID = blockID
+	b.resetTimer()
 	return nil
+}
+
+func (b *blockBuilder) Preferred() (Block, error) {
+	return b.blkVerifier.GetStatefulBlock(b.preferredBlockID)
 }
 
 func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
@@ -83,26 +122,26 @@ func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	txID := tx.ID()
-	if b.Has(txID) {
+	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
 		// as if it was successfully added
 		return nil
 	}
 
 	// Get the preferred block (which we want to build off)
-	preferred, err := b.vm.Preferred()
+	preferred, err := b.Preferred()
 	if err != nil {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
-	preferredState := preferredDecision.OnAccept()
 
-	if err := b.vm.txExecutor.SemanticVerify(tx, preferredState); err != nil {
+	preferredState := preferredDecision.OnAccept()
+	if err := b.blkVerifier.SemanticVerify(tx, preferredState); err != nil {
 		b.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -110,27 +149,27 @@ func (b *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 	if err := b.Mempool.Add(tx); err != nil {
 		return err
 	}
-	return b.vm.GossipTx(tx)
+	return b.GossipTx(tx)
 }
 
 // BuildBlock builds a block to be added to consensus
 func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
-	b.dropIncoming = true
+	b.Mempool.DisableAdding()
 	defer func() {
-		b.dropIncoming = false
+		b.Mempool.EnableAdding()
 		b.resetTimer()
 	}()
 
-	b.vm.ctx.Log.Debug("starting to attempt to build a block")
+	b.blkVerifier.Ctx().Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
-	preferred, err := b.vm.Preferred()
+	preferred, err := b.Preferred()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get preferred block: %w", err)
+		return nil, err
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
@@ -138,9 +177,9 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredState := preferredDecision.OnAccept()
 
 	// Try building a standard block.
-	if b.HasDecisionTxs() {
-		txs := b.PopDecisionTxs(TargetBlockSize)
-		return p_block.NewStandardBlock(b.vm.blkVerifier, preferredID, nextHeight, txs)
+	if b.Mempool.HasDecisionTxs() {
+		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
+		return NewStandardBlock(b.blkVerifier, preferredID, nextHeight, txs)
 	}
 
 	// Try building a proposal block that rewards a staker.
@@ -149,11 +188,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldReward {
-		rewardValidatorTx, err := b.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
+		rewardValidatorTx, err := b.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(b.vm.blkVerifier, preferredID, nextHeight, *rewardValidatorTx)
+		return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *rewardValidatorTx)
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -162,64 +201,76 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldAdvanceTime {
-		advanceTimeTx, err := b.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
+		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(nextChainTime)
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(b.vm.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
+		return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
 	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); !hasProposalTxs {
-		b.vm.ctx.Log.Debug("no pending blocks to build")
+		b.blkVerifier.Ctx().Log.Debug("no pending blocks to build")
 		return nil, errNoPendingBlocks
 	}
 
 	// Get the proposal transaction that should be issued.
-	tx := b.PopProposalTx()
+	tx := b.Mempool.PopProposalTx()
 	startTime := tx.Unsigned.(timed.Tx).StartTime()
 
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
+	maxChainStartTime := preferredState.GetTimestamp().Add(p_tx.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
-		b.AddProposalTx(tx)
+		b.Mempool.AddProposalTx(tx)
 
-		advanceTimeTx, err := b.vm.txBuilder.NewAdvanceTimeTx(b.vm.clock.Time())
+		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.blkVerifier.Clock().Time())
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(b.vm.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
+		return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
 	}
 
-	return p_block.NewProposalBlock(b.vm.blkVerifier, preferredID, nextHeight, *tx)
+	return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *tx)
 }
 
-// ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
+func (b *blockBuilder) Shutdown() {
+	if b.timer == nil {
+		return
+	}
+
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	b.blkVerifier.Ctx().Lock.Unlock()
+	b.timer.Stop()
+	b.blkVerifier.Ctx().Lock.Lock()
+}
+
+// resetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
 func (b *blockBuilder) resetTimer() {
 	// If there is a pending transaction trigger building of a block with that transaction
-	if b.HasDecisionTxs() {
+	if b.Mempool.HasDecisionTxs() {
 		b.notifyBlockReady()
 		return
 	}
 
-	preferred, err := b.vm.Preferred()
+	preferred, err := b.Preferred()
 	if err != nil {
 		return
 	}
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(Decision)
 	if !ok {
 		// The preferred block should always be a decision block
-		b.vm.ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
+		b.blkVerifier.Ctx().Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
 		return
 	}
 	preferredState := preferredDecision.OnAccept()
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {
-		b.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
+		b.blkVerifier.Ctx().Log.Error("failed to fetch next staker to reward with %s", err)
 		return
 	}
 	if shouldReward {
@@ -229,7 +280,7 @@ func (b *blockBuilder) resetTimer() {
 
 	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
-		b.vm.ctx.Log.Error("failed to fetch next chain time with %s", err)
+		b.blkVerifier.Ctx().Log.Error("failed to fetch next chain time with %s", err)
 		return
 	}
 	if shouldAdvanceTime {
@@ -243,30 +294,17 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 
-	now := b.vm.clock.Time()
+	now := b.blkVerifier.Clock().Time()
 	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
-		b.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
+		b.blkVerifier.Ctx().Log.Error("couldn't get next staker change time: %s", err)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)
-	b.vm.ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
+	b.blkVerifier.Ctx().Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
 
 	// Wake up when it's time to add/remove the next validator
 	b.timer.SetTimeoutIn(waitTime)
-}
-
-// Shutdown this mempool
-func (b *blockBuilder) Shutdown() {
-	if b.timer == nil {
-		return
-	}
-
-	// There is a potential deadlock if the timer is about to execute a timeout.
-	// So, the lock must be released before stopping the timer.
-	b.vm.ctx.Lock.Unlock()
-	b.timer.Stop()
-	b.vm.ctx.Lock.Lock()
 }
 
 // getStakerToReward return the staker txID to remove from the primary network
@@ -298,7 +336,7 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time
 		return time.Time{}, false, err
 	}
 
-	now := b.vm.clock.Time()
+	now := b.blkVerifier.Clock().Time()
 	return nextStakerChangeTime, !now.Before(nextStakerChangeTime), nil
 }
 
@@ -309,13 +347,13 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time
 // popped txs are not necessarily ordered by start time.
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
-	now := b.vm.clock.Time()
-	syncTime := now.Add(executor.SyncBound)
-	for b.HasProposalTx() {
-		tx := b.PopProposalTx()
+	now := b.blkVerifier.Clock().Time()
+	syncTime := now.Add(p_tx.SyncBound)
+	for b.Mempool.HasProposalTx() {
+		tx := b.Mempool.PopProposalTx()
 		startTime := tx.Unsigned.(timed.Tx).StartTime()
 		if !startTime.Before(syncTime) {
-			b.AddProposalTx(tx)
+			b.Mempool.AddProposalTx(tx)
 			return true
 		}
 
@@ -326,8 +364,8 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 			startTime,
 		)
 
-		b.vm.blockBuilder.MarkDropped(txID, errMsg) // cache tx as dropped
-		b.vm.ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
+		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
+		b.blkVerifier.Ctx().Log.Debug("dropping tx %s: %s", txID, errMsg)
 	}
 	return false
 }
@@ -338,6 +376,6 @@ func (b *blockBuilder) notifyBlockReady() {
 	select {
 	case b.toEngine <- common.PendingTxs:
 	default:
-		b.vm.ctx.Log.Debug("dropping message to consensus engine")
+		b.blkVerifier.Ctx().Log.Debug("dropping message to consensus engine")
 	}
 }

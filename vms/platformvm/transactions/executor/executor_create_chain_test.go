@@ -368,7 +368,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				VMID:       constants.AVMID,
 				SubnetAuth: subnetAuth,
 			}
-			tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+			tx, err := signed.New(utx, unsigned.Codec, signers)
 			assert.NoError(err)
 
 			vs := state.NewVersioned(

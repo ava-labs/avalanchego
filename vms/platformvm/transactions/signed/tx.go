@@ -35,7 +35,7 @@ type Tx struct {
 	bytes []byte
 }
 
-func NewSigned(unsigned unsigned.Tx, c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) (*Tx, error) {
+func New(unsigned unsigned.Tx, c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) (*Tx, error) {
 	res := &Tx{Unsigned: unsigned}
 	return res, res.Sign(c, signers)
 }

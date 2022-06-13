@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"testing"
@@ -13,133 +13,131 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/stretchr/testify/assert"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	h := newTestHelpersCollection(t)
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-
-		vm.ctx.Lock.Unlock()
+		if err := internalStateShutdown(h); err != nil {
+			t.Fatal(err)
+		}
 	}()
+	h.ctx.Lock.Lock()
+	h.sender.SendAppGossipF = func(b []byte) error { return nil }
 
 	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	key, err := testKeyfactory.NewPrivateKey()
+	key, err := testKeyFactory.NewPrivateKey()
 	assert.NoError(err)
 
 	id := key.PublicKey().Address()
 
 	// create valid tx
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
+	addValidatorTx, err := h.txBuilder.NewAddValidatorTx(
+		h.cfg.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
 		ids.NodeID(id),
 		id,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty, // change addr
 	)
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+	err = h.BlockBuilder.AddUnverifiedTx(addValidatorTx)
 	assert.NoError(err)
 
-	addValidatorBlock, err := vm.BuildBlock()
+	addValidatorBlock, err := h.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
 
-	vm.clock.Set(validatorStartTime)
+	h.clk.Set(validatorStartTime)
 
-	firstAdvanceTimeBlock, err := vm.BuildBlock()
+	firstAdvanceTimeBlock, err := h.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, firstAdvanceTimeBlock)
 
 	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
-	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
+	firstDelegatorEndTime := firstDelegatorStartTime.Add(h.cfg.MinStakeDuration)
 
 	// create valid tx
-	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
+	addFirstDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
+		4*h.cfg.MinValidatorStake, // maximum amount of stake this delegator can provide
 		uint64(firstDelegatorStartTime.Unix()),
 		uint64(firstDelegatorEndTime.Unix()),
 		ids.NodeID(id),
-		keys[0].PublicKey().Address(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		preFundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty, // change addr
 	)
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+	err = h.BlockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
 	assert.NoError(err)
 
-	addFirstDelegatorBlock, err := vm.BuildBlock()
+	addFirstDelegatorBlock, err := h.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
 
-	vm.clock.Set(firstDelegatorStartTime)
+	h.clk.Set(firstDelegatorStartTime)
 
-	secondAdvanceTimeBlock, err := vm.BuildBlock()
+	secondAdvanceTimeBlock, err := h.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, secondAdvanceTimeBlock)
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
-	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
+	secondDelegatorEndTime := secondDelegatorStartTime.Add(h.cfg.MinStakeDuration)
 
-	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
+	h.clk.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
 
 	// create valid tx
-	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
+	addSecondDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
+		h.cfg.MinDelegatorStake,
 		uint64(secondDelegatorStartTime.Unix()),
 		uint64(secondDelegatorEndTime.Unix()),
 		ids.NodeID(id),
-		keys[0].PublicKey().Address(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[3]},
+		preFundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1], preFundedKeys[3]},
 		ids.ShortEmpty, // change addr
 	)
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
+	err = h.BlockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
 	assert.NoError(err)
 
-	addSecondDelegatorBlock, err := vm.BuildBlock()
+	addSecondDelegatorBlock, err := h.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
-	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
+	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(h.cfg.MinStakeDuration)
 
 	// create valid tx
-	addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
+	addThirdDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
+		h.cfg.MinDelegatorStake,
 		uint64(thirdDelegatorStartTime.Unix()),
 		uint64(thirdDelegatorEndTime.Unix()),
 		ids.NodeID(id),
-		keys[0].PublicKey().Address(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[4]},
+		preFundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
 		ids.ShortEmpty, // change addr
 	)
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+	err = h.BlockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
 	assert.Error(err, "should have marked the delegator as being over delegated")
 }
 
@@ -185,130 +183,129 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _ := defaultVM()
-			vm.ApricotPhase3Time = test.ap3Time
-
-			vm.ctx.Lock.Lock()
+			h := newTestHelpersCollection(t)
 			defer func() {
-				err := vm.Shutdown()
-				assert.NoError(err)
-
-				vm.ctx.Lock.Unlock()
+				if err := internalStateShutdown(h); err != nil {
+					t.Fatal(err)
+				}
 			}()
+			h.ctx.Lock.Lock()
+			h.cfg.ApricotPhase3Time = test.ap3Time
+			h.sender.SendAppGossipF = func(b []byte) error { return nil }
 
-			key, err := testKeyfactory.NewPrivateKey()
+			key, err := testKeyFactory.NewPrivateKey()
 			assert.NoError(err)
 
 			id := key.PublicKey().Address()
-			changeAddr := keys[0].PublicKey().Address()
+			changeAddr := preFundedKeys[0].PublicKey().Address()
 
 			// create valid tx
-			addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+			addValidatorTx, err := h.txBuilder.NewAddValidatorTx(
 				validatorStake,
 				uint64(validatorStartTime.Unix()),
 				uint64(validatorEndTime.Unix()),
 				ids.NodeID(id),
 				id,
 				reward.PercentDenominator,
-				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				changeAddr,
 			)
 			assert.NoError(err)
 
 			// issue the add validator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+			err = h.BlockBuilder.AddUnverifiedTx(addValidatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the validator tx
-			addValidatorBlock, err := vm.BuildBlock()
+			addValidatorBlock, err := h.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
 
 			// create valid tx
-			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+			addFirstDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
 				delegator1Stake,
 				uint64(delegator1StartTime.Unix()),
 				uint64(delegator1EndTime.Unix()),
 				ids.NodeID(id),
-				keys[0].PublicKey().Address(),
-				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				preFundedKeys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				changeAddr,
 			)
 			assert.NoError(err)
 
 			// issue the first add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+			err = h.BlockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the first add delegator tx
-			addFirstDelegatorBlock, err := vm.BuildBlock()
+			addFirstDelegatorBlock, err := h.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
 
 			// create valid tx
-			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+			addSecondDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
 				delegator2Stake,
 				uint64(delegator2StartTime.Unix()),
 				uint64(delegator2EndTime.Unix()),
 				ids.NodeID(id),
-				keys[0].PublicKey().Address(),
-				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				preFundedKeys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				changeAddr,
 			)
 			assert.NoError(err)
 
 			// issue the second add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
+			err = h.BlockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the second add delegator tx
-			addSecondDelegatorBlock, err := vm.BuildBlock()
+			addSecondDelegatorBlock, err := h.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
 
 			// create valid tx
-			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+			addThirdDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
 				delegator3Stake,
 				uint64(delegator3StartTime.Unix()),
 				uint64(delegator3EndTime.Unix()),
 				ids.NodeID(id),
-				keys[0].PublicKey().Address(),
-				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				preFundedKeys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				changeAddr,
 			)
 			assert.NoError(err)
 
 			// issue the third add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+			err = h.BlockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the third add delegator tx
-			addThirdDelegatorBlock, err := vm.BuildBlock()
+			addThirdDelegatorBlock, err := h.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addThirdDelegatorBlock)
 
 			// create valid tx
-			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+			addFourthDelegatorTx, err := h.txBuilder.NewAddDelegatorTx(
 				delegator4Stake,
 				uint64(delegator4StartTime.Unix()),
 				uint64(delegator4EndTime.Unix()),
 				ids.NodeID(id),
-				keys[0].PublicKey().Address(),
-				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				preFundedKeys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				changeAddr,
 			)
 			assert.NoError(err)
 
 			// issue the fourth add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
+			err = h.BlockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx
-			addFourthDelegatorBlock, err := vm.BuildBlock()
+			addFourthDelegatorBlock, err := h.BuildBlock()
 
 			if test.shouldFail {
 				assert.Error(err, "should have failed to allow new delegator")
@@ -328,15 +325,15 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Bl
 	assert.NoError(err)
 
 	// Assert preferences are correct
-	proposalBlk := blk.(*p_block.ProposalBlock)
+	proposalBlk := blk.(*ProposalBlock)
 	options, err := proposalBlk.Options()
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*p_block.AbortBlock)
+	abort, ok := options[1].(*AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	err = commit.Verify()

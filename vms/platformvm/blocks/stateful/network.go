@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"fmt"
@@ -9,11 +9,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
+
+var _ Network = &network{}
 
 const (
 	// We allow [recentCacheSize] to be fairly large because we only store hashes
@@ -21,27 +24,36 @@ const (
 	recentCacheSize = 512
 )
 
+type Network interface {
+	common.AppHandler
+	GossipTx(tx *signed.Tx) error
+	SetActivationTime(time.Time)
+}
+
 type network struct {
-	log logging.Logger
+	ctx        *snow.Context
+	blkBuilder BlockBuilder
+
 	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            common.AppSender
-	mempool              *blockBuilder
-	vm                   *VM
 	recentTxs            *cache.LRU
 }
 
-func newNetwork(activationTime time.Time, appSender common.AppSender, vm *VM) *network {
-	n := &network{
-		log:                  vm.ctx.Log,
+func NewNetwork(
+	ctx *snow.Context,
+	blkBuilder *blockBuilder,
+	activationTime time.Time,
+	appSender common.AppSender,
+) Network {
+	return &network{
+		ctx:        ctx,
+		blkBuilder: blkBuilder,
+
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
-		mempool:              &vm.blockBuilder,
-		vm:                   vm,
 		recentTxs:            &cache.LRU{Size: recentCacheSize},
 	}
-
-	return n
 }
 
 func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
@@ -63,52 +75,52 @@ func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []by
 }
 
 func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
-	n.log.Debug(
+	n.ctx.Log.Debug(
 		"AppGossip message handler called from %s with %d bytes",
 		nodeID,
 		len(msgBytes),
 	)
 
 	if time.Now().Before(n.gossipActivationTime) {
-		n.log.Debug("AppGossip message called before activation time")
+		n.ctx.Log.Debug("AppGossip message called before activation time")
 		return nil
 	}
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
-		n.log.Debug("dropping AppGossip message due to failing to parse message")
+		n.ctx.Log.Debug("dropping AppGossip message due to failing to parse message")
 		return nil
 	}
 
 	msg, ok := msgIntf.(*message.Tx)
 	if !ok {
-		n.log.Debug(
+		n.ctx.Log.Debug(
 			"dropping unexpected message from %s",
 			nodeID,
 		)
 		return nil
 	}
 
-	tx, err := signed.FromBytes(Codec, msg.Tx)
+	tx, err := signed.FromBytes(unsigned.Codec, msg.Tx)
 	if err != nil {
-		n.log.Warn("failed building signed tx from bytes: %s", err)
+		n.ctx.Log.Warn("failed building signed tx from bytes: %s", err)
 		return nil
 	}
 	txID := tx.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
-	n.vm.ctx.Lock.Lock()
-	defer n.vm.ctx.Lock.Unlock()
+	n.ctx.Lock.Lock()
+	defer n.ctx.Lock.Unlock()
 
-	if _, dropped := n.mempool.GetDropReason(txID); dropped {
+	if _, dropped := n.blkBuilder.GetDropReason(txID); dropped {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
 
 	// add to mempool
-	if err = n.mempool.AddUnverifiedTx(tx); err != nil {
-		n.log.Debug(
+	if err = n.blkBuilder.AddUnverifiedTx(tx); err != nil {
+		n.ctx.Log.Debug(
 			"AppResponse failed AddUnverifiedTx from %s with: %s",
 			nodeID,
 			err,
@@ -125,7 +137,7 @@ func (n *network) GossipTx(tx *signed.Tx) error {
 	}
 	n.recentTxs.Put(txID, nil)
 
-	n.log.Debug("gossiping tx %s", txID)
+	n.ctx.Log.Debug("gossiping tx %s", txID)
 
 	msg := &message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(msg)
@@ -134,3 +146,5 @@ func (n *network) GossipTx(tx *signed.Tx) error {
 	}
 	return n.appSender.SendAppGossip(msgBytes)
 }
+
+func (n *network) SetActivationTime(t time.Time) { n.gossipActivationTime = t }

@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
@@ -46,8 +45,10 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
+	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	tx_state "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
+	p_utils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var (
@@ -67,29 +68,21 @@ const (
 
 type VM struct {
 	Factory
-	blockBuilder
+	p_block.BlockBuilder
 
-	metrics
-	avax.AddressManager
-	avax.AtomicUTXOManager
-	*network
+	metrics *p_metrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
-
-	uptimeManager uptime.Manager
-
-	rewards reward.Calculator
 
 	// The context of this vm
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	internalState state.State
-	spendHandler  utxos.SpendHandler
+	atomicUtxosManager avax.AtomicUTXOManager
+	uptimeManager      uptime.Manager
 
-	// ID of the preferred block
-	preferred ids.ID
+	internalState state.State
 
 	fx            fx.Fx
 	codecRegistry codec.Registry
@@ -102,16 +95,11 @@ type VM struct {
 	// Value: cache mapping height -> validator set map
 	validatorSetCaches map[ids.ID]cache.Cacher
 
-	// Key: block ID
-	// Value: the block
-	currentBlocks map[ids.ID]p_block.Block
-
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder   builder.TxBuilder
-	txExecutor  executor.Executor
 	blkVerifier p_block.Verifier
+	txBuilder   p_tx_builder.Builder
 }
 
 // Initialize this blockchain.
@@ -144,7 +132,8 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize metrics as soon as possible
-	if err := vm.metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
+	vm.metrics, err = p_metrics.NewMetrics("", registerer, vm.WhitelistedSubnets)
+	if err != nil {
 		return err
 	}
 
@@ -157,47 +146,46 @@ func (vm *VM) Initialize(
 		},
 	)
 
-	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-	vm.currentBlocks = make(map[ids.ID]p_block.Block)
+	rewards := reward.NewCalculator(vm.RewardConfig)
+
 	if vm.internalState, err = state.NewMetered(
 		vm.dbManager.Current().Database,
 		registerer,
 		&vm.Config,
 		vm.ctx,
-		vm.metrics.localStake,
-		vm.metrics.totalStake,
-		vm.rewards,
+		vm.metrics.LocalStake,
+		vm.metrics.TotalStake,
+		rewards,
 		genesisBytes,
 	); err != nil {
 		return err
 	}
 
-	vm.AddressManager = avax.NewAddressManager(ctx)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
-	vm.spendHandler = utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
+	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
+	spendHandler := utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.internalState)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
-	vm.txBuilder = builder.NewTxBuilder(
+	vm.txBuilder = p_tx_builder.New(
 		vm.ctx,
 		vm.Config,
 		vm.clock,
 		vm.fx,
 		vm.internalState,
-		vm.AtomicUTXOManager,
-		vm.spendHandler,
-		vm.rewards,
+		vm.atomicUtxosManager,
+		spendHandler,
+		rewards,
 	)
 
-	vm.txExecutor = executor.NewExecutor(
+	txExecutor := executor.NewExecutor(
 		&vm.Config,
 		vm.ctx,
 		&vm.bootstrapped,
 		&vm.clock,
 		vm.fx,
-		vm.spendHandler,
+		spendHandler,
 		vm.uptimeManager,
-		vm.rewards,
+		rewards,
 	)
 
 	// Note: there is a circular dependency among mempool and blkBuilder
@@ -206,45 +194,39 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
-	vm.blkVerifier = NewBlockVerifier(
+	vm.blkVerifier = p_block.NewBlockVerifier(
 		mempool,
 		vm.internalState,
-		vm.txExecutor,
-		&vm.metrics,
+		txExecutor,
+		vm.metrics,
 		vm.recentlyAccepted,
 	)
-
-	if err := vm.blockBuilder.Initialize(
+	vm.BlockBuilder = p_block.NewBlockBuilder(
 		mempool,
-		vm,
+		vm.txBuilder,
+		vm.blkVerifier,
 		toEngine,
-		registerer,
-	); err != nil {
-		return fmt.Errorf(
-			"failed to initialize the block builder: %w",
-			err,
-		)
-	}
-	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
+		appSender,
+	)
+
+	go vm.ctx.Log.RecoverAndPanic(vm.BlockBuilder.StartTimer)
 
 	if err := vm.updateValidators(); err != nil {
-		return fmt.Errorf(
-			"failed to initialize validator sets: %w",
-			err,
-		)
+		return fmt.Errorf("failed to Initialize validator sets: %w", err)
 	}
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {
 		return fmt.Errorf(
-			"failed to initialize blockchains: %w",
+			"failed to Initialize blockchains: %w",
 			err,
 		)
 	}
 
-	// Build off the most recently accepted block
 	lastAcceptedID := vm.internalState.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+
+	// Build off the most recently accepted block
 	return vm.SetPreference(lastAcceptedID)
 }
 
@@ -281,7 +263,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		return err
 	}
 	for _, chain := range chains {
-		if err := platformutils.CreateChain(vm.Config, chain.Unsigned, chain.ID()); err != nil {
+		if err := p_utils.CreateChain(vm.Config, chain.Unsigned, chain.ID()); err != nil {
 			return err
 		}
 	}
@@ -339,7 +321,7 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.blockBuilder.Shutdown()
+	vm.BlockBuilder.Shutdown()
 
 	if vm.bootstrapped.GetValue() {
 		primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -369,9 +351,6 @@ func (vm *VM) Shutdown() error {
 	return errs.Err
 }
 
-// BuildBlock builds a block to be added to consensus
-func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.BuildBlock() }
-
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	statelessBlk, err := stateless.Parse(b)
 	if err != nil {
@@ -399,17 +378,11 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
-	if blkID == vm.preferred {
-		// If the preference didn't change, then this is a noop
-		return nil
-	}
-	vm.preferred = blkID
-	vm.blockBuilder.ResetBlockTimer()
-	return nil
+	return vm.BlockBuilder.SetPreference(blkID)
 }
 
 func (vm *VM) Preferred() (p_block.Block, error) {
-	return vm.blkVerifier.GetStatefulBlock(vm.preferred)
+	return vm.BlockBuilder.Preferred()
 }
 
 func (vm *VM) Version() (string, error) {
@@ -423,9 +396,12 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptRequest)
-	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterRequest)
-	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
+	server.RegisterInterceptFunc(vm.metrics.APIRequestMetrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.APIRequestMetrics.AfterRequest)
+	if err := server.RegisterService(&Service{
+		vm:          vm,
+		addrManager: avax.NewAddressManager(vm.ctx),
+	}, "platform"); err != nil {
 		return nil, err
 	}
 
@@ -483,7 +459,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 		if !ok {
 			return nil, errWrongCacheType
 		}
-		vm.metrics.validatorSetsCached.Inc()
+		vm.metrics.ValidatorSetsCached.Inc()
 		return validatorSet, nil
 	}
 
@@ -500,7 +476,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, txstate.ErrNotEnoughValidators
+		return nil, tx_state.ErrNotEnoughValidators
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -543,9 +519,9 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 	validatorSetsCache.Put(height, vdrSet)
 
 	endTime := vm.Clock().Time()
-	vm.metrics.validatorSetsCreated.Inc()
-	vm.metrics.validatorSetsDuration.Add(float64(endTime.Sub(startTime)))
-	vm.metrics.validatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
+	vm.metrics.ValidatorSetsCreated.Inc()
+	vm.metrics.ValidatorSetsDuration.Add(float64(endTime.Sub(startTime)))
+	vm.metrics.ValidatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
 	return vdrSet, nil
 }
 
@@ -578,7 +554,8 @@ func (vm *VM) GetMinimumHeight() (uint64, error) {
 
 // GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
-	lastAccepted, err := vm.GetBlock(vm.internalState.GetLastAccepted())
+	lastAcceptedID := vm.internalState.GetLastAccepted()
+	lastAccepted, err := vm.blkVerifier.GetStatefulBlock(lastAcceptedID)
 	if err != nil {
 		return 0, err
 	}
@@ -596,8 +573,8 @@ func (vm *VM) updateValidators() error {
 	}
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.localStake.Set(float64(weight))
-	vm.totalStake.Set(float64(primaryValidators.Weight()))
+	vm.metrics.LocalStake.Set(float64(weight))
+	vm.metrics.TotalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)

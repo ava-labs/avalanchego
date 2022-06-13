@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
+	tx_state "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 )
 
 var (
@@ -32,7 +32,7 @@ var (
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func ConsumeInputs(
-	utxoDB txstate.UTXODeleter,
+	utxoDB tx_state.UTXODeleter,
 	ins []*avax.TransferableInput,
 ) {
 	for _, input := range ins {
@@ -43,7 +43,7 @@ func ConsumeInputs(
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
 func ProduceOutputs(
-	utxoDB txstate.UTXOAdder,
+	utxoDB tx_state.UTXOAdder,
 	txID ids.ID,
 	assetID ids.ID,
 	outs []*avax.TransferableOutput,
@@ -90,7 +90,7 @@ type SpendingOps interface {
 
 	// authorize an operation on behalf of the named subnet with the provided keys.
 	Authorize(
-		vs txstate.Mutable,
+		vs tx_state.Mutable,
 		subnetID ids.ID,
 		keys []*crypto.PrivateKeySECP256K1R,
 	) (
@@ -109,7 +109,7 @@ type SpendHandler interface {
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
 	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpend(
-		utxoDB txstate.UTXOGetter,
+		utxoDB tx_state.UTXOGetter,
 		tx unsigned.Tx,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
@@ -396,7 +396,7 @@ func (h *handler) Stake(
 }
 
 func (h *handler) Authorize(
-	vs txstate.Mutable,
+	vs tx_state.Mutable,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -439,7 +439,7 @@ func (h *handler) Authorize(
 }
 
 func (h *handler) SemanticVerifySpend(
-	utxoDB txstate.UTXOGetter,
+	utxoDB tx_state.UTXOGetter,
 	tx unsigned.Tx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,

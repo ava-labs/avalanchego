@@ -88,7 +88,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 		GenesisData: []byte{'g', 'e', 'n', 'D', 'a', 't', 'a'},
 		SubnetAuth:  &secp256k1fx.Input{SigIndices: []uint32{1}},
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	tx, err := signed.New(utx, unsigned.Codec, nil)
 	assert.NoError(err)
 
 	// shortcut to simulated almost filled mempool

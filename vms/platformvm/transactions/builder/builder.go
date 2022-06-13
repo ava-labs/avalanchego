@@ -21,12 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
-	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
-	_ TxBuilder = &builder{}
+	_ Builder = &builder{}
 
 	errNoFunds = errors.New("no spendable funds were found")
 )
@@ -34,7 +35,7 @@ var (
 // Max number of items allowed in a page
 const MaxPageSize = 1024
 
-type TxBuilder interface {
+type Builder interface {
 	AtomicTxBuilder
 	DecisionsTxBuilder
 	ProposalsTxBuilder
@@ -161,7 +162,7 @@ type ProposalsTxBuilder interface {
 	NewRewardValidatorTx(txID ids.ID) (*signed.Tx, error)
 }
 
-func NewTxBuilder(
+func New(
 	ctx *snow.Context,
 	cfg config.Config,
 	clk mockable.Clock,
@@ -170,7 +171,7 @@ func NewTxBuilder(
 	atoUtxosMan avax.AtomicUTXOManager,
 	spendingOps utxos.SpendingOps,
 	rewards reward.Calculator,
-) TxBuilder {
+) Builder {
 	return &builder{
 		AtomicUTXOManager: atoUtxosMan,
 		SpendingOps:       spendingOps,
@@ -280,7 +281,7 @@ func (b *builder) NewImportTx(
 		SourceChain:    from,
 		ImportedInputs: importedInputs,
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +325,7 @@ func (b *builder) NewExportTx(
 			},
 		}},
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +372,7 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +408,7 @@ func (b *builder) NewCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +451,7 @@ func (b *builder) NewAddValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +492,7 @@ func (b *builder) NewAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +538,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := signed.New(utx, unsigned.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +547,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 
 func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*signed.Tx, error) {
 	utx := &unsigned.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	tx, err := signed.New(utx, unsigned.Codec, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +556,7 @@ func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*signed.Tx, error) {
 
 func (b *builder) NewRewardValidatorTx(txID ids.ID) (*signed.Tx, error) {
 	utx := &unsigned.RewardValidatorTx{TxID: txID}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, nil)
+	tx, err := signed.New(utx, unsigned.Codec, nil)
 	if err != nil {
 		return nil, err
 	}

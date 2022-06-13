@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -35,6 +34,7 @@ import (
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 var (
@@ -62,7 +62,7 @@ var (
 )
 
 func defaultService(t *testing.T) *Service {
-	vm, _, _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
@@ -70,7 +70,10 @@ func defaultService(t *testing.T) *Service {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}
+	return &Service{
+		vm:          vm,
+		addrManager: avax.NewAddressManager(vm.ctx),
+	}
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -81,7 +84,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk, err := testKeyfactory.ToPrivateKey(testPrivateKey)
+	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,17 +232,22 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
+	oldAtomicUTXOManager := service.vm.atomicUtxosManager
 	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
 
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.AtomicUTXOManager)
-
-	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
+	service.vm.atomicUtxosManager = newAtomicUTXOManager
+	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.atomicUtxosManager)
+	tx, err := service.vm.txBuilder.NewImportTx(
+		xChainID,
+		ids.ShortEmpty,
+		[]*crypto.PrivateKeySECP256K1R{recipientKey},
+		ids.ShortEmpty,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
+	service.vm.atomicUtxosManager = oldAtomicUTXOManager
+	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.atomicUtxosManager)
 
 	var (
 		arg  = &GetTxStatusArgs{TxID: tx.ID()}
@@ -256,14 +264,15 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have errored because of missing funds")
 	}
 
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
+	service.vm.atomicUtxosManager = newAtomicUTXOManager
+	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.atomicUtxosManager)
 	service.vm.ctx.SharedMemory = sm
 
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -355,7 +364,7 @@ func TestGetTx(t *testing.T) {
 			var response api.GetTxReply
 			if err := service.GetTx(nil, arg, &response); err == nil {
 				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
-			} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+			} else if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else if block, err := service.vm.BuildBlock(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -535,7 +544,7 @@ func TestGetStake(t *testing.T) {
 	assert.NoError(err)
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
-	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
@@ -597,14 +606,14 @@ func TestGetStake(t *testing.T) {
 
 // Test method GetCurrentValidators
 func TestGetCurrentValidators(t *testing.T) {
-	service := defaultService(t)
-	defaultAddress(t, service)
-	service.vm.ctx.Lock.Lock()
+	srvc := defaultService(t)
+	defaultAddress(t, srvc)
+	srvc.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := srvc.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.ctx.Lock.Unlock()
+		srvc.vm.ctx.Lock.Unlock()
 	}()
 
 	genesis, _ := defaultGenesis()
@@ -613,7 +622,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
-	err := service.GetCurrentValidators(nil, &args, &response)
+	err := srvc.GetCurrentValidators(nil, &args, &response)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -657,12 +666,11 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmt := srvc.vm.MinDelegatorStake + 12345
 	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
-
-	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+	tx, err := srvc.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmt,
 		delegatorStartTime,
 		delegatorEndTime,
@@ -675,20 +683,20 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service.vm.internalState.AddCurrentStaker(tx, 0)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
+	srvc.vm.internalState.AddCurrentStaker(tx, 0)
+	srvc.vm.internalState.AddTx(tx, status.Committed)
+	err = srvc.vm.internalState.Commit()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = service.vm.internalState.Load()
+	err = srvc.vm.internalState.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Call getCurrentValidators
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
-	err = service.GetCurrentValidators(nil, &args, &response)
+	err = srvc.GetCurrentValidators(nil, &args, &response)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -772,6 +780,7 @@ func TestGetBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// ctrl := gomock.NewController(t)
 			service := defaultService(t)
 
 			block, err := p_block.NewStandardBlock(service.vm.blkVerifier, ids.GenerateTestID(), 1234, nil)

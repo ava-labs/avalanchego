@@ -32,11 +32,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
+
+	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 )
 
 var (
@@ -64,7 +65,7 @@ type testHelpersCollection struct {
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	utxosMan       utxos.SpendHandler
-	txBuilder      builder.TxBuilder
+	txBuilder      tx_builder.Builder
 }
 
 // TODO: snLookup currently duplicated in vm_test.go. Remove duplication
@@ -103,7 +104,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, unsigned.Codec)
 	utxosMan := utxos.NewHandler(ctx, clk, tState, fx)
 
-	txBuilder := builder.NewTxBuilder(
+	txBuilder := tx_builder.New(
 		ctx, cfg, clk, fx,
 		tState, atomicUtxosMan,
 		utxosMan, rewardsCalc)

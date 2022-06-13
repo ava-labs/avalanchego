@@ -70,7 +70,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				}},
 				Owner: &secp256k1fx.OutputOwners{},
 			}
-			tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+			tx, err := signed.New(utx, unsigned.Codec, signers)
 			assert.NoError(err)
 
 			vs := state.NewVersioned(
