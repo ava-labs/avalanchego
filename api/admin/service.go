@@ -215,7 +215,6 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 			}
 		}
 	}
-
 	return nil
 }
 
