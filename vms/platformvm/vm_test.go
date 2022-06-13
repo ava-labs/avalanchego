@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -2716,11 +2717,16 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := NewMeteredInternalState(
-		vm,
+	rewards := reward.NewCalculator(vm.RewardConfig)
+	is, err := state.NewMetered(
 		vm.dbManager.Current().Database,
-		nil,
 		prometheus.NewRegistry(),
+		&vm.Config,
+		vm.ctx,
+		vm.metrics.localStake,
+		vm.metrics.totalStake,
+		rewards,
+		nil, // test does not need syncing genesis
 	)
 	assert.NoError(err)
 	vm.internalState = is
@@ -3056,11 +3062,16 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := NewMeteredInternalState(
-		vm,
+	rewards := reward.NewCalculator(vm.RewardConfig)
+	is, err := state.NewMetered(
 		vm.dbManager.Current().Database,
-		nil,
 		prometheus.NewRegistry(),
+		&vm.Config,
+		vm.ctx,
+		vm.metrics.localStake,
+		vm.metrics.totalStake,
+		rewards,
+		nil, // test does not need syncing genesis
 	)
 	assert.NoError(err)
 	vm.internalState = is

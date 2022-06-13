@@ -43,8 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
-
-	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var (
@@ -200,18 +198,17 @@ func defaultState(
 		Help:      "Total amount of AVAX staked",
 	})
 
-	tState := state.New(baseDB, cfg, ctx,
-		dummyLocalStake, dummyTotalStake,
-		rewardsCalc)
-
-	// setup initial data as if we are storing genesis
-	initializeState(tState, ctx)
-
-	// persist and reload to init a bunch of in-memory stuff
-	if err := tState.Write(); err != nil {
-		panic(err)
-	}
-	if err := tState.Load(); err != nil {
+	genesisBytes := buildGenesisTest(ctx)
+	tState, err := state.New(
+		baseDB,
+		cfg,
+		ctx,
+		dummyLocalStake,
+		dummyTotalStake,
+		rewardsCalc,
+		genesisBytes,
+	)
+	if err != nil {
 		panic(err)
 	}
 	return tState
@@ -320,26 +317,6 @@ func defaultKeys() []*crypto.PrivateKeySECP256K1R {
 		res = append(res, pk.(*crypto.PrivateKeySECP256K1R))
 	}
 	return res
-}
-
-func initializeState(tState state.State, ctx *snow.Context) {
-	genesisBytes := buildGenesisTest(ctx)
-	utxos, timestamp, initialSupply,
-		validators, chains, err := p_genesis.ExtractGenesisContent(genesisBytes)
-	if err != nil {
-		panic(err)
-	}
-	dummyGenID := ids.ID{'g', 'e', 'n', 'I', 'D'}
-	if err := tState.SyncGenesis(
-		dummyGenID,
-		timestamp,
-		initialSupply,
-		utxos,
-		validators,
-		chains,
-	); err != nil {
-		panic(err)
-	}
 }
 
 func buildGenesisTest(ctx *snow.Context) []byte {

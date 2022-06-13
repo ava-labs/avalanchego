@@ -4,12 +4,9 @@
 package stateful
 
 import (
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
 
 	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
@@ -17,17 +14,9 @@ import (
 
 type Verifier interface {
 	mempool.Mempool
+	state.State
 	p_tx.Executor
 	stateless.Metrics
-
-	metadata.Content
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	AddStatelessBlock(block stateless.Block, status choices.Status)
-	StateContentForApply() state.Content
-	GetMutableState() state.Mutable
-	Abort()
-	Commit() error
-	CommitBatch() (database.Batch, error)
 
 	GetStatefulBlock(blkID ids.ID) (Block, error)
 	CacheVerifiedBlock(Block)

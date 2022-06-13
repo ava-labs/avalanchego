@@ -47,7 +47,7 @@ func (ddb *doubleDecisionBlock) updateState() error {
 	}
 
 	// Update the state of the chain in the database
-	ddb.onAcceptState.Apply(ddb.verifier.StateContentForApply())
+	ddb.onAcceptState.Apply(ddb.verifier)
 	if err := ddb.verifier.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}

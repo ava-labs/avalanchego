@@ -22,12 +22,12 @@ func (d *decisionBlock) free() {
 }
 
 func (d *decisionBlock) setBaseState() {
-	d.onAcceptState.SetBase(d.verifier.GetMutableState())
+	d.onAcceptState.SetBase(d.verifier)
 }
 
 func (d *decisionBlock) OnAccept() state.Mutable {
 	if d.Status().Decided() || d.onAcceptState == nil {
-		return d.verifier.GetMutableState()
+		return d.verifier
 	}
 	return d.onAcceptState
 }

@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
@@ -84,7 +85,7 @@ type VM struct {
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	internalState InternalState
+	internalState state.State
 	spendHandler  utxos.SpendHandler
 
 	// ID of the preferred block
@@ -158,11 +159,15 @@ func (vm *VM) Initialize(
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 	vm.currentBlocks = make(map[ids.ID]p_block.Block)
-	if vm.internalState, err = NewMeteredInternalState(
-		vm,
+	if vm.internalState, err = state.NewMetered(
 		vm.dbManager.Current().Database,
-		genesisBytes,
 		registerer,
+		&vm.Config,
+		vm.ctx,
+		vm.metrics.localStake,
+		vm.metrics.totalStake,
+		vm.rewards,
+		genesisBytes,
 	); err != nil {
 		return err
 	}

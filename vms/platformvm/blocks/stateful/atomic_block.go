@@ -175,7 +175,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	ab.onAcceptState.Apply(ab.verifier.StateContentForApply())
+	ab.onAcceptState.Apply(ab.verifier)
 
 	defer ab.verifier.Abort()
 	batch, err := ab.verifier.CommitBatch()

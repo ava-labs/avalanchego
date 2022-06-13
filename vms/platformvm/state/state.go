@@ -4,17 +4,23 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/prometheus/client_golang/prometheus"
+
+	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
+
+var _ State = &state{}
 
 // Mutable interface collects all methods updating
 // metadata and transactions state upon blocks execution
@@ -27,6 +33,7 @@ type Mutable interface {
 // all metadata and transactions state. Note this Content
 // is a superset of Mutable
 type Content interface {
+	blocks.Content
 	transactions.Content
 	metadata.Content
 }
@@ -38,108 +45,211 @@ type Content interface {
 type State interface {
 	Content
 
-	// Upon vm initialization, SyncGenesis loads
-	// information from genesis block as marshalled from bytes
-	SyncGenesis(
-		genesisBlkID ids.ID,
-		genesisTimestamp uint64,
-		genesisInitialSupply uint64,
-		genesisUtxos []*avax.UTXO,
-		genesisValidator []*signed.Tx,
-		genesisChains []*signed.Tx,
-	) error
-
-	// Upon vm initialization, Load pulls
-	// information previously stored on disk
+	Sync(genesisBytes []byte) error
 	Load() error
 
 	Write() error
+
+	Abort()
+	Commit() error
+	CommitBatch() (database.Batch, error)
 	Close() error
 }
 
 func New(
-	baseDB database.Database,
+	db database.Database,
 	cfg *config.Config,
 	ctx *snow.Context,
 	localStake prometheus.Gauge,
 	totalStake prometheus.Gauge,
 	rewards reward.Calculator,
-) State {
+	genesisBytes []byte,
+) (State, error) {
+	baseDB := versiondb.New(db)
+
 	metadata := metadata.NewState(baseDB)
 	txState := transactions.NewState(baseDB, metadata, cfg, ctx,
 		localStake, totalStake, rewards,
 	)
-	return &state{
-		TxState:   txState,
+	blkState := blocks.NewState(baseDB)
+
+	globalState := &state{
+		baseDB:    baseDB,
 		DataState: metadata,
+		TxState:   txState,
+		BlkState:  blkState,
 	}
+
+	// Finally create and load genesis block, once txs and blocks
+	// creators and verifiers are instantiated
+	if err := globalState.Sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = globalState.Close()
+		return globalState, err
+	}
+
+	return globalState, nil
 }
 
 func NewMetered(
-	baseDB database.Database,
+	db database.Database,
 	metrics prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,
 	localStake prometheus.Gauge,
 	totalStake prometheus.Gauge,
 	rewards reward.Calculator,
+	genesisBytes []byte,
 ) (State, error) {
+	baseDB := versiondb.New(db)
+
 	metadata := metadata.NewState(baseDB)
 	txState, err := transactions.NewMeteredTransactionsState(
 		baseDB, metadata, metrics, cfg, ctx,
 		localStake, totalStake, rewards)
-	return &state{
-		TxState:   txState,
+	if err != nil {
+		// Drop any errors on close to return the first error
+		_ = txState.CloseTxs()
+
+		return nil, err
+	}
+	blkState, err := blocks.NewMeteredState(baseDB, metrics)
+	if err != nil {
+		// Drop any errors on close to return the first error
+		_ = blkState.CloseBlocks()
+
+		return nil, err
+	}
+
+	globalState := &state{
+		baseDB:    baseDB,
 		DataState: metadata,
-	}, err
+		TxState:   txState,
+		BlkState:  blkState,
+	}
+
+	// Finally create and load genesis block, once txs and blocks
+	// creators and verifiers are instantiated
+	if err := globalState.Sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = globalState.Close()
+		return globalState, err
+	}
+
+	return globalState, nil
 }
 
 type state struct {
-	transactions.TxState
+	baseDB *versiondb.Database
+
 	metadata.DataState
+	transactions.TxState
+	blocks.BlkState
 }
 
-func (s *state) SyncGenesis(
-	genesisBlkID ids.ID,
-	genesisTimestamp uint64,
-	genesisInitialSupply uint64,
-	genesisUtxos []*avax.UTXO,
-	genesisValidator []*signed.Tx,
-	genesisChains []*signed.Tx,
-) error {
-	err := s.DataState.SyncGenesis(genesisBlkID, genesisTimestamp, genesisInitialSupply)
+func (s *state) Sync(genesisBytes []byte) error {
+	shouldInit, err := s.ShouldInit()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database is initialized: %w",
+			err,
+		)
+	}
+
+	// If the database is empty, create the platform chain anew using the
+	// provided genesis state
+	if shouldInit {
+		if err := s.syncGenesis(genesisBytes); err != nil {
+			return fmt.Errorf("failed to initialize the database: %w", err)
+		}
+
+		if err := s.DoneInit(); err != nil {
+			return fmt.Errorf("failed to initialize the database: %w", err)
+		}
+
+		if err := s.Commit(); err != nil {
+			return fmt.Errorf("failed to initialize the database: %w", err)
+		}
+	}
+
+	if err := s.Load(); err != nil {
+		return fmt.Errorf(
+			"failed to load the database state: %w",
+			err,
+		)
+	}
+
+	return nil
+}
+
+func (s *state) syncGenesis(genesisBytes []byte) error {
+	genesisBlkID, err := s.BlkState.SyncGenesis(genesisBytes)
 	if err != nil {
 		return err
 	}
 
-	return s.TxState.SyncGenesis(genesisUtxos, genesisValidator, genesisChains)
+	utxos, timestamp, initialSupply,
+		validators, chains, err := p_genesis.ExtractGenesisContent(genesisBytes)
+	if err != nil {
+		return err
+	}
+
+	if err := s.DataState.SyncGenesis(genesisBlkID, timestamp, initialSupply); err != nil {
+		return err
+	}
+
+	return s.TxState.SyncGenesis(utxos, validators, chains)
 }
 
 func (s *state) Load() error {
 	// TxState depends on Metadata, hence we load metadata first
-	err := s.LoadMetadata()
-	if err != nil {
+	if err := s.LoadMetadata(); err != nil {
 		return err
 	}
 
-	return s.LoadTxs()
+	return s.LoadTxs() // Nothing to load for blocks
 }
 
 func (s *state) Write() error {
-	err := s.WriteMetadata()
-	if err != nil {
+	if err := s.WriteMetadata(); err != nil {
 		return err
 	}
 
-	return s.WriteTxs()
+	if err := s.WriteTxs(); err != nil {
+		return err
+	}
+
+	return s.WriteBlocks()
 }
 
 func (s *state) Close() error {
 	// TxState depends on Metadata, hence we close metadata last
-	err := s.CloseTxs()
+	// Blocks first for simmetry
+	errs := wrappers.Errs{}
+	errs.Add(
+		s.CloseBlocks(),
+		s.CloseTxs(),
+		s.CloseMetadata(),
+		s.baseDB.Close(),
+	)
+	return errs.Err
+}
+
+func (s *state) Abort() { s.baseDB.Abort() }
+
+func (s *state) CommitBatch() (database.Batch, error) {
+	if err := s.Write(); err != nil {
+		return nil, err
+	}
+
+	return s.baseDB.CommitBatch()
+}
+
+func (s *state) Commit() error {
+	defer s.Abort()
+	batch, err := s.CommitBatch()
 	if err != nil {
 		return err
 	}
-
-	return s.CloseMetadata()
+	return batch.Write()
 }

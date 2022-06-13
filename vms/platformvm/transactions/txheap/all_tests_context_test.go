@@ -33,13 +33,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
-
-	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -48,13 +45,13 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
 	preFundedKeys             []*crypto.PrivateKeySECP256K1R
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
+
+	testGenesisBytes = []byte{0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 29, 205, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 252, 237, 168, 249, 15, 203, 93, 48, 97, 75, 153, 215, 159, 196, 186, 162, 147, 7, 118, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 29, 205, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 110, 173, 105, 60, 23, 171, 177, 190, 66, 43, 181, 11, 48, 185, 113, 31, 249, 141, 102, 126, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 29, 205, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 242, 66, 8, 70, 135, 110, 105, 244, 115, 221, 162, 86, 23, 41, 103, 233, 146, 240, 238, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 29, 205, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 60, 183, 211, 132, 46, 140, 238, 106, 14, 189, 9, 241, 254, 136, 79, 104, 97, 225, 178, 156, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 29, 205, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 135, 196, 236, 7, 54, 253, 173, 3, 253, 158, 200, 195, 186, 96, 157, 233, 88, 96, 26, 123, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 12, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252, 237, 168, 249, 15, 203, 93, 48, 97, 75, 153, 215, 159, 196, 186, 162, 147, 7, 118, 38, 0, 0, 0, 0, 50, 201, 169, 0, 0, 0, 0, 0, 50, 214, 216, 0, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 1, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 252, 237, 168, 249, 15, 203, 93, 48, 97, 75, 153, 215, 159, 196, 186, 162, 147, 7, 118, 38, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 252, 237, 168, 249, 15, 203, 93, 48, 97, 75, 153, 215, 159, 196, 186, 162, 147, 7, 118, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 110, 173, 105, 60, 23, 171, 177, 190, 66, 43, 181, 11, 48, 185, 113, 31, 249, 141, 102, 126, 0, 0, 0, 0, 50, 201, 169, 0, 0, 0, 0, 0, 50, 214, 216, 0, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 1, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 110, 173, 105, 60, 23, 171, 177, 190, 66, 43, 181, 11, 48, 185, 113, 31, 249, 141, 102, 126, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 110, 173, 105, 60, 23, 171, 177, 190, 66, 43, 181, 11, 48, 185, 113, 31, 249, 141, 102, 126, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 242, 66, 8, 70, 135, 110, 105, 244, 115, 221, 162, 86, 23, 41, 103, 233, 146, 240, 238, 49, 0, 0, 0, 0, 50, 201, 169, 0, 0, 0, 0, 0, 50, 214, 216, 0, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 1, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 242, 66, 8, 70, 135, 110, 105, 244, 115, 221, 162, 86, 23, 41, 103, 233, 146, 240, 238, 49, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 242, 66, 8, 70, 135, 110, 105, 244, 115, 221, 162, 86, 23, 41, 103, 233, 146, 240, 238, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60, 183, 211, 132, 46, 140, 238, 106, 14, 189, 9, 241, 254, 136, 79, 104, 97, 225, 178, 156, 0, 0, 0, 0, 50, 201, 169, 0, 0, 0, 0, 0, 50, 214, 216, 0, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 1, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 60, 183, 211, 132, 46, 140, 238, 106, 14, 189, 9, 241, 254, 136, 79, 104, 97, 225, 178, 156, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 60, 183, 211, 132, 46, 140, 238, 106, 14, 189, 9, 241, 254, 136, 79, 104, 97, 225, 178, 156, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 135, 196, 236, 7, 54, 253, 173, 3, 253, 158, 200, 195, 186, 96, 157, 233, 88, 96, 26, 123, 0, 0, 0, 0, 50, 201, 169, 0, 0, 0, 0, 0, 50, 214, 216, 0, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 1, 121, 101, 101, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 135, 196, 236, 7, 54, 253, 173, 3, 253, 158, 200, 195, 186, 96, 157, 233, 88, 96, 26, 123, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 135, 196, 236, 7, 54, 253, 173, 3, 253, 158, 200, 195, 186, 96, 157, 233, 88, 96, 26, 123, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, 201, 169, 0, 4, 254, 250, 23, 183, 36, 0, 0, 0, 0}
 )
 
 type testHelpersCollection struct {
@@ -142,18 +139,19 @@ func defaultState(
 		Help:      "Total amount of AVAX staked",
 	})
 
-	tState := state.New(baseDB, cfg, ctx, dummyLocalStake, dummyTotalStake, rewardsCalc)
-
-	// setup initial data as if we are storing genesis
-	initializeState(tState, ctx)
-
-	// persist and reload to init a bunch of in-memory stuff
-	if err := tState.Write(); err != nil {
+	tState, err := state.New(
+		baseDB,
+		cfg,
+		ctx,
+		dummyLocalStake,
+		dummyTotalStake,
+		rewardsCalc,
+		testGenesisBytes,
+	)
+	if err != nil {
 		panic(err)
 	}
-	if err := tState.Load(); err != nil {
-		panic(err)
-	}
+
 	return tState
 }
 
@@ -260,73 +258,6 @@ func defaultKeys() []*crypto.PrivateKeySECP256K1R {
 		res = append(res, pk.(*crypto.PrivateKeySECP256K1R))
 	}
 	return res
-}
-
-func initializeState(tState state.State, ctx *snow.Context) {
-	utxos := make([]*avax.UTXO, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		addr := key.PublicKey().Address()
-		utxos[i] = &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.Empty,
-				OutputIndex: uint32(i),
-			},
-			Asset: avax.Asset{ID: avaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: defaultBalance,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-			},
-		}
-	}
-
-	timestamp := uint64(defaultGenesisTime.Unix())
-	initialSupply := 360 * units.MegaAvax
-	validators := make([]*signed.Tx, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		addrID := key.PublicKey().Address()
-		utx := &unsigned.AddValidatorTx{
-			BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    ctx.NetworkID,
-				BlockchainID: ctx.ChainID,
-				Ins:          nil,
-				Outs:         nil,
-			}},
-			Validator: p_validator.Validator{
-				Start: uint64(defaultValidateStartTime.Unix()),
-				End:   uint64(defaultValidateEndTime.Unix()),
-				Wght:  defaultBalance,
-			},
-			Stake: nil,
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addrID},
-			},
-			Shares: uint32(defaultTxFee),
-		}
-		tx := &signed.Tx{Unsigned: utx}
-		if err := tx.Sign(unsigned.Codec, nil); err != nil {
-			panic(err)
-		}
-		validators[i] = tx
-	}
-
-	chains := make([]*signed.Tx, 0)
-	dummyGenID := ids.ID{'g', 'e', 'n', 'I', 'D'}
-	if err := tState.SyncGenesis(
-		dummyGenID,
-		timestamp,
-		initialSupply,
-		utxos,
-		validators,
-		chains,
-	); err != nil {
-		panic(err)
-	}
 }
 
 func internalStateShutdown(t *testHelpersCollection) error {

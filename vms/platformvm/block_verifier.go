@@ -18,14 +18,14 @@ var _ p_block.Verifier = &blkVerifier{}
 
 func NewBlockVerifier(
 	mempool mempool.Mempool,
-	internalState InternalState,
+	internalState state.State,
 	txExecutor p_tx.Executor,
 	blkMetrics stateless.Metrics,
 	windows *window.Window,
 ) p_block.Verifier {
 	return &blkVerifier{
 		Mempool:          mempool,
-		InternalState:    internalState,
+		State:            internalState,
 		Executor:         txExecutor,
 		Metrics:          blkMetrics,
 		currentBlksCache: make(map[ids.ID]p_block.Block),
@@ -35,7 +35,7 @@ func NewBlockVerifier(
 
 type blkVerifier struct {
 	mempool.Mempool
-	InternalState
+	state.State
 	p_tx.Executor
 	stateless.Metrics
 
@@ -52,15 +52,12 @@ func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (p_block.Block, error) {
 		return blk, nil
 	}
 
-	statelessBlk, blkStatus, err := bv.InternalState.GetStatelessBlock(blkID)
+	statelessBlk, blkStatus, err := bv.State.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
 	return p_block.MakeStateful(statelessBlk, bv, blkStatus)
 }
-
-func (bv *blkVerifier) StateContentForApply() state.Content { return bv.InternalState }
-func (bv *blkVerifier) GetMutableState() state.Mutable      { return bv.InternalState }
 
 func (bv *blkVerifier) CacheVerifiedBlock(blk p_block.Block) {
 	bv.currentBlksCache[blk.ID()] = blk

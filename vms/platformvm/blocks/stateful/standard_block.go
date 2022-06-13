@@ -215,7 +215,7 @@ func (sb *StandardBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	sb.onAcceptState.Apply(sb.verifier.StateContentForApply())
+	sb.onAcceptState.Apply(sb.verifier)
 
 	defer sb.verifier.Abort()
 	batch, err := sb.verifier.CommitBatch()
