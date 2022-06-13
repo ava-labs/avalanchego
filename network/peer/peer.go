@@ -178,8 +178,6 @@ func Start(
 		onClosed:           make(chan struct{}),
 	}
 
-	p.trackedSubnets.Add(constants.PrimaryNetworkID)
-
 	go p.readMessages()
 	go p.writeMessages()
 	go p.sendPings()
