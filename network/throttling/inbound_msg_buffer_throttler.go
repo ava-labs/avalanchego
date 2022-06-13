@@ -4,6 +4,7 @@
 package throttling
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ func newInboundMsgBufferThrottler(
 ) (*inboundMsgBufferThrottler, error) {
 	t := &inboundMsgBufferThrottler{
 		maxProcessingMsgsPerNode: maxProcessingMsgsPerNode,
-		awaitingAcquire:          make(map[ids.NodeID][]chan struct{}),
+		awaitingAcquire:          make(map[ids.NodeID]chan struct{}),
 		nodeToNumProcessingMsgs:  make(map[ids.NodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
@@ -45,21 +46,17 @@ type inboundMsgBufferThrottler struct {
 	// Node ID --> Number of messages from this node we're currently processing.
 	// Must only be accessed when [lock] is held.
 	nodeToNumProcessingMsgs map[ids.NodeID]uint64
-	// Node ID --> Channels where each channel, when closed,
+	// Node ID --> Channel, when closed
 	// causes a goroutine waiting in Acquire to return.
-	// The first element corresponds to the goroutine that has been waiting
-	// longest to acquire space on the message buffer for the given node ID,
-	// the second element the second longest, etc.
 	// Must only be accessed when [lock] is held.
-	awaitingAcquire map[ids.NodeID][]chan struct{}
+	awaitingAcquire map[ids.NodeID]chan struct{}
 }
 
 // Acquire returns when we've acquired space on the inbound message
 // buffer so that we can read a message from [nodeID].
-// Release([nodeID]) must be called (!) when done processing the message
+// The returned release function must be called (!) when done processing the message
 // (or when we give up trying to read the message.)
-// TODO pass in a context here to allow early cancellation.
-func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.NodeID) {
+func (t *inboundMsgBufferThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) ReleaseFunc {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
@@ -69,7 +66,7 @@ func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.NodeID) {
 	if t.nodeToNumProcessingMsgs[nodeID] < t.maxProcessingMsgsPerNode {
 		t.nodeToNumProcessingMsgs[nodeID]++
 		t.lock.Unlock()
-		return
+		return func() { t.release(nodeID) }
 	}
 
 	// We're currently processing the maximum number of
@@ -79,16 +76,30 @@ func (t *inboundMsgBufferThrottler) Acquire(nodeID ids.NodeID) {
 	// when we've acquired space on the inbound message buffer
 	// for this message.
 	closeOnAcquireChan := make(chan struct{})
-	t.awaitingAcquire[nodeID] = append(t.awaitingAcquire[nodeID], closeOnAcquireChan)
+	t.awaitingAcquire[nodeID] = closeOnAcquireChan
 	t.lock.Unlock()
 	t.metrics.awaitingAcquire.Inc()
-	<-closeOnAcquireChan
-	t.metrics.awaitingAcquire.Dec()
+	defer t.metrics.awaitingAcquire.Dec()
+
+	var releaseFunc ReleaseFunc
+	select {
+	case <-closeOnAcquireChan:
+		t.lock.Lock()
+		t.nodeToNumProcessingMsgs[nodeID]++
+		releaseFunc = func() { t.release(nodeID) }
+	case <-ctx.Done():
+		t.lock.Lock()
+		delete(t.awaitingAcquire, nodeID)
+		releaseFunc = noopRelease
+	}
+
+	t.lock.Unlock()
+	return releaseFunc
 }
 
-// Release marks that we've finished processing a message from [nodeID]
+// release marks that we've finished processing a message from [nodeID]
 // and can release the space it took on the inbound message buffer.
-func (t *inboundMsgBufferThrottler) Release(nodeID ids.NodeID) {
+func (t *inboundMsgBufferThrottler) release(nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -98,25 +109,11 @@ func (t *inboundMsgBufferThrottler) Release(nodeID ids.NodeID) {
 	}
 
 	// If we're waiting to acquire space on the inbound message
-	// buffer for messages from [nodeID], allow the one that
-	// had been waiting the longest to proceed
+	// buffer for messages from [nodeID], allow it to proceed
 	// (i.e. for its call to Acquire to return.)
-	waiting := t.awaitingAcquire[nodeID]
-	if len(waiting) == 0 {
-		// We're not waiting to acquire for any messages from [nodeID]
-		return
-	}
-	if len(waiting) > 0 {
-		waitingLongest := waiting[0]
-		t.nodeToNumProcessingMsgs[nodeID]++
-		close(waitingLongest)
-	}
-	// Update [t.awaitingAcquire]
-	if len(waiting) == 1 {
+	if waiting, ok := t.awaitingAcquire[nodeID]; ok {
+		close(waiting)
 		delete(t.awaitingAcquire, nodeID)
-	} else {
-		waiting[0] = nil
-		t.awaitingAcquire[nodeID] = waiting[1:]
 	}
 }
 

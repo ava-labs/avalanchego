@@ -338,16 +338,17 @@ func (p *peer) readMessages() {
 		}
 
 		// Wait until the throttler says we can proceed to read the message.
-		// Note that when we are done handling this message, or give up
-		// trying to read it, we must call [p.InboundMsgThrottler.Release]
-		// to give back the bytes used by this message.
-		p.InboundMsgThrottler.Acquire(p.onClosingCtx, uint64(msgLen), p.id)
-
 		// Invariant: When done processing this message, onFinishedHandling() is
 		// called exactly once. If this is not honored, the message throttler
 		// will leak until no new messages can be read. You can look at message
 		// throttler metrics to verify that there is no leak.
-		onFinishedHandling := func() { p.InboundMsgThrottler.Release(uint64(msgLen), p.id) }
+		onFinishedHandling := p.InboundMsgThrottler.Acquire(p.onClosingCtx, uint64(msgLen), p.id)
+
+		// If the peer is shutting down, there's no need to read the message.
+		if p.onClosingCtx.Err() != nil {
+			onFinishedHandling()
+			return
+		}
 
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
