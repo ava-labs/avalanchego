@@ -564,7 +564,7 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
 	service.vm.ctx.Log.Debug("Platform: GetStakingAssetID called")
 
 	if args.SubnetID != constants.PrimaryNetworkID {
-		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
+		return fmt.Errorf("subnet %s doesn't have a valid staking token",
 			args.SubnetID)
 	}
 
