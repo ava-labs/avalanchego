@@ -380,6 +380,17 @@ type ChitsHandler interface {
 	// However, the validatorID is assumed to be authenticated.
 	Chits(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error
 
+	// Notify this engine of the specified validators preferences.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is in response to a PullQuery or a PushQuery message.
+	// However, the validatorID is assumed to be authenticated.
+	//
+	// The new ChitsV2 could be sent from a node that implements "ChitsV2"
+	// sender with linearized DAG, while the older nodes may not have
+	// implemented such, thus fallback.
+	ChitsV2(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID, containerID ids.ID) error
+
 	// Notify this engine that a query it issued has failed.
 	//
 	// This function will be called if the engine sent a PullQuery or PushQuery

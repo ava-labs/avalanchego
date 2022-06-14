@@ -111,11 +111,13 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
-		tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
+
+	addSubnetValidatorTx := tx.Unsigned.(*unsigned.AddSubnetValidatorTx)
+	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
+	input.SigIndices[0] = input.SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err = tx.SyntacticVerify(vm.ctx); err == nil {
+	addSubnetValidatorTx.SyntacticallyVerified = false
+	if err = addSubnetValidatorTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because sig indices weren't unique")
 	}
 
@@ -410,11 +412,12 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove a signature
-	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
-		tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
-		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*unsigned.AddSubnetValidatorTx).SyntacticallyVerified = false
 
+	addSubnetValidatorTx := tx.Unsigned.(*unsigned.AddSubnetValidatorTx)
+	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
+	input.SigIndices = input.SigIndices[1:]
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	addSubnetValidatorTx.SyntacticallyVerified = false
 	statefulTx, err = MakeStatefulTx(tx)
 	if err != nil {
 		t.Fatalf("couldn't make stateful tx: %s", err)
