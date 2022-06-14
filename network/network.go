@@ -606,7 +606,7 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 		return false
 	}
 	trackedSubnets := peer.TrackedSubnets()
-	return trackedSubnets.Contains(subnetID)
+	return subnetID == constants.PrimaryNetworkID || trackedSubnets.Contains(subnetID)
 }
 
 func (n *network) sampleValidatorIPs() []ips.ClaimedIPPort {
@@ -658,7 +658,7 @@ func (n *network) getPeers(
 		}
 
 		trackedSubnets := peer.TrackedSubnets()
-		if !trackedSubnets.Contains(subnetID) {
+		if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 
@@ -693,7 +693,7 @@ func (n *network) samplePeers(
 		func(p peer.Peer) bool {
 			// Only return peers that are tracking [subnetID]
 			trackedSubnets := p.TrackedSubnets()
-			if !trackedSubnets.Contains(subnetID) {
+			if subnetID != constants.PrimaryNetworkID && !trackedSubnets.Contains(subnetID) {
 				return false
 			}
 

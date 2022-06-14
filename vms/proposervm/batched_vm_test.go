@@ -114,9 +114,12 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(blkID ids.ID,
-		maxBlocksNum, maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(
+		blkID ids.ID,
+		maxBlocksNum,
+		maxBlocksSize int,
+		maxBlocksRetrivalTime time.Duration,
+	) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk3.ID():
@@ -226,9 +229,12 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(blkID ids.ID,
-		maxBlocksNum, maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(
+		blkID ids.ID,
+		maxBlocksNum,
+		maxBlocksSize int,
+		maxBlocksRetrivalTime time.Duration,
+	) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk3.ID():
@@ -398,9 +404,12 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(blkID ids.ID,
-		maxBlocksNum, maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(
+		blkID ids.ID,
+		maxBlocksNum,
+		maxBlocksSize int,
+		maxBlocksRetrivalTime time.Duration,
+	) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk4.ID():
@@ -852,9 +861,16 @@ func initTestRemoteProposerVM(
 	coreVM.TestVM.T = t
 	coreVM.TestBatchedVM.T = t
 
-	coreVM.InitializeF = func(*snow.Context, manager.Manager,
-		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
+	coreVM.InitializeF = func(
+		*snow.Context,
+		manager.Manager,
+		[]byte,
+		[]byte,
+		[]byte,
+		chan<- common.Message,
+		[]*common.Fx,
+		common.AppSender,
+	) error {
 		return nil
 	}
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }

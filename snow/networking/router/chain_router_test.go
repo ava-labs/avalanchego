@@ -384,7 +384,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	assert.NoError(t, err)
 
-	assert.NoError(t, err)
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
