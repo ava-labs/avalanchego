@@ -13,7 +13,7 @@ type doubleDecisionBlock struct {
 }
 
 func (ddb *doubleDecisionBlock) acceptParent() error {
-	blkID := ddb.baseBlk.ID()
+	blkID := ddb.commonStatelessBlk.ID()
 	ddb.verifier.Ctx().Log.Verbo("Accepting block with ID %s", blkID)
 
 	parentIntf, err := ddb.parentBlock()

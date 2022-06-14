@@ -788,7 +788,7 @@ func TestGetBlock(t *testing.T) {
 				t.Fatal("couldn't create block: %w", err)
 			}
 
-			statelessBlk := block.StandardBlock
+			statelessBlk := block.StandardBlockIntf
 			service.vm.blkVerifier.AddStatelessBlock(statelessBlk, block.Status())
 
 			args := api.GetBlockArgs{

@@ -8,6 +8,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+type CommonBlockIntf interface {
+	Initialize(bytes []byte) error
+
+	ID() ids.ID
+	Bytes() []byte
+	Parent() ids.ID
+	Height() uint64
+}
+
 // CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID

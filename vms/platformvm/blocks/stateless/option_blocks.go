@@ -7,21 +7,20 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
 )
 
 var (
-	_ Block = &AbortBlock{}
-	_ Block = &CommitBlock{}
+	_ OptionBlock = &AbortBlock{}
+	_ OptionBlock = &CommitBlock{}
 )
+
+type OptionBlock CommonBlockIntf
 
 type AbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (ab *AbortBlock) BlockTxs() []*signed.Tx { return nil }
-
-func NewAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
+func NewAbortBlock(parentID ids.ID, height uint64) (OptionBlock, error) {
 	res := &AbortBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -31,7 +30,7 @@ func NewAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
-	blk := Block(res)
+	blk := CommonBlockIntf(res)
 	bytes, err := Codec.Marshal(Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
@@ -44,9 +43,7 @@ type CommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (cb *CommitBlock) BlockTxs() []*signed.Tx { return nil }
-
-func NewCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
+func NewCommitBlock(parentID ids.ID, height uint64) (OptionBlock, error) {
 	res := &CommitBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -56,7 +53,7 @@ func NewCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
-	blk := Block(res)
+	blk := CommonBlockIntf(res)
 	bytes, err := Codec.Marshal(Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)

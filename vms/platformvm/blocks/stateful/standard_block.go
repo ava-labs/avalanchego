@@ -26,7 +26,7 @@ var (
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
-	*stateless.StandardBlock
+	stateless.StandardBlockIntf
 	*decisionBlock
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
@@ -50,22 +50,22 @@ func NewStandardBlock(
 }
 
 func toStatefulStandardBlock(
-	statelessBlk *stateless.StandardBlock,
+	statelessBlk stateless.StandardBlockIntf,
 	verifier Verifier,
 	status choices.Status,
 ) (*StandardBlock, error) {
 	sb := &StandardBlock{
-		StandardBlock: statelessBlk,
+		StandardBlockIntf: statelessBlk,
 		decisionBlock: &decisionBlock{
 			commonBlock: &commonBlock{
-				baseBlk:  &statelessBlk.CommonBlock,
-				status:   status,
-				verifier: verifier,
+				commonStatelessBlk: statelessBlk,
+				status:             status,
+				verifier:           verifier,
 			},
 		},
 	}
 
-	for _, tx := range sb.Txs {
+	for _, tx := range sb.DecisionTxs() {
 		tx.Unsigned.InitCtx(sb.verifier.Ctx())
 	}
 
@@ -120,8 +120,9 @@ func (sb *StandardBlock) Verify() error {
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.inputs.Clear()
 
-	funcs := make([]func() error, 0, len(sb.Txs))
-	for _, tx := range sb.Txs {
+	txs := sb.DecisionTxs()
+	funcs := make([]func() error, 0, len(txs))
+	for _, tx := range txs {
 		txID := tx.ID()
 
 		inputUTXOs, err := sb.verifier.InputUTXOs(tx.Unsigned)
@@ -173,7 +174,7 @@ func (sb *StandardBlock) Verify() error {
 
 	sb.timestamp = sb.onAcceptState.GetTimestamp()
 
-	sb.verifier.RemoveDecisionTxs(sb.Txs)
+	sb.verifier.RemoveDecisionTxs(txs)
 	sb.verifier.CacheVerifiedBlock(sb)
 	parentIntf.addChild(sb)
 	return nil
@@ -184,8 +185,9 @@ func (sb *StandardBlock) Accept() error {
 	sb.verifier.Ctx().Log.Verbo("accepting block with ID %s", blkID)
 
 	// Set up the shared memory operations
+	txs := sb.DecisionTxs()
 	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range sb.Txs {
+	for _, tx := range txs {
 		// Get the shared memory operations this transaction is performing
 		chainID, txRequests, err := sb.verifier.AtomicOperations(tx)
 		if err != nil {
@@ -209,8 +211,8 @@ func (sb *StandardBlock) Accept() error {
 	}
 
 	sb.accept()
-	sb.verifier.AddStatelessBlock(sb.StandardBlock, sb.Status())
-	if err := sb.verifier.RegisterBlock(sb.StandardBlock); err != nil {
+	sb.verifier.AddStatelessBlock(sb.StandardBlockIntf, sb.Status())
+	if err := sb.verifier.RegisterBlock(sb.StandardBlockIntf); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
 
@@ -252,7 +254,8 @@ func (sb *StandardBlock) Reject() error {
 		sb.Parent(),
 	)
 
-	for _, tx := range sb.Txs {
+	txs := sb.DecisionTxs()
+	for _, tx := range txs {
 		if err := sb.verifier.Add(tx); err != nil {
 			sb.verifier.Ctx().Log.Debug(
 				"failed to reissue tx %q due to: %s",
@@ -263,6 +266,6 @@ func (sb *StandardBlock) Reject() error {
 	}
 
 	defer sb.reject()
-	sb.verifier.AddStatelessBlock(sb.StandardBlock, sb.Status())
+	sb.verifier.AddStatelessBlock(sb.StandardBlockIntf, sb.Status())
 	return sb.verifier.Commit()
 }

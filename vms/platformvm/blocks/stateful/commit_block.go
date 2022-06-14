@@ -19,7 +19,7 @@ var (
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
 type CommitBlock struct {
-	*stateless.CommitBlock
+	stateless.OptionBlock
 	*doubleDecisionBlock
 
 	wasPreferred bool
@@ -43,19 +43,19 @@ func NewCommitBlock(
 }
 
 func toStatefulCommitBlock(
-	statelessBlk *stateless.CommitBlock,
+	statelessBlk stateless.OptionBlock,
 	verifier Verifier,
 	wasPreferred bool,
 	status choices.Status,
 ) (*CommitBlock, error) {
 	commit := &CommitBlock{
-		CommitBlock: statelessBlk,
+		OptionBlock: statelessBlk,
 		doubleDecisionBlock: &doubleDecisionBlock{
 			decisionBlock: decisionBlock{
 				commonBlock: &commonBlock{
-					baseBlk:  &statelessBlk.CommonBlock,
-					status:   status,
-					verifier: verifier,
+					commonStatelessBlk: statelessBlk,
+					status:             status,
+					verifier:           verifier,
 				},
 			},
 		},
@@ -78,8 +78,8 @@ func (c *CommitBlock) Accept() error {
 		return err
 	}
 	c.accept()
-	c.verifier.AddStatelessBlock(c.CommitBlock, c.Status())
-	if err := c.verifier.RegisterBlock(c.CommitBlock); err != nil {
+	c.verifier.AddStatelessBlock(c.OptionBlock, c.Status())
+	if err := c.verifier.RegisterBlock(c.OptionBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", c.ID(), err)
 	}
 
@@ -93,7 +93,7 @@ func (c *CommitBlock) Reject() error {
 	)
 
 	defer c.reject()
-	c.verifier.AddStatelessBlock(c.CommitBlock, c.Status())
+	c.verifier.AddStatelessBlock(c.OptionBlock, c.Status())
 	return c.verifier.Commit()
 }
 

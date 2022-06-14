@@ -199,29 +199,40 @@ func newTxMetrics(namespace string, name string) prometheus.Counter {
 func (m *Metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
 func (m *Metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
 
-func (m *Metrics) RegisterBlock(b stateless.Block) error {
+func (m *Metrics) RegisterBlock(b stateless.CommonBlockIntf) error {
 	switch b := b.(type) {
-	case *stateless.AbortBlock:
-		m.numAbortBlocks.Inc()
-	case *stateless.AtomicBlock:
+	case stateless.AtomicBlockIntf:
 		m.numAtomicBlocks.Inc()
-		return m.acceptTx(&b.Tx)
-	case *stateless.CommitBlock:
-		m.numCommitBlocks.Inc()
-	case *stateless.ProposalBlock:
+		return m.acceptTx(b.AtomicTx())
+
+	case stateless.ProposalBlockIntf:
 		m.numProposalBlocks.Inc()
-		return m.acceptTx(&b.Tx)
-	case *stateless.StandardBlock:
+		return m.acceptTx(b.ProposalTx())
+
+	case stateless.StandardBlockIntf:
 		m.numStandardBlocks.Inc()
-		for _, tx := range b.Txs {
+		for _, tx := range b.DecisionTxs() {
 			if err := m.acceptTx(tx); err != nil {
 				return err
 			}
 		}
+		return nil
+
+	case stateless.OptionBlock:
+		switch b.(type) {
+		case *stateless.AbortBlock:
+			m.numAbortBlocks.Inc()
+			return nil
+		case *stateless.CommitBlock:
+			m.numCommitBlocks.Inc()
+			return nil
+		default:
+			return errUnknownBlockType
+		}
+
 	default:
 		return errUnknownBlockType
 	}
-	return nil
 }
 
 func (m *Metrics) acceptTx(tx *signed.Tx) error {

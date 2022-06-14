@@ -14,16 +14,16 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	baseBlk   *stateless.CommonBlock
-	timestamp time.Time // Time this block was proposed at
-	status    choices.Status
-	children  []Block
+	commonStatelessBlk stateless.CommonBlockIntf
+	timestamp          time.Time // Time this block was proposed at
+	status             choices.Status
+	children           []Block
 
 	verifier Verifier
 }
 
 func (c *commonBlock) parentBlock() (Block, error) {
-	parentBlkID := c.baseBlk.Parent()
+	parentBlkID := c.commonStatelessBlk.Parent()
 	return c.verifier.GetStatefulBlock(parentBlkID)
 }
 
@@ -38,7 +38,7 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.verifier.GetLastAccepted() {
+	if c.commonStatelessBlk.ID() == c.verifier.GetLastAccepted() {
 		return c.verifier.GetTimestamp()
 	}
 	return c.timestamp
@@ -64,27 +64,27 @@ func (c *commonBlock) verify() error {
 	if err != nil {
 		return err
 	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
+	if expectedHeight := parent.Height() + 1; expectedHeight != c.commonStatelessBlk.Height() {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
 			expectedHeight,
-			c.baseBlk.Height(),
+			c.commonStatelessBlk.Height(),
 		)
 	}
 	return nil
 }
 
 func (c *commonBlock) free() {
-	c.verifier.DropVerifiedBlock(c.baseBlk.ID())
+	c.verifier.DropVerifiedBlock(c.commonStatelessBlk.ID())
 	c.children = nil
 }
 
 func (c *commonBlock) accept() {
-	blkID := c.baseBlk.ID()
+	blkID := c.commonStatelessBlk.ID()
 
 	c.status = choices.Accepted
 	c.verifier.SetLastAccepted(blkID)
-	c.verifier.SetHeight(c.baseBlk.Height())
+	c.verifier.SetHeight(c.commonStatelessBlk.Height())
 	c.verifier.AddToRecentlyAcceptedWindows(blkID)
 }
 

@@ -134,7 +134,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	onAbortState := abort.OnAccept()
-	_, txStatus, err := onAbortState.GetTx(block.Tx.ID())
+	_, txStatus, err := onAbortState.GetTx(block.ProposalTx().ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.internalState.GetTx(block.ProposalTx().ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	onCommitState := commit.OnAccept()
-	_, txStatus, err = onCommitState.GetTx(block.Tx.ID())
+	_, txStatus, err = onCommitState.GetTx(block.ProposalTx().ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.internalState.GetTx(block.ProposalTx().ID())
 	if err != nil {
 		t.Fatal(err)
 	}

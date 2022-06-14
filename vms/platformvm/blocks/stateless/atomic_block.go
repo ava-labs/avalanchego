@@ -11,7 +11,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var _ Block = &AtomicBlock{}
+var _ AtomicBlockIntf = &AtomicBlock{}
+
+type AtomicBlockIntf interface {
+	CommonBlockIntf
+
+	// ProposalTx returns list of transactions
+	// contained in the block
+	AtomicTx() *signed.Tx
+}
 
 // AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
@@ -37,9 +45,9 @@ func (ab *AtomicBlock) Initialize(bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) BlockTxs() []*signed.Tx { return []*signed.Tx{&ab.Tx} }
+func (ab *AtomicBlock) AtomicTx() *signed.Tx { return &ab.Tx }
 
-func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (*AtomicBlock, error) {
+func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (AtomicBlockIntf, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -50,7 +58,7 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (*AtomicBlock,
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
-	blk := Block(res)
+	blk := CommonBlockIntf(res)
 	bytes, err := Codec.Marshal(Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)

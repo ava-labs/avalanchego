@@ -34,8 +34,8 @@ type BlkState interface {
 // Content interface collects all methods to query and mutate
 // all of the stored blocks.
 type Content interface {
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	AddStatelessBlock(block stateless.Block, status choices.Status)
+	GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error)
+	AddStatelessBlock(block stateless.CommonBlockIntf, status choices.Status)
 }
 
 // Management interface collects all methods used to initialize
@@ -79,12 +79,12 @@ type state struct {
 }
 
 type stateBlk struct {
-	Blk    stateless.Block
+	Blk    stateless.CommonBlockIntf
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
 }
 
-func (st *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+func (st *state) GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
 	if blkState, exists := st.addedBlocks[blockID]; exists {
 		return blkState.Blk, blkState.Status, nil
 	}
@@ -120,7 +120,7 @@ func (st *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Sta
 	return statelessBlk, blkState.Status, nil
 }
 
-func (st *state) AddStatelessBlock(block stateless.Block, status choices.Status) {
+func (st *state) AddStatelessBlock(block stateless.CommonBlockIntf, status choices.Status) {
 	st.addedBlocks[block.ID()] = stateBlk{
 		Blk:    block,
 		Bytes:  block.Bytes(),

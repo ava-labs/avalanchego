@@ -10,22 +10,30 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
-func MakeStateful(statelessBlk stateless.Block, verifier Verifier, status choices.Status) (Block, error) {
+func MakeStateful(
+	statelessBlk stateless.CommonBlockIntf,
+	verifier Verifier,
+	status choices.Status,
+) (Block, error) {
 	switch sb := statelessBlk.(type) {
-	case *stateless.AbortBlock:
-		return toStatefulAbortBlock(sb, verifier, false /*wasPreferred*/, status)
-
-	case *stateless.AtomicBlock:
+	case stateless.AtomicBlockIntf:
 		return toStatefulAtomicBlock(sb, verifier, status)
 
-	case *stateless.CommitBlock:
-		return toStatefulCommitBlock(sb, verifier, false /*wasPreferred*/, status)
-
-	case *stateless.ProposalBlock:
+	case stateless.ProposalBlockIntf:
 		return toStatefulProposalBlock(sb, verifier, status)
 
-	case *stateless.StandardBlock:
+	case stateless.StandardBlockIntf:
 		return toStatefulStandardBlock(sb, verifier, status)
+
+	case stateless.OptionBlock:
+		switch sb.(type) {
+		case *stateless.AbortBlock:
+			return toStatefulAbortBlock(sb, verifier, false /*wasPreferred*/, status)
+		case *stateless.CommitBlock:
+			return toStatefulCommitBlock(sb, verifier, false /*wasPreferred*/, status)
+		default:
+			return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)
+		}
 
 	default:
 		return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)

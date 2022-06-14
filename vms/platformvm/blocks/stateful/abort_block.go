@@ -19,7 +19,7 @@ var (
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.
 type AbortBlock struct {
-	*stateless.AbortBlock
+	stateless.OptionBlock
 	*doubleDecisionBlock
 
 	wasPreferred bool
@@ -42,19 +42,19 @@ func NewAbortBlock(
 }
 
 func toStatefulAbortBlock(
-	statelessBlk *stateless.AbortBlock,
+	statelessBlk stateless.OptionBlock,
 	verifier Verifier,
 	wasPreferred bool,
 	status choices.Status,
 ) (*AbortBlock, error) {
 	abort := &AbortBlock{
-		AbortBlock: statelessBlk,
+		OptionBlock: statelessBlk,
 		doubleDecisionBlock: &doubleDecisionBlock{
 			decisionBlock: decisionBlock{
 				commonBlock: &commonBlock{
-					baseBlk:  &statelessBlk.CommonBlock,
-					status:   status,
-					verifier: verifier,
+					commonStatelessBlk: statelessBlk,
+					status:             status,
+					verifier:           verifier,
 				},
 			},
 		},
@@ -77,8 +77,8 @@ func (a *AbortBlock) Accept() error {
 		return err
 	}
 	a.accept()
-	a.verifier.AddStatelessBlock(a.AbortBlock, a.Status())
-	if err := a.verifier.RegisterBlock(a.AbortBlock); err != nil {
+	a.verifier.AddStatelessBlock(a.OptionBlock, a.Status())
+	if err := a.verifier.RegisterBlock(a.OptionBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", a.ID(), err)
 	}
 
@@ -94,7 +94,7 @@ func (a *AbortBlock) Reject() error {
 	)
 
 	defer a.reject()
-	a.verifier.AddStatelessBlock(a.AbortBlock, a.Status())
+	a.verifier.AddStatelessBlock(a.OptionBlock, a.Status())
 	return a.verifier.Commit()
 }
 

@@ -3,8 +3,8 @@
 
 package stateless
 
-func Parse(b []byte) (Block, error) {
-	var blk Block
+func Parse(b []byte) (CommonBlockIntf, error) {
+	var blk CommonBlockIntf
 	if _, err := Codec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}

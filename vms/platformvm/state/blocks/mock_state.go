@@ -37,7 +37,7 @@ func (m *MockBlkState) EXPECT() *MockBlkStateMockRecorder {
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockBlkState) AddStatelessBlock(block stateless.Block, status choices.Status) {
+func (m *MockBlkState) AddStatelessBlock(block stateless.CommonBlockIntf, status choices.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddStatelessBlock", block, status)
 }
@@ -63,10 +63,10 @@ func (mr *MockBlkStateMockRecorder) CloseBlocks() *gomock.Call {
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockBlkState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+func (m *MockBlkState) GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
-	ret0, _ := ret[0].(stateless.Block)
+	ret0, _ := ret[0].(stateless.CommonBlockIntf)
 	ret1, _ := ret[1].(choices.Status)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -131,7 +131,7 @@ func (m *MockContent) EXPECT() *MockContentMockRecorder {
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockContent) AddStatelessBlock(block stateless.Block, status choices.Status) {
+func (m *MockContent) AddStatelessBlock(block stateless.CommonBlockIntf, status choices.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddStatelessBlock", block, status)
 }
@@ -143,10 +143,10 @@ func (mr *MockContentMockRecorder) AddStatelessBlock(block, status interface{}) 
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockContent) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+func (m *MockContent) GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
-	ret0, _ := ret[0].(stateless.Block)
+	ret0, _ := ret[0].(stateless.CommonBlockIntf)
 	ret1, _ := ret[1].(choices.Status)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

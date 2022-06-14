@@ -28,7 +28,7 @@ var _ Block = &ProposalBlock{}
 // The proposal will be enacted (change the chain's state) if the proposal block
 // is accepted and followed by an accepted Commit block
 type ProposalBlock struct {
-	*stateless.ProposalBlock
+	stateless.ProposalBlockIntf
 	*commonBlock
 
 	// The state that the chain will have if this block's proposal is committed
@@ -55,20 +55,20 @@ func NewProposalBlock(
 }
 
 func toStatefulProposalBlock(
-	statelessBlk *stateless.ProposalBlock,
+	statelessBlk stateless.ProposalBlockIntf,
 	verifier Verifier,
 	status choices.Status,
 ) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
-		ProposalBlock: statelessBlk,
+		ProposalBlockIntf: statelessBlk,
 		commonBlock: &commonBlock{
-			baseBlk:  &statelessBlk.CommonBlock,
-			status:   status,
-			verifier: verifier,
+			commonStatelessBlk: statelessBlk,
+			status:             status,
+			verifier:           verifier,
 		},
 	}
 
-	pb.Tx.Unsigned.InitCtx(pb.verifier.Ctx())
+	pb.ProposalTx().Unsigned.InitCtx(pb.verifier.Ctx())
 	return pb, nil
 }
 
@@ -103,16 +103,17 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.verifier.Add(&pb.Tx); err != nil {
+	tx := pb.ProposalTx()
+	if err := pb.verifier.Add(tx); err != nil {
 		pb.verifier.Ctx().Log.Verbo(
 			"failed to reissue tx %q due to: %s",
-			pb.Tx.ID(),
+			tx.ID(),
 			err,
 		)
 	}
 
 	defer pb.reject()
-	pb.verifier.AddStatelessBlock(pb.ProposalBlock, pb.Status())
+	pb.verifier.AddStatelessBlock(pb.ProposalBlockIntf, pb.Status())
 	return pb.verifier.Commit()
 }
 
@@ -144,18 +145,19 @@ func (pb *ProposalBlock) Verify() error {
 
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.OnAccept()
-	pb.onCommitState, pb.onAbortState, err = pb.verifier.ExecuteProposal(&pb.Tx, parentState)
+	tx := pb.ProposalTx()
+	pb.onCommitState, pb.onAbortState, err = pb.verifier.ExecuteProposal(tx, parentState)
 	if err != nil {
-		txID := pb.Tx.ID()
+		txID := tx.ID()
 		pb.verifier.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
-	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
-	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
+	pb.onCommitState.AddTx(tx, status.Committed)
+	pb.onAbortState.AddTx(tx, status.Aborted)
 
 	pb.timestamp = parentState.GetTimestamp()
 
-	pb.verifier.RemoveProposalTx(&pb.Tx)
+	pb.verifier.RemoveProposalTx(tx)
 	pb.verifier.CacheVerifiedBlock(pb)
 	parentIntf.addChild(pb)
 	return nil
@@ -164,8 +166,9 @@ func (pb *ProposalBlock) Verify() error {
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
+	tx := pb.ProposalTx()
 	nextHeight := pb.Height() + 1
-	prefersCommit, err := pb.verifier.InitiallyPrefersCommit(pb.Tx.Unsigned)
+	prefersCommit, err := pb.verifier.InitiallyPrefersCommit(tx.Unsigned)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create options, err %w",
