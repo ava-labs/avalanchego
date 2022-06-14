@@ -23,10 +23,10 @@ var (
 )
 
 type Semantic struct {
-	Major int `json:"major" yaml:"major"`
-	Minor int `json:"minor" yaml:"minor"`
-	Patch int `json:"patch" yaml:"patch"`
-	Str   string
+	Major int    `json:"major" yaml:"major"`
+	Minor int    `json:"minor" yaml:"minor"`
+	Patch int    `json:"patch" yaml:"patch"`
+	Str   string `json:"string" yaml:"string"`
 }
 
 func NewDefaultSemantic(major, minor, patch int) Semantic {
@@ -50,7 +50,9 @@ func NewSemantic(major, minor, patch int, prefix, versionSeparator string) Seman
 	}
 }
 
-func (s Semantic) String() string { return s.Str }
+func (s Semantic) String() string {
+	return s.Str
+}
 
 // Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
 func (s Semantic) Compare(other Semantic) int {
