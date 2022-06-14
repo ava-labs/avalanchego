@@ -18,11 +18,27 @@ var _ InboundMsgThrottler = &inboundMsgThrottler{}
 
 // InboundMsgThrottler rate-limits inbound messages from the network.
 type InboundMsgThrottler interface {
-	bandwidthThrottler
+	// Blocks until [nodeID] can read a message of size [msgSize].
+	// AddNode([nodeID], ...) must have been called since
+	// the last time RemoveNode([nodeID]) was called, if any.
+	// It's safe for multiple goroutines to concurrently call Acquire.
+	// Returns immediately if [ctx] is canceled.  The returned release function
+	// needs to be called so that any allocated resources will be released
+	// invariant: there is a maximum of 1 blocking call to Acquire for a given node
+	Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc
 
-	// Mark that we're done processing a message of size [msgSize]
-	// from [nodeID].
-	Release(msgSize uint64, nodeID ids.NodeID)
+	// Add a new node to this throttler.
+	// Must be called before Acquire(..., [nodeID]) is called.
+	// RemoveNode([nodeID]) must have been called since the last time
+	// AddNode([nodeID], ...) was called, if any.
+	AddNode(nodeID ids.NodeID)
+
+	// Remove a node from this throttler.
+	// AddNode([nodeID], ...) must have been called since
+	// the last time RemoveNode([nodeID]) was called, if any.
+	// Must be called when we stop reading messages from [nodeID].
+	// It's safe for multiple goroutines to concurrently call RemoveNode.
+	RemoveNode(nodeID ids.NodeID)
 }
 
 type InboundMsgThrottlerConfig struct {
@@ -132,10 +148,11 @@ type inboundMsgThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-// Even if [ctx] is canceled, [Release] must be called.
-func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) {
+// Even if [ctx] is canceled, The returned release function
+// needs to be called so that any allocated resources will be released.
+func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc {
 	// Acquire space on the inbound message buffer
-	t.bufferThrottler.Acquire(nodeID)
+	bufferRelease := t.bufferThrottler.Acquire(ctx, nodeID)
 	// Acquire bandwidth
 	t.bandwidthThrottler.Acquire(ctx, msgSize, nodeID)
 	// Wait until our CPU usage drops to an acceptable level.
@@ -143,16 +160,11 @@ func (t *inboundMsgThrottler) Acquire(ctx context.Context, msgSize uint64, nodeI
 	// Wait until our disk usage drops to an acceptable level.
 	t.diskThrottler.Acquire(ctx, nodeID)
 	// Acquire space on the inbound message byte buffer
-	t.byteThrottler.Acquire(msgSize, nodeID)
-}
-
-// Must correspond to a previous call of Acquire([msgSize], [nodeID]).
-// See InboundMsgThrottler interface.
-func (t *inboundMsgThrottler) Release(msgSize uint64, nodeID ids.NodeID) {
-	// Release space on the inbound message buffer
-	t.bufferThrottler.Release(nodeID)
-	// Release space on the inbound message byte buffer
-	t.byteThrottler.Release(msgSize, nodeID)
+	byteRelease := t.byteThrottler.Acquire(ctx, msgSize, nodeID)
+	return func() {
+		bufferRelease()
+		byteRelease()
+	}
 }
 
 // See BandwidthThrottler.

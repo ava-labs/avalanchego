@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	UncompressingBuilder OutboundMsgBuilder
-	TestCodec            Codec
+	UncompressingBuilder  OutboundMsgBuilder
+	TestInboundMsgBuilder InboundMsgBuilder
+	TestCodec             Codec
 
 	dummyNodeID             = ids.EmptyNodeID
 	dummyOnFinishedHandling = func() {}
@@ -33,6 +34,7 @@ func init() {
 	}
 	TestCodec = codec
 	UncompressingBuilder = NewOutboundBuilder(codec, false /*compress*/)
+	TestInboundMsgBuilder = NewInboundBuilder(codec)
 }
 
 func TestBuildVersion(t *testing.T) {
@@ -265,6 +267,35 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+}
+
+func TestBuildChitsV2(t *testing.T) {
+	chainID := ids.Empty.Prefix(0)
+	requestID := uint32(5)
+	containerID := ids.Empty.Prefix(1)
+	containerIDs := [][]byte{containerID[:]}
+
+	msg := TestInboundMsgBuilder.InboundChitsV2(chainID, requestID, []ids.ID{containerID}, containerID, dummyNodeID)
+	assert.NotNil(t, msg)
+	assert.Equal(t, ChitsV2, msg.Op())
+	assert.Equal(t, chainID[:], msg.Get(ChainID))
+	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
+	assert.Equal(t, containerID[:], msg.Get(ContainerID))
+
+	outboundMsg, err := UncompressingBuilder.ChitsV2(chainID, requestID, []ids.ID{containerID}, containerID)
+	assert.NoError(t, err)
+	assert.NotNil(t, outboundMsg)
+	assert.Equal(t, ChitsV2, outboundMsg.Op())
+
+	parsedMsg, err := TestCodec.Parse(outboundMsg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedMsg)
+	assert.Equal(t, ChitsV2, parsedMsg.Op())
+	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
+	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+	assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
 }
 
 func TestBuildAncestors(t *testing.T) {

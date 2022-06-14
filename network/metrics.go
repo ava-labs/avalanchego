@@ -135,10 +135,6 @@ func (m *metrics) markConnected(peer peer.Peer) {
 
 	trackedSubnets := peer.TrackedSubnets()
 	for subnetID := range trackedSubnets {
-		// no need to track primary network ID
-		if subnetID == constants.PrimaryNetworkID {
-			continue
-		}
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
 	}
 }
@@ -149,10 +145,6 @@ func (m *metrics) markDisconnected(peer peer.Peer) {
 
 	trackedSubnets := peer.TrackedSubnets()
 	for subnetID := range trackedSubnets {
-		// no need to track primary network ID
-		if subnetID == constants.PrimaryNetworkID {
-			continue
-		}
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
 	}
 }

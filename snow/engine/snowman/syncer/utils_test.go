@@ -68,7 +68,6 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	*stateSyncer,
 	*fullVM,
 	*common.SenderTest,
-
 ) {
 	sender := &common.SenderTest{T: t}
 	commonCfg.Sender = sender
