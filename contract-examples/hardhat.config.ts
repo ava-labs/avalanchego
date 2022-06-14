@@ -1,179 +1,14 @@
-import { task } from "hardhat/config"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { BigNumber } from "ethers"
 import "@nomiclabs/hardhat-waffle"
+import "./tasks.ts"
+import { existsSync } from "fs"
 
-const BLACKHOLE_ADDRESS = "0x0100000000000000000000000000000000000000"
-const CONTRACT_ALLOW_LIST_ADDRESS = "0x0200000000000000000000000000000000000000"
-const MINT_ADDRESS = "0x0200000000000000000000000000000000000001"
-const TX_ALLOW_LIST_ADDRESS = "0x0200000000000000000000000000000000000002"
-
-
-const ROLES = {
-  0: "None",
-  1: "Enabled",
-  2: "Admin",
+// Import the dynamic rpc url if the file exists
+let rpcUrl = ""
+if (existsSync("./dynamic_rpc.json")) {
+  const importedRpc = require("./dynamic_rpc.json")
+  rpcUrl = importedRpc.rpc
 }
 
-const getRole = async (allowList, address) => {
-  const role = await allowList.readAllowList(address)
-  console.log(`${address} has role: ${ROLES[role.toNumber()]}`)
-}
-
-task("accounts", "Prints the list of accounts", async (args, hre): Promise<void> => {
-  const accounts: SignerWithAddress[] = await hre.ethers.getSigners()
-  accounts.forEach((account: SignerWithAddress): void => {
-    console.log(account.address)
-  })
-})
-
-task("balances", "Prints the list of account balances", async (args, hre): Promise<void> => {
-  const accounts: SignerWithAddress[] = await hre.ethers.getSigners()
-  for (const account of accounts) {
-    const balance: BigNumber = await hre.ethers.provider.getBalance(
-      account.address
-    )
-    console.log(`${account.address} has balance ${balance.toString()}`)
-  }
-})
-
-
-task("balance", "a task to get the balance")
-  .addParam("address", "the address you want to know balance of")
-  .setAction(async (args, hre) => {
-    const balance = await hre.ethers.provider.getBalance(args.address)
-    const balanceInEth = hre.ethers.utils.formatEther(balance)
-    console.log(`balance: ${balanceInEth} ETH`)
-  })
-
-// npx hardhat allowList:readRole --network local --address [address]
-task("deployerAllowList:readRole", "a task to get the network deployer allow list")
-  .addParam("address", "the address you want to know the allowlist role for")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", CONTRACT_ALLOW_LIST_ADDRESS)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:addDeployer --network local --address [address]
-task("deployerAllowList:addDeployer", "a task to add the deployer on the allow list")
-  .addParam("address", "the address you want to add as a deployer")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", CONTRACT_ALLOW_LIST_ADDRESS)
-    // ADD CODE BELOW
-    await allowList.setEnabled(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:addAdmin --network local --address [address]
-task("deployerAllowList:addAdmin", "a task to add a admin on the allowlist")
-  .addParam("address", "the address you want to add as a admin")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", CONTRACT_ALLOW_LIST_ADDRESS)
-    await allowList.setAdmin(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:revoke --network local --address [address]
-task("deployerAllowList:revoke", "remove the address from the list")
-  .addParam("address", "the address you want to revoke all permission")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", CONTRACT_ALLOW_LIST_ADDRESS)
-    await allowList.setNone(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:readRole --network local --address [address]
-task("txAllowList:readRole", "a task to get the network transaction allow list")
-  .addParam("address", "the address you want to know the allowlist role for")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:addDeployer --network local --address [address]
-task("txAllowList:addDeployer", "a task to add an address to the transaction allow list")
-  .addParam("address", "the address you want to add as a deployer")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS)
-    // ADD CODE BELOW
-    await allowList.setEnabled(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:addAdmin --network local --address [address]
-task("txAllowList:addAdmin", "a task to add a admin on the transaction allow list")
-  .addParam("address", "the address you want to add as a admin")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS)
-    await allowList.setAdmin(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat allowList:revoke --network local --address [address]
-task("txAllowList:revoke", "remove the address from the transaction allow list")
-  .addParam("address", "the address you want to revoke all permission")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS)
-    await allowList.setNone(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat minter:readRole --network local --address [address]
-task("minter:readRole", "a task to get the network deployer minter list")
-  .addParam("address", "the address you want to know the minter role for")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("INativeMinter", MINT_ADDRESS)
-    await getRole(allowList, args.address)
-  })
-
-
-// npx hardhat minter:addMinter --network local --address [address]
-task("minter:addMinter", "a task to add the address on the minter list")
-  .addParam("address", "the address you want to add as a minter")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("INativeMinter", MINT_ADDRESS)
-    await allowList.setEnabled(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat minter:addAdmin --network local --address [address]
-task("minter:addAdmin", "a task to add a admin on the minter list")
-  .addParam("address", "the address you want to add as a admin")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("INativeMinter", MINT_ADDRESS)
-    await allowList.setAdmin(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat minter:revoke --network local --address [address]
-task("minter:revoke", "remove the address from the list")
-  .addParam("address", "the address you want to revoke all permission")
-  .setAction(async (args, hre) => {
-    const allowList = await hre.ethers.getContractAt("INativeMinter", MINT_ADDRESS)
-    await allowList.setNone(args.address)
-    await getRole(allowList, args.address)
-  })
-
-// npx hardhat minter:mint --network local --address [address]
-task("minter:mint", "mint native token")
-  .addParam("address", "the address you want to mint for")
-  .addParam("amount", "the amount you want to mint")
-  .setAction(async (args, hre) => {
-    const minter = await hre.ethers.getContractAt("INativeMinter", MINT_ADDRESS)
-    await minter.mintNativeToken(args.address, args.amount)
-  })
-
-// npx hardhat minter:burn --network local --address [address]
-task("minter:burn", "burn")
-  .addParam("amount", "the amount you want to burn (in ETH unit)")
-  .setAction(async (args, hre) => {
-    const [owner] = await hre.ethers.getSigners()
-    const transactionHash = await owner.sendTransaction({
-      to: BLACKHOLE_ADDRESS,
-      value: hre.ethers.utils.parseEther(args.amount),
-    })
-    console.log(transactionHash)
-  })
 
 export default {
   solidity: {
@@ -213,11 +48,9 @@ export default {
         "0x750839e9dbbd2a0910efe40f50b2f3b2f2f59f5580bb4b83bd8c1201cf9a010a"
       ]
     },
-    // This network is used by automated test scripts and is edited dynamically.
-    // Data here may be overwritten without warning.
     subnet: {
       //"http://{ip}:{port}/ext/bc/{chainID}/rpc
-      url: "http://localhost:32825/ext/bc/5AtzGKAdpoSg2KWickoae6EQWpVWSqin9oJygFF88FEJ2LnJ2/rpc",
+      url: rpcUrl,
       chainId: 99999,
       accounts: [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",

@@ -36,6 +36,13 @@ describe("ExampleTxAllowList", function () {
       to: allowed.address,
       value: ethers.utils.parseEther("10")
     })
+
+    // Fund no role address
+    let tx = await admin.sendTransaction({
+      to: noRole.address,
+      value: ethers.utils.parseEther("10")
+    })
+    await tx.wait()
   })
 
   it("should add contract deployer as admin", async function () {
