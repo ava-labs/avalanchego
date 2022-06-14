@@ -786,6 +786,7 @@ func TestGetBlock(t *testing.T) {
 
 			block, err := p_block.NewStandardBlock(
 				blkVersion,
+				0, // preFork timestamp is not serialized
 				service.vm.blkVerifier,
 				ids.GenerateTestID(),
 				1234,

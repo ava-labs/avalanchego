@@ -21,6 +21,30 @@ type AtomicBlockIntf interface {
 	AtomicTx() *signed.Tx
 }
 
+func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (AtomicBlockIntf, error) {
+	res := &AtomicBlock{
+		CommonBlock: CommonBlock{
+			PrntID: parentID,
+			Hght:   height,
+		},
+		Tx: tx,
+	}
+
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := CommonBlockIntf(res)
+	bytes, err := Codec.Marshal(PreForkVersion, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+	}
+
+	if err := tx.Sign(unsigned.Codec, nil); err != nil {
+		return nil, fmt.Errorf("failed to sign block: %w", err)
+	}
+
+	return res, res.Initialize(PreForkVersion, bytes)
+}
+
 // AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
@@ -46,27 +70,3 @@ func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
 }
 
 func (ab *AtomicBlock) AtomicTx() *signed.Tx { return &ab.Tx }
-
-func NewAtomicBlock(version uint16, parentID ids.ID, height uint64, tx signed.Tx) (AtomicBlockIntf, error) {
-	res := &AtomicBlock{
-		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
-		},
-		Tx: tx,
-	}
-
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(PreForkVersion, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	if err := tx.Sign(unsigned.Codec, nil); err != nil {
-		return nil, fmt.Errorf("failed to sign block: %w", err)
-	}
-
-	return res, res.Initialize(version, bytes)
-}

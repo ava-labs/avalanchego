@@ -42,12 +42,13 @@ type ProposalBlock struct {
 // The parent must be a decision block.
 func NewProposalBlock(
 	version uint16,
+	timestamp uint64,
 	verifier Verifier,
 	parentID ids.ID,
 	height uint64,
 	tx signed.Tx,
 ) (*ProposalBlock, error) {
-	statelessBlk, err := stateless.NewProposalBlock(version, parentID, height, tx)
+	statelessBlk, err := stateless.NewProposalBlock(version, timestamp, parentID, height, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -177,14 +178,28 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	commit, err := NewCommitBlock(pb.Version(), pb.verifier, blkID, nextHeight, prefersCommit)
+	commit, err := NewCommitBlock(
+		pb.Version(),
+		uint64(pb.Timestamp().Unix()),
+		pb.verifier,
+		blkID,
+		nextHeight,
+		prefersCommit,
+	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err := NewAbortBlock(pb.Version(), pb.verifier, blkID, nextHeight, !prefersCommit)
+	abort, err := NewAbortBlock(
+		pb.Version(),
+		uint64(pb.Timestamp().Unix()),
+		pb.verifier,
+		blkID,
+		nextHeight,
+		!prefersCommit,
+	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",

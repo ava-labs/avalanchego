@@ -38,12 +38,13 @@ type StandardBlock struct {
 // decision block, has ID [parentID].
 func NewStandardBlock(
 	version uint16,
+	timestamp uint64,
 	verifier Verifier,
 	parentID ids.ID,
 	height uint64,
 	txs []*signed.Tx,
 ) (*StandardBlock, error) {
-	statelessBlk, err := stateless.NewStandardBlock(version, parentID, height, txs)
+	statelessBlk, err := stateless.NewStandardBlock(version, timestamp, parentID, height, txs)
 	if err != nil {
 		return nil, err
 	}

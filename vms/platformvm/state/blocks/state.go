@@ -133,7 +133,12 @@ func (st *state) SyncGenesis(genesisBytes []byte) (ids.ID, error) {
 	// do genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlk, err := stateless.NewCommitBlock(stateless.PreForkVersion, genesisID, 0)
+	genesisBlk, err := stateless.NewCommitBlock(
+		stateless.PreForkVersion,
+		0, // timestamp, not serialized for pre-fork blocks
+		genesisID,
+		0,
+	)
 	if err != nil {
 		return ids.Empty, err
 	}

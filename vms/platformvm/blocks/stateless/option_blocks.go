@@ -16,22 +16,53 @@ var (
 
 type OptionBlock CommonBlockIntf
 
-type AbortBlock struct {
-	CommonBlock `serialize:"true"`
-}
-
-func NewAbortBlock(version uint16, parentID ids.ID, height uint64) (OptionBlock, error) {
+func NewAbortBlock(
+	version uint16,
+	timestamp uint64,
+	parentID ids.ID,
+	height uint64,
+) (OptionBlock, error) {
 	res := &AbortBlock{
 		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
+			PrntID:       parentID,
+			Hght:         height,
+			BlkTimestamp: timestamp,
 		},
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(PreForkVersion, &blk)
+	bytes, err := Codec.Marshal(version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+	}
+
+	return res, res.Initialize(version, bytes)
+}
+
+type AbortBlock struct {
+	CommonBlock `serialize:"true"`
+}
+
+func NewCommitBlock(
+	version uint16,
+	timestamp uint64,
+	parentID ids.ID,
+	height uint64,
+) (OptionBlock, error) {
+	res := &CommitBlock{
+		CommonBlock: CommonBlock{
+			PrntID:       parentID,
+			Hght:         height,
+			BlkTimestamp: timestamp,
+		},
+	}
+
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := CommonBlockIntf(res)
+	bytes, err := Codec.Marshal(version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
@@ -41,23 +72,4 @@ func NewAbortBlock(version uint16, parentID ids.ID, height uint64) (OptionBlock,
 
 type CommitBlock struct {
 	CommonBlock `serialize:"true"`
-}
-
-func NewCommitBlock(version uint16, parentID ids.ID, height uint64) (OptionBlock, error) {
-	res := &CommitBlock{
-		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
-		},
-	}
-
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(PreForkVersion, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	return res, res.Initialize(version, bytes)
 }

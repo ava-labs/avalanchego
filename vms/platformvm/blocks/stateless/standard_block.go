@@ -28,32 +28,67 @@ type StandardBlockIntf interface {
 	DecisionTxs() []*signed.Tx
 }
 
-// TODO ABENEGIA: NewStandardBlock should accept codec version
-// and switch across them
-func NewStandardBlock(version uint16, parentID ids.ID, height uint64, txs []*signed.Tx) (StandardBlockIntf, error) {
-	res := &StandardBlock{
-		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
-		},
-		Txs: txs,
-	}
-
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(PreForkVersion, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	for _, tx := range res.Txs {
+func NewStandardBlock(
+	version uint16,
+	timestamp uint64,
+	parentID ids.ID,
+	height uint64,
+	txs []*signed.Tx,
+) (StandardBlockIntf, error) {
+	// make sure txs to be included in the block
+	// are duly initialized
+	for _, tx := range txs {
 		if err := tx.Sign(unsigned.Codec, nil); err != nil {
 			return nil, fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 
-	return res, res.Initialize(version, bytes)
+	switch version {
+	case PreForkVersion:
+		res := &StandardBlock{
+			CommonBlock: CommonBlock{
+				PrntID:       parentID,
+				Hght:         height,
+				BlkTimestamp: timestamp,
+			},
+			Txs: txs,
+		}
+		// We serialize this block as a Block so that it can be deserialized into a
+		// Block
+		blk := CommonBlockIntf(res)
+		bytes, err := Codec.Marshal(version, &blk)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+		}
+
+		return res, res.Initialize(version, bytes)
+
+	case PostForkVersion:
+		txsBytes := make([][]byte, 0, len(txs))
+		for _, tx := range txs {
+			txsBytes = append(txsBytes, tx.Bytes())
+		}
+		res := &PostForkStandardBlock{
+			CommonBlock: CommonBlock{
+				PrntID:       parentID,
+				Hght:         height,
+				BlkTimestamp: timestamp,
+			},
+			TxsBytes: txsBytes,
+			Txs:      txs,
+		}
+		// We serialize this block as a Block so that it can be deserialized into a
+		// Block
+		blk := CommonBlockIntf(res)
+		bytes, err := Codec.Marshal(version, &blk)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+		}
+		return res, res.Initialize(version, bytes)
+
+	default:
+		return nil, fmt.Errorf("unsopported block version %d", version)
+	}
 }
 
 type StandardBlock struct {
@@ -83,7 +118,7 @@ func (sb *StandardBlock) DecisionTxs() []*signed.Tx { return sb.Txs }
 type PostForkStandardBlock struct {
 	CommonBlock `serialize:"true"`
 
-	TxsBytes [][]byte `serialize:"true" json:"txs"`
+	TxsBytes [][]byte `serialize:"false" postFork:"true" json:"txs"`
 
 	Txs []*signed.Tx
 }
@@ -95,16 +130,15 @@ func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error
 
 	txs := make([]*signed.Tx, 0, len(psb.TxsBytes))
 	for _, txBytes := range psb.TxsBytes {
-		// TODO ABENEGIA: more future_proof allowing tx.Sign to accept a version
-		var tx *signed.Tx
-		_, err := unsigned.Codec.Unmarshal(txBytes, tx)
+		var tx signed.Tx
+		_, err := unsigned.Codec.Unmarshal(txBytes, &tx)
 		if err != nil {
 			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
 		}
 		if err := tx.Sign(unsigned.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
-		txs = append(txs, tx)
+		txs = append(txs, &tx)
 	}
 	psb.Txs = txs
 	return nil

@@ -24,28 +24,62 @@ type ProposalBlockIntf interface {
 	ProposalTx() *signed.Tx
 }
 
-func NewProposalBlock(version uint16, parentID ids.ID, height uint64, tx signed.Tx) (ProposalBlockIntf, error) {
-	res := &ProposalBlock{
-		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
-		},
-		Tx: tx,
-	}
-
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(PreForkVersion, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
+func NewProposalBlock(
+	version uint16,
+	timestamp uint64,
+	parentID ids.ID,
+	height uint64,
+	tx signed.Tx,
+) (ProposalBlockIntf, error) {
+	// make sure txs to be included in the block
+	// are duly initialized
 	if err := tx.Sign(unsigned.Codec, nil); err != nil {
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
-	return res, res.Initialize(version, bytes)
+	switch version {
+	case PreForkVersion:
+		res := &ProposalBlock{
+			CommonBlock: CommonBlock{
+				PrntID:       parentID,
+				Hght:         height,
+				BlkTimestamp: timestamp,
+			},
+			Tx: tx,
+		}
+
+		// We serialize this block as a Block so that it can be deserialized into a
+		// Block
+		blk := CommonBlockIntf(res)
+		bytes, err := Codec.Marshal(version, &blk)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+		}
+		return res, res.Initialize(version, bytes)
+
+	case PostForkVersion:
+		res := &PostForkProposalBlock{
+			CommonBlock: CommonBlock{
+				PrntID:       parentID,
+				Hght:         height,
+				BlkTimestamp: timestamp,
+			},
+			TxBytes: tx.Bytes(),
+			Tx:      tx,
+		}
+
+		// We serialize this block as a Block so that it can be deserialized into a
+		// Block
+		blk := CommonBlockIntf(res)
+		bytes, err := Codec.Marshal(version, &blk)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+		}
+		return res, res.Initialize(version, bytes)
+
+	default:
+		return nil, fmt.Errorf("unsopported block version %d", version)
+	}
 }
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now
@@ -77,9 +111,9 @@ func (pb *ProposalBlock) ProposalTx() *signed.Tx { return &pb.Tx }
 type PostForkProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	TxBytes []byte `serialize:"true" json:"txs"`
+	TxBytes []byte `serialize:"false" postFork:"true" json:"txs"`
 
-	Tx *signed.Tx
+	Tx signed.Tx
 }
 
 func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error {
@@ -87,11 +121,12 @@ func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	// TODO ABENEGIA: more future_proof allowing tx.Sign to accept a version
-	_, err := unsigned.Codec.Unmarshal(ppb.TxBytes, ppb.Tx)
+	var tx signed.Tx
+	_, err := unsigned.Codec.Unmarshal(ppb.TxBytes, &tx)
 	if err != nil {
 		return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
 	}
+	ppb.Tx = tx
 	if err := ppb.Tx.Sign(unsigned.Codec, nil); err != nil {
 		return fmt.Errorf("failed to sign block: %w", err)
 	}
@@ -99,4 +134,4 @@ func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error
 	return nil
 }
 
-func (ppb *PostForkProposalBlock) ProposalTx() *signed.Tx { return ppb.Tx }
+func (ppb *PostForkProposalBlock) ProposalTx() *signed.Tx { return &ppb.Tx }

@@ -181,7 +181,14 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
-		return stateful.NewStandardBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, txs)
+		return stateful.NewStandardBlock(
+			stateless.PreForkVersion,
+			0, // preFork timestamp is not serialized
+			b.blkVerifier,
+			preferredID,
+			nextHeight,
+			txs,
+		)
 	}
 
 	// Try building a proposal block that rewards a staker.
@@ -194,7 +201,14 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *rewardValidatorTx)
+		return stateful.NewProposalBlock(
+			stateless.PreForkVersion,
+			0, // preFork timestamp is not serialized
+			b.blkVerifier,
+			preferredID,
+			nextHeight,
+			*rewardValidatorTx,
+		)
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -207,7 +221,14 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
+		return stateful.NewProposalBlock(
+			stateless.PreForkVersion,
+			0, // preFork timestamp is not serialized
+			b.blkVerifier,
+			preferredID,
+			nextHeight,
+			*advanceTimeTx,
+		)
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -231,10 +252,24 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
+		return stateful.NewProposalBlock(
+			stateless.PreForkVersion,
+			0, // preFork timestamp is not serialized
+			b.blkVerifier,
+			preferredID,
+			nextHeight,
+			*advanceTimeTx,
+		)
 	}
 
-	return stateful.NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *tx)
+	return stateful.NewProposalBlock(
+		stateless.PreForkVersion,
+		0, // preFork timestamp is not serialized
+		b.blkVerifier,
+		preferredID,
+		nextHeight,
+		*tx,
+	)
 }
 
 func (b *blockBuilder) Shutdown() {

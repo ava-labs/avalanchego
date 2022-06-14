@@ -32,8 +32,8 @@ func ValidateProposedChainTime(
 		)
 	}
 
-	// TODO ABENEGIA: this means I can only have sprees of <SyncBound> blocks
-	// because I have to increment 1 sec each block and I cannot violate SyncBound
+	// Note: this means we can only have sprees of <SyncBound> blocks
+	// because we increment 1 sec each block and I cannot violate SyncBound
 	localTimestampPlusSync := localTime.Add(SyncBound)
 	if localTimestampPlusSync.Before(proposedChainTime) {
 		return fmt.Errorf(

@@ -4,8 +4,6 @@
 package stateless
 
 import (
-	"math"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
@@ -30,16 +28,15 @@ func init() {
 	postCdc := linearcodec.NewWithTags(postForkTags)
 	Codec = codec.NewDefaultManager()
 
-	preGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	postGc := linearcodec.New(postForkTags, math.MaxInt32)
-
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{preCdc, postCdc, preGc, postGc} {
+	for _, c := range []codec.Registry{preCdc, postCdc} {
 		errs.Add(
-			RegisterBlockTypes(c),
+			RegisterPreForkBlockTypes(c),
 			unsigned.RegisterUnsignedTxsTypes(c),
 		)
 	}
+	errs.Add(RegisterPostForkBlockTypes(postCdc))
+
 	errs.Add(
 		Codec.RegisterCodec(PreForkVersion, preCdc),
 		Codec.RegisterCodec(PostForkVersion, postCdc),
@@ -49,12 +46,12 @@ func init() {
 	}
 }
 
-// RegisterBlockTypes allows registering relevant type of blocks package
+// RegisterPreForkBlockTypes allows registering relevant type of blocks package
 // in the right sequence. Following repackaging of platformvm package, a few
 // subpackage-level codecs were introduced, each handling serialization of specific types.
 // RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
 // are coherent with components one.
-func RegisterBlockTypes(targetCodec codec.Registry) error {
+func RegisterPreForkBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		targetCodec.RegisterType(&ProposalBlock{}),
@@ -62,6 +59,15 @@ func RegisterBlockTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&CommitBlock{}),
 		targetCodec.RegisterType(&StandardBlock{}),
 		targetCodec.RegisterType(&AtomicBlock{}),
+	)
+	return errs.Err
+}
+
+func RegisterPostForkBlockTypes(targetCodec codec.Registry) error {
+	errs := wrappers.Errs{}
+	errs.Add(
+		targetCodec.RegisterType(&PostForkProposalBlock{}),
+		targetCodec.RegisterType(&PostForkStandardBlock{}),
 	)
 	return errs.Err
 }

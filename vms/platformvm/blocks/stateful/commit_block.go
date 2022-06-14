@@ -30,12 +30,13 @@ type CommitBlock struct {
 // was originally preferred or not for metrics.
 func NewCommitBlock(
 	version uint16,
+	timestamp uint64,
 	verifier Verifier,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
 ) (*CommitBlock, error) {
-	statelessBlk, err := stateless.NewCommitBlock(version, parentID, height)
+	statelessBlk, err := stateless.NewCommitBlock(version, timestamp, parentID, height)
 	if err != nil {
 		return nil, err
 	}

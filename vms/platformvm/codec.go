@@ -33,7 +33,7 @@ func init() {
 	errs := wrappers.Errs{}
 	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
-			stateless.RegisterBlockTypes(c),
+			stateless.RegisterPreForkBlockTypes(c),
 			unsigned.RegisterUnsignedTxsTypes(c),
 		)
 	}

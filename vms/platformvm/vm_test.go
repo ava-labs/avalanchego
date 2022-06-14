@@ -670,6 +670,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredHeight := preferred.Height()
 	blk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -1646,7 +1647,6 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	vm, _ := defaultVM()
-	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1685,7 +1685,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	blk, err := p_block.NewAtomicBlock(blkVersion, vm.blkVerifier, preferredID, preferredHeight+1, tx)
+	blk, err := p_block.NewAtomicBlock(vm.blkVerifier, preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1766,6 +1766,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		firstVM.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -1897,6 +1898,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		firstVM.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2035,6 +2037,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	advanceTimeBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2322,6 +2325,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2349,6 +2353,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 	secondAdvanceTimeBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		firstOption.ID(),
 		firstOption.(p_block.Block).Height()+1,
@@ -2528,6 +2533,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 
 	addSubnetBlk0, err := p_block.NewStandardBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2538,6 +2544,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}
 	addSubnetBlk1, err := p_block.NewStandardBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2548,6 +2555,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}
 	addSubnetBlk2, err := p_block.NewStandardBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
@@ -2620,6 +2628,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	addValidatorProposalBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2694,6 +2703,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	importBlk, err := p_block.NewStandardBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2761,6 +2771,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	advanceTimeProposalBlk, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2872,6 +2883,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorProposalBlk0, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2915,6 +2927,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -2997,6 +3010,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	importBlk, err := p_block.NewStandardBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -3075,6 +3089,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorProposalBlk1, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,
@@ -3118,6 +3133,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(
 		blkVersion,
+		0, // preFork timestamp is not serialized
 		vm.blkVerifier,
 		preferredID,
 		preferredHeight+1,

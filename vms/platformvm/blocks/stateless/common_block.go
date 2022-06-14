@@ -25,14 +25,20 @@ type CommonBlockIntf interface {
 
 // CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
-	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
-	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
+	// parent's ID
+	PrntID ids.ID `serialize:"true" json:"parentID"`
 
-	BlkTimestamp uint64 `serialize:"false" postFork:"true" json:"time"` // Time this block was proposed at
+	// This block's height. The genesis block is at height 0.
+	Hght uint64 `serialize:"true" json:"height"`
 
-	version uint16 // Codec version used to serialized/deserialize the block
-	id      ids.ID
-	bytes   []byte
+	// Time this block was proposed at
+	BlkTimestamp uint64 `serialize:"false" postFork:"true" json:"time"`
+
+	// Codec version used to serialized/deserialize the block
+	version uint16
+
+	id    ids.ID
+	bytes []byte
 }
 
 func (b *CommonBlock) Initialize(version uint16, bytes []byte) error {
