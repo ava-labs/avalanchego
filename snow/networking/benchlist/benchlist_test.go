@@ -136,11 +136,6 @@ func TestBenchlistAdd(t *testing.T) {
 		b.RegisterFailure(vdr1.ID())
 	}
 
-	// Advance the time
-	b.lock.Lock()
-	now = now.Add(minimumFailingDuration)
-	b.lock.Unlock()
-
 	// Register another failure
 	b.RegisterResponse(vdr1.ID())
 
