@@ -31,9 +31,9 @@ import (
 // state of the network.
 
 var (
-	ErrStakeOverflow        = errors.New("too many funds staked on single validator")
 	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
+	errStakeOverflow        = errors.New("too many funds staked on single validator")
 )
 
 // StaticService defines the static API methods exposed by the platform VM
@@ -237,7 +237,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 			newWeight, err := math.Add64(weight, uint64(apiUTXO.Amount))
 			if err != nil {
-				return ErrStakeOverflow
+				return errStakeOverflow
 			}
 			weight = newWeight
 		}
