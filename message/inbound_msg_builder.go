@@ -104,6 +104,14 @@ type InboundMsgBuilder interface {
 		nodeID ids.NodeID,
 	) InboundMessage
 
+	InboundChitsV2(
+		chainID ids.ID,
+		requestID uint32,
+		containerIDs []ids.ID,
+		containerID ids.ID,
+		nodeID ids.NodeID,
+	) InboundMessage
+
 	InboundAppRequest(
 		chainID ids.ID,
 		requestID uint32,
@@ -366,6 +374,31 @@ func (b *inMsgBuilder) InboundChits(
 			ChainID:      chainID[:],
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
+		},
+		nodeID: nodeID,
+	}
+}
+
+// The first "containerIDs" is always populated for backward compatibilities with old "Chits"
+// Only after the DAG is linearized, the second "containerID" will be populated
+// with the new snowman chain containers.
+func (b *inMsgBuilder) InboundChitsV2(
+	chainID ids.ID,
+	requestID uint32,
+	containerIDs []ids.ID,
+	containerID ids.ID,
+	nodeID ids.NodeID,
+) InboundMessage {
+	containerIDBytes := make([][]byte, len(containerIDs))
+	encodeIDs(containerIDs, containerIDBytes)
+
+	return &inboundMessage{
+		op: ChitsV2,
+		fields: map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			ContainerIDs: containerIDBytes,
+			ContainerID:  containerID[:],
 		},
 		nodeID: nodeID,
 	}

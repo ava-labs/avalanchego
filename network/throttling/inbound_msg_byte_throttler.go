@@ -4,6 +4,7 @@
 package throttling
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -46,6 +47,8 @@ func newInboundMsgByteThrottler(
 type msgMetadata struct {
 	// Need this many more bytes before Acquire returns
 	bytesNeeded uint64
+	// The number of bytes that were attempted to be acquired
+	msgSize uint64
 	// The sender of this incoming message
 	nodeID ids.NodeID
 	// Closed when the message can be read.
@@ -79,22 +82,25 @@ type inboundMsgByteThrottler struct {
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
-// Release([msgSize], [nodeID]) must be called (!) when done with the message
+// The returned ReleaseFunc must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-// TODO pass in a context to allow early cancellation.
-func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
+func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.awaitingRelease.Inc()
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 	}()
+	metadata := &msgMetadata{
+		bytesNeeded: msgSize,
+		msgSize:     msgSize,
+		nodeID:      nodeID,
+	}
 
-	bytesNeeded := msgSize
 	t.lock.Lock()
 	// Take as many bytes as we can from the at-large allocation.
 	atLargeBytesUsed := math.Min64(
 		// only give as many bytes as needed
-		bytesNeeded,
+		metadata.bytesNeeded,
 		// don't exceed per-node limit
 		t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[nodeID],
 		// don't give more bytes than are in the allocation
@@ -103,11 +109,11 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 	if atLargeBytesUsed > 0 {
 		t.remainingAtLargeBytes -= atLargeBytesUsed
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
-		bytesNeeded -= atLargeBytesUsed
+		metadata.bytesNeeded -= atLargeBytesUsed
 		t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
-		if bytesNeeded == 0 { // If we acquired enough bytes, return
+		if metadata.bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
-			return
+			return func() { t.release(metadata, nodeID) }
 		}
 	}
 
@@ -128,16 +134,16 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min64(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := math.Min64(t.remainingVdrBytes, metadata.bytesNeeded, vdrBytesAllowed)
 	if vdrBytesUsed > 0 {
 		// Mark that [nodeID] used [vdrBytesUsed] from its validator allocation
 		t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
 		t.remainingVdrBytes -= vdrBytesUsed
 		t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
-		bytesNeeded -= vdrBytesUsed
-		if bytesNeeded == 0 { // If we acquired enough bytes, return
+		metadata.bytesNeeded -= vdrBytesUsed
+		if metadata.bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
-			return
+			return func() { t.release(metadata, nodeID) }
 		}
 	}
 
@@ -146,27 +152,34 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.NodeID) {
 
 	// [closeOnAcquireChan] is closed when [msgSize] bytes have
 	// been acquired and the message can be read.
-	closeOnAcquireChan := make(chan struct{})
+	metadata.closeOnAcquireChan = make(chan struct{})
 	t.nextMsgID++
 	msgID := t.nextMsgID
 	t.waitingToAcquire.Put(
 		msgID,
-		&msgMetadata{
-			bytesNeeded:        bytesNeeded,
-			nodeID:             nodeID,
-			closeOnAcquireChan: closeOnAcquireChan,
-		},
+		metadata,
 	)
 	t.nodeToWaitingMsgIDs[nodeID] = append(t.nodeToWaitingMsgIDs[nodeID], msgID)
 	t.lock.Unlock()
 
 	t.metrics.awaitingAcquire.Inc()
-	<-closeOnAcquireChan // We've acquired enough bytes
-	t.metrics.awaitingAcquire.Dec()
+	defer t.metrics.awaitingAcquire.Dec()
+
+	select {
+	case <-metadata.closeOnAcquireChan:
+	case <-ctx.Done():
+		t.lock.Lock()
+		t.waitingToAcquire.Delete(msgID)
+		t.lock.Unlock()
+	}
+
+	return func() {
+		t.release(metadata, nodeID)
+	}
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.NodeID) {
+func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -179,12 +192,13 @@ func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.NodeID) {
 	// that will be given back to [nodeID]'s validator allocation
 	// or messages from [nodeID] currently waiting to acquire bytes.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
-	vdrBytesToReturn := math.Min64(msgSize, vdrBytesUsed)
+	releasedBytes := metadata.msgSize - metadata.bytesNeeded
+	vdrBytesToReturn := math.Min64(releasedBytes, vdrBytesUsed)
 
 	// [atLargeBytesToReturn] is the number of bytes from [msgSize]
 	// that will be given to the at-large allocation or a message
 	// from any node currently waiting to acquire bytes.
-	atLargeBytesToReturn := msgSize - vdrBytesToReturn
+	atLargeBytesToReturn := releasedBytes - vdrBytesToReturn
 	if atLargeBytesToReturn > 0 {
 		// Mark that [nodeID] has released these bytes.
 		t.remainingAtLargeBytes += atLargeBytesToReturn
