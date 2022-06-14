@@ -81,4 +81,7 @@ type Config struct {
 
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
+
+	// Time of the removal of advance time tx
+	AdvanceTimeTxRemovalTime time.Time
 }

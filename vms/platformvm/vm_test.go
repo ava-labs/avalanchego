@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -317,21 +318,22 @@ func BuildGenesisTestWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) (*p_ap
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			Validators:             validators.NewManager(),
-			TxFee:                  defaultTxFee,
-			CreateSubnetTxFee:      100 * defaultTxFee,
-			CreateBlockchainTxFee:  100 * defaultTxFee,
-			MinValidatorStake:      defaultMinValidatorStake,
-			MaxValidatorStake:      defaultMaxValidatorStake,
-			MinDelegatorStake:      defaultMinDelegatorStake,
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			ApricotPhase3Time:      defaultValidateEndTime,
-			ApricotPhase4Time:      defaultValidateEndTime,
-			ApricotPhase5Time:      defaultValidateEndTime,
+			Chains:                   chains.MockManager{},
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			Validators:               validators.NewManager(),
+			TxFee:                    defaultTxFee,
+			CreateSubnetTxFee:        100 * defaultTxFee,
+			CreateBlockchainTxFee:    100 * defaultTxFee,
+			MinValidatorStake:        defaultMinValidatorStake,
+			MaxValidatorStake:        defaultMaxValidatorStake,
+			MinDelegatorStake:        defaultMinDelegatorStake,
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			ApricotPhase3Time:        defaultValidateEndTime,
+			ApricotPhase4Time:        defaultValidateEndTime,
+			ApricotPhase5Time:        defaultValidateEndTime,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -398,16 +400,17 @@ func GenesisVMWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) ([]byte, chan
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			TxFee:                  defaultTxFee,
-			MinValidatorStake:      defaultMinValidatorStake,
-			MaxValidatorStake:      defaultMaxValidatorStake,
-			MinDelegatorStake:      defaultMinDelegatorStake,
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			TxFee:                    defaultTxFee,
+			MinValidatorStake:        defaultMinValidatorStake,
+			MaxValidatorStake:        defaultMaxValidatorStake,
+			MinDelegatorStake:        defaultMinDelegatorStake,
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -1726,12 +1729,13 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1816,12 +1820,13 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -1859,12 +1864,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -1944,12 +1950,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -1993,12 +2000,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -2275,12 +2283,13 @@ func TestUnverifiedParent(t *testing.T) {
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -2444,12 +2453,13 @@ func TestUnverifiedParentPanic(t *testing.T) {
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
+			Chains:                   chains.MockManager{},
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			MinStakeDuration:         defaultMinStakingDuration,
+			MaxStakeDuration:         defaultMaxStakingDuration,
+			RewardConfig:             defaultRewardConfig,
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 

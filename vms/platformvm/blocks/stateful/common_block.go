@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
@@ -63,14 +64,88 @@ func (c *commonBlock) verify() error {
 	if err != nil {
 		return err
 	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != c.commonStatelessBlk.Height() {
+
+	// verify block height
+	expectedHeight := parent.Height() + 1
+	if expectedHeight != c.commonStatelessBlk.Height() {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
 			expectedHeight,
 			c.commonStatelessBlk.Height(),
 		)
 	}
-	return nil
+
+	// verify block version
+	blkVersion := c.commonStatelessBlk.Version()
+	expectedVersion := parent.expectedChildVersion()
+	if expectedVersion != blkVersion {
+		return fmt.Errorf(
+			"expected block to have version %d, but found %d",
+			expectedVersion,
+			blkVersion,
+		)
+	}
+
+	return c.validateBlockTimestamp()
+}
+
+func (c *commonBlock) expectedChildVersion() uint16 {
+	forkTime := c.verifier.PchainConfig().AdvanceTimeTxRemovalTime
+	if c.Timestamp().Before(forkTime) {
+		return stateless.PreForkVersion
+	}
+	return stateless.PostForkVersion
+}
+
+func (c *commonBlock) validateBlockTimestamp() error {
+	// verify timestamp only for post fork blocks
+	// Note: atomic blocks have been deprecated before fork introduction,
+	// therefore validateBlockTimestamp for atomic blocks should return
+	// immediately as they should all have PreForkVersion.
+	// We do not bother distinguishing atomic blocks below.
+	if c.commonStatelessBlk.Version() == stateless.PreForkVersion {
+		return nil
+	}
+
+	parentBlk, err := c.parentBlock()
+	if err != nil {
+		return err
+	}
+
+	blkTime := c.Timestamp()
+	currentChainTime := parentBlk.Timestamp()
+
+	switch c.commonStatelessBlk.(type) {
+	case *stateless.AbortBlock, *stateless.CommitBlock:
+		if !blkTime.Equal(currentChainTime) {
+			return fmt.Errorf(
+				"expected block timestamp (%s) to be equal to parent timestamp (%s)",
+				blkTime,
+				currentChainTime,
+			)
+		}
+		return nil
+
+	default:
+		parentDecision, ok := parentBlk.(Decision)
+		if !ok {
+			// The preferred block should always be a decision block
+			return fmt.Errorf("expected Decision block but got %T", parentBlk)
+		}
+		parentState := parentDecision.OnAccept()
+		nextStakerChangeTime, err := parentState.GetNextStakerChangeTime()
+		if err != nil {
+			return fmt.Errorf("could not verify block timestamp: %w", err)
+		}
+		localTime := c.verifier.Clock().Time()
+
+		return executor.ValidateProposedChainTime(
+			blkTime,
+			currentChainTime,
+			nextStakerChangeTime,
+			localTime,
+		)
+	}
 }
 
 func (c *commonBlock) free() {

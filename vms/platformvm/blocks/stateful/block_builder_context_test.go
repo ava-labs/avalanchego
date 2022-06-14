@@ -319,9 +319,10 @@ func defaultCfg() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase4Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
+		ApricotPhase3Time:        defaultValidateEndTime,
+		ApricotPhase4Time:        defaultValidateEndTime,
+		ApricotPhase5Time:        defaultValidateEndTime,
+		AdvanceTimeTxRemovalTime: mockable.MaxTime,
 	}
 }
 

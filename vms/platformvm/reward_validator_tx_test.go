@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -26,11 +27,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			UptimePercentage:       .2,
-			RewardConfig:           defaultRewardConfig,
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			Chains:                   chains.MockManager{},
+			UptimePercentage:         .2,
+			RewardConfig:             defaultRewardConfig,
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -64,10 +66,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			UptimePercentage:       .21,
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			Chains:                   chains.MockManager{},
+			UptimePercentage:         .21,
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
@@ -228,11 +231,12 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			UptimePercentage:       .2,
-			RewardConfig:           defaultRewardConfig,
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			Chains:                   chains.MockManager{},
+			UptimePercentage:         .2,
+			RewardConfig:             defaultRewardConfig,
+			Validators:               validators.NewManager(),
+			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
+			AdvanceTimeTxRemovalTime: mockable.MaxTime,
 		},
 	}}
 
