@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
+	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
@@ -54,6 +55,8 @@ import (
 )
 
 var (
+	acceptorQueueGauge = metrics.NewRegisteredGauge("blockchain/acceptor/queue/size", nil)
+
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
 	errFutureBlockUnsupported  = errors.New("future block insertion not supported")
@@ -102,21 +105,30 @@ const (
 // that's resident in a blockchain.
 type CacheConfig struct {
 	TrieCleanLimit                  int     // Memory allowance (MB) to use for caching trie nodes in memory
-	TrieDirtyLimit                  int     // Memory limit (MB) at which to start flushing dirty trie nodes to disk
+	TrieDirtyLimit                  int     // Memory limit (MB) at which to block on insert and force a flush of dirty trie nodes to disk
+	TrieDirtyCommitTarget           int     // Memory limit (MB) to target for the dirties cache before invoking commit
+	CommitInterval                  uint64  // Commit the trie every [CommitInterval] blocks.
 	Pruning                         bool    // Whether to disable trie write caching and GC altogether (archive node)
+	AcceptorQueueLimit              int     // Blocks to queue before blocking during acceptance
 	PopulateMissingTries            *uint64 // If non-nil, sets the starting height for re-generating historical tries.
 	PopulateMissingTriesParallelism int     // Is the number of readers to use when trying to populate missing tries.
+	SnapshotDelayInit               bool    // Whether to initialize snapshots on startup or wait for external call
 	AllowMissingTries               bool    // Whether to allow an archive node to run with pruning enabled
 	SnapshotLimit                   int     // Memory allowance (MB) to use for caching snapshot entries in memory
 	SnapshotAsync                   bool    // Generate snapshot tree async
 	SnapshotVerify                  bool    // Verify generated snapshots
+	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
 	Preimages                       bool    // Whether to store preimage of trie key to the disk
 }
 
 var DefaultCacheConfig = &CacheConfig{
-	TrieCleanLimit: 256,
-	TrieDirtyLimit: 256,
-	SnapshotLimit:  256,
+	TrieCleanLimit:        256,
+	TrieDirtyLimit:        256,
+	TrieDirtyCommitTarget: 20, // 20% overhead in memory counting (this targets 16 MB)
+	Pruning:               true,
+	CommitInterval:        4096,
+	AcceptorQueueLimit:    64, // Provides 2 minutes of buffer (2s block target) for a commit delay
+	SnapshotLimit:         256,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -180,6 +192,31 @@ type BlockChain struct {
 	lastAccepted *types.Block // Prevents reorgs past this height
 
 	senderCacher *TxSenderCacher
+
+	// [acceptorQueue] is a processing queue for the Acceptor. This is
+	// different than [chainAcceptedFeed], which is sent an event after an accepted
+	// block is processed (after each loop of the accepted worker). If there is a
+	// clean shutdown, all items inserted into the [acceptorQueue] will be processed.
+	acceptorQueue chan *types.Block
+
+	// [acceptorClosingLock], and [acceptorClosed] are used
+	// to synchronize the closing of the [acceptorQueue] channel.
+	//
+	// Because we can't check if a channel is closed without reading from it
+	// (which we don't want to do as we may remove a processing block), we need
+	// to use a second variable to ensure we don't close a closed channel.
+	acceptorClosingLock sync.RWMutex
+	acceptorClosed      bool
+
+	// [acceptorWg] is used to wait for the acceptorQueue to clear. This is used
+	// during shutdown and in tests.
+	acceptorWg sync.WaitGroup
+
+	// [acceptorTip] is the last block processed by the acceptor. This is
+	// returned as the LastAcceptedBlock() to ensure clients get only fully
+	// processed blocks. This may be equal to [lastAccepted].
+	acceptorTip     *types.Block
+	acceptorTipLock sync.Mutex
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -214,6 +251,7 @@ func NewBlockChain(
 		vmConfig:      vmConfig,
 		badBlocks:     badBlocks,
 		senderCacher:  newTxSenderCacher(runtime.NumCPU()),
+		acceptorQueue: make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
@@ -240,6 +278,13 @@ func NewBlockChain(
 		return nil, err
 	}
 
+	// After loading the last state (and reprocessing if necessary), we are
+	// guaranteed that [acceptorTip] is equal to [lastAccepted].
+	//
+	// It is critical to update this vaue before performing any state repairs so
+	// that all accepted blocks can be considered.
+	bc.acceptorTip = bc.lastAccepted
+
 	// Make sure the state associated with the block is available
 	head := bc.CurrentBlock()
 	if !bc.HasState(head.Root()) {
@@ -255,20 +300,158 @@ func NewBlockChain(
 		return nil, fmt.Errorf("could not populate missing tries: %v", err)
 	}
 
-	// Load any existing snapshot, regenerating it if loading failed
-	if bc.cacheConfig.SnapshotLimit > 0 {
-		// If we are starting from genesis, generate the original snapshot disk layer
-		// up front, so we can use it while executing blocks in bootstrapping. This
-		// also avoids a costly async generation process when reaching tip.
-		async := bc.cacheConfig.SnapshotAsync && head.NumberU64() > 0
-		log.Info("Initializing snapshots", "async", async)
-		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), async, true, bc.cacheConfig.SnapshotVerify)
-		if err != nil {
-			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", async)
-		}
+	// If snapshot initialization is delayed for fast sync, skip initializing it here.
+	// This assumes that no blocks will be processed until ResetState is called to initialize
+	// the state of fast sync.
+	if !bc.cacheConfig.SnapshotDelayInit {
+		// Load any existing snapshot, regenerating it if loading failed (if not
+		// already initialized in recovery)
+		bc.initSnapshot(head)
 	}
 
+	// Start processing accepted blocks effects in the background
+	go bc.startAcceptor()
+
 	return bc, nil
+}
+
+// writeBlockAcceptedIndices writes any indices that must be persisted for accepted block.
+// This includes the following:
+// - transaction lookup indices
+// - updating the acceptor tip index
+func (bc *BlockChain) writeBlockAcceptedIndices(b *types.Block) error {
+	batch := bc.db.NewBatch()
+	rawdb.WriteTxLookupEntriesByBlock(batch, b)
+	if err := rawdb.WriteAcceptorTip(batch, b.Hash()); err != nil {
+		return fmt.Errorf("%w: failed to write acceptor tip key", err)
+	}
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("%w: failed to write tx lookup entries batch", err)
+	}
+	return nil
+}
+
+// flattenSnapshot attempts to flatten a block of [hash] to disk.
+func (bc *BlockChain) flattenSnapshot(postAbortWork func() error, hash common.Hash) error {
+	// If snapshots are not initialized, perform [postAbortWork] immediately.
+	if bc.snaps == nil {
+		return postAbortWork()
+	}
+
+	// Abort snapshot generation before pruning anything from trie database
+	// (could occur in AcceptTrie)
+	bc.snaps.AbortGeneration()
+
+	// Perform work after snapshot generation is aborted (typically trie updates)
+	if err := postAbortWork(); err != nil {
+		return err
+	}
+
+	// Flatten the entire snap Trie to disk
+	//
+	// Note: This resumes snapshot generation.
+	return bc.snaps.Flatten(hash)
+}
+
+// startAcceptor starts processing items on the [acceptorQueue]. If a [nil]
+// object is placed on the [acceptorQueue], the [startAcceptor] will exit.
+func (bc *BlockChain) startAcceptor() {
+	log.Info("Starting Acceptor", "queue length", bc.cacheConfig.AcceptorQueueLimit)
+
+	for next := range bc.acceptorQueue {
+		acceptorQueueGauge.Dec(1)
+
+		if err := bc.flattenSnapshot(func() error {
+			return bc.stateManager.AcceptTrie(next)
+		}, next.Hash()); err != nil {
+			log.Crit("unable to flatten snapshot from acceptor", "blockHash", next.Hash(), "err", err)
+		}
+
+		// Update last processed and transaction lookup index
+		if err := bc.writeBlockAcceptedIndices(next); err != nil {
+			log.Crit("failed to write accepted block effects", "err", err)
+		}
+
+		// Fetch block logs
+		logs := bc.gatherBlockLogs(next.Hash(), next.NumberU64(), false)
+
+		// Update accepted feeds
+		bc.chainAcceptedFeed.Send(ChainEvent{Block: next, Hash: next.Hash(), Logs: logs})
+		if len(logs) > 0 {
+			bc.logsAcceptedFeed.Send(logs)
+		}
+		if len(next.Transactions()) != 0 {
+			bc.txAcceptedFeed.Send(NewTxsEvent{next.Transactions()})
+		}
+
+		bc.acceptorTipLock.Lock()
+		bc.acceptorTip = next
+		bc.acceptorTipLock.Unlock()
+		bc.acceptorWg.Done()
+	}
+}
+
+// addAcceptorQueue adds a new *types.Block to the [acceptorQueue]. This will
+// block if there are [AcceptorQueueLimit] items in [acceptorQueue].
+func (bc *BlockChain) addAcceptorQueue(b *types.Block) {
+	// We only acquire a read lock here because it is ok to add items to the
+	// [acceptorQueue] concurrently.
+	bc.acceptorClosingLock.RLock()
+	defer bc.acceptorClosingLock.RUnlock()
+
+	if bc.acceptorClosed {
+		return
+	}
+
+	acceptorQueueGauge.Inc(1)
+	bc.acceptorWg.Add(1)
+	bc.acceptorQueue <- b
+}
+
+// DrainAcceptorQueue blocks until all items in [acceptorQueue] have been
+// processed.
+func (bc *BlockChain) DrainAcceptorQueue() {
+	bc.acceptorClosingLock.Lock()
+	defer bc.acceptorClosingLock.Unlock()
+
+	if bc.acceptorClosed {
+		return
+	}
+
+	bc.acceptorWg.Wait()
+}
+
+// stopAcceptor sends a signal to the Acceptor to stop processing accepted
+// blocks. The Acceptor will exit once all items in [acceptorQueue] have been
+// processed.
+func (bc *BlockChain) stopAcceptor() {
+	bc.acceptorClosingLock.Lock()
+	defer bc.acceptorClosingLock.Unlock()
+
+	// If [acceptorClosed] is already false, we should just return here instead
+	// of attempting to close [acceptorQueue] more than once (will cause
+	// a panic).
+	//
+	// This typically happens when a test calls [stopAcceptor] directly (prior to
+	// shutdown) and then [stopAcceptor] is called again in shutdown.
+	if bc.acceptorClosed {
+		return
+	}
+
+	// Although nothing should be added to [acceptorQueue] after
+	// [acceptorClosed] is updated, we close the channel so the Acceptor
+	// goroutine exits.
+	bc.acceptorWg.Wait()
+	bc.acceptorClosed = true
+	close(bc.acceptorQueue)
+}
+
+func (bc *BlockChain) InitializeSnapshots() {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	head := bc.CurrentBlock()
+	bc.initSnapshot(head)
 }
 
 // SenderCacher returns the *TxSenderCacher used within the core package.
@@ -323,7 +506,7 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 	// reprocessState is necessary to ensure that the last accepted state is
 	// available. The state may not be available if it was not committed due
 	// to an unclean shutdown.
-	return bc.reprocessState(bc.lastAccepted, 2*commitInterval)
+	return bc.reprocessState(bc.lastAccepted, 2*bc.cacheConfig.CommitInterval)
 }
 
 func (bc *BlockChain) loadGenesisState() error {
@@ -400,6 +583,9 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 
 // ValidateCanonicalChain confirms a canonical chain is well-formed.
 func (bc *BlockChain) ValidateCanonicalChain() error {
+	// Ensure all accepted blocks are fully processed
+	bc.DrainAcceptorQueue()
+
 	current := bc.CurrentBlock()
 	i := 0
 	log.Info("Beginning to validate canonical chain", "startBlock", current.NumberU64())
@@ -498,10 +684,18 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
+	// Wait for accepted feed to process all remaining items
+	log.Info("Stopping Acceptor")
+	start := time.Now()
+	bc.stopAcceptor()
+	log.Info("Acceptor queue drained", "t", time.Since(start))
+
 	log.Info("Shutting down state manager")
+	start = time.Now()
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
+	log.Info("State manager shut down", "t", time.Since(start))
 
 	// Stop senderCacher's goroutines
 	log.Info("Shutting down sender cacher")
@@ -558,12 +752,24 @@ func (bc *BlockChain) setPreference(block *types.Block) error {
 	return nil
 }
 
-// LastAcceptedBlock returns the last block to be marked as accepted.
-func (bc *BlockChain) LastAcceptedBlock() *types.Block {
+// LastAcceptedBlock returns the last block to be marked as accepted. It may or
+// may not yet be processed.
+func (bc *BlockChain) LastConsensusAcceptedBlock() *types.Block {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
 	return bc.lastAccepted
+}
+
+// LastAcceptedBlock returns the last block to be marked as accepted and is
+// processed.
+//
+// Note: During initialization, [acceptorTip] is equal to [lastAccepted].
+func (bc *BlockChain) LastAcceptedBlock() *types.Block {
+	bc.acceptorTipLock.Lock()
+	defer bc.acceptorTipLock.Unlock()
+
+	return bc.acceptorTip
 }
 
 // Accept sets a minimum height at which no reorg can pass. Additionally,
@@ -597,44 +803,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	bc.lastAccepted = block
-
-	// Abort snapshot generation before pruning anything from trie database
-	// (could occur in AcceptTrie)
-	if bc.snaps != nil {
-		bc.snaps.AbortGeneration()
-	}
-
-	// Accept Trie
-	if err := bc.stateManager.AcceptTrie(block); err != nil {
-		return fmt.Errorf("unable to accept trie: %w", err)
-	}
-
-	// Flatten the entire snap Trie to disk
-	if bc.snaps != nil {
-		if err := bc.snaps.Flatten(block.Hash()); err != nil {
-			return fmt.Errorf("unable to flatten trie: %w", err)
-		}
-	}
-
-	// Update transaction lookup index
-	batch := bc.db.NewBatch()
-	rawdb.WriteTxLookupEntriesByBlock(batch, block)
-	if err := batch.Write(); err != nil {
-		return fmt.Errorf("failed to write tx lookup entries batch: %w", err)
-	}
-
-	// Fetch block logs
-	logs := bc.gatherBlockLogs(block.Hash(), block.NumberU64(), false)
-
-	// Update accepted feeds
-	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
-	if len(logs) > 0 {
-		bc.logsAcceptedFeed.Send(logs)
-	}
-	if len(block.Transactions()) != 0 {
-		bc.txAcceptedFeed.Send(NewTxsEvent{block.Transactions()})
-	}
-
+	bc.addAcceptorQueue(block)
 	return nil
 }
 
@@ -879,21 +1048,12 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		}
 	}()
 
-	// Retrieve the parent block and it's state to execute on top
+	// Retrieve the parent block and its state to execute on top
 	start := time.Now()
 
+	// Retrieve the parent block and its state to execute block
 	parent := bc.GetHeader(block.ParentHash(), block.NumberU64()-1)
-
-	var statedb *state.StateDB
-	if bc.snaps == nil {
-		statedb, err = state.New(parent.Root, bc.stateCache, nil)
-	} else {
-		snap := bc.snaps.Snapshot(parent.Root)
-		if snap == nil {
-			return fmt.Errorf("failed to get snapshot for parent root: %s", parent.Root)
-		}
-		statedb, err = state.NewWithSnapshot(parent.Root, bc.stateCache, snap)
-	}
+	statedb, err := state.New(parent.Root, bc.stateCache, bc.snaps)
 	if err != nil {
 		return err
 	}
@@ -1170,25 +1330,74 @@ func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
 // reprocessBlock reprocesses a previously accepted block. This is often used
 // to regenerate previously pruned state tries.
 func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) (common.Hash, error) {
-	statedb, err := state.New(parent.Root(), bc.stateCache, nil)
+	// Retrieve the parent block and its state to execute block
+	var (
+		statedb    *state.StateDB
+		err        error
+		parentRoot = parent.Root()
+	)
+	// We don't simply use [NewWithSnapshot] here because it doesn't return an
+	// error if [bc.snaps != nil] and [bc.snaps.Snapshot(parentRoot) == nil].
+	if bc.snaps == nil {
+		statedb, err = state.New(parentRoot, bc.stateCache, nil)
+	} else {
+		snap := bc.snaps.Snapshot(parentRoot)
+		if snap == nil {
+			return common.Hash{}, fmt.Errorf("failed to get snapshot for parent root: %s", parentRoot)
+		}
+		statedb, err = state.NewWithSnapshot(parentRoot, bc.stateCache, snap)
+	}
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("could not fetch state for (%s: %d): %v", parent.Hash().Hex(), parent.NumberU64(), err)
 	}
+
+	// Enable prefetching to pull in trie node paths while processing transactions
+	statedb.StartPrefetcher("chain")
+	defer func() {
+		statedb.StopPrefetcher()
+	}()
+
+	// Process previously stored block
 	receipts, _, usedGas, err := bc.processor.Process(current, parent.Header(), statedb, vm.Config{})
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to re-process block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
 	}
+
 	// Validate the state using the default validator
 	if err := bc.validator.ValidateState(current, statedb, receipts, usedGas); err != nil {
 		return common.Hash{}, fmt.Errorf("failed to validate state while re-processing block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
 	}
 	log.Debug("Processed block", "block", current.Hash(), "number", current.NumberU64())
-	// Finalize the state so any modifications are written to the trie
-	root, err := statedb.Commit(bc.chainConfig.IsEIP158(current.Number()))
-	if err != nil {
-		return common.Hash{}, err
+
+	// Commit all cached state changes into underlying memory database.
+	// If snapshots are enabled, call CommitWithSnaps to explicitly create a snapshot
+	// diff layer for the block.
+	if bc.snaps == nil {
+		return statedb.Commit(bc.chainConfig.IsEIP158(current.Number()))
 	}
-	return root, nil
+	return statedb.CommitWithSnap(bc.chainConfig.IsEIP158(current.Number()), bc.snaps, current.Hash(), current.ParentHash())
+}
+
+// initSnapshot instantiates a Snapshot instance and adds it to [bc]
+func (bc *BlockChain) initSnapshot(b *types.Block) {
+	if bc.cacheConfig.SnapshotLimit <= 0 || bc.snaps != nil {
+		return
+	}
+
+	// If we are starting from genesis, generate the original snapshot disk layer
+	// up front, so we can use it while executing blocks in bootstrapping. This
+	// also avoids a costly async generation process when reaching tip.
+	//
+	// Additionally, we should always repair a snapshot if starting at genesis
+	// if [SnapshotLimit] > 0.
+	async := bc.cacheConfig.SnapshotAsync && b.NumberU64() > 0
+	rebuild := !bc.cacheConfig.SkipSnapshotRebuild || b.NumberU64() == 0
+	log.Info("Initializing snapshots", "async", async, "rebuild", rebuild, "headHash", b.Hash(), "headRoot", b.Root())
+	var err error
+	bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, b.Hash(), b.Root(), async, rebuild, bc.cacheConfig.SnapshotVerify)
+	if err != nil {
+		log.Error("failed to initialize snapshots", "headHash", b.Hash(), "headRoot", b.Root(), "err", err, "async", async)
+	}
 }
 
 // reprocessState reprocesses the state up to [block], iterating through its ancestors until
@@ -1197,13 +1406,36 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 // state that reprocessing will start from.
 func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error {
 	origin := current.NumberU64()
+	acceptorTip, err := rawdb.ReadAcceptorTip(bc.db)
+	if err != nil {
+		return fmt.Errorf("%w: unable to get Acceptor tip", err)
+	}
+	log.Info("Loaded Acceptor tip", "hash", acceptorTip)
 
-	// If the state is already available, skip re-processing
-	if bc.HasState(current.Root()) {
+	// The acceptor tip is up to date either if it matches the current hash, or it has not been
+	// initialized (i.e., this node has not accepted any blocks asynchronously).
+	acceptorTipUpToDate := acceptorTip == (common.Hash{}) || acceptorTip == current.Hash()
+
+	// If the state is already available and the acceptor tip is up to date, skip re-processing.
+	if bc.HasState(current.Root()) && acceptorTipUpToDate {
+		log.Info("Skipping state reprocessing", "root", current.Root())
 		return nil
 	}
-	// Check how far back we need to re-execute, capped at [reexec]
-	var err error
+
+	// If the acceptorTip is a non-empty hash, jump re-processing back to the acceptor tip to ensure that
+	// we re-process at a minimum from the last processed accepted block.
+	// Note: we do not have a guarantee that the last trie on disk will be at a height <= acceptorTip.
+	// Since we need to re-process from at least the acceptorTip to ensure indices are updated correctly
+	// we must start searching for the block to start re-processing at the acceptorTip.
+	// This may occur if we are running in archive mode where every block's trie is committed on insertion
+	// or during an unclean shutdown.
+	if acceptorTip != (common.Hash{}) {
+		current = bc.GetBlockByHash(acceptorTip)
+		if current == nil {
+			return fmt.Errorf("failed to get block for acceptor tip %s", acceptorTip)
+		}
+	}
+
 	for i := 0; i < int(reexec); i++ {
 		// TODO: handle canceled context
 
@@ -1235,6 +1467,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		logged       time.Time
 		previousRoot common.Hash
 		triedb       = bc.stateCache.TrieDB()
+		writeIndices bool
 	)
 	// Note: we add 1 since in each iteration, we attempt to re-execute the next block.
 	log.Info("Re-executing blocks to generate state for last accepted block", "from", current.NumberU64()+1, "to", origin)
@@ -1246,22 +1479,53 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 			log.Info("Regenerating historical state", "block", current.NumberU64()+1, "target", origin, "remaining", origin-current.NumberU64(), "elapsed", time.Since(start))
 			logged = time.Now()
 		}
+
 		// Retrieve the next block to regenerate and process it
 		parent := current
 		next := current.NumberU64() + 1
 		if current = bc.GetBlockByNumber(next); current == nil {
 			return fmt.Errorf("failed to retrieve block %d while re-generating state", next)
 		}
+
+		// Initialize snapshot if required (prevents full snapshot re-generation in
+		// the case of unclean shutdown)
+		if parent.Hash() == acceptorTip {
+			log.Info("Recovering snapshot", "hash", parent.Hash(), "index", parent.NumberU64())
+			// TODO: switch to checking the snapshot block hash markers here to ensure that when we re-process the block, we have the opportunity to apply
+			// a snapshot diff layer that we may have been in the middle of committing during shutdown. This will prevent snapshot re-generation in the case
+			// that the node stops mid-way through snapshot flattening (performed across multiple DB batches).
+			// If snapshot initialization is delayed due to state sync, skip initializing snaps here
+			if !bc.cacheConfig.SnapshotDelayInit {
+				bc.initSnapshot(parent)
+			}
+			writeIndices = true // Set [writeIndices] to true, so that the indices will be updated from the last accepted tip onwards.
+		}
+
+		// Reprocess next block using previously fetched data
 		root, err := bc.reprocessBlock(parent, current)
 		if err != nil {
 			return err
 		}
-		// Hold a reference to the state root until the next block is processed
-		triedb.Reference(root, common.Hash{})
-		if previousRoot != (common.Hash{}) {
-			triedb.Dereference(previousRoot)
+
+		// Flatten snapshot if initialized, holding a reference to the state root until the next block
+		// is processed.
+		if err := bc.flattenSnapshot(func() error {
+			triedb.Reference(root, common.Hash{})
+			if previousRoot != (common.Hash{}) {
+				triedb.Dereference(previousRoot)
+			}
+			previousRoot = root
+			return nil
+		}, current.Hash()); err != nil {
+			return err
 		}
-		previousRoot = root
+
+		// Write any unsaved indices to disk
+		if writeIndices {
+			if err := bc.writeBlockAcceptedIndices(current); err != nil {
+				return fmt.Errorf("%w: failed to process accepted block indices", err)
+			}
+		}
 	}
 
 	nodes, imgs := triedb.Size()
@@ -1451,6 +1715,7 @@ func (bc *BlockChain) ResetState(block *types.Block) error {
 
 	// Update head block and snapshot pointers on disk
 	batch := bc.db.NewBatch()
+	rawdb.WriteAcceptorTip(batch, block.Hash())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 	rawdb.WriteSnapshotBlockHash(batch, block.Hash())
@@ -1461,6 +1726,7 @@ func (bc *BlockChain) ResetState(block *types.Block) error {
 
 	// Update all in-memory chain markers
 	bc.lastAccepted = block
+	bc.acceptorTip = block
 	bc.currentBlock.Store(block)
 	bc.hc.SetCurrentHeader(block.Header())
 

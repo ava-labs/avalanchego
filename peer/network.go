@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 
+	"github.com/ava-labs/subnet-evm/peer/stats"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -76,6 +77,7 @@ type network struct {
 	requestHandler                message.RequestHandler             // maps request type => handler
 	gossipHandler                 message.GossipHandler              // maps gossip type => handler
 	peers                         map[ids.NodeID]version.Application // maps nodeID => version.Version
+	stats                         stats.RequestHandlerStats          // Provide request handler metrics
 }
 
 func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID, maxActiveRequests int64) Network {
@@ -87,6 +89,7 @@ func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID
 		peers:                         make(map[ids.NodeID]version.Application),
 		activeRequests:                semaphore.NewWeighted(maxActiveRequests),
 		gossipHandler:                 message.NoopMempoolGossipHandler{},
+		stats:                         stats.NewRequestHandlerStats(),
 	}
 }
 
@@ -134,7 +137,7 @@ func (n *network) Request(nodeID ids.NodeID, request []byte, responseHandler mes
 	return n.request(nodeID, request, responseHandler)
 }
 
-// request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingResponseHandlerMap]
+// request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
 // so that it can be invoked when the network receives either a response or failure message.
 // Assumes [nodeID] is never [self] since we guarantee [self] will not be added to the [peers] map.
 // Releases active requests semaphore if there was an error in sending the request
@@ -155,7 +158,7 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	// send app request to the peer
 	// on failure: release the activeRequests slot, mark message as processed and return fatal error
 	// Send app request to [nodeID].
-	// On failure, release the slot from active requests and [outstandingResponseHandlerMap].
+	// On failure, release the slot from active requests and [outstandingRequestHandlers].
 	if err := n.appSender.SendAppRequest(nodeIDs, requestID, request); err != nil {
 		n.activeRequests.Release(1)
 		delete(n.outstandingResponseHandlerMap, requestID)
@@ -185,6 +188,7 @@ func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 
 	// calculate how much time is left until the deadline
 	timeTillDeadline := time.Until(deadline)
+	n.stats.UpdateTimeUntilDeadline(timeTillDeadline)
 
 	// bufferedDeadline is half the time till actual deadline so that the message has a reasonable chance
 	// of completing its processing and sending the response to the peer.
@@ -195,6 +199,7 @@ func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
 		// Drop the request if we already missed the deadline to respond.
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "req", req)
+		n.stats.IncDeadlineDroppedRequest()
 		return nil
 	}
 

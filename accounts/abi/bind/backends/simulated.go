@@ -149,6 +149,7 @@ func (b *SimulatedBackend) Commit(accept bool) {
 		if err := b.blockchain.Accept(b.acceptedBlock); err != nil {
 			panic(err)
 		}
+		b.blockchain.DrainAcceptorQueue()
 	}
 	// Using the last inserted block here makes it possible to build on a side
 	// chain after a fork.
