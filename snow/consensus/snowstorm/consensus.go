@@ -53,7 +53,7 @@ type Consensus interface {
 	Conflicts(Tx) ids.Set
 
 	// Collects the results of a network poll. Assumes all transactions
-	// have been previously added. Returns true is any statuses or preferences
+	// have been previously added. Returns true if any statuses or preferences
 	// changed. Returns if a critical error has occurred.
 	RecordPoll(ids.Bag) (bool, error)
 

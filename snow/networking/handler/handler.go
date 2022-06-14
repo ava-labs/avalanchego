@@ -534,6 +534,20 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		}
 		return engine.Chits(nodeID, reqID, votes)
 
+	case message.ChitsV2:
+		reqID := msg.Get(message.RequestID).(uint32)
+		votes, err := getIDs(message.ContainerIDs, msg)
+		if err != nil {
+			h.ctx.Log.Debug(
+				"Malformed message %s from (%s, %d): %s",
+				op, nodeID, reqID, err,
+			)
+			return engine.QueryFailed(nodeID, reqID)
+		}
+		vote, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		h.ctx.Log.AssertNoError(err)
+		return engine.ChitsV2(nodeID, reqID, votes, vote)
+
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
 		return engine.QueryFailed(nodeID, reqID)
