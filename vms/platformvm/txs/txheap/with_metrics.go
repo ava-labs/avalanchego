@@ -7,23 +7,23 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Heap = &txHeapWithMetrics{}
+var _ Heap = &withMetrics{}
 
-type txHeapWithMetrics struct {
+type withMetrics struct {
 	Heap
 
 	numTxs prometheus.Gauge
 }
 
-func NewTxHeapWithMetrics(
+func NewWithMetrics(
 	txHeap Heap,
 	namespace string,
 	registerer prometheus.Registerer,
 ) (Heap, error) {
-	h := &txHeapWithMetrics{
+	h := &withMetrics{
 		Heap: txHeap,
 		numTxs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -34,18 +34,18 @@ func NewTxHeapWithMetrics(
 	return h, registerer.Register(h.numTxs)
 }
 
-func (h *txHeapWithMetrics) Add(tx *signed.Tx) {
+func (h *withMetrics) Add(tx *txs.Tx) {
 	h.Heap.Add(tx)
 	h.numTxs.Set(float64(h.Heap.Len()))
 }
 
-func (h *txHeapWithMetrics) Remove(txID ids.ID) *signed.Tx {
+func (h *withMetrics) Remove(txID ids.ID) *txs.Tx {
 	tx := h.Heap.Remove(txID)
 	h.numTxs.Set(float64(h.Heap.Len()))
 	return tx
 }
 
-func (h *txHeapWithMetrics) RemoveTop() *signed.Tx {
+func (h *withMetrics) RemoveTop() *txs.Tx {
 	tx := h.Heap.RemoveTop()
 	h.numTxs.Set(float64(h.Heap.Len()))
 	return tx

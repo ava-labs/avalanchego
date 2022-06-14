@@ -1,10 +1,9 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -13,17 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
-	_ Tx       = &AddDelegatorTx{}
-	_ timed.Tx = &AddDelegatorTx{}
-
-	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
+	_ UnsignedTx = &AddDelegatorTx{}
+	_ StakerTx   = &AddDelegatorTx{}
 )
 
 // AddDelegatorTx is an unsigned addDelegatorTx
@@ -31,7 +26,7 @@ type AddDelegatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator p_validator.Validator `serialize:"true" json:"validator"`
+	Validator validator.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
@@ -95,7 +90,7 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
-		return ErrOutputsNotSorted
+		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
 	}
@@ -103,4 +98,8 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	// cache that this is valid
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *AddDelegatorTx) Visit(visitor Visitor) error {
+	return visitor.AddDelegatorTx(tx)
 }

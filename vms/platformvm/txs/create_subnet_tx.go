@@ -1,14 +1,14 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 )
 
-var _ Tx = &CreateSubnetTx{}
+var _ UnsignedTx = &CreateSubnetTx{}
 
 // CreateSubnetTx is an unsigned proposal to create a new subnet
 type CreateSubnetTx struct {
@@ -44,4 +44,8 @@ func (tx *CreateSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *CreateSubnetTx) Visit(visitor Visitor) error {
+	return visitor.CreateSubnetTx(tx)
 }

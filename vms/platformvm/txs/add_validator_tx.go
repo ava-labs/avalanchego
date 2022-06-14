@@ -1,27 +1,25 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
-	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
-	_ Tx       = &AddValidatorTx{}
-	_ timed.Tx = &AddValidatorTx{}
+	_ UnsignedTx = &AddValidatorTx{}
+	_ StakerTx   = &AddValidatorTx{}
 
 	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 )
@@ -31,7 +29,7 @@ type AddValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator p_validator.Validator `serialize:"true" json:"validator"`
+	Validator validator.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
@@ -91,7 +89,7 @@ func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("failed to verify output: %w", err)
 		}
-		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}
@@ -100,7 +98,7 @@ func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
-		return ErrOutputsNotSorted
+		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
 	}
@@ -108,4 +106,8 @@ func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	// cache that this is valid
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *AddValidatorTx) Visit(visitor Visitor) error {
+	return visitor.AddValidatorTx(tx)
 }

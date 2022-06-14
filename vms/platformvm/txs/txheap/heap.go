@@ -7,23 +7,23 @@ import (
 	"container/heap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Heap = &txHeap{}
 
 type Heap interface {
-	Add(tx *signed.Tx)
-	Get(txID ids.ID) *signed.Tx
-	List() []*signed.Tx
-	Remove(txID ids.ID) *signed.Tx
-	Peek() *signed.Tx
-	RemoveTop() *signed.Tx
+	Add(tx *txs.Tx)
+	Get(txID ids.ID) *txs.Tx
+	List() []*txs.Tx
+	Remove(txID ids.ID) *txs.Tx
+	Peek() *txs.Tx
+	RemoveTop() *txs.Tx
 	Len() int
 }
 
 type heapTx struct {
-	tx    *signed.Tx
+	tx    *txs.Tx
 	index int
 	age   int
 }
@@ -41,9 +41,9 @@ func (h *txHeap) initialize(self heap.Interface) {
 	h.txIDToIndex = make(map[ids.ID]int)
 }
 
-func (h *txHeap) Add(tx *signed.Tx) { heap.Push(h.self, tx) }
+func (h *txHeap) Add(tx *txs.Tx) { heap.Push(h.self, tx) }
 
-func (h *txHeap) Get(txID ids.ID) *signed.Tx {
+func (h *txHeap) Get(txID ids.ID) *txs.Tx {
 	index, exists := h.txIDToIndex[txID]
 	if !exists {
 		return nil
@@ -51,25 +51,25 @@ func (h *txHeap) Get(txID ids.ID) *signed.Tx {
 	return h.txs[index].tx
 }
 
-func (h *txHeap) List() []*signed.Tx {
-	res := make([]*signed.Tx, 0, len(h.txs))
-	for _, ht := range h.txs {
-		res = append(res, ht.tx)
+func (h *txHeap) List() []*txs.Tx {
+	res := make([]*txs.Tx, 0, len(h.txs))
+	for _, tx := range h.txs {
+		res = append(res, tx.tx)
 	}
 	return res
 }
 
-func (h *txHeap) Remove(txID ids.ID) *signed.Tx {
+func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
 	index, exists := h.txIDToIndex[txID]
 	if !exists {
 		return nil
 	}
-	return heap.Remove(h.self, index).(*signed.Tx)
+	return heap.Remove(h.self, index).(*txs.Tx)
 }
 
-func (h *txHeap) Peek() *signed.Tx { return h.txs[0].tx }
+func (h *txHeap) Peek() *txs.Tx { return h.txs[0].tx }
 
-func (h *txHeap) RemoveTop() *signed.Tx { return heap.Pop(h.self).(*signed.Tx) }
+func (h *txHeap) RemoveTop() *txs.Tx { return heap.Pop(h.self).(*txs.Tx) }
 
 func (h *txHeap) Len() int { return len(h.txs) }
 
@@ -91,7 +91,7 @@ func (h *txHeap) Swap(i, j int) {
 }
 
 func (h *txHeap) Push(x interface{}) {
-	tx := x.(*signed.Tx)
+	tx := x.(*txs.Tx)
 
 	txID := tx.ID()
 	_, exists := h.txIDToIndex[txID]

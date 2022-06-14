@@ -5,17 +5,17 @@ package platformvm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ currentValidator = &currentValidatorImpl{}
 
 type currentValidator interface {
-	validator
+	validatorIntf
 
-	// return unsigned.AddValidatorTx content along with
+	// return txs.AddValidatorTx content along with
 	// the ID of its signed.Tx
-	AddValidatorTx() (*unsigned.AddValidatorTx, ids.ID)
+	AddValidatorTx() (*txs.AddValidatorTx, ids.ID)
 
 	// Weight of delegations to this validator. Doesn't include the stake
 	// provided by this validator.
@@ -33,7 +33,7 @@ type currentValidatorImpl struct {
 	potentialReward uint64
 }
 
-func (v *currentValidatorImpl) AddValidatorTx() (*unsigned.AddValidatorTx, ids.ID) {
+func (v *currentValidatorImpl) AddValidatorTx() (*txs.AddValidatorTx, ids.ID) {
 	return v.addValidator.UnsignedAddValidatorTx, v.addValidator.TxID
 }
 

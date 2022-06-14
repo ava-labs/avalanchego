@@ -12,7 +12,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
-	signed "github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -64,7 +64,7 @@ func (mr *MockInternalStateMockRecorder) AddBlock(block interface{}) *gomock.Cal
 }
 
 // AddChain mocks base method.
-func (m *MockInternalState) AddChain(createChainTx *signed.Tx) {
+func (m *MockInternalState) AddChain(createChainTx *txs.Tx) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddChain", createChainTx)
 }
@@ -76,7 +76,7 @@ func (mr *MockInternalStateMockRecorder) AddChain(createChainTx interface{}) *go
 }
 
 // AddCurrentStaker mocks base method.
-func (m *MockInternalState) AddCurrentStaker(tx *signed.Tx, potentialReward uint64) {
+func (m *MockInternalState) AddCurrentStaker(tx *txs.Tx, potentialReward uint64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddCurrentStaker", tx, potentialReward)
 }
@@ -88,7 +88,7 @@ func (mr *MockInternalStateMockRecorder) AddCurrentStaker(tx, potentialReward in
 }
 
 // AddPendingStaker mocks base method.
-func (m *MockInternalState) AddPendingStaker(tx *signed.Tx) {
+func (m *MockInternalState) AddPendingStaker(tx *txs.Tx) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddPendingStaker", tx)
 }
@@ -112,7 +112,7 @@ func (mr *MockInternalStateMockRecorder) AddRewardUTXO(txID, utxo interface{}) *
 }
 
 // AddSubnet mocks base method.
-func (m *MockInternalState) AddSubnet(createSubnetTx *signed.Tx) {
+func (m *MockInternalState) AddSubnet(createSubnetTx *txs.Tx) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddSubnet", createSubnetTx)
 }
@@ -124,7 +124,7 @@ func (mr *MockInternalStateMockRecorder) AddSubnet(createSubnetTx interface{}) *
 }
 
 // AddTx mocks base method.
-func (m *MockInternalState) AddTx(tx *signed.Tx, status status.Status) {
+func (m *MockInternalState) AddTx(tx *txs.Tx, status status.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddTx", tx, status)
 }
@@ -205,7 +205,7 @@ func (mr *MockInternalStateMockRecorder) CurrentStakerChainState() *gomock.Call 
 }
 
 // DeleteCurrentStaker mocks base method.
-func (m *MockInternalState) DeleteCurrentStaker(tx *signed.Tx) {
+func (m *MockInternalState) DeleteCurrentStaker(tx *txs.Tx) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "DeleteCurrentStaker", tx)
 }
@@ -217,7 +217,7 @@ func (mr *MockInternalStateMockRecorder) DeleteCurrentStaker(tx interface{}) *go
 }
 
 // DeletePendingStaker mocks base method.
-func (m *MockInternalState) DeletePendingStaker(tx *signed.Tx) {
+func (m *MockInternalState) DeletePendingStaker(tx *txs.Tx) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "DeletePendingStaker", tx)
 }
@@ -256,10 +256,10 @@ func (mr *MockInternalStateMockRecorder) GetBlock(blockID interface{}) *gomock.C
 }
 
 // GetChains mocks base method.
-func (m *MockInternalState) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
+func (m *MockInternalState) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChains", subnetID)
-	ret0, _ := ret[0].([]*signed.Tx)
+	ret0, _ := ret[0].([]*txs.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -329,10 +329,10 @@ func (mr *MockInternalStateMockRecorder) GetStartTime(nodeID interface{}) *gomoc
 }
 
 // GetSubnets mocks base method.
-func (m *MockInternalState) GetSubnets() ([]*signed.Tx, error) {
+func (m *MockInternalState) GetSubnets() ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSubnets")
-	ret0, _ := ret[0].([]*signed.Tx)
+	ret0, _ := ret[0].([]*txs.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -358,10 +358,10 @@ func (mr *MockInternalStateMockRecorder) GetTimestamp() *gomock.Call {
 }
 
 // GetTx mocks base method.
-func (m *MockInternalState) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
+func (m *MockInternalState) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTx", txID)
-	ret0, _ := ret[0].(*signed.Tx)
+	ret0, _ := ret[0].(*txs.Tx)
 	ret1, _ := ret[1].(status.Status)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

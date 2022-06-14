@@ -11,16 +11,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type dummyUnsignedTx struct {
-	unsigned.BaseTx
+	txs.BaseTx
 }
 
-func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *txs.Tx) error {
+	return nil
+}
+
+func (du *dummyUnsignedTx) Visit(txs.Visitor) error {
 	return nil
 }
 
@@ -38,7 +41,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	now := time.Unix(1607133207, 0)
 
 	unsignedTx := dummyUnsignedTx{
-		BaseTx: unsigned.BaseTx{},
+		BaseTx: txs.BaseTx{},
 	}
 	unsignedTx.Initialize([]byte{0})
 

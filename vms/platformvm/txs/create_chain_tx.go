@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"errors"
@@ -14,10 +14,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	_ Tx = &CreateChainTx{}
+const (
+	MaxNameLen    = 128
+	MaxGenesisLen = units.MiB
+)
 
-	ErrDSCantValidate          = errors.New("new blockchain can't be validated by primary network")
+var (
+	_ UnsignedTx = &CreateChainTx{}
+
+	ErrDSCantValidate = errors.New("new blockchain can't be validated by primary network")
+
 	errInvalidVMID             = errors.New("invalid VM ID")
 	errFxIDsNotSortedAndUnique = errors.New("feature extensions IDs must be sorted and unique")
 	errNameTooLong             = errors.New("name too long")
@@ -25,12 +31,7 @@ var (
 	errIllegalNameCharacter    = errors.New("illegal name character")
 )
 
-const (
-	maxNameLen    = 128
-	maxGenesisLen = units.MiB
-)
-
-// CreateChainTx is an unsigned CreateChainTx
+// CreateChainTx is an unsigned createChainTx
 type CreateChainTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
@@ -56,13 +57,13 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.SubnetID == constants.PrimaryNetworkID:
 		return ErrDSCantValidate
-	case len(tx.ChainName) > maxNameLen:
+	case len(tx.ChainName) > MaxNameLen:
 		return errNameTooLong
 	case tx.VMID == ids.Empty:
 		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
-	case len(tx.GenesisData) > maxGenesisLen:
+	case len(tx.GenesisData) > MaxGenesisLen:
 		return errGenesisTooLong
 	}
 
@@ -81,4 +82,8 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *CreateChainTx) Visit(visitor Visitor) error {
+	return visitor.CreateChainTx(tx)
 }

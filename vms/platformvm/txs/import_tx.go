@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"errors"
@@ -14,14 +14,12 @@ import (
 )
 
 var (
-	_ Tx = &ImportTx{}
+	_ UnsignedTx = &ImportTx{}
 
-	ErrAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
-	ErrWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
-	errNoImportInputs           = errors.New("tx has no imported inputs")
+	errNoImportInputs = errors.New("tx has no imported inputs")
 )
 
-// ImportTx is an unsigned ImportTx
+// ImportTx is an unsigned importTx
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
@@ -79,9 +77,13 @@ func (tx *ImportTx) SyntacticVerify(ctx *snow.Context) error {
 		}
 	}
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
-		return ErrInputsNotSortedUnique
+		return errInputsNotSortedUnique
 	}
 
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *ImportTx) Visit(visitor Visitor) error {
+	return visitor.ImportTx(tx)
 }

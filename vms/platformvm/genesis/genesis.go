@@ -5,7 +5,7 @@ package genesis
 
 import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // UTXO adds messages to UTXOs
@@ -16,15 +16,15 @@ type UTXO struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*UTXO      `serialize:"true"`
-	Validators    []*signed.Tx `serialize:"true"`
-	Chains        []*signed.Tx `serialize:"true"`
-	Timestamp     uint64       `serialize:"true"`
-	InitialSupply uint64       `serialize:"true"`
-	Message       string       `serialize:"true"`
+	UTXOs         []*UTXO   `serialize:"true"`
+	Validators    []*txs.Tx `serialize:"true"`
+	Chains        []*txs.Tx `serialize:"true"`
+	Timestamp     uint64    `serialize:"true"`
+	InitialSupply uint64    `serialize:"true"`
+	Message       string    `serialize:"true"`
 }
 
-func New(genesisBytes []byte) (*Genesis, error) {
+func Parse(genesisBytes []byte) (*Genesis, error) {
 	gen := &Genesis{}
 	if _, err := Codec.Unmarshal(genesisBytes, gen); err != nil {
 		return nil, err

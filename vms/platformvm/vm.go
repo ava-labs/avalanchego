@@ -38,8 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -251,8 +250,8 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (vm *VM) createChain(tx *signed.Tx) error {
-	unsignedTx, ok := tx.Unsigned.(*unsigned.CreateChainTx)
+func (vm *VM) createChain(tx *txs.Tx) error {
+	unsignedTx, ok := tx.Unsigned.(*txs.CreateChainTx)
 	if !ok {
 		return errWrongTxType
 	}

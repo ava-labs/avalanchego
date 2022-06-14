@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -255,7 +255,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	// put the chain in existing chain list
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
-		t.Fatal("should have errored because of missing funds")
+		t.Fatal("should have erred because of missing funds")
 	}
 
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager
@@ -289,13 +289,13 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service) (*signed.Tx, error)
+		createTx    func(service *Service) (*txs.Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(service *Service) (*signed.Tx, error) {
+			func(service *Service) (*txs.Tx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
@@ -309,7 +309,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func(service *Service) (*signed.Tx, error) {
+			func(service *Service) (*txs.Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
@@ -324,7 +324,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func(service *Service) (*signed.Tx, error) {
+			func(service *Service) (*txs.Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,
