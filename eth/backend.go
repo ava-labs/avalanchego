@@ -142,7 +142,11 @@ func New(
 	config.TrieCleanCache = roundUpCacheSize(config.TrieCleanCache, 64)
 	config.SnapshotCache = roundUpCacheSize(config.SnapshotCache, 64)
 
-	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
+	log.Info(
+		"Allocated trie memory caches",
+		"clean", common.StorageSize(config.TrieCleanCache)*1024*1024,
+		"dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024,
+	)
 
 	chainConfig, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if genesisErr != nil {
@@ -200,13 +204,18 @@ func New(
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:                  config.TrieCleanCache,
 			TrieDirtyLimit:                  config.TrieDirtyCache,
+			TrieDirtyCommitTarget:           config.TrieDirtyCommitTarget,
 			Pruning:                         config.Pruning,
+			AcceptorQueueLimit:              config.AcceptorQueueLimit,
+			CommitInterval:                  config.CommitInterval,
 			PopulateMissingTries:            config.PopulateMissingTries,
 			PopulateMissingTriesParallelism: config.PopulateMissingTriesParallelism,
 			AllowMissingTries:               config.AllowMissingTries,
+			SnapshotDelayInit:               config.SnapshotDelayInit,
 			SnapshotLimit:                   config.SnapshotCache,
 			SnapshotAsync:                   config.SnapshotAsync,
 			SnapshotVerify:                  config.SnapshotVerify,
+			SkipSnapshotRebuild:             config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
 		}
 	)

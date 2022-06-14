@@ -292,14 +292,17 @@ func (vm *VM) Initialize(
 	ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	ethConfig.Preimages = vm.config.Preimages
 	ethConfig.Pruning = vm.config.Pruning
+	ethConfig.AcceptorQueueLimit = vm.config.AcceptorQueueLimit
 	ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
 	ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
 	ethConfig.AllowMissingTries = vm.config.AllowMissingTries
+	ethConfig.SnapshotDelayInit = false // state sync enabled
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 	ethConfig.OfflinePruning = vm.config.OfflinePruning
 	ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
 	ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
+	ethConfig.CommitInterval = vm.config.CommitInterval
 
 	// Create directory for offline pruning
 	if len(ethConfig.OfflinePruningDataDirectory) != 0 {

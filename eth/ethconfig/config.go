@@ -51,19 +51,20 @@ var DefaultConfig = NewDefaultConfig()
 
 func NewDefaultConfig() Config {
 	return Config{
-		NetworkId:          1,
-		LightPeers:         100,
-		UltraLightFraction: 75,
-		DatabaseCache:      512,
-		TrieCleanCache:     128,
-		TrieDirtyCache:     256,
-		SnapshotCache:      128,
-		Miner:              miner.Config{},
-		TxPool:             core.DefaultTxPoolConfig,
-		RPCGasCap:          25000000,
-		RPCEVMTimeout:      5 * time.Second,
-		GPO:                DefaultFullGPOConfig,
-		RPCTxFeeCap:        1,
+		NetworkId:             1,
+		LightPeers:            100,
+		UltraLightFraction:    75,
+		DatabaseCache:         512,
+		TrieCleanCache:        128,
+		TrieDirtyCache:        256,
+		TrieDirtyCommitTarget: 20,
+		SnapshotCache:         128,
+		Miner:                 miner.Config{},
+		TxPool:                core.DefaultTxPoolConfig,
+		RPCGasCap:             25000000,
+		RPCEVMTimeout:         5 * time.Second,
+		GPO:                   DefaultFullGPOConfig,
+		RPCTxFeeCap:           1,
 	}
 }
 
@@ -83,11 +84,15 @@ type Config struct {
 	DiscoveryURLs []string
 
 	Pruning                         bool    // Whether to disable pruning and flush everything to disk
+	AcceptorQueueLimit              int     // Maximum blocks to queue before blocking during acceptance
+	CommitInterval                  uint64  // If pruning is enabled, specified the interval at which to commit an entire trie to disk.
 	PopulateMissingTries            *uint64 // Height at which to start re-populating missing tries on startup.
 	PopulateMissingTriesParallelism int     // Number of concurrent readers to use when re-populating missing tries on startup.
 	AllowMissingTries               bool    // Whether to allow an archival node to run with pruning enabled and corrupt a complete index.
+	SnapshotDelayInit               bool    // Whether snapshot tree should be initialized on startup or delayed until explicit call
 	SnapshotAsync                   bool    // Whether to generate the initial snapshot in async mode
 	SnapshotVerify                  bool    // Whether to verify generated snapshots
+	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
 
 	// Whitelist of required block number -> hash values to accept
 	Whitelist map[uint64]common.Hash `toml:"-"`
@@ -110,10 +115,11 @@ type Config struct {
 	DatabaseCache      int
 	// DatabaseFreezer    string
 
-	TrieCleanCache int
-	TrieDirtyCache int
-	SnapshotCache  int
-	Preimages      bool
+	TrieCleanCache        int
+	TrieDirtyCache        int
+	TrieDirtyCommitTarget int
+	SnapshotCache         int
+	Preimages             bool
 
 	// Mining options
 	Miner miner.Config
