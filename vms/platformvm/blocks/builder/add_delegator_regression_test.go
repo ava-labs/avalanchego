@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package builder
 
 import (
 	"testing"
@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/stretchr/testify/assert"
@@ -325,15 +326,15 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Bl
 	assert.NoError(err)
 
 	// Assert preferences are correct
-	proposalBlk := blk.(*ProposalBlock)
+	proposalBlk := blk.(*stateful.ProposalBlock)
 	options, err := proposalBlk.Options()
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*AbortBlock)
+	abort, ok := options[1].(*stateful.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	err = commit.Verify()

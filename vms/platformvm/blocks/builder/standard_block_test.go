@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package builder
 
 import (
 	"testing"
@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -100,5 +101,5 @@ func TestAtomicTxImports(t *testing.T) {
 	// Ensure transaction is in the committed state
 	assert.Equal(txStatus, status.Committed)
 	// Ensure standard block contains one atomic transaction
-	assert.Equal(b.(*StandardBlock).inputs.Len(), 1)
+	assert.Equal(b.(*stateful.StandardBlock).Inputs.Len(), 1)
 }

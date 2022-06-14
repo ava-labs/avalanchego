@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package builder
 
 import (
 	"errors"
@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -81,7 +82,7 @@ const (
 
 type testHelpersCollection struct {
 	BlockBuilder
-	blkVerifier Verifier
+	blkVerifier stateful.Verifier
 	mpool       mempool.Mempool
 	sender      *common.SenderTest
 
@@ -182,7 +183,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
-	res.blkVerifier = NewBlockVerifier(
+	res.blkVerifier = stateful.NewBlockVerifier(
 		res.mpool,
 		res.fullState,
 		res.txVerifier,
