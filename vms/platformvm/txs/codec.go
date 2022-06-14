@@ -11,10 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const (
-	// Version is the current default codec version
-	Version = 0
-)
+// Version is the current default codec version
+const Version = 0
 
 // Codec does serialization and deserialization
 var Codec codec.Manager

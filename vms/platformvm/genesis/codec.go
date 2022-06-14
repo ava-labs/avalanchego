@@ -12,11 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	// Version is the current default codec version
-	Version = 0
-)
-
 var Codec codec.Manager
 
 func init() {
@@ -31,7 +26,7 @@ func init() {
 	errs.Add(
 
 		txs.RegisterUnsignedTxsTypes(gc),
-		Codec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(txs.Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
