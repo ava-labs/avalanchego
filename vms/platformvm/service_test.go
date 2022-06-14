@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -780,10 +781,16 @@ func TestGetBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// ctrl := gomock.NewController(t)
 			service := defaultService(t)
+			blkVersion := uint16(stateless.PreForkVersion)
 
-			block, err := p_block.NewStandardBlock(service.vm.blkVerifier, ids.GenerateTestID(), 1234, nil)
+			block, err := p_block.NewStandardBlock(
+				blkVersion,
+				service.vm.blkVerifier,
+				ids.GenerateTestID(),
+				1234,
+				nil,
+			)
 			if err != nil {
 				t.Fatal("couldn't create block: %w", err)
 			}

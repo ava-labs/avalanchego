@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -629,6 +630,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
+	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -663,7 +665,13 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	blk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *tx)
+	blk, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*tx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1635,6 +1643,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	vm, _ := defaultVM()
+	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1673,7 +1682,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	blk, err := p_block.NewAtomicBlock(vm.blkVerifier, preferredID, preferredHeight+1, tx)
+	blk, err := p_block.NewAtomicBlock(blkVersion, vm.blkVerifier, preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1711,6 +1720,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
+	blkVersion := uint16(stateless.PreForkVersion)
 	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1750,7 +1760,13 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(firstVM.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		blkVersion,
+		firstVM.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1837,6 +1853,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
+	blkVersion := uint16(stateless.PreForkVersion)
 
 	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1872,7 +1889,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(firstVM.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		blkVersion,
+		firstVM.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1957,6 +1980,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
+	blkVersion := uint16(stateless.PreForkVersion)
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
@@ -2001,7 +2025,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeBlk, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2240,7 +2270,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-
+	blkVersion := uint16(stateless.PreForkVersion)
 	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	vm := &VM{Factory: Factory{
@@ -2281,7 +2311,13 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2303,6 +2339,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		blkVersion,
 		vm.blkVerifier,
 		firstOption.ID(),
 		firstOption.(p_block.Block).Height()+1,
@@ -2401,7 +2438,7 @@ func TestMaxStakeAmount(t *testing.T) {
 // Test that calling Verify on a block with an unverified parent doesn't cause a panic.
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-
+	blkVersion := uint16(stateless.PreForkVersion)
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
@@ -2479,15 +2516,33 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx0})
+	addSubnetBlk0, err := p_block.NewStandardBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		[]*signed.Tx{addSubnetTx0},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx1})
+	addSubnetBlk1, err := p_block.NewStandardBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		[]*signed.Tx{addSubnetTx1},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := p_block.NewStandardBlock(vm.blkVerifier, addSubnetBlk1.ID(), preferredHeight+2, []*signed.Tx{addSubnetTx2})
+	addSubnetBlk2, err := p_block.NewStandardBlock(
+		blkVersion,
+		vm.blkVerifier,
+		addSubnetBlk1.ID(),
+		preferredHeight+2,
+		[]*signed.Tx{addSubnetTx2},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2516,6 +2571,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, baseDB := defaultVM()
+	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -2552,7 +2608,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx)
+	addValidatorProposalBlk, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*addValidatorTx,
+	)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk.Verify()
@@ -2620,7 +2682,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	importBlk, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
+	importBlk, err := p_block.NewStandardBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		[]*signed.Tx{signedImportTx},
+	)
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2681,7 +2749,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	advanceTimeProposalBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeProposalBlk, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx,
+	)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk.Verify()
@@ -2750,6 +2824,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, baseDB := defaultVM()
+	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -2785,7 +2860,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx0)
+	addValidatorProposalBlk0, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*addValidatorTx0,
+	)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk0.Verify()
@@ -2822,7 +2903,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx0)
+	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx0,
+	)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk0.Verify()
@@ -2898,7 +2985,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	importBlk, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
+	importBlk, err := p_block.NewStandardBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		[]*signed.Tx{signedImportTx},
+	)
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2970,7 +3063,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	addValidatorProposalBlk1, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx1)
+	addValidatorProposalBlk1, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*addValidatorTx1,
+	)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk1.Verify()
@@ -3007,7 +3106,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx1)
+	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(
+		blkVersion,
+		vm.blkVerifier,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx1,
+	)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk1.Verify()

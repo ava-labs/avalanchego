@@ -24,7 +24,7 @@ type ProposalBlockIntf interface {
 	ProposalTx() *signed.Tx
 }
 
-func NewProposalBlock(parentID ids.ID, height uint64, tx signed.Tx) (ProposalBlockIntf, error) {
+func NewProposalBlock(version uint16, parentID ids.ID, height uint64, tx signed.Tx) (ProposalBlockIntf, error) {
 	res := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -36,7 +36,7 @@ func NewProposalBlock(parentID ids.ID, height uint64, tx signed.Tx) (ProposalBlo
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(PreForkVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
@@ -45,7 +45,7 @@ func NewProposalBlock(parentID ids.ID, height uint64, tx signed.Tx) (ProposalBlo
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.Initialize(version, bytes)
 }
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now
@@ -55,8 +55,8 @@ type ProposalBlock struct {
 	Tx signed.Tx `serialize:"true" json:"tx"`
 }
 
-func (pb *ProposalBlock) Initialize(bytes []byte) error {
-	if err := pb.CommonBlock.Initialize(bytes); err != nil {
+func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
+	if err := pb.CommonBlock.Initialize(version, bytes); err != nil {
 		return err
 	}
 
@@ -82,8 +82,8 @@ type PostForkProposalBlock struct {
 	Tx *signed.Tx
 }
 
-func (ppb *PostForkProposalBlock) Initialize(bytes []byte) error {
-	if err := ppb.CommonBlock.Initialize(bytes); err != nil {
+func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error {
+	if err := ppb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 

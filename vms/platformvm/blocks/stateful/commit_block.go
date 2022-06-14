@@ -29,12 +29,13 @@ type CommitBlock struct {
 // proposal block, has ID [parentID]. Additionally the block will track if it
 // was originally preferred or not for metrics.
 func NewCommitBlock(
+	version uint16,
 	verifier Verifier,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
 ) (*CommitBlock, error) {
-	statelessBlk, err := stateless.NewCommitBlock(parentID, height)
+	statelessBlk, err := stateless.NewCommitBlock(version, parentID, height)
 	if err != nil {
 		return nil, err
 	}

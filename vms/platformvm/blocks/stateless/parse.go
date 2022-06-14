@@ -5,9 +5,10 @@ package stateless
 
 func Parse(b []byte) (CommonBlockIntf, error) {
 	var blk CommonBlockIntf
-	if _, err := Codec.Unmarshal(b, &blk); err != nil {
+	v, err := Codec.Unmarshal(b, &blk)
+	if err != nil {
 		return nil, err
 	}
 
-	return blk, blk.Initialize(b)
+	return blk, blk.Initialize(v, b)
 }

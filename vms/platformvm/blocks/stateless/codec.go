@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// Version is the current default codec version
-	Version         = 0
+	// PreForkVersion is the current default codec version
+	PreForkVersion  = 0
 	PostForkVersion = 1
 
 	postForkTag = "postFork"
@@ -41,7 +41,7 @@ func init() {
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(Version, preCdc),
+		Codec.RegisterCodec(PreForkVersion, preCdc),
 		Codec.RegisterCodec(PostForkVersion, postCdc),
 	)
 	if errs.Errored() {

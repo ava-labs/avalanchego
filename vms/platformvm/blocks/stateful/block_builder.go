@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
@@ -179,7 +180,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
-		return NewStandardBlock(b.blkVerifier, preferredID, nextHeight, txs)
+		return NewStandardBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, txs)
 	}
 
 	// Try building a proposal block that rewards a staker.
@@ -192,7 +193,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *rewardValidatorTx)
+		return NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *rewardValidatorTx)
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -205,7 +206,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
+		return NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -229,10 +230,10 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
+		return NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *advanceTimeTx)
 	}
 
-	return NewProposalBlock(b.blkVerifier, preferredID, nextHeight, *tx)
+	return NewProposalBlock(stateless.PreForkVersion, b.blkVerifier, preferredID, nextHeight, *tx)
 }
 
 func (b *blockBuilder) Shutdown() {

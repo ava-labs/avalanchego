@@ -11,12 +11,13 @@ import (
 )
 
 type CommonBlockIntf interface {
-	Initialize(bytes []byte) error
+	Initialize(version uint16, bytes []byte) error
 
 	ID() ids.ID
 	Bytes() []byte
 	Parent() ids.ID
 	Height() uint64
+	Version() uint16
 	UnixTimestamp() int64
 
 	SetTimestamp(time.Time)
@@ -29,13 +30,15 @@ type CommonBlock struct {
 
 	BlkTimestamp uint64 `serialize:"false" postFork:"true" json:"time"` // Time this block was proposed at
 
-	id    ids.ID
-	bytes []byte
+	version uint16 // Codec version used to serialized/deserialize the block
+	id      ids.ID
+	bytes   []byte
 }
 
-func (b *CommonBlock) Initialize(bytes []byte) error {
+func (b *CommonBlock) Initialize(version uint16, bytes []byte) error {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
+	b.version = version
 	return nil
 }
 
@@ -50,6 +53,8 @@ func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *CommonBlock) Height() uint64 { return b.Hght }
+
+func (b *CommonBlock) Version() uint16 { return b.version }
 
 func (b *CommonBlock) UnixTimestamp() int64 {
 	return int64(b.BlkTimestamp)

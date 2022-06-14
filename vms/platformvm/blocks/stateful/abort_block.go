@@ -29,12 +29,13 @@ type AbortBlock struct {
 // block, has ID [parentID]. Additionally the block will track if it was
 // originally preferred or not for metrics.
 func NewAbortBlock(
+	version uint16,
 	verifier Verifier,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
 ) (*AbortBlock, error) {
-	statelessBlk, err := stateless.NewAbortBlock(parentID, height)
+	statelessBlk, err := stateless.NewAbortBlock(version, parentID, height)
 	if err != nil {
 		return nil, err
 	}

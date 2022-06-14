@@ -20,7 +20,7 @@ type AbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func NewAbortBlock(parentID ids.ID, height uint64) (OptionBlock, error) {
+func NewAbortBlock(version uint16, parentID ids.ID, height uint64) (OptionBlock, error) {
 	res := &AbortBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -31,19 +31,19 @@ func NewAbortBlock(parentID ids.ID, height uint64) (OptionBlock, error) {
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(PreForkVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.Initialize(version, bytes)
 }
 
 type CommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func NewCommitBlock(parentID ids.ID, height uint64) (OptionBlock, error) {
+func NewCommitBlock(version uint16, parentID ids.ID, height uint64) (OptionBlock, error) {
 	res := &CommitBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -54,10 +54,10 @@ func NewCommitBlock(parentID ids.ID, height uint64) (OptionBlock, error) {
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(PreForkVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.Initialize(version, bytes)
 }

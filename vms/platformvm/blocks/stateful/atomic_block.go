@@ -36,12 +36,13 @@ type AtomicBlock struct {
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewAtomicBlock(
+	version uint16,
 	verifier Verifier,
 	parentID ids.ID,
 	height uint64,
 	tx signed.Tx,
 ) (*AtomicBlock, error) {
-	statelessBlk, err := stateless.NewAtomicBlock(parentID, height, tx)
+	statelessBlk, err := stateless.NewAtomicBlock(version, parentID, height, tx)
 	if err != nil {
 		return nil, err
 	}

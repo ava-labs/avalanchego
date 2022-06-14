@@ -30,7 +30,7 @@ type StandardBlockIntf interface {
 
 // TODO ABENEGIA: NewStandardBlock should accept codec version
 // and switch across them
-func NewStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (StandardBlockIntf, error) {
+func NewStandardBlock(version uint16, parentID ids.ID, height uint64, txs []*signed.Tx) (StandardBlockIntf, error) {
 	res := &StandardBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -42,7 +42,7 @@ func NewStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (Standar
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(PreForkVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
@@ -53,7 +53,7 @@ func NewStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (Standar
 		}
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.Initialize(version, bytes)
 }
 
 type StandardBlock struct {
@@ -62,8 +62,8 @@ type StandardBlock struct {
 	Txs []*signed.Tx `serialize:"true" json:"txs"`
 }
 
-func (sb *StandardBlock) Initialize(bytes []byte) error {
-	if err := sb.CommonBlock.Initialize(bytes); err != nil {
+func (sb *StandardBlock) Initialize(version uint16, bytes []byte) error {
+	if err := sb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
@@ -88,8 +88,8 @@ type PostForkStandardBlock struct {
 	Txs []*signed.Tx
 }
 
-func (psb *PostForkStandardBlock) Initialize(bytes []byte) error {
-	if err := psb.CommonBlock.Initialize(bytes); err != nil {
+func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error {
+	if err := psb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 

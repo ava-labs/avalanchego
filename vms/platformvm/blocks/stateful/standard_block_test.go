@@ -58,7 +58,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := stateless.Codec.Marshal(stateless.Version, utxo)
+	utxoBytes, err := stateless.Codec.Marshal(stateless.PreForkVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
