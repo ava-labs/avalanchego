@@ -172,7 +172,7 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
-	sb.timestamp = sb.onAcceptState.GetTimestamp()
+	sb.SetTimestamp(sb.onAcceptState.GetTimestamp())
 
 	sb.verifier.RemoveDecisionTxs(txs)
 	sb.verifier.CacheVerifiedBlock(sb)

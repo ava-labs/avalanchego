@@ -11,7 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var _ ProposalBlockIntf = &ProposalBlock{}
+var (
+	_ ProposalBlockIntf = &ProposalBlock{}
+	_ ProposalBlockIntf = &PostForkProposalBlock{}
+)
 
 type ProposalBlockIntf interface {
 	CommonBlockIntf
@@ -70,3 +73,30 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 }
 
 func (pb *ProposalBlock) ProposalTx() *signed.Tx { return &pb.Tx }
+
+type PostForkProposalBlock struct {
+	CommonBlock `serialize:"true"`
+
+	TxBytes []byte `serialize:"true" json:"txs"`
+
+	Tx *signed.Tx
+}
+
+func (ppb *PostForkProposalBlock) Initialize(bytes []byte) error {
+	if err := ppb.CommonBlock.Initialize(bytes); err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+
+	// TODO ABENEGIA: more future_proof allowing tx.Sign to accept a version
+	_, err := unsigned.Codec.Unmarshal(ppb.TxBytes, ppb.Tx)
+	if err != nil {
+		return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
+	}
+	if err := ppb.Tx.Sign(unsigned.Codec, nil); err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
+	}
+
+	return nil
+}
+
+func (ppb *PostForkProposalBlock) ProposalTx() *signed.Tx { return ppb.Tx }

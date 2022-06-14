@@ -4,6 +4,8 @@
 package stateless
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -15,12 +17,17 @@ type CommonBlockIntf interface {
 	Bytes() []byte
 	Parent() ids.ID
 	Height() uint64
+	UnixTimestamp() int64
+
+	SetTimestamp(time.Time)
 }
 
 // CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
+
+	BlkTimestamp uint64 `serialize:"false" postFork:"true" json:"time"` // Time this block was proposed at
 
 	id    ids.ID
 	bytes []byte
@@ -43,3 +50,11 @@ func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *CommonBlock) Height() uint64 { return b.Hght }
+
+func (b *CommonBlock) UnixTimestamp() int64 {
+	return int64(b.BlkTimestamp)
+}
+
+func (b *CommonBlock) SetTimestamp(t time.Time) {
+	b.BlkTimestamp = uint64(t.Unix())
+}

@@ -15,7 +15,6 @@ import (
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
 	commonStatelessBlk stateless.CommonBlockIntf
-	timestamp          time.Time // Time this block was proposed at
 	status             choices.Status
 	children           []Block
 
@@ -41,7 +40,7 @@ func (c *commonBlock) Timestamp() time.Time {
 	if c.commonStatelessBlk.ID() == c.verifier.GetLastAccepted() {
 		return c.verifier.GetTimestamp()
 	}
-	return c.timestamp
+	return time.Unix(c.commonStatelessBlk.UnixTimestamp(), 0)
 }
 
 func (c *commonBlock) conflicts(s ids.Set) (bool, error) {

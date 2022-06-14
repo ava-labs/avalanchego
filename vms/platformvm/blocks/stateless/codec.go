@@ -8,29 +8,42 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
 const (
 	// Version is the current default codec version
-	Version = 0
+	Version         = 0
+	PostForkVersion = 1
+
+	postForkTag = "postFork"
 )
 
 // Codec does serialization and deserialization
 var Codec codec.Manager
 
 func init() {
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	Codec = codec.NewManager(math.MaxInt32)
+	postForkTags := []string{reflectcodec.DefaultTagName, postForkTag}
+	preCdc := linearcodec.NewDefault()
+	postCdc := linearcodec.NewWithTags(postForkTags)
+	Codec = codec.NewDefaultManager()
+
+	preGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+	postGc := linearcodec.New(postForkTags, math.MaxInt32)
 
 	errs := wrappers.Errs{}
+	for _, c := range []codec.Registry{preCdc, postCdc, preGc, postGc} {
+		errs.Add(
+			RegisterBlockTypes(c),
+			unsigned.RegisterUnsignedTxsTypes(c),
+		)
+	}
 	errs.Add(
-		RegisterBlockTypes(gc),
-		unsigned.RegisterUnsignedTxsTypes(gc),
-		Codec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(Version, preCdc),
+		Codec.RegisterCodec(PostForkVersion, postCdc),
 	)
-
 	if errs.Errored() {
 		panic(errs.Err)
 	}

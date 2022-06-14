@@ -148,7 +148,7 @@ func (ab *AtomicBlock) Verify() error {
 	onAccept.AddTx(tx, status.Committed)
 
 	ab.onAcceptState = onAccept
-	ab.timestamp = onAccept.GetTimestamp()
+	ab.SetTimestamp(onAccept.GetTimestamp())
 
 	ab.verifier.RemoveDecisionTxs([]*signed.Tx{tx})
 	ab.verifier.CacheVerifiedBlock(ab)

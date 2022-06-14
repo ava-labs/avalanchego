@@ -120,7 +120,7 @@ func (a *AbortBlock) Verify() error {
 	}
 
 	a.onAcceptState = parent.onAbortState
-	a.timestamp = a.onAcceptState.GetTimestamp()
+	a.SetTimestamp(a.onAcceptState.GetTimestamp())
 
 	a.verifier.CacheVerifiedBlock(a)
 	parent.addChild(a)

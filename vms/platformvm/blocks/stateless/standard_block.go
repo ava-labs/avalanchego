@@ -11,7 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 )
 
-var _ StandardBlockIntf = &StandardBlock{}
+var (
+	_ StandardBlockIntf = &StandardBlock{}
+	_ StandardBlockIntf = &PostForkStandardBlock{}
+)
 
 type StandardBlockIntf interface {
 	CommonBlockIntf
@@ -76,3 +79,39 @@ func (sb *StandardBlock) StandardCommonComponents() CommonBlockIntf {
 }
 
 func (sb *StandardBlock) DecisionTxs() []*signed.Tx { return sb.Txs }
+
+type PostForkStandardBlock struct {
+	CommonBlock `serialize:"true"`
+
+	TxsBytes [][]byte `serialize:"true" json:"txs"`
+
+	Txs []*signed.Tx
+}
+
+func (psb *PostForkStandardBlock) Initialize(bytes []byte) error {
+	if err := psb.CommonBlock.Initialize(bytes); err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+
+	txs := make([]*signed.Tx, 0, len(psb.TxsBytes))
+	for _, txBytes := range psb.TxsBytes {
+		// TODO ABENEGIA: more future_proof allowing tx.Sign to accept a version
+		var tx *signed.Tx
+		_, err := unsigned.Codec.Unmarshal(txBytes, tx)
+		if err != nil {
+			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
+		}
+		if err := tx.Sign(unsigned.Codec, nil); err != nil {
+			return fmt.Errorf("failed to sign block: %w", err)
+		}
+		txs = append(txs, tx)
+	}
+	psb.Txs = txs
+	return nil
+}
+
+func (psb *PostForkStandardBlock) StandardCommonComponents() CommonBlockIntf {
+	return &psb.CommonBlock
+}
+
+func (psb *PostForkStandardBlock) DecisionTxs() []*signed.Tx { return psb.Txs }

@@ -119,7 +119,7 @@ func (c *CommitBlock) Verify() error {
 	}
 
 	c.onAcceptState = parent.onCommitState
-	c.timestamp = c.onAcceptState.GetTimestamp()
+	c.SetTimestamp(c.onAcceptState.GetTimestamp())
 
 	c.verifier.CacheVerifiedBlock(c)
 	parent.addChild(c)

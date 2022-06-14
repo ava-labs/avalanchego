@@ -155,7 +155,7 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onCommitState.AddTx(tx, status.Committed)
 	pb.onAbortState.AddTx(tx, status.Aborted)
 
-	pb.timestamp = parentState.GetTimestamp()
+	pb.SetTimestamp(parentState.GetTimestamp())
 
 	pb.verifier.RemoveProposalTx(tx)
 	pb.verifier.CacheVerifiedBlock(pb)
