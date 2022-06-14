@@ -24,7 +24,6 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-
 		txs.RegisterUnsignedTxsTypes(gc),
 		Codec.RegisterCodec(txs.Version, gc),
 	)
