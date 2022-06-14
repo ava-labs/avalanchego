@@ -44,6 +44,7 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	p_blk_builder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	tx_state "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
@@ -68,7 +69,7 @@ const (
 
 type VM struct {
 	Factory
-	p_block.BlockBuilder
+	p_blk_builder.BlockBuilder
 
 	metrics *p_metrics.Metrics
 
@@ -201,7 +202,7 @@ func (vm *VM) Initialize(
 		vm.metrics,
 		vm.recentlyAccepted,
 	)
-	vm.BlockBuilder = p_block.NewBlockBuilder(
+	vm.BlockBuilder = p_blk_builder.NewBlockBuilder(
 		mempool,
 		vm.txBuilder,
 		vm.blkVerifier,

@@ -1,13 +1,14 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package builder
 
 import (
 	"math"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blkIntf, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
-	blk, ok := blkIntf.(*StandardBlock)
+	blk, ok := blkIntf.(*stateful.StandardBlock)
 	assert.True(ok, "expected standard block")
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
