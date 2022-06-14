@@ -6,146 +6,13 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var _ StatefulAtomicTx = &StatefulImportTx{}
-
-// StatefulImportTx is an unsigned ImportTx
-type StatefulImportTx struct {
-	*unsigned.ImportTx `serialize:"true"`
-
-	txID ids.ID // ID of signed import tx
-}
-
-// InputUTXOs returns the UTXOIDs of the imported funds
-func (tx *StatefulImportTx) InputUTXOs() ids.Set {
-	set := ids.NewSet(len(tx.ImportedInputs))
-	for _, in := range tx.ImportedInputs {
-		set.Add(in.InputID())
-	}
-	return set
-}
-
-func (tx *StatefulImportTx) InputIDs() ids.Set {
-	inputs := tx.BaseTx.InputIDs()
-	atomicInputs := tx.InputUTXOs()
-	inputs.Union(atomicInputs)
-	return inputs
-}
-
-// Attempts to verify this transaction with the provided state.
-func (tx *StatefulImportTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
-	_, err := tx.AtomicExecute(vm, parentState, stx)
-	return err
-}
-
-// Execute this transaction.
-func (tx *StatefulImportTx) Execute(
-	vm *VM,
-	vs VersionedState,
-	stx *signed.Tx,
-) (func() error, error) {
-	if err := stx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, err
-	}
-
-	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
-	for index, input := range tx.Ins {
-		utxo, err := vs.GetUTXO(input.InputID())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
-		}
-		utxos[index] = utxo
-	}
-
-	if vm.bootstrapped.GetValue() {
-		if err := verify.SameSubnet(vm.ctx, tx.SourceChain); err != nil {
-			return nil, err
-		}
-
-		utxoIDs := make([][]byte, len(tx.ImportedInputs))
-		for i, in := range tx.ImportedInputs {
-			utxoID := in.UTXOID.InputID()
-			utxoIDs[i] = utxoID[:]
-		}
-		allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get shared memory: %w", err)
-		}
-
-		for i, utxoBytes := range allUTXOBytes {
-			utxo := &avax.UTXO{}
-			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal UTXO: %w", err)
-			}
-			utxos[i+len(tx.Ins)] = utxo
-		}
-
-		ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
-		copy(ins, tx.Ins)
-		copy(ins[len(tx.Ins):], tx.ImportedInputs)
-
-		if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
-			return nil, err
-		}
-	}
-
-	// Consume the UTXOS
-	consumeInputs(vs, tx.Ins)
-	// Produce the UTXOS
-	produceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
-	return nil, nil
-}
-
-// AtomicOperations returns the shared memory requests
-func (tx *StatefulImportTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		utxoID := in.InputID()
-		utxoIDs[i] = utxoID[:]
-	}
-	return tx.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
-}
-
-// [AtomicExecute] to maintain consistency for the standard block.
-func (tx *StatefulImportTx) AtomicExecute(
-	vm *VM,
-	parentState MutableState,
-	stx *signed.Tx,
-) (VersionedState, error) {
-	// Set up the state if this tx is committed
-	newState := newVersionedState(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
-	_, err := tx.Execute(vm, newState, stx)
-	return newState, err
-}
-
-// Accept this transaction and spend imported inputs
-// We spend imported UTXOs here rather than in semanticVerify because
-// we don't want to remove an imported UTXO in semanticVerify
-// only to have the transaction not be Accepted. This would be inconsistent.
-// Recall that imported UTXOs are not kept in a versionDB.
-func (tx *StatefulImportTx) AtomicAccept(ctx *snow.Context, batch database.Batch) error {
-	chainID, requests, err := tx.AtomicOperations()
-	if err != nil {
-		return err
-	}
-	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
-}
 
 // Create a new transaction
 func (vm *VM) newImportTx(
@@ -153,7 +20,7 @@ func (vm *VM) newImportTx(
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*signed.Tx, error) {
+) (*txs.Tx, error) {
 	kc := secp256k1fx.NewKeychain(keys...)
 
 	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, maxPageSize)
@@ -219,8 +86,8 @@ func (vm *VM) newImportTx(
 	}
 
 	// Create the transaction
-	utx := &unsigned.ImportTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+	utx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Outs:         outs,
@@ -229,7 +96,7 @@ func (vm *VM) newImportTx(
 		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}

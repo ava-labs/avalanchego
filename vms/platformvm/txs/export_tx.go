@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"errors"
@@ -15,14 +15,13 @@ import (
 )
 
 var (
-	_ Tx = &ExportTx{}
+	_ UnsignedTx = &ExportTx{}
 
-	ErrWrongLocktime   = errors.New("wrong locktime reported")
-	ErrOverflowExport  = errors.New("overflow when computing export amount + txFee")
+	errWrongLocktime   = errors.New("wrong locktime reported")
 	errNoExportOutputs = errors.New("no export outputs")
 )
 
-// ExportTx is an unsigned ExportTx
+// ExportTx is an unsigned exportTx
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
@@ -64,13 +63,17 @@ func (tx *ExportTx) SyntacticVerify(ctx *snow.Context) error {
 			return fmt.Errorf("output failed verification: %w", err)
 		}
 		if _, ok := out.Output().(*stakeable.LockOut); ok {
-			return ErrWrongLocktime
+			return errWrongLocktime
 		}
 	}
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
-		return ErrOutputsNotSorted
+		return errOutputsNotSorted
 	}
 
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *ExportTx) Visit(visitor Visitor) error {
+	return visitor.ExportTx(tx)
 }

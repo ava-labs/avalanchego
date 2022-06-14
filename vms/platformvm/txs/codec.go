@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"math"
@@ -30,8 +30,7 @@ func init() {
 	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
 	GenCodec = codec.NewManager(math.MaxInt32)
 
-	// To maintain codec type ordering, skip positions
-	// for Proposal/Abort/Commit/Standard/Atomic blocks
+	// To maintain codec type ordering, skip positions for the blocks
 	c.SkipRegistrations(5)
 	gc.SkipRegistrations(5)
 

@@ -7,80 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var _ StatefulDecisionTx = &StatefulCreateSubnetTx{}
-
-// StatefulCreateSubnetTx is an unsigned proposal to create a new subnet
-type StatefulCreateSubnetTx struct {
-	*unsigned.CreateSubnetTx `serialize:"true"`
-
-	txID ids.ID // ID of signed create subnet tx
-}
-
-// InputUTXOs for [DecisionTxs] will return an empty set to diffrentiate from the [AtomicTxs] input UTXOs
-func (tx *StatefulCreateSubnetTx) InputUTXOs() ids.Set { return nil }
-
-func (tx *StatefulCreateSubnetTx) AtomicOperations() (ids.ID, *atomic.Requests, error) {
-	return ids.ID{}, nil, nil
-}
-
-// Attempts to verify this transaction with the provided state.
-func (tx *StatefulCreateSubnetTx) SemanticVerify(vm *VM, parentState MutableState, stx *signed.Tx) error {
-	vs := newVersionedState(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
-	_, err := tx.Execute(vm, vs, stx)
-	return err
-}
-
-// Execute this transaction.
-func (tx *StatefulCreateSubnetTx) Execute(
-	vm *VM,
-	vs VersionedState,
-	stx *signed.Tx,
-) (
-	func() error,
-	error,
-) {
-	// Make sure this transaction is well formed.
-	if err := stx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, err
-	}
-
-	// Verify the flowcheck
-	timestamp := vs.GetTimestamp()
-	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	if err := vm.semanticVerifySpend(
-		vs,
-		tx.CreateSubnetTx,
-		tx.Ins,
-		tx.Outs,
-		stx.Creds,
-		createSubnetTxFee,
-		vm.ctx.AVAXAssetID,
-	); err != nil {
-		return nil, err
-	}
-
-	// Consume the UTXOS
-	consumeInputs(vs, tx.Ins)
-	// Produce the UTXOS
-	produceOutputs(vs, tx.txID, vm.ctx.AVAXAssetID, tx.Outs)
-	// Attempt to the new chain to the database
-	vs.AddSubnet(stx)
-
-	return nil, nil
-}
 
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
@@ -89,7 +21,7 @@ func (vm *VM) newCreateSubnetTx(
 	ownerAddrs []ids.ShortID, // control addresses for the new subnet
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*signed.Tx, error) {
+) (*txs.Tx, error) {
 	timestamp := vm.internalState.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	ins, outs, _, signers, err := vm.stake(keys, 0, createSubnetTxFee, changeAddr)
@@ -101,8 +33,8 @@ func (vm *VM) newCreateSubnetTx(
 	ids.SortShortIDs(ownerAddrs)
 
 	// Create the tx
-	utx := &unsigned.CreateSubnetTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+	utx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
@@ -113,7 +45,7 @@ func (vm *VM) newCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx, err := signed.NewSigned(utx, unsigned.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}

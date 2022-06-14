@@ -14,14 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
-	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 // Note that since an Avalanche network has exactly one Platform Chain,
@@ -160,8 +158,8 @@ type GenesisUTXO struct {
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
 	UTXOs         []*GenesisUTXO `serialize:"true"`
-	Validators    []*signed.Tx   `serialize:"true"`
-	Chains        []*signed.Tx   `serialize:"true"`
+	Validators    []*txs.Tx      `serialize:"true"`
+	Chains        []*txs.Tx      `serialize:"true"`
 	Timestamp     uint64         `serialize:"true"`
 	InitialSupply uint64         `serialize:"true"`
 	Message       string         `serialize:"true"`
@@ -236,11 +234,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	// Specify the validators that are validating the primary network at genesis.
 	vdrs := newTxHeapByEndTime()
-	for _, validator := range args.Validators {
+	for _, vdr := range args.Validators {
 		weight := uint64(0)
-		stake := make([]*avax.TransferableOutput, len(validator.Staked))
-		sortAPIUTXOs(validator.Staked)
-		for i, apiUTXO := range validator.Staked {
+		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
+		sortAPIUTXOs(vdr.Staked)
+		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
 				return err
@@ -265,7 +263,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			}
 			stake[i] = utxo
 
-			newWeight, err := safemath.Add64(weight, uint64(apiUTXO.Amount))
+			newWeight, err := math.Add64(weight, uint64(apiUTXO.Amount))
 			if err != nil {
 				return errStakeOverflow
 			}
@@ -275,15 +273,15 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if weight == 0 {
 			return errValidatorAddsNoValue
 		}
-		if uint64(validator.EndTime) <= uint64(args.Time) {
+		if uint64(vdr.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
 
 		owner := &secp256k1fx.OutputOwners{
-			Locktime:  uint64(validator.RewardOwner.Locktime),
-			Threshold: uint32(validator.RewardOwner.Threshold),
+			Locktime:  uint64(vdr.RewardOwner.Locktime),
+			Threshold: uint32(vdr.RewardOwner.Threshold),
 		}
-		for _, addrStr := range validator.RewardOwner.Addresses {
+		for _, addrStr := range vdr.RewardOwner.Addresses {
 			addrID, err := bech32ToID(addrStr)
 			if err != nil {
 				return err
@@ -293,27 +291,25 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		ids.SortShortIDs(owner.Addrs)
 
 		delegationFee := uint32(0)
-		if validator.ExactDelegationFee != nil {
-			delegationFee = uint32(*validator.ExactDelegationFee)
+		if vdr.ExactDelegationFee != nil {
+			delegationFee = uint32(*vdr.ExactDelegationFee)
 		}
 
-		tx := &signed.Tx{
-			Unsigned: &unsigned.AddValidatorTx{
-				BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				Validator: p_validator.Validator{
-					NodeID: validator.NodeID,
-					Start:  uint64(args.Time),
-					End:    uint64(validator.EndTime),
-					Wght:   weight,
-				},
-				Stake:        stake,
-				RewardsOwner: owner,
-				Shares:       delegationFee,
+		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			Validator: validator.Validator{
+				NodeID: vdr.NodeID,
+				Start:  uint64(args.Time),
+				End:    uint64(vdr.EndTime),
+				Wght:   weight,
 			},
-		}
+			Stake:        stake,
+			RewardsOwner: owner,
+			Shares:       delegationFee,
+		}}
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
 		}
@@ -322,26 +318,24 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the chains that exist at genesis.
-	chains := []*signed.Tx{}
+	chains := []*txs.Tx{}
 	for _, chain := range args.Chains {
 		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
-		tx := &signed.Tx{
-			Unsigned: &unsigned.CreateChainTx{
-				BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				SubnetID:    chain.SubnetID,
-				ChainName:   chain.Name,
-				VMID:        chain.VMID,
-				FxIDs:       chain.FxIDs,
-				GenesisData: genesisBytes,
-				SubnetAuth:  &secp256k1fx.Input{},
-			},
-		}
+		tx := &txs.Tx{Unsigned: &txs.CreateChainTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			SubnetID:    chain.SubnetID,
+			ChainName:   chain.Name,
+			VMID:        chain.VMID,
+			FxIDs:       chain.FxIDs,
+			GenesisData: genesisBytes,
+			SubnetAuth:  &secp256k1fx.Input{},
+		}}
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
 		}
@@ -349,7 +343,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		chains = append(chains, tx)
 	}
 
-	validatorTxs := make([]*signed.Tx, vdrs.Len())
+	validatorTxs := make([]*txs.Tx, vdrs.Len())
 	for i, tx := range vdrs.txs {
 		validatorTxs[i] = tx.tx
 	}

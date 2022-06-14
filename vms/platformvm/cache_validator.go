@@ -7,9 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ validator = &validatorImpl{}
+var _ validatorIntf = &validatorImpl{}
 
-type validator interface {
+type validatorIntf interface {
 	Delegators() []DelegatorAndID
 	SubnetValidators() map[ids.ID]SubnetValidatorAndID
 }

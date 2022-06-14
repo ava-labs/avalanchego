@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"time"
@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ Tx = &AdvanceTimeTx{}
+var _ UnsignedTx = &AdvanceTimeTx{}
 
 // AdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
@@ -40,3 +40,7 @@ func (tx *AdvanceTimeTx) Timestamp() time.Time {
 func (tx *AdvanceTimeTx) InputIDs() ids.Set                   { return nil }
 func (tx *AdvanceTimeTx) Outputs() []*avax.TransferableOutput { return nil }
 func (tx *AdvanceTimeTx) SyntacticVerify(*snow.Context) error { return nil }
+
+func (tx *AdvanceTimeTx) Visit(visitor Visitor) error {
+	return visitor.AdvanceTimeTx(tx)
+}

@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -43,28 +43,46 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statefulTx, err := MakeStatefulTx(toRemoveTx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	toRemove := toRemoveTx.Unsigned.(*txs.AddValidatorTx)
 	toRemoveTxID := toRemoveTx.ID()
-	toRemove := statefulTx.(*StatefulAddValidatorTx)
 
-	// Case 1: Chain timestamp is wrong
-	if tx, err := vm.newRewardValidatorTx(toRemoveTxID); err != nil {
-		t.Fatal(err)
-	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
-		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
+	{
+		// Case 1: Chain timestamp is wrong
+		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		executor := proposalTxExecutor{
+			vm:          vm,
+			parentState: vm.internalState,
+			tx:          tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		if err == nil {
+			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
+		}
 	}
 
 	// Advance chain timestamp to time that next validator leaves
 	vm.internalState.SetTimestamp(toRemove.EndTime())
 
-	// Case 2: Wrong validator
-	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
-		t.Fatal(err)
-	} else if _, _, err := toRemove.Execute(vm, vm.internalState, tx); err == nil {
-		t.Fatalf("should have failed because validator ID is wrong")
+	{
+		// Case 2: Wrong validator
+		tx, err := vm.newRewardValidatorTx(ids.GenerateTestID())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		executor := proposalTxExecutor{
+			vm:          vm,
+			parentState: vm.internalState,
+			tx:          tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		if err == nil {
+			t.Fatalf("should have failed because validator ID is wrong")
+		}
 	}
 
 	// Case 3: Happy path
@@ -73,16 +91,17 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	statefulTx, err = MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatal(err)
+	executor := proposalTxExecutor{
+		vm:          vm,
+		parentState: vm.internalState,
+		tx:          tx,
 	}
-	onCommitState, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
+	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentStakers := onCommitState.CurrentStakerChainState()
+	onCommitCurrentStakers := executor.onCommit.CurrentStakerChainState()
 	nextToRemoveTx, _, err := onCommitCurrentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +119,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState.Apply(vm.internalState)
+	executor.onCommit.Apply(vm.internalState)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -132,75 +151,96 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 	toRemoveTxID := toRemoveTx.ID()
-	toRemove := toRemoveTx.Unsigned.(*unsigned.AddValidatorTx)
+	toRemove := toRemoveTx.Unsigned.(*txs.AddValidatorTx)
 
-	// Case 1: Chain timestamp is wrong
-	if tx, err := vm.newRewardValidatorTx(toRemoveTxID); err != nil {
-		t.Fatal(err)
-	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
-		t.Fatalf("couldn't make stateful tx: %s", err)
-	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
-		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
+	{
+		// Case 1: Chain timestamp is wrong
+		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		executor := proposalTxExecutor{
+			vm:          vm,
+			parentState: vm.internalState,
+			tx:          tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		if err == nil {
+			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
+		}
 	}
 
 	// Advance chain timestamp to time that next validator leaves
 	vm.internalState.SetTimestamp(toRemove.EndTime())
 
-	// Case 2: Wrong validator
-	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
-		t.Fatal(err)
-	} else if statefulTx, err := MakeStatefulTx(tx); err != nil {
-		t.Fatalf("couldn't make stateful tx: %s", err)
-	} else if _, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx); err == nil {
-		t.Fatalf("should have failed because validator ID is wrong")
+	{
+		// Case 2: Wrong validator
+		tx, err := vm.newRewardValidatorTx(ids.GenerateTestID())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		executor := proposalTxExecutor{
+			vm:          vm,
+			parentState: vm.internalState,
+			tx:          tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		if err == nil {
+			t.Fatalf("should have failed because validator ID is wrong")
+		}
 	}
 
-	// Case 3: Happy path
-	tx, err := vm.newRewardValidatorTx(toRemoveTxID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	{
+		// Case 3: Happy path
+		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatalf("couldn't make stateful tx: %s", err)
-	}
-	_, onAbortState, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
+		executor := proposalTxExecutor{
+			vm:          vm,
+			parentState: vm.internalState,
+			tx:          tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	onAbortCurrentStakers := onAbortState.CurrentStakerChainState()
-	nextToRemoveTx, _, err := onAbortCurrentStakers.GetNextStaker()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if toRemoveTxID == nextToRemoveTx.ID() {
-		t.Fatalf("Should have removed the previous validator")
-	}
+		onAbortCurrentStakers := executor.onAbort.CurrentStakerChainState()
+		nextToRemoveTx, _, err := onAbortCurrentStakers.GetNextStaker()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if toRemoveTxID == nextToRemoveTx.ID() {
+			t.Fatalf("Should have removed the previous validator")
+		}
 
-	// check that stake/reward isn't given back
-	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+		// check that stake/reward isn't given back
+		stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
-	// Get old balances
-	oldBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
-	if err != nil {
-		t.Fatal(err)
-	}
+		// Get old balances
+		oldBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	onAbortState.Apply(vm.internalState)
-	if err := vm.internalState.Commit(); err != nil {
-		t.Fatal(err)
-	}
+		executor.onAbort.Apply(vm.internalState)
+		if err := vm.internalState.Commit(); err != nil {
+			t.Fatal(err)
+		}
 
-	onAbortBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
-	if err != nil {
-		t.Fatal(err)
-	}
+		onAbortBalance, err := avax.GetBalance(vm.internalState, stakeOwners)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
-		t.Fatalf("on abort, should have old balance (%d) + staked amount (%d) but have %d",
-			oldBalance, toRemove.Validator.Weight(), onAbortBalance)
+		if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
+			t.Fatalf("on abort, should have old balance (%d) + staked amount (%d) but have %d",
+				oldBalance, toRemove.Validator.Weight(), onAbortBalance)
+		}
 	}
 }
 
@@ -266,11 +306,12 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatalf("couldn't make stateful tx: %s", err)
+	executor := proposalTxExecutor{
+		vm:          vm,
+		parentState: vm.internalState,
+		tx:          tx,
 	}
-	onCommitState, _, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
+	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -285,7 +326,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 
-	onCommitState.Apply(vm.internalState)
+	executor.onCommit.Apply(vm.internalState)
 	err = vm.internalState.Commit()
 	assert.NoError(err)
 
@@ -369,11 +410,12 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatalf("couldn't make stateful tx: %s", err)
+	executor := proposalTxExecutor{
+		vm:          vm,
+		parentState: vm.internalState,
+		tx:          tx,
 	}
-	_, onAbortState, err := statefulTx.(StatefulProposalTx).Execute(vm, vm.internalState, tx)
+	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -388,7 +430,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 
-	onAbortState.Apply(vm.internalState)
+	executor.onAbort.Apply(vm.internalState)
 	err = vm.internalState.Commit()
 	assert.NoError(err)
 
