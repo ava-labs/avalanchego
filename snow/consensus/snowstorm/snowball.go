@@ -20,14 +20,14 @@ type snowball struct {
 	rogue bool
 }
 
-func (sb *snowball) Confidence(currentVote uint64) int {
+func (sb *snowball) getConfidence(currentVote uint64) int {
 	if sb.lastVote != currentVote {
 		return 0
 	}
 	return sb.confidence
 }
 
-func (sb *snowball) RecordSuccessfulPoll(currentVote uint64) {
+func (sb *snowball) recordSuccessfulPoll(currentVote uint64) {
 	// If this choice wasn't voted for during the last poll, the confidence
 	// should have been reset during the last poll. So, we reset it now.
 	if sb.lastVote+1 != currentVote {
@@ -42,7 +42,7 @@ func (sb *snowball) RecordSuccessfulPoll(currentVote uint64) {
 	sb.confidence++
 }
 
-func (sb *snowball) Finalized(betaVirtuous, betaRogue int) bool {
+func (sb *snowball) finalized(betaVirtuous, betaRogue int) bool {
 	// This choice is finalized if the snowflake counter is at least
 	// [betaRogue]. If there are no known conflicts with this operation, it can
 	// be accepted with a snowflake counter of at least [betaVirtuous].

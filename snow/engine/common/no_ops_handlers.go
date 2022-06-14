@@ -161,8 +161,13 @@ func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
 	return &noOpChitsHandler{log: log}
 }
 
-func (nop *noOpChitsHandler) Chits(vdr ids.NodeID, requestID uint32, votes []ids.ID) error {
+func (nop *noOpChitsHandler) Chits(vdr ids.NodeID, requestID uint32, _ []ids.ID) error {
 	nop.log.Debug("Chits(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+	return nil
+}
+
+func (nop *noOpChitsHandler) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, _ ids.ID) error {
+	nop.log.Debug("ChitsV2(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
 	return nil
 }
 
