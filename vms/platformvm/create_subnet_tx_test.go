@@ -13,8 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -63,8 +62,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			assert.NoError(err)
 
 			// Create the tx
-			utx := &unsigned.CreateSubnetTx{
-				BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+			utx := &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    vm.ctx.NetworkID,
 					BlockchainID: vm.ctx.ChainID,
 					Ins:          ins,
@@ -72,22 +71,23 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				}},
 				Owner: &secp256k1fx.OutputOwners{},
 			}
-			tx := &signed.Tx{Unsigned: utx}
+			tx := &txs.Tx{Unsigned: utx}
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			vs := state.NewVersioned(
+			state := state.NewVersioned(
 				vm.internalState,
 				vm.internalState.CurrentStakerChainState(),
 				vm.internalState.PendingStakerChainState(),
 			)
-			vs.SetTimestamp(test.time)
+			state.SetTimestamp(test.time)
 
-			statefulTx, err := MakeStatefulTx(tx)
-			assert.NoError(err)
-			decisionTx, ok := statefulTx.(StatefulDecisionTx)
-			assert.True(ok)
-			_, err = decisionTx.Execute(vm, vs, tx)
+			executor := standardTxExecutor{
+				vm:    vm,
+				state: state,
+				tx:    tx,
+			}
+			err = tx.Unsigned.Visit(&executor)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}

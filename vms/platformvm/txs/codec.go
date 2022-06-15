@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"github.com/ava-labs/avalanchego/codec"
@@ -11,10 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const (
-	// Version is the current default codec version
-	Version = 0
-)
+// Version is the current default codec version
+const Version = 0
 
 // Codec does serialization and deserialization
 var Codec codec.Manager
@@ -23,8 +21,7 @@ func init() {
 	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
 
-	// To maintain codec type ordering, skip positions
-	// for Proposal/Abort/Commit/Standard/Atomic blocks
+	// To maintain codec type ordering, skip positions for the blocks
 	c.SkipRegistrations(5)
 
 	errs := wrappers.Errs{}

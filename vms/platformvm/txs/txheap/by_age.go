@@ -3,18 +3,18 @@
 
 package txheap
 
-var _ Heap = &txHeapByAge{}
+var _ Heap = &byAge{}
 
-type txHeapByAge struct {
+type byAge struct {
 	txHeap
 }
 
-func NewTxHeapByAge() Heap {
-	h := &txHeapByAge{}
+func NewByAge() Heap {
+	h := &byAge{}
 	h.initialize(h)
 	return h
 }
 
-func (h *txHeapByAge) Less(i, j int) bool {
+func (h *byAge) Less(i, j int) bool {
 	return h.txs[i].age < h.txs[j].age
 }

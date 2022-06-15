@@ -5,8 +5,7 @@ package transactions
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ currentValidator = &currentValidatorImpl{}
@@ -14,9 +13,9 @@ var _ currentValidator = &currentValidatorImpl{}
 type currentValidator interface {
 	validator
 
-	// return unsigned.AddValidatorTx content along with
-	// the ID of its signed.Tx
-	AddValidatorTx() (*unsigned.AddValidatorTx, ids.ID)
+	// return txs.AddValidatorTx content along with
+	// the ID of its txs.Tx
+	AddValidatorTx() (*txs.AddValidatorTx, ids.ID)
 
 	// Weight of delegations to this validator. Doesn't include the stake
 	// provided by this validator.
@@ -29,12 +28,12 @@ type currentValidatorImpl struct {
 	// delegators are sorted in order of removal.
 	validatorImpl
 
-	addValidator    signed.ValidatorAndID
+	addValidator    txs.ValidatorAndID
 	delegatorWeight uint64
 	potentialReward uint64
 }
 
-func (v *currentValidatorImpl) AddValidatorTx() (*unsigned.AddValidatorTx, ids.ID) {
+func (v *currentValidatorImpl) AddValidatorTx() (*txs.AddValidatorTx, ids.ID) {
 	return v.addValidator.UnsignedAddValidatorTx, v.addValidator.TxID
 }
 

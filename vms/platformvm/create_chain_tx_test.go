@@ -16,8 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -40,7 +39,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		fxIDs       []ids.ID
 		chainName   string
 		keys        []*crypto.PrivateKeySECP256K1R
-		setup       func(*unsigned.CreateChainTx) *unsigned.CreateChainTx
+		setup       func(*txs.CreateChainTx) *txs.CreateChainTx
 	}
 
 	tests := []test{
@@ -53,7 +52,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(*unsigned.CreateChainTx) *unsigned.CreateChainTx { return nil },
+			setup:       func(*txs.CreateChainTx) *txs.CreateChainTx { return nil },
 		},
 		{
 			description: "vm ID is empty",
@@ -64,7 +63,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(tx *unsigned.CreateChainTx) *unsigned.CreateChainTx { tx.VMID = ids.ID{}; return tx },
+			setup:       func(tx *txs.CreateChainTx) *txs.CreateChainTx { tx.VMID = ids.ID{}; return tx },
 		},
 		{
 			description: "subnet ID is empty",
@@ -75,7 +74,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(tx *unsigned.CreateChainTx) *unsigned.CreateChainTx { tx.SubnetID = ids.ID{}; return tx },
+			setup:       func(tx *txs.CreateChainTx) *txs.CreateChainTx { tx.SubnetID = ids.ID{}; return tx },
 		},
 		{
 			description: "subnet ID is platform chain's ID",
@@ -86,7 +85,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(tx *unsigned.CreateChainTx) *unsigned.CreateChainTx { tx.SubnetID = vm.ctx.ChainID; return tx },
+			setup: func(tx *txs.CreateChainTx) *txs.CreateChainTx {
+				tx.SubnetID = vm.ctx.ChainID
+				return tx
+			},
 		},
 		{
 			description: "chain name is too long",
@@ -97,8 +99,8 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup: func(tx *unsigned.CreateChainTx) *unsigned.CreateChainTx {
-				tx.ChainName = string(make([]byte, maxNameLen+1))
+			setup: func(tx *txs.CreateChainTx) *txs.CreateChainTx {
+				tx.ChainName = string(make([]byte, txs.MaxNameLen+1))
 				return tx
 			},
 		},
@@ -111,7 +113,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup: func(tx *unsigned.CreateChainTx) *unsigned.CreateChainTx {
+			setup: func(tx *txs.CreateChainTx) *txs.CreateChainTx {
 				tx.ChainName = "⌘"
 				return tx
 			},
@@ -125,8 +127,8 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup: func(tx *unsigned.CreateChainTx) *unsigned.CreateChainTx {
-				tx.GenesisData = make([]byte, maxGenesisLen+1)
+			setup: func(tx *txs.CreateChainTx) *txs.CreateChainTx {
+				tx.GenesisData = make([]byte, txs.MaxGenesisLen+1)
 				return tx
 			},
 		},
@@ -145,8 +147,8 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx.Unsigned.(*unsigned.CreateChainTx).SyntacticallyVerified = false
-		tx.Unsigned = test.setup(tx.Unsigned.(*unsigned.CreateChainTx))
+		tx.Unsigned.(*txs.CreateChainTx).SyntacticallyVerified = false
+		tx.Unsigned = test.setup(tx.Unsigned.(*txs.CreateChainTx))
 		if err := tx.SyntacticVerify(vm.ctx); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
@@ -179,20 +181,21 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := state.NewVersioned(
-		vm.internalState,
-		vm.internalState.CurrentStakerChainState(),
-		vm.internalState.PendingStakerChainState(),
-	)
-
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatal(err)
+
+	executor := standardTxExecutor{
+		vm: vm,
+		state: state.NewVersioned(
+			vm.internalState,
+			vm.internalState.CurrentStakerChainState(),
+			vm.internalState.PendingStakerChainState(),
+		),
+		tx: tx,
 	}
-	if _, err := statefulTx.(StatefulDecisionTx).Execute(vm, vs, tx); err == nil {
-		t.Fatal("should have errored because a sig is missing")
+	err = tx.Unsigned.Visit(&executor)
+	if err == nil {
+		t.Fatal("should have erred because a sig is missing")
 	}
 }
 
@@ -227,23 +230,24 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := state.NewVersioned(
-		vm.internalState,
-		vm.internalState.CurrentStakerChainState(),
-		vm.internalState.PendingStakerChainState(),
-	)
-
 	// Replace a valid signature with one from another key
 	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatal(err)
+
+	executor := standardTxExecutor{
+		vm: vm,
+		state: state.NewVersioned(
+			vm.internalState,
+			vm.internalState.CurrentStakerChainState(),
+			vm.internalState.PendingStakerChainState(),
+		),
+		tx: tx,
 	}
-	if _, err = statefulTx.(StatefulDecisionTx).Execute(vm, vs, tx); err == nil {
+	err = tx.Unsigned.Visit(&executor)
+	if err == nil {
 		t.Fatal("should have failed verification because a sig is invalid")
 	}
 }
@@ -273,19 +277,20 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := state.NewVersioned(
-		vm.internalState,
-		vm.internalState.CurrentStakerChainState(),
-		vm.internalState.PendingStakerChainState(),
-	)
+	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	tx.Unsigned.(*unsigned.CreateChainTx).SubnetID = ids.GenerateTestID()
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatal(err)
+	executor := standardTxExecutor{
+		vm: vm,
+		state: state.NewVersioned(
+			vm.internalState,
+			vm.internalState.CurrentStakerChainState(),
+			vm.internalState.PendingStakerChainState(),
+		),
+		tx: tx,
 	}
-	if _, err := statefulTx.(StatefulDecisionTx).Execute(vm, vs, tx); err == nil {
-		t.Fatal("should have failed because subent doesn't exist")
+	err = tx.Unsigned.Visit(&executor)
+	if err == nil {
+		t.Fatal("should have failed because subnet doesn't exist")
 	}
 }
 
@@ -314,17 +319,16 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vs := state.NewVersioned(
-		vm.internalState,
-		vm.internalState.CurrentStakerChainState(),
-		vm.internalState.PendingStakerChainState(),
-	)
-
-	statefulTx, err := MakeStatefulTx(tx)
-	if err != nil {
-		t.Fatal(err)
+	executor := standardTxExecutor{
+		vm: vm,
+		state: state.NewVersioned(
+			vm.internalState,
+			vm.internalState.CurrentStakerChainState(),
+			vm.internalState.PendingStakerChainState(),
+		),
+		tx: tx,
 	}
-	_, err = statefulTx.(StatefulDecisionTx).Execute(vm, vs, tx)
+	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
 		t.Fatalf("expected tx to pass verification but got error: %v", err)
 	}
@@ -381,8 +385,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			// Create the tx
 
-			utx := &unsigned.CreateChainTx{
-				BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+			utx := &txs.CreateChainTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    vm.ctx.NetworkID,
 					BlockchainID: vm.ctx.ChainID,
 					Ins:          ins,
@@ -392,7 +396,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				VMID:       constants.AVMID,
 				SubnetAuth: subnetAuth,
 			}
-			tx := &signed.Tx{Unsigned: utx}
+			tx := &txs.Tx{Unsigned: utx}
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
@@ -403,11 +407,12 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			statefulTx, err := MakeStatefulTx(tx)
-			assert.NoError(err)
-			decisionTx, ok := statefulTx.(StatefulDecisionTx)
-			assert.True(ok)
-			_, err = decisionTx.Execute(vm, vs, tx)
+			executor := standardTxExecutor{
+				vm:    vm,
+				state: vs,
+				tx:    tx,
+			}
+			err = tx.Unsigned.Visit(&executor)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}

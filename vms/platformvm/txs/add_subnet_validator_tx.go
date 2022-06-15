@@ -1,24 +1,19 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
-
-	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
-	_ Tx       = &AddSubnetValidatorTx{}
-	_ timed.Tx = &AddSubnetValidatorTx{}
-
-	ErrDSValidatorSubset = errors.New("staking period for all subnets must be a subset  of the primary network")
+	_ UnsignedTx = &AddSubnetValidatorTx{}
+	_ StakerTx   = &AddSubnetValidatorTx{}
 )
 
 // AddSubnetValidatorTx is an unsigned addSubnetValidatorTx
@@ -26,7 +21,7 @@ type AddSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The validator
-	Validator p_validator.SubnetValidator `serialize:"true" json:"validator"`
+	Validator validator.SubnetValidator `serialize:"true" json:"validator"`
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
@@ -65,4 +60,8 @@ func (tx *AddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	// cache that this is valid
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+func (tx *AddSubnetValidatorTx) Visit(visitor Visitor) error {
+	return visitor.AddSubnetValidatorTx(tx)
 }

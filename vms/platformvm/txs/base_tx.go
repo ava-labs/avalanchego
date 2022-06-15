@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package unsigned
+package txs
 
 import (
 	"errors"
@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	ErrNilTx                 = errors.New("tx is nil")
-	ErrOutputsNotSorted      = errors.New("outputs not sorted")
-	ErrInputsNotSortedUnique = errors.New("inputs not sorted and unique")
+	ErrNilTx = errors.New("tx is nil")
+
+	errOutputsNotSorted      = errors.New("outputs not sorted")
+	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
 )
 
 // BaseTx contains fields common to many transaction types. It should be
@@ -65,7 +66,7 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
-	if err := tx.BaseTxVerify(ctx); err != nil {
+	if err := tx.BaseTx.Verify(ctx); err != nil {
 		return fmt.Errorf("metadata failed verification: %w", err)
 	}
 	for _, out := range tx.Outs {
@@ -80,9 +81,9 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
-		return ErrOutputsNotSorted
+		return errOutputsNotSorted
 	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
-		return ErrInputsNotSortedUnique
+		return errInputsNotSortedUnique
 	default:
 		return nil
 	}

@@ -55,8 +55,8 @@ func (t *BaseTx) AssetIDs() ids.Set { return t.ConsumedAssetIDs() }
 // NumCredentials returns the number of expected credentials
 func (t *BaseTx) NumCredentials() int { return len(t.Ins) }
 
-// BaseTxVerify ensures that transaction metadata is valid
-func (t *BaseTx) BaseTxVerify(ctx *snow.Context) error {
+// Verify ensures that transaction metadata is valid
+func (t *BaseTx) Verify(ctx *snow.Context) error {
 	switch {
 	case t == nil:
 		return errNilTx
