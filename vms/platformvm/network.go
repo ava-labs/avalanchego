@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -89,11 +89,12 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		return nil
 	}
 
-	tx, err := signed.FromBytes(Codec, msg.Tx)
+	tx, err := txs.Parse(Codec, msg.Tx)
 	if err != nil {
-		n.log.Warn("failed building signed tx from bytes: %s", err)
+		n.log.Verbo("AppGossip provided invalid tx: %s", err)
 		return nil
 	}
+
 	txID := tx.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
@@ -117,7 +118,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	return nil
 }
 
-func (n *network) GossipTx(tx *signed.Tx) error {
+func (n *network) GossipTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := n.recentTxs.Get(txID); has {

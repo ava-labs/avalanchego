@@ -10,14 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
-
-	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 type Verifier interface {
 	mempool.Mempool
-	p_tx.Executor
 	stateless.Metrics
 
 	metadata.Content

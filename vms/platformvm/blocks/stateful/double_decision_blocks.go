@@ -14,7 +14,7 @@ type doubleDecisionBlock struct {
 
 func (ddb *doubleDecisionBlock) acceptParent() error {
 	blkID := ddb.baseBlk.ID()
-	ddb.verifier.Ctx().Log.Verbo("Accepting block with ID %s", blkID)
+	ddb.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
 	parentIntf, err := ddb.parentBlock()
 	if err != nil {
@@ -23,7 +23,7 @@ func (ddb *doubleDecisionBlock) acceptParent() error {
 
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
-		ddb.verifier.Ctx().Log.Error("double decision block should only follow a proposal block")
+		ddb.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 
@@ -42,7 +42,7 @@ func (ddb *doubleDecisionBlock) updateState() error {
 
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
-		ddb.verifier.Ctx().Log.Error("double decision block should only follow a proposal block")
+		ddb.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 

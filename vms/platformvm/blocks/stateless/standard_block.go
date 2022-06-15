@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Block = &StandardBlock{}
@@ -16,7 +15,7 @@ var _ Block = &StandardBlock{}
 type StandardBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Txs []*signed.Tx `serialize:"true" json:"txs"`
+	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (sb *StandardBlock) Initialize(bytes []byte) error {
@@ -24,22 +23,22 @@ func (sb *StandardBlock) Initialize(bytes []byte) error {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
-		if err := tx.Sign(unsigned.Codec, nil); err != nil {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
 }
 
-func (sb *StandardBlock) BlockTxs() []*signed.Tx { return sb.Txs }
+func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
 
-func NewStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (*StandardBlock, error) {
+func NewStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (*StandardBlock, error) {
 	res := &StandardBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
-		Txs: txs,
+		Txs: txes,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
@@ -51,7 +50,7 @@ func NewStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (*Standa
 	}
 
 	for _, tx := range res.Txs {
-		if err := tx.Sign(unsigned.Codec, nil); err != nil {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return nil, fmt.Errorf("failed to sign block: %w", err)
 		}
 	}

@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
@@ -118,12 +119,9 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	switch tx.Unsigned.(type) {
-	case timed.Tx:
+	case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
 		mempool.PopProposalTx()
-	case *unsigned.CreateChainTx,
-		*unsigned.CreateSubnetTx,
-		*unsigned.ImportTx,
-		*unsigned.ExportTx:
+	case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
 		mempool.PopDecisionTxs(math.MaxInt64)
 	default:
 		t.Fatal("unknown tx type")

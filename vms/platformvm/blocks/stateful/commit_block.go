@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -30,6 +31,7 @@ type CommitBlock struct {
 // was originally preferred or not for metrics.
 func NewCommitBlock(
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
@@ -39,12 +41,13 @@ func NewCommitBlock(
 		return nil, err
 	}
 
-	return toStatefulCommitBlock(statelessBlk, verifier, wasPreferred, choices.Processing)
+	return toStatefulCommitBlock(statelessBlk, verifier, txExecutorBackend, wasPreferred, choices.Processing)
 }
 
 func toStatefulCommitBlock(
 	statelessBlk *stateless.CommitBlock,
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
 ) (*CommitBlock, error) {
@@ -53,9 +56,10 @@ func toStatefulCommitBlock(
 		doubleDecisionBlock: &doubleDecisionBlock{
 			decisionBlock: decisionBlock{
 				commonBlock: &commonBlock{
-					baseBlk:  &statelessBlk.CommonBlock,
-					status:   status,
-					verifier: verifier,
+					baseBlk:           &statelessBlk.CommonBlock,
+					status:            status,
+					verifier:          verifier,
+					txExecutorBackend: txExecutorBackend,
 				},
 			},
 		},
@@ -66,7 +70,7 @@ func toStatefulCommitBlock(
 }
 
 func (c *CommitBlock) Accept() error {
-	if c.verifier.Bootstrapped() {
+	if c.txExecutorBackend.Bootstrapped.GetValue() {
 		if c.wasPreferred {
 			c.verifier.MarkAcceptedOptionVote()
 		} else {
@@ -87,7 +91,7 @@ func (c *CommitBlock) Accept() error {
 }
 
 func (c *CommitBlock) Reject() error {
-	c.verifier.Ctx().Log.Verbo(
+	c.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting CommitBlock Block %s at height %d with parent %s",
 		c.ID(), c.Height(), c.Parent(),
 	)
