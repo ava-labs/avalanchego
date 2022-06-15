@@ -23,11 +23,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 const (
@@ -465,7 +464,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		response.Subnets = make([]APISubnet, len(subnets)+1)
 		for i, subnet := range subnets {
-			unsignedTx := subnet.Unsigned.(*unsigned.CreateSubnetTx)
+			unsignedTx := subnet.Unsigned.(*txs.CreateSubnetTx)
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
@@ -516,7 +515,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			return err
 		}
 
-		subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
+		subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -600,7 +599,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = []interface{}{}
 
 	// Validator's node ID as string --> Delegators to them
-	vdrToDelegators := map[ids.NodeID][]p_api.PrimaryDelegator{}
+	vdrToDelegators := map[ids.NodeID][]pchainapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
 	nodeIDs := ids.NodeIDSet{}
@@ -616,7 +615,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			return err
 		}
 		switch staker := tx.Unsigned.(type) {
-		case *unsigned.AddDelegatorTx:
+		case *txs.AddDelegatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -626,10 +625,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			weight := json.Uint64(staker.Validator.Weight())
 
-			var rewardOwner *p_api.Owner
+			var rewardOwner *pchainapi.Owner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
-				rewardOwner = &p_api.Owner{
+				rewardOwner = &pchainapi.Owner{
 					Locktime:  json.Uint64(owner.Locktime),
 					Threshold: json.Uint32(owner.Threshold),
 				}
@@ -643,8 +642,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			potentialReward := json.Uint64(rewardAmount)
-			delegator := p_api.PrimaryDelegator{
-				Staker: p_api.Staker{
+			delegator := pchainapi.PrimaryDelegator{
+				Staker: pchainapi.Staker{
 					TxID:        tx.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
 					EndTime:     json.Uint64(staker.EndTime().Unix()),
@@ -655,7 +654,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				PotentialReward: &potentialReward,
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
-		case *unsigned.AddValidatorTx:
+		case *txs.AddValidatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -676,10 +675,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 
-			var rewardOwner *p_api.Owner
+			var rewardOwner *pchainapi.Owner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
-				rewardOwner = &p_api.Owner{
+				rewardOwner = &pchainapi.Owner{
 					Locktime:  json.Uint64(owner.Locktime),
 					Threshold: json.Uint32(owner.Threshold),
 				}
@@ -692,8 +691,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			reply.Validators = append(reply.Validators, p_api.PrimaryValidator{
-				Staker: p_api.Staker{
+			reply.Validators = append(reply.Validators, pchainapi.PrimaryValidator{
+				Staker: pchainapi.Staker{
 					TxID:        tx.ID(),
 					NodeID:      nodeID,
 					StartTime:   json.Uint64(startTime.Unix()),
@@ -706,7 +705,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				RewardOwner:     rewardOwner,
 				DelegationFee:   delegationFee,
 			})
-		case *unsigned.AddSubnetValidatorTx:
+		case *txs.AddSubnetValidatorTx:
 			if args.SubnetID != staker.Validator.Subnet {
 				continue
 			}
@@ -717,8 +716,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			weight := json.Uint64(staker.Validator.Weight())
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, p_api.SubnetValidator{
-				Staker: p_api.Staker{
+			reply.Validators = append(reply.Validators, pchainapi.SubnetValidator{
+				Staker: pchainapi.Staker{
 					NodeID:    nodeID,
 					TxID:      tx.ID(),
 					StartTime: json.Uint64(staker.StartTime().Unix()),
@@ -733,7 +732,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	for i, vdrIntf := range reply.Validators {
-		vdr, ok := vdrIntf.(p_api.PrimaryValidator)
+		vdr, ok := vdrIntf.(pchainapi.PrimaryValidator)
 		if !ok {
 			continue
 		}
@@ -781,7 +780,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
 		switch staker := tx.Unsigned.(type) {
-		case *unsigned.AddDelegatorTx:
+		case *txs.AddDelegatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -790,14 +789,14 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			}
 
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Delegators = append(reply.Delegators, p_api.Staker{
+			reply.Delegators = append(reply.Delegators, pchainapi.Staker{
 				TxID:        tx.ID(),
 				NodeID:      staker.Validator.ID(),
 				StartTime:   json.Uint64(staker.StartTime().Unix()),
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
 				StakeAmount: &weight,
 			})
-		case *unsigned.AddValidatorTx:
+		case *txs.AddValidatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -810,8 +809,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
-			reply.Validators = append(reply.Validators, p_api.PrimaryValidator{
-				Staker: p_api.Staker{
+			reply.Validators = append(reply.Validators, pchainapi.PrimaryValidator{
+				Staker: pchainapi.Staker{
 					TxID:        tx.ID(),
 					NodeID:      staker.Validator.ID(),
 					StartTime:   json.Uint64(staker.StartTime().Unix()),
@@ -821,7 +820,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				DelegationFee: delegationFee,
 				Connected:     connected,
 			})
-		case *unsigned.AddSubnetValidatorTx:
+		case *txs.AddSubnetValidatorTx:
 			if args.SubnetID != staker.Validator.Subnet {
 				continue
 			}
@@ -833,8 +832,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(staker.Validator.Weight())
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, p_api.SubnetValidator{
-				Staker: p_api.Staker{
+			reply.Validators = append(reply.Validators, pchainapi.SubnetValidator{
+				Staker: pchainapi.Staker{
 					NodeID:    nodeID,
 					TxID:      tx.ID(),
 					StartTime: json.Uint64(staker.StartTime().Unix()),
@@ -913,7 +912,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 type AddValidatorArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
-	p_api.Staker
+	pchainapi.Staker
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
@@ -1019,7 +1018,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 type AddDelegatorArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
-	p_api.Staker
+	pchainapi.Staker
 	RewardAddress string `json:"rewardAddress"`
 }
 
@@ -1120,7 +1119,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 type AddSubnetValidatorArgs struct {
 	// User, password, from addrs, change addr
 	api.JSONSpendHeader
-	p_api.Staker
+	pchainapi.Staker
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
 }
@@ -1515,7 +1514,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	if args.SubnetID == constants.PrimaryNetworkID {
-		return unsigned.ErrDSCantValidate
+		return txs.ErrDSCantValidate
 	}
 
 	// Parse the from addresses
@@ -1642,7 +1641,7 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
+	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 	if !ok {
 		return false
 	}
@@ -1681,7 +1680,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	if err != nil {
 		return false, err
 	}
-	_, ok = tx.Unsigned.(*unsigned.CreateChainTx)
+	_, ok = tx.Unsigned.(*txs.CreateChainTx)
 	return ok, nil
 }
 
@@ -1709,7 +1708,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 			err,
 		)
 	}
-	chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
+	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 	if !ok {
 		return fmt.Errorf("%q is not a blockchain", args.BlockchainID)
 	}
@@ -1740,7 +1739,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 				err,
 			)
 		}
-		_, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
+		_, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 		if !ok {
 			return fmt.Errorf("%q is not a subnet", args.SubnetID)
 		}
@@ -1803,7 +1802,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 
 		for _, chainTx := range chains {
 			chainID := chainTx.ID()
-			chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
+			chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 			if !ok {
 				return errWrongTxType
 			}
@@ -1822,7 +1821,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	}
 	for _, chainTx := range chains {
 		chainID := chainTx.ID()
-		chain, ok := chainTx.Unsigned.(*unsigned.CreateChainTx)
+		chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1845,8 +1844,8 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx := &signed.Tx{}
-	if _, err := Codec.Unmarshal(txBytes, tx); err != nil {
+	tx, err := txs.Parse(Codec, txBytes)
+	if err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
@@ -1978,14 +1977,14 @@ type GetStakeReply struct {
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func (service *Service) getStakeHelper(tx *signed.Tx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
+func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
 	var outs []*avax.TransferableOutput
 	switch staker := tx.Unsigned.(type) {
-	case *unsigned.AddDelegatorTx:
+	case *txs.AddDelegatorTx:
 		outs = staker.Stake
-	case *unsigned.AddValidatorTx:
+	case *txs.AddValidatorTx:
 		outs = staker.Stake
-	case *unsigned.AddSubnetValidatorTx:
+	case *txs.AddSubnetValidatorTx:
 		return 0, nil, nil
 	default:
 		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.Unsigned)

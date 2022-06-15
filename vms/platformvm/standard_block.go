@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -27,11 +27,13 @@ var (
 type StandardBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Txs []*signed.Tx `serialize:"true" json:"txs"`
+	Txs []*txs.Tx `serialize:"true" json:"txs"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transactions
 	inputs ids.Set
+
+	atomicRequests map[ids.ID]*atomic.Requests
 }
 
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
@@ -96,42 +98,47 @@ func (sb *StandardBlock) Verify() error {
 
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.inputs.Clear()
+	sb.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		txID := tx.ID()
-
-		statefulTx, err := MakeStatefulTx(tx)
+		executor := standardTxExecutor{
+			vm:    sb.vm,
+			state: sb.onAcceptState,
+			tx:    tx,
+		}
+		err := tx.Unsigned.Visit(&executor)
 		if err != nil {
-			return err
-		}
-		decisionTx, ok := statefulTx.(StatefulDecisionTx)
-		if !ok {
-			return errWrongTxType
-		}
-
-		inputUTXOs := decisionTx.InputUTXOs()
-		// ensure it doesn't overlap with current input batch
-		if sb.inputs.Overlaps(inputUTXOs) {
-			return errConflictingBatchTxs
-		}
-		// Add UTXOs to batch
-		sb.inputs.Union(inputUTXOs)
-
-		onAccept, err := decisionTx.Execute(sb.vm, sb.onAcceptState, tx)
-		if err != nil {
+			txID := tx.ID()
 			sb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
 		}
 
+		if sb.inputs.Overlaps(executor.inputs) {
+			return errConflictingBatchTxs
+		}
+		sb.inputs.Union(executor.inputs)
+
 		sb.onAcceptState.AddTx(tx, status.Committed)
-		if onAccept != nil {
-			funcs = append(funcs, onAccept)
+		if executor.onAccept != nil {
+			funcs = append(funcs, executor.onAccept)
+		}
+
+		for chainID, txRequests := range executor.atomicRequests {
+			// Add/merge in the atomic requests represented by [tx]
+			chainRequests, exists := sb.atomicRequests[chainID]
+			if !exists {
+				sb.atomicRequests[chainID] = txRequests
+				continue
+			}
+
+			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
+			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
 		}
 	}
 
 	if sb.inputs.Len() > 0 {
-		// ensure it doesnt conflict with the parent block
+		// ensure it doesn't conflict with the parent block
 		conflicts, err := parentIntf.conflicts(sb.inputs)
 		if err != nil {
 			return err
@@ -166,40 +173,6 @@ func (sb *StandardBlock) Accept() error {
 	blkID := sb.ID()
 	sb.vm.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
-	// Set up the shared memory operations
-	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range sb.Txs {
-		statefulTx, err := MakeStatefulTx(tx)
-		if err != nil {
-			return err
-		}
-		decisionTx, ok := statefulTx.(StatefulDecisionTx)
-		if !ok {
-			return errWrongTxType
-		}
-
-		// Get the shared memory operations this transaction is performing
-		chainID, txRequests, err := decisionTx.AtomicOperations()
-		if err != nil {
-			return err
-		}
-
-		// Only [AtomicTx]s will return operations to be applied to shared memory
-		if txRequests == nil {
-			continue
-		}
-
-		// Add/merge in the atomic requests represented by [tx]
-		chainRequests, exists := sharedMemoryOps[chainID]
-		if !exists {
-			sharedMemoryOps[chainID] = txRequests
-			continue
-		}
-
-		chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
-		chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
-	}
-
 	if err := sb.CommonDecisionBlock.Accept(); err != nil {
 		return fmt.Errorf("failed to accept CommonDecisionBlock: %w", err)
 	}
@@ -217,7 +190,7 @@ func (sb *StandardBlock) Accept() error {
 		)
 	}
 
-	if err := sb.vm.ctx.SharedMemory.Apply(sharedMemoryOps, batch); err != nil {
+	if err := sb.vm.ctx.SharedMemory.Apply(sb.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
@@ -256,7 +229,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*signed.Tx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*txs.Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{

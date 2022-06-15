@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-
-	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 const testNetworkID = 10 // To be used in tests
@@ -243,8 +241,8 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
 	}
 
-	genesis := &p_genesis.Genesis{}
-	if _, err := unsigned.Codec.Unmarshal(genesisBytes, genesis); err != nil {
+	genesis, err := genesis.Parse(genesisBytes)
+	if err != nil {
 		t.Fatal(err)
 	}
 	validators := genesis.Validators

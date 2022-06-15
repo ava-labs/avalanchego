@@ -78,10 +78,10 @@ func (t *ImportTx) SyntacticVerify(
 		return errNoImportInputs
 	}
 
-	if err := t.BaseTxVerify(ctx); err != nil {
+	if err := t.Metadata.Verify(); err != nil {
 		return err
 	}
-	if err := t.Metadata.Verify(); err != nil {
+	if err := t.BaseTx.BaseTx.Verify(ctx); err != nil {
 		return err
 	}
 

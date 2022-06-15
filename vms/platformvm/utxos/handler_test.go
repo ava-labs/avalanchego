@@ -15,10 +15,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 )
+
+type dummyUnsignedTx struct {
+	txs.BaseTx
+}
+
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *txs.Tx) error {
+	return nil
+}
+
+func (du *dummyUnsignedTx) Visit(txs.Visitor) error {
+	return nil
+}
 
 func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
@@ -40,7 +54,9 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	// The handler time during a test, unless [chainTimestamp] is set
 	now := time.Unix(1607133207, 0)
 
-	unsignedTx := unsigned.BaseTx{}
+	unsignedTx := dummyUnsignedTx{
+		BaseTx: txs.BaseTx{},
+	}
 	unsignedTx.Initialize([]byte{0})
 
 	// Note that setting [chainTimestamp] also set's the handler's clock.

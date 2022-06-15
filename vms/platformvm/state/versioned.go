@@ -11,8 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Versioned = &versioned{}
@@ -33,11 +32,11 @@ type versioned struct {
 
 	currentSupply uint64
 
-	addedSubnets  []*signed.Tx
-	cachedSubnets []*signed.Tx
+	addedSubnets  []*txs.Tx
+	cachedSubnets []*txs.Tx
 
-	addedChains  map[ids.ID][]*signed.Tx
-	cachedChains map[ids.ID][]*signed.Tx
+	addedChains  map[ids.ID][]*txs.Tx
+	cachedChains map[ids.ID][]*txs.Tx
 
 	// map of txID -> []*UTXO
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO
@@ -83,7 +82,7 @@ func (vs *versioned) SetCurrentSupply(currentSupply uint64) {
 	vs.currentSupply = currentSupply
 }
 
-func (vs *versioned) GetSubnets() ([]*signed.Tx, error) {
+func (vs *versioned) GetSubnets() ([]*txs.Tx, error) {
 	if len(vs.addedSubnets) == 0 {
 		return vs.parentState.GetSubnets()
 	}
@@ -94,7 +93,7 @@ func (vs *versioned) GetSubnets() ([]*signed.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	newSubnets := make([]*signed.Tx, len(subnets)+len(vs.addedSubnets))
+	newSubnets := make([]*txs.Tx, len(subnets)+len(vs.addedSubnets))
 	copy(newSubnets, subnets)
 	for i, subnet := range vs.addedSubnets {
 		newSubnets[i+len(subnets)] = subnet
@@ -103,14 +102,14 @@ func (vs *versioned) GetSubnets() ([]*signed.Tx, error) {
 	return newSubnets, nil
 }
 
-func (vs *versioned) AddSubnet(createSubnetTx *signed.Tx) {
+func (vs *versioned) AddSubnet(createSubnetTx *txs.Tx) {
 	vs.addedSubnets = append(vs.addedSubnets, createSubnetTx)
 	if vs.cachedSubnets != nil {
 		vs.cachedSubnets = append(vs.cachedSubnets, createSubnetTx)
 	}
 }
 
-func (vs *versioned) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
+func (vs *versioned) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	if len(vs.addedChains) == 0 {
 		// No chains have been added
 		return vs.parentState.GetChains(subnetID)
@@ -125,7 +124,7 @@ func (vs *versioned) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 
 	if vs.cachedChains == nil {
 		// This is the first time we are going to be caching the subnet chains
-		vs.cachedChains = make(map[ids.ID][]*signed.Tx)
+		vs.cachedChains = make(map[ids.ID][]*txs.Tx)
 	}
 
 	cachedChains, cached := vs.cachedChains[subnetID]
@@ -139,7 +138,7 @@ func (vs *versioned) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 		return nil, err
 	}
 
-	newChains := make([]*signed.Tx, len(chains)+len(addedChains))
+	newChains := make([]*txs.Tx, len(chains)+len(addedChains))
 	copy(newChains, chains)
 	for i, chain := range addedChains {
 		newChains[i+len(chains)] = chain
@@ -148,10 +147,10 @@ func (vs *versioned) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 	return newChains, nil
 }
 
-func (vs *versioned) AddChain(createChainTx *signed.Tx) {
-	tx := createChainTx.Unsigned.(*unsigned.CreateChainTx)
+func (vs *versioned) AddChain(createChainTx *txs.Tx) {
+	tx := createChainTx.Unsigned.(*txs.CreateChainTx)
 	if vs.addedChains == nil {
-		vs.addedChains = map[ids.ID][]*signed.Tx{
+		vs.addedChains = map[ids.ID][]*txs.Tx{
 			tx.SubnetID: {createChainTx},
 		}
 	} else {
@@ -165,7 +164,7 @@ func (vs *versioned) AddChain(createChainTx *signed.Tx) {
 	vs.cachedChains[tx.SubnetID] = append(cachedChains, createChainTx)
 }
 
-func (vs *versioned) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
+func (vs *versioned) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	tx, exists := vs.addedTxs[txID]
 	if !exists {
 		return vs.parentState.GetTx(txID)
@@ -173,7 +172,7 @@ func (vs *versioned) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 	return tx.Tx, tx.Status, nil
 }
 
-func (vs *versioned) AddTx(tx *signed.Tx, status status.Status) {
+func (vs *versioned) AddTx(tx *txs.Tx, status status.Status) {
 	txID := tx.ID()
 	txStatus := &transactions.TxAndStatus{
 		Tx:     tx,

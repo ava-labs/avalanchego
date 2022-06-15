@@ -80,9 +80,12 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			statefulTx, err := MakeStatefulTx(tx)
-			assert.NoError(err)
-			err = statefulTx.SemanticVerify(vm, fakedState, tx)
+			verifier := mempoolTxVerifier{
+				vm:          vm,
+				parentState: fakedState,
+				tx:          tx,
+			}
+			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
@@ -412,7 +412,7 @@ func (h *handler) Authorize(
 			err,
 		)
 	}
-	subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
+	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected tx type *unsigned.CreateSubnetTx but got %T", subnetTx.Unsigned)
 	}
@@ -440,7 +440,7 @@ func (h *handler) Authorize(
 
 func (h *handler) SemanticVerifySpend(
 	utxoDB txstate.UTXOGetter,
-	tx unsigned.Tx,
+	utx txs.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -463,9 +463,15 @@ func (h *handler) SemanticVerifySpend(
 	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
+// Verify that [tx] is semantically valid.
+// [db] should not be committed if an error is returned
+// [ins] and [outs] are the inputs and outputs of [tx].
+// [creds] are the credentials of [tx], which allow [ins] to be spent.
+// [utxos[i]] is the UTXO being consumed by [ins[i]]
+// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpendUTXOs(
-	tx unsigned.Tx,
-	utxosList []*avax.UTXO,
+	utx unsigned.Tx,
+	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
