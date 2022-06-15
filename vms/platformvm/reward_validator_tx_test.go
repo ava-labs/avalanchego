@@ -194,7 +194,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	{
 		// Case 3: Happy path
-		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		tx, err := vm.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 		if err != nil {
 			t.Fatal(err)
 		}

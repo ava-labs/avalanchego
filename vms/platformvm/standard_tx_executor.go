@@ -13,6 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utils"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var _ txs.Visitor = &standardTxExecutor{}
@@ -55,8 +58,8 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.state.GetTimestamp()
-	createBlockchainTxFee := e.vm.getCreateBlockchainTxFee(timestamp)
-	if err := e.vm.semanticVerifySpend(
+	createBlockchainTxFee := builder.GetCreateBlockchainTxFee(e.vm.Config, timestamp)
+	if err := e.vm.spendHandler.SemanticVerifySpend(
 		e.state,
 		tx,
 		tx.Ins,
@@ -89,15 +92,15 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxos.ConsumeInputs(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 	// Add the new chain to the database
 	e.state.AddChain(e.tx)
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.onAccept = func() error { return e.vm.createChain(e.tx) }
+	e.onAccept = func() error { return utils.CreateChain(e.vm.Config, e.tx.Unsigned, e.tx.ID()) }
 	return nil
 }
 
@@ -109,8 +112,8 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.state.GetTimestamp()
-	createSubnetTxFee := e.vm.getCreateSubnetTxFee(timestamp)
-	if err := e.vm.semanticVerifySpend(
+	createSubnetTxFee := builder.GetCreateSubnetTxFee(e.vm.Config, timestamp)
+	if err := e.vm.spendHandler.SemanticVerifySpend(
 		e.state,
 		tx,
 		tx.Ins,
@@ -125,9 +128,9 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxos.ConsumeInputs(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 	// Add the new subnet to the database
 	e.state.AddSubnet(e.tx)
 	return nil
@@ -177,7 +180,15 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := e.vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, e.tx.Creds, e.vm.TxFee, e.vm.ctx.AVAXAssetID); err != nil {
+		if err := e.vm.spendHandler.SemanticVerifySpendUTXOs(
+			tx,
+			utxos,
+			ins,
+			tx.Outs,
+			e.tx.Creds,
+			e.vm.TxFee,
+			e.vm.ctx.AVAXAssetID,
+		); err != nil {
 			return err
 		}
 	}
@@ -185,9 +196,9 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxos.ConsumeInputs(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	e.atomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
@@ -213,7 +224,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	if err := e.vm.semanticVerifySpend(
+	if err := e.vm.spendHandler.SemanticVerifySpend(
 		e.state,
 		tx,
 		tx.Ins,
@@ -228,9 +239,9 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxos.ConsumeInputs(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {

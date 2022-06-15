@@ -235,7 +235,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 
 	{
 		// Case: Validator already validating primary network
-		tx, err := vm.newAddValidatorTx(
+		tx, err := vm.txBuilder.NewAddValidatorTx(
 			vm.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
@@ -303,7 +303,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
-		tx, err := vm.newAddValidatorTx( // create the tx
+		tx, err := vm.txBuilder.NewAddValidatorTx( // create the tx
 			vm.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),

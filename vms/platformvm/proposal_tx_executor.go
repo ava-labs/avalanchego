@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
 var (
@@ -136,7 +137,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.semanticVerifySpend(
+		if err := e.vm.spendHandler.SemanticVerifySpend(
 			e.parentState,
 			tx,
 			tx.Ins,
@@ -164,16 +165,16 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	consumeInputs(e.onCommit, tx.Ins)
+	utxos.ConsumeInputs(e.onCommit, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	consumeInputs(e.onAbort, tx.Ins)
+	utxos.ConsumeInputs(e.onAbort, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
 
 	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
 	return nil
@@ -299,7 +300,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.semanticVerifySpend(
+		if err := e.vm.spendHandler.SemanticVerifySpend(
 			e.parentState,
 			tx,
 			tx.Ins,
@@ -327,16 +328,16 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	consumeInputs(e.onCommit, tx.Ins)
+	utxos.ConsumeInputs(e.onCommit, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	consumeInputs(e.onAbort, tx.Ins)
+	utxos.ConsumeInputs(e.onAbort, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
 	return nil
@@ -459,7 +460,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.semanticVerifySpend(
+		if err := e.vm.spendHandler.SemanticVerifySpend(
 			e.parentState,
 			tx,
 			tx.Ins,
@@ -487,16 +488,16 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	consumeInputs(e.onCommit, tx.Ins)
+	utxos.ConsumeInputs(e.onCommit, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	consumeInputs(e.onAbort, tx.Ins)
+	utxos.ConsumeInputs(e.onAbort, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
 
 	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
 	return nil

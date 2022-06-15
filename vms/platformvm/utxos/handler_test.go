@@ -15,19 +15,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 )
 
+var _ txs.UnsignedTx = &dummyUnsignedTx{}
+
 type dummyUnsignedTx struct {
 	txs.BaseTx
-}
-
-func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *txs.Tx) error {
-	return nil
 }
 
 func (du *dummyUnsignedTx) Visit(txs.Visitor) error {
@@ -45,7 +41,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 		clk: mockable.Clock{},
 		utxosReader: avax.NewUTXOState(
 			memdb.New(),
-			unsigned.Codec,
+			txs.Codec,
 		),
 		fx: mockFx,
 	}

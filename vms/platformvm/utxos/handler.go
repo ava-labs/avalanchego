@@ -110,7 +110,7 @@ type SpendHandler interface {
 	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpend(
 		utxoDB txstate.UTXOGetter,
-		tx unsigned.Tx,
+		tx txs.UnsignedTx,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
@@ -125,8 +125,8 @@ type SpendHandler interface {
 	// [utxos[i]] is the UTXO being consumed by [ins[i]]
 	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpendUTXOs(
-		tx unsigned.Tx,
-		utxosList []*avax.UTXO,
+		tx txs.UnsignedTx,
+		utxos []*avax.UTXO,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
@@ -388,9 +388,9 @@ func (h *handler) Stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers)       // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, unsigned.Codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, unsigned.Codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers)  // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, txs.Codec) // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, txs.Codec)   // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
@@ -414,7 +414,7 @@ func (h *handler) Authorize(
 	}
 	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
-		return nil, nil, fmt.Errorf("expected tx type *unsigned.CreateSubnetTx but got %T", subnetTx.Unsigned)
+		return nil, nil, fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
 	}
 
 	// Make sure the owners of the subnet match the provided keys
@@ -460,7 +460,7 @@ func (h *handler) SemanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return h.SemanticVerifySpendUTXOs(utx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
 // Verify that [tx] is semantically valid.
@@ -470,7 +470,7 @@ func (h *handler) SemanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpendUTXOs(
-	utx unsigned.Tx,
+	utx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -485,11 +485,11 @@ func (h *handler) SemanticVerifySpendUTXOs(
 			len(creds),
 		)
 	}
-	if len(ins) != len(utxosList) {
+	if len(ins) != len(utxos) {
 		return fmt.Errorf(
 			"there are %d inputs but %d utxos. Should be same number",
 			len(ins),
-			len(utxosList),
+			len(utxos),
 		)
 	}
 	for _, cred := range creds { // Verify credentials are well-formed.
@@ -511,7 +511,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 	lockedConsumed := make(map[uint64]map[ids.ID]uint64)
 
 	for index, input := range ins {
-		utxo := utxosList[index] // The UTXO consumed by [input]
+		utxo := utxos[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
 			return fmt.Errorf("utxo asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
@@ -537,13 +537,13 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return unsigned.ErrWrongLocktime
+				return txs.ErrWrongLocktime
 			}
 			in = inner.TransferableIn
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := h.fx.VerifyTransfer(utx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
@@ -563,7 +563,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := unsigned.Codec.Marshal(unsigned.Version, owner)
+		ownerBytes, err := txs.Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -609,7 +609,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := unsigned.Codec.Marshal(unsigned.Version, owner)
+		ownerBytes, err := txs.Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
