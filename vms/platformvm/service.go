@@ -23,9 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"

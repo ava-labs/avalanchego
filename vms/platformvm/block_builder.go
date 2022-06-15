@@ -104,10 +104,10 @@ func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return errInvalidBlockType
 	}
 	preferredState := preferredDecision.onAccept()
-	verifier := mempoolTxVerifier{
-		vm:          m.vm,
-		parentState: preferredState,
-		tx:          tx,
+	verifier := executor.MempoolTxVerifier{
+		Backend:     &m.vm.txExecutorBackend,
+		ParentState: preferredState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&verifier)
 	if err != nil {

@@ -77,10 +77,10 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			verifier := mempoolTxVerifier{
-				vm:          vm,
-				parentState: fakedState,
-				tx:          tx,
+			verifier := MempoolTxVerifier{
+				Backend:     &h.execBackend,
+				ParentState: fakedState,
+				Tx:          tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

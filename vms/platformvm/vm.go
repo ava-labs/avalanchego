@@ -35,9 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -109,8 +108,8 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder  builder.TxBuilder
-	txExecutor executor.Executor
+	txBuilder         builder.TxBuilder
+	txExecutorBackend executor.Backend
 }
 
 // Initialize this blockchain.
@@ -210,16 +209,16 @@ func (vm *VM) Initialize(
 		vm.rewards,
 	)
 
-	vm.txExecutor = executor.NewExecutor(
-		&vm.Config,
-		vm.ctx,
-		&vm.bootstrapped,
-		&vm.clock,
-		vm.fx,
-		vm.spendHandler,
-		vm.uptimeManager,
-		vm.rewards,
-	)
+	vm.txExecutorBackend = executor.Backend{
+		Cfg:          &vm.Config,
+		Ctx:          vm.ctx,
+		Clk:          &vm.clock,
+		Fx:           vm.fx,
+		SpendHandler: vm.spendHandler,
+		UptimeMan:    vm.uptimeManager,
+		Rewards:      vm.rewards,
+		Bootstrapped: &vm.bootstrapped,
+	}
 
 	vm.lastAcceptedID = is.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)

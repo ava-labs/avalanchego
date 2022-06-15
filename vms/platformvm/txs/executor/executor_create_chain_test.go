@@ -101,7 +101,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *txs.CreateChainTx) *txs.CreateChainTx {
-				tx.ChainName = string(make([]byte, MaxNameLen+1))
+				tx.ChainName = string(make([]byte, txs.MaxNameLen+1))
 				return tx
 			},
 		},
@@ -129,7 +129,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *txs.CreateChainTx) *txs.CreateChainTx {
-				tx.GenesisData = make([]byte, MaxGenesisLen+1)
+				tx.GenesisData = make([]byte, txs.MaxGenesisLen+1)
 				return tx
 			},
 		},
@@ -183,14 +183,14 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
-	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewVersioned(
-			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+	executor := StandardTxExecutor{
+		Backend: &h.execBackend,
+		State: state.NewVersioned(
+			h.tState,
+			h.tState.CurrentStakerChainState(),
+			h.tState.PendingStakerChainState(),
 		),
-		tx: tx,
+		Tx: tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -234,14 +234,14 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewVersioned(
-			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+	executor := StandardTxExecutor{
+		Backend: &h.execBackend,
+		State: state.NewVersioned(
+			h.tState,
+			h.tState.CurrentStakerChainState(),
+			h.tState.PendingStakerChainState(),
 		),
-		tx: tx,
+		Tx: tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -274,14 +274,14 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewVersioned(
-			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+	executor := StandardTxExecutor{
+		Backend: &h.execBackend,
+		State: state.NewVersioned(
+			h.tState,
+			h.tState.CurrentStakerChainState(),
+			h.tState.PendingStakerChainState(),
 		),
-		tx: tx,
+		Tx: tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -311,14 +311,14 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewVersioned(
-			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+	executor := StandardTxExecutor{
+		Backend: &h.execBackend,
+		State: state.NewVersioned(
+			h.tState,
+			h.tState.CurrentStakerChainState(),
+			h.tState.PendingStakerChainState(),
 		),
-		tx: tx,
+		Tx: tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -377,8 +377,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			utx := &txs.CreateChainTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    vm.ctx.NetworkID,
-					BlockchainID: vm.ctx.ChainID,
+					NetworkID:    h.ctx.NetworkID,
+					BlockchainID: h.ctx.ChainID,
 					Ins:          ins,
 					Outs:         outs,
 				}},
@@ -387,7 +387,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				SubnetAuth: subnetAuth,
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			err = tx.Sign(Codec, signers)
+			err = tx.Sign(txs.Codec, signers)
 			assert.NoError(err)
 
 			vs := state.NewVersioned(
@@ -397,10 +397,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			executor := standardTxExecutor{
-				vm:    vm,
-				state: vs,
-				tx:    tx,
+			executor := StandardTxExecutor{
+				Backend: &h.execBackend,
+				State:   vs,
+				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			assert.Equal(test.expectsError, err != nil)

@@ -37,9 +37,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
@@ -61,8 +60,11 @@ var (
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
 
-	testSubnet1            *signed.Tx
+	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
+
+	// Used to create and use keys.
+	testKeyfactory crypto.FactorySECP256K1R
 )
 
 const (
@@ -82,7 +84,7 @@ type testHelpersCollection struct {
 	uptimeMan      uptime.Manager
 	utxosMan       utxos.SpendHandler
 	txBuilder      builder.TxBuilder
-	txExecutor     Executor
+	execBackend    Backend
 }
 
 // TODO: snLookup currently duplicated in vm_test.go. Remove duplication
@@ -119,7 +121,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
 	tState := defaultState(&cfg, ctx, baseDB, rewardsCalc)
 
-	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, unsigned.Codec)
+	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimeMan := uptime.NewManager(tState)
 	utxosMan := utxos.NewHandler(ctx, clk, tState, fx)
 
@@ -128,9 +130,18 @@ func newTestHelpersCollection() *testHelpersCollection {
 		tState, atomicUtxosMan,
 		utxosMan, rewardsCalc)
 
-	txExecutor := NewExecutor(&cfg, ctx, &isBootstrapped, &clk, fx, utxosMan, uptimeMan, rewardsCalc)
+	execBackend := Backend{
+		Cfg:          &cfg,
+		Ctx:          ctx,
+		Clk:          &clk,
+		Bootstrapped: &isBootstrapped,
+		Fx:           fx,
+		SpendHandler: utxosMan,
+		UptimeMan:    uptimeMan,
+		Rewards:      rewardsCalc,
+	}
 
-	addSubnet(tState, txBuilder, txExecutor)
+	addSubnet(tState, txBuilder, execBackend)
 
 	return &testHelpersCollection{
 		isBootstrapped: &isBootstrapped,
@@ -144,14 +155,14 @@ func newTestHelpersCollection() *testHelpersCollection {
 		uptimeMan:      uptimeMan,
 		utxosMan:       utxosMan,
 		txBuilder:      txBuilder,
-		txExecutor:     txExecutor,
+		execBackend:    execBackend,
 	}
 }
 
 func addSubnet(
 	tState state.State,
 	txBuilder builder.TxBuilder,
-	txExecutor Executor,
+	execBackend Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -175,10 +186,17 @@ func addSubnet(
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	_, err = txExecutor.ExecuteDecision(testSubnet1, versionedState)
+
+	executor := StandardTxExecutor{
+		Backend: &execBackend,
+		State:   versionedState,
+		Tx:      testSubnet1,
+	}
+	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {
 		panic(err)
 	}
+
 	versionedState.AddTx(testSubnet1, status.Committed)
 	versionedState.Apply(tState)
 }

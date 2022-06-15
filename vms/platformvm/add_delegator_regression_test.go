@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/stretchr/testify/assert"
 )
 

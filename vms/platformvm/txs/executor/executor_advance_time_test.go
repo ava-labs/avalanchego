@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -33,10 +32,10 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor := ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -64,10 +63,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: h.tState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -97,10 +96,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: h.tState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -133,17 +132,17 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor := ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentStakers := executor.onCommit.CurrentStakerChainState()
+	onCommitCurrentStakers := executor.OnCommit.CurrentStakerChainState()
 	validator, err := onCommitCurrentStakers.GetValidator(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +153,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatalf("Added the wrong tx to the validator set")
 	}
 
-	onCommitPendingStakers := executor.onCommit.PendingStakerChainState()
+	onCommitPendingStakers := executor.OnCommit.PendingStakerChainState()
 	if _, _, err := onCommitPendingStakers.GetValidatorTx(nodeID); err == nil {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
@@ -167,12 +166,12 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatalf("Expected reward of %d but was %d", 1370, reward)
 	}
 
-	onAbortCurrentStakers := executor.onAbort.CurrentStakerChainState()
+	onAbortCurrentStakers := executor.OnAbort.CurrentStakerChainState()
 	if _, err := onAbortCurrentStakers.GetValidator(nodeID); err == nil {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	onAbortPendingStakers := executor.onAbort.PendingStakerChainState()
+	onAbortPendingStakers := executor.OnAbort.PendingStakerChainState()
 	_, retrievedTxID, err := onAbortPendingStakers.GetValidatorTx(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +181,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	}
 
 	// Test VM validators
-	executor.onCommit.Apply(h.tState)
+	executor.OnCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
 	assert.True(t, h.cfg.Validators.Contains(constants.PrimaryNetworkID, nodeID))
 }
@@ -361,10 +360,10 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				executor := proposalTxExecutor{
-					vm:          vm,
-					parentState: h.tState,
-					tx:          tx,
+				executor := ProposalTxExecutor{
+					Backend:     &h.execBackend,
+					ParentState: h.tState,
+					Tx:          tx,
 				}
 				err = tx.Unsigned.Visit(&executor)
 				if err != nil {
@@ -372,7 +371,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				}
 
 				assert.NoError(err)
-				executor.onCommit.Apply(h.tState)
+				executor.OnCommit.Apply(h.tState)
 			}
 
 			assert.NoError(h.tState.Write())
@@ -480,17 +479,17 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor := ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	currentStakers := executor.onCommit.CurrentStakerChainState()
+	currentStakers := executor.OnCommit.CurrentStakerChainState()
 	vdr, err := currentStakers.GetValidator(ids.NodeID(subnetValidatorNodeID))
 	if err != nil {
 		t.Fatal(err)
@@ -502,7 +501,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		t.Fatal("should have been removed from validator set")
 	}
 	// Check VM Validators are removed successfully
-	executor.onCommit.Apply(h.tState)
+	executor.OnCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
 	assert.False(t, h.cfg.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetVdr2NodeID)))
 	assert.False(t, h.cfg.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
@@ -555,17 +554,17 @@ func TestWhitelistedSubnet(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			executor := proposalTxExecutor{
-				vm:          vm,
-				parentState: h.tState,
-				tx:          tx,
+			executor := ProposalTxExecutor{
+				Backend:     &h.execBackend,
+				ParentState: h.tState,
+				Tx:          tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			executor.onCommit.Apply(h.tState)
+			executor.OnCommit.Apply(h.tState)
 			assert.NoError(t, h.tState.Write())
 			assert.Equal(t, whitelist, h.cfg.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
 		})
@@ -593,15 +592,15 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err := h.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor := ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(h.tState)
+	executor.OnCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
 
 	// Test validator weight before delegation
@@ -633,15 +632,15 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err = h.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
-	executor = proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor = ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(h.tState)
+	executor.OnCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
 
 	// Test validator weight after delegation
@@ -670,15 +669,15 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err := h.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor := ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(h.tState)
+	executor.OnCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
 
 	// Test validator weight before delegation
@@ -709,15 +708,15 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err = h.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
-	executor = proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor = ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(h.tState)
+	executor.OnCommit.Apply(h.tState)
 	assert.NoError(t, h.tState.Write())
 
 	// Test validator weight after delegation
@@ -737,20 +736,20 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	h.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 
 	// Proposed advancing timestamp to 1 second after sync bound
-	tx, err := h.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(syncBound))
+	tx, err := h.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: h.tState,
-		tx:          tx,
+	executor := ProposalTxExecutor{
+		Backend:     &h.execBackend,
+		ParentState: h.tState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	if !executor.prefersCommit {
+	if !executor.PrefersCommit {
 		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
 	}
 }
@@ -769,13 +768,13 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := unsigned.Codec.Marshal(unsigned.Version, tx)
+	bytes, err := txs.Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var unmarshaledTx txs.Tx
-	if _, err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
+	if _, err := txs.Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	} else if tx.Unsigned.(*txs.AdvanceTimeTx).Time != unmarshaledTx.Unsigned.(*txs.AdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")

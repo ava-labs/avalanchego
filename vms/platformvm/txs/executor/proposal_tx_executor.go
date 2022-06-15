@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package executor
 
 import (
 	"errors"
@@ -21,79 +21,90 @@ import (
 )
 
 var (
-	_ txs.Visitor = &proposalTxExecutor{}
+	_ txs.Visitor = &ProposalTxExecutor{}
 
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
 	errStakeTooShort             = errors.New("staking period is too short")
 	errStakeTooLong              = errors.New("staking period is too long")
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
-	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", maxFutureStartTime)
+	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
 	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
 	errStakeOverflow             = errors.New("too many funds staked on single validator")
 	errInvalidState              = errors.New("generated output isn't valid state")
 	errOverDelegated             = errors.New("validator would be over delegated")
 	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
 	errWrongTxType               = errors.New("wrong transaction type")
+	errInvalidID                 = errors.New("invalid ID")
 )
 
-type proposalTxExecutor struct {
+const (
+	// Maximum future start time for staking/delegating
+	MaxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	// SyncBound is the synchrony bound used for safe decision making
+	SyncBound = 10 * time.Second
+
+	MaxValidatorWeightFactor = uint64(5)
+)
+
+type ProposalTxExecutor struct {
 	// inputs
-	vm          *VM
-	parentState state.Mutable
-	tx          *txs.Tx
+	*Backend
+	ParentState state.Mutable
+	Tx          *txs.Tx
 
 	// outputs
-	onCommit      state.Versioned
-	onAbort       state.Versioned
-	prefersCommit bool
+	OnCommit      state.Versioned
+	OnAbort       state.Versioned
+	PrefersCommit bool
 }
 
-func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error   { return errWrongTxType }
-func (*proposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return errWrongTxType }
-func (*proposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
-func (*proposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
+func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error   { return errWrongTxType }
+func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return errWrongTxType }
+func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
+func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
 
-func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
 	switch {
-	case tx.Validator.Wght < e.vm.MinValidatorStake:
+	case tx.Validator.Wght < e.Cfg.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 
-	case tx.Validator.Wght > e.vm.MaxValidatorStake:
+	case tx.Validator.Wght > e.Cfg.MaxValidatorStake:
 		// Ensure validator isn't staking too much
 		return errWeightTooLarge
 
-	case tx.Shares < e.vm.MinDelegationFee:
+	case tx.Shares < e.Cfg.MinDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
 		return errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < e.vm.MinStakeDuration:
+	case duration < e.Cfg.MinStakeDuration:
 		// Ensure staking length is not too short
 		return errStakeTooShort
 
-	case duration > e.vm.MaxStakeDuration:
+	case duration > e.Cfg.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
 	}
 
-	currentStakers := e.parentState.CurrentStakerChainState()
-	pendingStakers := e.parentState.PendingStakerChainState()
+	currentStakers := e.ParentState.CurrentStakerChainState()
+	pendingStakers := e.ParentState.PendingStakerChainState()
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	if e.vm.bootstrapped.GetValue() {
-		currentTimestamp := e.parentState.GetTimestamp()
+	if e.Bootstrapped.GetValue() {
+		currentTimestamp := e.ParentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()
 		if !currentTimestamp.Before(startTime) {
@@ -137,14 +148,14 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.spendHandler.SemanticVerifySpend(
-			e.parentState,
+		if err := e.SpendHandler.SemanticVerifySpend(
+			e.ParentState,
 			tx,
 			tx.Ins,
 			outs,
-			e.tx.Creds,
-			e.vm.AddStakerTxFee,
-			e.vm.ctx.AVAXAssetID,
+			e.Tx.Creds,
+			e.Cfg.AddStakerTxFee,
+			e.Ctx.AVAXAssetID,
 		); err != nil {
 			return fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}
@@ -152,60 +163,60 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		// Make sure the tx doesn't start too far in the future. This is done
 		// last to allow SemanticVerification to explicitly check for this
 		// error.
-		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if startTime.After(maxStartTime) {
 			return errFutureStakeTime
 		}
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
+	newlyPendingStakers := pendingStakers.AddStaker(e.Tx)
+	e.OnCommit = state.NewVersioned(e.ParentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.onCommit, tx.Ins)
+	utxos.ConsumeInputs(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.OnAbort = state.NewVersioned(e.ParentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.onAbort, tx.Ins)
+	utxos.ConsumeInputs(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
 
-	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
+	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
-func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < e.vm.MinStakeDuration:
+	case duration < e.Cfg.MinStakeDuration:
 		// Ensure staking length is not too short
 		return errStakeTooShort
 
-	case duration > e.vm.MaxStakeDuration:
+	case duration > e.Cfg.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
 
-	case len(e.tx.Creds) == 0:
+	case len(e.Tx.Creds) == 0:
 		// Ensure there is at least one credential for the subnet authorization
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakers := e.parentState.CurrentStakerChainState()
-	pendingStakers := e.parentState.PendingStakerChainState()
+	currentStakers := e.ParentState.CurrentStakerChainState()
+	pendingStakers := e.ParentState.PendingStakerChainState()
 
-	if e.vm.bootstrapped.GetValue() {
-		currentTimestamp := e.parentState.GetTimestamp()
+	if e.Bootstrapped.GetValue() {
+		currentTimestamp := e.ParentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
@@ -271,11 +282,11 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
-		baseTxCredsLen := len(e.tx.Creds) - 1
-		baseTxCreds := e.tx.Creds[:baseTxCredsLen]
-		subnetCred := e.tx.Creds[baseTxCredsLen]
+		baseTxCredsLen := len(e.Tx.Creds) - 1
+		baseTxCreds := e.Tx.Creds[:baseTxCredsLen]
+		subnetCred := e.Tx.Creds[baseTxCredsLen]
 
-		subnetIntf, _, err := e.parentState.GetTx(tx.Validator.Subnet)
+		subnetIntf, _, err := e.ParentState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			if err == database.ErrNotFound {
 				return transactions.ErrDSValidatorSubset
@@ -295,19 +306,19 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
-		if err := e.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+		if err := e.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 			return err
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.spendHandler.SemanticVerifySpend(
-			e.parentState,
+		if err := e.SpendHandler.SemanticVerifySpend(
+			e.ParentState,
 			tx,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
-			e.vm.TxFee,
-			e.vm.ctx.AVAXAssetID,
+			e.Cfg.TxFee,
+			e.Ctx.AVAXAssetID,
 		); err != nil {
 			return err
 		}
@@ -315,51 +326,51 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		// Make sure the tx doesn't start too far in the future. This is done
 		// last to allow SemanticVerification to explicitly check for this
 		// error.
-		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {
 			return errFutureStakeTime
 		}
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
+	newlyPendingStakers := pendingStakers.AddStaker(e.Tx)
+	e.OnCommit = state.NewVersioned(e.ParentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.onCommit, tx.Ins)
+	utxos.ConsumeInputs(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.OnAbort = state.NewVersioned(e.ParentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.onAbort, tx.Ins)
+	utxos.ConsumeInputs(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.OnAbort, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
-	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
+	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
-func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < e.vm.MinStakeDuration:
+	case duration < e.Cfg.MinStakeDuration:
 		// Ensure staking length is not too short
 		return errStakeTooShort
 
-	case duration > e.vm.MaxStakeDuration:
+	case duration > e.Cfg.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
 
-	case tx.Validator.Wght < e.vm.MinDelegatorStake:
+	case tx.Validator.Wght < e.Cfg.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
@@ -368,11 +379,11 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	currentStakers := e.parentState.CurrentStakerChainState()
-	pendingStakers := e.parentState.PendingStakerChainState()
+	currentStakers := e.ParentState.CurrentStakerChainState()
+	pendingStakers := e.ParentState.PendingStakerChainState()
 
-	if e.vm.bootstrapped.GetValue() {
-		currentTimestamp := e.parentState.GetTimestamp()
+	if e.Bootstrapped.GetValue() {
+		currentTimestamp := e.ParentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
@@ -441,8 +452,8 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			return errStakeOverflow
 		}
 
-		if !currentTimestamp.Before(e.vm.ApricotPhase3Time) {
-			maximumWeight = math.Min64(maximumWeight, e.vm.MaxValidatorStake)
+		if !currentTimestamp.Before(e.Cfg.ApricotPhase3Time) {
+			maximumWeight = math.Min64(maximumWeight, e.Cfg.MaxValidatorStake)
 		}
 
 		canDelegate, err := transactions.CanDelegate(
@@ -460,14 +471,14 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.spendHandler.SemanticVerifySpend(
-			e.parentState,
+		if err := e.SpendHandler.SemanticVerifySpend(
+			e.ParentState,
 			tx,
 			tx.Ins,
 			outs,
-			e.tx.Creds,
-			e.vm.AddStakerTxFee,
-			e.vm.ctx.AVAXAssetID,
+			e.Tx.Creds,
+			e.Cfg.AddStakerTxFee,
+			e.Ctx.AVAXAssetID,
 		); err != nil {
 			return fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}
@@ -475,45 +486,45 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		// Make sure the tx doesn't start too far in the future. This is done
 		// last to allow SemanticVerification to explicitly check for this
 		// error.
-		maxStartTime := currentTimestamp.Add(maxFutureStartTime)
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {
 			return errFutureStakeTime
 		}
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
+	newlyPendingStakers := pendingStakers.AddStaker(e.Tx)
+	e.OnCommit = state.NewVersioned(e.ParentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.onCommit, tx.Ins)
+	utxos.ConsumeInputs(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxos.ProduceOutputs(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.OnAbort = state.NewVersioned(e.ParentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.onAbort, tx.Ins)
+	utxos.ConsumeInputs(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
+	utxos.ProduceOutputs(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
 
-	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
+	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
-func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	switch {
 	case tx == nil:
 		return txs.ErrNilTx
-	case len(e.tx.Creds) != 0:
+	case len(e.Tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
 
 	txTimestamp := tx.Timestamp()
-	localTimestamp := e.vm.clock.Time()
-	localTimestampPlusSync := localTimestamp.Add(syncBound)
+	localTimestamp := e.Clk.Time()
+	localTimestampPlusSync := localTimestamp.Add(SyncBound)
 	if localTimestampPlusSync.Before(txTimestamp) {
 		return fmt.Errorf(
 			"proposed time (%s) is too far in the future relative to local time (%s)",
@@ -522,7 +533,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	if chainTimestamp := e.parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
+	if chainTimestamp := e.ParentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
 		return fmt.Errorf(
 			"proposed timestamp (%s), not after current timestamp (%s)",
 			txTimestamp,
@@ -532,7 +543,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := e.parentState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := e.ParentState.GetNextStakerChangeTime()
 	if err != nil {
 		return err
 	}
@@ -545,9 +556,9 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	currentSupply := e.parentState.GetCurrentSupply()
+	currentSupply := e.ParentState.GetCurrentSupply()
 
-	pendingStakers := e.parentState.PendingStakerChainState()
+	pendingStakers := e.ParentState.PendingStakerChainState()
 	toAddValidatorsWithRewardToCurrent := []*transactions.ValidatorReward(nil)
 	toAddDelegatorsWithRewardToCurrent := []*transactions.ValidatorReward(nil)
 	toAddWithoutRewardToCurrent := []*txs.Tx(nil)
@@ -564,7 +575,7 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := e.vm.rewards.Calculate(
+			r := e.Rewards.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
@@ -584,7 +595,7 @@ pendingStakerLoop:
 				break pendingStakerLoop
 			}
 
-			r := e.vm.rewards.Calculate(
+			r := e.Rewards.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
@@ -616,7 +627,7 @@ pendingStakerLoop:
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
 
-	currentStakers := e.parentState.CurrentStakerChainState()
+	currentStakers := e.ParentState.CurrentStakerChainState()
 	numToRemoveFromCurrent := 0
 
 	// Remove from the staker set any subnet validators whose endTime is at or
@@ -647,28 +658,28 @@ currentStakerLoop:
 		return err
 	}
 
-	e.onCommit = state.NewVersioned(e.parentState, newlyCurrentStakers, newlyPendingStakers)
-	e.onCommit.SetTimestamp(txTimestamp)
-	e.onCommit.SetCurrentSupply(currentSupply)
+	e.OnCommit = state.NewVersioned(e.ParentState, newlyCurrentStakers, newlyPendingStakers)
+	e.OnCommit.SetTimestamp(txTimestamp)
+	e.OnCommit.SetCurrentSupply(currentSupply)
 
 	// State doesn't change if this proposal is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.OnAbort = state.NewVersioned(e.ParentState, currentStakers, pendingStakers)
 
-	e.prefersCommit = !txTimestamp.After(localTimestampPlusSync)
+	e.PrefersCommit = !txTimestamp.After(localTimestampPlusSync)
 	return nil
 }
 
-func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
 	switch {
 	case tx == nil:
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return errInvalidID
-	case len(e.tx.Creds) != 0:
+	case len(e.Tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakers := e.parentState.CurrentStakerChainState()
+	currentStakers := e.ParentState.CurrentStakerChainState()
 	stakerTx, stakerReward, err := currentStakers.GetNextStaker()
 	if err == database.ErrNotFound {
 		return fmt.Errorf("failed to get next staker stop time: %w", err)
@@ -687,7 +698,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
-	currentTime := e.parentState.GetTimestamp()
+	currentTime := e.ParentState.GetTimestamp()
 	staker, ok := stakerTx.Unsigned.(txs.StakerTx)
 	if !ok {
 		return errWrongTxType
@@ -705,17 +716,17 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	pendingStakers := e.parentState.PendingStakerChainState()
-	e.onCommit = state.NewVersioned(e.parentState, newlyCurrentStakers, pendingStakers)
-	e.onAbort = state.NewVersioned(e.parentState, newlyCurrentStakers, pendingStakers)
+	pendingStakers := e.ParentState.PendingStakerChainState()
+	e.OnCommit = state.NewVersioned(e.ParentState, newlyCurrentStakers, pendingStakers)
+	e.OnAbort = state.NewVersioned(e.ParentState, newlyCurrentStakers, pendingStakers)
 
 	// If the reward is aborted, then the current supply should be decreased.
-	currentSupply := e.onAbort.GetCurrentSupply()
+	currentSupply := e.OnAbort.GetCurrentSupply()
 	newSupply, err := math.Sub64(currentSupply, stakerReward)
 	if err != nil {
 		return err
 	}
-	e.onAbort.SetCurrentSupply(newSupply)
+	e.OnAbort.SetCurrentSupply(newSupply)
 
 	var (
 		nodeID    ids.NodeID
@@ -730,16 +741,16 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
-			e.onCommit.AddUTXO(utxo)
-			e.onAbort.AddUTXO(utxo)
+			e.OnCommit.AddUTXO(utxo)
+			e.OnAbort.AddUTXO(utxo)
 		}
 
 		// Provide the reward here
 		if stakerReward > 0 {
-			outIntf, err := e.vm.fx.CreateOutput(stakerReward, uStakerTx.RewardsOwner)
+			outIntf, err := e.Fx.CreateOutput(stakerReward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return fmt.Errorf("failed to create output: %w", err)
 			}
@@ -753,12 +764,12 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out,
 			}
 
-			e.onCommit.AddUTXO(utxo)
-			e.onCommit.AddRewardUTXO(tx.TxID, utxo)
+			e.OnCommit.AddUTXO(utxo)
+			e.OnCommit.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		// Handle reward preferences
@@ -772,11 +783,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
-			e.onCommit.AddUTXO(utxo)
-			e.onAbort.AddUTXO(utxo)
+			e.OnCommit.AddUTXO(utxo)
+			e.OnAbort.AddUTXO(utxo)
 		}
 
 		// We're removing a delegator, so we need to fetch the validator they
@@ -805,7 +816,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 		// Reward the delegator here
 		if delegatorReward > 0 {
-			outIntf, err := e.vm.fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
+			outIntf, err := e.Fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return fmt.Errorf("failed to create output: %w", err)
 			}
@@ -818,19 +829,19 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out,
 			}
 
-			e.onCommit.AddUTXO(utxo)
-			e.onCommit.AddRewardUTXO(tx.TxID, utxo)
+			e.OnCommit.AddUTXO(utxo)
+			e.OnCommit.AddRewardUTXO(tx.TxID, utxo)
 
 			offset++
 		}
 
 		// Reward the delegatee here
 		if delegateeReward > 0 {
-			outIntf, err := e.vm.fx.CreateOutput(delegateeReward, vdrTx.RewardsOwner)
+			outIntf, err := e.Fx.CreateOutput(delegateeReward, vdrTx.RewardsOwner)
 			if err != nil {
 				return fmt.Errorf("failed to create output: %w", err)
 			}
@@ -843,12 +854,12 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out,
 			}
 
-			e.onCommit.AddUTXO(utxo)
-			e.onCommit.AddRewardUTXO(tx.TxID, utxo)
+			e.OnCommit.AddUTXO(utxo)
+			e.OnCommit.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		nodeID = uStakerTx.Validator.ID()
@@ -857,11 +868,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errShouldBeDSValidator
 	}
 
-	uptime, err := e.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
+	uptime, err := e.UptimeMan.CalculateUptimePercentFrom(nodeID, startTime)
 	if err != nil {
 		return fmt.Errorf("failed to calculate uptime: %w", err)
 	}
 
-	e.prefersCommit = uptime >= e.vm.UptimePercentage
+	e.PrefersCommit = uptime >= e.Cfg.UptimePercentage
 	return nil
 }

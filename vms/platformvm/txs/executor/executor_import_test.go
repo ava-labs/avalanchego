@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -78,7 +77,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := unsigned.Codec.Marshal(unsigned.Version, utxo)
+		utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +128,7 @@ func TestNewImportTx(t *testing.T) {
 			assert := assert.New(t)
 
 			h.ctx.SharedMemory = tt.sharedMemory
-			h.atomicUtxosMan = avax.NewAtomicUTXOManager(tt.sharedMemory, unsigned.Codec)
+			h.atomicUtxosMan = avax.NewAtomicUTXOManager(tt.sharedMemory, txs.Codec)
 			h.txBuilder.ResetAtomicUTXOManager(h.atomicUtxosMan)
 			tx, err := h.txBuilder.NewImportTx(
 				tt.sourceChainID,
@@ -169,10 +168,10 @@ func TestNewImportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			verifier := mempoolTxVerifier{
-				vm:          vm,
-				parentState: fakedState,
-				tx:          tx,
+			verifier := MempoolTxVerifier{
+				Backend:     &h.execBackend,
+				ParentState: fakedState,
+				Tx:          tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

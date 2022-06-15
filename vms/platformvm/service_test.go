@@ -30,8 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"

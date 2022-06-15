@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -162,10 +161,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -191,10 +190,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -203,8 +202,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	// Add a validator to pending validator set of primary network
-	factory := crypto.FactorySECP256K1R{}
-	key, err := factory.NewPrivateKey()
+	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,10 +241,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -281,10 +279,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -308,10 +306,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -335,10 +333,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -365,10 +363,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -418,10 +416,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          duplicateSubnetTx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -452,10 +450,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -485,10 +483,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -504,23 +502,23 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], keys[1]},
+			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Replace a valid signature with one from keys[3]
-		sig, err := keys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
+		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -544,19 +542,19 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		vm.internalState.AddCurrentStaker(tx, 0)
-		vm.internalState.AddTx(tx, status.Committed)
-		if err := vm.internalState.Commit(); err != nil {
+		h.tState.AddCurrentStaker(tx, 0)
+		h.tState.AddTx(tx, status.Committed)
+		if err := h.tState.Write(); err != nil {
 			t.Fatal(err)
 		}
-		if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
+		if err := h.tState.Load(); err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -587,12 +585,12 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := unsigned.Codec.Marshal(unsigned.Version, tx)
+	txBytes, err := txs.Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parsedTx, err := txs.Parse(Codec, txBytes)
+	parsedTx, err := txs.Parse(txs.Codec, txBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

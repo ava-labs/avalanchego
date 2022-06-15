@@ -58,7 +58,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*txs.AddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*txs.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -89,7 +89,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*txs.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
 
@@ -114,7 +114,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*txs.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
 	}
 
@@ -135,7 +135,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.Unsigned.(*txs.AddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.Unsigned.(*txs.AddValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(vm.ctx); err == nil {
+	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
 
@@ -180,17 +180,17 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID),
 			nodeID,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -202,37 +202,28 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		// Case: Validator's start time too far in the future
 		tx, err := h.txBuilder.NewAddValidatorTx(
 			h.cfg.MinValidatorStake,
-			uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
-			uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
+			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
+			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
 			ids.NodeID(nodeID),
 			nodeID,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
 			t.Fatal("should've errored because start time too far in the future")
 		}
 	}
-	{ // test execute
-		h.tState.AddCurrentStaker(tx, 0)
-		h.tState.AddTx(tx, status.Committed)
-		if err := h.tState.Write(); err != nil {
-			t.Fatal(err)
-		}
-		if err := h.tState.Load(); err != nil {
-			t.Fatal(err)
-		}
 
 	{
 		// Case: Validator already validating primary network
@@ -243,17 +234,17 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID), // node ID
 			nodeID,             // reward address
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -269,32 +260,32 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := h.txBuilder.NewAddValidatorTx(
-			h.cfg.MinValidatorStake,     // stake amount
-			uint64(startTime.Unix()), // start time
+			h.cfg.MinValidatorStake,                                 // stake amount
+			uint64(startTime.Unix()),                                // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-			ids.NodeID(nodeID),         // node ID
-			key2.PublicKey().Address(), // reward address
-			reward.PercentDenominator,  // shares
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
+			ids.NodeID(nodeID),                                      // node ID
+			key2.PublicKey().Address(),                              // reward address
+			reward.PercentDenominator,                               // shares
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr // key
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		vm.internalState.AddCurrentStaker(tx, 0)
-		vm.internalState.AddTx(tx, status.Committed)
-		if err := vm.internalState.Commit(); err != nil {
+		h.tState.AddCurrentStaker(tx, 0)
+		h.tState.AddTx(tx, status.Committed)
+		if err := h.tState.Write(); err != nil {
 			t.Fatal(err)
 		}
-		if err := vm.internalState.(*internalStateImpl).Load(); err != nil {
+		if err := h.tState.Load(); err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -311,26 +302,26 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID),
 			nodeID,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// Remove all UTXOs owned by keys[0]
-		utxoIDs, err := vm.internalState.UTXOIDs(keys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+		// Remove all UTXOs owned by preFundedKeys[0]
+		utxoIDs, err := h.tState.UTXOIDs(preFundedKeys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, utxoID := range utxoIDs {
-			vm.internalState.DeleteUTXO(utxoID)
+			h.tState.DeleteUTXO(utxoID)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		executor := ProposalTxExecutor{
+			Backend:     &h.execBackend,
+			ParentState: h.tState,
+			Tx:          tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

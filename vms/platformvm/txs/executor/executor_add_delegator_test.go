@@ -13,8 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
@@ -29,8 +28,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	nodeID := ids.NodeID(rewardAddress)
 
 	// Case : tx is nil
-	var unsignedTx *unsigned.AddDelegatorTx
-	stx := signed.Tx{
+	var unsignedTx *txs.AddDelegatorTx
+	stx := txs.Tx{
 		Unsigned: unsignedTx,
 	}
 	if err := stx.SyntacticVerify(h.ctx); err == nil {
@@ -50,9 +49,9 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Unsigned.(*unsigned.AddDelegatorTx).NetworkID++
+	tx.Unsigned.(*txs.AddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*unsigned.AddDelegatorTx).SyntacticallyVerified = false
+	tx.Unsigned.(*txs.AddDelegatorTx).SyntacticallyVerified = false
 	if err := tx.SyntacticVerify(h.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
@@ -332,7 +331,12 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
-			_, _, err = freshTH.txExecutor.ExecuteProposal(tx, freshTH.tState)
+			executor := ProposalTxExecutor{
+				Backend:     &freshTH.execBackend,
+				ParentState: freshTH.tState,
+				Tx:          tx,
+			}
+			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {

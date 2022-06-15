@@ -62,28 +62,28 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			// Create the tx
 			utx := &txs.CreateSubnetTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    vm.ctx.NetworkID,
-					BlockchainID: vm.ctx.ChainID,
+					NetworkID:    h.ctx.NetworkID,
+					BlockchainID: h.ctx.ChainID,
 					Ins:          ins,
 					Outs:         outs,
 				}},
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			err = tx.Sign(Codec, signers)
+			err = tx.Sign(txs.Codec, signers)
 			assert.NoError(err)
 
-			state := state.NewVersioned(
-				vm.internalState,
-				vm.internalState.CurrentStakerChainState(),
-				vm.internalState.PendingStakerChainState(),
+			versionedState := state.NewVersioned(
+				h.tState,
+				h.tState.CurrentStakerChainState(),
+				h.tState.PendingStakerChainState(),
 			)
-			state.SetTimestamp(test.time)
+			versionedState.SetTimestamp(test.time)
 
-			executor := standardTxExecutor{
-				vm:    vm,
-				state: state,
-				tx:    tx,
+			executor := StandardTxExecutor{
+				Backend: &h.execBackend,
+				State:   versionedState,
+				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			assert.Equal(test.expectsError, err != nil)

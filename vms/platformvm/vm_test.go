@@ -51,8 +51,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"

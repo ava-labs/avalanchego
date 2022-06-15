@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
@@ -52,12 +53,12 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		txExecutor := executor.ProposalTxExecutor{
+			Backend:     &vm.txExecutorBackend,
+			ParentState: vm.internalState,
+			Tx:          tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
+		err = tx.Unsigned.Visit(&txExecutor)
 		if err == nil {
 			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 		}
@@ -73,12 +74,12 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		txExecutor := executor.ProposalTxExecutor{
+			Backend:     &vm.txExecutorBackend,
+			ParentState: vm.internalState,
+			Tx:          tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
+		err = tx.Unsigned.Visit(&txExecutor)
 		if err == nil {
 			t.Fatalf("should have failed because validator ID is wrong")
 		}
@@ -90,17 +91,17 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: vm.internalState,
-		tx:          tx,
+	txExecutor := executor.ProposalTxExecutor{
+		Backend:     &vm.txExecutorBackend,
+		ParentState: vm.internalState,
+		Tx:          tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
+	err = tx.Unsigned.Visit(&txExecutor)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentStakers := executor.onCommit.CurrentStakerChainState()
+	onCommitCurrentStakers := txExecutor.OnCommit.CurrentStakerChainState()
 	nextToRemoveTx, _, err := onCommitCurrentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -118,7 +119,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	executor.onCommit.Apply(vm.internalState)
+	txExecutor.OnCommit.Apply(vm.internalState)
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -159,12 +160,12 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		txExecutor := executor.ProposalTxExecutor{
+			Backend:     &vm.txExecutorBackend,
+			ParentState: vm.internalState,
+			Tx:          tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
+		err = tx.Unsigned.Visit(&txExecutor)
 		if err == nil {
 			t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 		}
@@ -180,12 +181,12 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		txExecutor := executor.ProposalTxExecutor{
+			Backend:     &vm.txExecutorBackend,
+			ParentState: vm.internalState,
+			Tx:          tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
+		err = tx.Unsigned.Visit(&txExecutor)
 		if err == nil {
 			t.Fatalf("should have failed because validator ID is wrong")
 		}
@@ -198,17 +199,17 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+		txExecutor := executor.ProposalTxExecutor{
+			Backend:     &vm.txExecutorBackend,
+			ParentState: vm.internalState,
+			Tx:          tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
+		err = tx.Unsigned.Visit(&txExecutor)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortCurrentStakers := executor.onAbort.CurrentStakerChainState()
+		onAbortCurrentStakers := txExecutor.OnAbort.CurrentStakerChainState()
 		nextToRemoveTx, _, err := onAbortCurrentStakers.GetNextStaker()
 		if err != nil {
 			t.Fatal(err)
@@ -226,7 +227,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		executor.onAbort.Apply(vm.internalState)
+		txExecutor.OnAbort.Apply(vm.internalState)
 		if err := vm.internalState.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -305,12 +306,12 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := vm.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: vm.internalState,
-		tx:          tx,
+	txExecutor := executor.ProposalTxExecutor{
+		Backend:     &vm.txExecutorBackend,
+		ParentState: vm.internalState,
+		Tx:          tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
+	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -325,7 +326,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 
-	executor.onCommit.Apply(vm.internalState)
+	txExecutor.OnCommit.Apply(vm.internalState)
 	err = vm.internalState.Commit()
 	assert.NoError(err)
 
@@ -409,12 +410,12 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := vm.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: vm.internalState,
-		tx:          tx,
+	txExecutor := executor.ProposalTxExecutor{
+		Backend:     &vm.txExecutorBackend,
+		ParentState: vm.internalState,
+		Tx:          tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
+	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -429,7 +430,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(vm.internalState, delDestSet)
 	assert.NoError(err)
 
-	executor.onAbort.Apply(vm.internalState)
+	txExecutor.OnAbort.Apply(vm.internalState)
 	err = vm.internalState.Commit()
 	assert.NoError(err)
 
