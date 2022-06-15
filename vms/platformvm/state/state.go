@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -45,8 +45,8 @@ type State interface {
 		genesisTimestamp uint64,
 		genesisInitialSupply uint64,
 		genesisUtxos []*avax.UTXO,
-		genesisValidator []*signed.Tx,
-		genesisChains []*signed.Tx,
+		genesisValidator []*txs.Tx,
+		genesisChains []*txs.Tx,
 	) error
 
 	// Upon vm initialization, Load pulls
@@ -104,8 +104,8 @@ func (s *state) SyncGenesis(
 	genesisTimestamp uint64,
 	genesisInitialSupply uint64,
 	genesisUtxos []*avax.UTXO,
-	genesisValidator []*signed.Tx,
-	genesisChains []*signed.Tx,
+	genesisValidator []*txs.Tx,
+	genesisChains []*txs.Tx,
 ) error {
 	err := s.DataState.SyncGenesis(genesisBlkID, genesisTimestamp, genesisInitialSupply)
 	if err != nil {

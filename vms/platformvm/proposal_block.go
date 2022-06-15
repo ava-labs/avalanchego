@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Block = &ProposalBlock{}
@@ -29,12 +29,13 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx signed.Tx `serialize:"true" json:"tx"`
+	Tx txs.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState state.Versioned
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState state.Versioned
+	onAbortState  state.Versioned
+	prefersCommit bool
 }
 
 func (pb *ProposalBlock) free() {
@@ -113,9 +114,9 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := pb.parentBlock()
-	if err != nil {
-		return err
+	parentIntf, parentErr := pb.parentBlock()
+	if parentErr != nil {
+		return parentErr
 	}
 
 	// The parent of a proposal block (ie this block) must be a decision block
@@ -126,12 +127,23 @@ func (pb *ProposalBlock) Verify() error {
 
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
-	pb.onCommitState, pb.onAbortState, err = pb.vm.txExecutor.ExecuteProposal(&pb.Tx, parentState)
+
+	executor := proposalTxExecutor{
+		vm:          pb.vm,
+		parentState: parentState,
+		tx:          &pb.Tx,
+	}
+	err := pb.Tx.Unsigned.Visit(&executor)
 	if err != nil {
 		txID := pb.Tx.ID()
 		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
+
+	pb.onCommitState = executor.onCommit
+	pb.onAbortState = executor.onAbort
+	pb.prefersCommit = executor.prefersCommit
+
 	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
 	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
 
@@ -147,22 +159,15 @@ func (pb *ProposalBlock) Verify() error {
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit, err := pb.vm.txExecutor.InitiallyPrefersCommit(pb.Tx.Unsigned)
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create options, err %w",
-			err,
-		)
-	}
 
-	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
+	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !prefersCommit)
+	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",
@@ -170,7 +175,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	if prefersCommit {
+	if pb.prefersCommit {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil
@@ -181,7 +186,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx signed.Tx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
