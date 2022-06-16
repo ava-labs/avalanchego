@@ -59,20 +59,12 @@ func TestByStartTime(t *testing.T) {
 	assert.NoError(err)
 
 	txHeap.Add(tx2)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(utx2.EndTime()) {
-		t.Fatalf("txHeap.Timestamp returned %s, expected %s", timestamp, utx2.EndTime())
-	}
+	assert.Equal(utx2.EndTime(), txHeap.Timestamp())
 
 	txHeap.Add(tx1)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(utx1.EndTime()) {
-		t.Fatalf("txHeap.Timestamp returned %s, expected %s", timestamp, utx1.EndTime())
-	}
+	assert.Equal(utx1.EndTime(), txHeap.Timestamp())
 
 	txHeap.Add(tx0)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(utx0.EndTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, utx0.EndTime())
-	}
-	if top := txHeap.Peek(); top.ID() != tx0.ID() {
-		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), tx0.ID())
-	}
+	assert.Equal(utx0.EndTime(), txHeap.Timestamp())
+	assert.Equal(tx0, txHeap.Peek())
 }
