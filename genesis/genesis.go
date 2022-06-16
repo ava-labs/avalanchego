@@ -18,7 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -326,7 +327,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
-	platformvmArgs := platformvm.BuildGenesisArgs{
+	platformvmArgs := api.BuildGenesisArgs{
 		AvaxAssetID:   avaxAssetID,
 		NetworkID:     json.Uint32(config.NetworkID),
 		Time:          json.Uint64(config.StartTime),
@@ -350,7 +351,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
-					platformvm.APIUTXO{
+					api.UTXO{
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
 						Address:  addr,
@@ -375,7 +376,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.ID{}, err
 		}
 
-		utxos := []platformvm.APIUTXO(nil)
+		utxos := []api.UTXO(nil)
 		for _, allocation := range nodeAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
@@ -386,7 +387,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
-				utxos = append(utxos, platformvm.APIUTXO{
+				utxos = append(utxos, api.UTXO{
 					Locktime: json.Uint64(unlock.Locktime),
 					Amount:   json.Uint64(unlock.Amount),
 					Address:  addr,
@@ -399,13 +400,13 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		delegationFee := json.Uint32(staker.DelegationFee)
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.APIPrimaryValidator{
-				APIStaker: platformvm.APIStaker{
+			api.PrimaryValidator{
+				Staker: api.Staker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,
 				},
-				RewardOwner: &platformvm.APIOwner{
+				RewardOwner: &api.Owner{
 					Threshold: 1,
 					Addresses: []string{destAddrStr},
 				},
@@ -420,7 +421,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
-	platformvmArgs.Chains = []platformvm.APIChain{
+	platformvmArgs.Chains = []api.Chain{
 		{
 			GenesisData: avmReply.Bytes,
 			SubnetID:    constants.PrimaryNetworkID,
@@ -440,8 +441,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	platformvmReply := platformvm.BuildGenesisReply{}
-	platformvmSS := platformvm.StaticService{}
+	platformvmReply := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
@@ -518,12 +519,9 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
-	genesis := platformvm.Genesis{}
-	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
-	}
-	if err := genesis.Initialize(); err != nil {
-		return nil, err
+	genesis, err := genesis.Parse(genesisBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse genesis: %w", err)
 	}
 	for _, chain := range genesis.Chains {
 		uChain := chain.Unsigned.(*pchaintxs.CreateChainTx)

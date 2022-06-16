@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package api
 
 import (
 	"bytes"
@@ -16,8 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -31,14 +33,14 @@ import (
 var (
 	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
-	errStakeOverflow        = errors.New("too many funds staked on single validator")
+	errStakeOverflow        = errors.New("validator stake exceeds limit")
 )
 
 // StaticService defines the static API methods exposed by the platform VM
 type StaticService struct{}
 
-// APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
-type APIUTXO struct {
+// UTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
+type UTXO struct {
 	Locktime json.Uint64 `json:"locktime"`
 	Amount   json.Uint64 `json:"amount"`
 	Address  string      `json:"address"`
@@ -53,7 +55,7 @@ type APIUTXO struct {
 // [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
 // [NodeID] is the node ID of the staker
-type APIStaker struct {
+type Staker struct {
 	TxID        ids.ID       `json:"txID"`
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
@@ -62,43 +64,43 @@ type APIStaker struct {
 	NodeID      ids.NodeID   `json:"nodeID"`
 }
 
-// APIOwner is the repr. of a reward owner sent over APIs.
-type APIOwner struct {
+// Owner is the repr. of a reward owner sent over APIs.
+type Owner struct {
 	Locktime  json.Uint64 `json:"locktime"`
 	Threshold json.Uint32 `json:"threshold"`
 	Addresses []string    `json:"addresses"`
 }
 
-// APIPrimaryValidator is the repr. of a primary network validator sent over APIs.
-type APIPrimaryValidator struct {
-	APIStaker
+// PrimaryValidator is the repr. of a primary network validator sent over APIs.
+type PrimaryValidator struct {
+	Staker
 	// The owner the staking reward, if applicable, will go to
-	RewardOwner        *APIOwner     `json:"rewardOwner,omitempty"`
+	RewardOwner        *Owner        `json:"rewardOwner,omitempty"`
 	PotentialReward    *json.Uint64  `json:"potentialReward,omitempty"`
 	DelegationFee      json.Float32  `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
-	Uptime             *json.Float32 `json:"uptime"`
+	Uptime             *json.Float32 `json:"uptime,omitempty"`
 	Connected          bool          `json:"connected"`
-	Staked             []APIUTXO     `json:"staked,omitempty"`
+	Staked             []UTXO        `json:"staked,omitempty"`
 	// The delegators delegating to this validator
-	Delegators []APIPrimaryDelegator `json:"delegators"`
+	Delegators []PrimaryDelegator `json:"delegators"`
 }
 
 // APISubnetValidator is the repr. of a subnet validator sent over APIs.
-type APISubnetValidator struct {
-	APIStaker
+type SubnetValidator struct {
+	Staker
 	// The owner the staking reward, if applicable, will go to
 	Connected bool `json:"connected"`
 }
 
-// APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
-type APIPrimaryDelegator struct {
-	APIStaker
-	RewardOwner     *APIOwner    `json:"rewardOwner,omitempty"`
+// PrimaryDelegator is the repr. of a primary network delegator sent over APIs.
+type PrimaryDelegator struct {
+	Staker
+	RewardOwner     *Owner       `json:"rewardOwner,omitempty"`
 	PotentialReward *json.Uint64 `json:"potentialReward,omitempty"`
 }
 
-func (v *APIStaker) weight() uint64 {
+func (v *Staker) GetWeight() uint64 {
 	switch {
 	case v.Weight != nil:
 		return uint64(*v.Weight)
@@ -109,14 +111,14 @@ func (v *APIStaker) weight() uint64 {
 	}
 }
 
-// APIChain defines a chain that exists
+// Chain defines a chain that exists
 // at the network's genesis.
 // [GenesisData] is the initial state of the chain.
 // [VMID] is the ID of the VM this chain runs.
 // [FxIDs] are the IDs of the Fxs the chain supports.
 // [Name] is a human-readable, non-unique name for the chain.
 // [SubnetID] is the ID of the subnet that validates the chain
-type APIChain struct {
+type Chain struct {
 	GenesisData string   `json:"genesisData"`
 	VMID        ids.ID   `json:"vmID"`
 	FxIDs       []ids.ID `json:"fxIDs"`
@@ -132,51 +134,21 @@ type APIChain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID   ids.ID                `json:"avaxAssetID"`
-	NetworkID     json.Uint32           `json:"networkID"`
-	UTXOs         []APIUTXO             `json:"utxos"`
-	Validators    []APIPrimaryValidator `json:"validators"`
-	Chains        []APIChain            `json:"chains"`
-	Time          json.Uint64           `json:"time"`
-	InitialSupply json.Uint64           `json:"initialSupply"`
-	Message       string                `json:"message"`
-	Encoding      formatting.Encoding   `json:"encoding"`
+	AvaxAssetID   ids.ID              `json:"avaxAssetID"`
+	NetworkID     json.Uint32         `json:"networkID"`
+	UTXOs         []UTXO              `json:"utxos"`
+	Validators    []PrimaryValidator  `json:"validators"`
+	Chains        []Chain             `json:"chains"`
+	Time          json.Uint64         `json:"time"`
+	InitialSupply json.Uint64         `json:"initialSupply"`
+	Message       string              `json:"message"`
+	Encoding      formatting.Encoding `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
 	Bytes    string              `json:"bytes"`
 	Encoding formatting.Encoding `json:"encoding"`
-}
-
-// GenesisUTXO adds messages to UTXOs
-type GenesisUTXO struct {
-	avax.UTXO `serialize:"true"`
-	Message   []byte `serialize:"true" json:"message"`
-}
-
-// Genesis represents a genesis state of the platform chain
-type Genesis struct {
-	UTXOs         []*GenesisUTXO `serialize:"true"`
-	Validators    []*txs.Tx      `serialize:"true"`
-	Chains        []*txs.Tx      `serialize:"true"`
-	Timestamp     uint64         `serialize:"true"`
-	InitialSupply uint64         `serialize:"true"`
-	Message       string         `serialize:"true"`
-}
-
-func (g *Genesis) Initialize() error {
-	for _, tx := range g.Validators {
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
-			return err
-		}
-	}
-	for _, tx := range g.Chains {
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // beck32ToID takes bech32 address and produces a shortID
@@ -191,7 +163,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
-	utxos := make([]*GenesisUTXO, 0, len(args.UTXOs))
+	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
 		if apiUTXO.Amount == 0 {
 			return errUTXOHasNoValue
@@ -226,18 +198,18 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if err != nil {
 			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
-		utxos = append(utxos, &GenesisUTXO{
+		utxos = append(utxos, &genesis.UTXO{
 			UTXO:    utxo,
 			Message: messageBytes,
 		})
 	}
 
 	// Specify the validators that are validating the primary network at genesis.
-	vdrs := newTxHeapByEndTime()
+	vdrs := txheap.NewByEndTime()
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
-		sortAPIUTXOs(vdr.Staked)
+		sortUTXOs(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -310,7 +282,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			RewardsOwner: owner,
 			Shares:       delegationFee,
 		}}
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
+		if err := tx.Sign(genesis.Codec, nil); err != nil {
 			return err
 		}
 
@@ -336,20 +308,17 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			GenesisData: genesisBytes,
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
+		if err := tx.Sign(genesis.Codec, nil); err != nil {
 			return err
 		}
 
 		chains = append(chains, tx)
 	}
 
-	validatorTxs := make([]*txs.Tx, vdrs.Len())
-	for i, tx := range vdrs.txs {
-		validatorTxs[i] = tx.tx
-	}
+	validatorTxs := vdrs.List()
 
 	// genesis holds the genesis state
-	genesis := Genesis{
+	g := genesis.Genesis{
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
@@ -359,7 +328,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(CodecVersion, genesis)
+	bytes, err := genesis.Codec.Marshal(txs.Version, g)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
@@ -371,27 +340,27 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	return nil
 }
 
-type innerSortAPIUTXO []APIUTXO
+type innerSortUTXO []UTXO
 
-func (xa innerSortAPIUTXO) Less(i, j int) bool {
-	if xa[i].Locktime < xa[j].Locktime {
+func (s innerSortUTXO) Less(i, j int) bool {
+	if s[i].Locktime < s[j].Locktime {
 		return true
-	} else if xa[i].Locktime > xa[j].Locktime {
+	} else if s[i].Locktime > s[j].Locktime {
 		return false
 	}
 
-	if xa[i].Amount < xa[j].Amount {
+	if s[i].Amount < s[j].Amount {
 		return true
-	} else if xa[i].Amount > xa[j].Amount {
+	} else if s[i].Amount > s[j].Amount {
 		return false
 	}
 
-	iAddrID, err := bech32ToID(xa[i].Address)
+	iAddrID, err := bech32ToID(s[i].Address)
 	if err != nil {
 		return false
 	}
 
-	jAddrID, err := bech32ToID(xa[j].Address)
+	jAddrID, err := bech32ToID(s[j].Address)
 	if err != nil {
 		return false
 	}
@@ -399,7 +368,7 @@ func (xa innerSortAPIUTXO) Less(i, j int) bool {
 	return bytes.Compare(iAddrID.Bytes(), jAddrID.Bytes()) == -1
 }
 
-func (xa innerSortAPIUTXO) Len() int      { return len(xa) }
-func (xa innerSortAPIUTXO) Swap(i, j int) { xa[j], xa[i] = xa[i], xa[j] }
+func (s innerSortUTXO) Len() int      { return len(s) }
+func (s innerSortUTXO) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
 
-func sortAPIUTXOs(a []APIUTXO) { sort.Sort(innerSortAPIUTXO(a)) }
+func sortUTXOs(utxos []UTXO) { sort.Sort(innerSortUTXO(utxos)) }

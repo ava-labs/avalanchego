@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 )
 
 const (
@@ -65,8 +66,8 @@ type mempool struct {
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
-	unissuedDecisionTxs TxHeap
-	unissuedProposalTxs TxHeap
+	unissuedDecisionTxs txheap.Heap
+	unissuedProposalTxs txheap.Heap
 	unknownTxs          prometheus.Counter
 
 	// Key: Tx ID
@@ -86,8 +87,8 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 		return nil, err
 	}
 
-	unissuedDecisionTxs, err := NewTxHeapWithMetrics(
-		NewTxHeapByAge(),
+	unissuedDecisionTxs, err := txheap.NewWithMetrics(
+		txheap.NewByAge(),
 		fmt.Sprintf("%s_decision_txs", namespace),
 		registerer,
 	)
@@ -95,8 +96,8 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 		return nil, err
 	}
 
-	unissuedProposalTxs, err := NewTxHeapWithMetrics(
-		NewTxHeapByStartTime(),
+	unissuedProposalTxs, err := txheap.NewWithMetrics(
+		txheap.NewByStartTime(),
 		fmt.Sprintf("%s_proposal_txs", namespace),
 		registerer,
 	)

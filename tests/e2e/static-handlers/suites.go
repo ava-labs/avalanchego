@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -131,34 +131,34 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		}
 
-		genesisUTXOs := make([]platformvm.APIUTXO, len(keys))
+		genesisUTXOs := make([]api.UTXO, len(keys))
 		hrp := constants.NetworkIDToHRP[constants.UnitTestID]
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := address.FormatBech32(hrp, id.Bytes())
 			gomega.Expect(err).Should(gomega.BeNil())
-			genesisUTXOs[i] = platformvm.APIUTXO{
+			genesisUTXOs[i] = api.UTXO{
 				Amount:  json.Uint64(50000 * units.MilliAvax),
 				Address: addr,
 			}
 		}
 
-		genesisValidators := make([]platformvm.APIPrimaryValidator, len(keys))
+		genesisValidators := make([]api.PrimaryValidator, len(keys))
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := address.FormatBech32(hrp, id.Bytes())
 			gomega.Expect(err).Should(gomega.BeNil())
-			genesisValidators[i] = platformvm.APIPrimaryValidator{
-				APIStaker: platformvm.APIStaker{
+			genesisValidators[i] = api.PrimaryValidator{
+				Staker: api.Staker{
 					StartTime: json.Uint64(time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC).Unix()),
 					EndTime:   json.Uint64(time.Date(1997, 1, 30, 0, 0, 0, 0, time.UTC).Unix()),
 					NodeID:    ids.NodeID(id),
 				},
-				RewardOwner: &platformvm.APIOwner{
+				RewardOwner: &api.Owner{
 					Threshold: 1,
 					Addresses: []string{addr},
 				},
-				Staked: []platformvm.APIUTXO{{
+				Staked: []api.UTXO{{
 					Amount:  json.Uint64(10000),
 					Address: addr,
 				}},
@@ -166,7 +166,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			}
 		}
 
-		buildGenesisArgs := platformvm.BuildGenesisArgs{
+		buildGenesisArgs := api.BuildGenesisArgs{
 			NetworkID:     json.Uint32(constants.UnitTestID),
 			AvaxAssetID:   ids.ID{'a', 'v', 'a', 'x'},
 			UTXOs:         genesisUTXOs,
@@ -180,7 +180,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		uris := e2e.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
-		staticClient := platformvm.NewStaticClient(uris[0])
+		staticClient := api.NewStaticClient(uris[0])
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		resp, err := staticClient.BuildGenesis(ctx, &buildGenesisArgs)
 		cancel()

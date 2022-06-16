@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package txheap
 
 import (
 	"container/heap"
@@ -10,11 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ TxHeap = &txHeap{}
+var _ Heap = &txHeap{}
 
-type TxHeap interface {
+type Heap interface {
 	Add(tx *txs.Tx)
 	Get(txID ids.ID) *txs.Tx
+	List() []*txs.Tx
 	Remove(txID ids.ID) *txs.Tx
 	Peek() *txs.Tx
 	RemoveTop() *txs.Tx
@@ -48,6 +49,14 @@ func (h *txHeap) Get(txID ids.ID) *txs.Tx {
 		return nil
 	}
 	return h.txs[index].tx
+}
+
+func (h *txHeap) List() []*txs.Tx {
+	res := make([]*txs.Tx, 0, len(h.txs))
+	for _, tx := range h.txs {
+		res = append(res, tx.tx)
+	}
+	return res
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {

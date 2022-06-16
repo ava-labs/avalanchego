@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package txheap
 
 import (
 	"time"
@@ -9,24 +9,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ TimedTxHeap = &txHeapByEndTime{}
+var _ TimedHeap = &byEndTime{}
 
-type txHeapByEndTime struct {
+type byEndTime struct {
 	txHeap
 }
 
-func newTxHeapByEndTime() *txHeapByEndTime {
-	h := &txHeapByEndTime{}
+func NewByEndTime() TimedHeap {
+	h := &byEndTime{}
 	h.initialize(h)
 	return h
 }
 
-func (h *txHeapByEndTime) Less(i, j int) bool {
+func (h *byEndTime) Less(i, j int) bool {
 	iTime := h.txs[i].tx.Unsigned.(txs.StakerTx).EndTime()
 	jTime := h.txs[j].tx.Unsigned.(txs.StakerTx).EndTime()
 	return iTime.Before(jTime)
 }
 
-func (h *txHeapByEndTime) Timestamp() time.Time {
+func (h *byEndTime) Timestamp() time.Time {
 	return h.Peek().Unsigned.(txs.StakerTx).EndTime()
 }

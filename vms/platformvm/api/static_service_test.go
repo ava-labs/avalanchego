@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package api
 
 import (
 	"testing"
@@ -11,7 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
+
+const testNetworkID = 10 // To be used in tests
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	nodeID := ids.NodeID{1, 2, 3}
@@ -20,32 +23,32 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	utxo := APIUTXO{
+	utxo := UTXO{
 		Address: addr,
 		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
-	validator := APIPrimaryValidator{
-		APIStaker: APIStaker{
+	validator := PrimaryValidator{
+		Staker: Staker{
 			EndTime: 15,
 			Weight:  &weight,
 			NodeID:  nodeID,
 		},
-		RewardOwner: &APIOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
-		Staked: []APIUTXO{{
+		Staked: []UTXO{{
 			Amount:  weight,
 			Address: addr,
 		}},
 	}
 
 	args := BuildGenesisArgs{
-		UTXOs: []APIUTXO{
+		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []APIPrimaryValidator{
+		Validators: []PrimaryValidator{
 			validator,
 		},
 		Time:     5,
@@ -66,32 +69,32 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	utxo := APIUTXO{
+	utxo := UTXO{
 		Address: addr,
 		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
-	validator := APIPrimaryValidator{
-		APIStaker: APIStaker{
+	validator := PrimaryValidator{
+		Staker: Staker{
 			StartTime: 0,
 			EndTime:   15,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &APIOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
-		Staked: []APIUTXO{{
+		Staked: []UTXO{{
 			Amount:  weight,
 			Address: addr,
 		}},
 	}
 
 	args := BuildGenesisArgs{
-		UTXOs: []APIUTXO{
+		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []APIPrimaryValidator{
+		Validators: []PrimaryValidator{
 			validator,
 		},
 		Time:     5,
@@ -112,33 +115,33 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	utxo := APIUTXO{
+	utxo := UTXO{
 		Address: addr,
 		Amount:  123456789,
 	}
 
 	weight := json.Uint64(987654321)
-	validator := APIPrimaryValidator{
-		APIStaker: APIStaker{
+	validator := PrimaryValidator{
+		Staker: Staker{
 			StartTime: 0,
 			EndTime:   5,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &APIOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
-		Staked: []APIUTXO{{
+		Staked: []UTXO{{
 			Amount:  weight,
 			Address: addr,
 		}},
 	}
 
 	args := BuildGenesisArgs{
-		UTXOs: []APIUTXO{
+		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []APIPrimaryValidator{
+		Validators: []PrimaryValidator{
 			validator,
 		},
 		Time:     5,
@@ -159,55 +162,55 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	utxo := APIUTXO{
+	utxo := UTXO{
 		Address: addr,
 		Amount:  123456789,
 	}
 
 	weight := json.Uint64(987654321)
-	validator1 := APIPrimaryValidator{
-		APIStaker: APIStaker{
+	validator1 := PrimaryValidator{
+		Staker: Staker{
 			StartTime: 0,
 			EndTime:   20,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &APIOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
-		Staked: []APIUTXO{{
+		Staked: []UTXO{{
 			Amount:  weight,
 			Address: addr,
 		}},
 	}
 
-	validator2 := APIPrimaryValidator{
-		APIStaker: APIStaker{
+	validator2 := PrimaryValidator{
+		Staker: Staker{
 			StartTime: 3,
 			EndTime:   15,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &APIOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
-		Staked: []APIUTXO{{
+		Staked: []UTXO{{
 			Amount:  weight,
 			Address: addr,
 		}},
 	}
 
-	validator3 := APIPrimaryValidator{
-		APIStaker: APIStaker{
+	validator3 := PrimaryValidator{
+		Staker: Staker{
 			StartTime: 1,
 			EndTime:   10,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &APIOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
-		Staked: []APIUTXO{{
+		Staked: []UTXO{{
 			Amount:  weight,
 			Address: addr,
 		}},
@@ -215,10 +218,10 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 
 	args := BuildGenesisArgs{
 		AvaxAssetID: ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'},
-		UTXOs: []APIUTXO{
+		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []APIPrimaryValidator{
+		Validators: []PrimaryValidator{
 			validator1,
 			validator2,
 			validator3,
@@ -238,8 +241,8 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
 	}
 
-	genesis := &Genesis{}
-	if _, err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
+	genesis, err := genesis.Parse(genesisBytes)
+	if err != nil {
 		t.Fatal(err)
 	}
 	validators := genesis.Validators

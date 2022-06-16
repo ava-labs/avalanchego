@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
+	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -621,10 +622,10 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, vdr := range genesis.Validators {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
-			gotVdr, ok := response.Validators[i].(APIPrimaryValidator)
+			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
 			switch {
 			case !ok:
-				t.Fatal("expected APIPrimaryValidator")
+				t.Fatal("expected pchainapi.PrimaryValidator")
 			case gotVdr.NodeID != vdr.NodeID:
 			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
@@ -696,7 +697,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Make sure the delegator is there
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
-		vdr := response.Validators[i].(APIPrimaryValidator)
+		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
 		if vdr.NodeID != validatorNodeID {
 			continue
 		}
@@ -712,7 +713,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			t.Fatal("wrong start time")
 		case uint64(delegator.EndTime) != delegatorEndTime:
 			t.Fatal("wrong end time")
-		case delegator.weight() != stakeAmt:
+		case delegator.GetWeight() != stakeAmt:
 			t.Fatalf("wrong weight")
 		}
 	}

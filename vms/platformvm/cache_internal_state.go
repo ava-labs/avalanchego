@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -1574,11 +1575,8 @@ func (st *internalStateImpl) shouldInit() (bool, error) {
 }
 
 func (st *internalStateImpl) init(genesisBytes []byte) error {
-	genesis := &Genesis{}
-	if _, err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
-		return err
-	}
-	if err := genesis.Initialize(); err != nil {
+	genesis, err := genesis.Parse(genesisBytes)
+	if err != nil {
 		return err
 	}
 
