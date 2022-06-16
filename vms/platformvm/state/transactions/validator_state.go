@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	p_validator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
@@ -67,9 +65,9 @@ func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
 		nextStakerToRemove := currentStakers[0]
-		staker, ok := nextStakerToRemove.Unsigned.(timed.Tx)
+		staker, ok := nextStakerToRemove.Unsigned.(txs.StakerTx)
 		if !ok {
-			return time.Time{}, fmt.Errorf("expected tx type timed.Tx but got %T", nextStakerToRemove.Unsigned)
+			return time.Time{}, fmt.Errorf("expected tx type StakerTx but got %T", nextStakerToRemove.Unsigned)
 		}
 		if endTime := staker.EndTime(); endTime.Before(earliest) {
 			earliest = endTime
@@ -78,9 +76,9 @@ func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 	pendingStakers := vs.PendingStakerChainState()
 	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
 		nextStakerToAdd := pendingStakers[0]
-		staker, ok := nextStakerToAdd.Unsigned.(timed.Tx)
+		staker, ok := nextStakerToAdd.Unsigned.(txs.StakerTx)
 		if !ok {
-			return time.Time{}, fmt.Errorf("expected tx type timed.Tx but got %T", nextStakerToAdd.Unsigned)
+			return time.Time{}, fmt.Errorf("expected tx type txs.StakerTx but got %T", nextStakerToAdd.Unsigned)
 		}
 		if startTime := staker.StartTime(); startTime.Before(earliest) {
 			earliest = startTime
@@ -96,7 +94,7 @@ func (vs *validatorState) maxSubnetStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	var (
-		vdrTxAndID signed.SubnetValidatorAndID
+		vdrTxAndID txs.SubnetValidatorAndID
 		exists     bool
 	)
 	currentValidator, err := vs.current.GetValidator(nodeID)
@@ -192,8 +190,8 @@ func (vs *validatorState) maxPrimarySubnetStakeAmount(
 // [maximumStake].
 func CanDelegate(
 	current,
-	pending []signed.DelegatorAndID, // sorted by next start time first
-	new *unsigned.AddDelegatorTx,
+	pending []txs.DelegatorAndID, // sorted by next start time first
+	new *txs.AddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
 ) (bool, error) {
@@ -220,7 +218,7 @@ func CanDelegate(
 // * [pending] is sorted in order of increasing delegation start time
 func getMaxStakeAmount(
 	current,
-	pending []signed.DelegatorAndID, // sorted by next start time first
+	pending []txs.DelegatorAndID, // sorted by next start time first
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,

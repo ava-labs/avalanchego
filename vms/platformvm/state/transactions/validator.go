@@ -5,27 +5,27 @@ package transactions
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ validator = &validatorImpl{}
 
 type validator interface {
-	Delegators() []signed.DelegatorAndID
-	SubnetValidators() map[ids.ID]signed.SubnetValidatorAndID
+	Delegators() []txs.DelegatorAndID
+	SubnetValidators() map[ids.ID]txs.SubnetValidatorAndID
 }
 
 type validatorImpl struct {
 	// sorted in order of next operation, either addition or removal.
-	delegators []signed.DelegatorAndID
+	delegators []txs.DelegatorAndID
 	// maps subnetID to tx
-	subnets map[ids.ID]signed.SubnetValidatorAndID
+	subnets map[ids.ID]txs.SubnetValidatorAndID
 }
 
-func (v *validatorImpl) Delegators() []signed.DelegatorAndID {
+func (v *validatorImpl) Delegators() []txs.DelegatorAndID {
 	return v.delegators
 }
 
-func (v *validatorImpl) SubnetValidators() map[ids.ID]signed.SubnetValidatorAndID {
+func (v *validatorImpl) SubnetValidators() map[ids.ID]txs.SubnetValidatorAndID {
 	return v.subnets
 }

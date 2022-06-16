@@ -7,15 +7,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
-
-	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 type Verifier interface {
 	mempool.Mempool
 	state.State
-	p_tx.Executor
 	stateless.Metrics
 
 	GetStatefulBlock(blkID ids.ID) (Block, error)

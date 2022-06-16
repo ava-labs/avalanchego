@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -19,7 +19,7 @@ type AbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (ab *AbortBlock) BlockTxs() []*signed.Tx { return nil }
+func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
 
 func NewAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
 	res := &AbortBlock{
@@ -44,7 +44,7 @@ type CommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (cb *CommitBlock) BlockTxs() []*signed.Tx { return nil }
+func (cb *CommitBlock) BlockTxs() []*txs.Tx { return nil }
 
 func NewCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
 	res := &CommitBlock{

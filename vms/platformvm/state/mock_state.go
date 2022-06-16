@@ -15,7 +15,7 @@ import (
 	stateless "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	transactions "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
-	signed "github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	signed "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
 )
 

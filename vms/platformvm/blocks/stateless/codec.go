@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -27,7 +27,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		RegisterBlockTypes(gc),
-		unsigned.RegisterUnsignedTxsTypes(gc),
+		txs.RegisterUnsignedTxsTypes(gc),
 		Codec.RegisterCodec(Version, gc),
 	)
 

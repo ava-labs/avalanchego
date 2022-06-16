@@ -14,8 +14,9 @@ var _ UnsignedTx = &BaseTx{}
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
-	avax.BaseTx `serialize:"true"`
 	avax.Metadata
+
+	avax.BaseTx `serialize:"true"`
 }
 
 func (t *BaseTx) InitCtx(ctx *snow.Context) {
@@ -53,10 +54,10 @@ func (t *BaseTx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.BaseTxVerify(ctx); err != nil {
+	if err := t.Metadata.Verify(); err != nil {
 		return err
 	}
-	if err := t.Metadata.Verify(); err != nil {
+	if err := t.BaseTx.Verify(ctx); err != nil {
 		return err
 	}
 

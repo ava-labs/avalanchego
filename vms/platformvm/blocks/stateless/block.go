@@ -5,7 +5,7 @@ package stateless
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Interface introduced for marshalling/unmarshalling
@@ -19,5 +19,5 @@ type Block interface {
 
 	// BlockTxs returns list of transactions
 	// contained in the block
-	BlockTxs() []*signed.Tx
+	BlockTxs() []*txs.Tx
 }

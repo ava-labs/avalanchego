@@ -52,9 +52,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -103,7 +102,7 @@ var (
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	// Its threshold is 2
-	testSubnet1            *signed.Tx
+	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = keys[0:3]
 
 	xChainID = ids.Empty.Prefix(0)
@@ -663,7 +662,13 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	blk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *tx)
+	blk, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*tx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1643,25 +1648,23 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := signed.Tx{
-		Unsigned: &unsigned.ImportTx{
-			BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    vm.ctx.NetworkID,
-				BlockchainID: vm.ctx.ChainID,
-			}},
-			SourceChain: vm.ctx.XChainID,
-			ImportedInputs: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        ids.Empty.Prefix(1),
-					OutputIndex: 1,
-				},
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				In: &secp256k1fx.TransferInput{
-					Amt: 50000,
-				},
-			}},
-		},
-	}
+	tx := txs.Tx{Unsigned: &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+		}},
+		SourceChain: vm.ctx.XChainID,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(1),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+			},
+		}},
+	}}
 	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)
 	}
@@ -1673,7 +1676,13 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	blk, err := p_block.NewAtomicBlock(vm.blkVerifier, preferredID, preferredHeight+1, tx)
+	blk, err := p_block.NewAtomicBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		tx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1750,7 +1759,13 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(firstVM.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		firstVM.blkVerifier,
+		firstVM.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1872,7 +1887,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(firstVM.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		firstVM.blkVerifier,
+		firstVM.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2001,7 +2022,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeBlk, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2012,7 +2039,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimePreference := options[0]
+
+	// Because the block needs to have been verified for it's preference to be
+	// set correctly, we manually select the correct preference here.
+	advanceTimePreference := options[1]
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
 	vdrs := validators.NewSet()
@@ -2281,7 +2311,13 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2304,6 +2340,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 	secondAdvanceTimeBlk, err := p_block.NewProposalBlock(
 		vm.blkVerifier,
+		vm.txExecutorBackend,
 		firstOption.ID(),
 		firstOption.(p_block.Block).Height()+1,
 		*secondAdvanceTimeTx,
@@ -2479,15 +2516,33 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx0})
+	addSubnetBlk0, err := p_block.NewStandardBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{addSubnetTx0},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{addSubnetTx1})
+	addSubnetBlk1, err := p_block.NewStandardBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{addSubnetTx1},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := p_block.NewStandardBlock(vm.blkVerifier, addSubnetBlk1.ID(), preferredHeight+2, []*signed.Tx{addSubnetTx2})
+	addSubnetBlk2, err := p_block.NewStandardBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		addSubnetBlk1.ID(),
+		preferredHeight+2,
+		[]*txs.Tx{addSubnetTx2},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2552,7 +2607,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx)
+	addValidatorProposalBlk, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*addValidatorTx,
+	)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk.Verify()
@@ -2593,8 +2654,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Create the import tx that will fail verification
-	unsignedImportTx := &unsigned.ImportTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+	unsignedImportTx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -2609,7 +2670,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			},
 		},
 	}
-	signedImportTx := &signed.Tx{Unsigned: unsignedImportTx}
+	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
 	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
@@ -2620,7 +2681,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	importBlk, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
+	importBlk, err := p_block.NewStandardBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{signedImportTx},
+	)
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2681,7 +2748,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	advanceTimeProposalBlk, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeProposalBlk, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx,
+	)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk.Verify()
@@ -2785,7 +2858,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx0)
+	addValidatorProposalBlk0, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*addValidatorTx0,
+	)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk0.Verify()
@@ -2822,7 +2901,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx0)
+	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx0,
+	)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk0.Verify()
@@ -2871,8 +2956,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Create the import tx that will fail verification
-	unsignedImportTx := &unsigned.ImportTx{
-		BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+	unsignedImportTx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -2887,7 +2972,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			},
 		},
 	}
-	signedImportTx := &signed.Tx{Unsigned: unsignedImportTx}
+	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
 	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
@@ -2898,7 +2983,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	importBlk, err := p_block.NewStandardBlock(vm.blkVerifier, preferredID, preferredHeight+1, []*signed.Tx{signedImportTx})
+	importBlk, err := p_block.NewStandardBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{signedImportTx},
+	)
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2970,7 +3061,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	addValidatorProposalBlk1, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *addValidatorTx1)
+	addValidatorProposalBlk1, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*addValidatorTx1,
+	)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk1.Verify()
@@ -3007,7 +3104,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(vm.blkVerifier, preferredID, preferredHeight+1, *advanceTimeTx1)
+	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		preferredID,
+		preferredHeight+1,
+		*advanceTimeTx1,
+	)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk1.Verify()

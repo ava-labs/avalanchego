@@ -37,9 +37,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -109,9 +109,9 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder   builder.TxBuilder
-	txExecutor  executor.Executor
-	blkVerifier p_block.Verifier
+	txBuilder         builder.TxBuilder
+	txExecutorBackend executor.Backend
+	blkVerifier       p_block.Verifier
 }
 
 // Initialize this blockchain.
@@ -189,16 +189,16 @@ func (vm *VM) Initialize(
 		vm.rewards,
 	)
 
-	vm.txExecutor = executor.NewExecutor(
-		&vm.Config,
-		vm.ctx,
-		&vm.bootstrapped,
-		&vm.clock,
-		vm.fx,
-		vm.spendHandler,
-		vm.uptimeManager,
-		vm.rewards,
-	)
+	vm.txExecutorBackend = executor.Backend{
+		Cfg:          &vm.Config,
+		Ctx:          vm.ctx,
+		Clk:          &vm.clock,
+		Fx:           vm.fx,
+		SpendHandler: vm.spendHandler,
+		UptimeMan:    vm.uptimeManager,
+		Rewards:      vm.rewards,
+		Bootstrapped: &vm.bootstrapped,
+	}
 
 	// Note: there is a circular dependency among mempool and blkBuilder
 	// which is broken by mean of vm
@@ -209,7 +209,7 @@ func (vm *VM) Initialize(
 	vm.blkVerifier = NewBlockVerifier(
 		mempool,
 		vm.internalState,
-		vm.txExecutor,
+		vm.txExecutorBackend,
 		&vm.metrics,
 		vm.recentlyAccepted,
 	)
@@ -385,7 +385,12 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	return p_block.MakeStateful(statelessBlk, vm.blkVerifier, choices.Processing)
+	return p_block.MakeStateful(
+		statelessBlk,
+		vm.blkVerifier,
+		vm.txExecutorBackend,
+		choices.Processing,
+	)
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
