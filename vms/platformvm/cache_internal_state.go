@@ -93,10 +93,10 @@ type InternalState interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type internalStateImpl struct {
+	state.State
+
 	vm     *VM
 	baseDB *versiondb.Database
-
-	state.State
 
 	addedBlocks map[ids.ID]Block // map of blockID -> Block
 	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
