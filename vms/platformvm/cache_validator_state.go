@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 type ValidatorState interface {
@@ -21,7 +22,7 @@ func getNextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
 		nextStakerToRemove := currentStakers[0]
-		staker, ok := nextStakerToRemove.UnsignedTx.(TimedTx)
+		staker, ok := nextStakerToRemove.Unsigned.(txs.StakerTx)
 		if !ok {
 			return time.Time{}, errWrongTxType
 		}
@@ -33,7 +34,7 @@ func getNextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	pendingStakers := vs.PendingStakerChainState()
 	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
 		nextStakerToAdd := pendingStakers[0]
-		staker, ok := nextStakerToAdd.UnsignedTx.(TimedTx)
+		staker, ok := nextStakerToAdd.Unsigned.(txs.StakerTx)
 		if !ok {
 			return time.Time{}, errWrongTxType
 		}

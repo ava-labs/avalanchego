@@ -11,14 +11,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type dummyUnsignedTx struct {
-	BaseTx
+	txs.BaseTx
 }
 
-func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *Tx) error {
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState MutableState, stx *txs.Tx) error {
+	return nil
+}
+
+func (du *dummyUnsignedTx) Visit(txs.Visitor) error {
 	return nil
 }
 
@@ -36,9 +41,9 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 	now := time.Unix(1607133207, 0)
 
 	unsignedTx := dummyUnsignedTx{
-		BaseTx: BaseTx{},
+		BaseTx: txs.BaseTx{},
 	}
-	unsignedTx.Initialize([]byte{0}, []byte{1})
+	unsignedTx.Initialize([]byte{0})
 
 	// Note that setting [chainTimestamp] also set's the VM's clock.
 	// Adjust input/output locktimes accordingly.

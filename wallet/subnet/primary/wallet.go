@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -57,7 +58,7 @@ func NewWalletWithState(
 	kc *secp256k1fx.Keychain,
 ) Wallet {
 	pUTXOs := NewChainUTXOs(constants.PlatformChainID, utxos)
-	pTXs := make(map[ids.ID]*platformvm.Tx)
+	pTXs := make(map[ids.ID]*txs.Tx)
 	pBackend := p.NewBackend(pCTX, pUTXOs, pTXs)
 	pBuilder := p.NewBuilder(kc.Addrs, pBackend)
 	pSigner := p.NewSigner(kc, pBackend)

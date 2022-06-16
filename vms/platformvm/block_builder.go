@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -84,12 +85,7 @@ func (m *blockBuilder) Initialize(
 }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
-	// Initialize the transaction
-	if err := tx.Sign(Codec, nil); err != nil {
-		return err
-	}
-
+func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	if m.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -110,7 +106,13 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	if err := tx.UnsignedTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
+	verifier := mempoolTxVerifier{
+		vm:          m.vm,
+		parentState: preferredState,
+		tx:          tx,
+	}
+	err = tx.Unsigned.Visit(&verifier)
+	if err != nil {
 		m.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -122,7 +124,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 }
 
 // AddVerifiedTx attempts to add a transaction to the mempool
-func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
+func (m *blockBuilder) AddVerifiedTx(tx *txs.Tx) error {
 	if m.dropIncoming {
 		return errMempoolReentrancy
 	}
@@ -203,7 +205,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Get the proposal transaction that should be issued.
 	tx := m.PopProposalTx()
-	startTime := tx.UnsignedTx.(TimedTx).StartTime()
+	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
@@ -309,9 +311,9 @@ func (m *blockBuilder) getStakerToReward(preferredState MutableState) (ids.ID, b
 		return ids.Empty, false, err
 	}
 
-	staker, ok := tx.UnsignedTx.(TimedTx)
+	staker, ok := tx.Unsigned.(txs.StakerTx)
 	if !ok {
-		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.UnsignedTx)
+		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
 	}
 	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
 }
@@ -339,7 +341,7 @@ func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	syncTime := now.Add(syncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
-		startTime := tx.UnsignedTx.(TimedTx).StartTime()
+		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
 			m.AddProposalTx(tx)
 			return true

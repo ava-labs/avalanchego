@@ -10,10 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -45,15 +45,15 @@ type Wallet interface {
 	// IssueAddValidatorTx creates, signs, and issues a new validator of the
 	// primary network.
 	//
-	// - [validator] specifies all the details of the validation period such as
-	//   the startTime, endTime, stake weight, and nodeID.
+	// - [vdr] specifies all the details of the validation period such as the
+	//   startTime, endTime, stake weight, and nodeID.
 	// - [rewardsOwner] specifies the owner of all the rewards this validator
 	//   may accrue during its validation period.
 	// - [shares] specifies the fraction (out of 1,000,000) that this validator
 	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddValidatorTx(
-		validator *pChainValidator.Validator,
+		vdr *validator.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
 		options ...common.Option,
@@ -62,22 +62,22 @@ type Wallet interface {
 	// IssueAddSubnetValidatorTx creates, signs, and issues a new validator of a
 	// subnet.
 	//
-	// - [validator] specifies all the details of the validation period such as
-	//   the startTime, endTime, sampling weight, nodeID, and subnetID.
+	// - [vdr] specifies all the details of the validation period such as the
+	//   startTime, endTime, sampling weight, nodeID, and subnetID.
 	IssueAddSubnetValidatorTx(
-		validator *pChainValidator.SubnetValidator,
+		vdr *validator.SubnetValidator,
 		options ...common.Option,
 	) (ids.ID, error)
 
 	// IssueAddDelegatorTx creates, signs, and issues a new delegator to a
 	// validator on the primary network.
 	//
-	// - [validator] specifies all the details of the delegation period such as
-	//   the startTime, endTime, stake weight, and validator's nodeID.
+	// - [vdr] specifies all the details of the delegation period such as the
+	//   startTime, endTime, stake weight, and validator's nodeID.
 	// - [rewardsOwner] specifies the owner of all the rewards this delegator
 	//   may accrue at the end of its delegation period.
 	IssueAddDelegatorTx(
-		validator *pChainValidator.Validator,
+		vdr *validator.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (ids.ID, error)
@@ -134,13 +134,13 @@ type Wallet interface {
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
-		utx platformvm.UnsignedTx,
+		utx txs.UnsignedTx,
 		options ...common.Option,
 	) (ids.ID, error)
 
 	// IssueTx issues the signed tx.
 	IssueTx(
-		tx *platformvm.Tx,
+		tx *txs.Tx,
 		options ...common.Option,
 	) (ids.ID, error)
 }
@@ -182,12 +182,12 @@ func (w *wallet) IssueBaseTx(
 }
 
 func (w *wallet) IssueAddValidatorTx(
-	validator *pChainValidator.Validator,
+	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
 ) (ids.ID, error) {
-	utx, err := w.builder.NewAddValidatorTx(validator, rewardsOwner, shares, options...)
+	utx, err := w.builder.NewAddValidatorTx(vdr, rewardsOwner, shares, options...)
 	if err != nil {
 		return ids.Empty, err
 	}
@@ -195,10 +195,10 @@ func (w *wallet) IssueAddValidatorTx(
 }
 
 func (w *wallet) IssueAddSubnetValidatorTx(
-	validator *pChainValidator.SubnetValidator,
+	vdr *validator.SubnetValidator,
 	options ...common.Option,
 ) (ids.ID, error) {
-	utx, err := w.builder.NewAddSubnetValidatorTx(validator, options...)
+	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, options...)
 	if err != nil {
 		return ids.Empty, err
 	}
@@ -206,11 +206,11 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 }
 
 func (w *wallet) IssueAddDelegatorTx(
-	validator *pChainValidator.Validator,
+	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (ids.ID, error) {
-	utx, err := w.builder.NewAddDelegatorTx(validator, rewardsOwner, options...)
+	utx, err := w.builder.NewAddDelegatorTx(vdr, rewardsOwner, options...)
 	if err != nil {
 		return ids.Empty, err
 	}
@@ -268,7 +268,7 @@ func (w *wallet) IssueExportTx(
 }
 
 func (w *wallet) IssueUnsignedTx(
-	utx platformvm.UnsignedTx,
+	utx txs.UnsignedTx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)
@@ -282,7 +282,7 @@ func (w *wallet) IssueUnsignedTx(
 }
 
 func (w *wallet) IssueTx(
-	tx *platformvm.Tx,
+	tx *txs.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)

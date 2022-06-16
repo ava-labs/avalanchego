@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -295,7 +296,7 @@ func (vm *VM) authorize(
 			err,
 		)
 	}
-	subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
 		return nil, nil, errWrongTxType
 	}
@@ -328,7 +329,7 @@ func (vm *VM) authorize(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	utxoDB UTXOGetter,
-	tx UnsignedTx,
+	utx txs.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -348,7 +349,7 @@ func (vm *VM) semanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return vm.semanticVerifySpendUTXOs(utx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
 // Verify that [tx] is semantically valid.
@@ -358,7 +359,7 @@ func (vm *VM) semanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx UnsignedTx,
+	utx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -402,10 +403,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		utxo := utxos[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return errAssetIDMismatch
+			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
 		}
 		if assetID := input.AssetID(); assetID != feeAssetID {
-			return errAssetIDMismatch
+			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
 		}
 
 		out := utxo.Out
@@ -431,7 +432,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := vm.fx.VerifyTransfer(utx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
@@ -470,7 +471,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	for _, out := range outs {
 		if assetID := out.AssetID(); assetID != feeAssetID {
-			return errAssetIDMismatch
+			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
 		}
 
 		output := out.Output()

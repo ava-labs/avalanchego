@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 func TestPrimaryValidatorSet(t *testing.T) {
@@ -19,29 +19,37 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
-		addValidatorTx: &UnsignedAddValidatorTx{
-			Validator: pChainValidator.Validator{
-				Wght: node0Weight,
+		addValidator: ValidatorAndID{
+			Tx: &txs.AddValidatorTx{
+				Validator: validator.Validator{
+					Wght: node0Weight,
+				},
 			},
+			TxID: ids.ID{'v', 'd', 'r', '0', 'I', 'D'},
 		},
 	}
 
 	nodeID1 := ids.GenerateTestNodeID()
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
-		addValidatorTx: &UnsignedAddValidatorTx{
-			Validator: pChainValidator.Validator{
-				Wght: node1Weight,
+		addValidator: ValidatorAndID{
+			Tx: &txs.AddValidatorTx{
+				Validator: validator.Validator{
+					Wght: node1Weight,
+				},
 			},
+			TxID: ids.ID{'v', 'd', 'r', '1', 'I', 'D'},
 		},
 	}
 
 	nodeID2 := ids.GenerateTestNodeID()
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
-		addValidatorTx: &UnsignedAddValidatorTx{
-			Validator: pChainValidator.Validator{
-				Wght: node2Weight,
+		addValidator: ValidatorAndID{
+			Tx: &txs.AddValidatorTx{
+				Validator: validator.Validator{
+					Wght: node2Weight,
+				},
 			},
 		},
 	}
@@ -104,13 +112,16 @@ func TestSubnetValidatorSet(t *testing.T) {
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
 		validatorImpl: validatorImpl{
-			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
-					Validator: pChainValidator.SubnetValidator{
-						Validator: pChainValidator.Validator{
-							Wght: node0Weight,
+					Tx: &txs.AddSubnetValidatorTx{
+						Validator: validator.SubnetValidator{
+							Validator: validator.Validator{
+								Wght: node0Weight,
+							},
 						},
 					},
+					TxID: ids.ID{'s', 'u', 'b', 'v', 'd', 'r', '0', 'I', 'D'},
 				},
 			},
 		},
@@ -120,13 +131,16 @@ func TestSubnetValidatorSet(t *testing.T) {
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
 		validatorImpl: validatorImpl{
-			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
-					Validator: pChainValidator.SubnetValidator{
-						Validator: pChainValidator.Validator{
-							Wght: node1Weight,
+					Tx: &txs.AddSubnetValidatorTx{
+						Validator: validator.SubnetValidator{
+							Validator: validator.Validator{
+								Wght: node1Weight,
+							},
 						},
 					},
+					TxID: ids.ID{'s', 'u', 'b', 'v', 'd', 'r', '1', 'I', 'D'},
 				},
 			},
 		},
@@ -136,13 +150,16 @@ func TestSubnetValidatorSet(t *testing.T) {
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
 		validatorImpl: validatorImpl{
-			subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
-					Validator: pChainValidator.SubnetValidator{
-						Validator: pChainValidator.Validator{
-							Wght: node2Weight,
+					Tx: &txs.AddSubnetValidatorTx{
+						Validator: validator.SubnetValidator{
+							Validator: validator.Validator{
+								Wght: node2Weight,
+							},
 						},
 					},
+					TxID: ids.ID{'s', 'u', 'b', 'v', 'd', 'r', '2', 'I', 'D'},
 				},
 			},
 		},

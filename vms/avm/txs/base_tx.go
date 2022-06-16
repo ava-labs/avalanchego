@@ -14,6 +14,8 @@ var _ UnsignedTx = &BaseTx{}
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
+	avax.Metadata
+
 	avax.BaseTx `serialize:"true"`
 }
 
@@ -21,6 +23,23 @@ func (t *BaseTx) InitCtx(ctx *snow.Context) {
 	for _, out := range t.Outs {
 		out.InitCtx(ctx)
 	}
+}
+
+// UTXOs returns the UTXOs transaction is producing.
+func (t *BaseTx) UTXOs() []*avax.UTXO {
+	txID := t.ID()
+	utxos := make([]*avax.UTXO, len(t.Outs))
+	for i, out := range t.Outs {
+		utxos[i] = &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i),
+			},
+			Asset: avax.Asset{ID: out.AssetID()},
+			Out:   out.Out,
+		}
+	}
+	return utxos
 }
 
 func (t *BaseTx) SyntacticVerify(
@@ -35,7 +54,10 @@ func (t *BaseTx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.MetadataVerify(ctx); err != nil {
+	if err := t.Metadata.Verify(); err != nil {
+		return err
+	}
+	if err := t.BaseTx.Verify(ctx); err != nil {
 		return err
 	}
 

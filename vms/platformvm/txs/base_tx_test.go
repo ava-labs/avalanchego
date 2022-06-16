@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package txs
 
 import (
 	"encoding/json"
@@ -9,20 +9,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 func TestBaseTxMarshalJSON(t *testing.T) {
-	vm, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-
 	blockchainID := ids.ID{1}
 	utxoTxID := ids.ID{2}
 	assetID := ids.ID{3}

@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ TxHeap = &txHeapWithMetrics{}
@@ -33,18 +34,18 @@ func NewTxHeapWithMetrics(
 	return h, registerer.Register(h.numTxs)
 }
 
-func (h *txHeapWithMetrics) Add(tx *Tx) {
+func (h *txHeapWithMetrics) Add(tx *txs.Tx) {
 	h.TxHeap.Add(tx)
 	h.numTxs.Set(float64(h.TxHeap.Len()))
 }
 
-func (h *txHeapWithMetrics) Remove(txID ids.ID) *Tx {
+func (h *txHeapWithMetrics) Remove(txID ids.ID) *txs.Tx {
 	tx := h.TxHeap.Remove(txID)
 	h.numTxs.Set(float64(h.TxHeap.Len()))
 	return tx
 }
 
-func (h *txHeapWithMetrics) RemoveTop() *Tx {
+func (h *txHeapWithMetrics) RemoveTop() *txs.Tx {
 	tx := h.TxHeap.RemoveTop()
 	h.numTxs.Set(float64(h.TxHeap.Len()))
 	return tx

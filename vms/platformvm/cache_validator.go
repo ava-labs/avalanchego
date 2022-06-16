@@ -7,24 +7,24 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ validator = &validatorImpl{}
+var _ validatorIntf = &validatorImpl{}
 
-type validator interface {
-	Delegators() []*UnsignedAddDelegatorTx
-	SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx
+type validatorIntf interface {
+	Delegators() []DelegatorAndID
+	SubnetValidators() map[ids.ID]SubnetValidatorAndID
 }
 
 type validatorImpl struct {
 	// sorted in order of next operation, either addition or removal.
-	delegators []*UnsignedAddDelegatorTx
+	delegators []DelegatorAndID
 	// maps subnetID to tx
-	subnets map[ids.ID]*UnsignedAddSubnetValidatorTx
+	subnets map[ids.ID]SubnetValidatorAndID
 }
 
-func (v *validatorImpl) Delegators() []*UnsignedAddDelegatorTx {
+func (v *validatorImpl) Delegators() []DelegatorAndID {
 	return v.delegators
 }
 
-func (v *validatorImpl) SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx {
+func (v *validatorImpl) SubnetValidators() map[ids.ID]SubnetValidatorAndID {
 	return v.subnets
 }

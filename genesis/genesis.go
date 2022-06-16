@@ -17,11 +17,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	xchaintxs "github.com/ava-labs/avalanchego/vms/avm/txs"
+	pchaintxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -515,7 +517,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
+func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
 	genesis := platformvm.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
@@ -524,7 +526,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 		return nil, err
 	}
 	for _, chain := range genesis.Chains {
-		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
+		uChain := chain.Unsigned.(*pchaintxs.CreateChainTx)
 		if uChain.VMID == vmID {
 			return chain, nil
 		}
@@ -533,7 +535,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 }
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	parser, err := txs.NewParser([]fxs.Fx{
+	parser, err := xchaintxs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 	})
 	if err != nil {
@@ -551,7 +553,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	}
 	genesisTx := genesis.Txs[0]
 
-	tx := txs.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
+	tx := xchaintxs.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
 	if err := parser.InitializeGenesisTx(&tx); err != nil {
 		return ids.Empty, err
 	}

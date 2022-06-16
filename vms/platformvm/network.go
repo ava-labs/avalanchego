@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -88,17 +89,11 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		return nil
 	}
 
-	tx := &Tx{}
-	if _, err := Codec.Unmarshal(msg.Tx, tx); err != nil {
+	tx, err := txs.Parse(Codec, msg.Tx)
+	if err != nil {
 		n.log.Verbo("AppGossip provided invalid tx: %s", err)
 		return nil
 	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.UnsignedTx)
-	if err != nil {
-		n.log.Warn("AppGossip failed to marshal unsigned tx: %s", err)
-		return nil
-	}
-	tx.Initialize(unsignedBytes, msg.Tx)
 
 	txID := tx.ID()
 
@@ -123,7 +118,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	return nil
 }
 
-func (n *network) GossipTx(tx *Tx) error {
+func (n *network) GossipTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := n.recentTxs.Get(txID); has {
@@ -133,9 +128,7 @@ func (n *network) GossipTx(tx *Tx) error {
 
 	n.log.Debug("gossiping tx %s", txID)
 
-	msg := &message.Tx{
-		Tx: tx.Bytes(),
-	}
+	msg := &message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(msg)
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message with: %w", err)

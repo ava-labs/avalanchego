@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Block = &ProposalBlock{}
@@ -27,12 +28,13 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx txs.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState VersionedState
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState VersionedState
+	onAbortState  VersionedState
+	prefersCommit bool
 }
 
 func (pb *ProposalBlock) free() {
@@ -81,7 +83,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
@@ -90,7 +92,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	pb.Tx.Initialize(unsignedBytes, signedBytes)
-	pb.Tx.InitCtx(vm.ctx)
+	pb.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
 
@@ -111,11 +113,6 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
-	if !ok {
-		return errWrongTxType
-	}
-
 	parentIntf, parentErr := pb.parentBlock()
 	if parentErr != nil {
 		return parentErr
@@ -130,13 +127,22 @@ func (pb *ProposalBlock) Verify() error {
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.onAccept()
 
-	var err error
-	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
+	executor := proposalTxExecutor{
+		vm:          pb.vm,
+		parentState: parentState,
+		tx:          &pb.Tx,
+	}
+	err := pb.Tx.Unsigned.Visit(&executor)
 	if err != nil {
-		txID := tx.ID()
+		txID := pb.Tx.ID()
 		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
+
+	pb.onCommitState = executor.onCommit
+	pb.onAbortState = executor.onAbort
+	pb.prefersCommit = executor.prefersCommit
+
 	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
 	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
 
@@ -150,27 +156,17 @@ func (pb *ProposalBlock) Verify() error {
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
-	if !ok {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"%w, expected UnsignedProposalTx but got %T",
-			errWrongTxType,
-			pb.Tx.UnsignedTx,
-		)
-	}
-
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit := tx.InitiallyPrefersCommit(pb.vm)
 
-	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
+	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !prefersCommit)
+	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",
@@ -178,7 +174,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	if prefersCommit {
+	if pb.prefersCommit {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil
@@ -189,7 +185,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,

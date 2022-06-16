@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -98,7 +99,7 @@ var (
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	// Its threshold is 2
-	testSubnet1            *UnsignedCreateSubnetTx
+	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = keys[0:3]
 
 	xChainID = ids.Empty.Prefix(0)
@@ -359,15 +360,16 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	}
 
 	// Create a subnet and store it in testSubnet1
-	if tx, err := vm.newCreateSubnetTx(
+	testSubnet1, err = vm.newCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
 		keys[0].PublicKey().Address(),           // change addr
-	); err != nil {
+	)
+	if err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -375,8 +377,6 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 		panic(err)
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
-	} else {
-		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
 	return vm, baseDBManager.Current().Database, appSender
@@ -435,15 +435,16 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}
 
 	// Create a subnet and store it in testSubnet1
-	if tx, err := vm.newCreateSubnetTx(
+	testSubnet1, err = vm.newCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
 		keys[0].PublicKey().Address(),           // change addr
-	); err != nil {
+	)
+	if err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -451,8 +452,6 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		panic(err)
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
-	} else {
-		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
 	return genesisBytes, msgChan, vm, m
@@ -618,7 +617,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	pendingStakers := vm.internalState.PendingStakerChainState()
 
 	// Verify that new validator now in pending validator set
-	if _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
+	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
 		t.Fatalf("Should have added validator to the pending queue")
 	}
 }
@@ -749,7 +748,7 @@ func TestAddValidatorReject(t *testing.T) {
 	pendingStakers := vm.internalState.PendingStakerChainState()
 
 	// Verify that new validator NOT in pending validator set
-	if _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
+	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
 		t.Fatalf("Shouldn't have added validator to the pending queue")
 	}
 }
@@ -1637,8 +1636,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := Tx{UnsignedTx: &UnsignedImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	tx := txs.Tx{Unsigned: &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -2004,7 +2003,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimePreference := options[0]
+
+	// Because the block needs to have been verified for it's preference to be
+	// set correctly, we manually select the correct preference here.
+	advanceTimePreference := options[1]
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
 	vdrs := validators.NewSet()
@@ -2373,7 +2375,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			amount, err := vm.maxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
+			amount, err := currentMaxStakeAmount(vm.internalState, vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2449,15 +2451,15 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*Tx{addSubnetTx0})
+	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{addSubnetTx0})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*Tx{addSubnetTx1})
+	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{addSubnetTx1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*Tx{addSubnetTx2})
+	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*txs.Tx{addSubnetTx2})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2544,7 +2546,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		onAccept := addValidatorProposalCommit.onAccept()
 		pendingStakers := onAccept.PendingStakerChainState()
 
-		_, err := pendingStakers.GetValidatorTx(nodeID)
+		_, _, err := pendingStakers.GetValidatorTx(nodeID)
 		assert.NoError(err)
 	}
 
@@ -2563,8 +2565,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Create the import tx that will fail verification
-	unsignedImportTx := &UnsignedImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	unsignedImportTx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -2579,7 +2581,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			},
 		},
 	}
-	signedImportTx := &Tx{UnsignedTx: unsignedImportTx}
+	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
 	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
@@ -2590,7 +2592,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*Tx{signedImportTx})
+	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{signedImportTx})
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2702,7 +2704,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		assert.NoError(err)
 
 		pendingStakers := vm.internalState.PendingStakerChainState()
-		_, err := pendingStakers.GetValidatorTx(nodeID)
+		_, _, err := pendingStakers.GetValidatorTx(nodeID)
 		assert.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := vm.internalState.GetTimestamp()
@@ -2771,7 +2773,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		onAccept := addValidatorProposalCommit0.onAccept()
 		pendingStakers := onAccept.PendingStakerChainState()
 
-		_, err := pendingStakers.GetValidatorTx(nodeID0)
+		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
 		assert.NoError(err)
 	}
 
@@ -2813,7 +2815,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		assert.NoError(err)
 
 		pendingStakers := onAccept.PendingStakerChainState()
-		_, err := pendingStakers.GetValidatorTx(nodeID0)
+		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
 		assert.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := onAccept.GetTimestamp()
@@ -2835,8 +2837,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Create the import tx that will fail verification
-	unsignedImportTx := &UnsignedImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+	unsignedImportTx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -2851,7 +2853,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			},
 		},
 	}
-	signedImportTx := &Tx{UnsignedTx: unsignedImportTx}
+	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
 	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
@@ -2862,7 +2864,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*Tx{signedImportTx})
+	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{signedImportTx})
 	assert.NoError(err)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
@@ -2955,7 +2957,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		onAccept := addValidatorProposalCommit1.onAccept()
 		pendingStakers := onAccept.PendingStakerChainState()
 
-		_, err := pendingStakers.GetValidatorTx(nodeID1)
+		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
 		assert.NoError(err)
 	}
 
@@ -2997,7 +2999,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		assert.NoError(err)
 
 		pendingStakers := onAccept.PendingStakerChainState()
-		_, err = pendingStakers.GetValidatorTx(nodeID1)
+		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := onAccept.GetTimestamp()
@@ -3049,9 +3051,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		assert.EqualValues(uint64(59999999), potentialReward)
 
 		pendingStakers := vm.internalState.PendingStakerChainState()
-		_, err = pendingStakers.GetValidatorTx(nodeID1)
+		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
-		_, err = pendingStakers.GetValidatorTx(nodeID1)
+		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 
 		currentTimestamp := vm.internalState.GetTimestamp()

@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package txs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,14 +13,27 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var (
+	ErrNilTx = errors.New("tx is nil")
+
+	errOutputsNotSorted      = errors.New("outputs not sorted")
+	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
+)
+
 // BaseTx contains fields common to many transaction types. It should be
 // embedded in transaction implementations.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 
 	// true iff this transaction has already passed syntactic verification
-	syntacticallyVerified bool
+	SyntacticallyVerified bool
+
+	unsignedBytes []byte // Unsigned byte representation of this data
 }
+
+func (tx *BaseTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsignedBytes }
+
+func (tx *BaseTx) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func (tx *BaseTx) InputIDs() ids.Set {
 	inputIDs := ids.NewSet(len(tx.Ins))
@@ -28,6 +42,8 @@ func (tx *BaseTx) InputIDs() ids.Set {
 	}
 	return inputIDs
 }
+
+func (tx *BaseTx) Outputs() []*avax.TransferableOutput { return tx.Outs }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
@@ -46,11 +62,11 @@ func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
-	if err := tx.MetadataVerify(ctx); err != nil {
+	if err := tx.BaseTx.Verify(ctx); err != nil {
 		return fmt.Errorf("metadata failed verification: %w", err)
 	}
 	for _, out := range tx.Outs {

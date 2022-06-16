@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -58,7 +59,6 @@ const (
 
 var (
 	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
 	errWrongCacheType    = errors.New("unexpectedly cached type")
@@ -249,8 +249,8 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (vm *VM) createChain(tx *Tx) error {
-	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
+func (vm *VM) createChain(tx *txs.Tx) error {
+	unsignedTx, ok := tx.Unsigned.(*txs.CreateChainTx)
 	if !ok {
 		return errWrongTxType
 	}

@@ -3,7 +3,11 @@
 
 package platformvm
 
-import "time"
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+)
 
 var _ TimedTxHeap = &txHeapByEndTime{}
 
@@ -18,11 +22,11 @@ func newTxHeapByEndTime() *txHeapByEndTime {
 }
 
 func (h *txHeapByEndTime) Less(i, j int) bool {
-	iTime := h.txs[i].tx.UnsignedTx.(TimedTx).EndTime()
-	jTime := h.txs[j].tx.UnsignedTx.(TimedTx).EndTime()
+	iTime := h.txs[i].tx.Unsigned.(txs.StakerTx).EndTime()
+	jTime := h.txs[j].tx.Unsigned.(txs.StakerTx).EndTime()
 	return iTime.Before(jTime)
 }
 
 func (h *txHeapByEndTime) Timestamp() time.Time {
-	return h.Peek().UnsignedTx.(TimedTx).EndTime()
+	return h.Peek().Unsigned.(txs.StakerTx).EndTime()
 }
