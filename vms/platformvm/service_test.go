@@ -625,7 +625,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
 			switch {
 			case !ok:
-				t.Fatal("expected p_api.PrimaryValidator")
+				t.Fatal("expected pchainapi.PrimaryValidator")
 			case gotVdr.NodeID != vdr.NodeID:
 			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
