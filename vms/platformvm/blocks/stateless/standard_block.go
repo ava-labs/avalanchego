@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -25,7 +24,7 @@ type StandardBlockIntf interface {
 
 	// DecisionTxs returns list of transactions
 	// contained in the block
-	DecisionTxs() []*signed.Tx
+	DecisionTxs() []*txs.Tx
 }
 
 func NewStandardBlock(
@@ -33,12 +32,12 @@ func NewStandardBlock(
 	timestamp uint64,
 	parentID ids.ID,
 	height uint64,
-	txs []*signed.Tx,
+	txes []*txs.Tx,
 ) (StandardBlockIntf, error) {
 	// make sure txs to be included in the block
 	// are duly initialized
-	for _, tx := range txs {
-		if err := tx.Sign(unsigned.Codec, nil); err != nil {
+	for _, tx := range txes {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return nil, fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
@@ -51,7 +50,7 @@ func NewStandardBlock(
 				Hght:         height,
 				BlkTimestamp: timestamp,
 			},
-			Txs: txs,
+			Txs: txes,
 		}
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
@@ -64,8 +63,8 @@ func NewStandardBlock(
 		return res, res.Initialize(version, bytes)
 
 	case PostForkVersion:
-		txsBytes := make([][]byte, 0, len(txs))
-		for _, tx := range txs {
+		txsBytes := make([][]byte, 0, len(txes))
+		for _, tx := range txes {
 			txsBytes = append(txsBytes, tx.Bytes())
 		}
 		res := &PostForkStandardBlock{
@@ -75,7 +74,7 @@ func NewStandardBlock(
 				BlkTimestamp: timestamp,
 			},
 			TxsBytes: txsBytes,
-			Txs:      txs,
+			Txs:      txes,
 		}
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
@@ -94,7 +93,7 @@ func NewStandardBlock(
 type StandardBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Txs []*signed.Tx `serialize:"true" json:"txs"`
+	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (sb *StandardBlock) Initialize(version uint16, bytes []byte) error {
@@ -102,7 +101,7 @@ func (sb *StandardBlock) Initialize(version uint16, bytes []byte) error {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
-		if err := tx.Sign(unsigned.Codec, nil); err != nil {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
@@ -113,14 +112,14 @@ func (sb *StandardBlock) StandardCommonComponents() CommonBlockIntf {
 	return &sb.CommonBlock
 }
 
-func (sb *StandardBlock) DecisionTxs() []*signed.Tx { return sb.Txs }
+func (sb *StandardBlock) DecisionTxs() []*txs.Tx { return sb.Txs }
 
 type PostForkStandardBlock struct {
 	CommonBlock `serialize:"true"`
 
 	TxsBytes [][]byte `serialize:"false" postFork:"true" json:"txs"`
 
-	Txs []*signed.Tx
+	Txs []*txs.Tx
 }
 
 func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error {
@@ -128,19 +127,19 @@ func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	txs := make([]*signed.Tx, 0, len(psb.TxsBytes))
+	txes := make([]*txs.Tx, 0, len(psb.TxsBytes))
 	for _, txBytes := range psb.TxsBytes {
-		var tx signed.Tx
-		_, err := unsigned.Codec.Unmarshal(txBytes, &tx)
+		var tx txs.Tx
+		_, err := txs.Codec.Unmarshal(txBytes, &tx)
 		if err != nil {
 			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
 		}
-		if err := tx.Sign(unsigned.Codec, nil); err != nil {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
-		txs = append(txs, &tx)
+		txes = append(txes, &tx)
 	}
-	psb.Txs = txs
+	psb.Txs = txes
 	return nil
 }
 
@@ -148,4 +147,4 @@ func (psb *PostForkStandardBlock) StandardCommonComponents() CommonBlockIntf {
 	return &psb.CommonBlock
 }
 
-func (psb *PostForkStandardBlock) DecisionTxs() []*signed.Tx { return psb.Txs }
+func (psb *PostForkStandardBlock) DecisionTxs() []*txs.Tx { return psb.Txs }

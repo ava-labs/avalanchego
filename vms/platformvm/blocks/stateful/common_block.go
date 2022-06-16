@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
@@ -19,7 +19,8 @@ type commonBlock struct {
 	status             choices.Status
 	children           []Block
 
-	verifier Verifier
+	verifier          Verifier
+	txExecutorBackend executor.Backend
 }
 
 func (c *commonBlock) parentBlock() (Block, error) {
@@ -90,7 +91,7 @@ func (c *commonBlock) verify() error {
 }
 
 func (c *commonBlock) expectedChildVersion() uint16 {
-	forkTime := c.verifier.PchainConfig().AdvanceTimeTxRemovalTime
+	forkTime := c.txExecutorBackend.Cfg.AdvanceTimeTxRemovalTime
 	if c.Timestamp().Before(forkTime) {
 		return stateless.PreForkVersion
 	}
@@ -137,7 +138,7 @@ func (c *commonBlock) validateBlockTimestamp() error {
 		if err != nil {
 			return fmt.Errorf("could not verify block timestamp: %w", err)
 		}
-		localTime := c.verifier.Clock().Time()
+		localTime := c.txExecutorBackend.Clk.Time()
 
 		return executor.ValidateProposedChainTime(
 			blkTime,

@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ AtomicBlockIntf = &AtomicBlock{}
@@ -18,10 +17,10 @@ type AtomicBlockIntf interface {
 
 	// ProposalTx returns list of transactions
 	// contained in the block
-	AtomicTx() *signed.Tx
+	AtomicTx() *txs.Tx
 }
 
-func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (AtomicBlockIntf, error) {
+func NewAtomicBlock(parentID ids.ID, height uint64, tx txs.Tx) (AtomicBlockIntf, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -38,7 +37,7 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (AtomicBlockIn
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	if err := tx.Sign(unsigned.Codec, nil); err != nil {
+	if err := tx.Sign(txs.Codec, nil); err != nil {
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
@@ -50,18 +49,18 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx signed.Tx) (AtomicBlockIn
 type AtomicBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx signed.Tx `serialize:"true" json:"tx"`
+	Tx txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
 	if err := ab.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &ab.Tx.Unsigned)
+	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &ab.Tx)
+	signedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -69,4 +68,4 @@ func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) AtomicTx() *signed.Tx { return &ab.Tx }
+func (ab *AtomicBlock) AtomicTx() *txs.Tx { return &ab.Tx }

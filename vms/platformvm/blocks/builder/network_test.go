@@ -11,13 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/stretchr/testify/assert"
 )
 
-func getValidTx(txBuilder builder.Builder, t *testing.T) *signed.Tx {
+func getValidTx(txBuilder builder.Builder, t *testing.T) *txs.Tx {
 	tx, err := txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -80,14 +79,9 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	reply, ok := replyIntf.(*message.Tx)
 	assert.True(ok, "unknown message type")
 
-	retrivedTx := &signed.Tx{}
-	_, err = unsigned.Codec.Unmarshal(reply.Tx, retrivedTx)
-	assert.NoError(err, "failed unmarshalling tx")
+	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
+	assert.NoError(err, "failed parsing tx")
 
-	unsignedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &retrivedTx.Unsigned)
-	assert.NoError(err, "failed unmarshalling tx")
-
-	retrivedTx.Initialize(unsignedBytes, reply.Tx)
 	assert.Equal(txID, retrivedTx.ID())
 }
 
@@ -155,19 +149,14 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	reply, ok := replyIntf.(*message.Tx)
 	assert.True(ok, "unknown message type")
 
-	retrivedTx := &signed.Tx{}
-	_, err = unsigned.Codec.Unmarshal(reply.Tx, retrivedTx)
-	assert.NoError(err, "failed unmarshalling tx")
+	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
+	assert.NoError(err, "failed parsing tx")
 
-	unsignedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &retrivedTx.Unsigned)
-	assert.NoError(err, "failed unmarshalling tx")
-
-	retrivedTx.Initialize(unsignedBytes, reply.Tx)
 	assert.Equal(txID, retrivedTx.ID())
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
-	h.BlockBuilder.RemoveDecisionTxs([]*signed.Tx{tx})
+	h.BlockBuilder.RemoveDecisionTxs([]*txs.Tx{tx})
 	err = h.BlockBuilder.Add(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 

@@ -14,15 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
@@ -44,8 +43,8 @@ type BlockBuilder interface {
 
 	StartTimer()
 	SetPreference(blockID ids.ID) error
-	Preferred() (stateful.Block, error)
-	AddUnverifiedTx(tx *signed.Tx) error
+	Preferred() (p_block.Block, error)
+	AddUnverifiedTx(tx *txs.Tx) error
 	BuildBlock() (snowman.Block, error)
 	Shutdown()
 }
@@ -55,8 +54,9 @@ type blockBuilder struct {
 	mempool.Mempool
 	Network
 
-	txBuilder   p_tx_builder.Builder
-	blkVerifier stateful.Verifier
+	txBuilder         p_tx_builder.Builder
+	txExecutorBackend executor.Backend
+	blkVerifier       p_block.Verifier
 
 	// ID of the preferred block to build on top of
 	preferredBlockID ids.ID
@@ -74,30 +74,32 @@ type blockBuilder struct {
 func NewBlockBuilder(
 	mempool mempool.Mempool,
 	txBuilder p_tx_builder.Builder,
-	blkVerifier stateful.Verifier,
+	txExecutorBackend executor.Backend,
+	blkVerifier p_block.Verifier,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
 ) BlockBuilder {
 	blkBuilder := &blockBuilder{
-		Mempool:     mempool,
-		txBuilder:   txBuilder,
-		blkVerifier: blkVerifier,
-		toEngine:    toEngine,
+		Mempool:           mempool,
+		txBuilder:         txBuilder,
+		txExecutorBackend: txExecutorBackend,
+		blkVerifier:       blkVerifier,
+		toEngine:          toEngine,
 	}
 
 	blkBuilder.timer = timer.NewTimer(
 		func() {
-			blkVerifier.Ctx().Lock.Lock()
-			defer blkVerifier.Ctx().Lock.Unlock()
+			txExecutorBackend.Ctx.Lock.Lock()
+			defer txExecutorBackend.Ctx.Lock.Unlock()
 
 			blkBuilder.resetTimer()
 		},
 	)
 
 	blkBuilder.Network = NewNetwork(
-		blkVerifier.Ctx(),
+		txExecutorBackend.Ctx,
 		blkBuilder,
-		blkVerifier.PchainConfig().ApricotPhase4Time,
+		txExecutorBackend.Cfg.ApricotPhase4Time,
 		appSender,
 	)
 	return blkBuilder
@@ -115,14 +117,14 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) error {
 	return nil
 }
 
-func (b *blockBuilder) Preferred() (stateful.Block, error) {
+func (b *blockBuilder) Preferred() (p_block.Block, error) {
 	return b.blkVerifier.GetStatefulBlock(b.preferredBlockID)
 }
 
 func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (b *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
+func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -136,14 +138,19 @@ func (b *blockBuilder) AddUnverifiedTx(tx *signed.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(stateful.Decision)
+	preferredDecision, ok := preferred.(p_block.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
-
 	preferredState := preferredDecision.OnAccept()
-	if err := b.blkVerifier.SemanticVerify(tx, preferredState); err != nil {
+	verifier := executor.MempoolTxVerifier{
+		Backend:     &b.txExecutorBackend,
+		ParentState: preferredState,
+		Tx:          tx,
+	}
+	err = tx.Unsigned.Visit(&verifier)
+	if err != nil {
 		b.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -162,7 +169,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		b.resetTimer()
 	}()
 
-	b.blkVerifier.Ctx().Log.Debug("starting to attempt to build a block")
+	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
 	preferred, err := b.Preferred()
@@ -171,7 +178,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	preferredDecision, ok := preferred.(stateful.Decision)
+	preferredDecision, ok := preferred.(p_block.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
@@ -181,10 +188,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
-		return stateful.NewStandardBlock(
+		return p_block.NewStandardBlock(
 			stateless.PreForkVersion,
 			0, // preFork timestamp is not serialized
 			b.blkVerifier,
+			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
 			txs,
@@ -201,10 +209,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
+		return p_block.NewProposalBlock(
 			stateless.PreForkVersion,
 			0, // preFork timestamp is not serialized
 			b.blkVerifier,
+			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
 			*rewardValidatorTx,
@@ -221,10 +230,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
+		return p_block.NewProposalBlock(
 			stateless.PreForkVersion,
 			0, // preFork timestamp is not serialized
 			b.blkVerifier,
+			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
 			*advanceTimeTx,
@@ -233,39 +243,41 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Clean out the mempool's transactions with invalid timestamps.
 	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); !hasProposalTxs {
-		b.blkVerifier.Ctx().Log.Debug("no pending blocks to build")
+		b.txExecutorBackend.Ctx.Log.Debug("no pending blocks to build")
 		return nil, errNoPendingBlocks
 	}
 
 	// Get the proposal transaction that should be issued.
 	tx := b.Mempool.PopProposalTx()
-	startTime := tx.Unsigned.(timed.Tx).StartTime()
+	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(p_tx.MaxFutureStartTime)
+	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
 		b.Mempool.AddProposalTx(tx)
 
-		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.blkVerifier.Clock().Time())
+		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.txExecutorBackend.Clk.Time())
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
+		return p_block.NewProposalBlock(
 			stateless.PreForkVersion,
 			0, // preFork timestamp is not serialized
 			b.blkVerifier,
+			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
 			*advanceTimeTx,
 		)
 	}
 
-	return stateful.NewProposalBlock(
+	return p_block.NewProposalBlock(
 		stateless.PreForkVersion,
 		0, // preFork timestamp is not serialized
 		b.blkVerifier,
+		b.txExecutorBackend,
 		preferredID,
 		nextHeight,
 		*tx,
@@ -279,9 +291,9 @@ func (b *blockBuilder) Shutdown() {
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
 	// So, the lock must be released before stopping the timer.
-	b.blkVerifier.Ctx().Lock.Unlock()
+	b.txExecutorBackend.Ctx.Lock.Unlock()
 	b.timer.Stop()
-	b.blkVerifier.Ctx().Lock.Lock()
+	b.txExecutorBackend.Ctx.Lock.Lock()
 }
 
 // resetTimer Check if there is a block ready to be added to consensus. If so, notify the
@@ -297,17 +309,17 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
-	preferredDecision, ok := preferred.(stateful.Decision)
+	preferredDecision, ok := preferred.(p_block.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
-		b.blkVerifier.Ctx().Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
+		b.txExecutorBackend.Ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
 		return
 	}
 	preferredState := preferredDecision.OnAccept()
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {
-		b.blkVerifier.Ctx().Log.Error("failed to fetch next staker to reward with %s", err)
+		b.txExecutorBackend.Ctx.Log.Error("failed to fetch next staker to reward with %s", err)
 		return
 	}
 	if shouldReward {
@@ -317,7 +329,7 @@ func (b *blockBuilder) resetTimer() {
 
 	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
-		b.blkVerifier.Ctx().Log.Error("failed to fetch next chain time with %s", err)
+		b.txExecutorBackend.Ctx.Log.Error("failed to fetch next chain time with %s", err)
 		return
 	}
 	if shouldAdvanceTime {
@@ -331,14 +343,14 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 
-	now := b.blkVerifier.Clock().Time()
+	now := b.txExecutorBackend.Clk.Time()
 	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
-		b.blkVerifier.Ctx().Log.Error("couldn't get next staker change time: %s", err)
+		b.txExecutorBackend.Ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)
-	b.blkVerifier.Ctx().Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
+	b.txExecutorBackend.Ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
 
 	// Wake up when it's time to add/remove the next validator
 	b.timer.SetTimeoutIn(waitTime)
@@ -358,7 +370,7 @@ func (b *blockBuilder) getStakerToReward(preferredState state.Mutable) (ids.ID, 
 		return ids.Empty, false, err
 	}
 
-	staker, ok := tx.Unsigned.(timed.Tx)
+	staker, ok := tx.Unsigned.(txs.StakerTx)
 	if !ok {
 		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
 	}
@@ -373,7 +385,7 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time
 		return time.Time{}, false, err
 	}
 
-	now := b.blkVerifier.Clock().Time()
+	now := b.txExecutorBackend.Clk.Time()
 	return nextStakerChangeTime, !now.Before(nextStakerChangeTime), nil
 }
 
@@ -384,11 +396,11 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time
 // popped txs are not necessarily ordered by start time.
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
-	now := b.blkVerifier.Clock().Time()
-	syncTime := now.Add(p_tx.SyncBound)
+	now := b.txExecutorBackend.Clk.Time()
+	syncTime := now.Add(executor.SyncBound)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PopProposalTx()
-		startTime := tx.Unsigned.(timed.Tx).StartTime()
+		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
 			b.Mempool.AddProposalTx(tx)
 			return true
@@ -402,7 +414,7 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 		)
 
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
-		b.blkVerifier.Ctx().Log.Debug("dropping tx %s: %s", txID, errMsg)
+		b.txExecutorBackend.Ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 	}
 	return false
 }
@@ -413,6 +425,6 @@ func (b *blockBuilder) notifyBlockReady() {
 	select {
 	case b.toEngine <- common.PendingTxs:
 	default:
-		b.blkVerifier.Ctx().Log.Debug("dropping message to consensus engine")
+		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
 	}
 }

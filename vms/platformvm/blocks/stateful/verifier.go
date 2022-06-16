@@ -8,15 +8,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
-
-	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 type Verifier interface {
 	mempool.Mempool
 	state.State
-	p_tx.Executor
 	stateless.Metrics
 
 	GetStatefulBlock(blkID ids.ID) (Block, error)
@@ -32,14 +30,14 @@ type Verifier interface {
 func NewBlockVerifier(
 	mempool mempool.Mempool,
 	state state.State,
-	txExecutor p_tx.Executor,
+	txExecutorBackend executor.Backend,
 	blkMetrics stateless.Metrics,
 	windows *window.Window,
 ) Verifier {
 	return &blkVerifier{
 		Mempool:          mempool,
 		State:            state,
-		Executor:         txExecutor,
+		Backend:          txExecutorBackend,
 		Metrics:          blkMetrics,
 		currentBlksCache: make(map[ids.ID]Block),
 		recentlyAccepted: windows,
@@ -49,7 +47,7 @@ func NewBlockVerifier(
 type blkVerifier struct {
 	mempool.Mempool
 	state.State
-	p_tx.Executor
+	executor.Backend
 	stateless.Metrics
 
 	// Key: block ID
@@ -69,7 +67,7 @@ func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return MakeStateful(statelessBlk, bv, blkStatus)
+	return MakeStateful(statelessBlk, bv, bv.Backend, blkStatus)
 }
 
 func (bv *blkVerifier) CacheVerifiedBlock(blk Block) {

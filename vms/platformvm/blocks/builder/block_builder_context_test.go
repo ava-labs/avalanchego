@@ -41,16 +41,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/transactions/builder"
-	p_tx "github.com/ava-labs/avalanchego/vms/platformvm/transactions/executor"
+	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
@@ -67,7 +66,7 @@ var (
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
-	testSubnet1               *signed.Tx
+	testSubnet1               *txs.Tx
 	testSubnet1ControlKeys    []*crypto.PrivateKeySECP256K1R
 
 	testKeyFactory = crypto.FactorySECP256K1R{}
@@ -97,7 +96,7 @@ type testHelpersCollection struct {
 	uptimeMan      uptime.Manager
 	utxosMan       utxos.SpendHandler
 	txBuilder      tx_builder.Builder
-	txVerifier     p_tx.Executor
+	txExecBackend  executor.Backend
 }
 
 // TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
@@ -138,7 +137,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	rewardsCalc := reward.NewCalculator(res.cfg.RewardConfig)
 	res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUtxosMan = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, unsigned.Codec)
+	res.atomicUtxosMan = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimeMan = uptime.NewManager(res.fullState)
 	res.utxosMan = utxos.NewHandler(res.ctx, *res.clk, res.fullState, res.fx)
 
@@ -153,16 +152,16 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 		rewardsCalc,
 	)
 
-	res.txVerifier = p_tx.NewExecutor(
-		res.cfg,
-		res.ctx,
-		res.isBootstrapped,
-		res.clk,
-		res.fx,
-		res.utxosMan,
-		res.uptimeMan,
-		rewardsCalc,
-	)
+	res.txExecBackend = executor.Backend{
+		Cfg:          res.cfg,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		SpendHandler: res.utxosMan,
+		UptimeMan:    res.uptimeMan,
+		Rewards:      rewardsCalc,
+	}
 
 	registerer := prometheus.NewRegistry()
 	window := window.New(
@@ -186,13 +185,14 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	res.blkVerifier = stateful.NewBlockVerifier(
 		res.mpool,
 		res.fullState,
-		res.txVerifier,
+		res.txExecBackend,
 		metrics,
 		window,
 	)
 	res.BlockBuilder = NewBlockBuilder(
 		res.mpool,
 		res.txBuilder,
+		res.txExecBackend,
 		res.blkVerifier,
 		nil, // toEngine,
 		res.sender,
@@ -203,7 +203,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 		panic(fmt.Errorf("failed setting last accepted block: %w", err))
 	}
 
-	addSubnet(res.fullState, res.txBuilder, res.txVerifier)
+	addSubnet(res.fullState, res.txBuilder, res.txExecBackend)
 
 	return res
 }
@@ -211,7 +211,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 func addSubnet(
 	tState state.State,
 	txBuilder tx_builder.Builder,
-	txVerifier p_tx.Executor,
+	txExecBackend executor.Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -235,7 +235,14 @@ func addSubnet(
 		tState.CurrentStakerChainState(),
 		tState.PendingStakerChainState(),
 	)
-	if _, err = txVerifier.ExecuteDecision(testSubnet1, versionedState); err != nil {
+
+	executor := executor.StandardTxExecutor{
+		Backend: &txExecBackend,
+		State:   versionedState,
+		Tx:      testSubnet1,
+	}
+	err = testSubnet1.Unsigned.Visit(&executor)
+	if err != nil {
 		panic(err)
 	}
 	versionedState.AddTx(testSubnet1, status.Committed)

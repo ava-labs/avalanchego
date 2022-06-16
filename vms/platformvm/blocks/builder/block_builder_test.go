@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/timed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -81,12 +80,12 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	switch tx.Unsigned.(type) {
-	case timed.Tx:
+	case txs.StakerTx:
 		h.mpool.PopProposalTx()
-	case *unsigned.CreateChainTx,
-		*unsigned.CreateSubnetTx,
-		*unsigned.ImportTx,
-		*unsigned.ExportTx:
+	case *txs.CreateChainTx,
+		*txs.CreateSubnetTx,
+		*txs.ImportTx,
+		*txs.ExportTx:
 		h.mpool.PopDecisionTxs(math.MaxInt64)
 	default:
 		t.Fatal("unknown tx type")

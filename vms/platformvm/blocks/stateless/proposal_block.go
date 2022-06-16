@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -21,7 +20,7 @@ type ProposalBlockIntf interface {
 
 	// ProposalTx returns list of transactions
 	// contained in the block
-	ProposalTx() *signed.Tx
+	ProposalTx() *txs.Tx
 }
 
 func NewProposalBlock(
@@ -29,11 +28,11 @@ func NewProposalBlock(
 	timestamp uint64,
 	parentID ids.ID,
 	height uint64,
-	tx signed.Tx,
+	tx txs.Tx,
 ) (ProposalBlockIntf, error) {
 	// make sure txs to be included in the block
 	// are duly initialized
-	if err := tx.Sign(unsigned.Codec, nil); err != nil {
+	if err := tx.Sign(txs.Codec, nil); err != nil {
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
@@ -86,7 +85,7 @@ func NewProposalBlock(
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx signed.Tx `serialize:"true" json:"tx"`
+	Tx txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
@@ -94,11 +93,11 @@ func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
 		return err
 	}
 
-	unsignedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &pb.Tx.Unsigned)
+	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &pb.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &pb.Tx)
+	signedBytes, err := txs.Codec.Marshal(txs.Version, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -106,14 +105,14 @@ func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (pb *ProposalBlock) ProposalTx() *signed.Tx { return &pb.Tx }
+func (pb *ProposalBlock) ProposalTx() *txs.Tx { return &pb.Tx }
 
 type PostForkProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
 	TxBytes []byte `serialize:"false" postFork:"true" json:"txs"`
 
-	Tx signed.Tx
+	Tx txs.Tx
 }
 
 func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error {
@@ -121,17 +120,17 @@ func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	var tx signed.Tx
-	_, err := unsigned.Codec.Unmarshal(ppb.TxBytes, &tx)
+	var tx txs.Tx
+	_, err := txs.Codec.Unmarshal(ppb.TxBytes, &tx)
 	if err != nil {
 		return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
 	}
 	ppb.Tx = tx
-	if err := ppb.Tx.Sign(unsigned.Codec, nil); err != nil {
+	if err := ppb.Tx.Sign(txs.Codec, nil); err != nil {
 		return fmt.Errorf("failed to sign block: %w", err)
 	}
 
 	return nil
 }
 
-func (ppb *PostForkProposalBlock) ProposalTx() *signed.Tx { return &ppb.Tx }
+func (ppb *PostForkProposalBlock) ProposalTx() *txs.Tx { return &ppb.Tx }

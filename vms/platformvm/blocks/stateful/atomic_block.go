@@ -7,12 +7,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -31,26 +32,30 @@ type AtomicBlock struct {
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
 	inputs ids.Set
+
+	atomicRequests map[ids.ID]*atomic.Requests
 }
 
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewAtomicBlock(
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
-	tx signed.Tx,
+	tx txs.Tx,
 ) (*AtomicBlock, error) {
 	statelessBlk, err := stateless.NewAtomicBlock(parentID, height, tx)
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulAtomicBlock(statelessBlk, verifier, choices.Processing)
+	return toStatefulAtomicBlock(statelessBlk, verifier, txExecutorBackend, choices.Processing)
 }
 
 func toStatefulAtomicBlock(
 	statelessBlk stateless.AtomicBlockIntf,
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
@@ -60,11 +65,12 @@ func toStatefulAtomicBlock(
 				commonStatelessBlk: statelessBlk,
 				status:             status,
 				verifier:           verifier,
+				txExecutorBackend:  txExecutorBackend,
 			},
 		},
 	}
 
-	ab.AtomicTx().Unsigned.InitCtx(ab.verifier.Ctx())
+	ab.AtomicTx().Unsigned.InitCtx(ab.txExecutorBackend.Ctx)
 	return ab, nil
 }
 
@@ -95,23 +101,9 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	tx := ab.AtomicTx()
-	ab.inputs, err = ab.verifier.InputUTXOs(tx.Unsigned)
-	if err != nil {
-		return err
-	}
-
 	parentIntf, err := ab.parentBlock()
 	if err != nil {
 		return err
-	}
-
-	conflicts, err := parentIntf.conflicts(ab.inputs)
-	if err != nil {
-		return err
-	}
-	if conflicts {
-		return ErrConflictingParentTxs
 	}
 
 	// AtomicBlock is not a modifier on a proposal block, so its parent must be
@@ -123,7 +115,7 @@ func (ab *AtomicBlock) Verify() error {
 
 	parentState := parent.OnAccept()
 
-	cfg := ab.verifier.PchainConfig()
+	cfg := ab.txExecutorBackend.Cfg
 	currentTimestamp := parentState.GetTimestamp()
 	enabledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time)
 
@@ -135,22 +127,35 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept := state.NewVersioned(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
-	if _, err = ab.verifier.ExecuteAtomicTx(tx, onAccept); err != nil {
+	tx := ab.AtomicTx()
+	atomicExecutor := executor.AtomicTxExecutor{
+		Backend:     &ab.txExecutorBackend,
+		ParentState: parentState,
+		Tx:          tx,
+	}
+	err = tx.Unsigned.Visit(&atomicExecutor)
+	if err != nil {
 		txID := tx.ID()
 		ab.verifier.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
-	onAccept.AddTx(tx, status.Committed)
 
-	ab.onAcceptState = onAccept
-	ab.SetTimestamp(onAccept.GetTimestamp())
+	atomicExecutor.OnAccept.AddTx(tx, status.Committed)
 
-	ab.verifier.RemoveDecisionTxs([]*signed.Tx{tx})
+	ab.onAcceptState = atomicExecutor.OnAccept
+	ab.inputs = atomicExecutor.Inputs
+	ab.atomicRequests = atomicExecutor.AtomicRequests
+
+	conflicts, err := parentIntf.conflicts(ab.inputs)
+	if err != nil {
+		return err
+	}
+	if conflicts {
+		return ErrConflictingParentTxs
+	}
+
+	ab.SetTimestamp(ab.onAcceptState.GetTimestamp())
+	ab.verifier.RemoveDecisionTxs([]*txs.Tx{tx})
 	ab.verifier.CacheVerifiedBlock(ab)
 	parentIntf.addChild(ab)
 	return nil
@@ -163,7 +168,7 @@ func (ab *AtomicBlock) Accept() error {
 		txID  = tx.ID()
 	)
 
-	ab.verifier.Ctx().Log.Verbo(
+	ab.txExecutorBackend.Ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
 		ab.Height(),
@@ -189,7 +194,7 @@ func (ab *AtomicBlock) Accept() error {
 		)
 	}
 
-	if err := ab.verifier.AtomicAccept(tx, ab.verifier.Ctx(), batch); err != nil {
+	if err = ab.txExecutorBackend.Ctx.SharedMemory.Apply(ab.atomicRequests, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			txID,
@@ -217,7 +222,7 @@ func (ab *AtomicBlock) Accept() error {
 
 func (ab *AtomicBlock) Reject() error {
 	tx := ab.AtomicTx()
-	ab.verifier.Ctx().Log.Verbo(
+	ab.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Atomic Block %s at height %d with parent %s",
 		ab.ID(),
 		ab.Height(),
@@ -225,7 +230,7 @@ func (ab *AtomicBlock) Reject() error {
 	)
 
 	if err := ab.verifier.Add(tx); err != nil {
-		ab.verifier.Ctx().Log.Debug(
+		ab.txExecutorBackend.Ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			tx.ID(),
 			err,

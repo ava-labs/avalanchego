@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -32,7 +32,7 @@ func init() {
 	for _, c := range []codec.Registry{preCdc, postCdc} {
 		errs.Add(
 			RegisterPreForkBlockTypes(c),
-			unsigned.RegisterUnsignedTxsTypes(c),
+			txs.RegisterUnsignedTxsTypes(c),
 		)
 	}
 	errs.Add(RegisterPostForkBlockTypes(postCdc))

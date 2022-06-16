@@ -12,8 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
@@ -295,13 +294,13 @@ func TestAbortBlock(t *testing.T) {
 	assert.Equal(postForkAbortBlk.UnixTimestamp(), parsed.UnixTimestamp())
 }
 
-func testDecisionTxs() ([]*signed.Tx, error) {
+func testDecisionTxs() ([]*txs.Tx, error) {
 	countTxs := 2
-	txs := make([]*signed.Tx, 0, countTxs)
+	txes := make([]*txs.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
-		utx := &unsigned.CreateChainTx{
-			BaseTx: unsigned.BaseTx{BaseTx: avax.BaseTx{
+		utx := &txs.CreateChainTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    10,
 				BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
 				Outs: []*avax.TransferableOutput{{
@@ -336,20 +335,20 @@ func testDecisionTxs() ([]*signed.Tx, error) {
 		}
 
 		signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
-		tx, err := signed.New(utx, unsigned.Codec, signers)
+		tx, err := txs.NewSigned(utx, txs.Codec, signers)
 		if err != nil {
 			return nil, err
 		}
-		txs = append(txs, tx)
+		txes = append(txes, tx)
 	}
-	return txs, nil
+	return txes, nil
 }
 
-func testProposalTx() (*signed.Tx, error) {
-	utx := &unsigned.RewardValidatorTx{
+func testProposalTx() (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{
 		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
 	}
 
 	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
-	return signed.New(utx, unsigned.Codec, signers)
+	return txs.NewSigned(utx, txs.Codec, signers)
 }

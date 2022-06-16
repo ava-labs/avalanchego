@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -34,7 +34,7 @@ func init() {
 	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
 			stateless.RegisterPreForkBlockTypes(c),
-			unsigned.RegisterUnsignedTxsTypes(c),
+			txs.RegisterUnsignedTxsTypes(c),
 		)
 	}
 	errs.Add(

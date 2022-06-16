@@ -13,7 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -32,6 +33,8 @@ type StandardBlock struct {
 	// Inputs are the atomic Inputs that are consumed by this block's atomic
 	// transactions
 	Inputs ids.Set
+
+	atomicRequests map[ids.ID]*atomic.Requests
 }
 
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
@@ -40,20 +43,22 @@ func NewStandardBlock(
 	version uint16,
 	timestamp uint64,
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
-	txs []*signed.Tx,
+	txs []*txs.Tx,
 ) (*StandardBlock, error) {
 	statelessBlk, err := stateless.NewStandardBlock(version, timestamp, parentID, height, txs)
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulStandardBlock(statelessBlk, verifier, choices.Processing)
+	return toStatefulStandardBlock(statelessBlk, verifier, txExecutorBackend, choices.Processing)
 }
 
 func toStatefulStandardBlock(
 	statelessBlk stateless.StandardBlockIntf,
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*StandardBlock, error) {
 	sb := &StandardBlock{
@@ -63,12 +68,13 @@ func toStatefulStandardBlock(
 				commonStatelessBlk: statelessBlk,
 				status:             status,
 				verifier:           verifier,
+				txExecutorBackend:  txExecutorBackend,
 			},
 		},
 	}
 
 	for _, tx := range sb.DecisionTxs() {
-		tx.Unsigned.InitCtx(sb.verifier.Ctx())
+		tx.Unsigned.InitCtx(sb.txExecutorBackend.Ctx)
 	}
 
 	return sb, nil
@@ -121,32 +127,44 @@ func (sb *StandardBlock) Verify() error {
 
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.Inputs.Clear()
+	sb.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
 	txs := sb.DecisionTxs()
 	funcs := make([]func() error, 0, len(txs))
 	for _, tx := range txs {
-		txID := tx.ID()
-
-		inputUTXOs, err := sb.verifier.InputUTXOs(tx.Unsigned)
-		if err != nil {
-			return err
+		txExecutor := executor.StandardTxExecutor{
+			Backend: &sb.txExecutorBackend,
+			State:   sb.onAcceptState,
+			Tx:      tx,
 		}
-		// ensure it doesn't overlap with current input batch
-		if sb.Inputs.Overlaps(inputUTXOs) {
-			return errConflictingBatchTxs
-		}
-		// Add UTXOs to batch
-		sb.Inputs.Union(inputUTXOs)
-
-		onAccept, err := sb.verifier.ExecuteDecision(tx, sb.onAcceptState)
+		err := tx.Unsigned.Visit(&txExecutor)
 		if err != nil {
+			txID := tx.ID()
 			sb.verifier.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
 		}
+		// ensure it doesn't overlap with current input batch
+		if sb.Inputs.Overlaps(txExecutor.Inputs) {
+			return errConflictingBatchTxs
+		}
+		// Add UTXOs to batch
+		sb.Inputs.Union(txExecutor.Inputs)
 
 		sb.onAcceptState.AddTx(tx, status.Committed)
-		if onAccept != nil {
-			funcs = append(funcs, onAccept)
+		if txExecutor.OnAccept != nil {
+			funcs = append(funcs, txExecutor.OnAccept)
+		}
+
+		for chainID, txRequests := range txExecutor.AtomicRequests {
+			// Add/merge in the atomic requests represented by [tx]
+			chainRequests, exists := sb.atomicRequests[chainID]
+			if !exists {
+				sb.atomicRequests[chainID] = txRequests
+				continue
+			}
+
+			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
+			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
 		}
 	}
 
@@ -184,33 +202,7 @@ func (sb *StandardBlock) Verify() error {
 
 func (sb *StandardBlock) Accept() error {
 	blkID := sb.ID()
-	sb.verifier.Ctx().Log.Verbo("accepting block with ID %s", blkID)
-
-	// Set up the shared memory operations
-	txs := sb.DecisionTxs()
-	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range txs {
-		// Get the shared memory operations this transaction is performing
-		chainID, txRequests, err := sb.verifier.AtomicOperations(tx)
-		if err != nil {
-			return err
-		}
-
-		// Only [AtomicTx]s will return operations to be applied to shared memory
-		if txRequests == nil {
-			continue
-		}
-
-		// Add/merge in the atomic requests represented by [tx]
-		chainRequests, exists := sharedMemoryOps[chainID]
-		if !exists {
-			sharedMemoryOps[chainID] = txRequests
-			continue
-		}
-
-		chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
-		chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
-	}
+	sb.txExecutorBackend.Ctx.Log.Verbo("accepting block with ID %s", blkID)
 
 	sb.accept()
 	sb.verifier.AddStatelessBlock(sb.StandardBlockIntf, sb.Status())
@@ -231,7 +223,7 @@ func (sb *StandardBlock) Accept() error {
 		)
 	}
 
-	if err := sb.verifier.Ctx().SharedMemory.Apply(sharedMemoryOps, batch); err != nil {
+	if err := sb.txExecutorBackend.Ctx.SharedMemory.Apply(sb.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
@@ -249,7 +241,7 @@ func (sb *StandardBlock) Accept() error {
 }
 
 func (sb *StandardBlock) Reject() error {
-	sb.verifier.Ctx().Log.Verbo(
+	sb.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Standard Block %s at height %d with parent %s",
 		sb.ID(),
 		sb.Height(),
@@ -259,7 +251,7 @@ func (sb *StandardBlock) Reject() error {
 	txs := sb.DecisionTxs()
 	for _, tx := range txs {
 		if err := sb.verifier.Add(tx); err != nil {
-			sb.verifier.Ctx().Log.Debug(
+			sb.txExecutorBackend.Ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),
 				err,
