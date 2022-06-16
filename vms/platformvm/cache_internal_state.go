@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -278,7 +279,7 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	errs := wrappers.Errs{}
 	errs.Add(
 		st.writeBlocks(),
-		st.Write(),
+		st.State.Write(),
 	)
 	if errs.Err != nil {
 		return nil, errs.Err
@@ -297,30 +298,23 @@ func (st *internalStateImpl) Close() error {
 	return errs.Err
 }
 
-func (st *internalStateImpl) writeBlocks() (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to write blocks with: %w", err)
-		}
-	}()
-
+func (st *internalStateImpl) writeBlocks() error {
 	for blkID, blk := range st.addedBlocks {
-		var btxBytes []byte
 		blkID := blkID
 
 		sblk := stateBlk{
 			Blk:    blk.Bytes(),
 			Status: blk.Status(),
 		}
-		btxBytes, err = GenesisCodec.Marshal(CodecVersion, &sblk)
+		btxBytes, err := GenesisCodec.Marshal(txs.Version, &sblk)
 		if err != nil {
-			return
+			return fmt.Errorf("failed to marshal state block with: %w", err)
 		}
 
 		delete(st.addedBlocks, blkID)
 		st.blockCache.Put(blkID, blk)
-		if err = st.blockDB.Put(blkID[:], btxBytes); err != nil {
-			return
+		if err := st.blockDB.Put(blkID[:], btxBytes); err != nil {
+			return fmt.Errorf("failed to write block with: %w", err)
 		}
 	}
 	return nil
@@ -339,18 +333,11 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	st.AddBlock(genesisBlock)
 	st.SetLastAccepted(genesisBlock.ID())
 
-	utxos, timestamp, initialSupply,
-		validators, chains, err := genesis.ExtractGenesisContent(genesisBytes)
+	genesisState, err := genesis.ParseState(genesisBytes)
 	if err != nil {
 		return err
 	}
-	if err := st.SyncGenesis(
-		genesisBlock.ID(),
-		timestamp,
-		initialSupply,
-		utxos,
-		validators,
-		chains); err != nil {
+	if err := st.SyncGenesis(genesisBlock.ID(), genesisState); err != nil {
 		return err
 	}
 

@@ -785,7 +785,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := Codec.Marshal(CodecVersion, tx)
+	bytes, err := Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}

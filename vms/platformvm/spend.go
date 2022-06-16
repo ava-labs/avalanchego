@@ -455,7 +455,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return errUnknownOwners
 		}
 		owner := owned.Owners()
-		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
+		ownerBytes, err := Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -501,7 +501,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return errUnknownOwners
 		}
 		owner := owned.Owners()
-		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
+		ownerBytes, err := Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}

@@ -602,7 +602,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := Codec.Marshal(CodecVersion, tx)
+	txBytes, err := Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}

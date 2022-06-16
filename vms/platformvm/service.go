@@ -397,7 +397,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := Codec.Marshal(CodecVersion, utxo)
+		bytes, err := Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -2092,7 +2092,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := Codec.Marshal(CodecVersion, output)
+		bytes, err := Codec.Marshal(txs.Version, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -2202,7 +2202,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := GenesisCodec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := GenesisCodec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}

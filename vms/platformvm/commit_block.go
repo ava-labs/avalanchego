@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -84,7 +85,7 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64, wasPreferred bool) 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(commit)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal commit block: %w", err)
 	}
