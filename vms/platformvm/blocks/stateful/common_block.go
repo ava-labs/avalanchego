@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
@@ -19,7 +20,8 @@ type commonBlock struct {
 	status    choices.Status
 	children  []Block
 
-	verifier Verifier
+	verifier          Verifier
+	txExecutorBackend executor.Backend
 }
 
 func (c *commonBlock) parentBlock() (Block, error) {

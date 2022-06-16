@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Block = &ProposalBlock{}
@@ -17,7 +16,7 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx signed.Tx `serialize:"true" json:"tx"`
+	Tx txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (pb *ProposalBlock) Initialize(bytes []byte) error {
@@ -25,11 +24,11 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 		return err
 	}
 
-	unsignedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &pb.Tx.Unsigned)
+	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &pb.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := unsigned.Codec.Marshal(unsigned.Version, &pb.Tx)
+	signedBytes, err := txs.Codec.Marshal(txs.Version, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -37,9 +36,9 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 	return nil
 }
 
-func (pb *ProposalBlock) BlockTxs() []*signed.Tx { return []*signed.Tx{&pb.Tx} }
+func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{&pb.Tx} }
 
-func NewProposalBlock(parentID ids.ID, height uint64, tx signed.Tx) (*ProposalBlock, error) {
+func NewProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*ProposalBlock, error) {
 	res := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -56,7 +55,7 @@ func NewProposalBlock(parentID ids.ID, height uint64, tx signed.Tx) (*ProposalBl
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	if err := tx.Sign(unsigned.Codec, nil); err != nil {
+	if err := tx.Sign(txs.Codec, nil); err != nil {
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 

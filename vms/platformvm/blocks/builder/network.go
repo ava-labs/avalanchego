@@ -12,8 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Network = &network{}
@@ -26,7 +25,7 @@ const (
 
 type Network interface {
 	common.AppHandler
-	GossipTx(tx *signed.Tx) error
+	GossipTx(tx *txs.Tx) error
 	SetActivationTime(time.Time)
 }
 
@@ -101,11 +100,12 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		return nil
 	}
 
-	tx, err := signed.FromBytes(unsigned.Codec, msg.Tx)
+	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
-		n.ctx.Log.Warn("failed building signed tx from bytes: %s", err)
+		n.ctx.Log.Verbo("AppGossip provided invalid tx: %s", err)
 		return nil
 	}
+
 	txID := tx.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
@@ -129,7 +129,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	return nil
 }
 
-func (n *network) GossipTx(tx *signed.Tx) error {
+func (n *network) GossipTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := n.recentTxs.Get(txID); has {

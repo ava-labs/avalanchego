@@ -9,12 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
-)
-
-const (
-	// Version is the current default codec version
-	Version = 0
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var Codec codec.Manager
@@ -29,9 +24,8 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-
-		unsigned.RegisterUnsignedTxsTypes(gc),
-		Codec.RegisterCodec(Version, gc),
+		txs.RegisterUnsignedTxsTypes(gc),
+		Codec.RegisterCodec(txs.Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

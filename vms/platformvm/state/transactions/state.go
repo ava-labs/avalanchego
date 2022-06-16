@@ -24,8 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/prometheus/client_golang/prometheus"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -34,8 +33,10 @@ import (
 var (
 	_ TxState = &state{}
 
-	errStartTimeTooEarly = errors.New("start time is before the current chain time")
-	errStartAfterEndTime = errors.New("start time is after the end time")
+	ErrDelegatorSubset   = errors.New("delegator's time range must be a subset of the validator's time range")
+	ErrDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
+	ErrStartTimeTooEarly = errors.New("start time is before the current chain time")
+	ErrStartAfterEndTime = errors.New("start time is after the end time")
 
 	validatorsPrefix      = []byte("validators")
 	currentPrefix         = []byte("current")
@@ -79,12 +80,12 @@ type Mutable interface {
 
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
-	GetSubnets() ([]*signed.Tx, error)
-	AddSubnet(createSubnetTx *signed.Tx)
-	GetChains(subnetID ids.ID) ([]*signed.Tx, error)
-	AddChain(createChainTx *signed.Tx)
-	GetTx(txID ids.ID) (*signed.Tx, status.Status, error)
-	AddTx(tx *signed.Tx, status status.Status)
+	GetSubnets() ([]*txs.Tx, error)
+	AddSubnet(createSubnetTx *txs.Tx)
+	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
+	AddChain(createChainTx *txs.Tx)
+	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
+	AddTx(tx *txs.Tx, status status.Status)
 }
 
 // Content interface collects all methods to query and mutate
@@ -95,10 +96,10 @@ type Content interface {
 	uptime.State
 	avax.UTXOReader
 
-	AddCurrentStaker(tx *signed.Tx, potentialReward uint64)
-	DeleteCurrentStaker(tx *signed.Tx)
-	AddPendingStaker(tx *signed.Tx)
-	DeletePendingStaker(tx *signed.Tx)
+	AddCurrentStaker(tx *txs.Tx, potentialReward uint64)
+	DeleteCurrentStaker(tx *txs.Tx)
+	AddPendingStaker(tx *txs.Tx)
+	DeletePendingStaker(tx *txs.Tx)
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
 	// Return the maximum amount of stake on a node (including delegations) at any
@@ -127,8 +128,8 @@ type Management interface {
 	// transactions data from genesis block as marshalled from bytes
 	SyncGenesis(
 		genesisUtxos []*avax.UTXO,
-		genesisValidator []*signed.Tx,
-		genesisChains []*signed.Tx,
+		genesisValidator []*txs.Tx,
+		genesisChains []*txs.Tx,
 	) error
 
 	// Upon vm initialization, LoadTxs pulls
@@ -153,9 +154,9 @@ type state struct {
 	validatorState
 
 	addedCurrentStakers   []*ValidatorReward
-	deletedCurrentStakers []*signed.Tx
-	addedPendingStakers   []*signed.Tx
-	deletedPendingStakers []*signed.Tx
+	deletedCurrentStakers []*txs.Tx
+	addedPendingStakers   []*txs.Tx
+	deletedPendingStakers []*txs.Tx
 	uptimes               map[ids.NodeID]*currentValidatorState // nodeID -> uptimes
 	updatedUptimes        map[ids.NodeID]struct{}               // nodeID -> nil
 
@@ -190,14 +191,14 @@ type state struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	cachedSubnets []*signed.Tx // nil if the subnets haven't been loaded
-	addedSubnets  []*signed.Tx
+	cachedSubnets []*txs.Tx // nil if the subnets haven't been loaded
+	addedSubnets  []*txs.Tx
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
 
-	addedChains  map[ids.ID][]*signed.Tx // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher            // cache of subnetID -> the chains after all local modifications []*transaction.Tx
-	chainDBCache cache.Cacher            // cache of subnetID -> linkedDB
+	addedChains  map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher         // cache of subnetID -> the chains after all local modifications []*transaction.Tx
+	chainDBCache cache.Cacher         // cache of subnetID -> linkedDB
 	chainDB      database.Database
 }
 
@@ -207,7 +208,7 @@ type ValidatorWeightDiff struct {
 }
 
 type TxAndStatus struct {
-	Tx     *signed.Tx
+	Tx     *txs.Tx
 	Status status.Status
 }
 
@@ -294,7 +295,7 @@ func NewState(
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains:  make(map[ids.ID][]*signed.Tx),
+		addedChains:  make(map[ids.ID][]*txs.Tx),
 		chainDB:      prefixdb.New(chainPrefix, baseDB),
 		chainCache:   &cache.LRU{Size: chainCacheSize},
 		chainDBCache: &cache.LRU{Size: chainDBCacheSize},
@@ -422,14 +423,14 @@ func NewMeteredTransactionsState(
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains:  make(map[ids.ID][]*signed.Tx),
+		addedChains:  make(map[ids.ID][]*txs.Tx),
 		chainDB:      prefixdb.New(chainPrefix, baseDB),
 		chainCache:   chainCache,
 		chainDBCache: chainDBCache,
 	}, err
 }
 
-func (s *state) GetSubnets() ([]*signed.Tx, error) {
+func (s *state) GetSubnets() ([]*txs.Tx, error) {
 	if s.cachedSubnets != nil {
 		return s.cachedSubnets, nil
 	}
@@ -437,7 +438,7 @@ func (s *state) GetSubnets() ([]*signed.Tx, error) {
 	subnetDBIt := s.subnetDB.NewIterator()
 	defer subnetDBIt.Release()
 
-	txs := []*signed.Tx(nil)
+	txs := []*txs.Tx(nil)
 	for subnetDBIt.Next() {
 		subnetIDBytes := subnetDBIt.Key()
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -458,22 +459,22 @@ func (s *state) GetSubnets() ([]*signed.Tx, error) {
 	return txs, nil
 }
 
-func (s *state) AddSubnet(createSubnetTx *signed.Tx) {
+func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	s.addedSubnets = append(s.addedSubnets, createSubnetTx)
 	if s.cachedSubnets != nil {
 		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
 }
 
-func (s *state) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
+func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	if chainsIntf, cached := s.chainCache.Get(subnetID); cached {
-		return chainsIntf.([]*signed.Tx), nil
+		return chainsIntf.([]*txs.Tx), nil
 	}
 	chainDB := s.getChainDB(subnetID)
 	chainDBIt := chainDB.NewIterator()
 	defer chainDBIt.Release()
 
-	txs := []*signed.Tx(nil)
+	txs := []*txs.Tx(nil)
 	for chainDBIt.Next() {
 		chainIDBytes := chainDBIt.Key()
 		chainID, err := ids.ToID(chainIDBytes)
@@ -494,12 +495,12 @@ func (s *state) GetChains(subnetID ids.ID) ([]*signed.Tx, error) {
 	return txs, nil
 }
 
-func (s *state) AddChain(createChainTxIntf *signed.Tx) {
-	createChainTx := createChainTxIntf.Unsigned.(*unsigned.CreateChainTx)
+func (s *state) AddChain(createChainTxIntf *txs.Tx) {
+	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
 	subnetID := createChainTx.SubnetID
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
 	if chainsIntf, cached := s.chainCache.Get(subnetID); cached {
-		chains := chainsIntf.([]*signed.Tx)
+		chains := chainsIntf.([]*txs.Tx)
 		chains = append(chains, createChainTxIntf)
 		s.chainCache.Put(subnetID, chains)
 	}
@@ -515,7 +516,7 @@ func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	return chainDB
 }
 
-func (s *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
+func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.Tx, tx.Status, nil
 	}
@@ -539,7 +540,7 @@ func (s *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 		return nil, status.Unknown, err
 	}
 
-	tx := signed.Tx{}
+	tx := txs.Tx{}
 	if _, err := genesis.Codec.Unmarshal(stx.Tx, &tx); err != nil {
 		return nil, status.Unknown, err
 	}
@@ -556,7 +557,7 @@ func (s *state) GetTx(txID ids.ID) (*signed.Tx, status.Status, error) {
 	return ptx.Tx, ptx.Status, nil
 }
 
-func (s *state) AddTx(tx *signed.Tx, status status.Status) {
+func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 	s.addedTxs[tx.ID()] = &TxAndStatus{
 		Tx:     tx,
 		Status: status,
@@ -579,7 +580,7 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := unsigned.Codec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -647,22 +648,22 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return unsignedVdrTx.StartTime(), nil
 }
 
-func (s *state) AddCurrentStaker(tx *signed.Tx, potentialReward uint64) {
+func (s *state) AddCurrentStaker(tx *txs.Tx, potentialReward uint64) {
 	s.addedCurrentStakers = append(s.addedCurrentStakers, &ValidatorReward{
 		AddStakerTx:     tx,
 		PotentialReward: potentialReward,
 	})
 }
 
-func (s *state) DeleteCurrentStaker(tx *signed.Tx) {
+func (s *state) DeleteCurrentStaker(tx *txs.Tx) {
 	s.deletedCurrentStakers = append(s.deletedCurrentStakers, tx)
 }
 
-func (s *state) AddPendingStaker(tx *signed.Tx) {
+func (s *state) AddPendingStaker(tx *txs.Tx) {
 	s.addedPendingStakers = append(s.addedPendingStakers, tx)
 }
 
-func (s *state) DeletePendingStaker(tx *signed.Tx) {
+func (s *state) DeletePendingStaker(tx *txs.Tx) {
 	s.deletedPendingStakers = append(s.deletedPendingStakers, tx)
 }
 
@@ -671,7 +672,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := genesis.Codec.Marshal(unsigned.Version, prefixStruct)
+	prefixBytes, err := genesis.Codec.Marshal(txs.Version, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -713,10 +714,10 @@ func (s *state) MaxStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	if startTime.After(endTime) {
-		return 0, errStartAfterEndTime
+		return 0, ErrStartAfterEndTime
 	}
 	if timestamp := s.GetTimestamp(); startTime.Before(timestamp) {
-		return 0, errStartTimeTooEarly
+		return 0, ErrStartTimeTooEarly
 	}
 	if subnetID == constants.PrimaryNetworkID {
 		return s.maxPrimarySubnetStakeAmount(nodeID, startTime, endTime)
@@ -726,8 +727,8 @@ func (s *state) MaxStakeAmount(
 
 func (s *state) SyncGenesis(
 	genesisUtxos []*avax.UTXO,
-	genesisValidator []*signed.Tx,
-	genesisChains []*signed.Tx,
+	genesisValidator []*txs.Tx,
+	genesisChains []*txs.Tx,
 ) error {
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesisUtxos {
@@ -736,9 +737,9 @@ func (s *state) SyncGenesis(
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesisValidator {
-		tx, ok := vdrTx.Unsigned.(*unsigned.AddValidatorTx)
+		tx, ok := vdrTx.Unsigned.(*txs.AddValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", vdrTx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
 		stakeAmount := tx.Validator.Wght
@@ -761,9 +762,9 @@ func (s *state) SyncGenesis(
 	}
 
 	for _, chain := range genesisChains {
-		unsignedChain, ok := chain.Unsigned.(*unsigned.CreateChainTx)
+		unsignedChain, ok := chain.Unsigned.(*txs.CreateChainTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", chain.Unsigned)
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
 
 		// Ensure all chains that the genesis bytes say to create have the right
@@ -813,22 +814,22 @@ func (s *state) LoadCurrentValidators() error {
 		uptime := &currentValidatorState{
 			txID: txID,
 		}
-		if _, err := unsigned.Codec.Unmarshal(uptimeBytes, uptime); err != nil {
+		if _, err := txs.Codec.Unmarshal(uptimeBytes, uptime); err != nil {
 			return err
 		}
 		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
 
-		addValidatorTx, ok := tx.Unsigned.(*unsigned.AddValidatorTx)
+		addValidatorTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx.Unsigned)
 		}
 
 		cs.validators = append(cs.validators, tx)
 		cs.validatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
-				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
+				subnets: make(map[ids.ID]txs.SubnetValidatorAndID),
 			},
-			addValidator: signed.ValidatorAndID{
+			addValidator: txs.ValidatorAndID{
 				UnsignedAddValidatorTx: addValidatorTx,
 				TxID:                   txID,
 			},
@@ -865,18 +866,18 @@ func (s *state) LoadCurrentValidators() error {
 			return err
 		}
 
-		addDelegatorTx, ok := tx.Unsigned.(*unsigned.AddDelegatorTx)
+		addDelegatorTx, ok := tx.Unsigned.(*txs.AddDelegatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx.Unsigned)
 		}
 
 		cs.validators = append(cs.validators, tx)
 		vdr, exists := cs.validatorsByNodeID[addDelegatorTx.Validator.NodeID]
 		if !exists {
-			return unsigned.ErrDelegatorSubset
+			return ErrDelegatorSubset
 		}
 		vdr.delegatorWeight += addDelegatorTx.Validator.Wght
-		vdr.delegators = append(vdr.delegators, signed.DelegatorAndID{
+		vdr.delegators = append(vdr.delegators, txs.DelegatorAndID{
 			UnsignedAddDelegatorTx: addDelegatorTx,
 			TxID:                   txID,
 		})
@@ -902,17 +903,17 @@ func (s *state) LoadCurrentValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.Unsigned.(*unsigned.AddSubnetValidatorTx)
+		addSubnetValidatorTx, ok := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
 		}
 
 		cs.validators = append(cs.validators, tx)
 		vdr, exists := cs.validatorsByNodeID[addSubnetValidatorTx.Validator.NodeID]
 		if !exists {
-			return unsigned.ErrDSValidatorSubset
+			return ErrDSValidatorSubset
 		}
-		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = signed.SubnetValidatorAndID{
+		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = txs.SubnetValidatorAndID{
 			UnsignedAddSubnetValidator: addSubnetValidatorTx,
 			TxID:                       txID,
 		}
@@ -937,7 +938,7 @@ func (s *state) LoadCurrentValidators() error {
 
 func (s *state) LoadPendingValidators() error {
 	ps := &pendingStakerState{
-		validatorsByNodeID:      make(map[ids.NodeID]signed.ValidatorAndID),
+		validatorsByNodeID:      make(map[ids.NodeID]txs.ValidatorAndID),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}
 
@@ -954,13 +955,13 @@ func (s *state) LoadPendingValidators() error {
 			return err
 		}
 
-		addValidatorTx, ok := tx.Unsigned.(*unsigned.AddValidatorTx)
+		addValidatorTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx.Unsigned)
 		}
 
 		ps.validators = append(ps.validators, tx)
-		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = signed.ValidatorAndID{
+		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = txs.ValidatorAndID{
 			UnsignedAddValidatorTx: addValidatorTx,
 			TxID:                   txID,
 		}
@@ -982,26 +983,26 @@ func (s *state) LoadPendingValidators() error {
 			return err
 		}
 
-		addDelegatorTx, ok := tx.Unsigned.(*unsigned.AddDelegatorTx)
+		addDelegatorTx, ok := tx.Unsigned.(*txs.AddDelegatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx.Unsigned)
 		}
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID]; exists {
-			vdr.delegators = append(vdr.delegators, signed.DelegatorAndID{
+			vdr.delegators = append(vdr.delegators, txs.DelegatorAndID{
 				UnsignedAddDelegatorTx: addDelegatorTx,
 				TxID:                   txID,
 			})
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
-				delegators: []signed.DelegatorAndID{
+				delegators: []txs.DelegatorAndID{
 					{
 						UnsignedAddDelegatorTx: addDelegatorTx,
 						TxID:                   txID,
 					},
 				},
-				subnets: make(map[ids.ID]signed.SubnetValidatorAndID),
+				subnets: make(map[ids.ID]txs.SubnetValidatorAndID),
 			}
 		}
 	}
@@ -1022,20 +1023,20 @@ func (s *state) LoadPendingValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.Unsigned.(*unsigned.AddSubnetValidatorTx)
+		addSubnetValidatorTx, ok := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
 		}
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID]; exists {
-			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = signed.SubnetValidatorAndID{
+			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = txs.SubnetValidatorAndID{
 				UnsignedAddSubnetValidator: addSubnetValidatorTx,
 				TxID:                       txID,
 			}
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]signed.SubnetValidatorAndID{
+				subnets: map[ids.ID]txs.SubnetValidatorAndID{
 					addSubnetValidatorTx.Validator.Subnet: {
 						UnsignedAddSubnetValidator: addSubnetValidatorTx,
 						TxID:                       txID,
@@ -1120,7 +1121,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			weight   uint64
 		)
 		switch tx := currentStaker.AddStakerTx.Unsigned.(type) {
-		case *unsigned.AddValidatorTx:
+		case *txs.AddValidatorTx:
 			var vdrBytes []byte
 			startTime := tx.StartTime()
 			vdr := &currentValidatorState{
@@ -1132,7 +1133,7 @@ func (s *state) writeCurrentStakers() (err error) {
 				PotentialReward: potentialReward,
 			}
 
-			vdrBytes, err = genesis.Codec.Marshal(unsigned.Version, vdr)
+			vdrBytes, err = genesis.Codec.Marshal(txs.Version, vdr)
 			if err != nil {
 				return
 			}
@@ -1145,7 +1146,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *unsigned.AddDelegatorTx:
+		case *txs.AddDelegatorTx:
 			if err = database.PutUInt64(s.currentDelegatorList, txID[:], potentialReward); err != nil {
 				return
 			}
@@ -1153,7 +1154,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *unsigned.AddSubnetValidatorTx:
+		case *txs.AddSubnetValidatorTx:
 			if err = s.currentSubnetValidatorList.Put(txID[:], nil); err != nil {
 				return
 			}
@@ -1162,7 +1163,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
 		default:
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx, *txs.AddDelegatorTx or *txs.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		subnetDiffs, ok := weightDiffs[subnetID]
@@ -1194,7 +1195,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			weight   uint64
 		)
 		switch tx := tx.Unsigned.(type) {
-		case *unsigned.AddValidatorTx:
+		case *txs.AddValidatorTx:
 			db = s.currentValidatorList
 
 			delete(s.uptimes, tx.Validator.NodeID)
@@ -1203,20 +1204,20 @@ func (s *state) writeCurrentStakers() (err error) {
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *unsigned.AddDelegatorTx:
+		case *txs.AddDelegatorTx:
 			db = s.currentDelegatorList
 
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *unsigned.AddSubnetValidatorTx:
+		case *txs.AddSubnetValidatorTx:
 			db = s.currentSubnetValidatorList
 
 			subnetID = tx.Validator.Subnet
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
 		default:
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx, *txs.AddDelegatorTx or *txs.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		txID := tx.ID()
@@ -1256,7 +1257,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			Height:   s.DataState.GetHeight(),
 			SubnetID: subnetID,
 		}
-		prefixBytes, err = genesis.Codec.Marshal(unsigned.Version, prefixStruct)
+		prefixBytes, err = genesis.Codec.Marshal(txs.Version, prefixStruct)
 		if err != nil {
 			return
 		}
@@ -1280,7 +1281,7 @@ func (s *state) writeCurrentStakers() (err error) {
 			}
 
 			var nodeDiffBytes []byte
-			nodeDiffBytes, err = genesis.Codec.Marshal(unsigned.Version, nodeDiff)
+			nodeDiffBytes, err = genesis.Codec.Marshal(txs.Version, nodeDiff)
 			if err != nil {
 				return err
 			}
@@ -1309,14 +1310,14 @@ func (s *state) writePendingStakers() error {
 	for _, tx := range s.addedPendingStakers {
 		var db database.KeyValueWriter
 		switch tx.Unsigned.(type) {
-		case *unsigned.AddValidatorTx:
+		case *txs.AddValidatorTx:
 			db = s.pendingValidatorList
-		case *unsigned.AddDelegatorTx:
+		case *txs.AddDelegatorTx:
 			db = s.pendingDelegatorList
-		case *unsigned.AddSubnetValidatorTx:
+		case *txs.AddSubnetValidatorTx:
 			db = s.pendingSubnetValidatorList
 		default:
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx, *txs.AddDelegatorTx or *txs.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		txID := tx.ID()
@@ -1329,14 +1330,14 @@ func (s *state) writePendingStakers() error {
 	for _, tx := range s.deletedPendingStakers {
 		var db database.KeyValueDeleter
 		switch tx.Unsigned.(type) {
-		case *unsigned.AddValidatorTx:
+		case *txs.AddValidatorTx:
 			db = s.pendingValidatorList
-		case *unsigned.AddDelegatorTx:
+		case *txs.AddDelegatorTx:
 			db = s.pendingDelegatorList
-		case *unsigned.AddSubnetValidatorTx:
+		case *txs.AddSubnetValidatorTx:
 			db = s.pendingSubnetValidatorList
 		default:
-			return fmt.Errorf("expected tx type *unsigned.AddValidatorTx, *unsigned.AddDelegatorTx or *unsigned.AddSubnetValidatorTx but got %T", tx)
+			return fmt.Errorf("expected tx type *txs.AddValidatorTx, *txs.AddDelegatorTx or *txs.AddSubnetValidatorTx but got %T", tx)
 		}
 
 		txID := tx.ID()
@@ -1355,7 +1356,7 @@ func (s *state) writeUptimes() error {
 		uptime := s.uptimes[nodeID]
 		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
 
-		uptimeBytes, err := genesis.Codec.Marshal(unsigned.Version, uptime)
+		uptimeBytes, err := genesis.Codec.Marshal(txs.Version, uptime)
 		if err != nil {
 			return fmt.Errorf("failed to write uptimes with: %w", err)
 		}
@@ -1376,7 +1377,7 @@ func (s *state) writeTXs() error {
 			Status: txStatus.Status,
 		}
 
-		txBytes, err := genesis.Codec.Marshal(unsigned.Version, &stx)
+		txBytes, err := genesis.Codec.Marshal(txs.Version, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to write txs with: %w", err)
 		}
@@ -1398,7 +1399,7 @@ func (s *state) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := genesis.Codec.Marshal(unsigned.Version, utxo)
+			utxoBytes, err := genesis.Codec.Marshal(txs.Version, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to write reward UTXOs with: %w", err)
 			}

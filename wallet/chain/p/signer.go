@@ -18,8 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -37,13 +36,13 @@ var (
 )
 
 type Signer interface {
-	SignUnsigned(ctx stdcontext.Context, tx unsigned.Tx) (*signed.Tx, error)
-	Sign(ctx stdcontext.Context, tx *signed.Tx) error
+	SignUnsigned(ctx stdcontext.Context, tx txs.UnsignedTx) (*txs.Tx, error)
+	Sign(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type SignerBackend interface {
 	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
-	GetTx(ctx stdcontext.Context, txID ids.ID) (*signed.Tx, error)
+	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
 }
 
 type signer struct {
@@ -58,35 +57,35 @@ func NewSigner(kc *secp256k1fx.Keychain, backend SignerBackend) Signer {
 	}
 }
 
-func (s *signer) SignUnsigned(ctx stdcontext.Context, utx unsigned.Tx) (*signed.Tx, error) {
-	tx := &signed.Tx{
+func (s *signer) SignUnsigned(ctx stdcontext.Context, utx txs.UnsignedTx) (*txs.Tx, error) {
+	tx := &txs.Tx{
 		Unsigned: utx,
 	}
 	return tx, s.Sign(ctx, tx)
 }
 
-func (s *signer) Sign(ctx stdcontext.Context, tx *signed.Tx) error {
+func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	switch utx := tx.Unsigned.(type) {
-	case *unsigned.AddValidatorTx:
+	case *txs.AddValidatorTx:
 		return s.signAddValidatorTx(ctx, tx, utx)
-	case *unsigned.AddSubnetValidatorTx:
+	case *txs.AddSubnetValidatorTx:
 		return s.signAddSubnetValidatorTx(ctx, tx, utx)
-	case *unsigned.AddDelegatorTx:
+	case *txs.AddDelegatorTx:
 		return s.signAddDelegatorTx(ctx, tx, utx)
-	case *unsigned.CreateChainTx:
+	case *txs.CreateChainTx:
 		return s.signCreateChainTx(ctx, tx, utx)
-	case *unsigned.CreateSubnetTx:
+	case *txs.CreateSubnetTx:
 		return s.signCreateSubnetTx(ctx, tx, utx)
-	case *unsigned.ImportTx:
+	case *txs.ImportTx:
 		return s.signImportTx(ctx, tx, utx)
-	case *unsigned.ExportTx:
+	case *txs.ExportTx:
 		return s.signExportTx(ctx, tx, utx)
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
 	}
 }
 
-func (s *signer) signAddValidatorTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.AddValidatorTx) error {
+func (s *signer) signAddValidatorTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -94,7 +93,7 @@ func (s *signer) signAddValidatorTx(ctx stdcontext.Context, tx *signed.Tx, utx *
 	return s.sign(tx, txSigners)
 }
 
-func (s *signer) signAddSubnetValidatorTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.AddSubnetValidatorTx) error {
+func (s *signer) signAddSubnetValidatorTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.AddSubnetValidatorTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -107,7 +106,7 @@ func (s *signer) signAddSubnetValidatorTx(ctx stdcontext.Context, tx *signed.Tx,
 	return s.sign(tx, txSigners)
 }
 
-func (s *signer) signAddDelegatorTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.AddDelegatorTx) error {
+func (s *signer) signAddDelegatorTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.AddDelegatorTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -115,7 +114,7 @@ func (s *signer) signAddDelegatorTx(ctx stdcontext.Context, tx *signed.Tx, utx *
 	return s.sign(tx, txSigners)
 }
 
-func (s *signer) signCreateChainTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.CreateChainTx) error {
+func (s *signer) signCreateChainTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.CreateChainTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -128,7 +127,7 @@ func (s *signer) signCreateChainTx(ctx stdcontext.Context, tx *signed.Tx, utx *u
 	return s.sign(tx, txSigners)
 }
 
-func (s *signer) signCreateSubnetTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.CreateSubnetTx) error {
+func (s *signer) signCreateSubnetTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.CreateSubnetTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -136,7 +135,7 @@ func (s *signer) signCreateSubnetTx(ctx stdcontext.Context, tx *signed.Tx, utx *
 	return s.sign(tx, txSigners)
 }
 
-func (s *signer) signImportTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.ImportTx) error {
+func (s *signer) signImportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.ImportTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -149,7 +148,7 @@ func (s *signer) signImportTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsign
 	return s.sign(tx, txSigners)
 }
 
-func (s *signer) signExportTx(ctx stdcontext.Context, tx *signed.Tx, utx *unsigned.ExportTx) error {
+func (s *signer) signExportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.ExportTx) error {
 	txSigners, err := s.getSigners(ctx, constants.PlatformChainID, utx.Ins)
 	if err != nil {
 		return err
@@ -221,7 +220,7 @@ func (s *signer) getSubnetSigners(ctx stdcontext.Context, subnetID ids.ID, subne
 			err,
 		)
 	}
-	subnet, ok := subnetTx.Unsigned.(*unsigned.CreateSubnetTx)
+	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
 		return nil, errWrongTxType
 	}
@@ -249,7 +248,7 @@ func (s *signer) getSubnetSigners(ctx stdcontext.Context, subnetID ids.ID, subne
 	return authSigners, nil
 }
 
-func (s *signer) sign(tx *signed.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
+func (s *signer) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := platformvm.Codec.Marshal(platformvm.CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)

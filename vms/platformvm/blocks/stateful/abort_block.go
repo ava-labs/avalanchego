@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -30,6 +31,7 @@ type AbortBlock struct {
 // originally preferred or not for metrics.
 func NewAbortBlock(
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
@@ -38,12 +40,13 @@ func NewAbortBlock(
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulAbortBlock(statelessBlk, verifier, wasPreferred, choices.Processing)
+	return toStatefulAbortBlock(statelessBlk, verifier, txExecutorBackend, wasPreferred, choices.Processing)
 }
 
 func toStatefulAbortBlock(
 	statelessBlk *stateless.AbortBlock,
 	verifier Verifier,
+	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
 ) (*AbortBlock, error) {
@@ -52,9 +55,10 @@ func toStatefulAbortBlock(
 		doubleDecisionBlock: &doubleDecisionBlock{
 			decisionBlock: decisionBlock{
 				commonBlock: &commonBlock{
-					baseBlk:  &statelessBlk.CommonBlock,
-					status:   status,
-					verifier: verifier,
+					baseBlk:           &statelessBlk.CommonBlock,
+					status:            status,
+					verifier:          verifier,
+					txExecutorBackend: txExecutorBackend,
 				},
 			},
 		},
@@ -65,7 +69,7 @@ func toStatefulAbortBlock(
 }
 
 func (a *AbortBlock) Accept() error {
-	if a.verifier.Bootstrapped() {
+	if a.txExecutorBackend.Bootstrapped.GetValue() {
 		if a.wasPreferred {
 			a.verifier.MarkAcceptedOptionVote()
 		} else {
@@ -86,7 +90,7 @@ func (a *AbortBlock) Accept() error {
 }
 
 func (a *AbortBlock) Reject() error {
-	a.verifier.Ctx().Log.Verbo(
+	a.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Abort Block %s at height %d with parent %s",
 		a.ID(),
 		a.Height(),

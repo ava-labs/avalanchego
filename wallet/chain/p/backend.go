@@ -13,8 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/signed"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ Backend = &backend{}
@@ -33,7 +32,7 @@ type Backend interface {
 	BuilderBackend
 	SignerBackend
 
-	AcceptTx(ctx stdcontext.Context, tx *signed.Tx) error
+	AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type backend struct {
@@ -42,10 +41,10 @@ type backend struct {
 
 	txsLock sync.RWMutex
 	// txID -> tx
-	txs map[ids.ID]*signed.Tx
+	txs map[ids.ID]*txs.Tx
 }
 
-func NewBackend(ctx Context, utxos ChainUTXOs, txs map[ids.ID]*signed.Tx) Backend {
+func NewBackend(ctx Context, utxos ChainUTXOs, txs map[ids.ID]*txs.Tx) Backend {
 	return &backend{
 		Context:    ctx,
 		ChainUTXOs: utxos,
@@ -53,17 +52,17 @@ func NewBackend(ctx Context, utxos ChainUTXOs, txs map[ids.ID]*signed.Tx) Backen
 	}
 }
 
-func (b *backend) AcceptTx(ctx stdcontext.Context, tx *signed.Tx) error {
-	var baseTx *unsigned.BaseTx
+func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
+	var baseTx *txs.BaseTx
 	txID := tx.ID()
 	switch utx := tx.Unsigned.(type) {
-	case *unsigned.AddDelegatorTx:
+	case *txs.AddDelegatorTx:
 		baseTx = &utx.BaseTx
-	case *unsigned.AddSubnetValidatorTx:
+	case *txs.AddSubnetValidatorTx:
 		baseTx = &utx.BaseTx
-	case *unsigned.AddValidatorTx:
+	case *txs.AddValidatorTx:
 		baseTx = &utx.BaseTx
-	case *unsigned.ExportTx:
+	case *txs.ExportTx:
 		baseTx = &utx.BaseTx
 
 		for i, out := range utx.ExportedOutputs {
@@ -83,7 +82,7 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *signed.Tx) error {
 				return err
 			}
 		}
-	case *unsigned.ImportTx:
+	case *txs.ImportTx:
 		baseTx = &utx.BaseTx
 
 		consumedRemoteUTXOIDs := utx.InputUTXOs()
@@ -91,9 +90,9 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *signed.Tx) error {
 		if err != nil {
 			return err
 		}
-	case *unsigned.CreateChainTx:
+	case *txs.CreateChainTx:
 		baseTx = &utx.BaseTx
-	case *unsigned.CreateSubnetTx:
+	case *txs.CreateSubnetTx:
 		baseTx = &utx.BaseTx
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
@@ -136,7 +135,7 @@ func (b *backend) removeUTXOs(ctx stdcontext.Context, sourceChain ids.ID, utxoID
 	return nil
 }
 
-func (b *backend) GetTx(_ stdcontext.Context, txID ids.ID) (*signed.Tx, error) {
+func (b *backend) GetTx(_ stdcontext.Context, txID ids.ID) (*txs.Tx, error) {
 	b.txsLock.RLock()
 	defer b.txsLock.RUnlock()
 

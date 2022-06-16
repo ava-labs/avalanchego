@@ -10,15 +10,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions/unsigned"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func CreateChain(vmCfg config.Config, utx unsigned.Tx, txID ids.ID) error {
-	unsignedTx, ok := utx.(*unsigned.CreateChainTx)
+func CreateChain(vmCfg config.Config, utx txs.UnsignedTx, txID ids.ID) error {
+	unsignedTx, ok := utx.(*txs.CreateChainTx)
 	if !ok {
-		return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", utx)
+		return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", utx)
 	}
 
 	if vmCfg.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
