@@ -143,8 +143,8 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 				txID := vdr.addStakerTx.ID()
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &currentValidatorImpl{
 					addValidator: ValidatorAndID{
-						UnsignedAddValidatorTx: tx,
-						TxID:                   txID,
+						Tx:   tx,
+						TxID: txID,
 					},
 					potentialReward: vdr.potentialReward,
 				}
@@ -163,8 +163,8 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 				newVdr.delegators = make([]DelegatorAndID, len(oldVdr.delegators)+1)
 				copy(newVdr.delegators, oldVdr.delegators)
 				newVdr.delegators[len(oldVdr.delegators)] = DelegatorAndID{
-					UnsignedAddDelegatorTx: tx,
-					TxID:                   txID,
+					Tx:   tx,
+					TxID: txID,
 				}
 				sortDelegatorsByRemoval(newVdr.delegators)
 				newVdr.delegatorWeight += tx.Validator.Wght
@@ -186,8 +186,8 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 					newVdr.subnets[subnetID] = addTx
 				}
 				newVdr.subnets[tx.Validator.Subnet] = SubnetValidatorAndID{
-					UnsignedAddSubnetValidator: tx,
-					TxID:                       txID,
+					Tx:   tx,
+					TxID: txID,
 				}
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
@@ -260,8 +260,8 @@ func (cs *currentStakerChainStateImpl) DeleteNextStaker() (currentStakerChainSta
 						subnets:    vdr.subnets,
 					},
 					addValidator: ValidatorAndID{
-						UnsignedAddValidatorTx: vdr.addValidator.UnsignedAddValidatorTx,
-						TxID:                   vdr.addValidator.TxID,
+						Tx:   vdr.addValidator.Tx,
+						TxID: vdr.addValidator.TxID,
 					},
 					delegatorWeight: vdr.delegatorWeight - tx.Validator.Wght,
 					potentialReward: vdr.potentialReward,
@@ -312,7 +312,7 @@ func (cs *currentStakerChainStateImpl) primaryValidatorSet() (validators.Set, er
 
 	var err error
 	for nodeID, vdr := range cs.validatorsByNodeID {
-		vdrWeight := vdr.addValidator.UnsignedAddValidatorTx.Validator.Wght
+		vdrWeight := vdr.addValidator.Tx.Validator.Wght
 		vdrWeight, err = safemath.Add64(vdrWeight, vdr.delegatorWeight)
 		if err != nil {
 			return nil, err
@@ -333,7 +333,7 @@ func (cs *currentStakerChainStateImpl) subnetValidatorSet(subnetID ids.ID) (vali
 		if !exists {
 			continue
 		}
-		if err := vdrs.AddWeight(nodeID, subnetVDR.UnsignedAddSubnetValidator.Validator.Wght); err != nil {
+		if err := vdrs.AddWeight(nodeID, subnetVDR.Tx.Validator.Wght); err != nil {
 			return nil, err
 		}
 	}
@@ -445,8 +445,8 @@ func (s innerSortDelegatorsByRemoval) Less(i, j int) bool {
 	iDel := s[i]
 	jDel := s[j]
 
-	iEndTime := iDel.UnsignedAddDelegatorTx.EndTime()
-	jEndTime := jDel.UnsignedAddDelegatorTx.EndTime()
+	iEndTime := iDel.Tx.EndTime()
+	jEndTime := jDel.Tx.EndTime()
 	if iEndTime.Before(jEndTime) {
 		return true
 	}

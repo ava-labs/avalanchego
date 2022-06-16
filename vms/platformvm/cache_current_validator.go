@@ -34,7 +34,7 @@ type currentValidatorImpl struct {
 }
 
 func (v *currentValidatorImpl) AddValidatorTx() (*txs.AddValidatorTx, ids.ID) {
-	return v.addValidator.UnsignedAddValidatorTx, v.addValidator.TxID
+	return v.addValidator.Tx, v.addValidator.TxID
 }
 
 func (v *currentValidatorImpl) DelegatorWeight() uint64 {
