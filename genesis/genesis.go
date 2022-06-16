@@ -521,7 +521,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
 	genesis, err := genesis.Parse(genesisBytes)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't build genesis from bytes due to: %w", err)
+		return nil, fmt.Errorf("failed to parse genesis: %w", err)
 	}
 	for _, chain := range genesis.Chains {
 		uChain := chain.Unsigned.(*pchaintxs.CreateChainTx)
