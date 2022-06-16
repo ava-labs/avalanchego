@@ -80,7 +80,7 @@ type PrimaryValidator struct {
 	DelegationFee      json.Float32  `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
 	Uptime             *json.Float32 `json:"uptime,omitempty"`
-	Connected          bool          `json:"connected,omitempty"`
+	Connected          bool          `json:"connected"`
 	Staked             []UTXO        `json:"staked,omitempty"`
 	// The delegators delegating to this validator
 	Delegators []PrimaryDelegator `json:"delegators"`
