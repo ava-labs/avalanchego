@@ -284,7 +284,6 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	if errs.Err != nil {
 		return nil, errs.Err
 	}
-
 	return st.baseDB.CommitBatch()
 }
 
