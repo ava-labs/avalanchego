@@ -1422,7 +1422,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		cs.validators = append(cs.validators, tx)
 		vdr, exists := cs.validatorsByNodeID[addSubnetValidatorTx.Validator.NodeID]
 		if !exists {
-			return errDSValidatorSubset
+			return errValidatorSubset
 		}
 		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
 			Tx:   addSubnetValidatorTx,

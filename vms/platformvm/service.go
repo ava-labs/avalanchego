@@ -1513,7 +1513,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	if args.SubnetID == constants.PrimaryNetworkID {
-		return txs.ErrDSCantValidate
+		return txs.ErrCantValidatePrimaryNetwork
 	}
 
 	// Parse the from addresses

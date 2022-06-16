@@ -11,6 +11,8 @@ import (
 
 var _ txs.Visitor = &atomicTxExecutor{}
 
+// atomicTxExecutor is used to execute atomic transactions pre-AP5. After AP5
+// the execution was moved to be performed inside of the standardTxExecutor.
 type atomicTxExecutor struct {
 	// inputs
 	vm          *VM

@@ -27,7 +27,7 @@ var (
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
 	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", maxFutureStartTime)
 	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
-	errDSValidatorSubset         = errors.New("all subnets' staking period must be a subset of the primary network")
+	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
 	errDelegatorSubset           = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState              = errors.New("generated output isn't valid state")
 	errOverDelegated             = errors.New("validator would be over delegated")
@@ -243,7 +243,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
-					return errDSValidatorSubset
+					return errValidatorSubset
 				}
 				return fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
@@ -256,7 +256,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		// Ensure that the period this validator validates the specified subnet
 		// is a subset of the time they validate the primary network.
 		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-			return errDSValidatorSubset
+			return errValidatorSubset
 		}
 
 		// Ensure that this transaction isn't a duplicate add validator tx.
@@ -276,7 +276,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		subnetIntf, _, err := e.parentState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			if err == database.ErrNotFound {
-				return errDSValidatorSubset
+				return errValidatorSubset
 			}
 			return fmt.Errorf(
 				"couldn't find subnet %s with %w",
