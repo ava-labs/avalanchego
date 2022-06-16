@@ -73,18 +73,18 @@ const (
 // some helper structures useful for storing transactions
 
 type ValidatorAndID struct {
-	UnsignedAddValidatorTx *txs.AddValidatorTx
-	TxID                   ids.ID
+	Tx   *txs.AddValidatorTx
+	TxID ids.ID
 }
 
 type SubnetValidatorAndID struct {
-	UnsignedAddSubnetValidator *txs.AddSubnetValidatorTx
-	TxID                       ids.ID
+	Tx   *txs.AddSubnetValidatorTx
+	TxID ids.ID
 }
 
 type DelegatorAndID struct {
-	UnsignedAddDelegatorTx *txs.AddDelegatorTx
-	TxID                   ids.ID
+	Tx   *txs.AddDelegatorTx
+	TxID ids.ID
 }
 
 type InternalState interface {
@@ -1341,8 +1341,8 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 				subnets: make(map[ids.ID]SubnetValidatorAndID),
 			},
 			addValidator: ValidatorAndID{
-				UnsignedAddValidatorTx: addValidatorTx,
-				TxID:                   txID,
+				Tx:   addValidatorTx,
+				TxID: txID,
 			},
 			potentialReward: uptime.PotentialReward,
 		}
@@ -1389,8 +1389,8 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		}
 		vdr.delegatorWeight += addDelegatorTx.Validator.Wght
 		vdr.delegators = append(vdr.delegators, DelegatorAndID{
-			UnsignedAddDelegatorTx: addDelegatorTx,
-			TxID:                   txID,
+			Tx:   addDelegatorTx,
+			TxID: txID,
 		})
 		cs.validatorsByTxID[txID] = &validatorReward{
 			addStakerTx:     tx,
@@ -1425,8 +1425,8 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			return errDSValidatorSubset
 		}
 		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
-			UnsignedAddSubnetValidator: addSubnetValidatorTx,
-			TxID:                       txID,
+			Tx:   addSubnetValidatorTx,
+			TxID: txID,
 		}
 		cs.validatorsByTxID[txID] = &validatorReward{
 			addStakerTx: tx,
@@ -1472,8 +1472,8 @@ func (st *internalStateImpl) loadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = ValidatorAndID{
-			UnsignedAddValidatorTx: addValidatorTx,
-			TxID:                   txID,
+			Tx:   addValidatorTx,
+			TxID: txID,
 		}
 	}
 	if err := validatorIt.Error(); err != nil {
@@ -1501,15 +1501,15 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID]; exists {
 			vdr.delegators = append(vdr.delegators, DelegatorAndID{
-				UnsignedAddDelegatorTx: addDelegatorTx,
-				TxID:                   txID,
+				Tx:   addDelegatorTx,
+				TxID: txID,
 			})
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
 				delegators: []DelegatorAndID{
 					{
-						UnsignedAddDelegatorTx: addDelegatorTx,
-						TxID:                   txID,
+						Tx:   addDelegatorTx,
+						TxID: txID,
 					},
 				},
 				subnets: make(map[ids.ID]SubnetValidatorAndID),
@@ -1541,15 +1541,15 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID]; exists {
 			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
-				UnsignedAddSubnetValidator: addSubnetValidatorTx,
-				TxID:                       txID,
+				Tx:   addSubnetValidatorTx,
+				TxID: txID,
 			}
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
 				subnets: map[ids.ID]SubnetValidatorAndID{
 					addSubnetValidatorTx.Validator.Subnet: {
-						UnsignedAddSubnetValidator: addSubnetValidatorTx,
-						TxID:                       txID,
+						Tx:   addSubnetValidatorTx,
+						TxID: txID,
 					},
 				},
 			}

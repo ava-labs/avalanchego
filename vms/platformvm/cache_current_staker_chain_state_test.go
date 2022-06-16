@@ -20,7 +20,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node0Weight := uint64(1)
 	vdr0 := &currentValidatorImpl{
 		addValidator: ValidatorAndID{
-			UnsignedAddValidatorTx: &txs.AddValidatorTx{
+			Tx: &txs.AddValidatorTx{
 				Validator: validator.Validator{
 					Wght: node0Weight,
 				},
@@ -33,7 +33,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node1Weight := uint64(2)
 	vdr1 := &currentValidatorImpl{
 		addValidator: ValidatorAndID{
-			UnsignedAddValidatorTx: &txs.AddValidatorTx{
+			Tx: &txs.AddValidatorTx{
 				Validator: validator.Validator{
 					Wght: node1Weight,
 				},
@@ -46,7 +46,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	node2Weight := uint64(2)
 	vdr2 := &currentValidatorImpl{
 		addValidator: ValidatorAndID{
-			UnsignedAddValidatorTx: &txs.AddValidatorTx{
+			Tx: &txs.AddValidatorTx{
 				Validator: validator.Validator{
 					Wght: node2Weight,
 				},
@@ -114,7 +114,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
-					UnsignedAddSubnetValidator: &txs.AddSubnetValidatorTx{
+					Tx: &txs.AddSubnetValidatorTx{
 						Validator: validator.SubnetValidator{
 							Validator: validator.Validator{
 								Wght: node0Weight,
@@ -133,7 +133,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
-					UnsignedAddSubnetValidator: &txs.AddSubnetValidatorTx{
+					Tx: &txs.AddSubnetValidatorTx{
 						Validator: validator.SubnetValidator{
 							Validator: validator.Validator{
 								Wght: node1Weight,
@@ -152,7 +152,7 @@ func TestSubnetValidatorSet(t *testing.T) {
 		validatorImpl: validatorImpl{
 			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
-					UnsignedAddSubnetValidator: &txs.AddSubnetValidatorTx{
+					Tx: &txs.AddSubnetValidatorTx{
 						Validator: validator.SubnetValidator{
 							Validator: validator.Validator{
 								Wght: node2Weight,

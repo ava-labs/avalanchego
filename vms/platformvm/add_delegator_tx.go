@@ -105,7 +105,7 @@ func maxStakeAmount(
 	// efficiently remove delegators and keep the current stake updated.
 	toRemoveHeap := validator.EndTimeHeap{}
 	for _, currentDelegator := range current {
-		toRemoveHeap.Add(&currentDelegator.UnsignedAddDelegatorTx.Validator)
+		toRemoveHeap.Add(&currentDelegator.Tx.Validator)
 	}
 
 	var (
@@ -118,7 +118,7 @@ func maxStakeAmount(
 	// starts.
 	for _, nextPending := range pending { // Iterates in order of increasing start time
 		// Calculate what the amount staked will be when this delegation starts.
-		nextPendingStartTime := nextPending.UnsignedAddDelegatorTx.StartTime()
+		nextPendingStartTime := nextPending.Tx.StartTime()
 
 		if nextPendingStartTime.After(endTime) {
 			// This delegation starts after [endTime].
@@ -163,7 +163,7 @@ func maxStakeAmount(
 		// Add to [currentStake] the stake of this pending delegator to
 		// calculate what the stake will be when this pending delegation has
 		// started.
-		currentStake, err = math.Add64(currentStake, nextPending.UnsignedAddDelegatorTx.Validator.Wght)
+		currentStake, err = math.Add64(currentStake, nextPending.Tx.Validator.Wght)
 		if err != nil {
 			return 0, err
 		}
@@ -181,7 +181,7 @@ func maxStakeAmount(
 
 		// This pending delegator is a current delegator relative
 		// when considering later pending delegators that start late
-		toRemoveHeap.Add(&nextPending.UnsignedAddDelegatorTx.Validator)
+		toRemoveHeap.Add(&nextPending.Tx.Validator)
 	}
 
 	// [currentStake] is now the amount staked before the next pending delegator
@@ -263,7 +263,7 @@ func currentMaxSubnetStakeAmount(
 		return 0, err
 	}
 
-	vdrTx := vdrTxAndID.UnsignedAddSubnetValidator
+	vdrTx := vdrTxAndID.Tx
 	if vdrTx == nil {
 		return 0, nil
 	}

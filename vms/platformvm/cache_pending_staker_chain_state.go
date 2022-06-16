@@ -58,7 +58,7 @@ func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.NodeID) (
 	if !exists {
 		return nil, ids.Empty, database.ErrNotFound
 	}
-	return vdr.UnsignedAddValidatorTx, vdr.TxID, nil
+	return vdr.Tx, vdr.TxID, nil
 }
 
 func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.NodeID) validatorIntf {
@@ -87,8 +87,8 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			newPS.validatorsByNodeID[nodeID] = vdr
 		}
 		newPS.validatorsByNodeID[tx.Validator.NodeID] = ValidatorAndID{
-			UnsignedAddValidatorTx: tx,
-			TxID:                   txID,
+			Tx:   tx,
+			TxID: txID,
 		}
 	case *txs.AddDelegatorTx:
 		newPS.validatorsByNodeID = ps.validatorsByNodeID
@@ -103,8 +103,8 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			newDelegators := make([]DelegatorAndID, len(vdr.delegators)+1)
 			copy(newDelegators, vdr.delegators)
 			newDelegators[len(vdr.delegators)] = DelegatorAndID{
-				UnsignedAddDelegatorTx: tx,
-				TxID:                   txID,
+				Tx:   tx,
+				TxID: txID,
 			}
 			sortDelegatorsByAddition(newDelegators)
 
@@ -116,8 +116,8 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				delegators: []DelegatorAndID{
 					{
-						UnsignedAddDelegatorTx: tx,
-						TxID:                   txID,
+						Tx:   tx,
+						TxID: txID,
 					},
 				},
 			}
@@ -137,8 +137,8 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 				newSubnets[subnet] = subnetTx
 			}
 			newSubnets[tx.Validator.Subnet] = SubnetValidatorAndID{
-				UnsignedAddSubnetValidator: tx,
-				TxID:                       txID,
+				Tx:   tx,
+				TxID: txID,
 			}
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				delegators: vdr.delegators,
@@ -148,8 +148,8 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
 				subnets: map[ids.ID]SubnetValidatorAndID{
 					tx.Validator.Subnet: {
-						UnsignedAddSubnetValidator: tx,
-						TxID:                       txID,
+						Tx:   tx,
+						TxID: txID,
 					},
 				},
 			}
@@ -317,8 +317,8 @@ func (s innerSortDelegatorsByAddition) Less(i, j int) bool {
 	iDel := s[i]
 	jDel := s[j]
 
-	iStartTime := iDel.UnsignedAddDelegatorTx.StartTime()
-	jStartTime := jDel.UnsignedAddDelegatorTx.StartTime()
+	iStartTime := iDel.Tx.StartTime()
+	jStartTime := jDel.Tx.StartTime()
 	if iStartTime.Before(jStartTime) {
 		return true
 	}
