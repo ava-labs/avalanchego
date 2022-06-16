@@ -22,7 +22,7 @@ const (
 var (
 	_ UnsignedTx = &CreateChainTx{}
 
-	ErrDSCantValidate = errors.New("new blockchain can't be validated by primary network")
+	ErrCantValidatePrimaryNetwork = errors.New("new blockchain can't be validated by primary network")
 
 	errInvalidVMID             = errors.New("invalid VM ID")
 	errFxIDsNotSortedAndUnique = errors.New("feature extensions IDs must be sorted and unique")
@@ -56,7 +56,7 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.SubnetID == constants.PrimaryNetworkID:
-		return ErrDSCantValidate
+		return ErrCantValidatePrimaryNetwork
 	case len(tx.ChainName) > MaxNameLen:
 		return errNameTooLong
 	case tx.VMID == ids.Empty:

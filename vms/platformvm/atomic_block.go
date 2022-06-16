@@ -139,10 +139,7 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 func (ab *AtomicBlock) Accept() error {
-	var (
-		blkID = ab.ID()
-		txID  = ab.Tx.ID()
-	)
+	blkID := ab.ID()
 
 	ab.vm.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
@@ -169,12 +166,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 
 	if err = ab.vm.ctx.SharedMemory.Apply(ab.atomicRequests, batch); err != nil {
-		return fmt.Errorf(
-			"failed to atomically accept tx %s in block %s: %w",
-			txID,
-			blkID,
-			err,
-		)
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
 	for _, child := range ab.children {

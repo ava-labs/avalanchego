@@ -94,7 +94,7 @@ func (vs *validatorState) maxSubnetStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	var (
-		vdrTxAndID txs.SubnetValidatorAndID
+		vdrTxAndID SubnetValidatorAndID
 		exists     bool
 	)
 	currentValidator, err := vs.current.GetValidator(nodeID)
@@ -112,7 +112,7 @@ func (vs *validatorState) maxSubnetStakeAmount(
 		return 0, err
 	}
 
-	vdrTx := vdrTxAndID.UnsignedAddSubnetValidator
+	vdrTx := vdrTxAndID.Tx
 	if vdrTx == nil {
 		return 0, nil
 	}
@@ -190,7 +190,7 @@ func (vs *validatorState) maxPrimarySubnetStakeAmount(
 // [maximumStake].
 func CanDelegate(
 	current,
-	pending []txs.DelegatorAndID, // sorted by next start time first
+	pending []DelegatorAndID, // sorted by next start time first
 	new *txs.AddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
@@ -218,7 +218,7 @@ func CanDelegate(
 // * [pending] is sorted in order of increasing delegation start time
 func getMaxStakeAmount(
 	current,
-	pending []txs.DelegatorAndID, // sorted by next start time first
+	pending []DelegatorAndID, // sorted by next start time first
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,
@@ -227,7 +227,7 @@ func getMaxStakeAmount(
 	// efficiently remove delegators and keep the current stake updated.
 	toRemoveHeap := p_validator.EndTimeHeap{}
 	for _, currentDelegator := range current {
-		toRemoveHeap.Add(&currentDelegator.UnsignedAddDelegatorTx.Validator)
+		toRemoveHeap.Add(&currentDelegator.Tx.Validator)
 	}
 
 	var (
@@ -240,7 +240,7 @@ func getMaxStakeAmount(
 	// starts.
 	for _, nextPending := range pending { // Iterates in order of increasing start time
 		// Calculate what the amount staked will be when this delegation starts.
-		nextPendingStartTime := nextPending.UnsignedAddDelegatorTx.StartTime()
+		nextPendingStartTime := nextPending.Tx.StartTime()
 
 		if nextPendingStartTime.After(endTime) {
 			// This delegation starts after [endTime].
@@ -285,7 +285,7 @@ func getMaxStakeAmount(
 		// Add to [currentStake] the stake of this pending delegator to
 		// calculate what the stake will be when this pending delegation has
 		// started.
-		currentStake, err = math.Add64(currentStake, nextPending.UnsignedAddDelegatorTx.Validator.Wght)
+		currentStake, err = math.Add64(currentStake, nextPending.Tx.Validator.Wght)
 		if err != nil {
 			return 0, err
 		}
@@ -303,7 +303,7 @@ func getMaxStakeAmount(
 
 		// This pending delegator is a current delegator relative
 		// when considering later pending delegators that start late
-		toRemoveHeap.Add(&nextPending.UnsignedAddDelegatorTx.Validator)
+		toRemoveHeap.Add(&nextPending.Tx.Validator)
 	}
 
 	// [currentStake] is now the amount staked before the next pending delegator
