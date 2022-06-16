@@ -30,7 +30,7 @@ var (
 	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", maxFutureStartTime)
 	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
 	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
-	errStakeOverflow             = errors.New("too many funds staked on single validator")
+	errStakeOverflow             = errors.New("validator stake exceeds limit")
 	errInvalidState              = errors.New("generated output isn't valid state")
 	errOverDelegated             = errors.New("validator would be over delegated")
 	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
