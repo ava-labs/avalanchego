@@ -75,7 +75,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
 	assert.EqualValues(t, ip, parsedMsg.Get(IP))
-	assert.EqualValues(t, myVersion, parsedMsg.Get(VersionStr))
+	assert.EqualValues(t, myVersionStr, parsedMsg.Get(VersionStr))
 	assert.EqualValues(t, myVersionTime, parsedMsg.Get(VersionTime))
 	assert.EqualValues(t, sig, parsedMsg.Get(SigBytes))
 	assert.EqualValues(t, subnetIDs, parsedMsg.Get(TrackedSubnets))
