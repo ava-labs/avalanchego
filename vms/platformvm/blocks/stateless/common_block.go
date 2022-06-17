@@ -31,7 +31,8 @@ type CommonBlock struct {
 	// This block's height. The genesis block is at height 0.
 	Hght uint64 `serialize:"true" json:"height"`
 
-	// Time this block was proposed at
+	// Time this block was proposed at. Note that this
+	// is serialized for post fork blocks only
 	BlkTimestamp uint64 `serialize:"false" postFork:"true" json:"time"`
 
 	// Codec version used to serialized/deserialize the block
