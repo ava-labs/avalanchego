@@ -24,7 +24,8 @@ type InboundMsgThrottler interface {
 	// It's safe for multiple goroutines to concurrently call Acquire.
 	// Returns immediately if [ctx] is canceled.  The returned release function
 	// needs to be called so that any allocated resources will be released
-	// invariant: there is a maximum of 1 blocking call to Acquire for a given node
+	// invariant: There should be a maximum of 1 blocking call to Acquire for a
+	//            given nodeID. Callers must enforce this invariant.
 	Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc
 
 	// Add a new node to this throttler.

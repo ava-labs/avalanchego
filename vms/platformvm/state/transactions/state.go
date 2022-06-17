@@ -127,7 +127,7 @@ type Management interface {
 	// Upon vm initialization, SyncGenesis loads
 	// transactions data from genesis block as marshalled from bytes
 	SyncGenesis(
-		genesisUtxos []*avax.UTXO,
+		genesisUtxos []*genesis.UTXO,
 		genesisValidator []*txs.Tx,
 		genesisChains []*txs.Tx,
 	) error
@@ -726,13 +726,13 @@ func (s *state) MaxStakeAmount(
 }
 
 func (s *state) SyncGenesis(
-	genesisUtxos []*avax.UTXO,
+	genesisUtxos []*genesis.UTXO,
 	genesisValidator []*txs.Tx,
 	genesisChains []*txs.Tx,
 ) error {
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesisUtxos {
-		s.AddUTXO(utxo)
+		s.AddUTXO(&utxo.UTXO)
 	}
 
 	// Persist primary network validator set at genesis
@@ -827,11 +827,11 @@ func (s *state) LoadCurrentValidators() error {
 		cs.validators = append(cs.validators, tx)
 		cs.validatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
-				subnets: make(map[ids.ID]txs.SubnetValidatorAndID),
+				subnets: make(map[ids.ID]SubnetValidatorAndID),
 			},
-			addValidator: txs.ValidatorAndID{
-				UnsignedAddValidatorTx: addValidatorTx,
-				TxID:                   txID,
+			addValidator: ValidatorAndID{
+				Tx:   addValidatorTx,
+				TxID: txID,
 			},
 			potentialReward: uptime.PotentialReward,
 		}
@@ -877,9 +877,9 @@ func (s *state) LoadCurrentValidators() error {
 			return ErrDelegatorSubset
 		}
 		vdr.delegatorWeight += addDelegatorTx.Validator.Wght
-		vdr.delegators = append(vdr.delegators, txs.DelegatorAndID{
-			UnsignedAddDelegatorTx: addDelegatorTx,
-			TxID:                   txID,
+		vdr.delegators = append(vdr.delegators, DelegatorAndID{
+			Tx:   addDelegatorTx,
+			TxID: txID,
 		})
 		cs.validatorsByTxID[txID] = &ValidatorReward{
 			AddStakerTx:     tx,
@@ -913,9 +913,9 @@ func (s *state) LoadCurrentValidators() error {
 		if !exists {
 			return ErrDSValidatorSubset
 		}
-		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = txs.SubnetValidatorAndID{
-			UnsignedAddSubnetValidator: addSubnetValidatorTx,
-			TxID:                       txID,
+		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
+			Tx:   addSubnetValidatorTx,
+			TxID: txID,
 		}
 
 		cs.validatorsByTxID[txID] = &ValidatorReward{
@@ -938,7 +938,7 @@ func (s *state) LoadCurrentValidators() error {
 
 func (s *state) LoadPendingValidators() error {
 	ps := &pendingStakerState{
-		validatorsByNodeID:      make(map[ids.NodeID]txs.ValidatorAndID),
+		validatorsByNodeID:      make(map[ids.NodeID]ValidatorAndID),
 		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl),
 	}
 
@@ -961,9 +961,9 @@ func (s *state) LoadPendingValidators() error {
 		}
 
 		ps.validators = append(ps.validators, tx)
-		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = txs.ValidatorAndID{
-			UnsignedAddValidatorTx: addValidatorTx,
-			TxID:                   txID,
+		ps.validatorsByNodeID[addValidatorTx.Validator.NodeID] = ValidatorAndID{
+			Tx:   addValidatorTx,
+			TxID: txID,
 		}
 	}
 	if err := validatorIt.Error(); err != nil {
@@ -990,19 +990,19 @@ func (s *state) LoadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID]; exists {
-			vdr.delegators = append(vdr.delegators, txs.DelegatorAndID{
-				UnsignedAddDelegatorTx: addDelegatorTx,
-				TxID:                   txID,
+			vdr.delegators = append(vdr.delegators, DelegatorAndID{
+				Tx:   addDelegatorTx,
+				TxID: txID,
 			})
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
-				delegators: []txs.DelegatorAndID{
+				delegators: []DelegatorAndID{
 					{
-						UnsignedAddDelegatorTx: addDelegatorTx,
-						TxID:                   txID,
+						Tx:   addDelegatorTx,
+						TxID: txID,
 					},
 				},
-				subnets: make(map[ids.ID]txs.SubnetValidatorAndID),
+				subnets: make(map[ids.ID]SubnetValidatorAndID),
 			}
 		}
 	}
@@ -1030,16 +1030,16 @@ func (s *state) LoadPendingValidators() error {
 
 		ps.validators = append(ps.validators, tx)
 		if vdr, exists := ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID]; exists {
-			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = txs.SubnetValidatorAndID{
-				UnsignedAddSubnetValidator: addSubnetValidatorTx,
-				TxID:                       txID,
+			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
+				Tx:   addSubnetValidatorTx,
+				TxID: txID,
 			}
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]txs.SubnetValidatorAndID{
+				subnets: map[ids.ID]SubnetValidatorAndID{
 					addSubnetValidatorTx.Validator.Subnet: {
-						UnsignedAddSubnetValidator: addSubnetValidatorTx,
-						TxID:                       txID,
+						Tx:   addSubnetValidatorTx,
+						TxID: txID,
 					},
 				},
 			}

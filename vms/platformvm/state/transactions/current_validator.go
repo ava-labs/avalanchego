@@ -11,7 +11,7 @@ import (
 var _ currentValidator = &currentValidatorImpl{}
 
 type currentValidator interface {
-	validator
+	validatorIntf
 
 	// return txs.AddValidatorTx content along with
 	// the ID of its txs.Tx
@@ -28,13 +28,13 @@ type currentValidatorImpl struct {
 	// delegators are sorted in order of removal.
 	validatorImpl
 
-	addValidator    txs.ValidatorAndID
+	addValidator    ValidatorAndID
 	delegatorWeight uint64
 	potentialReward uint64
 }
 
 func (v *currentValidatorImpl) AddValidatorTx() (*txs.AddValidatorTx, ids.ID) {
-	return v.addValidator.UnsignedAddValidatorTx, v.addValidator.TxID
+	return v.addValidator.Tx, v.addValidator.TxID
 }
 
 func (v *currentValidatorImpl) DelegatorWeight() uint64 {
