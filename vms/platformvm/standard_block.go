@@ -230,7 +230,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*txs.Tx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txSlice []*txs.Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
@@ -238,13 +238,13 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*txs.Tx) (*
 				Hght:   height,
 			},
 		},
-		Txs: txs,
+		Txs: txSlice,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(sb)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

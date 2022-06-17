@@ -112,10 +112,11 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	addSubnetValidatorTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
 	input.SigIndices[0] = input.SigIndices[1]
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	// This tx was syntactically verified when it was created... pretend it
+	// wasn't so we don't use cache
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	if err = tx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have errored because sig indices weren't unique")
+		t.Fatal("should have erred because sig indices weren't unique")
 	}
 
 	// Case: Valid

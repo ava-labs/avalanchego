@@ -40,11 +40,11 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx.Unsigned)
+	unsignedBytes, err := Codec.Marshal(txs.Version, &ab.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx)
+	signedBytes, err := Codec.Marshal(txs.Version, &ab.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -141,10 +141,7 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 func (ab *AtomicBlock) Accept() error {
-	var (
-		blkID = ab.ID()
-		txID  = ab.Tx.ID()
-	)
+	blkID := ab.ID()
 
 	ab.vm.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
@@ -171,12 +168,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 
 	if err = ab.vm.ctx.SharedMemory.Apply(ab.atomicRequests, batch); err != nil {
-		return fmt.Errorf(
-			"failed to atomically accept tx %s in block %s: %w",
-			txID,
-			blkID,
-			err,
-		)
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
 	for _, child := range ab.children {
@@ -230,7 +222,7 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx txs.Tx) (*Atomic
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(ab)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

@@ -85,11 +85,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.Unsigned)
+	unsignedBytes, err := Codec.Marshal(txs.Version, &pb.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx)
+	signedBytes, err := Codec.Marshal(txs.Version, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -199,7 +199,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*Prop
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(CodecVersion, &block)
+	bytes, err := Codec.Marshal(txs.Version, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

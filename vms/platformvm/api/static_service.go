@@ -33,7 +33,7 @@ import (
 var (
 	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
-	errStakeOverflow        = errors.New("too many funds staked on single validator")
+	errStakeOverflow        = errors.New("validator stake exceeds limit")
 )
 
 // StaticService defines the static API methods exposed by the platform VM
@@ -80,7 +80,7 @@ type PrimaryValidator struct {
 	DelegationFee      json.Float32  `json:"delegationFee"`
 	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
 	Uptime             *json.Float32 `json:"uptime,omitempty"`
-	Connected          bool          `json:"connected,omitempty"`
+	Connected          bool          `json:"connected"`
 	Staked             []UTXO        `json:"staked,omitempty"`
 	// The delegators delegating to this validator
 	Delegators []PrimaryDelegator `json:"delegators"`
