@@ -233,7 +233,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 
 	// Replace a valid signature with one from another key
-	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
+	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 	if err != nil {
 		t.Fatal(err)
 	}

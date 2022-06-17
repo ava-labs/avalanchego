@@ -203,7 +203,7 @@ func TestServiceIssueTx(t *testing.T) {
 		t.Fatal("Expected empty transaction to return an error")
 	}
 	tx := NewTx(t, genesisBytes, vm)
-	txArgs.Tx, err = formatting.EncodeWithChecksum(formatting.Hex, tx.Bytes())
+	txArgs.Tx, err = formatting.EncodeWithChecksum(formatting.Hex, tx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
-	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, tx.Bytes())
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, tx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -683,7 +683,7 @@ func TestServiceGetTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, genesisTx.Bytes(), txBytes, "Wrong tx returned from service.GetTx")
+	assert.Equal(t, genesisTx.SignedBytes(), txBytes, "Wrong tx returned from service.GetTx")
 }
 
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
@@ -698,7 +698,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 
 	newTx := newAvaxBaseTxWithOutputs(t, genesisBytes, vm)
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := vm.IssueTx(newTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,7 +746,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 
 	newTx := newAvaxExportTxWithOutputs(t, genesisBytes, vm)
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := vm.IssueTx(newTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -833,7 +833,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	}
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	txID, err := vm.IssueTx(createAssetTx.Bytes())
+	txID, err := vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -925,7 +925,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	key := keys[0]
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err = vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -934,7 +934,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}})
 	assert.NoError(t, err)
 
-	txID, err := vm.IssueTx(mintNFTTx.Bytes())
+	txID, err := vm.IssueTx(mintNFTTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1030,7 +1030,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	key := keys[0]
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err = vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1042,7 +1042,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
 	assert.NoError(t, err)
 
-	txID, err := vm.IssueTx(mintNFTTx.Bytes())
+	txID, err := vm.IssueTx(mintNFTTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1137,7 +1137,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	key := keys[0]
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err = vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1146,7 +1146,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	err = mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}})
 	assert.NoError(t, err)
 
-	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
+	txID, err := vm.IssueTx(mintSecpOpTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1244,7 +1244,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	key := keys[0]
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err = vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1256,7 +1256,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	err = mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
 	assert.NoError(t, err)
 
-	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
+	txID, err := vm.IssueTx(mintSecpOpTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1352,7 +1352,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	key := keys[0]
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err = vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1360,7 +1360,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	err = mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}})
 	assert.NoError(t, err)
 
-	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
+	txID, err := vm.IssueTx(mintPropertyFxOpTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1457,7 +1457,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	key := keys[0]
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err = vm.IssueTx(createAssetTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1469,7 +1469,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	err = mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
 	assert.NoError(t, err)
 
-	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
+	txID, err := vm.IssueTx(mintPropertyFxOpTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}

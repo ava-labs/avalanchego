@@ -554,7 +554,7 @@ func TestIssueTx(t *testing.T) {
 
 	newTx := NewTx(t, genesisBytes, vm)
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := vm.IssueTx(newTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,11 +588,11 @@ func TestIssueDependentTx(t *testing.T) {
 	firstTx := txs[1]
 	secondTx := txs[2]
 
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(secondTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(secondTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Lock.Unlock()
@@ -688,7 +688,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -717,7 +717,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(mintNFTTx.Bytes()); err != nil {
+	if _, err = vm.IssueTx(mintNFTTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -751,7 +751,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(transferNFTTx.Bytes()); err != nil {
+	if _, err = vm.IssueTx(transferNFTTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -832,7 +832,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -870,7 +870,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
+	if _, err = vm.IssueTx(mintPropertyTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -896,7 +896,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
+	if _, err = vm.IssueTx(burnPropertyTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -969,7 +969,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	// send first asset
 	newTx := NewTxWithAsset(t, genesisBytes, vm, feeAssetName)
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := vm.IssueTx(newTx.SignedBytes())
 	assert.NoError(t, err)
 	assert.Equal(t, txID, newTx.ID())
 
@@ -1040,7 +1040,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := vm.IssueTx(newTx.SignedBytes())
 	assert.NoError(t, err)
 	assert.Equal(t, txID, newTx.ID())
 
@@ -1092,7 +1092,7 @@ func TestTxCached(t *testing.T) {
 	}()
 
 	newTx := NewTx(t, genesisBytes, vm)
-	txBytes := newTx.Bytes()
+	txBytes := newTx.SignedBytes()
 
 	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
@@ -1128,7 +1128,7 @@ func TestTxNotCached(t *testing.T) {
 	}()
 
 	newTx := NewTx(t, genesisBytes, vm)
-	txBytes := newTx.Bytes()
+	txBytes := newTx.SignedBytes()
 
 	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
@@ -1167,14 +1167,14 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	}()
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
-	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Accept(); err != nil {
@@ -1210,14 +1210,14 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
 
-	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 	parsedFirstTx, err := vm.GetTx(firstTx.ID())
@@ -1277,17 +1277,17 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
+	if _, err := vm.IssueTx(firstTxDescendant.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 	parsedFirstTx, err := vm.GetTx(firstTx.ID())
@@ -1397,7 +1397,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
-	result := tx.Bytes()
+	result := tx.SignedBytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
@@ -1455,7 +1455,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
-	result = tx.Bytes()
+	result = tx.SignedBytes()
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02
@@ -1566,7 +1566,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
+	if _, err := vm.IssueTx(tx.SignedBytes()); err == nil {
 		t.Fatal(err)
 	}
 
@@ -1601,7 +1601,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
 		t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 	}
 	ctx.Lock.Unlock()
@@ -1728,7 +1728,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx, err := vm.ParseTx(tx.Bytes())
+	parsedTx, err := vm.ParseTx(tx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1834,7 +1834,7 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1973,7 +1973,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
 		t.Fatal(err)
 	}
 

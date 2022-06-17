@@ -296,7 +296,7 @@ func (w *wallet) IssueTx(
 ) (ids.ID, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	txID, err := w.client.IssueTx(ctx, tx.Bytes())
+	txID, err := w.client.IssueTx(ctx, tx.SignedBytes())
 	if err != nil {
 		return ids.Empty, err
 	}

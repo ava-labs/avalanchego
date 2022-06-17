@@ -468,7 +468,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(pendingTx.Bytes())
+	txID, err := vm.IssueTx(pendingTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,7 +567,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(pendingTx.Bytes())
+	txID, err := vm.IssueTx(pendingTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -710,7 +710,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(pendingTx.Bytes())
+	txID, err := vm.IssueTx(pendingTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -859,7 +859,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(pendingTx.Bytes())
+	txID, err := vm.IssueTx(pendingTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1083,7 +1083,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1147,7 +1147,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1212,7 +1212,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1300,7 +1300,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1426,7 +1426,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1491,7 +1491,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.ParseTx(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.SignedBytes())
 	if err != nil {
 		t.Fatal(err)
 	}

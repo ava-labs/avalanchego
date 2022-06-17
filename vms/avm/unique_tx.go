@@ -306,7 +306,7 @@ func (tx *UniqueTx) UTXOs() []*avax.UTXO {
 // Bytes returns the binary representation of this transaction
 func (tx *UniqueTx) Bytes() []byte {
 	tx.refresh()
-	return tx.Tx.Bytes()
+	return tx.Tx.SignedBytes()
 }
 
 func (tx *UniqueTx) verifyWithoutCacheWrites() error {

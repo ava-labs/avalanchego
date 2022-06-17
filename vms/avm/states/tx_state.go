@@ -82,7 +82,7 @@ func (s *txState) GetTx(txID ids.ID) (*txs.Tx, error) {
 
 func (s *txState) PutTx(txID ids.ID, tx *txs.Tx) error {
 	s.txCache.Put(txID, tx)
-	return s.txDB.Put(txID[:], tx.Bytes())
+	return s.txDB.Put(txID[:], tx.SignedBytes())
 }
 
 func (s *txState) DeleteTx(txID ids.ID) error {

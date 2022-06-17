@@ -111,7 +111,7 @@ func TestExportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3")
-	result := tx.Bytes()
+	result := tx.SignedBytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
@@ -169,7 +169,7 @@ func TestExportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "2oG52e7Cb7XF1yUzv3pRFndAypgbpswWRcSAKD5SH5VgaiTm5D")
-	result = tx.Bytes()
+	result = tx.SignedBytes()
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02

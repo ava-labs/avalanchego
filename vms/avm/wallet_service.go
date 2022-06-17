@@ -247,7 +247,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	txID, err := w.issue(tx.Bytes())
+	txID, err := w.issue(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

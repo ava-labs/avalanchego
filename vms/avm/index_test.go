@@ -81,7 +81,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		}
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+		if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
 			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 		}
 
@@ -174,7 +174,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		}
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+		if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
 			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 		}
 
@@ -333,7 +333,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		}
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+		if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
 			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 		}
 

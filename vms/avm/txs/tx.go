@@ -26,8 +26,8 @@ type UnsignedTx interface {
 
 	Initialize(unsignedBytes, bytes []byte)
 	ID() ids.ID
-	UnsignedBytes() []byte
 	Bytes() []byte
+	SignedBytes() []byte
 
 	ConsumedAssetIDs() ids.Set
 	AssetIDs() ids.Set

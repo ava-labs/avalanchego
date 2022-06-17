@@ -272,7 +272,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := tx.Bytes()
+	result := tx.SignedBytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
@@ -444,7 +444,7 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := tx.Bytes()
+	result := tx.SignedBytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}

@@ -606,7 +606,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes())
+	assetID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -742,7 +742,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes())
+	assetID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1058,7 +1058,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes())
+	txID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1173,7 +1173,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes())
+	txID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1281,7 +1281,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes())
+	txID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1399,7 +1399,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes())
+	txID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1514,7 +1514,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes())
+	txID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1652,7 +1652,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes())
+	txID, err := service.vm.IssueTx(tx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
