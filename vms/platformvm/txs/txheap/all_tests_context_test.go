@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -316,13 +317,16 @@ func initializeState(tState state.State, ctx *snow.Context) {
 
 	chains := make([]*txs.Tx, 0)
 	dummyGenID := ids.ID{'g', 'e', 'n', 'I', 'D'}
+	genesisState := &genesis.State{
+		UTXOs:         utxos,
+		Validators:    validators,
+		Chains:        chains,
+		Timestamp:     timestamp,
+		InitialSupply: initialSupply,
+	}
 	if err := tState.SyncGenesis(
 		dummyGenID,
-		timestamp,
-		initialSupply,
-		utxos,
-		validators,
-		chains,
+		genesisState,
 	); err != nil {
 		panic(err)
 	}

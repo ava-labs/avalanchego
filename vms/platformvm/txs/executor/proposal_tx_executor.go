@@ -30,7 +30,8 @@ var (
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
 	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
 	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
-	errStakeOverflow             = errors.New("too many funds staked on single validator")
+	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
+	errStakeOverflow             = errors.New("validator stake exceeds limit")
 	errInvalidState              = errors.New("generated output isn't valid state")
 	errOverDelegated             = errors.New("validator would be over delegated")
 	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
@@ -256,7 +257,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
-					return transactions.ErrDSValidatorSubset
+					return errValidatorSubset
 				}
 				return fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
@@ -269,7 +270,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		// Ensure that the period this validator validates the specified subnet
 		// is a subset of the time they validate the primary network.
 		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-			return transactions.ErrDSValidatorSubset
+			return errValidatorSubset
 		}
 
 		// Ensure that this transaction isn't a duplicate add validator tx.
@@ -289,7 +290,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		subnetIntf, _, err := e.ParentState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			if err == database.ErrNotFound {
-				return transactions.ErrDSValidatorSubset
+				return errValidatorSubset
 			}
 			return fmt.Errorf(
 				"couldn't find subnet %s with %w",
@@ -409,7 +410,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		var (
 			vdrTx                  *txs.AddValidatorTx
 			currentDelegatorWeight uint64
-			currentDelegators      []txs.DelegatorAndID
+			currentDelegators      []transactions.DelegatorAndID
 		)
 		if err == nil {
 			// This delegator is attempting to delegate to a currently validing

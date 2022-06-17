@@ -93,10 +93,10 @@ type InternalState interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type internalStateImpl struct {
+	state.State
+
 	vm     *VM
 	baseDB *versiondb.Database
-
-	state.State
 
 	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
 	blockCache  cache.Cacher        // cache of blockID -> Block, if the entry is nil, it is not in the database
@@ -284,12 +284,11 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	errs := wrappers.Errs{}
 	errs.Add(
 		st.writeBlocks(),
-		st.Write(),
+		st.State.Write(),
 	)
 	if errs.Err != nil {
 		return nil, errs.Err
 	}
-
 	return st.baseDB.CommitBatch()
 }
 
@@ -303,29 +302,22 @@ func (st *internalStateImpl) Close() error {
 	return errs.Err
 }
 
-func (st *internalStateImpl) writeBlocks() (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to write blocks with: %w", err)
-		}
-	}()
-
+func (st *internalStateImpl) writeBlocks() error {
 	for blkID, stateBlk := range st.addedBlocks {
 		var (
-			btxBytes []byte
-			blkID    = blkID
-			sblk     = stateBlk
+			blkID = blkID
+			stBlk = stateBlk
 		)
 
-		btxBytes, err = stateless.Codec.Marshal(stateless.Version, &sblk)
+		btxBytes, err := stateless.Codec.Marshal(stateless.Version, &stBlk)
 		if err != nil {
-			return
+			return fmt.Errorf("failed to marshal state block with: %w", err)
 		}
 
 		delete(st.addedBlocks, blkID)
 		st.blockCache.Put(blkID, stateBlk)
 		if err = st.blockDB.Put(blkID[:], btxBytes); err != nil {
-			return
+			return fmt.Errorf("failed to write block with: %w", err)
 		}
 	}
 	return nil
@@ -343,18 +335,11 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	st.AddStatelessBlock(genesisBlock, choices.Accepted)
 	st.SetLastAccepted(genesisBlock.ID())
 
-	utxos, timestamp, initialSupply,
-		validators, chains, err := genesis.ExtractGenesisContent(genesisBytes)
+	genesisState, err := genesis.ParseState(genesisBytes)
 	if err != nil {
 		return err
 	}
-	if err := st.SyncGenesis(
-		genesisBlock.ID(),
-		timestamp,
-		initialSupply,
-		utxos,
-		validators,
-		chains); err != nil {
+	if err := st.SyncGenesis(genesisBlock.ID(), genesisState); err != nil {
 		return err
 	}
 

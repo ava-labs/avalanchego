@@ -342,19 +342,14 @@ func defaultKeys() []*crypto.PrivateKeySECP256K1R {
 
 func initializeState(tState state.State, ctx *snow.Context) {
 	genesisBytes := buildGenesisTest(ctx)
-	utxos, timestamp, initialSupply,
-		validators, chains, err := p_genesis.ExtractGenesisContent(genesisBytes)
+	genesisState, err := p_genesis.ParseState(genesisBytes)
 	if err != nil {
 		panic(err)
 	}
 	dummyGenID := ids.ID{'g', 'e', 'n', 'I', 'D'}
 	if err := tState.SyncGenesis(
 		dummyGenID,
-		timestamp,
-		initialSupply,
-		utxos,
-		validators,
-		chains,
+		genesisState,
 	); err != nil {
 		panic(err)
 	}

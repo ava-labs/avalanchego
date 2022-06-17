@@ -76,7 +76,9 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Unsigned.(*txs.AddValidatorTx).Stake = []*avax.TransferableOutput{{
+
+	addValidatorTx := tx.Unsigned.(*txs.AddValidatorTx)
+	addValidatorTx.Stake = []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: h.cfg.MinValidatorStake,
@@ -107,7 +109,9 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Unsigned.(*txs.AddValidatorTx).RewardsOwner = &secp256k1fx.OutputOwners{
+
+	addValidatorTx = tx.Unsigned.(*txs.AddValidatorTx)
+	addValidatorTx.RewardsOwner = &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
 		Addrs:     nil,

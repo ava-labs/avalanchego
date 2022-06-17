@@ -7,12 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -42,11 +41,7 @@ type State interface {
 	// information from genesis block as marshalled from bytes
 	SyncGenesis(
 		genesisBlkID ids.ID,
-		genesisTimestamp uint64,
-		genesisInitialSupply uint64,
-		genesisUtxos []*avax.UTXO,
-		genesisValidator []*txs.Tx,
-		genesisChains []*txs.Tx,
+		genesisState *genesis.State,
 	) error
 
 	// Upon vm initialization, Load pulls
@@ -101,18 +96,14 @@ type state struct {
 
 func (s *state) SyncGenesis(
 	genesisBlkID ids.ID,
-	genesisTimestamp uint64,
-	genesisInitialSupply uint64,
-	genesisUtxos []*avax.UTXO,
-	genesisValidator []*txs.Tx,
-	genesisChains []*txs.Tx,
+	genesisState *genesis.State,
 ) error {
-	err := s.DataState.SyncGenesis(genesisBlkID, genesisTimestamp, genesisInitialSupply)
+	err := s.DataState.SyncGenesis(genesisBlkID, genesisState.Timestamp, genesisState.InitialSupply)
 	if err != nil {
 		return err
 	}
 
-	return s.TxState.SyncGenesis(genesisUtxos, genesisValidator, genesisChains)
+	return s.TxState.SyncGenesis(genesisState.UTXOs, genesisState.Validators, genesisState.Chains)
 }
 
 func (s *state) Load() error {
