@@ -6,78 +6,60 @@ package version
 import (
 	"errors"
 	"fmt"
-)
-
-const (
-	defaultAppSeparator = "/"
+	"sync/atomic"
 )
 
 var (
-	errDifferentApps = errors.New("different applications")
+	errDifferentMajor = errors.New("different major version")
+
+	_ fmt.Stringer = &Semantic{}
 )
 
 type Application struct {
-	Semantic
-	app string
-	str string
+	Major int `json:"major" yaml:"major"`
+	Minor int `json:"minor" yaml:"minor"`
+	Patch int `json:"patch" yaml:"patch"`
+
+	str atomic.Value
 }
 
-// NewDefaultApplication returns a new version with default separators
-func NewDefaultApplication(
-	app string,
-	major int,
-	minor int,
-	patch int,
-) Application {
-	return NewApplication(
-		app,
-		defaultAppSeparator,
-		defaultVersionSeparator,
-		major,
-		minor,
-		patch,
-	)
-}
-
-// NewApplication returns a new version
-func NewApplication(
-	app string,
-	appSeparator string,
-	versionSeparator string,
-	major int,
-	minor int,
-	patch int,
-) Application {
-	v := NewSemantic(major, minor, patch, "", versionSeparator)
-	return Application{
-		Semantic: v,
-		app:      app,
-		str: fmt.Sprintf("%s%s%s",
-			app,
-			appSeparator,
-			v,
-		),
+func (a *Application) String() string {
+	strIntf := a.str.Load()
+	if strIntf != nil {
+		return strIntf.(string)
 	}
+
+	str := fmt.Sprintf(
+		"avalanche/%d.%d.%d",
+		a.Major,
+		a.Minor,
+		a.Patch,
+	)
+	a.str.Store(str)
+	return str
 }
 
-func (a Application) App() string    { return a.app }
-func (a Application) String() string { return a.str }
-
-func (a Application) Compatible(other Application) error {
+func (a *Application) Compatible(o *Application) error {
 	switch {
-	case a.App() != other.App():
-		return errDifferentApps
-	case a.Major > other.Major:
+	case a.Major > o.Major:
 		return errDifferentMajor
 	default:
 		return nil
 	}
 }
 
-func (a Application) Before(other Application) bool {
-	if a.App() != other.App() {
-		return false
-	}
+func (a *Application) Before(o *Application) bool {
+	return a.Compare(o) < 0
+}
 
-	return a.Compare(other.Semantic) < 0
+// Compare returns a positive number if s > o, 0 if s == o, or a negative number
+// if s < o.
+func (a *Application) Compare(o *Application) int {
+	if a.Major != o.Major {
+		return a.Major - o.Major
+	}
+	if a.Minor != o.Minor {
+		return a.Minor - o.Minor
+	}
+	return a.Patch - o.Patch
 }

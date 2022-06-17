@@ -19,7 +19,7 @@ type InternalMsgBuilder interface {
 	) InboundMessage
 
 	InternalTimeout(nodeID ids.NodeID) InboundMessage
-	InternalConnected(nodeID ids.NodeID, nodeVersion version.Application) InboundMessage
+	InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage
 	InternalDisconnected(nodeID ids.NodeID) InboundMessage
 	InternalVMMessage(nodeID ids.NodeID, notification uint32) InboundMessage
 	InternalGossipRequest(nodeID ids.NodeID) InboundMessage
@@ -54,7 +54,7 @@ func (internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
 	}
 }
 
-func (internalMsgBuilder) InternalConnected(nodeID ids.NodeID, nodeVersion version.Application) InboundMessage {
+func (internalMsgBuilder) InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
 	return &inboundMessage{
 		op: Connected,
 		fields: map[Field]interface{}{

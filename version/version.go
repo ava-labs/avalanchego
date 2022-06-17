@@ -4,80 +4,53 @@
 package version
 
 import (
-	"errors"
 	"fmt"
-)
-
-const (
-	defaultVersionSeparator = "."
-	defaultVersionPrefix    = "v"
+	"sync/atomic"
 )
 
 var (
-	// DefaultVersion1_0_0 is a useful version to use in tests
-	DefaultVersion1_0_0 = NewDefaultSemantic(1, 0, 0)
-
-	errDifferentMajor = errors.New("different major version")
+	// V1_0_0 is a useful version to use in tests
+	Semantic1_0_0 = &Semantic{
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
+	}
 
 	_ fmt.Stringer = &Semantic{}
 )
 
 type Semantic struct {
-	Major int    `json:"major" yaml:"major"`
-	Minor int    `json:"minor" yaml:"minor"`
-	Patch int    `json:"patch" yaml:"patch"`
-	Str   string `json:"string" yaml:"string"`
+	Major int `json:"major" yaml:"major"`
+	Minor int `json:"minor" yaml:"minor"`
+	Patch int `json:"patch" yaml:"patch"`
+
+	str atomic.Value
 }
 
-func NewDefaultSemantic(major, minor, patch int) Semantic {
-	return NewSemantic(major, minor, patch, defaultVersionPrefix, defaultVersionSeparator)
+func (s *Semantic) String() string {
+	strIntf := s.str.Load()
+	if strIntf != nil {
+		return strIntf.(string)
+	}
+
+	str := fmt.Sprintf(
+		"v%d.%d.%d",
+		s.Major,
+		s.Minor,
+		s.Patch,
+	)
+	s.str.Store(str)
+	return str
 }
 
-func NewSemantic(major, minor, patch int, prefix, versionSeparator string) Semantic {
-	return Semantic{
-		Major: major,
-		Minor: minor,
-		Patch: patch,
-		Str: fmt.Sprintf(
-			"%s%d%s%d%s%d",
-			prefix,
-			major,
-			versionSeparator,
-			minor,
-			versionSeparator,
-			patch,
-		),
+// Compare returns a positive number if s > o, 0 if s == o, or a negative number
+// if s < o.
+func (s *Semantic) Compare(o *Semantic) int {
+	if s.Major != o.Major {
+		return s.Major - o.Major
 	}
-}
-
-func (s Semantic) String() string {
-	return s.Str
-}
-
-// Compare returns a positive number if v > o, 0 if v == o, or a negative number if v < 0.
-func (s Semantic) Compare(other Semantic) int {
-	{
-		vm := s.Major
-		om := other.Major
-
-		if vm != om {
-			return vm - om
-		}
+	if s.Minor != o.Minor {
+		return s.Minor - o.Minor
 	}
-
-	{
-		vm := s.Minor
-		om := other.Minor
-
-		if vm != om {
-			return vm - om
-		}
-	}
-
-	{
-		vp := s.Patch
-		op := other.Patch
-
-		return vp - op
-	}
+	return s.Patch - o.Patch
 }

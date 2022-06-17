@@ -29,6 +29,6 @@ func (f InboundHandlerFunc) HandleInbound(msg message.InboundMessage) {
 type ExternalHandler interface {
 	InboundHandler
 
-	Connected(nodeID ids.NodeID, nodeVersion version.Application)
+	Connected(nodeID ids.NodeID, nodeVersion *version.Application)
 	Disconnected(nodeID ids.NodeID)
 }
