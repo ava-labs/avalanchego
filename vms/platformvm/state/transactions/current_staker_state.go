@@ -142,9 +142,9 @@ func (cs *currentStakerState) UpdateStakers(
 			case *txs.AddValidatorTx:
 				txID := vdr.AddStakerTx.ID()
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &currentValidatorImpl{
-					addValidator: txs.ValidatorAndID{
-						UnsignedAddValidatorTx: tx,
-						TxID:                   txID,
+					addValidator: ValidatorAndID{
+						Tx:   tx,
+						TxID: txID,
 					},
 					potentialReward: vdr.PotentialReward,
 				}
@@ -160,11 +160,11 @@ func (cs *currentStakerState) UpdateStakers(
 				txID := vdr.AddStakerTx.ID()
 				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
-				newVdr.delegators = make([]txs.DelegatorAndID, len(oldVdr.delegators)+1)
+				newVdr.delegators = make([]DelegatorAndID, len(oldVdr.delegators)+1)
 				copy(newVdr.delegators, oldVdr.delegators)
-				newVdr.delegators[len(oldVdr.delegators)] = txs.DelegatorAndID{
-					UnsignedAddDelegatorTx: tx,
-					TxID:                   txID,
+				newVdr.delegators[len(oldVdr.delegators)] = DelegatorAndID{
+					Tx:   tx,
+					TxID: txID,
 				}
 				sortDelegatorsByRemoval(newVdr.delegators)
 				newVdr.delegatorWeight += tx.Validator.Wght
@@ -181,13 +181,13 @@ func (cs *currentStakerState) UpdateStakers(
 				txID := vdr.ID()
 				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
-				newVdr.subnets = make(map[ids.ID]txs.SubnetValidatorAndID, len(oldVdr.subnets)+1)
+				newVdr.subnets = make(map[ids.ID]SubnetValidatorAndID, len(oldVdr.subnets)+1)
 				for subnetID, addTx := range oldVdr.subnets {
 					newVdr.subnets[subnetID] = addTx
 				}
-				newVdr.subnets[tx.Validator.Subnet] = txs.SubnetValidatorAndID{
-					UnsignedAddSubnetValidator: tx,
-					TxID:                       txID,
+				newVdr.subnets[tx.Validator.Subnet] = SubnetValidatorAndID{
+					Tx:   tx,
+					TxID: txID,
 				}
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
@@ -211,7 +211,7 @@ func (cs *currentStakerState) UpdateStakers(
 		case *txs.AddSubnetValidatorTx:
 			oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 			newVdr := *oldVdr
-			newVdr.subnets = make(map[ids.ID]txs.SubnetValidatorAndID, len(oldVdr.subnets)-1)
+			newVdr.subnets = make(map[ids.ID]SubnetValidatorAndID, len(oldVdr.subnets)-1)
 			for subnetID, addTx := range oldVdr.subnets {
 				if removedID != addTx.TxID {
 					newVdr.subnets[subnetID] = addTx
@@ -259,9 +259,9 @@ func (cs *currentStakerState) DeleteNextStaker() (CurrentStakerState, error) {
 						delegators: vdr.delegators[1:], // sorted in order of removal
 						subnets:    vdr.subnets,
 					},
-					addValidator: txs.ValidatorAndID{
-						UnsignedAddValidatorTx: vdr.addValidator.UnsignedAddValidatorTx,
-						TxID:                   vdr.addValidator.TxID,
+					addValidator: ValidatorAndID{
+						Tx:   vdr.addValidator.Tx,
+						TxID: vdr.addValidator.TxID,
 					},
 					delegatorWeight: vdr.delegatorWeight - tx.Validator.Wght,
 					potentialReward: vdr.potentialReward,
@@ -312,7 +312,7 @@ func (cs *currentStakerState) primaryValidatorSet() (validators.Set, error) {
 
 	var err error
 	for nodeID, vdr := range cs.validatorsByNodeID {
-		vdrWeight := vdr.addValidator.UnsignedAddValidatorTx.Validator.Wght
+		vdrWeight := vdr.addValidator.Tx.Validator.Wght
 		vdrWeight, err = safemath.Add64(vdrWeight, vdr.delegatorWeight)
 		if err != nil {
 			return nil, err
@@ -333,7 +333,7 @@ func (cs *currentStakerState) subnetValidatorSet(subnetID ids.ID) (validators.Se
 		if !exists {
 			continue
 		}
-		if err := vdrs.AddWeight(nodeID, subnetVDR.UnsignedAddSubnetValidator.Validator.Wght); err != nil {
+		if err := vdrs.AddWeight(nodeID, subnetVDR.Tx.Validator.Wght); err != nil {
 			return nil, err
 		}
 	}
@@ -439,14 +439,14 @@ func sortValidatorsByRemoval(s []*txs.Tx) {
 	sort.Sort(innerSortValidatorsByRemoval(s))
 }
 
-type innerSortDelegatorsByRemoval []txs.DelegatorAndID
+type innerSortDelegatorsByRemoval []DelegatorAndID
 
 func (s innerSortDelegatorsByRemoval) Less(i, j int) bool {
 	iDel := s[i]
 	jDel := s[j]
 
-	iEndTime := iDel.UnsignedAddDelegatorTx.EndTime()
-	jEndTime := jDel.UnsignedAddDelegatorTx.EndTime()
+	iEndTime := iDel.Tx.EndTime()
+	jEndTime := jDel.Tx.EndTime()
 	if iEndTime.Before(jEndTime) {
 		return true
 	}
@@ -468,6 +468,6 @@ func (s innerSortDelegatorsByRemoval) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func sortDelegatorsByRemoval(s []txs.DelegatorAndID) {
+func sortDelegatorsByRemoval(s []DelegatorAndID) {
 	sort.Sort(innerSortDelegatorsByRemoval(s))
 }

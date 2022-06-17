@@ -42,27 +42,31 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 	return gen, nil
 }
 
-func ExtractGenesisContent(genesisBytes []byte) (
-	utxos []*avax.UTXO,
-	timestamp uint64,
-	initialSupply uint64,
-	validators []*txs.Tx,
-	chains []*txs.Tx,
-	err error,
-) {
+// State represents the state of a genesis state of the platform chain
+type State struct {
+	UTXOs         []*avax.UTXO
+	Validators    []*txs.Tx
+	Chains        []*txs.Tx
+	Timestamp     uint64
+	InitialSupply uint64
+}
+
+func ParseState(genesisBytes []byte) (*State, error) {
 	genesis, err := Parse(genesisBytes)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	utxos = make([]*avax.UTXO, 0, len(genesis.UTXOs))
+	utxos := make([]*avax.UTXO, 0, len(genesis.UTXOs))
 	for _, utxo := range genesis.UTXOs {
 		utxos = append(utxos, &utxo.UTXO)
 	}
 
-	timestamp = genesis.Timestamp
-	initialSupply = genesis.InitialSupply
-	validators = genesis.Validators
-	chains = genesis.Chains
-	return
+	return &State{
+		UTXOs:         utxos,
+		Validators:    genesis.Validators,
+		Chains:        genesis.Chains,
+		Timestamp:     genesis.Timestamp,
+		InitialSupply: genesis.InitialSupply,
+	}, nil
 }

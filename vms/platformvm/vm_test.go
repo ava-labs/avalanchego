@@ -1593,7 +1593,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2710,7 +2710,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
@@ -3012,7 +3012,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
