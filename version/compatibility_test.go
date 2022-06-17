@@ -86,18 +86,6 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			peer: &Application{
-				Major: 1,
-				Minor: 5,
-				Patch: 0,
-			},
-			time:        minCompatableTime,
-			connectable: false,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
-		},
-		{
-			peer: &Application{
 				Major: 0,
 				Minor: 1,
 				Patch: 0,
