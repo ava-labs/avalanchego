@@ -176,7 +176,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 
 	if args.Encoding == formatting.JSON {
 		reply.Tx = tx
-		return tx.Visit(&txInit{
+		return tx.Unsigned.Visit(&txInit{
 			tx:            tx.Tx,
 			ctx:           service.vm.ctx,
 			typeToFxIndex: service.vm.typeToFxIndex,
@@ -316,7 +316,7 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownAssetID
 	}
-	createAssetTx, ok := tx.UnsignedTx.(*txs.CreateAssetTx)
+	createAssetTx, ok := tx.Unsigned.(*txs.CreateAssetTx)
 	if !ok {
 		return errTxNotCreateAsset
 	}
@@ -590,7 +590,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 	initialState.Sort(service.vm.parser.Codec())
 
-	tx := txs.Tx{UnsignedTx: &txs.CreateAssetTx{
+	tx := txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -606,7 +606,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.SignedBytes())
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -726,7 +726,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 	initialState.Sort(service.vm.parser.Codec())
 
-	tx := txs.Tx{UnsignedTx: &txs.CreateAssetTx{
+	tx := txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -742,7 +742,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.SignedBytes())
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1047,7 +1047,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 	avax.SortTransferableOutputs(outs, service.vm.parser.Codec())
 
-	tx := txs.Tx{UnsignedTx: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    service.vm.ctx.NetworkID,
 		BlockchainID: service.vm.ctx.ChainID,
 		Outs:         outs,
@@ -1058,7 +1058,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.SignedBytes())
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1160,7 +1160,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	}
 	keys = append(keys, opKeys...)
 
-	tx := txs.Tx{UnsignedTx: &txs.OperationTx{
+	tx := txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -1173,7 +1173,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.SignedBytes())
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1265,7 +1265,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		return err
 	}
 
-	tx := txs.Tx{UnsignedTx: &txs.OperationTx{
+	tx := txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -1281,7 +1281,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.SignedBytes())
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1383,7 +1383,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return err
 	}
 
-	tx := txs.Tx{UnsignedTx: &txs.OperationTx{
+	tx := txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -1399,7 +1399,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.SignedBytes())
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1500,7 +1500,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 	}
 	avax.SortTransferableOutputs(outs, service.vm.parser.Codec())
 
-	tx := txs.Tx{UnsignedTx: &txs.ImportTx{
+	tx := txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -1514,7 +1514,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.SignedBytes())
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1638,7 +1638,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 	avax.SortTransferableOutputs(outs, service.vm.parser.Codec())
 
-	tx := txs.Tx{UnsignedTx: &txs.ExportTx{
+	tx := txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
@@ -1652,7 +1652,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.SignedBytes())
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

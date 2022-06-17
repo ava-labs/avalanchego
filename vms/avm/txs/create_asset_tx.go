@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 const (
@@ -58,29 +57,6 @@ func (t *CreateAssetTx) InitCtx(ctx *snow.Context) {
 // InitialStates track which virtual machines, and the initial state of these
 // machines, this asset uses. The returned array should not be modified.
 func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }
-
-// UTXOs returns the UTXOs transaction is producing.
-func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
-	txID := t.ID()
-	utxos := t.BaseTx.UTXOs()
-
-	for _, state := range t.States {
-		for _, out := range state.Outs {
-			utxos = append(utxos, &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(utxos)),
-				},
-				Asset: avax.Asset{
-					ID: txID,
-				},
-				Out: out,
-			})
-		}
-	}
-
-	return utxos
-}
 
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,

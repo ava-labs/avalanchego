@@ -175,7 +175,7 @@ func (tx *UniqueTx) Accept() error {
 		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
-	err = tx.Tx.Visit(&executeTx{
+	err = tx.Tx.Unsigned.Visit(&executeTx{
 		tx:           tx.Tx,
 		batch:        commitBatch,
 		sharedMemory: tx.vm.ctx.SharedMemory,
@@ -244,8 +244,8 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 			txID: txID,
 		})
 	}
-	consumedIDs := tx.Tx.ConsumedAssetIDs()
-	for assetID := range tx.Tx.AssetIDs() {
+	consumedIDs := tx.Tx.Unsigned.ConsumedAssetIDs()
+	for assetID := range tx.Tx.Unsigned.AssetIDs() {
 		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
 			continue
 		}
@@ -289,7 +289,7 @@ func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
 	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
 		return tx.inputUTXOs
 	}
-	tx.inputUTXOs = tx.Tx.InputUTXOs()
+	tx.inputUTXOs = tx.Tx.Unsigned.InputUTXOs()
 	return tx.inputUTXOs
 }
 
@@ -306,7 +306,7 @@ func (tx *UniqueTx) UTXOs() []*avax.UTXO {
 // Bytes returns the binary representation of this transaction
 func (tx *UniqueTx) Bytes() []byte {
 	tx.refresh()
-	return tx.Tx.SignedBytes()
+	return tx.Tx.Bytes()
 }
 
 func (tx *UniqueTx) verifyWithoutCacheWrites() error {
@@ -366,7 +366,7 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	return tx.Visit(&txSemanticVerify{
+	return tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx.Tx,
 		vm: tx.vm,
 	})

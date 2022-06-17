@@ -71,28 +71,6 @@ func (t *OperationTx) NumCredentials() int {
 	return t.BaseTx.NumCredentials() + len(t.Ops)
 }
 
-// UTXOs returns the UTXOs transaction is producing.
-func (t *OperationTx) UTXOs() []*avax.UTXO {
-	txID := t.ID()
-	utxos := t.BaseTx.UTXOs()
-
-	for _, op := range t.Ops {
-		asset := op.AssetID()
-		for _, out := range op.Op.Outs() {
-			utxos = append(utxos, &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(utxos)),
-				},
-				Asset: avax.Asset{ID: asset},
-				Out:   out,
-			})
-		}
-	}
-
-	return utxos
-}
-
 // SyntacticVerify that this transaction is well-formed.
 func (t *OperationTx) SyntacticVerify(
 	ctx *snow.Context,

@@ -23,7 +23,7 @@ func (t *txSemanticVerify) BaseTx(tx *txs.BaseTx) error {
 		// Note: Verification of the length of [t.tx.Creds] happens during
 		// syntactic verification, which happens before semantic verification.
 		cred := t.tx.Creds[i].Verifiable
-		if err := t.vm.verifyTransfer(t.tx, in, cred); err != nil {
+		if err := t.vm.verifyTransfer(t.tx.Unsigned, in, cred); err != nil {
 			return err
 		}
 	}

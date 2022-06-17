@@ -434,7 +434,7 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		}
 
 		tx := txs.Tx{
-			UnsignedTx: &genesisTx.CreateAssetTx,
+			Unsigned: &genesisTx.CreateAssetTx,
 		}
 		if err := vm.parser.InitializeGenesisTx(&tx); err != nil {
 			return err
@@ -570,7 +570,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if status := tx.Status(); !status.Fetched() {
 		return false
 	}
-	createAssetTx, ok := tx.UnsignedTx.(*txs.CreateAssetTx)
+	createAssetTx, ok := tx.Unsigned.(*txs.CreateAssetTx)
 	if !ok {
 		// This transaction was not an asset creation tx
 		return false

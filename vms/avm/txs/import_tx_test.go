@@ -69,7 +69,7 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 
-	tx := &Tx{UnsignedTx: &ImportTx{
+	tx := &Tx{Unsigned: &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID: 2,
 			BlockchainID: ids.ID{
@@ -111,7 +111,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
-	result := tx.SignedBytes()
+	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
@@ -169,7 +169,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
-	result = tx.SignedBytes()
+	result = tx.Bytes()
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02
@@ -218,7 +218,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
@@ -265,7 +265,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to memo field being too long")

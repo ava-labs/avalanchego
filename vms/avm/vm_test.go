@@ -150,7 +150,7 @@ func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	}
 
 	tx := &txs.Tx{
-		UnsignedTx: &assetTx.CreateAssetTx,
+		Unsigned: &assetTx.CreateAssetTx,
 	}
 	if err := parser.InitializeGenesisTx(tx); err != nil {
 		tb.Fatal(err)
@@ -342,29 +342,27 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
 func NewTxWithAsset(t *testing.T, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
 	createTx := GetCreateTxFromGenesisTest(t, genesisBytes, assetName)
 
-	newTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        createTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: createTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        createTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: createTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := newTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -377,76 +375,72 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*txs
 
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
-	firstTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        avaxTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: avaxTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: avaxTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: avaxTx.ID()},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: startBalance - vm.TxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: avaxTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := firstTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	secondTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        avaxTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: avaxTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: avaxTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: avaxTx.ID()},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{key.PublicKey().Address()},
-						},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: avaxTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := secondTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
@@ -554,7 +548,7 @@ func TestIssueTx(t *testing.T) {
 
 	newTx := NewTx(t, genesisBytes, vm)
 
-	txID, err := vm.IssueTx(newTx.SignedBytes())
+	txID, err := vm.IssueTx(newTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,11 +582,11 @@ func TestIssueDependentTx(t *testing.T) {
 	firstTx := txs[1]
 	secondTx := txs[2]
 
-	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(secondTx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(secondTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Lock.Unlock()
@@ -656,7 +650,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createAssetTx := &txs.Tx{UnsignedTx: &txs.CreateAssetTx{
+	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -688,11 +682,11 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(createAssetTx.SignedBytes()); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	mintNFTTx := &txs.Tx{UnsignedTx: &txs.OperationTx{
+	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -717,12 +711,12 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(mintNFTTx.SignedBytes()); err != nil {
+	if _, err = vm.IssueTx(mintNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	transferNFTTx := &txs.Tx{
-		UnsignedTx: &txs.OperationTx{
+		Unsigned: &txs.OperationTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
@@ -751,7 +745,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(transferNFTTx.SignedBytes()); err != nil {
+	if _, err = vm.IssueTx(transferNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -808,7 +802,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createAssetTx := &txs.Tx{UnsignedTx: &txs.CreateAssetTx{
+	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -832,11 +826,11 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(createAssetTx.SignedBytes()); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	mintPropertyTx := &txs.Tx{UnsignedTx: &txs.OperationTx{
+	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -870,11 +864,11 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(mintPropertyTx.SignedBytes()); err != nil {
+	if _, err = vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	burnPropertyTx := &txs.Tx{UnsignedTx: &txs.OperationTx{
+	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -896,7 +890,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(burnPropertyTx.SignedBytes()); err != nil {
+	if _, err = vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -969,7 +963,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	// send first asset
 	newTx := NewTxWithAsset(t, genesisBytes, vm, feeAssetName)
 
-	txID, err := vm.IssueTx(newTx.SignedBytes())
+	txID, err := vm.IssueTx(newTx.Bytes())
 	assert.NoError(t, err)
 	assert.Equal(t, txID, newTx.ID())
 
@@ -996,7 +990,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	feeAssetCreateTx := GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
 	createTx := GetCreateTxFromGenesisTest(t, genesisBytes, otherAssetName)
 
-	newTx := &txs.Tx{UnsignedTx: &txs.BaseTx{
+	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1040,7 +1034,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(newTx.SignedBytes())
+	txID, err := vm.IssueTx(newTx.Bytes())
 	assert.NoError(t, err)
 	assert.Equal(t, txID, newTx.ID())
 
@@ -1092,7 +1086,7 @@ func TestTxCached(t *testing.T) {
 	}()
 
 	newTx := NewTx(t, genesisBytes, vm)
-	txBytes := newTx.SignedBytes()
+	txBytes := newTx.Bytes()
 
 	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
@@ -1128,7 +1122,7 @@ func TestTxNotCached(t *testing.T) {
 	}()
 
 	newTx := NewTx(t, genesisBytes, vm)
-	txBytes := newTx.SignedBytes()
+	txBytes := newTx.Bytes()
 
 	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
@@ -1167,14 +1161,14 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	}()
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
-	parsedSecondTx, err := vm.ParseTx(secondTx.SignedBytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Accept(); err != nil {
@@ -1210,14 +1204,14 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
 
-	parsedSecondTx, err := vm.ParseTx(secondTx.SignedBytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	parsedFirstTx, err := vm.GetTx(firstTx.ID())
@@ -1244,7 +1238,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
 	key := keys[0]
-	firstTxDescendant := &txs.Tx{UnsignedTx: &txs.BaseTx{BaseTx: avax.BaseTx{
+	firstTxDescendant := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
@@ -1277,17 +1271,17 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.ParseTx(secondTx.SignedBytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := parsedSecondTx.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.IssueTx(firstTxDescendant.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	parsedFirstTx, err := vm.GetTx(firstTx.ID())
@@ -1356,7 +1350,7 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 
-	tx := &txs.Tx{UnsignedTx: &txs.ImportTx{
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID: 2,
 			BlockchainID: ids.ID{
@@ -1397,7 +1391,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
-	result := tx.SignedBytes()
+	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
@@ -1455,7 +1449,7 @@ func TestImportTxSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
-	result = tx.SignedBytes()
+	result = tx.Bytes()
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02
@@ -1535,7 +1529,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	txAssetID := avax.Asset{ID: avaxID}
-	tx := &txs.Tx{UnsignedTx: &txs.ImportTx{
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1566,7 +1560,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.SignedBytes()); err == nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
 		t.Fatal(err)
 	}
 
@@ -1601,7 +1595,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatalf("should have issued the transaction correctly but erred: %s", err)
 	}
 	ctx.Lock.Unlock()
@@ -1708,7 +1702,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		},
 	}
 
-	tx := &txs.Tx{UnsignedTx: &txs.ImportTx{
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1728,7 +1722,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx, err := vm.ParseTx(tx.SignedBytes())
+	parsedTx, err := vm.ParseTx(tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1802,7 +1796,7 @@ func TestIssueExportTx(t *testing.T) {
 
 	key := keys[0]
 
-	tx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1834,7 +1828,7 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1941,7 +1935,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	key := keys[0]
 
 	assetID := avax.Asset{ID: avaxID}
-	tx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1973,7 +1967,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.IssueTx(tx.SignedBytes()); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
