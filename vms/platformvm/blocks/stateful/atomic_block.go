@@ -162,11 +162,7 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 func (ab *AtomicBlock) Accept() error {
-	var (
-		blkID = ab.ID()
-		tx    = ab.AtomicTx()
-		txID  = tx.ID()
-	)
+	blkID := ab.ID()
 
 	ab.txExecutorBackend.Ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
@@ -197,7 +193,7 @@ func (ab *AtomicBlock) Accept() error {
 	if err = ab.txExecutorBackend.Ctx.SharedMemory.Apply(ab.atomicRequests, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
-			txID,
+			ab.AtomicTx().ID(),
 			blkID,
 			err,
 		)

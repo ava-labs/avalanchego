@@ -45,6 +45,8 @@ type Content interface {
 type State interface {
 	Content
 
+	// Upon vm initialization, SyncGenesis loads
+	// information from genesis block as marshalled from bytes
 	Sync(genesisBytes []byte) error
 	Load() error
 
@@ -188,17 +190,24 @@ func (s *state) syncGenesis(genesisBytes []byte) error {
 		return err
 	}
 
-	utxos, timestamp, initialSupply,
-		validators, chains, err := p_genesis.ExtractGenesisContent(genesisBytes)
+	genesisState, err := p_genesis.Parse(genesisBytes)
 	if err != nil {
 		return err
 	}
 
-	if err := s.DataState.SyncGenesis(genesisBlkID, timestamp, initialSupply); err != nil {
+	if err := s.DataState.SyncGenesis(
+		genesisBlkID,
+		genesisState.Timestamp,
+		genesisState.InitialSupply,
+	); err != nil {
 		return err
 	}
 
-	return s.TxState.SyncGenesis(utxos, validators, chains)
+	return s.TxState.SyncGenesis(
+		genesisState.UTXOs,
+		genesisState.Validators,
+		genesisState.Chains,
+	)
 }
 
 func (s *state) Load() error {
