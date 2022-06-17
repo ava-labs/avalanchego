@@ -586,7 +586,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return fxIDs.Contains(uint(fxID))
 }
 
-func (vm *VM) verifyTransferOfUTXO(tx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
+func (vm *VM) verifyTransferOfUTXO(utx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
 	fxIndex, err := vm.getFx(cred)
 	if err != nil {
 		return err
@@ -603,7 +603,7 @@ func (vm *VM) verifyTransferOfUTXO(tx txs.UnsignedTx, in *avax.TransferableInput
 		return errIncompatibleFx
 	}
 
-	return fx.VerifyTransfer(tx, in.In, cred, utxo.Out)
+	return fx.VerifyTransfer(utx, in.In, cred, utxo.Out)
 }
 
 func (vm *VM) verifyTransfer(tx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
