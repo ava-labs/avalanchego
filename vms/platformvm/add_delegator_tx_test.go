@@ -54,11 +54,14 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Unsigned.(*txs.AddDelegatorTx).NetworkID++
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*txs.AddDelegatorTx).SyntacticallyVerified = false
+
+	addDelegatorTx := tx.Unsigned.(*txs.AddDelegatorTx)
+	addDelegatorTx.NetworkID++
+	// This tx was syntactically verified when it was created... pretend it
+	// wasn't so we don't use cache
+	addDelegatorTx.SyntacticallyVerified = false
 	if err := tx.SyntacticVerify(vm.ctx); err == nil {
-		t.Fatal("should have errored because the wrong network ID was used")
+		t.Fatal("should have erred because the wrong network ID was used")
 	}
 
 	// Case: Valid
