@@ -119,11 +119,40 @@ func (sb *StandardBlock) Verify() error {
 	}
 
 	parentState := parent.OnAccept()
-	sb.onAcceptState = state.NewVersioned(
-		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
-	)
+	blkVersion := sb.Version()
+	switch blkVersion {
+	case stateless.PreForkVersion:
+		sb.onAcceptState = state.NewVersioned(
+			parentState,
+			parentState.CurrentStakerChainState(),
+			parentState.PendingStakerChainState(),
+		)
+
+	case stateless.PostForkVersion:
+		// We update staker set before processing block transactions
+		nextChainTime := sb.Timestamp()
+		currentStakers := parentState.CurrentStakerChainState()
+		pendingStakers := parentState.PendingStakerChainState()
+		currentSupply := parentState.GetCurrentSupply()
+		newlyCurrentStakers, newlyPendingStakers, updatedSupply, err := executor.UpdateStakerSet(currentStakers, pendingStakers, currentSupply, &sb.txExecutorBackend, nextChainTime)
+		if err != nil {
+			return err
+		}
+
+		sb.onAcceptState = state.NewVersioned(
+			parentState,
+			newlyCurrentStakers,
+			newlyPendingStakers,
+		)
+		sb.onAcceptState.SetTimestamp(nextChainTime)
+		sb.onAcceptState.SetCurrentSupply(updatedSupply)
+
+	default:
+		return fmt.Errorf(
+			"block version %d, unknown recipe to update chain state. Verification failed",
+			blkVersion,
+		)
+	}
 
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.Inputs.Clear()
