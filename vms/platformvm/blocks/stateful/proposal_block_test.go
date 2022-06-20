@@ -10,15 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPostForkStandardBlockTimestampChecks(t *testing.T) {
+func TestPostForkProposalBlockTimestampChecks(t *testing.T) {
 	assert := assert.New(t)
 
 	h := newTestHelpersCollection(t)
@@ -116,72 +114,31 @@ func TestPostForkStandardBlockTimestampChecks(t *testing.T) {
 			// build and verify child block
 			childVersion := blkVersion
 			childHeight := uint64(2022)
-			childTxs, err := testDecisionTxs()
+			childTx, err := testProposalTx()
 			assert.NoError(err)
-			blk, err := NewStandardBlock(
+			blk, err := NewProposalBlock(
 				childVersion,
 				uint64(test.childTime.Unix()),
 				h.blkVerifier,
 				h.txExecBackend,
 				postForkParentBlk.ID(),
 				childHeight,
-				childTxs,
+				*childTx,
 			)
 			assert.NoError(err)
 
 			// call verify on it
-			err = blk.decisionBlock.verify()
+			err = blk.commonBlock.verify()
 			assert.ErrorIs(err, test.result)
 		})
 	}
 }
 
-func testDecisionTxs() ([]*txs.Tx, error) {
-	countTxs := 2
-	txes := make([]*txs.Tx, 0, countTxs)
-	for i := 0; i < countTxs; i++ {
-		// Create the tx
-		utx := &txs.CreateChainTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    10,
-				BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: uint64(1234),
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-						},
-					},
-				}},
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        ids.ID{'t', 'x', 'I', 'D'},
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
-					In: &secp256k1fx.TransferInput{
-						Amt:   uint64(5678),
-						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-					},
-				}},
-				Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
-			}},
-			SubnetID:    ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'},
-			ChainName:   "a chain",
-			VMID:        ids.GenerateTestID(),
-			FxIDs:       []ids.ID{ids.GenerateTestID()},
-			GenesisData: []byte{'g', 'e', 'n', 'D', 'a', 't', 'a'},
-			SubnetAuth:  &secp256k1fx.Input{SigIndices: []uint32{1}},
-		}
-
-		signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
-		tx, err := txs.NewSigned(utx, txs.Codec, signers)
-		if err != nil {
-			return nil, err
-		}
-		txes = append(txes, tx)
+func testProposalTx() (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{
+		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
 	}
-	return txes, nil
+
+	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
+	return txs.NewSigned(utx, txs.Codec, signers)
 }
