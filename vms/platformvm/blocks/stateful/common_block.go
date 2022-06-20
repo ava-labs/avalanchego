@@ -4,6 +4,7 @@
 package stateful
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
+
+var ErrOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
@@ -120,9 +123,10 @@ func (c *commonBlock) validateBlockTimestamp() error {
 	case *stateless.AbortBlock, *stateless.CommitBlock:
 		if !blkTime.Equal(currentChainTime) {
 			return fmt.Errorf(
-				"expected block timestamp (%s) to be equal to parent timestamp (%s)",
-				blkTime,
+				"%w parent block timestamp (%s) option block timestamp (%s)",
+				ErrOptionBlockTimestampNotMatchingParent,
 				currentChainTime,
+				blkTime,
 			)
 		}
 		return nil

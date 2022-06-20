@@ -104,8 +104,8 @@ func TestPostForkProposalBlockTimestampChecks(t *testing.T) {
 			postForkParentBlk, err := stateless.NewStandardBlock(
 				parentVersion,
 				uint64(test.parentTime.Unix()),
-				ids.Empty,
-				parentHeight-1,
+				ids.Empty, // does not matter
+				parentHeight,
 				parentTxs,
 			)
 			assert.NoError(err)
@@ -113,7 +113,7 @@ func TestPostForkProposalBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childVersion := blkVersion
-			childHeight := uint64(2022)
+			childHeight := parentHeight + 1
 			childTx, err := testProposalTx()
 			assert.NoError(err)
 			blk, err := NewProposalBlock(
