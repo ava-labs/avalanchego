@@ -4,6 +4,7 @@
 package stateful
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,7 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var _ Block = &ProposalBlock{}
+var (
+	_ Block = &ProposalBlock{}
+
+	ErrAdvanceTimeTxCannotBeIncluded = errors.New("advance time tx cannot be included in block")
+)
 
 // ProposalBlock is a proposal to change the chain's state.
 //
@@ -138,6 +143,12 @@ func (pb *ProposalBlock) setBaseState() {
 func (pb *ProposalBlock) Verify() error {
 	if err := pb.verify(); err != nil {
 		return err
+	}
+
+	if pb.Version() == stateless.PostForkVersion {
+		if _, ok := pb.ProposalTx().Unsigned.(*txs.AdvanceTimeTx); ok {
+			return ErrAdvanceTimeTxCannotBeIncluded
+		}
 	}
 
 	parentIntf, parentErr := pb.parentBlock()

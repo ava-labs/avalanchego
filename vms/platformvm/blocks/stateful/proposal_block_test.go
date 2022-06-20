@@ -134,6 +134,67 @@ func TestPostForkProposalBlockTimestampChecks(t *testing.T) {
 	}
 }
 
+func TestPostForkProposalBlockCannotContainAdvanceTimeTx(t *testing.T) {
+	assert := assert.New(t)
+
+	h := newTestHelpersCollection(t)
+	defer func() {
+		if err := internalStateShutdown(h); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	h.cfg.AdvanceTimeTxRemovalTime = time.Time{}
+
+	nextStakerChangeTime, err := h.fullState.GetNextStakerChangeTime()
+	assert.NoError(err)
+	blkVersion := uint16(stateless.PostForkVersion)
+	localTime := nextStakerChangeTime.Add(-59 * time.Second)
+	parentTime := nextStakerChangeTime.Add(-60 * time.Second)
+	childTime := nextStakerChangeTime.Add(-55 * time.Second)
+
+	h.clk.Set(localTime)
+
+	// setup and store parent block
+	// it's a standard block for simplicity
+	parentVersion := blkVersion
+	parentHeight := uint64(2022)
+	parentTxs, err := testDecisionTxs()
+	assert.NoError(err)
+
+	postForkParentBlk, err := stateless.NewStandardBlock(
+		parentVersion,
+		uint64(parentTime.Unix()),
+		ids.Empty, // does not matter
+		parentHeight,
+		parentTxs,
+	)
+	assert.NoError(err)
+	h.fullState.AddStatelessBlock(postForkParentBlk, choices.Accepted)
+
+	// build and verify child block
+	childVersion := blkVersion
+	childHeight := parentHeight + 1
+
+	utx := &txs.AdvanceTimeTx{Time: uint64(h.clk.Time().Unix())}
+	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
+	advanceTimeTx, err := txs.NewSigned(utx, txs.Codec, signers)
+	assert.NoError(err)
+
+	blk, err := NewProposalBlock(
+		childVersion,
+		uint64(childTime.Unix()),
+		h.blkVerifier,
+		h.txExecBackend,
+		postForkParentBlk.ID(),
+		childHeight,
+		*advanceTimeTx,
+	)
+	assert.NoError(err)
+
+	// call verify on it
+	assert.ErrorIs(blk.Verify(), ErrAdvanceTimeTxCannotBeIncluded)
+}
+
 func testProposalTx() (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{
 		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
