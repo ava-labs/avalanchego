@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -82,18 +83,19 @@ type testHelpersCollection struct {
 	mpool       mempool.Mempool
 	sender      *common.SenderTest
 
-	isBootstrapped *utils.AtomicBool
-	cfg            *config.Config
-	clk            *mockable.Clock
-	baseDB         *versiondb.Database
-	ctx            *snow.Context
-	fx             fx.Fx
-	fullState      state.State
-	atomicUtxosMan avax.AtomicUTXOManager
-	uptimeMan      uptime.Manager
-	utxosMan       utxos.SpendHandler
-	txBuilder      tx_builder.Builder
-	txExecBackend  executor.Backend
+	isBootstrapped  *utils.AtomicBool
+	cfg             *config.Config
+	clk             *mockable.Clock
+	baseDB          *versiondb.Database
+	ctx             *snow.Context
+	fx              fx.Fx
+	fullState       state.State
+	mockedFullState *state.MockState
+	atomicUtxosMan  avax.AtomicUTXOManager
+	uptimeMan       uptime.Manager
+	utxosMan        utxos.SpendHandler
+	txBuilder       tx_builder.Builder
+	txExecBackend   executor.Backend
 }
 
 func (t *testHelpersCollection) ResetBlockTimer() {
@@ -118,7 +120,7 @@ func init() {
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 }
 
-func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
+func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelpersCollection {
 	var (
 		res = &testHelpersCollection{}
 		err error
@@ -136,22 +138,37 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
 
 	rewardsCalc := reward.NewCalculator(res.cfg.RewardConfig)
-	res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
-
 	res.atomicUtxosMan = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
-	res.uptimeMan = uptime.NewManager(res.fullState)
-	res.utxosMan = utxos.NewHandler(res.ctx, *res.clk, res.fullState, res.fx)
 
-	res.txBuilder = tx_builder.New(
-		res.ctx,
-		*res.cfg,
-		*res.clk,
-		res.fx,
-		res.fullState,
-		res.atomicUtxosMan,
-		res.utxosMan,
-		rewardsCalc,
-	)
+	if ctrl == nil {
+		res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
+		res.uptimeMan = uptime.NewManager(res.fullState)
+		res.utxosMan = utxos.NewHandler(res.ctx, *res.clk, res.fullState, res.fx)
+		res.txBuilder = tx_builder.New(
+			res.ctx,
+			*res.cfg,
+			*res.clk,
+			res.fx,
+			res.fullState,
+			res.atomicUtxosMan,
+			res.utxosMan,
+			rewardsCalc,
+		)
+	} else {
+		res.mockedFullState = state.NewMockState(ctrl)
+		res.uptimeMan = uptime.NewManager(res.mockedFullState)
+		res.utxosMan = utxos.NewHandler(res.ctx, *res.clk, res.mockedFullState, res.fx)
+		res.txBuilder = tx_builder.New(
+			res.ctx,
+			*res.cfg,
+			*res.clk,
+			res.fx,
+			res.mockedFullState,
+			res.atomicUtxosMan,
+			res.utxosMan,
+			rewardsCalc,
+		)
+	}
 
 	res.txExecBackend = executor.Backend{
 		Cfg:          res.cfg,
@@ -183,15 +200,27 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
-	res.blkVerifier = NewBlockVerifier(
-		res.mpool,
-		res.fullState,
-		res.txExecBackend,
-		metrics,
-		window,
-	)
 
-	addSubnet(res.fullState, res.txBuilder, res.txExecBackend)
+	if ctrl == nil {
+		res.blkVerifier = NewBlockVerifier(
+			res.mpool,
+			res.fullState,
+			res.txExecBackend,
+			metrics,
+			window,
+		)
+		addSubnet(res.fullState, res.txBuilder, res.txExecBackend)
+	} else {
+		res.blkVerifier = NewBlockVerifier(
+			res.mpool,
+			res.mockedFullState,
+			res.txExecBackend,
+			metrics,
+			window,
+		)
+		// we do not add any subnet to state, since we can mock
+		// whatever we need
+	}
 
 	return res
 }
@@ -442,6 +471,11 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 }
 
 func internalStateShutdown(t *testHelpersCollection) error {
+	if t.mockedFullState != nil {
+		// state is mocked, nothing to do here
+		return nil
+	}
+
 	if t.isBootstrapped.GetValue() {
 		primaryValidatorSet, exist := t.cfg.Validators.GetValidators(constants.PrimaryNetworkID)
 		if !exist {
@@ -463,9 +497,9 @@ func internalStateShutdown(t *testHelpersCollection) error {
 	}
 
 	errs := wrappers.Errs{}
-	errs.Add(
-		t.fullState.Close(),
-		t.baseDB.Close(),
-	)
+	if t.fullState != nil {
+		errs.Add(t.fullState.Close())
+	}
+	errs.Add(t.baseDB.Close())
 	return errs.Err
 }

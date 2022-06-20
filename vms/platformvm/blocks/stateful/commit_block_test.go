@@ -16,7 +16,7 @@ import (
 func TestPostForkCommitBlockTimestampChecks(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	h := newTestHelpersCollection(t, nil)
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
