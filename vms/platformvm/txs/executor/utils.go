@@ -4,8 +4,15 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp not after current chain time")
+	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
+	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
 func ValidateProposedChainTime(
@@ -16,7 +23,8 @@ func ValidateProposedChainTime(
 ) error {
 	if !proposedChainTime.After(currentChainTime) {
 		return fmt.Errorf(
-			"proposed timestamp (%s), not after current timestamp (%s)",
+			"%w, proposed timestamp (%s), chain time (%s)",
+			ErrChildBlockEarlierThanParent,
 			proposedChainTime,
 			currentChainTime,
 		)
@@ -26,7 +34,8 @@ func ValidateProposedChainTime(
 	// set change time
 	if proposedChainTime.After(nextStakerChangeTime) {
 		return fmt.Errorf(
-			"proposed timestamp (%s) later than next staker change time (%s)",
+			"%w, proposed timestamp (%s), next staker change time (%s)",
+			ErrChildBlockAfterStakerChangeTime,
 			proposedChainTime,
 			nextStakerChangeTime,
 		)
@@ -37,7 +46,8 @@ func ValidateProposedChainTime(
 	localTimestampPlusSync := localTime.Add(SyncBound)
 	if localTimestampPlusSync.Before(proposedChainTime) {
 		return fmt.Errorf(
-			"proposed time (%s) is too far in the future relative to local time (%s)",
+			"%w, proposed time (%s), local time (%s)",
+			ErrChildBlockBeyondSyncBound,
 			proposedChainTime,
 			localTime,
 		)
