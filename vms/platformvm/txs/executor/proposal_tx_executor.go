@@ -523,151 +523,158 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return errWrongNumberOfCredentials
 	}
 
+	// Validate txTimestamp by comparing it with relevant time quantities
 	txTimestamp := tx.Timestamp()
 	localTimestamp := e.Clk.Time()
-	localTimestampPlusSync := localTimestamp.Add(SyncBound)
-	if localTimestampPlusSync.Before(txTimestamp) {
-		return fmt.Errorf(
-			"proposed time (%s) is too far in the future relative to local time (%s)",
-			txTimestamp,
-			localTimestamp,
-		)
-	}
-
-	if chainTimestamp := e.ParentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
-		return fmt.Errorf(
-			"proposed timestamp (%s), not after current timestamp (%s)",
-			txTimestamp,
-			chainTimestamp,
-		)
-	}
-
-	// Only allow timestamp to move forward as far as the time of next staker
-	// set change time
+	chainTimestamp := e.ParentState.GetTimestamp()
 	nextStakerChangeTime, err := e.ParentState.GetNextStakerChangeTime()
 	if err != nil {
 		return err
 	}
 
-	if txTimestamp.After(nextStakerChangeTime) {
-		return fmt.Errorf(
-			"proposed timestamp (%s) later than next staker change time (%s)",
-			txTimestamp,
-			nextStakerChangeTime,
-		)
+	if err := ValidateProposedChainTime(
+		txTimestamp,
+		chainTimestamp,
+		nextStakerChangeTime,
+		localTimestamp,
+	); err != nil {
+		return err
 	}
 
+	// update State if this proposal is committed
+	CurrentStakerStates := e.ParentState.CurrentStakerChainState()
+	PendingStakerStates := e.ParentState.PendingStakerChainState()
 	currentSupply := e.ParentState.GetCurrentSupply()
 
-	pendingStakers := e.ParentState.PendingStakerChainState()
+	newlyCurrentStakerStates, newlyPendingStakerStates, updatedSupply, err := UpdateStakerSet(CurrentStakerStates, PendingStakerStates, currentSupply, e.Backend, txTimestamp)
+	if err != nil {
+		return err
+	}
+
+	e.OnCommit = state.NewVersioned(e.ParentState, newlyCurrentStakerStates, newlyPendingStakerStates)
+	e.OnCommit.SetTimestamp(txTimestamp)
+	e.OnCommit.SetCurrentSupply(updatedSupply)
+
+	// State doesn't change if this proposal is aborted
+	e.OnAbort = state.NewVersioned(e.ParentState, CurrentStakerStates, PendingStakerStates)
+	e.PrefersCommit = !txTimestamp.After(localTimestamp.Add(SyncBound))
+	return nil
+}
+
+func UpdateStakerSet(
+	currentStakerStates transactions.CurrentStakerState,
+	pendingStakerStates transactions.PendingStakerState,
+	currentSupply uint64,
+	backend *Backend,
+	proposedChainTime time.Time,
+) (
+	transactions.CurrentStakerState,
+	transactions.PendingStakerState,
+	uint64, // updatedSupply
+	error,
+) {
 	toAddValidatorsWithRewardToCurrent := []*transactions.ValidatorReward(nil)
 	toAddDelegatorsWithRewardToCurrent := []*transactions.ValidatorReward(nil)
 	toAddWithoutRewardToCurrent := []*txs.Tx(nil)
 	numToRemoveFromPending := 0
+	var err error
 
 	// Add to the staker set any pending stakers whose start time is at or
-	// before the new timestamp. [pendingStakers.Stakers()] is sorted in order
+	// before the new timestamp. [PendingStakerStates.Stakers()] is sorted in order
 	// of increasing startTime
-pendingStakerLoop:
-	for _, tx := range pendingStakers.Stakers() {
-		switch staker := tx.Unsigned.(type) {
+PendingStakerStateLoop:
+	for _, stakerTx := range pendingStakerStates.Stakers() {
+		switch staker := stakerTx.Unsigned.(type) {
 		case *txs.AddDelegatorTx:
-			if staker.StartTime().After(txTimestamp) {
-				break pendingStakerLoop
+			if staker.StartTime().After(proposedChainTime) {
+				break PendingStakerStateLoop
 			}
 
-			r := e.Rewards.Calculate(
+			r := backend.Rewards.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
 			)
 			currentSupply, err = math.Add64(currentSupply, r)
 			if err != nil {
-				return err
+				return nil, nil, 0, err
 			}
 
 			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &transactions.ValidatorReward{
-				AddStakerTx:     tx,
+				AddStakerTx:     stakerTx,
 				PotentialReward: r,
 			})
 			numToRemoveFromPending++
 		case *txs.AddValidatorTx:
-			if staker.StartTime().After(txTimestamp) {
-				break pendingStakerLoop
+			if staker.StartTime().After(proposedChainTime) {
+				break PendingStakerStateLoop
 			}
 
-			r := e.Rewards.Calculate(
+			r := backend.Rewards.Calculate(
 				staker.Validator.Duration(),
 				staker.Validator.Wght,
 				currentSupply,
 			)
 			currentSupply, err = math.Add64(currentSupply, r)
 			if err != nil {
-				return err
+				return nil, nil, 0, err
 			}
 
 			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &transactions.ValidatorReward{
-				AddStakerTx:     tx,
+				AddStakerTx:     stakerTx,
 				PotentialReward: r,
 			})
 			numToRemoveFromPending++
 		case *txs.AddSubnetValidatorTx:
-			if staker.StartTime().After(txTimestamp) {
-				break pendingStakerLoop
+			if staker.StartTime().After(proposedChainTime) {
+				break PendingStakerStateLoop
 			}
 
 			// If this staker should already be removed, then we should just
 			// never add them.
-			if staker.EndTime().After(txTimestamp) {
-				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, tx)
+			if staker.EndTime().After(proposedChainTime) {
+				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, stakerTx)
 			}
 			numToRemoveFromPending++
 		default:
-			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+			return nil, nil, 0, fmt.Errorf("expected validator but got %T", stakerTx.Unsigned)
 		}
 	}
-	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
-
-	currentStakers := e.ParentState.CurrentStakerChainState()
-	numToRemoveFromCurrent := 0
+	newlyPendingStakerStates := pendingStakerStates.DeleteStakers(numToRemoveFromPending)
 
 	// Remove from the staker set any subnet validators whose endTime is at or
 	// before the new timestamp
-currentStakerLoop:
-	for _, tx := range currentStakers.Stakers() {
+	numToRemoveFromCurrent := 0
+CurrentStakerStateLoop:
+	for _, tx := range currentStakerStates.Stakers() {
 		switch staker := tx.Unsigned.(type) {
 		case *txs.AddSubnetValidatorTx:
-			if staker.EndTime().After(txTimestamp) {
-				break currentStakerLoop
+			if staker.EndTime().After(proposedChainTime) {
+				break CurrentStakerStateLoop
 			}
 
 			numToRemoveFromCurrent++
 		case *txs.AddValidatorTx, *txs.AddDelegatorTx:
 			// We shouldn't be removing any primary network validators here
-			break currentStakerLoop
+			break CurrentStakerStateLoop
 		default:
-			return errWrongTxType
+			return nil,
+				nil,
+				0,
+				fmt.Errorf("expected tx type *txs.AddValidatorTx or *txs.AddDelegatorTx but got %T", staker)
 		}
 	}
-	newlyCurrentStakers, err := currentStakers.UpdateStakers(
+	newlyCurrentStakerStates, err := currentStakerStates.UpdateStakers(
 		toAddValidatorsWithRewardToCurrent,
 		toAddDelegatorsWithRewardToCurrent,
 		toAddWithoutRewardToCurrent,
 		numToRemoveFromCurrent,
 	)
 	if err != nil {
-		return err
+		return nil, nil, 0, err
 	}
 
-	e.OnCommit = state.NewVersioned(e.ParentState, newlyCurrentStakers, newlyPendingStakers)
-	e.OnCommit.SetTimestamp(txTimestamp)
-	e.OnCommit.SetCurrentSupply(currentSupply)
-
-	// State doesn't change if this proposal is aborted
-	e.OnAbort = state.NewVersioned(e.ParentState, currentStakers, pendingStakers)
-
-	e.PrefersCommit = !txTimestamp.After(localTimestampPlusSync)
-	return nil
+	return newlyCurrentStakerStates, newlyPendingStakerStates, currentSupply, nil
 }
 
 func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
