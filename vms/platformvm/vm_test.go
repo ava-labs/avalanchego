@@ -667,7 +667,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*tx,
+		tx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1648,7 +1648,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := txs.Tx{Unsigned: &txs.ImportTx{
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
@@ -1764,7 +1764,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		firstVM.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*firstAdvanceTimeTx,
+		firstAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1892,7 +1892,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		firstVM.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*firstAdvanceTimeTx,
+		firstAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2027,7 +2027,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx,
+		advanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2316,7 +2316,7 @@ func TestUnverifiedParent(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*firstAdvanceTimeTx,
+		firstAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2343,7 +2343,7 @@ func TestUnverifiedParent(t *testing.T) {
 		vm.txExecutorBackend,
 		firstOption.ID(),
 		firstOption.(p_block.Block).Height()+1,
-		*secondAdvanceTimeTx,
+		secondAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2612,7 +2612,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*addValidatorTx,
+		addValidatorTx,
 	)
 	assert.NoError(err)
 
@@ -2753,7 +2753,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx,
+		advanceTimeTx,
 	)
 	assert.NoError(err)
 
@@ -2863,7 +2863,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*addValidatorTx0,
+		addValidatorTx0,
 	)
 	assert.NoError(err)
 
@@ -2906,7 +2906,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx0,
+		advanceTimeTx0,
 	)
 	assert.NoError(err)
 
@@ -3066,7 +3066,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*addValidatorTx1,
+		addValidatorTx1,
 	)
 	assert.NoError(err)
 
@@ -3109,7 +3109,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx1,
+		advanceTimeTx1,
 	)
 	assert.NoError(err)
 

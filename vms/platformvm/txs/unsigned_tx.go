@@ -15,7 +15,7 @@ type UnsignedTx interface {
 	// avm.
 	snow.ContextInitializable
 	Initialize(unsignedBytes []byte)
-	UnsignedBytes() []byte
+	Bytes() []byte
 
 	// InputIDs returns the set of inputs this transaction consumes
 	InputIDs() ids.Set

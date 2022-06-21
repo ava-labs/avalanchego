@@ -16,7 +16,7 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx txs.Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (pb *ProposalBlock) Initialize(bytes []byte) error {
@@ -36,9 +36,9 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 	return nil
 }
 
-func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{&pb.Tx} }
+func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
 
-func NewProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*ProposalBlock, error) {
+func NewProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*ProposalBlock, error) {
 	res := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,

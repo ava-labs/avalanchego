@@ -28,14 +28,14 @@ type RewardValidatorTx struct {
 	// Marks if this validator should be rewarded according to this node.
 	ShouldPreferCommit bool
 
-	unsignedBytes []byte // Unsigned byte representation of this data
+	bytes []byte // Unsigned byte representation of this data
 }
 
 func (tx *RewardValidatorTx) Initialize(unsignedBytes []byte) {
-	tx.unsignedBytes = unsignedBytes
+	tx.bytes = unsignedBytes
 }
 func (tx *RewardValidatorTx) InitCtx(*snow.Context)               {}
-func (tx *RewardValidatorTx) UnsignedBytes() []byte               { return tx.unsignedBytes }
+func (tx *RewardValidatorTx) Bytes() []byte                       { return tx.bytes }
 func (tx *RewardValidatorTx) InputIDs() ids.Set                   { return nil }
 func (tx *RewardValidatorTx) Outputs() []*avax.TransferableOutput { return nil }
 func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error { return nil }
