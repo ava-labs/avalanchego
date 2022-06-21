@@ -35,34 +35,32 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -96,7 +94,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
+		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
@@ -127,7 +125,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -148,35 +146,32 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: assetID},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: assetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
-
+	}}
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -239,28 +234,25 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In:    &avax.TestTransferable{},
-				}},
-			},
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In:    &avax.TestTransferable{},
+			}},
 		},
-	}
-
+	}}
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	err = tx.Visit(&txSemanticVerify{
+	err = tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -282,7 +274,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
+		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
@@ -317,7 +309,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -338,35 +330,32 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        ids.Empty,
-						OutputIndex: 1,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: 1,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
-
+	}}
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -387,35 +376,32 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: math.MaxUint32,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: math.MaxUint32,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
-
+	}}
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -430,40 +416,38 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	pendingTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	pendingTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: startBalance - vm.TxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -487,34 +471,32 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 
 	vm.PendingTxs()
 
-	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        txID,
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	err = tx.Visit(&txSemanticVerify{
+	err = tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -529,40 +511,38 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	pendingTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	pendingTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: startBalance - vm.TxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +566,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 
 	vm.PendingTxs()
 
-	tx := &txs.Tx{UnsignedTx: &txs.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -612,7 +592,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tx.Visit(&txSemanticVerify{
+	err = tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -672,40 +652,38 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	pendingTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	pendingTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: startBalance - vm.TxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -730,7 +708,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	vm.PendingTxs()
 
 	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
+		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
@@ -761,7 +739,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tx.Visit(&txSemanticVerify{
+	err = tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -821,40 +799,38 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	pendingTx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        genesisTx.ID(),
-						OutputIndex: 2,
-					},
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					In: &secp256k1fx.TransferInput{
-						Amt: startBalance,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+	pendingTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: genesisTx.ID()},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: startBalance - vm.TxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-						},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -879,7 +855,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	vm.PendingTxs()
 
 	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
+		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
@@ -913,7 +889,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tx.Visit(&txSemanticVerify{
+	err = tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -998,7 +974,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
-	tx := &txs.Tx{UnsignedTx: &txs.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1029,7 +1005,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := tx.Visit(&txSemanticVerify{
+	err := tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx,
 		vm: vm,
 	})
@@ -1050,7 +1026,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
-	rawTx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	rawTx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1093,7 +1069,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	err = rawTx.Visit(&txSemanticVerify{
+	err = rawTx.Unsigned.Visit(&txSemanticVerify{
 		tx: utx.Tx,
 		vm: vm,
 	})
@@ -1114,7 +1090,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
-	rawTx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	rawTx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1142,7 +1118,6 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 			},
 		}},
 	}}
-
 	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -1158,7 +1133,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 	}
 
 	utx.Tx.Creds[0].Verifiable = nil
-	err = rawTx.Visit(&txSemanticVerify{
+	err = rawTx.Unsigned.Visit(&txSemanticVerify{
 		tx: utx.Tx,
 		vm: vm,
 	})
@@ -1179,7 +1154,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
-	rawTx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	rawTx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1222,7 +1197,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	err = rawTx.Visit(&txSemanticVerify{
+	err = rawTx.Unsigned.Visit(&txSemanticVerify{
 		tx: utx.Tx,
 		vm: vm,
 	})
@@ -1247,7 +1222,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 	assetID := avaxID
 	// so the inputs below are sorted
 	copy(assetID[len(assetID)-5:], []byte{255, 255, 255, 255})
-	rawTx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	rawTx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1288,7 +1263,6 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 			},
 		}},
 	}}
-
 	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{
 		{
 			keys[0],
@@ -1310,7 +1284,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	err = rawTx.Visit(&txSemanticVerify{
+	err = rawTx.Unsigned.Visit(&txSemanticVerify{
 		tx: utx.Tx,
 		vm: vm,
 	})
@@ -1393,7 +1367,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	rawTx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	rawTx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1421,7 +1395,6 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 			},
 		}},
 	}}
-
 	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -1437,7 +1410,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	}
 
 	utx.Tx.Creds[0].Verifiable = &avax.TestVerifiable{}
-	err = rawTx.Visit(&txSemanticVerify{
+	err = rawTx.Unsigned.Visit(&txSemanticVerify{
 		tx: utx.Tx,
 		vm: vm,
 	})
@@ -1458,7 +1431,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
-	rawTx := &txs.Tx{UnsignedTx: &txs.ExportTx{
+	rawTx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1486,7 +1459,6 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 			},
 		}},
 	}}
-
 	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[1]}}); err != nil {
 		t.Fatal(err)
 	}
@@ -1501,7 +1473,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	err = rawTx.Visit(&txSemanticVerify{
+	err = rawTx.Unsigned.Visit(&txSemanticVerify{
 		tx: utx.Tx,
 		vm: vm,
 	})

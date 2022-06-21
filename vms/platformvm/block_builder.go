@@ -179,7 +179,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
+		return m.vm.newProposalBlock(preferredID, nextHeight, rewardValidatorTx)
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -192,7 +192,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
+		return m.vm.newProposalBlock(preferredID, nextHeight, advanceTimeTx)
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -216,10 +216,10 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
+		return m.vm.newProposalBlock(preferredID, nextHeight, advanceTimeTx)
 	}
 
-	return m.vm.newProposalBlock(preferredID, nextHeight, *tx)
+	return m.vm.newProposalBlock(preferredID, nextHeight, tx)
 }
 
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the

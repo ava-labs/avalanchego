@@ -28,7 +28,7 @@ type AdvanceTimeTx struct {
 
 func (tx *AdvanceTimeTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsignedBytes }
 
-func (tx *AdvanceTimeTx) UnsignedBytes() []byte { return tx.unsignedBytes }
+func (tx *AdvanceTimeTx) Bytes() []byte { return tx.unsignedBytes }
 
 func (tx *AdvanceTimeTx) InitCtx(*snow.Context) {}
 

@@ -194,12 +194,12 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 		m.numAbortBlocks.Inc()
 	case *AtomicBlock:
 		m.numAtomicBlocks.Inc()
-		return m.AcceptTx(&b.Tx)
+		return m.AcceptTx(b.Tx)
 	case *CommitBlock:
 		m.numCommitBlocks.Inc()
 	case *ProposalBlock:
 		m.numProposalBlocks.Inc()
-		return m.AcceptTx(&b.Tx)
+		return m.AcceptTx(b.Tx)
 	case *StandardBlock:
 		m.numStandardBlocks.Inc()
 		for _, tx := range b.Txs {
