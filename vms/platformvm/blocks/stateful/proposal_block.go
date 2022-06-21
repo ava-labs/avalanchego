@@ -47,7 +47,7 @@ func NewProposalBlock(
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
-	tx txs.Tx,
+	tx *txs.Tx,
 ) (*ProposalBlock, error) {
 	statelessBlk, err := stateless.NewProposalBlock(parentID, height, tx)
 	if err != nil {
@@ -108,7 +108,7 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.verifier.Add(&pb.Tx); err != nil {
+	if err := pb.verifier.Add(pb.Tx); err != nil {
 		pb.txExecutorBackend.Ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			pb.Tx.ID(),
@@ -153,7 +153,7 @@ func (pb *ProposalBlock) Verify() error {
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &pb.txExecutorBackend,
 		ParentState: parentState,
-		Tx:          &pb.Tx,
+		Tx:          pb.Tx,
 	}
 	err := pb.Tx.Unsigned.Visit(&txExecutor)
 	if err != nil {
@@ -166,12 +166,12 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onAbortState = txExecutor.OnAbort
 	pb.prefersCommit = txExecutor.PrefersCommit
 
-	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
-	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
+	pb.onCommitState.AddTx(pb.Tx, status.Committed)
+	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
 
 	pb.timestamp = parentState.GetTimestamp()
 
-	pb.verifier.RemoveProposalTx(&pb.Tx)
+	pb.verifier.RemoveProposalTx(pb.Tx)
 	pb.verifier.CacheVerifiedBlock(pb)
 	parentIntf.addChild(pb)
 	return nil

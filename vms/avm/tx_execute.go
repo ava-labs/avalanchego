@@ -41,7 +41,7 @@ func (et *executeTx) ImportTx(t *txs.ImportTx) error {
 }
 
 func (et *executeTx) ExportTx(t *txs.ExportTx) error {
-	txID := t.ID()
+	txID := et.tx.ID()
 
 	elems := make([]*atomic.Element, len(t.ExportedOuts))
 	codec := et.parser.Codec()

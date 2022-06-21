@@ -202,12 +202,12 @@ func (m *metrics) RegisterBlock(b stateless.Block) error {
 		m.numAbortBlocks.Inc()
 	case *stateless.AtomicBlock:
 		m.numAtomicBlocks.Inc()
-		return m.acceptTx(&b.Tx)
+		return m.acceptTx(b.Tx)
 	case *stateless.CommitBlock:
 		m.numCommitBlocks.Inc()
 	case *stateless.ProposalBlock:
 		m.numProposalBlocks.Inc()
-		return m.acceptTx(&b.Tx)
+		return m.acceptTx(b.Tx)
 	case *stateless.StandardBlock:
 		m.numStandardBlocks.Inc()
 		for _, tx := range b.Txs {

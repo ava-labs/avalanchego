@@ -17,7 +17,7 @@ var _ Block = &AtomicBlock{}
 type AtomicBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx txs.Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (ab *AtomicBlock) Initialize(bytes []byte) error {
@@ -36,9 +36,9 @@ func (ab *AtomicBlock) Initialize(bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{&ab.Tx} }
+func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
-func NewAtomicBlock(parentID ids.ID, height uint64, tx txs.Tx) (*AtomicBlock, error) {
+func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*AtomicBlock, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
