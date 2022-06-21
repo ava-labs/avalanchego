@@ -68,7 +68,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -141,7 +141,7 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -173,7 +173,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	utxo := &MintOutput{OutputOwners: secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -206,7 +206,7 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -238,7 +238,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -277,7 +277,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -316,7 +316,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -368,7 +368,7 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -410,7 +410,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -459,7 +459,7 @@ func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -511,7 +511,7 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -563,7 +563,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
@@ -616,7 +616,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &secp256k1fx.TestTx{
-		Bytes: txBytes,
+		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{

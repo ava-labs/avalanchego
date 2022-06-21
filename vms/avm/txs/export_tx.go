@@ -55,9 +55,6 @@ func (t *ExportTx) SyntacticVerify(
 	// here is more strict than the flow check performed in the [BaseTx].
 	// Therefore, we avoid performing a useless flow check by performing the
 	// other verifications here.
-	if err := t.Metadata.Verify(); err != nil {
-		return err
-	}
 	if err := t.BaseTx.BaseTx.Verify(ctx); err != nil {
 		return err
 	}

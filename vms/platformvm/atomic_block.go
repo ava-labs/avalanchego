@@ -26,7 +26,7 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx txs.Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
@@ -39,15 +39,9 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := Codec.Marshal(txs.Version, &ab.Tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
+	if err := ab.Tx.Sign(Codec, nil); err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(txs.Version, &ab.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	ab.Tx.Initialize(unsignedBytes, signedBytes)
 	ab.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
@@ -108,7 +102,7 @@ func (ab *AtomicBlock) Verify() error {
 	executor := atomicTxExecutor{
 		vm:          ab.vm,
 		parentState: parentState,
-		tx:          &ab.Tx,
+		tx:          ab.Tx,
 	}
 	err = ab.Tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -117,7 +111,7 @@ func (ab *AtomicBlock) Verify() error {
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 
-	executor.onAccept.AddTx(&ab.Tx, status.Committed)
+	executor.onAccept.AddTx(ab.Tx, status.Committed)
 
 	ab.onAcceptState = executor.onAccept
 	ab.inputs = executor.inputs
@@ -132,7 +126,7 @@ func (ab *AtomicBlock) Verify() error {
 		return errConflictingParentTxs
 	}
 
-	ab.vm.blockBuilder.RemoveDecisionTxs([]*txs.Tx{&ab.Tx})
+	ab.vm.blockBuilder.RemoveDecisionTxs([]*txs.Tx{ab.Tx})
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
@@ -194,7 +188,7 @@ func (ab *AtomicBlock) Reject() error {
 		ab.Parent(),
 	)
 
-	if err := ab.vm.blockBuilder.AddVerifiedTx(&ab.Tx); err != nil {
+	if err := ab.vm.blockBuilder.AddVerifiedTx(ab.Tx); err != nil {
 		ab.vm.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			ab.Tx.ID(),
@@ -206,7 +200,7 @@ func (ab *AtomicBlock) Reject() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx txs.Tx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
