@@ -50,7 +50,7 @@ func NewBackend(ctx Context, chainID ids.ID, utxos ChainUTXOs) Backend {
 
 // TODO: implement txs.Visitor here
 func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
-	switch utx := tx.UnsignedTx.(type) {
+	switch utx := tx.Unsigned.(type) {
 	case *txs.BaseTx, *txs.CreateAssetTx, *txs.OperationTx:
 	case *txs.ImportTx:
 		for _, input := range utx.ImportedIns {
@@ -79,10 +79,10 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 			}
 		}
 	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.UnsignedTx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
 	}
 
-	inputUTXOs := tx.UnsignedTx.InputUTXOs()
+	inputUTXOs := tx.Unsigned.InputUTXOs()
 	for _, utxoID := range inputUTXOs {
 		if utxoID.Symbol {
 			continue
@@ -92,7 +92,7 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 		}
 	}
 
-	outputUTXOs := tx.UnsignedTx.UTXOs()
+	outputUTXOs := tx.UTXOs()
 	for _, utxo := range outputUTXOs {
 		if err := b.AddUTXO(ctx, b.chainID, utxo); err != nil {
 			return err

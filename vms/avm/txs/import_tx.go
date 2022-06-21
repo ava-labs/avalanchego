@@ -80,9 +80,6 @@ func (t *ImportTx) SyntacticVerify(
 
 	// We don't call [t.BaseTx.SyntacticVerify] because the flow check performed
 	// here is less strict than the flow check performed in the [BaseTx].
-	if err := t.Metadata.Verify(); err != nil {
-		return err
-	}
 	if err := t.BaseTx.BaseTx.Verify(ctx); err != nil {
 		return err
 	}

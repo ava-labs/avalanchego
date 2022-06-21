@@ -211,7 +211,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
-			*rewardValidatorTx,
+			rewardValidatorTx,
 		)
 	}
 
@@ -230,7 +230,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
-			*advanceTimeTx,
+			advanceTimeTx,
 		)
 	}
 
@@ -260,7 +260,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			b.txExecutorBackend,
 			preferredID,
 			nextHeight,
-			*advanceTimeTx,
+			advanceTimeTx,
 		)
 	}
 
@@ -269,7 +269,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		b.txExecutorBackend,
 		preferredID,
 		nextHeight,
-		*tx,
+		tx,
 	)
 }
 

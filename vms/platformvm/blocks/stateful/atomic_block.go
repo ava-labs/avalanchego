@@ -43,7 +43,7 @@ func NewAtomicBlock(
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
-	tx txs.Tx,
+	tx *txs.Tx,
 ) (*AtomicBlock, error) {
 	statelessBlk, err := stateless.NewAtomicBlock(parentID, height, tx)
 	if err != nil {
@@ -130,7 +130,7 @@ func (ab *AtomicBlock) Verify() error {
 	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:     &ab.txExecutorBackend,
 		ParentState: parentState,
-		Tx:          &ab.Tx,
+		Tx:          ab.Tx,
 	}
 	err = ab.Tx.Unsigned.Visit(&atomicExecutor)
 	if err != nil {
@@ -139,7 +139,7 @@ func (ab *AtomicBlock) Verify() error {
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 
-	atomicExecutor.OnAccept.AddTx(&ab.Tx, status.Committed)
+	atomicExecutor.OnAccept.AddTx(ab.Tx, status.Committed)
 
 	ab.onAcceptState = atomicExecutor.OnAccept
 	ab.inputs = atomicExecutor.Inputs
@@ -154,7 +154,7 @@ func (ab *AtomicBlock) Verify() error {
 		return ErrConflictingParentTxs
 	}
 
-	ab.verifier.RemoveDecisionTxs([]*txs.Tx{&ab.Tx})
+	ab.verifier.RemoveDecisionTxs([]*txs.Tx{ab.Tx})
 	ab.verifier.CacheVerifiedBlock(ab)
 	parentIntf.addChild(ab)
 	return nil
@@ -223,7 +223,7 @@ func (ab *AtomicBlock) Reject() error {
 		ab.Parent(),
 	)
 
-	if err := ab.verifier.Add(&ab.Tx); err != nil {
+	if err := ab.verifier.Add(ab.Tx); err != nil {
 		ab.txExecutorBackend.Ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			ab.Tx.ID(),

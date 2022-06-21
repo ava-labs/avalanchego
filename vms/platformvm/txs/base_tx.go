@@ -33,7 +33,7 @@ type BaseTx struct {
 
 func (tx *BaseTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsignedBytes }
 
-func (tx *BaseTx) UnsignedBytes() []byte { return tx.unsignedBytes }
+func (tx *BaseTx) Bytes() []byte { return tx.unsignedBytes }
 
 func (tx *BaseTx) InputIDs() ids.Set {
 	inputIDs := ids.NewSet(len(tx.Ins))
