@@ -32,9 +32,9 @@ type ProposalBlock struct {
 	Tx txs.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState state.Versioned
+	onCommitState state.Diff
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState  state.Versioned
+	onAbortState  state.Diff
 	prefersCommit bool
 }
 

@@ -188,10 +188,10 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: state.NewVersioned(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -241,10 +241,10 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: state.NewVersioned(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -283,10 +283,10 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: state.NewVersioned(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -323,10 +323,10 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: state.NewVersioned(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -402,16 +402,16 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			vs := state.NewVersioned(
+			state := state.NewDiff(
 				vm.internalState,
-				vm.internalState.CurrentStakerChainState(),
-				vm.internalState.PendingStakerChainState(),
+				vm.internalState.CurrentStakers(),
+				vm.internalState.PendingStakers(),
 			)
-			vs.SetTimestamp(test.time)
+			state.SetTimestamp(test.time)
 
 			executor := standardTxExecutor{
 				vm:    vm,
-				state: vs,
+				state: state,
 				tx:    tx,
 			}
 			err = tx.Unsigned.Visit(&executor)

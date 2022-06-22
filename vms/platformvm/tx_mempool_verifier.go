@@ -14,7 +14,7 @@ var _ txs.Visitor = &mempoolTxVerifier{}
 
 type mempoolTxVerifier struct {
 	vm          *VM
-	parentState state.Mutable
+	parentState state.Chain
 	tx          *txs.Tx
 }
 
@@ -73,10 +73,10 @@ func (v *mempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 func (v *mempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 	executor := standardTxExecutor{
 		vm: v.vm,
-		state: state.NewVersioned(
+		state: state.NewDiff(
 			v.parentState,
-			v.parentState.CurrentStakerChainState(),
-			v.parentState.PendingStakerChainState(),
+			v.parentState.CurrentStakers(),
+			v.parentState.PendingStakers(),
 		),
 		tx: v.tx,
 	}
