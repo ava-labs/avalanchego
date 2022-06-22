@@ -214,7 +214,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := secondVM.internalState.CurrentStakerChainState()
+	currentStakers := secondVM.internalState.CurrentStakers()
 	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")
@@ -348,7 +348,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")

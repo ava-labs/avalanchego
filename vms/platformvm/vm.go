@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
@@ -42,7 +43,6 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
@@ -164,7 +164,7 @@ func (vm *VM) Initialize(
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 
-	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
+	is, err := NewState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
 	if err != nil {
 		return err
 	}
@@ -487,7 +487,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, txstate.ErrNotEnoughValidators
+		return nil, state.ErrNotEnoughValidators
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -573,7 +573,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 }
 
 func (vm *VM) updateValidators() error {
-	currentValidators := vm.internalState.CurrentStakerChainState()
+	currentValidators := vm.internalState.CurrentStakers()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {
 		return err

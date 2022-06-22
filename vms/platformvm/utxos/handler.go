@@ -17,10 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	txstate "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 )
 
 var (
@@ -32,7 +31,7 @@ var (
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func ConsumeInputs(
-	utxoDB txstate.UTXODeleter,
+	utxoDB state.UTXODeleter,
 	ins []*avax.TransferableInput,
 ) {
 	for _, input := range ins {
@@ -43,7 +42,7 @@ func ConsumeInputs(
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
 func ProduceOutputs(
-	utxoDB txstate.UTXOAdder,
+	utxoDB state.UTXOAdder,
 	txID ids.ID,
 	assetID ids.ID,
 	outs []*avax.TransferableOutput,
@@ -90,7 +89,7 @@ type SpendingOps interface {
 
 	// authorize an operation on behalf of the named subnet with the provided keys.
 	Authorize(
-		vs txstate.Mutable,
+		vs state.Chain,
 		subnetID ids.ID,
 		keys []*crypto.PrivateKeySECP256K1R,
 	) (
@@ -109,7 +108,7 @@ type SpendHandler interface {
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
 	// Precondition: [tx] has already been syntactically verified
 	SemanticVerifySpend(
-		utxoDB txstate.UTXOGetter,
+		utxoDB state.UTXOGetter,
 		tx txs.UnsignedTx,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
@@ -396,7 +395,7 @@ func (h *handler) Stake(
 }
 
 func (h *handler) Authorize(
-	vs txstate.Mutable,
+	state state.Chain,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -404,7 +403,7 @@ func (h *handler) Authorize(
 	[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
 	error,
 ) {
-	subnetTx, _, err := vs.GetTx(subnetID)
+	subnetTx, _, err := state.GetTx(subnetID)
 	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"failed to fetch subnet %s: %w",
@@ -438,8 +437,13 @@ func (h *handler) Authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
+// Verify that [tx] is semantically valid.
+// [db] should not be committed if an error is returned
+// [ins] and [outs] are the inputs and outputs of [tx].
+// [creds] are the credentials of [tx], which allow [ins] to be spent.
+// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpend(
-	utxoDB txstate.UTXOGetter,
+	utxoDB state.UTXOGetter,
 	utx txs.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,

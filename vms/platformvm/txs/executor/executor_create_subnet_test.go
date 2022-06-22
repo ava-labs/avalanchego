@@ -73,10 +73,10 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(txs.Codec, signers)
 			assert.NoError(err)
 
-			versionedState := state.NewVersioned(
+			versionedState := state.NewDiff(
 				h.tState,
-				h.tState.CurrentStakerChainState(),
-				h.tState.PendingStakerChainState(),
+				h.tState.CurrentStakers(),
+				h.tState.PendingStakers(),
 			)
 			versionedState.SetTimestamp(test.time)
 

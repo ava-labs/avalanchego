@@ -532,7 +532,7 @@ func TestGetStake(t *testing.T) {
 	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	assert.NoError(err)
-	err = service.vm.internalState.(*internalStateImpl).Load()
+	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
@@ -576,7 +576,7 @@ func TestGetStake(t *testing.T) {
 	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	assert.NoError(err)
-	err = service.vm.internalState.(*internalStateImpl).Load()
+	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
 	// Make sure the delegator has the right stake (old stake + stakeAmt)
@@ -682,7 +682,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = service.vm.internalState.(*internalStateImpl).Load()
+	err = service.vm.internalState.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
