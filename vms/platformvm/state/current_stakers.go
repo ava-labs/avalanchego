@@ -149,7 +149,7 @@ func (c *currentStakers) UpdateStakers(
 				}
 				newCS.validatorsByTxID[vdr.AddStakerTx.ID()] = vdr
 			default:
-				return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx)
+				return nil, fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx)
 			}
 		}
 
