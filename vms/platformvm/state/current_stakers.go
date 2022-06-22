@@ -170,7 +170,7 @@ func (c *currentStakers) UpdateStakers(
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 				newCS.validatorsByTxID[txID] = vdr
 			default:
-				return nil, fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx)
+				return nil, fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx)
 			}
 		}
 
