@@ -16,13 +16,13 @@ var ErrBlockNil = errors.New("block is nil")
 type Block interface {
 	snowman.Block
 
+	// ExpectedChildVersion returns the expected version of this block's
+	// direct child
+	ExpectedChildVersion() uint16
+
 	// parent returns the parent block, similarly to Parent. However, it
 	// provides the more specific Block interface.
 	parentBlock() (Block, error)
-
-	// expectedChildVersion returns the expected version of this block's
-	// direct child
-	expectedChildVersion() uint16
 
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.

@@ -14,13 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
@@ -176,8 +176,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	preferredID := preferred.ID()
-	nextHeight := preferred.Height() + 1
 	preferredDecision, ok := preferred.(p_block.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
@@ -185,103 +183,59 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredState := preferredDecision.OnAccept()
 
-	// Try building a standard block.
-	if b.Mempool.HasDecisionTxs() {
-		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
-		return p_block.NewStandardBlock(
-			stateless.PreForkVersion,
-			0, // preFork timestamp is not serialized
-			b.blkVerifier,
-			b.txExecutorBackend,
-			preferredID,
-			nextHeight,
-			txs,
-		)
-	}
-
-	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := b.getStakerToReward(preferredState)
-	if err != nil {
-		return nil, err
-	}
-	if shouldReward {
-		rewardValidatorTx, err := b.txBuilder.NewRewardValidatorTx(stakerTxID)
-		if err != nil {
-			return nil, err
-		}
-		return p_block.NewProposalBlock(
-			stateless.PreForkVersion,
-			0, // preFork timestamp is not serialized
-			b.blkVerifier,
-			b.txExecutorBackend,
-			preferredID,
-			nextHeight,
-			*rewardValidatorTx,
-		)
-	}
-
-	// Try building a proposal block that advances the chain timestamp.
-	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
-	if err != nil {
-		return nil, err
-	}
-	if shouldAdvanceTime {
-		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(nextChainTime)
-		if err != nil {
-			return nil, err
-		}
-		return p_block.NewProposalBlock(
-			stateless.PreForkVersion,
-			0, // preFork timestamp is not serialized
-			b.blkVerifier,
-			b.txExecutorBackend,
-			preferredID,
-			nextHeight,
-			*advanceTimeTx,
-		)
-	}
-
-	// Clean out the mempool's transactions with invalid timestamps.
-	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); !hasProposalTxs {
-		b.txExecutorBackend.Ctx.Log.Debug("no pending blocks to build")
-		return nil, errNoPendingBlocks
-	}
-
-	// Get the proposal transaction that should be issued.
-	tx := b.Mempool.PopProposalTx()
-	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
-
-	// If the chain timestamp is too far in the past to issue this transaction
-	// but according to local time, it's ready to be issued, then attempt to
-	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
-	if startTime.After(maxChainStartTime) {
-		b.Mempool.AddProposalTx(tx)
-
-		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.txExecutorBackend.Clk.Time())
-		if err != nil {
-			return nil, err
-		}
-		return p_block.NewProposalBlock(
-			stateless.PreForkVersion,
-			0, // preFork timestamp is not serialized
-			b.blkVerifier,
-			b.txExecutorBackend,
-			preferredID,
-			nextHeight,
-			*advanceTimeTx,
-		)
-	}
-
-	return p_block.NewProposalBlock(
-		stateless.PreForkVersion,
-		0, // preFork timestamp is not serialized
-		b.blkVerifier,
-		b.txExecutorBackend,
-		preferredID,
-		nextHeight,
-		*tx,
+	var (
+		txes    []*txs.Tx
+		blkTime time.Time
 	)
+
+	blkVersion := preferred.ExpectedChildVersion()
+	switch blkVersion {
+	case stateless.PreForkVersion:
+		b.txExecutorBackend.Ctx.Log.Info("about to build pre fork blocks")
+		txes, err = b.nextPreForkTxs(preferredState)
+	case stateless.PostForkVersion:
+		b.txExecutorBackend.Ctx.Log.Info("about to build post fork blocks")
+		txes, blkTime, err = b.nextPostForkTxs(preferredState)
+	default:
+		err = fmt.Errorf("unsupported block version %d", blkVersion)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	prefBlkID := preferred.ID()
+	nextHeight := preferred.Height() + 1
+	switch txes[0].Unsigned.(type) {
+	case txs.StakerTx,
+		*txs.RewardValidatorTx,
+		*txs.AdvanceTimeTx:
+		return p_block.NewProposalBlock(
+			blkVersion,
+			uint64(blkTime.Unix()),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			prefBlkID,
+			nextHeight,
+			*txes[0],
+		)
+
+	case *txs.CreateChainTx,
+		*txs.CreateSubnetTx,
+		*txs.ImportTx,
+		*txs.ExportTx:
+		return p_block.NewStandardBlock(
+			blkVersion,
+			uint64(blkTime.Unix()),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			prefBlkID,
+			nextHeight,
+			txes,
+		)
+
+	default:
+		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+	}
 }
 
 func (b *blockBuilder) Shutdown() {
@@ -358,23 +312,23 @@ func (b *blockBuilder) resetTimer() {
 
 // getStakerToReward return the staker txID to remove from the primary network
 // staking set, if one exists.
-func (b *blockBuilder) getStakerToReward(preferredState state.Mutable) (ids.ID, bool, error) {
+func (b *blockBuilder) getStakerToReward(preferredState state.Mutable) (*txs.Tx, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
-		return ids.Empty, false, errEndOfTime
+		return nil, false, errEndOfTime
 	}
 
 	currentStakers := preferredState.CurrentStakerChainState()
 	tx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
-		return ids.Empty, false, err
+		return nil, false, err
 	}
 
 	staker, ok := tx.Unsigned.(txs.StakerTx)
 	if !ok {
-		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
+		return nil, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
 	}
-	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
+	return tx, currentChainTimestamp.Equal(staker.EndTime()), nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the

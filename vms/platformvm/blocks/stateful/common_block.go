@@ -81,7 +81,7 @@ func (c *commonBlock) verify() error {
 
 	// verify block version
 	blkVersion := c.commonStatelessBlk.Version()
-	expectedVersion := parent.expectedChildVersion()
+	expectedVersion := parent.ExpectedChildVersion()
 	if expectedVersion != blkVersion {
 		return fmt.Errorf(
 			"expected block to have version %d, but found %d",
@@ -93,7 +93,7 @@ func (c *commonBlock) verify() error {
 	return c.validateBlockTimestamp()
 }
 
-func (c *commonBlock) expectedChildVersion() uint16 {
+func (c *commonBlock) ExpectedChildVersion() uint16 {
 	forkTime := c.txExecutorBackend.Cfg.AdvanceTimeTxRemovalTime
 	if c.Timestamp().Before(forkTime) {
 		return stateless.PreForkVersion

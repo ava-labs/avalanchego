@@ -6,11 +6,13 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
@@ -58,6 +60,11 @@ type Mempool interface {
 
 	AddDecisionTx(tx *txs.Tx)
 	AddProposalTx(tx *txs.Tx)
+
+	// Return timestamp of earliest proposal tx in mempool.
+	// Note: if no proposal txs are available, MaxTime is returned,
+	// which comes handy in subsequent comparisons
+	EarliestProposalTxTime() time.Time
 
 	HasDecisionTxs() bool
 	HasProposalTx() bool
@@ -262,6 +269,14 @@ func (m *mempool) PopProposalTx() *txs.Tx {
 	tx := m.unissuedProposalTxs.RemoveTop()
 	m.deregister(tx)
 	return tx
+}
+
+func (m *mempool) EarliestProposalTxTime() time.Time {
+	if m.unissuedProposalTxs.Len() == 0 {
+		return mockable.MaxTime
+	}
+
+	return m.unissuedProposalTxs.Peek().Unsigned.(txs.StakerTx).StartTime()
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason string) {
