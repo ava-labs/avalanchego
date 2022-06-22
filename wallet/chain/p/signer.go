@@ -249,7 +249,7 @@ func (s *signer) getSubnetSigners(ctx stdcontext.Context, subnetID ids.ID, subne
 }
 
 func (s *signer) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := platformvm.Codec.Marshal(platformvm.CodecVersion, &tx.Unsigned)
+	unsignedBytes, err := platformvm.Codec.Marshal(txs.Version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
@@ -305,7 +305,7 @@ func (s *signer) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) er
 		}
 	}
 
-	signedBytes, err := platformvm.Codec.Marshal(platformvm.CodecVersion, tx)
+	signedBytes, err := platformvm.Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}

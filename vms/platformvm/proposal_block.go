@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -31,9 +32,9 @@ type ProposalBlock struct {
 	Tx txs.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState VersionedState
+	onCommitState state.Diff
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState  VersionedState
+	onAbortState  state.Diff
 	prefersCommit bool
 }
 
@@ -83,11 +84,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.Unsigned)
+	unsignedBytes, err := Codec.Marshal(txs.Version, &pb.Tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx)
+	signedBytes, err := Codec.Marshal(txs.Version, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -197,7 +198,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*Prop
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(CodecVersion, &block)
+	bytes, err := Codec.Marshal(txs.Version, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

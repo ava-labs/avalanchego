@@ -110,7 +110,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	// add to mempool
 	if err = n.mempool.AddUnverifiedTx(tx); err != nil {
 		n.log.Debug(
-			"AppResponse failed AddUnverifiedTx from %s with: %s",
+			"AppResponse failed AddUnverifiedTx from %s: %s",
 			nodeID,
 			err,
 		)
@@ -131,7 +131,7 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	msg := &message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(msg)
 	if err != nil {
-		return fmt.Errorf("GossipTx: failed to build Tx message with: %w", err)
+		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
 	}
 	return n.appSender.SendAppGossip(msgBytes)
 }

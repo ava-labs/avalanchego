@@ -38,7 +38,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	toRemoveTx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentStakers := executor.onCommit.CurrentStakerChainState()
+	onCommitCurrentStakers := executor.onCommit.CurrentStakers()
 	nextToRemoveTx, _, err := onCommitCurrentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +145,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	toRemoveTx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +209,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onAbortCurrentStakers := executor.onAbort.CurrentStakerChainState()
+		onAbortCurrentStakers := executor.onAbort.CurrentStakers()
 		nextToRemoveTx, _, err := onAbortCurrentStakers.GetNextStaker()
 		if err != nil {
 			t.Fatal(err)
@@ -294,7 +294,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
-	err = vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	err = vm.internalState.Load()
 	assert.NoError(err)
 	// test validator stake
 	set, ok := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -404,7 +404,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
-	err = vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	err = vm.internalState.Load()
 	assert.NoError(err)
 
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
@@ -647,7 +647,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := secondVM.internalState.CurrentStakerChainState()
+	currentStakers := secondVM.internalState.CurrentStakers()
 	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")
@@ -781,7 +781,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")

@@ -272,7 +272,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+	if err := vm.internalState.Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -412,7 +412,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+	if err := vm.internalState.Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -446,7 +446,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+	if err := vm.internalState.Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -562,7 +562,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if err := vm.internalState.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+		if err := vm.internalState.Load(); err != nil {
 			t.Fatal(err)
 		}
 
@@ -602,7 +602,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := Codec.Marshal(CodecVersion, tx)
+	txBytes, err := Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}

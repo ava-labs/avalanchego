@@ -6,6 +6,7 @@ package platformvm
 import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -16,11 +17,11 @@ var _ txs.Visitor = &atomicTxExecutor{}
 type atomicTxExecutor struct {
 	// inputs
 	vm          *VM
-	parentState MutableState
+	parentState state.Chain
 	tx          *txs.Tx
 
 	// outputs
-	onAccept       VersionedState
+	onAccept       state.Diff
 	inputs         ids.Set
 	atomicRequests map[ids.ID]*atomic.Requests
 }
@@ -42,10 +43,10 @@ func (e *atomicTxExecutor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (e *atomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
-	e.onAccept = newVersionedState(
+	e.onAccept = state.NewDiff(
 		e.parentState,
-		e.parentState.CurrentStakerChainState(),
-		e.parentState.PendingStakerChainState(),
+		e.parentState.CurrentStakers(),
+		e.parentState.PendingStakers(),
 	)
 	executor := standardTxExecutor{
 		vm:    e.vm,

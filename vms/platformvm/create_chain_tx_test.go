@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -149,9 +150,9 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 
 		createChainTx := tx.Unsigned.(*txs.CreateChainTx)
 		createChainTx.SyntacticallyVerified = false
-		tx.Unsigned = test.setup(tx.Unsigned.(*txs.CreateChainTx))
+		tx.Unsigned = test.setup(createChainTx)
 		if err := tx.SyntacticVerify(vm.ctx); err != nil && !test.shouldErr {
-			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
+			t.Fatalf("test '%s' shouldn't have erred but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)
 		}
@@ -187,10 +188,10 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: newVersionedState(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -240,10 +241,10 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: newVersionedState(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -282,10 +283,10 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: newVersionedState(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -322,10 +323,10 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := standardTxExecutor{
 		vm: vm,
-		state: newVersionedState(
+		state: state.NewDiff(
 			vm.internalState,
-			vm.internalState.CurrentStakerChainState(),
-			vm.internalState.PendingStakerChainState(),
+			vm.internalState.CurrentStakers(),
+			vm.internalState.PendingStakers(),
 		),
 		tx: tx,
 	}
@@ -401,10 +402,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			state := newVersionedState(
+			state := state.NewDiff(
 				vm.internalState,
-				vm.internalState.CurrentStakerChainState(),
-				vm.internalState.PendingStakerChainState(),
+				vm.internalState.CurrentStakers(),
+				vm.internalState.PendingStakers(),
 			)
 			state.SetTimestamp(test.time)
 

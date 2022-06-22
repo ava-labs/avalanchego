@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -78,7 +79,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,10 +164,10 @@ func TestNewImportTx(t *testing.T) {
 			assert.True(ok)
 
 			preferredState := preferredDecision.onAccept()
-			fakedState := newVersionedState(
+			fakedState := state.NewDiff(
 				preferredState,
-				preferredState.CurrentStakerChainState(),
-				preferredState.PendingStakerChainState(),
+				preferredState.CurrentStakers(),
+				preferredState.PendingStakers(),
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 

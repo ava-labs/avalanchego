@@ -148,7 +148,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentStakers := executor.onCommit.CurrentStakerChainState()
+	onCommitCurrentStakers := executor.onCommit.CurrentStakers()
 	validator, err := onCommitCurrentStakers.GetValidator(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatalf("Added the wrong tx to the validator set")
 	}
 
-	onCommitPendingStakers := executor.onCommit.PendingStakerChainState()
+	onCommitPendingStakers := executor.onCommit.PendingStakers()
 	if _, _, err := onCommitPendingStakers.GetValidatorTx(nodeID); err == nil {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
@@ -172,12 +172,12 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		t.Fatalf("Expected reward of %d but was %d", 1370, reward)
 	}
 
-	onAbortCurrentStakers := executor.onAbort.CurrentStakerChainState()
+	onAbortCurrentStakers := executor.onAbort.CurrentStakers()
 	if _, err := onAbortCurrentStakers.GetValidator(nodeID); err == nil {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	onAbortPendingStakers := executor.onAbort.PendingStakerChainState()
+	onAbortPendingStakers := executor.onAbort.PendingStakers()
 	_, retrievedTxID, err := onAbortPendingStakers.GetValidatorTx(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -357,7 +357,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			if err := vm.internalState.Commit(); err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+			if err := vm.internalState.Load(); err != nil {
 				t.Fatal(err)
 			}
 
@@ -385,9 +385,9 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			assert.NoError(vm.internalState.Commit())
 
 			// Check that the validators we expect to be in the current staker set are there
-			currentStakers := vm.internalState.CurrentStakerChainState()
+			currentStakers := vm.internalState.CurrentStakers()
 			// Check that the validators we expect to be in the pending staker set are there
-			pendingStakers := vm.internalState.PendingStakerChainState()
+			pendingStakers := vm.internalState.PendingStakers()
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
@@ -450,7 +450,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+	if err := vm.internalState.Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -476,7 +476,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+	if err := vm.internalState.Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -499,7 +499,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentStakers := executor.onCommit.CurrentStakerChainState()
+	currentStakers := executor.onCommit.CurrentStakers()
 	vdr, err := currentStakers.GetValidator(ids.NodeID(subnetValidatorNodeID))
 	if err != nil {
 		t.Fatal(err)
@@ -555,7 +555,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if err := vm.internalState.Commit(); err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+			if err := vm.internalState.Load(); err != nil {
 				t.Fatal(err)
 			}
 
@@ -638,7 +638,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	vm.internalState.AddPendingStaker(addDelegatorTx)
 	vm.internalState.AddTx(addDelegatorTx, status.Committed)
 	assert.NoError(t, vm.internalState.Commit())
-	assert.NoError(t, vm.internalState.(*internalStateImpl).loadPendingValidators())
+	assert.NoError(t, vm.internalState.Load())
 
 	// Advance Time
 	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
@@ -715,7 +715,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	vm.internalState.AddPendingStaker(addDelegatorTx)
 	vm.internalState.AddTx(addDelegatorTx, status.Committed)
 	assert.NoError(t, vm.internalState.Commit())
-	assert.NoError(t, vm.internalState.(*internalStateImpl).loadPendingValidators())
+	assert.NoError(t, vm.internalState.Load())
 
 	// Advance Time
 	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
@@ -785,7 +785,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := Codec.Marshal(CodecVersion, tx)
+	bytes, err := Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -823,7 +823,7 @@ func addPendingValidator(
 	if err := vm.internalState.Commit(); err != nil {
 		return nil, err
 	}
-	if err := vm.internalState.(*internalStateImpl).loadPendingValidators(); err != nil {
+	if err := vm.internalState.Load(); err != nil {
 		return nil, err
 	}
 	return addPendingValidatorTx, err

@@ -397,7 +397,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := Codec.Marshal(CodecVersion, utxo)
+		bytes, err := Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -607,7 +607,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentValidators := service.vm.internalState.CurrentStakerChainState()
+	currentValidators := service.vm.internalState.CurrentStakers()
 
 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
@@ -777,7 +777,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingValidators := service.vm.internalState.PendingStakerChainState()
+	pendingValidators := service.vm.internalState.PendingStakers()
 
 	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
 		switch staker := tx.Unsigned.(type) {
@@ -2057,7 +2057,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return err
 	}
 
-	currentStakers := service.vm.internalState.CurrentStakerChainState()
+	currentStakers := service.vm.internalState.CurrentStakers()
 	stakers := currentStakers.Stakers()
 
 	var (
@@ -2076,7 +2076,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts = append(stakedOuts, outs...)
 	}
 
-	pendingStakers := service.vm.internalState.PendingStakerChainState()
+	pendingStakers := service.vm.internalState.PendingStakers()
 	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
@@ -2092,7 +2092,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := Codec.Marshal(CodecVersion, output)
+		bytes, err := Codec.Marshal(txs.Version, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -2168,8 +2168,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	startTime := time.Unix(int64(args.StartTime), 0)
 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	maxStakeAmount, err := currentMaxStakeAmount(
-		service.vm.internalState,
+	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
 		args.SubnetID,
 		args.NodeID,
 		startTime,
@@ -2203,7 +2202,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := GenesisCodec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := GenesisCodec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}

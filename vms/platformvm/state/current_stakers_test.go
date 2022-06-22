@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package state
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 	// Initialize the chain state
 	nodeID0 := ids.GenerateTestNodeID()
 	node0Weight := uint64(1)
-	vdr0 := &currentValidatorImpl{
+	vdr0 := &currentValidator{
 		addValidator: ValidatorAndID{
 			Tx: &txs.AddValidatorTx{
 				Validator: validator.Validator{
@@ -31,7 +31,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 
 	nodeID1 := ids.GenerateTestNodeID()
 	node1Weight := uint64(2)
-	vdr1 := &currentValidatorImpl{
+	vdr1 := &currentValidator{
 		addValidator: ValidatorAndID{
 			Tx: &txs.AddValidatorTx{
 				Validator: validator.Validator{
@@ -44,7 +44,7 @@ func TestPrimaryValidatorSet(t *testing.T) {
 
 	nodeID2 := ids.GenerateTestNodeID()
 	node2Weight := uint64(2)
-	vdr2 := &currentValidatorImpl{
+	vdr2 := &currentValidator{
 		addValidator: ValidatorAndID{
 			Tx: &txs.AddValidatorTx{
 				Validator: validator.Validator{
@@ -54,8 +54,8 @@ func TestPrimaryValidatorSet(t *testing.T) {
 		},
 	}
 
-	cs := &currentStakerChainStateImpl{
-		validatorsByNodeID: map[ids.NodeID]*currentValidatorImpl{
+	cs := &currentStakers{
+		validatorsByNodeID: map[ids.NodeID]*currentValidator{
 			nodeID0: vdr0,
 			nodeID1: vdr1,
 			nodeID2: vdr2,
@@ -110,8 +110,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 	// Initialize the chain state
 	nodeID0 := ids.GenerateTestNodeID()
 	node0Weight := uint64(1)
-	vdr0 := &currentValidatorImpl{
-		validatorImpl: validatorImpl{
+	vdr0 := &currentValidator{
+		validatorModifications: validatorModifications{
 			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
 					Tx: &txs.AddSubnetValidatorTx{
@@ -129,8 +129,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 
 	nodeID1 := ids.GenerateTestNodeID()
 	node1Weight := uint64(2)
-	vdr1 := &currentValidatorImpl{
-		validatorImpl: validatorImpl{
+	vdr1 := &currentValidator{
+		validatorModifications: validatorModifications{
 			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
 					Tx: &txs.AddSubnetValidatorTx{
@@ -148,8 +148,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 
 	nodeID2 := ids.GenerateTestNodeID()
 	node2Weight := uint64(2)
-	vdr2 := &currentValidatorImpl{
-		validatorImpl: validatorImpl{
+	vdr2 := &currentValidator{
+		validatorModifications: validatorModifications{
 			subnets: map[ids.ID]SubnetValidatorAndID{
 				subnetID: {
 					Tx: &txs.AddSubnetValidatorTx{
@@ -165,8 +165,8 @@ func TestSubnetValidatorSet(t *testing.T) {
 		},
 	}
 
-	cs := &currentStakerChainStateImpl{
-		validatorsByNodeID: map[ids.NodeID]*currentValidatorImpl{
+	cs := &currentStakers{
+		validatorsByNodeID: map[ids.NodeID]*currentValidator{
 			nodeID0: vdr0,
 			nodeID1: vdr1,
 			nodeID2: vdr2,

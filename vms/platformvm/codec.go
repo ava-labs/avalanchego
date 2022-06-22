@@ -12,11 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	// CodecVersion is the current default codec version
-	CodecVersion = 0
-)
-
 // Codecs do serialization and deserialization
 var (
 	Codec        codec.Manager
@@ -42,8 +37,8 @@ func init() {
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(CodecVersion, c),
-		GenesisCodec.RegisterCodec(CodecVersion, gc),
+		Codec.RegisterCodec(txs.Version, c),
+		GenesisCodec.RegisterCodec(txs.Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

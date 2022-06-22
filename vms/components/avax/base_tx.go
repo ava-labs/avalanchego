@@ -16,9 +16,10 @@ import (
 const MaxMemoSize = 256
 
 var (
-	errNilTx          = errors.New("nil tx is not valid")
-	errWrongNetworkID = errors.New("tx has wrong network ID")
-	errWrongChainID   = errors.New("tx has wrong chain ID")
+	ErrWrongNetworkID = errors.New("tx has wrong network ID")
+
+	errNilTx        = errors.New("nil tx is not valid")
+	errWrongChainID = errors.New("tx has wrong chain ID")
 )
 
 // BaseTx is the basis of all standard transactions.
@@ -60,7 +61,7 @@ func (t *BaseTx) Verify(ctx *snow.Context) error {
 	case t == nil:
 		return errNilTx
 	case t.NetworkID != ctx.NetworkID:
-		return errWrongNetworkID
+		return ErrWrongNetworkID
 	case t.BlockchainID != ctx.ChainID:
 		return errWrongChainID
 	case len(t.Memo) > MaxMemoSize:

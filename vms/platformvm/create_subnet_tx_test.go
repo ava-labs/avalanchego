@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -74,10 +75,10 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			state := newVersionedState(
+			state := state.NewDiff(
 				vm.internalState,
-				vm.internalState.CurrentStakerChainState(),
-				vm.internalState.PendingStakerChainState(),
+				vm.internalState.CurrentStakers(),
+				vm.internalState.PendingStakers(),
 			)
 			state.SetTimestamp(test.time)
 

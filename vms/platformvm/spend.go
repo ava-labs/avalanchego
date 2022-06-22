@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -280,7 +281,7 @@ func (vm *VM) stake(
 
 // authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
-	vs MutableState,
+	state state.Chain,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -288,7 +289,7 @@ func (vm *VM) authorize(
 	[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
 	error,
 ) {
-	subnetTx, _, err := vs.GetTx(subnetID)
+	subnetTx, _, err := state.GetTx(subnetID)
 	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"failed to fetch subnet %s: %w",
@@ -328,7 +329,7 @@ func (vm *VM) authorize(
 // [creds] are the credentials of [tx], which allow [ins] to be spent.
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
-	utxoDB UTXOGetter,
+	utxoDB state.UTXOGetter,
 	utx txs.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -452,7 +453,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return errUnknownOwners
 		}
 		owner := owned.Owners()
-		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
+		ownerBytes, err := Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -498,7 +499,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return errUnknownOwners
 		}
 		owner := owned.Owners()
-		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
+		ownerBytes, err := Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -550,7 +551,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func consumeInputs(
-	utxoDB UTXODeleter,
+	utxoDB state.UTXODeleter,
 	ins []*avax.TransferableInput,
 ) {
 	for _, input := range ins {
@@ -561,7 +562,7 @@ func consumeInputs(
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
 func produceOutputs(
-	utxoDB UTXOAdder,
+	utxoDB state.UTXOAdder,
 	txID ids.ID,
 	assetID ids.ID,
 	outs []*avax.TransferableOutput,

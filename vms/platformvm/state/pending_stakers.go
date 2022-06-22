@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package state
 
 import (
 	"bytes"
@@ -14,32 +14,31 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ pendingStakerChainState = &pendingStakerChainStateImpl{}
+var _ PendingStakers = &pendingStakers{}
 
-// pendingStakerChainState manages the set of stakers (both validators and
-// delegators) that are slated to start staking in the future.
-type pendingStakerChainState interface {
-	// return txs.AddValidatorTx content along with the ID of its signed.Tx
+// PendingStakers manages the set of stakers (both validators and delegators)
+// that are slated to start staking in the future.
+type PendingStakers interface {
 	GetValidatorTx(nodeID ids.NodeID) (addStakerTx *txs.AddValidatorTx, txID ids.ID, err error)
-	GetValidator(nodeID ids.NodeID) validatorIntf
+	GetValidator(nodeID ids.NodeID) ValidatorModifications
 
-	AddStaker(addStakerTx *txs.Tx) pendingStakerChainState
-	DeleteStakers(numToRemove int) pendingStakerChainState
+	AddStaker(addStakerTx *txs.Tx) PendingStakers
+	DeleteStakers(numToRemove int) PendingStakers
 
 	// Stakers returns the list of pending validators in order of their removal
 	// from the pending staker set
 	Stakers() []*txs.Tx
 
-	Apply(InternalState)
+	Apply(State)
 }
 
-// pendingStakerChainStateImpl is a copy on write implementation for versioning
-// the validator set. None of the slices, maps, or pointers should be modified
-// after initialization.
-type pendingStakerChainStateImpl struct {
+// pendingStakers is a copy on write implementation for versioning the validator
+// set. None of the slices, maps, or pointers should be modified after
+// initialization.
+type pendingStakers struct {
 	// nodeID -> validator
 	validatorsByNodeID      map[ids.NodeID]ValidatorAndID
-	validatorExtrasByNodeID map[ids.NodeID]*validatorImpl
+	validatorExtrasByNodeID map[ids.NodeID]*validatorModifications
 
 	// list of pending validators in order of their removal from the pending
 	// staker set
@@ -49,41 +48,41 @@ type pendingStakerChainStateImpl struct {
 	deletedStakers []*txs.Tx
 }
 
-func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.NodeID) (
+func (p *pendingStakers) GetValidatorTx(nodeID ids.NodeID) (
 	addStakerTx *txs.AddValidatorTx,
 	txID ids.ID,
 	err error,
 ) {
-	vdr, exists := ps.validatorsByNodeID[nodeID]
+	vdr, exists := p.validatorsByNodeID[nodeID]
 	if !exists {
 		return nil, ids.Empty, database.ErrNotFound
 	}
 	return vdr.Tx, vdr.TxID, nil
 }
 
-func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.NodeID) validatorIntf {
-	if vdr, exists := ps.validatorExtrasByNodeID[nodeID]; exists {
+func (p *pendingStakers) GetValidator(nodeID ids.NodeID) ValidatorModifications {
+	if vdr, exists := p.validatorExtrasByNodeID[nodeID]; exists {
 		return vdr
 	}
-	return &validatorImpl{}
+	return &validatorModifications{}
 }
 
-func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingStakerChainState {
-	newPS := &pendingStakerChainStateImpl{
-		validators:   make([]*txs.Tx, len(ps.validators)+1),
+func (p *pendingStakers) AddStaker(addStakerTx *txs.Tx) PendingStakers {
+	newPS := &pendingStakers{
+		validators:   make([]*txs.Tx, len(p.validators)+1),
 		addedStakers: []*txs.Tx{addStakerTx},
 	}
-	copy(newPS.validators, ps.validators)
-	newPS.validators[len(ps.validators)] = addStakerTx
+	copy(newPS.validators, p.validators)
+	newPS.validators[len(p.validators)] = addStakerTx
 	sortValidatorsByAddition(newPS.validators)
 
 	txID := addStakerTx.ID()
 	switch tx := addStakerTx.Unsigned.(type) {
 	case *txs.AddValidatorTx:
-		newPS.validatorExtrasByNodeID = ps.validatorExtrasByNodeID
+		newPS.validatorExtrasByNodeID = p.validatorExtrasByNodeID
 
-		newPS.validatorsByNodeID = make(map[ids.NodeID]ValidatorAndID, len(ps.validatorsByNodeID)+1)
-		for nodeID, vdr := range ps.validatorsByNodeID {
+		newPS.validatorsByNodeID = make(map[ids.NodeID]ValidatorAndID, len(p.validatorsByNodeID)+1)
+		for nodeID, vdr := range p.validatorsByNodeID {
 			newPS.validatorsByNodeID[nodeID] = vdr
 		}
 		newPS.validatorsByNodeID[tx.Validator.NodeID] = ValidatorAndID{
@@ -91,15 +90,15 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			TxID: txID,
 		}
 	case *txs.AddDelegatorTx:
-		newPS.validatorsByNodeID = ps.validatorsByNodeID
+		newPS.validatorsByNodeID = p.validatorsByNodeID
 
-		newPS.validatorExtrasByNodeID = make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
-		for nodeID, vdr := range ps.validatorExtrasByNodeID {
+		newPS.validatorExtrasByNodeID = make(map[ids.NodeID]*validatorModifications, len(p.validatorExtrasByNodeID)+1)
+		for nodeID, vdr := range p.validatorExtrasByNodeID {
 			if nodeID != tx.Validator.NodeID {
 				newPS.validatorExtrasByNodeID[nodeID] = vdr
 			}
 		}
-		if vdr, exists := ps.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
+		if vdr, exists := p.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
 			newDelegators := make([]DelegatorAndID, len(vdr.delegators)+1)
 			copy(newDelegators, vdr.delegators)
 			newDelegators[len(vdr.delegators)] = DelegatorAndID{
@@ -108,12 +107,12 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			}
 			sortDelegatorsByAddition(newDelegators)
 
-			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorModifications{
 				delegators: newDelegators,
 				subnets:    vdr.subnets,
 			}
 		} else {
-			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorModifications{
 				delegators: []DelegatorAndID{
 					{
 						Tx:   tx,
@@ -123,15 +122,15 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 			}
 		}
 	case *txs.AddSubnetValidatorTx:
-		newPS.validatorsByNodeID = ps.validatorsByNodeID
+		newPS.validatorsByNodeID = p.validatorsByNodeID
 
-		newPS.validatorExtrasByNodeID = make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
-		for nodeID, vdr := range ps.validatorExtrasByNodeID {
+		newPS.validatorExtrasByNodeID = make(map[ids.NodeID]*validatorModifications, len(p.validatorExtrasByNodeID)+1)
+		for nodeID, vdr := range p.validatorExtrasByNodeID {
 			if nodeID != tx.Validator.NodeID {
 				newPS.validatorExtrasByNodeID[nodeID] = vdr
 			}
 		}
-		if vdr, exists := ps.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
+		if vdr, exists := p.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
 			newSubnets := make(map[ids.ID]SubnetValidatorAndID, len(vdr.subnets)+1)
 			for subnet, subnetTx := range vdr.subnets {
 				newSubnets[subnet] = subnetTx
@@ -140,12 +139,12 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 				Tx:   tx,
 				TxID: txID,
 			}
-			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorModifications{
 				delegators: vdr.delegators,
 				subnets:    newSubnets,
 			}
 		} else {
-			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorModifications{
 				subnets: map[ids.ID]SubnetValidatorAndID{
 					tx.Validator.Subnet: {
 						Tx:   tx,
@@ -161,23 +160,23 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *txs.Tx) pendingSta
 	return newPS
 }
 
-func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingStakerChainState {
-	newPS := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.NodeID]ValidatorAndID, len(ps.validatorsByNodeID)),
-		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorImpl, len(ps.validatorExtrasByNodeID)),
-		validators:              ps.validators[numToRemove:],
+func (p *pendingStakers) DeleteStakers(numToRemove int) PendingStakers {
+	newPS := &pendingStakers{
+		validatorsByNodeID:      make(map[ids.NodeID]ValidatorAndID, len(p.validatorsByNodeID)),
+		validatorExtrasByNodeID: make(map[ids.NodeID]*validatorModifications, len(p.validatorExtrasByNodeID)),
+		validators:              p.validators[numToRemove:],
 
-		deletedStakers: ps.validators[:numToRemove],
+		deletedStakers: p.validators[:numToRemove],
 	}
 
-	for nodeID, vdr := range ps.validatorsByNodeID {
+	for nodeID, vdr := range p.validatorsByNodeID {
 		newPS.validatorsByNodeID[nodeID] = vdr
 	}
-	for nodeID, vdr := range ps.validatorExtrasByNodeID {
+	for nodeID, vdr := range p.validatorExtrasByNodeID {
 		newPS.validatorExtrasByNodeID[nodeID] = vdr
 	}
 
-	for _, removedTx := range ps.validators[:numToRemove] {
+	for _, removedTx := range p.validators[:numToRemove] {
 		switch tx := removedTx.Unsigned.(type) {
 		case *txs.AddValidatorTx:
 			delete(newPS.validatorsByNodeID, tx.Validator.NodeID)
@@ -187,7 +186,7 @@ func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingSta
 				delete(newPS.validatorExtrasByNodeID, tx.Validator.NodeID)
 				break
 			}
-			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorModifications{
 				delegators: vdr.delegators[1:], // sorted in order of removal
 				subnets:    vdr.subnets,
 			}
@@ -203,7 +202,7 @@ func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingSta
 					newSubnets[subnetID] = subnetTx
 				}
 			}
-			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
+			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorModifications{
 				delegators: vdr.delegators,
 				subnets:    newSubnets,
 			}
@@ -215,22 +214,22 @@ func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingSta
 	return newPS
 }
 
-func (ps *pendingStakerChainStateImpl) Stakers() []*txs.Tx {
-	return ps.validators
+func (p *pendingStakers) Stakers() []*txs.Tx {
+	return p.validators
 }
 
-func (ps *pendingStakerChainStateImpl) Apply(is InternalState) {
-	for _, added := range ps.addedStakers {
-		is.AddPendingStaker(added)
+func (p *pendingStakers) Apply(baseState State) {
+	for _, added := range p.addedStakers {
+		baseState.AddPendingStaker(added)
 	}
-	for _, deleted := range ps.deletedStakers {
-		is.DeletePendingStaker(deleted)
+	for _, deleted := range p.deletedStakers {
+		baseState.DeletePendingStaker(deleted)
 	}
-	is.SetPendingStakerChainState(ps)
+	baseState.SetPendingStakers(p)
 
 	// Validator changes should only be applied once.
-	ps.addedStakers = nil
-	ps.deletedStakers = nil
+	p.addedStakers = nil
+	p.deletedStakers = nil
 }
 
 type innerSortValidatorsByAddition []*txs.Tx

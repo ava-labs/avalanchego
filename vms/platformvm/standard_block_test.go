@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -56,7 +57,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -19,7 +20,7 @@ var _ txs.Visitor = &standardTxExecutor{}
 type standardTxExecutor struct {
 	// inputs
 	vm    *VM
-	state VersionedState // state is expected to be modified
+	state state.Diff // state is expected to be modified
 	tx    *txs.Tx
 
 	// outputs
@@ -242,7 +243,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}

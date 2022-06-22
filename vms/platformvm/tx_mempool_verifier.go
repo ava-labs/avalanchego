@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -13,7 +14,7 @@ var _ txs.Visitor = &mempoolTxVerifier{}
 
 type mempoolTxVerifier struct {
 	vm          *VM
-	parentState MutableState
+	parentState state.Chain
 	tx          *txs.Tx
 }
 
@@ -72,10 +73,10 @@ func (v *mempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 func (v *mempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 	executor := standardTxExecutor{
 		vm: v.vm,
-		state: newVersionedState(
+		state: state.NewDiff(
 			v.parentState,
-			v.parentState.CurrentStakerChainState(),
-			v.parentState.PendingStakerChainState(),
+			v.parentState.CurrentStakers(),
+			v.parentState.PendingStakers(),
 		),
 		tx: v.tx,
 	}
