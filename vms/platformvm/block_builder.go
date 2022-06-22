@@ -300,13 +300,13 @@ func (m *blockBuilder) Shutdown() {
 
 // getStakerToReward return the staker txID to remove from the primary network
 // staking set, if one exists.
-func (m *blockBuilder) getStakerToReward(preferredState state.Mutable) (ids.ID, bool, error) {
+func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
 	}
 
-	currentStakers := preferredState.CurrentStakerChainState()
+	currentStakers := preferredState.CurrentStakers()
 	tx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		return ids.Empty, false, err
@@ -321,7 +321,7 @@ func (m *blockBuilder) getStakerToReward(preferredState state.Mutable) (ids.ID, 
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
-func (m *blockBuilder) getNextChainTime(preferredState state.Mutable) (time.Time, bool, error) {
+func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
 	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		return time.Time{}, false, err

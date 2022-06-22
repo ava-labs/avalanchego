@@ -607,7 +607,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentValidators := service.vm.internalState.CurrentStakerChainState()
+	currentValidators := service.vm.internalState.CurrentStakers()
 
 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
@@ -777,7 +777,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingValidators := service.vm.internalState.PendingStakerChainState()
+	pendingValidators := service.vm.internalState.PendingStakers()
 
 	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
 		switch staker := tx.Unsigned.(type) {
@@ -2057,7 +2057,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return err
 	}
 
-	currentStakers := service.vm.internalState.CurrentStakerChainState()
+	currentStakers := service.vm.internalState.CurrentStakers()
 	stakers := currentStakers.Stakers()
 
 	var (
@@ -2076,7 +2076,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts = append(stakedOuts, outs...)
 	}
 
-	pendingStakers := service.vm.internalState.PendingStakerChainState()
+	pendingStakers := service.vm.internalState.PendingStakers()
 	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {

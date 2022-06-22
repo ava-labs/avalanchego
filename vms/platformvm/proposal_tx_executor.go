@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -40,12 +39,12 @@ var (
 type proposalTxExecutor struct {
 	// inputs
 	vm          *VM
-	parentState state.Mutable
+	parentState state.Chain
 	tx          *txs.Tx
 
 	// outputs
-	onCommit      state.Versioned
-	onAbort       state.Versioned
+	onCommit      state.Diff
+	onAbort       state.Diff
 	prefersCommit bool
 }
 
@@ -85,8 +84,8 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return errStakeTooLong
 	}
 
-	currentStakers := e.parentState.CurrentStakerChainState()
-	pendingStakers := e.parentState.PendingStakerChainState()
+	currentStakers := e.parentState.CurrentStakers()
+	pendingStakers := e.parentState.PendingStakers()
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
@@ -162,7 +161,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
+	e.onCommit = state.NewDiff(e.parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	consumeInputs(e.onCommit, tx.Ins)
@@ -170,7 +169,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	produceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(e.onAbort, tx.Ins)
 	// Produce the UTXOS
@@ -201,8 +200,8 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakers := e.parentState.CurrentStakerChainState()
-	pendingStakers := e.parentState.PendingStakerChainState()
+	currentStakers := e.parentState.CurrentStakers()
+	pendingStakers := e.parentState.PendingStakers()
 
 	if e.vm.bootstrapped.GetValue() {
 		currentTimestamp := e.parentState.GetTimestamp()
@@ -325,7 +324,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
+	e.onCommit = state.NewDiff(e.parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	consumeInputs(e.onCommit, tx.Ins)
@@ -333,7 +332,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	produceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(e.onAbort, tx.Ins)
 	// Produce the UTXOS
@@ -368,8 +367,8 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	currentStakers := e.parentState.CurrentStakerChainState()
-	pendingStakers := e.parentState.PendingStakerChainState()
+	currentStakers := e.parentState.CurrentStakers()
+	pendingStakers := e.parentState.PendingStakers()
 
 	if e.vm.bootstrapped.GetValue() {
 		currentTimestamp := e.parentState.GetTimestamp()
@@ -398,7 +397,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		var (
 			vdrTx                  *txs.AddValidatorTx
 			currentDelegatorWeight uint64
-			currentDelegators      []transactions.DelegatorAndID
+			currentDelegators      []state.DelegatorAndID
 		)
 		if err == nil {
 			// This delegator is attempting to delegate to a currently validing
@@ -412,7 +411,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			vdrTx, _, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
 			if err != nil {
 				if err == database.ErrNotFound {
-					return transactions.ErrDelegatorSubset
+					return state.ErrDelegatorSubset
 				}
 				return fmt.Errorf(
 					"failed to find whether %s is a validator: %w",
@@ -425,7 +424,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		// Ensure that the period this delegator delegates is a subset of the
 		// time the validator validates.
 		if !tx.Validator.BoundedBy(vdrTx.StartTime(), vdrTx.EndTime()) {
-			return transactions.ErrDelegatorSubset
+			return state.ErrDelegatorSubset
 		}
 
 		// Ensure that the period this delegator delegates wouldn't become over
@@ -445,7 +444,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			maximumWeight = math.Min64(maximumWeight, e.vm.MaxValidatorStake)
 		}
 
-		canDelegate, err := transactions.CanDelegate(
+		canDelegate, err := state.CanDelegate(
 			currentDelegators,
 			pendingDelegators,
 			tx,
@@ -485,7 +484,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewVersioned(e.parentState, currentStakers, newlyPendingStakers)
+	e.onCommit = state.NewDiff(e.parentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
 	consumeInputs(e.onCommit, tx.Ins)
@@ -493,7 +492,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	produceOutputs(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	consumeInputs(e.onAbort, tx.Ins)
 	// Produce the UTXOS
@@ -547,9 +546,9 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	currentSupply := e.parentState.GetCurrentSupply()
 
-	pendingStakers := e.parentState.PendingStakerChainState()
-	toAddValidatorsWithRewardToCurrent := []*transactions.ValidatorReward(nil)
-	toAddDelegatorsWithRewardToCurrent := []*transactions.ValidatorReward(nil)
+	pendingStakers := e.parentState.PendingStakers()
+	toAddValidatorsWithRewardToCurrent := []*state.ValidatorReward(nil)
+	toAddDelegatorsWithRewardToCurrent := []*state.ValidatorReward(nil)
 	toAddWithoutRewardToCurrent := []*txs.Tx(nil)
 	numToRemoveFromPending := 0
 
@@ -574,7 +573,7 @@ pendingStakerLoop:
 				return err
 			}
 
-			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &transactions.ValidatorReward{
+			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &state.ValidatorReward{
 				AddStakerTx:     tx,
 				PotentialReward: r,
 			})
@@ -594,7 +593,7 @@ pendingStakerLoop:
 				return err
 			}
 
-			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &transactions.ValidatorReward{
+			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &state.ValidatorReward{
 				AddStakerTx:     tx,
 				PotentialReward: r,
 			})
@@ -616,7 +615,7 @@ pendingStakerLoop:
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
 
-	currentStakers := e.parentState.CurrentStakerChainState()
+	currentStakers := e.parentState.CurrentStakers()
 	numToRemoveFromCurrent := 0
 
 	// Remove from the staker set any subnet validators whose endTime is at or
@@ -647,12 +646,12 @@ currentStakerLoop:
 		return err
 	}
 
-	e.onCommit = state.NewVersioned(e.parentState, newlyCurrentStakers, newlyPendingStakers)
+	e.onCommit = state.NewDiff(e.parentState, newlyCurrentStakers, newlyPendingStakers)
 	e.onCommit.SetTimestamp(txTimestamp)
 	e.onCommit.SetCurrentSupply(currentSupply)
 
 	// State doesn't change if this proposal is aborted
-	e.onAbort = state.NewVersioned(e.parentState, currentStakers, pendingStakers)
+	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 
 	e.prefersCommit = !txTimestamp.After(localTimestampPlusSync)
 	return nil
@@ -668,7 +667,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakers := e.parentState.CurrentStakerChainState()
+	currentStakers := e.parentState.CurrentStakers()
 	stakerTx, stakerReward, err := currentStakers.GetNextStaker()
 	if err == database.ErrNotFound {
 		return fmt.Errorf("failed to get next staker stop time: %w", err)
@@ -705,9 +704,9 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	pendingStakers := e.parentState.PendingStakerChainState()
-	e.onCommit = state.NewVersioned(e.parentState, newlyCurrentStakers, pendingStakers)
-	e.onAbort = state.NewVersioned(e.parentState, newlyCurrentStakers, pendingStakers)
+	pendingStakers := e.parentState.PendingStakers()
+	e.onCommit = state.NewDiff(e.parentState, newlyCurrentStakers, pendingStakers)
+	e.onAbort = state.NewDiff(e.parentState, newlyCurrentStakers, pendingStakers)
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := e.onAbort.GetCurrentSupply()

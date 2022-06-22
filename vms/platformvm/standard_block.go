@@ -90,10 +90,10 @@ func (sb *StandardBlock) Verify() error {
 	}
 
 	parentState := parent.onAccept()
-	sb.onAcceptState = state.NewVersioned(
+	sb.onAcceptState = state.NewDiff(
 		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
+		parentState.CurrentStakers(),
+		parentState.PendingStakers(),
 	)
 
 	// clear inputs so that multiple [Verify] calls can be made

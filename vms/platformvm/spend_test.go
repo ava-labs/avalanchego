@@ -20,7 +20,7 @@ type dummyUnsignedTx struct {
 	txs.BaseTx
 }
 
-func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState state.Mutable, stx *txs.Tx) error {
+func (du *dummyUnsignedTx) SemanticVerify(vm *VM, parentState state.Chain, stx *txs.Tx) error {
 	return nil
 }
 
