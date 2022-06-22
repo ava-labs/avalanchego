@@ -31,7 +31,9 @@ var (
 const blockCacheSize = 2048
 
 type InternalState interface {
-	state.Content
+	state.State
+
+	SetHeight(height uint64)
 
 	GetBlock(blockID ids.ID) (Block, error)
 	AddBlock(block Block)
@@ -98,6 +100,8 @@ type internalStateImpl struct {
 	vm     *VM
 	baseDB *versiondb.Database
 
+	currentHeight uint64
+
 	addedBlocks map[ids.ID]Block // map of blockID -> Block
 	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
 	blockDB     database.Database
@@ -108,33 +112,47 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl {
-	baseDB := versiondb.New(db)
-
-	return &internalStateImpl{
-		vm:          vm,
-		baseDB:      baseDB,
-		addedBlocks: make(map[ids.ID]Block),
-		blockDB:     prefixdb.New(blockPrefix, baseDB),
-	}
-}
-
-func (st *internalStateImpl) initCaches() {
-	st.blockCache = &cache.LRU{Size: blockCacheSize}
-}
-
-func (st *internalStateImpl) initMeteredCaches(metrics prometheus.Registerer) error {
+func NewState(vm *VM, db database.Database, genesis []byte, metrics prometheus.Registerer) (InternalState, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metrics,
 		&cache.LRU{Size: blockCacheSize},
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	st.blockCache = blockCache
-	return err
+	baseDB := versiondb.New(db)
+
+	state, err := state.New(
+		baseDB,
+		metrics,
+		&vm.Config,
+		vm.ctx,
+		vm.localStake,
+		vm.totalStake,
+		vm.rewards,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	is := &internalStateImpl{
+		State:       state,
+		vm:          vm,
+		baseDB:      baseDB,
+		addedBlocks: make(map[ids.ID]Block),
+		blockCache:  blockCache,
+		blockDB:     prefixdb.New(blockPrefix, baseDB),
+	}
+
+	if err := is.sync(genesis); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
+	}
+	return is, nil
 }
 
 func (st *internalStateImpl) sync(genesis []byte) error {
@@ -163,63 +181,11 @@ func (st *internalStateImpl) sync(genesis []byte) error {
 			err,
 		)
 	}
-
 	return nil
 }
 
-func NewInternalState(vm *VM, db database.Database, genesis []byte) (InternalState, error) {
-	is := newInternalStateDatabases(vm, db)
-	is.State = state.New(
-		is.baseDB,
-		&vm.Config,
-		vm.ctx,
-		vm.localStake,
-		vm.totalStake,
-		vm.rewards,
-	)
-	is.initCaches()
-
-	if err := is.sync(genesis); err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
-
-		return nil, err
-	}
-	return is, nil
-}
-
-func NewMeteredInternalState(vm *VM, db database.Database, genesis []byte, metrics prometheus.Registerer) (InternalState, error) {
-	is := newInternalStateDatabases(vm, db)
-	var err error
-	is.State, err = state.NewMetered(
-		is.baseDB,
-		metrics,
-		&vm.Config,
-		vm.ctx,
-		vm.localStake,
-		vm.totalStake,
-		vm.rewards,
-	)
-	if err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
-
-		return nil, err
-	}
-	if err = is.initMeteredCaches(metrics); err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
-
-		return nil, err
-	}
-
-	if err = is.sync(genesis); err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
-
-		return nil, err
-	}
-	return is, nil
+func (st *internalStateImpl) SetHeight(height uint64) {
+	st.currentHeight = height
 }
 
 func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
@@ -279,7 +245,7 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	errs := wrappers.Errs{}
 	errs.Add(
 		st.writeBlocks(),
-		st.State.Write(),
+		st.State.Write(st.currentHeight),
 	)
 	if errs.Err != nil {
 		return nil, errs.Err
@@ -330,7 +296,6 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	}
 	genesisBlock.status = choices.Accepted
 	st.AddBlock(genesisBlock)
-	st.SetLastAccepted(genesisBlock.ID())
 
 	genesisState, err := genesis.ParseState(genesisBytes)
 	if err != nil {
