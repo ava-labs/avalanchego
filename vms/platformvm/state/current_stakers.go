@@ -149,7 +149,7 @@ func (c *currentStakers) UpdateStakers(
 				}
 				newCS.validatorsByTxID[vdr.AddStakerTx.ID()] = vdr
 			default:
-				return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx but got %T", tx)
+				return nil, fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx)
 			}
 		}
 
@@ -170,7 +170,7 @@ func (c *currentStakers) UpdateStakers(
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 				newCS.validatorsByTxID[txID] = vdr
 			default:
-				return nil, fmt.Errorf("expected tx type *unsigned.AddDelegatorTx but got %T", tx)
+				return nil, fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx)
 			}
 		}
 
@@ -190,7 +190,7 @@ func (c *currentStakers) UpdateStakers(
 				}
 				newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 			default:
-				return nil, fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx)
+				return nil, fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx)
 			}
 
 			wrappedTx := &ValidatorReward{
@@ -218,7 +218,7 @@ func (c *currentStakers) UpdateStakers(
 			}
 			newCS.validatorsByNodeID[tx.Validator.NodeID] = &newVdr
 		default:
-			return nil, fmt.Errorf("expected tx type *unsigned.AddSubnetValidatorTx but got %T", tx)
+			return nil, fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx)
 		}
 	}
 
@@ -268,7 +268,7 @@ func (c *currentStakers) DeleteNextStaker() (CurrentStakers, error) {
 			}
 		}
 	default:
-		return nil, fmt.Errorf("expected tx type *unsigned.AddValidatorTx or *unsigned.AddDelegatorTx but got %T", removedTx.Unsigned)
+		return nil, fmt.Errorf("expected tx type *txs.AddValidatorTx or *txs.AddDelegatorTx but got %T", removedTx.Unsigned)
 	}
 
 	for txID, vdr := range c.validatorsByTxID {

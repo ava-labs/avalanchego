@@ -9,11 +9,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ UnsignedTx = &AddSubnetValidatorTx{}
-	_ StakerTx   = &AddSubnetValidatorTx{}
+	_ UnsignedTx             = &AddSubnetValidatorTx{}
+	_ StakerTx               = &AddSubnetValidatorTx{}
+	_ secp256k1fx.UnsignedTx = &AddSubnetValidatorTx{}
 )
 
 // AddSubnetValidatorTx is an unsigned addSubnetValidatorTx

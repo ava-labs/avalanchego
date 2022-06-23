@@ -273,21 +273,21 @@ func (st *internalStateImpl) writeBlocks() error {
 		}
 		btxBytes, err := GenesisCodec.Marshal(txs.Version, &sblk)
 		if err != nil {
-			return fmt.Errorf("failed to marshal state block with: %w", err)
+			return fmt.Errorf("failed to marshal state block: %w", err)
 		}
 
 		delete(st.addedBlocks, blkID)
 		st.blockCache.Put(blkID, blk)
 		if err := st.blockDB.Put(blkID[:], btxBytes); err != nil {
-			return fmt.Errorf("failed to write block with: %w", err)
+			return fmt.Errorf("failed to write block: %w", err)
 		}
 	}
 	return nil
 }
 
 func (st *internalStateImpl) init(genesisBytes []byte) error {
-	// Create the genesis block and save it as being accepted (We don't just
-	// do genesisBlock.Accept() because then it'd look for genesisBlock's
+	// Create the genesis block and save it as being accepted (We don't do
+	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
 	genesisBlock, err := st.vm.newCommitBlock(genesisID, 0, true)
