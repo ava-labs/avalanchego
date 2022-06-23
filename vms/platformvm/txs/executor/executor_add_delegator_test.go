@@ -75,7 +75,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 }
 
 func TestAddDelegatorTxExecute(t *testing.T) {
-	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
@@ -108,7 +107,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.tState.AddCurrentStaker(tx, 0)
 		target.tState.AddTx(tx, status.Committed)
-		if err := target.tState.Write(dummyHeight); err != nil {
+		if err := target.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := target.tState.Load(); err != nil {
@@ -135,7 +134,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.tState.AddCurrentStaker(tx, 0)
 		target.tState.AddTx(tx, status.Committed)
-		if err := target.tState.Write(dummyHeight); err != nil {
+		if err := target.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := target.tState.Load(); err != nil {
@@ -264,7 +263,6 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			rewardAddress: rewardAddress,                                    // Reward Address
 			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[1]}, // tx fee payer
 			setup: func(target *testHelpersCollection) { // Remove all UTXOs owned by keys[1]
-				dummyHeight := uint64(1)
 				utxoIDs, err := target.tState.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
@@ -275,7 +273,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				for _, utxoID := range utxoIDs {
 					target.tState.DeleteUTXO(utxoID)
 				}
-				if err := target.tState.Write(dummyHeight); err != nil {
+				if err := target.tState.Commit(); err != nil {
 					t.Fatal(err)
 				}
 			},

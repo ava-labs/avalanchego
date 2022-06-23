@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -2790,7 +2791,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	rewards := reward.NewCalculator(vm.RewardConfig)
-	is, err := NewState(
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -3165,7 +3166,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	rewards := reward.NewCalculator(vm.RewardConfig)
-	is, err := NewState(
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		prometheus.NewRegistry(),
 		&vm.Config,

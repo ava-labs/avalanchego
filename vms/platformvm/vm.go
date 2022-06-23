@@ -158,7 +158,7 @@ func (vm *VM) Initialize(
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 	vm.currentBlocks = make(map[ids.ID]p_block.Block)
-	if vm.internalState, err = state.NewState(
+	if vm.internalState, err = state.New(
 		vm.dbManager.Current().Database,
 		registerer,
 		&vm.Config,

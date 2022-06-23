@@ -255,8 +255,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	h.tState.AddCurrentStaker(addDSTx, 0)
 	h.tState.AddTx(addDSTx, status.Committed)
-	dummyHeight := uint64(1)
-	if err := h.tState.Write(dummyHeight); err != nil {
+	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.tState.Load(); err != nil {
@@ -396,7 +395,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	h.tState.AddCurrentStaker(subnetTx, 0)
 	h.tState.AddTx(subnetTx, status.Committed)
-	if err := h.tState.Write(dummyHeight); err != nil {
+	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.tState.Load(); err != nil {
@@ -430,7 +429,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	h.tState.DeleteCurrentStaker(subnetTx)
-	if err := h.tState.Write(dummyHeight); err != nil {
+	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.tState.Load(); err != nil {
@@ -546,7 +545,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 		h.tState.AddCurrentStaker(tx, 0)
 		h.tState.AddTx(tx, status.Committed)
-		if err := h.tState.Write(dummyHeight); err != nil {
+		if err := h.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.tState.Load(); err != nil {
