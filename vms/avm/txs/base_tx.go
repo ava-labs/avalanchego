@@ -8,9 +8,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedTx = &BaseTx{}
+var (
+	_ UnsignedTx             = &BaseTx{}
+	_ secp256k1fx.UnsignedTx = &BaseTx{}
+)
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {

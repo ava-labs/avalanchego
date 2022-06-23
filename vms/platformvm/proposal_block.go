@@ -84,7 +84,6 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	if err := pb.CommonBlock.initialize(vm, bytes, status, self); err != nil {
 		return err
 	}
-
 	if err := pb.Tx.Sign(Codec, nil); err != nil {
 		return fmt.Errorf("failed to sign block: %w", err)
 	}

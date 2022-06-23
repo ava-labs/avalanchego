@@ -29,13 +29,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+const (
+	validatorDiffsCacheSize = 2048
+	txCacheSize             = 2048
+	rewardUTXOsCacheSize    = 2048
+	chainCacheSize          = 2048
+	chainDBCacheSize        = 2048
+)
+
 var (
 	_ State = &state{}
 
-	ErrDelegatorSubset   = errors.New("delegator's time range must be a subset of the validator's time range")
-	ErrDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
-	ErrStartTimeTooEarly = errors.New("start time is before the current chain time")
-	ErrStartAfterEndTime = errors.New("start time is after the end time")
+	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
+
+	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
+	errStartTimeTooEarly = errors.New("start time is before the current chain time")
+	errStartAfterEndTime = errors.New("start time is after the end time")
 
 	validatorsPrefix      = []byte("validators")
 	currentPrefix         = []byte("current")
@@ -55,21 +64,6 @@ var (
 	currentSupplyKey = []byte("current supply")
 	lastAcceptedKey  = []byte("last accepted")
 	initializedKey   = []byte("initialized")
-)
-
-const (
-	// priority values are used as part of the keys in the pending/current
-	// validator state to ensure they are sorted in the order that they should
-	// be added/removed.
-	lowPriority byte = iota
-	mediumPriority
-	topPriority
-
-	validatorDiffsCacheSize = 2048
-	txCacheSize             = 2048
-	rewardUTXOsCacheSize    = 2048
-	chainCacheSize          = 2048
-	chainDBCacheSize        = 2048
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -652,10 +646,10 @@ func (s *state) MaxStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	if startTime.After(endTime) {
-		return 0, ErrStartAfterEndTime
+		return 0, errStartAfterEndTime
 	}
 	if timestamp := s.GetTimestamp(); startTime.Before(timestamp) {
-		return 0, ErrStartTimeTooEarly
+		return 0, errStartTimeTooEarly
 	}
 	if subnetID == constants.PrimaryNetworkID {
 		return s.maxPrimarySubnetStakeAmount(nodeID, startTime, endTime)
@@ -871,7 +865,7 @@ func (s *state) loadCurrentValidators() error {
 		cs.validators = append(cs.validators, tx)
 		vdr, exists := cs.validatorsByNodeID[addSubnetValidatorTx.Validator.NodeID]
 		if !exists {
-			return ErrDSValidatorSubset
+			return errDSValidatorSubset
 		}
 		vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = SubnetValidatorAndID{
 			Tx:   addSubnetValidatorTx,

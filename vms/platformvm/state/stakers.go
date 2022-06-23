@@ -15,6 +15,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
+const (
+	// priority values are used as part of the keys in the pending/current
+	// validator state to ensure they are sorted in the order that they should
+	// be added/removed.
+	lowPriority byte = iota
+	mediumPriority
+	topPriority
+)
+
 var _ Stakers = &stakers{}
 
 type Stakers interface {
