@@ -74,7 +74,7 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 				h.txExecBackend,
 				ids.Empty, // does not matter
 				parentHeight,
-				*parentTx,
+				parentTx,
 			)
 			assert.NoError(err)
 			assert.NoError(err)

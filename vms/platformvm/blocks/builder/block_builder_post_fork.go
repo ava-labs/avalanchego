@@ -13,7 +13,7 @@ import (
 
 // nextTx returns the next transactions to be included in a block, along with
 // its timestamp.
-func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Mutable) ([]*txs.Tx, time.Time, error) {
+func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Chain) ([]*txs.Tx, time.Time, error) {
 	// Before selecting txs to be included in block, we need to clean mempool
 	// from transactions with invalid timestamps.
 	b.dropTooEarlyMempoolProposalTxs()
@@ -73,7 +73,7 @@ func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Mutable) ([]*txs.Tx, t
 // nextStandardPostForkBlkTimestamp attempts to calculate timestamp of next Standard Block
 // to be issued. Returns the calculated time, true/false if a standard block could be issued,
 // finally error.
-func (b *blockBuilder) nextStandardPostForkBlkTimestamp(preBlkState state.Mutable) (time.Time, bool, error) {
+func (b *blockBuilder) nextStandardPostForkBlkTimestamp(preBlkState state.Chain) (time.Time, bool, error) {
 	minNextTimestamp := preBlkState.GetTimestamp()
 
 	maxNextTimeStamp, err := preBlkState.GetNextStakerChangeTime()

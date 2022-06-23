@@ -52,5 +52,5 @@ type Decision interface {
 	//    been verified.
 	// 2) The state of the chain after this block is accepted, if this block was
 	//    verified successfully.
-	OnAccept() state.Mutable
+	OnAccept() state.Chain
 }

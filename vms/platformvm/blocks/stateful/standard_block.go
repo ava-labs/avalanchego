@@ -122,17 +122,17 @@ func (sb *StandardBlock) Verify() error {
 	blkVersion := sb.Version()
 	switch blkVersion {
 	case stateless.PreForkVersion:
-		sb.onAcceptState = state.NewVersioned(
+		sb.onAcceptState = state.NewDiff(
 			parentState,
-			parentState.CurrentStakerChainState(),
-			parentState.PendingStakerChainState(),
+			parentState.CurrentStakers(),
+			parentState.PendingStakers(),
 		)
 
 	case stateless.PostForkVersion:
 		// We update staker set before processing block transactions
 		nextChainTime := sb.Timestamp()
-		currentStakers := parentState.CurrentStakerChainState()
-		pendingStakers := parentState.PendingStakerChainState()
+		currentStakers := parentState.CurrentStakers()
+		pendingStakers := parentState.PendingStakers()
 		currentSupply := parentState.GetCurrentSupply()
 		newlyCurrentStakers,
 			newlyPendingStakers,
@@ -148,7 +148,7 @@ func (sb *StandardBlock) Verify() error {
 			return err
 		}
 
-		sb.onAcceptState = state.NewVersioned(
+		sb.onAcceptState = state.NewDiff(
 			parentState,
 			newlyCurrentStakers,
 			newlyPendingStakers,

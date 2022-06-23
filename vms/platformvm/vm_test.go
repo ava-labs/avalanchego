@@ -621,7 +621,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		t.Fatalf("status of tx should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakerChainState()
+	pendingStakers := vm.internalState.PendingStakers()
 
 	// Verify that new validator now in pending validator set
 	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
@@ -674,7 +674,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*tx,
+		tx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -761,7 +761,7 @@ func TestAddValidatorReject(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakerChainState()
+	pendingStakers := vm.internalState.PendingStakers()
 
 	// Verify that new validator NOT in pending validator set
 	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
@@ -880,7 +880,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakerChainState()
+	pendingStakers := vm.internalState.PendingStakers()
 	vdr := pendingStakers.GetValidator(nodeID)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
 
@@ -963,7 +963,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakerChainState()
+	pendingStakers := vm.internalState.PendingStakers()
 	vdr := pendingStakers.GetValidator(nodeID)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
 
@@ -1066,7 +1066,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -1154,7 +1154,7 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -1240,7 +1240,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -1426,7 +1426,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakerChainState()
+	pendingStakers := vm.internalState.PendingStakers()
 	vdr := pendingStakers.GetValidator(nodeID)
 	_, exists := vdr.SubnetValidators()[createSubnetTx.ID()]
 	if !exists {
@@ -1474,14 +1474,14 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers = vm.internalState.PendingStakerChainState()
+	pendingStakers = vm.internalState.PendingStakers()
 	vdr = pendingStakers.GetValidator(nodeID)
 	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
 	if exists {
 		t.Fatal("should have removed the pending validator")
 	}
 
-	currentStakers := vm.internalState.CurrentStakerChainState()
+	currentStakers := vm.internalState.CurrentStakers()
 	cVDR, err := currentStakers.GetValidator(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -1530,14 +1530,14 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers = vm.internalState.PendingStakerChainState()
+	pendingStakers = vm.internalState.PendingStakers()
 	vdr = pendingStakers.GetValidator(nodeID)
 	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
 	if exists {
 		t.Fatal("should have removed the pending validator")
 	}
 
-	currentStakers = vm.internalState.CurrentStakerChainState()
+	currentStakers = vm.internalState.CurrentStakers()
 	cVDR, err = currentStakers.GetValidator(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -1655,7 +1655,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := txs.Tx{Unsigned: &txs.ImportTx{
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
@@ -1775,7 +1775,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		firstVM.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*firstAdvanceTimeTx,
+		firstAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1908,7 +1908,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		firstVM.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*firstAdvanceTimeTx,
+		firstAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2048,7 +2048,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx,
+		advanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2340,7 +2340,7 @@ func TestUnverifiedParent(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*firstAdvanceTimeTx,
+		firstAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2369,7 +2369,7 @@ func TestUnverifiedParent(t *testing.T) {
 		vm.txExecutorBackend,
 		firstOption.ID(),
 		firstOption.(p_block.Block).Height()+1,
-		*secondAdvanceTimeTx,
+		secondAdvanceTimeTx,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2648,7 +2648,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*addValidatorTx,
+		addValidatorTx,
 	)
 	assert.NoError(err)
 
@@ -2669,7 +2669,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Verify that the new validator now in pending validator set
 	{
 		OnAccept := addValidatorProposalCommit.OnAccept()
-		pendingStakers := OnAccept.PendingStakerChainState()
+		pendingStakers := OnAccept.PendingStakers()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID)
 		assert.NoError(err)
@@ -2793,7 +2793,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx,
+		advanceTimeTx,
 	)
 	assert.NoError(err)
 
@@ -2831,7 +2831,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	rewards := reward.NewCalculator(vm.RewardConfig)
-	is, err := state.NewMetered(
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -2846,11 +2846,11 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that new validator is now in the current validator set.
 	{
-		currentStakers := vm.internalState.CurrentStakerChainState()
+		currentStakers := vm.internalState.CurrentStakers()
 		_, err = currentStakers.GetValidator(nodeID)
 		assert.NoError(err)
 
-		pendingStakers := vm.internalState.PendingStakerChainState()
+		pendingStakers := vm.internalState.PendingStakers()
 		_, _, err := pendingStakers.GetValidatorTx(nodeID)
 		assert.ErrorIs(err, database.ErrNotFound)
 
@@ -2906,7 +2906,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*addValidatorTx0,
+		addValidatorTx0,
 	)
 	assert.NoError(err)
 
@@ -2927,7 +2927,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Verify that first new validator now in pending validator set
 	{
 		OnAccept := addValidatorProposalCommit0.OnAccept()
-		pendingStakers := OnAccept.PendingStakerChainState()
+		pendingStakers := OnAccept.PendingStakers()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
 		assert.NoError(err)
@@ -2951,7 +2951,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx0,
+		advanceTimeTx0,
 	)
 	assert.NoError(err)
 
@@ -2974,11 +2974,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Verify that the first new validator is now in the current validator set.
 	{
 		OnAccept := advanceTimeProposalCommit0.OnAccept()
-		currentStakers := OnAccept.CurrentStakerChainState()
+		currentStakers := OnAccept.CurrentStakers()
 		_, err = currentStakers.GetValidator(nodeID0)
 		assert.NoError(err)
 
-		pendingStakers := OnAccept.PendingStakerChainState()
+		pendingStakers := OnAccept.PendingStakers()
 		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
 		assert.ErrorIs(err, database.ErrNotFound)
 
@@ -3115,7 +3115,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*addValidatorTx1,
+		addValidatorTx1,
 	)
 	assert.NoError(err)
 
@@ -3136,7 +3136,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Verify that the second new validator now in pending validator set
 	{
 		OnAccept := addValidatorProposalCommit1.OnAccept()
-		pendingStakers := OnAccept.PendingStakerChainState()
+		pendingStakers := OnAccept.PendingStakers()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
 		assert.NoError(err)
@@ -3160,7 +3160,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
-		*advanceTimeTx1,
+		advanceTimeTx1,
 	)
 	assert.NoError(err)
 
@@ -3183,11 +3183,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Verify that the second new validator is now in the current validator set.
 	{
 		OnAccept := advanceTimeProposalCommit1.OnAccept()
-		currentStakers := OnAccept.CurrentStakerChainState()
+		currentStakers := OnAccept.CurrentStakers()
 		_, err := currentStakers.GetValidator(nodeID1)
 		assert.NoError(err)
 
-		pendingStakers := OnAccept.PendingStakerChainState()
+		pendingStakers := OnAccept.PendingStakers()
 		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 
@@ -3217,7 +3217,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	rewards := reward.NewCalculator(vm.RewardConfig)
-	is, err := state.NewMetered(
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		prometheus.NewRegistry(),
 		&vm.Config,
@@ -3233,7 +3233,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
 	{
-		currentStakers := vm.internalState.CurrentStakerChainState()
+		currentStakers := vm.internalState.CurrentStakers()
 		node0, err := currentStakers.GetValidator(nodeID0)
 		assert.NoError(err)
 		potentialReward := node0.PotentialReward()
@@ -3244,7 +3244,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		potentialReward = node1.PotentialReward()
 		assert.EqualValues(uint64(59999999), potentialReward)
 
-		pendingStakers := vm.internalState.PendingStakerChainState()
+		pendingStakers := vm.internalState.PendingStakers()
 		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 		_, _, err = pendingStakers.GetValidatorTx(nodeID1)

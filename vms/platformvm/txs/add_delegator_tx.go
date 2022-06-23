@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	_ UnsignedTx = &AddDelegatorTx{}
-	_ StakerTx   = &AddDelegatorTx{}
+	_ UnsignedTx             = &AddDelegatorTx{}
+	_ StakerTx               = &AddDelegatorTx{}
+	_ secp256k1fx.UnsignedTx = &AddDelegatorTx{}
 )
 
 // AddDelegatorTx is an unsigned addDelegatorTx

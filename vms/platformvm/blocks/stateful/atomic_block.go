@@ -43,7 +43,7 @@ func NewAtomicBlock(
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
-	tx txs.Tx,
+	tx *txs.Tx,
 ) (*AtomicBlock, error) {
 	statelessBlk, err := stateless.NewAtomicBlock(parentID, height, tx)
 	if err != nil {

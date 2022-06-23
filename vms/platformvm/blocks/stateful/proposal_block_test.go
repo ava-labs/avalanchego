@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -73,20 +73,20 @@ func TestPreForkProposalBlockTimeVerification(t *testing.T) {
 	}
 	addValTx := &txs.Tx{Unsigned: utx}
 	assert.NoError(addValTx.Sign(txs.Codec, nil))
-	blkTx := txs.Tx{
+	blkTx := &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addValTx.ID(),
 		},
 	}
 
 	// setup state to validate proposal block transaction
-	currentStaker := transactions.NewMockCurrentStakerState(ctrl)
+	currentStaker := state.NewMockCurrentStakers(ctrl)
 	currentStaker.EXPECT().GetNextStaker().
 		Return(addValTx, uint64(0), nil).AnyTimes()
 	currentStaker.EXPECT().DeleteNextStaker().AnyTimes()
 
-	h.mockedFullState.EXPECT().CurrentStakerChainState().Return(currentStaker).AnyTimes()
-	h.mockedFullState.EXPECT().PendingStakerChainState().AnyTimes()
+	h.mockedFullState.EXPECT().CurrentStakers().Return(currentStaker).AnyTimes()
+	h.mockedFullState.EXPECT().PendingStakers().AnyTimes()
 	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	h.mockedFullState.EXPECT().GetCurrentSupply().Return(currentSupply).AnyTimes()
 	h.mockedFullState.EXPECT().GetUptime(gomock.Any()).
@@ -166,18 +166,18 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 		Return(nextStakerTime, nil).AnyTimes()
 
 	// Timestamp Update - Pending Stakers
-	pendingStaker := transactions.NewMockPendingStakerState(ctrl)
+	pendingStaker := state.NewMockPendingStakers(ctrl)
 	pendingStaker.EXPECT().Stakers().AnyTimes()
 	pendingStaker.EXPECT().DeleteStakers(gomock.Any()).Return(pendingStaker).AnyTimes()
-	h.mockedFullState.EXPECT().PendingStakerChainState().Return(pendingStaker).AnyTimes()
+	h.mockedFullState.EXPECT().PendingStakers().Return(pendingStaker).AnyTimes()
 
 	// Timestamp Update - Current Stakers
-	currentStaker := transactions.NewMockCurrentStakerState(ctrl)
+	currentStaker := state.NewMockCurrentStakers(ctrl)
 	currentStaker.EXPECT().Stakers().AnyTimes()
 	currentStaker.EXPECT().
 		UpdateStakers(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(currentStaker, nil).AnyTimes()
-	h.mockedFullState.EXPECT().CurrentStakerChainState().Return(currentStaker).AnyTimes()
+	h.mockedFullState.EXPECT().CurrentStakers().Return(currentStaker).AnyTimes()
 
 	// Other Timestamp updates
 	h.mockedFullState.EXPECT().GetCurrentSupply().Return(currentSupply).AnyTimes()
@@ -198,7 +198,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 		},
 	}
 	assert.NoError(addValTx.Sign(txs.Codec, nil))
-	blkTx := txs.Tx{
+	blkTx := &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addValTx.ID(),
 		},
@@ -236,7 +236,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// wrong tx content (no advance time txs)
-	invalidTx := txs.Tx{
+	invalidTx := &txs.Tx{
 		Unsigned: &txs.AdvanceTimeTx{
 			Time: uint64(now.Unix()),
 		},
@@ -314,7 +314,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 		End: uint64(blkTimeStamp.Unix()),
 	}
 	assert.NoError(addValTx.Sign(txs.Codec, nil))
-	blkTx = txs.Tx{
+	blkTx = &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addValTx.ID(),
 		},
@@ -590,9 +590,9 @@ func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
 						toReward = append(toReward, stakerTx)
 					}
 				}
-				transactions.SortValidatorsByRemoval(toReward)
+				state.SortValidatorsByRemoval(toReward)
 
-				s0RewardTx := txs.Tx{
+				s0RewardTx := &txs.Tx{
 					Unsigned: &txs.RewardValidatorTx{
 						TxID: toReward[0].ID(),
 					},
@@ -623,9 +623,9 @@ func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
 			assert.NoError(h.fullState.Commit())
 
 			// Check that the validators we expect to be in the current staker set are there
-			currentStakers := h.fullState.CurrentStakerChainState()
+			currentStakers := h.fullState.CurrentStakers()
 			// Check that the validators we expect to be in the pending staker set are there
-			pendingStakers := h.fullState.PendingStakerChainState()
+			pendingStakers := h.fullState.PendingStakers()
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
@@ -728,7 +728,7 @@ func TestPostForkProposalBlockRemoveSubnetValidator(t *testing.T) {
 	assert.NoError(h.fullState.Load())
 
 	// create rewardTx for staker0
-	s0RewardTx := txs.Tx{
+	s0RewardTx := &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
@@ -753,7 +753,7 @@ func TestPostForkProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// update staker set
 	assert.NoError(block.Verify())
 
-	currentStakers := block.onCommitState.CurrentStakerChainState()
+	currentStakers := block.onCommitState.CurrentStakers()
 	vdr, err := currentStakers.GetValidator(subnetValidatorNodeID)
 	assert.NoError(err)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
@@ -830,7 +830,7 @@ func TestPostForkProposalBlockWhitelistedSubnet(t *testing.T) {
 			assert.NoError(h.fullState.Load())
 
 			// create rewardTx for staker0
-			s0RewardTx := txs.Tx{
+			s0RewardTx := &txs.Tx{
 				Unsigned: &txs.RewardValidatorTx{
 					TxID: addStaker0.ID(),
 				},
@@ -913,7 +913,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(h.fullState.Load())
 
 	// create rewardTx for staker0
-	s0RewardTx := txs.Tx{
+	s0RewardTx := &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
@@ -989,7 +989,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(h.fullState.Load())
 
 	// create rewardTx for staker0
-	s0RewardTx = txs.Tx{
+	s0RewardTx = &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
@@ -1068,7 +1068,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(h.fullState.Load())
 
 	// create rewardTx for staker0
-	s0RewardTx := txs.Tx{
+	s0RewardTx := &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
@@ -1143,7 +1143,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(h.fullState.Load())
 
 	// create rewardTx for staker0
-	s0RewardTx = txs.Tx{
+	s0RewardTx = &txs.Tx{
 		Unsigned: &txs.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},

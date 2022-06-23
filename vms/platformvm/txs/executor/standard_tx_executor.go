@@ -23,7 +23,7 @@ var _ txs.Visitor = &StandardTxExecutor{}
 type StandardTxExecutor struct {
 	// inputs
 	*Backend
-	State state.Versioned // state is expected to be modified
+	State state.Diff // state is expected to be modified
 	Tx    *txs.Tx
 
 	// outputs

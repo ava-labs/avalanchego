@@ -28,7 +28,7 @@ func NewProposalBlock(
 	timestamp uint64,
 	parentID ids.ID,
 	height uint64,
-	tx txs.Tx,
+	tx *txs.Tx,
 ) (ProposalBlockIntf, error) {
 	// make sure txs to be included in the block
 	// are duly initialized
@@ -85,7 +85,7 @@ func NewProposalBlock(
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx txs.Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
@@ -105,14 +105,14 @@ func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (pb *ProposalBlock) ProposalTx() *txs.Tx { return &pb.Tx }
+func (pb *ProposalBlock) ProposalTx() *txs.Tx { return pb.Tx }
 
 type PostForkProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
 	TxBytes []byte `serialize:"false" postFork:"true" json:"txs"`
 
-	Tx txs.Tx
+	Tx *txs.Tx
 }
 
 func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error {
@@ -120,7 +120,7 @@ func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	var tx txs.Tx
+	var tx *txs.Tx
 	_, err := txs.Codec.Unmarshal(ppb.TxBytes, &tx)
 	if err != nil {
 		return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
@@ -133,4 +133,4 @@ func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error
 	return nil
 }
 
-func (ppb *PostForkProposalBlock) ProposalTx() *txs.Tx { return &ppb.Tx }
+func (ppb *PostForkProposalBlock) ProposalTx() *txs.Tx { return ppb.Tx }

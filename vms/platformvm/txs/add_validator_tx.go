@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	_ UnsignedTx = &AddValidatorTx{}
-	_ StakerTx   = &AddValidatorTx{}
+	_ UnsignedTx             = &AddValidatorTx{}
+	_ StakerTx               = &AddValidatorTx{}
+	_ secp256k1fx.UnsignedTx = &AddValidatorTx{}
 
 	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 )

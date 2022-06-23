@@ -125,7 +125,7 @@ func TestProposalBlocks(t *testing.T) {
 		blkTimestamp,
 		parentID,
 		height,
-		*tx,
+		tx,
 	)
 	assert.NoError(err)
 
@@ -146,7 +146,7 @@ func TestProposalBlocks(t *testing.T) {
 
 	parsedPreForkProposalBlk, ok := parsed.(*ProposalBlock)
 	assert.True(ok)
-	assert.Equal(*tx, parsedPreForkProposalBlk.Tx)
+	assert.Equal(tx, parsedPreForkProposalBlk.Tx)
 
 	// check that post fork standard block can be built and parsed
 	postForkBlkVersion := uint16(PostForkVersion)
@@ -157,7 +157,7 @@ func TestProposalBlocks(t *testing.T) {
 		blkTimestamp,
 		parentID,
 		height,
-		*tx,
+		tx,
 	)
 	assert.NoError(err)
 
@@ -174,7 +174,7 @@ func TestProposalBlocks(t *testing.T) {
 	assert.Equal(postForkProposalBlk.UnixTimestamp(), parsed.UnixTimestamp())
 	parsedPostForkProposalBlk, ok := parsed.(*PostForkProposalBlock)
 	assert.True(ok)
-	assert.Equal(*tx, parsedPostForkProposalBlk.Tx)
+	assert.Equal(tx, parsedPostForkProposalBlk.Tx)
 
 	// backward compatibility check
 	assert.Equal(parsedPreForkProposalBlk.Tx, parsedPostForkProposalBlk.Tx)

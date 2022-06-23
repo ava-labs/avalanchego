@@ -187,10 +187,10 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend: &h.execBackend,
-		State: state.NewVersioned(
+		State: state.NewDiff(
 			h.tState,
-			h.tState.CurrentStakerChainState(),
-			h.tState.PendingStakerChainState(),
+			h.tState.CurrentStakers(),
+			h.tState.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -230,7 +230,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 
 	// Replace a valid signature with one from another key
-	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
+	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,10 +238,10 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend: &h.execBackend,
-		State: state.NewVersioned(
+		State: state.NewDiff(
 			h.tState,
-			h.tState.CurrentStakerChainState(),
-			h.tState.PendingStakerChainState(),
+			h.tState.CurrentStakers(),
+			h.tState.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -278,10 +278,10 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend: &h.execBackend,
-		State: state.NewVersioned(
+		State: state.NewDiff(
 			h.tState,
-			h.tState.CurrentStakerChainState(),
-			h.tState.PendingStakerChainState(),
+			h.tState.CurrentStakers(),
+			h.tState.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -315,10 +315,10 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	executor := StandardTxExecutor{
 		Backend: &h.execBackend,
-		State: state.NewVersioned(
+		State: state.NewDiff(
 			h.tState,
-			h.tState.CurrentStakerChainState(),
-			h.tState.PendingStakerChainState(),
+			h.tState.CurrentStakers(),
+			h.tState.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -392,10 +392,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(txs.Codec, signers)
 			assert.NoError(err)
 
-			vs := state.NewVersioned(
+			vs := state.NewDiff(
 				h.tState,
-				h.tState.CurrentStakerChainState(),
-				h.tState.PendingStakerChainState(),
+				h.tState.CurrentStakers(),
+				h.tState.PendingStakers(),
 			)
 			vs.SetTimestamp(test.time)
 

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -83,8 +83,8 @@ func TestPreForkStandardBlockTimeVerification(t *testing.T) {
 			return nil, choices.Rejected, database.ErrNotFound
 		}).AnyTimes()
 	h.mockedFullState.EXPECT().GetLastAccepted().Return(preForkParentBlk.ID()).AnyTimes()
-	h.mockedFullState.EXPECT().CurrentStakerChainState().AnyTimes()
-	h.mockedFullState.EXPECT().PendingStakerChainState().AnyTimes()
+	h.mockedFullState.EXPECT().CurrentStakers().AnyTimes()
+	h.mockedFullState.EXPECT().PendingStakers().AnyTimes()
 	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	h.mockedFullState.EXPECT().GetCurrentSupply().Return(currentSupply).AnyTimes()
 
@@ -159,18 +159,18 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 	h.mockedFullState.EXPECT().GetLastAccepted().Return(postForkParentBlk.ID()).AnyTimes()
 
 	// currentStaker is set just so UpdateStakerSet goes through doing nothing
-	currentStaker := transactions.NewMockCurrentStakerState(ctrl)
+	currentStaker := state.NewMockCurrentStakers(ctrl)
 	currentStaker.EXPECT().Stakers().AnyTimes()
 	currentStaker.EXPECT().UpdateStakers(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	h.mockedFullState.EXPECT().CurrentStakerChainState().
-		DoAndReturn(func() transactions.CurrentStakerState { return currentStaker }).AnyTimes()
+	h.mockedFullState.EXPECT().CurrentStakers().
+		DoAndReturn(func() state.CurrentStakers { return currentStaker }).AnyTimes()
 
 	// pendingStaker is set just so UpdateStakerSet goes through doing nothing
-	pendingStaker := transactions.NewMockPendingStakerState(ctrl)
+	pendingStaker := state.NewMockPendingStakers(ctrl)
 	pendingStaker.EXPECT().Stakers().AnyTimes()
 	pendingStaker.EXPECT().DeleteStakers(gomock.Any()).AnyTimes()
-	h.mockedFullState.EXPECT().PendingStakerChainState().
-		DoAndReturn(func() transactions.PendingStakerState { return pendingStaker }).AnyTimes()
+	h.mockedFullState.EXPECT().PendingStakers().
+		DoAndReturn(func() state.PendingStakers { return pendingStaker }).AnyTimes()
 
 	h.mockedFullState.EXPECT().GetNextStakerChangeTime().Return(nextStakerTime, nil).AnyTimes()
 	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
@@ -325,14 +325,14 @@ func TestPostForkStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// tests
 	updatedState := block.onAcceptState
-	onCommitCurrentStakers := updatedState.CurrentStakerChainState()
+	onCommitCurrentStakers := updatedState.CurrentStakers()
 	validator, err := onCommitCurrentStakers.GetValidator(nodeID)
 	assert.NoError(err)
 
 	_, vdrID := validator.AddValidatorTx()
 	assert.True(vdrID == addPendingValidatorTx.ID(), "Added the wrong tx to the validator set")
 
-	onCommitPendingStakers := updatedState.PendingStakerChainState()
+	onCommitPendingStakers := updatedState.PendingStakers()
 	_, _, err = onCommitPendingStakers.GetValidatorTx(nodeID)
 	assert.Error(err, "Should have removed the validator from the pending validator set")
 
@@ -532,9 +532,9 @@ func TestPostForkStandardBlockUpdateStakers(t *testing.T) {
 			assert.NoError(h.fullState.Commit())
 
 			// Check that the validators we expect to be in the current staker set are there
-			currentStakers := h.fullState.CurrentStakerChainState()
+			currentStakers := h.fullState.CurrentStakers()
 			// Check that the validators we expect to be in the pending staker set are there
-			pendingStakers := h.fullState.PendingStakerChainState()
+			pendingStakers := h.fullState.PendingStakers()
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
@@ -638,7 +638,7 @@ func TestPostForkStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// update staker set
 	assert.NoError(block.Verify())
 
-	currentStakers := block.onAcceptState.CurrentStakerChainState()
+	currentStakers := block.onAcceptState.CurrentStakers()
 	vdr, err := currentStakers.GetValidator(subnetValidatorNodeID)
 	assert.NoError(err)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]

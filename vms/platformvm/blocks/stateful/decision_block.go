@@ -9,7 +9,7 @@ type decisionBlock struct {
 	*commonBlock
 
 	// state of the chain if this block is accepted
-	onAcceptState state.Versioned
+	onAcceptState state.Diff
 
 	// to be executed if this block is accepted
 	onAcceptFunc func() error
@@ -25,7 +25,7 @@ func (d *decisionBlock) setBaseState() {
 	d.onAcceptState.SetBase(d.verifier)
 }
 
-func (d *decisionBlock) OnAccept() state.Mutable {
+func (d *decisionBlock) OnAccept() state.Chain {
 	if d.Status().Decided() || d.onAcceptState == nil {
 		return d.verifier
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -41,11 +40,11 @@ type ProposalBlock struct {
 	// TODO ABENEGIA: cleanup
 	// Following advance time tx removal fork, onPostForkBaseOptionsState is the base state
 	// over which both commit and abort states are built
-	onPostForkBaseOptionsState state.Versioned
+	onPostForkBaseOptionsState state.Diff
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState state.Versioned
+	onCommitState state.Diff
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState state.Versioned
+	onAbortState state.Diff
 
 	prefersCommit bool
 }
@@ -60,7 +59,7 @@ func NewProposalBlock(
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
-	tx txs.Tx,
+	tx *txs.Tx,
 ) (*ProposalBlock, error) {
 	statelessBlk, err := stateless.NewProposalBlock(version, timestamp, parentID, height, tx)
 	if err != nil {
@@ -190,13 +189,13 @@ func (pb *ProposalBlock) Verify() error {
 		// Having verifier block timestamp, we update staker set
 		// before processing block transaction
 		var (
-			newlyCurrentStakers transactions.CurrentStakerState
-			newlyPendingStakers transactions.PendingStakerState
+			newlyCurrentStakers state.CurrentStakers
+			newlyPendingStakers state.PendingStakers
 			updatedSupply       uint64
 		)
 		nextChainTime := pb.Timestamp()
-		currentStakers := parentState.CurrentStakerChainState()
-		pendingStakers := parentState.PendingStakerChainState()
+		currentStakers := parentState.CurrentStakers()
+		pendingStakers := parentState.PendingStakers()
 		currentSupply := parentState.GetCurrentSupply()
 		newlyCurrentStakers,
 			newlyPendingStakers,
@@ -211,7 +210,7 @@ func (pb *ProposalBlock) Verify() error {
 		if err != nil {
 			return err
 		}
-		baseOptionsState := state.NewVersioned(
+		baseOptionsState := state.NewDiff(
 			parentState,
 			newlyCurrentStakers,
 			newlyPendingStakers,

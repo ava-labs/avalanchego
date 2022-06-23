@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -17,7 +18,8 @@ var (
 	errNoOperations              = errors.New("an operationTx must have at least one operation")
 	errDoubleSpend               = errors.New("inputs attempt to double spend an input")
 
-	_ UnsignedTx = &OperationTx{}
+	_ UnsignedTx             = &OperationTx{}
+	_ secp256k1fx.UnsignedTx = &OperationTx{}
 )
 
 // OperationTx is a transaction with no credentials.
@@ -69,28 +71,6 @@ func (t *OperationTx) AssetIDs() ids.Set {
 // NumCredentials returns the number of expected credentials
 func (t *OperationTx) NumCredentials() int {
 	return t.BaseTx.NumCredentials() + len(t.Ops)
-}
-
-// UTXOs returns the UTXOs transaction is producing.
-func (t *OperationTx) UTXOs() []*avax.UTXO {
-	txID := t.ID()
-	utxos := t.BaseTx.UTXOs()
-
-	for _, op := range t.Ops {
-		asset := op.AssetID()
-		for _, out := range op.Op.Outs() {
-			utxos = append(utxos, &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(utxos)),
-				},
-				Asset: avax.Asset{ID: asset},
-				Out:   out,
-			})
-		}
-	}
-
-	return utxos
 }
 
 // SyntacticVerify that this transaction is well-formed.

@@ -255,7 +255,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	h.tState.AddCurrentStaker(addDSTx, 0)
 	h.tState.AddTx(addDSTx, status.Committed)
-	if err := h.tState.Write(); err != nil {
+	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.tState.Load(); err != nil {
@@ -395,7 +395,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	h.tState.AddCurrentStaker(subnetTx, 0)
 	h.tState.AddTx(subnetTx, status.Committed)
-	if err := h.tState.Write(); err != nil {
+	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.tState.Load(); err != nil {
@@ -429,7 +429,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	h.tState.DeleteCurrentStaker(subnetTx)
-	if err := h.tState.Write(); err != nil {
+	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.tState.Load(); err != nil {
@@ -510,7 +510,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Replace a valid signature with one from keys[3]
-		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.UnsignedBytes()))
+		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -545,7 +545,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 		h.tState.AddCurrentStaker(tx, 0)
 		h.tState.AddTx(tx, status.Committed)
-		if err := h.tState.Write(); err != nil {
+		if err := h.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.tState.Load(); err != nil {

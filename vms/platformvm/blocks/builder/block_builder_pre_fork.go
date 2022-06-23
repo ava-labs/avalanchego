@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-func (b *blockBuilder) nextPreForkTxs(preBlkState state.Mutable) ([]*txs.Tx, error) {
+func (b *blockBuilder) nextPreForkTxs(preBlkState state.Chain) ([]*txs.Tx, error) {
 	// Try return standard txs. Note that
 	// PreFork standard blocks to not advance chain time
 	if b.HasDecisionTxs() {

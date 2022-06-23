@@ -67,7 +67,7 @@ func TestTxState(t *testing.T) {
 	assert.Equal(database.ErrNotFound, err)
 
 	tx := &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
+		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,

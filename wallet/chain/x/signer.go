@@ -58,15 +58,13 @@ func NewSigner(kc *secp256k1fx.Keychain, backend SignerBackend) Signer {
 }
 
 func (s *signer) SignUnsigned(ctx stdcontext.Context, utx txs.UnsignedTx) (*txs.Tx, error) {
-	tx := &txs.Tx{
-		UnsignedTx: utx,
-	}
+	tx := &txs.Tx{Unsigned: utx}
 	return tx, s.Sign(ctx, tx)
 }
 
 // TODO: implement txs.Visitor here
 func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
-	switch utx := tx.UnsignedTx.(type) {
+	switch utx := tx.Unsigned.(type) {
 	case *txs.BaseTx:
 		return s.signBaseTx(ctx, tx, utx)
 	case *txs.CreateAssetTx:
@@ -78,7 +76,7 @@ func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	case *txs.ExportTx:
 		return s.signExportTx(ctx, tx, utx)
 	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.UnsignedTx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
 	}
 }
 
@@ -259,7 +257,7 @@ func (s *signer) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops
 
 func (s *signer) sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
 	codec := Parser.Codec()
-	unsignedBytes, err := codec.Marshal(txs.CodecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := codec.Marshal(txs.CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}

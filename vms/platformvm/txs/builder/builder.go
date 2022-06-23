@@ -165,7 +165,7 @@ func New(
 	cfg config.Config,
 	clk mockable.Clock,
 	fx fx.Fx,
-	state state.Mutable,
+	state state.Chain,
 	atoUtxosMan avax.AtomicUTXOManager,
 	spendingOps utxos.SpendingOps,
 	rewards reward.Calculator,
@@ -185,7 +185,7 @@ func New(
 type builder struct {
 	avax.AtomicUTXOManager
 	utxos.SpendingOps
-	state state.Mutable
+	state state.Chain
 
 	cfg     config.Config
 	ctx     *snow.Context

@@ -20,7 +20,7 @@ type AtomicBlockIntf interface {
 	AtomicTx() *txs.Tx
 }
 
-func NewAtomicBlock(parentID ids.ID, height uint64, tx txs.Tx) (AtomicBlockIntf, error) {
+func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (AtomicBlockIntf, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -49,7 +49,7 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx txs.Tx) (AtomicBlockIntf,
 type AtomicBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx txs.Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
@@ -68,4 +68,4 @@ func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) AtomicTx() *txs.Tx { return &ab.Tx }
+func (ab *AtomicBlock) AtomicTx() *txs.Tx { return ab.Tx }

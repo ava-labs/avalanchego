@@ -42,7 +42,7 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 	return gen, nil
 }
 
-// State represents the state of a genesis state of the platform chain
+// State represents the genesis state of the platform chain
 type State struct {
 	UTXOs         []*avax.UTXO
 	Validators    []*txs.Tx
