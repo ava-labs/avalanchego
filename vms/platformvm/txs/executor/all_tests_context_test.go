@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -179,10 +180,10 @@ func addSubnet(
 	}
 
 	// store it
-	versionedState := state.NewVersioned(
+	versionedState := state.NewDiff(
 		tState,
-		tState.CurrentStakerChainState(),
-		tState.PendingStakerChainState(),
+		tState.CurrentStakers(),
+		tState.PendingStakers(),
 	)
 
 	executor := StandardTxExecutor{
@@ -219,6 +220,7 @@ func defaultState(
 	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
 		baseDB,
+		prometheus.NewRegistry(),
 		cfg,
 		ctx,
 		dummyLocalStake,
@@ -227,6 +229,17 @@ func defaultState(
 		genesisBytes,
 	)
 	if err != nil {
+		panic(err)
+	}
+
+	// setup initial data as if we are storing genesis
+	initializeState(tState, ctx)
+
+	// persist and reload to init a bunch of in-memory stuff
+	if err := tState.Write( /*height*/ 0); err != nil {
+		panic(err)
+	}
+	if err := tState.Load(); err != nil {
 		panic(err)
 	}
 	return tState
@@ -418,7 +431,7 @@ func internalStateShutdown(t *testHelpersCollection) error {
 		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := t.tState.Write(); err != nil {
+		if err := t.tState.Write( /*height*/ math.MaxUint64); err != nil {
 			return err
 		}
 	}

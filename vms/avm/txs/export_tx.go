@@ -10,12 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
 	errNoExportOutputs = errors.New("no export outputs")
 
-	_ UnsignedTx = &ExportTx{}
+	_ UnsignedTx             = &ExportTx{}
+	_ secp256k1fx.UnsignedTx = &ExportTx{}
 )
 
 // ExportTx is a transaction that exports an asset to another blockchain.

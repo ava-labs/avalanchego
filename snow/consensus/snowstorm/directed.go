@@ -437,7 +437,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		// Get the node this tx represents
 		txNode, exist := dg.txs[txIDKey]
 		if !exist {
-			// This tx may have already been accepted because of tx
+			// This tx may have already been accepted because of its
 			// dependencies. If this is the case, we can just drop the vote.
 			continue
 		}
@@ -519,9 +519,8 @@ func (dg *Directed) accept(txID ids.ID) error {
 	if err := dg.reject(txNode.ins); err != nil {
 		return err
 	}
-	// While it is typically true that a tx this is being accepted is preferred,
-	// it is possible for this to not be the case. So this is handled for
-	// completeness.
+	// While it is typically true that a tx that is being accepted is preferred,
+	// it is possible for this to not be the case.
 	if err := dg.reject(txNode.outs); err != nil {
 		return err
 	}
@@ -586,9 +585,14 @@ func (dg *Directed) redirectEdges(tx *directedTx) bool {
 	return changed
 }
 
-// Change the direction of this edge if needed. Returns true if the direction
-// was switched.
-// TODO replace
+// Fixes the direction of the edge between [txNode] and [conflictID] if needed.
+//
+// It is assumed the edge is currently directed as [txNode] -> [conflictID].
+//
+// If [conflictID] has less successful polls than [txNode], the direction of the
+// edge will be set to [conflictID] -> [txNode].
+//
+// Returns true if the direction was switched.
 func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	conflict := dg.txs[conflictID]
 	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {

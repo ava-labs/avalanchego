@@ -17,11 +17,11 @@ var _ txs.Visitor = &AtomicTxExecutor{}
 type AtomicTxExecutor struct {
 	// inputs
 	*Backend
-	ParentState state.Mutable
+	ParentState state.Chain
 	Tx          *txs.Tx
 
 	// outputs
-	OnAccept       state.Versioned
+	OnAccept       state.Diff
 	Inputs         ids.Set
 	AtomicRequests map[ids.ID]*atomic.Requests
 }
@@ -43,10 +43,10 @@ func (e *AtomicTxExecutor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
-	e.OnAccept = state.NewVersioned(
+	e.OnAccept = state.NewDiff(
 		e.ParentState,
-		e.ParentState.CurrentStakerChainState(),
-		e.ParentState.PendingStakerChainState(),
+		e.ParentState.CurrentStakers(),
+		e.ParentState.PendingStakers(),
 	)
 	executor := StandardTxExecutor{
 		Backend: e.Backend,

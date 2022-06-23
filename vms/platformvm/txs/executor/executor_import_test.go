@@ -161,10 +161,10 @@ func TestNewImportTx(t *testing.T) {
 			assert.Equal(h.cfg.TxFee, totalIn-totalOut, "burned too much")
 
 			preferredState := h.tState
-			fakedState := state.NewVersioned(
+			fakedState := state.NewDiff(
 				preferredState,
-				preferredState.CurrentStakerChainState(),
-				preferredState.PendingStakerChainState(),
+				preferredState.CurrentStakers(),
+				preferredState.PendingStakers(),
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 

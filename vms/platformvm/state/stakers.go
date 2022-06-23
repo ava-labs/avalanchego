@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package transactions
+package state
 
 import (
 	"fmt"
@@ -15,53 +15,59 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
-var _ ValidatorState = &validatorState{}
+const (
+	// priority values are used as part of the keys in the pending/current
+	// validator state to ensure they are sorted in the order that they should
+	// be added/removed.
+	lowPriority byte = iota
+	mediumPriority
+	topPriority
+)
 
-type ValidatorState interface {
-	SetCurrentStakerChainState(cs CurrentStakerState)
-	CurrentStakerChainState() CurrentStakerState
-	SetPendingStakerChainState(ps PendingStakerState)
-	PendingStakerChainState() PendingStakerState
+var _ Stakers = &stakers{}
 
-	// GetNextStakerChangeTime returns the next time
-	// that a staker set change should occur.
+type Stakers interface {
+	SetCurrentStakers(cs CurrentStakers)
+	CurrentStakers() CurrentStakers
+	SetPendingStakers(ps PendingStakers)
+	PendingStakers() PendingStakers
+
+	// GetNextStakerChangeTime returns the next time that a staker set change
+	// should occur.
 	GetNextStakerChangeTime() (time.Time, error)
 }
 
-func NewValidatorState(
-	current CurrentStakerState,
-	pending PendingStakerState,
-) ValidatorState {
-	return &validatorState{
+func NewStakers(current CurrentStakers, pending PendingStakers) Stakers {
+	return &stakers{
 		current: current,
 		pending: pending,
 	}
 }
 
-type validatorState struct {
-	current CurrentStakerState
-	pending PendingStakerState
+type stakers struct {
+	current CurrentStakers
+	pending PendingStakers
 }
 
-func (vs *validatorState) CurrentStakerChainState() CurrentStakerState {
-	return vs.current
+func (s *stakers) CurrentStakers() CurrentStakers {
+	return s.current
 }
 
-func (vs *validatorState) PendingStakerChainState() PendingStakerState {
-	return vs.pending
+func (s *stakers) PendingStakers() PendingStakers {
+	return s.pending
 }
 
-func (vs *validatorState) SetCurrentStakerChainState(cs CurrentStakerState) {
-	vs.current = cs
+func (s *stakers) SetCurrentStakers(cs CurrentStakers) {
+	s.current = cs
 }
 
-func (vs *validatorState) SetPendingStakerChainState(ps PendingStakerState) {
-	vs.pending = ps
+func (s *stakers) SetPendingStakers(ps PendingStakers) {
+	s.pending = ps
 }
 
-func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
+func (s *stakers) GetNextStakerChangeTime() (time.Time, error) {
 	earliest := mockable.MaxTime
-	currentStakers := vs.CurrentStakerChainState()
+	currentStakers := s.CurrentStakers()
 	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
 		nextStakerToRemove := currentStakers[0]
 		staker, ok := nextStakerToRemove.Unsigned.(txs.StakerTx)
@@ -72,7 +78,7 @@ func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 			earliest = endTime
 		}
 	}
-	pendingStakers := vs.PendingStakerChainState()
+	pendingStakers := s.PendingStakers()
 	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
 		nextStakerToAdd := pendingStakers[0]
 		staker, ok := nextStakerToAdd.Unsigned.(txs.StakerTx)
@@ -86,7 +92,7 @@ func (vs *validatorState) GetNextStakerChangeTime() (time.Time, error) {
 	return earliest, nil
 }
 
-func (vs *validatorState) maxSubnetStakeAmount(
+func (s *stakers) maxSubnetStakeAmount(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
 	startTime time.Time,
@@ -96,8 +102,8 @@ func (vs *validatorState) maxSubnetStakeAmount(
 		vdrTxAndID SubnetValidatorAndID
 		exists     bool
 	)
-	currentValidator, err := vs.current.GetValidator(nodeID)
-	pendingValidator := vs.pending.GetValidator(nodeID)
+	currentValidator, err := s.current.GetValidator(nodeID)
+	pendingValidator := s.pending.GetValidator(nodeID)
 
 	switch err {
 	case nil:
@@ -124,13 +130,13 @@ func (vs *validatorState) maxSubnetStakeAmount(
 	return vdrTx.Weight(), nil
 }
 
-func (vs *validatorState) maxPrimarySubnetStakeAmount(
+func (s *stakers) maxPrimarySubnetStakeAmount(
 	nodeID ids.NodeID,
 	startTime time.Time,
 	endTime time.Time,
 ) (uint64, error) {
-	currentValidator, err := vs.current.GetValidator(nodeID)
-	pendingValidator := vs.pending.GetValidator(nodeID)
+	currentValidator, err := s.current.GetValidator(nodeID)
+	pendingValidator := s.pending.GetValidator(nodeID)
 
 	switch err {
 	case nil:
@@ -155,7 +161,7 @@ func (vs *validatorState) maxPrimarySubnetStakeAmount(
 			currentWeight,
 		)
 	case database.ErrNotFound:
-		futureValidator, _, err := vs.pending.GetValidatorTx(nodeID)
+		futureValidator, _, err := s.pending.GetValidatorTx(nodeID)
 		if err == database.ErrNotFound {
 			return 0, nil
 		}

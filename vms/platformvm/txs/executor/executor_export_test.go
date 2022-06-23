@@ -70,10 +70,10 @@ func TestNewExportTx(t *testing.T) {
 			assert.NoError(err)
 
 			preferredState := h.tState
-			fakedState := state.NewVersioned(
+			fakedState := state.NewDiff(
 				preferredState,
-				preferredState.CurrentStakerChainState(),
-				preferredState.PendingStakerChainState(),
+				preferredState.CurrentStakers(),
+				preferredState.PendingStakers(),
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
