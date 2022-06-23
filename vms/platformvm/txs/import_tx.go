@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	_ UnsignedTx = &ImportTx{}
+	_ UnsignedTx             = &ImportTx{}
+	_ secp256k1fx.UnsignedTx = &ImportTx{}
 
 	errNoImportInputs = errors.New("tx has no imported inputs")
 )

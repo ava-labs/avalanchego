@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -35,7 +36,8 @@ var (
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
 
-	_ UnsignedTx = &CreateAssetTx{}
+	_ UnsignedTx             = &CreateAssetTx{}
+	_ secp256k1fx.UnsignedTx = &CreateAssetTx{}
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
