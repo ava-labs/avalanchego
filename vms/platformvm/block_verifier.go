@@ -46,6 +46,8 @@ type blkVerifier struct {
 	recentlyAccepted *window.Window
 }
 
+func (bv *blkVerifier) SetHeight(height uint64) { bv.InternalState.SetHeight(height) }
+
 func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (p_block.Block, error) {
 	// If block is in memory, return it.
 	if blk, exists := bv.currentBlksCache[blkID]; exists {
@@ -59,8 +61,8 @@ func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (p_block.Block, error) {
 	return p_block.MakeStateful(statelessBlk, bv, bv.Backend, blkStatus)
 }
 
-func (bv *blkVerifier) StateContentForApply() state.Content { return bv.InternalState }
-func (bv *blkVerifier) GetMutableState() state.Mutable      { return bv.InternalState }
+func (bv *blkVerifier) StateContentForApply() state.State { return bv.InternalState }
+func (bv *blkVerifier) GetMutableState() state.Chain      { return bv.InternalState }
 
 func (bv *blkVerifier) CacheVerifiedBlock(blk p_block.Block) {
 	bv.currentBlksCache[blk.ID()] = blk

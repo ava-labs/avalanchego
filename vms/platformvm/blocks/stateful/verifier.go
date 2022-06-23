@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/metadata"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
@@ -17,11 +16,13 @@ type Verifier interface {
 	mempool.Mempool
 	stateless.Metrics
 
-	metadata.Content
+	state.State
+	SetHeight(height uint64)
+
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
 	AddStatelessBlock(block stateless.Block, status choices.Status)
-	StateContentForApply() state.Content
-	GetMutableState() state.Mutable
+	StateContentForApply() state.State
+	GetMutableState() state.Chain
 	Abort()
 	Commit() error
 	CommitBatch() (database.Batch, error)

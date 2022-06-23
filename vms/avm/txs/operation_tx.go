@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -17,7 +18,8 @@ var (
 	errNoOperations              = errors.New("an operationTx must have at least one operation")
 	errDoubleSpend               = errors.New("inputs attempt to double spend an input")
 
-	_ UnsignedTx = &OperationTx{}
+	_ UnsignedTx             = &OperationTx{}
+	_ secp256k1fx.UnsignedTx = &OperationTx{}
 )
 
 // OperationTx is a transaction with no credentials.
