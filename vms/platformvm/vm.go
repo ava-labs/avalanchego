@@ -47,7 +47,6 @@ import (
 	p_blk_builder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	tx_state "github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	p_utils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
@@ -150,7 +149,7 @@ func (vm *VM) Initialize(
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
-	if vm.internalState, err = state.NewMetered(
+	if vm.internalState, err = state.New(
 		vm.dbManager.Current().Database,
 		registerer,
 		&vm.Config,
@@ -484,7 +483,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, tx_state.ErrNotEnoughValidators
+		return nil, state.ErrNotEnoughValidators
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -571,7 +570,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 }
 
 func (vm *VM) updateValidators() error {
-	currentValidators := vm.internalState.CurrentStakerChainState()
+	currentValidators := vm.internalState.CurrentStakers()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {
 		return err

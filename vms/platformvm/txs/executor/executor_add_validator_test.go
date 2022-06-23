@@ -279,7 +279,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 
 		h.tState.AddCurrentStaker(tx, 0)
 		h.tState.AddTx(tx, status.Committed)
-		if err := h.tState.Write(); err != nil {
+		if err := h.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.tState.Load(); err != nil {

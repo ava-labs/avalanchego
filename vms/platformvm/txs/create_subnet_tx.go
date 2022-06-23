@@ -6,9 +6,13 @@ package txs
 import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedTx = &CreateSubnetTx{}
+var (
+	_ UnsignedTx             = &CreateSubnetTx{}
+	_ secp256k1fx.UnsignedTx = &CreateSubnetTx{}
+)
 
 // CreateSubnetTx is an unsigned proposal to create a new subnet
 type CreateSubnetTx struct {

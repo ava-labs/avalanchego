@@ -230,10 +230,10 @@ func addSubnet(
 	}
 
 	// store it
-	versionedState := state.NewVersioned(
+	versionedState := state.NewDiff(
 		tState,
-		tState.CurrentStakerChainState(),
-		tState.PendingStakerChainState(),
+		tState.CurrentStakers(),
+		tState.PendingStakers(),
 	)
 
 	executor := executor.StandardTxExecutor{
@@ -269,6 +269,7 @@ func defaultState(
 	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
 		baseDB,
+		prometheus.NewRegistry(),
 		cfg,
 		ctx,
 		dummyLocalStake,
@@ -468,7 +469,7 @@ func internalStateShutdown(t *testHelpersCollection) error {
 		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := t.fullState.Write(); err != nil {
+		if err := t.fullState.Commit(); err != nil {
 			return err
 		}
 	}

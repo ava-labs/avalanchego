@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -20,7 +21,8 @@ const (
 )
 
 var (
-	_ UnsignedTx = &CreateChainTx{}
+	_ UnsignedTx             = &CreateChainTx{}
+	_ secp256k1fx.UnsignedTx = &CreateChainTx{}
 
 	ErrCantValidatePrimaryNetwork = errors.New("new blockchain can't be validated by primary network")
 
