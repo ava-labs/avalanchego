@@ -9,7 +9,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -97,4 +99,13 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 			assert.ErrorIs(err, test.result)
 		})
 	}
+}
+
+func testProposalTx() (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{
+		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
+	}
+
+	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
+	return txs.NewSigned(utx, txs.Codec, signers)
 }

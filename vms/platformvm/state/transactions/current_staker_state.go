@@ -134,7 +134,7 @@ func (cs *currentStakerState) UpdateStakers(
 			newValidators[numStart+i] = tx.AddStakerTx
 		}
 
-		sortValidatorsByRemoval(newValidators)
+		SortValidatorsByRemoval(newValidators)
 		newCS.validators = newValidators
 
 		for _, vdr := range addValidatorTxs {
@@ -435,7 +435,7 @@ func (s innerSortValidatorsByRemoval) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func sortValidatorsByRemoval(s []*txs.Tx) {
+func SortValidatorsByRemoval(s []*txs.Tx) {
 	sort.Sort(innerSortValidatorsByRemoval(s))
 }
 

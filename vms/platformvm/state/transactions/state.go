@@ -929,7 +929,7 @@ func (s *state) LoadCurrentValidators() error {
 	for _, vdr := range cs.validatorsByNodeID {
 		sortDelegatorsByRemoval(vdr.delegators)
 	}
-	sortValidatorsByRemoval(cs.validators)
+	SortValidatorsByRemoval(cs.validators)
 	cs.SetNextStaker()
 
 	s.SetCurrentStakerChainState(cs)

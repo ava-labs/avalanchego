@@ -15,6 +15,18 @@ var (
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
+// proposedChainTime must be strictly later than currentChainTime
+// and earlier or equal to nextStakerChangeTime, so that no staker
+// event are skipped. Also it must be within syncBound with respect
+// to local clock, to make sure chain time approximate "real" time
+// See example below
+// -----|--------|---------X------------|----------------------|
+//      ^        ^         ^            ^                      ^
+//      |        |         |            |                      |
+//  localTime    |         |  localTime + syncBound            |
+//        currentChainTime |                          nextStakerChangeTime
+//                  proposedChainTime
+
 func ValidateProposedChainTime(
 	proposedChainTime,
 	currentChainTime,

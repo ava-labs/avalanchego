@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -37,6 +38,10 @@ type ProposalBlock struct {
 	stateless.ProposalBlockIntf
 	*commonBlock
 
+	// TODO ABENEGIA: cleanup
+	// Following advance time tx removal fork, onPostForkBaseOptionsState is the base state
+	// over which both commit and abort states are built
+	onPostForkBaseOptionsState state.Versioned
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState state.Versioned
 	// The state that the chain will have if this block's proposal is aborted
@@ -99,6 +104,12 @@ func (pb *ProposalBlock) Accept() error {
 		pb.Height(),
 		pb.Parent(),
 	)
+
+	// Update the state of the chain in the database
+	// apply baseOptionState first
+	if pb.Version() == stateless.PostForkVersion {
+		pb.onPostForkBaseOptionsState.Apply(pb.verifier)
+	}
 
 	pb.status = choices.Accepted
 	pb.verifier.SetLastAccepted(blkID)
@@ -165,13 +176,61 @@ func (pb *ProposalBlock) Verify() error {
 	// parentState is the state if this block's parent is accepted
 	parentState := parent.OnAccept()
 	tx := pb.ProposalTx()
-	txExecutor := executor.ProposalTxExecutor{
-		Backend:     &pb.txExecutorBackend,
-		ParentState: parentState,
-		Tx:          tx,
+	blkVersion := pb.Version()
+	var txExecutor executor.ProposalTxExecutor
+	switch blkVersion {
+	case stateless.PreForkVersion:
+		txExecutor = executor.ProposalTxExecutor{
+			Backend:     &pb.txExecutorBackend,
+			ParentState: parentState,
+			Tx:          tx,
+		}
+
+	case stateless.PostForkVersion:
+		// Having verifier block timestamp, we update staker set
+		// before processing block transaction
+		var (
+			newlyCurrentStakers transactions.CurrentStakerState
+			newlyPendingStakers transactions.PendingStakerState
+			updatedSupply       uint64
+		)
+		nextChainTime := pb.Timestamp()
+		currentStakers := parentState.CurrentStakerChainState()
+		pendingStakers := parentState.PendingStakerChainState()
+		currentSupply := parentState.GetCurrentSupply()
+		newlyCurrentStakers,
+			newlyPendingStakers,
+			updatedSupply,
+			err := executor.UpdateStakerSet(
+			currentStakers,
+			pendingStakers,
+			currentSupply,
+			&pb.txExecutorBackend,
+			nextChainTime,
+		)
+		if err != nil {
+			return err
+		}
+		baseOptionsState := state.NewVersioned(
+			parentState,
+			newlyCurrentStakers,
+			newlyPendingStakers,
+		)
+		baseOptionsState.SetTimestamp(nextChainTime)
+		baseOptionsState.SetCurrentSupply(updatedSupply)
+
+		pb.onPostForkBaseOptionsState = baseOptionsState
+		txExecutor = executor.ProposalTxExecutor{
+			Backend:     &pb.txExecutorBackend,
+			ParentState: baseOptionsState,
+			Tx:          tx,
+		}
+
+	default:
+		return fmt.Errorf("block version %d, unknown recipe to update chain state. Verification failed", blkVersion)
 	}
-	err := tx.Unsigned.Visit(&txExecutor)
-	if err != nil {
+
+	if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 		txID := tx.ID()
 		pb.verifier.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err

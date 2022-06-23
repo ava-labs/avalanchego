@@ -59,12 +59,12 @@ func TestPreForkStandardBlockTimeVerification(t *testing.T) {
 
 	// setup and store parent block
 	// it's a standard block for simplicity
-	parentVersion := uint16(stateless.PreForkVersion)
+	blksVersion := uint16(stateless.PreForkVersion)
 	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
 	preForkParentBlk, err := stateless.NewStandardBlock(
-		parentVersion,
+		blksVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
 		parentHeight,
@@ -90,7 +90,7 @@ func TestPreForkStandardBlockTimeVerification(t *testing.T) {
 
 	// wrong height
 	preForkChildBlk, err := NewStandardBlock(
-		stateless.PreForkVersion,
+		blksVersion,
 		uint64(parentTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,

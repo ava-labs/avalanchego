@@ -134,7 +134,16 @@ func (sb *StandardBlock) Verify() error {
 		currentStakers := parentState.CurrentStakerChainState()
 		pendingStakers := parentState.PendingStakerChainState()
 		currentSupply := parentState.GetCurrentSupply()
-		newlyCurrentStakers, newlyPendingStakers, updatedSupply, err := executor.UpdateStakerSet(currentStakers, pendingStakers, currentSupply, &sb.txExecutorBackend, nextChainTime)
+		newlyCurrentStakers,
+			newlyPendingStakers,
+			updatedSupply,
+			err := executor.UpdateStakerSet(
+			currentStakers,
+			pendingStakers,
+			currentSupply,
+			&sb.txExecutorBackend,
+			nextChainTime,
+		)
 		if err != nil {
 			return err
 		}

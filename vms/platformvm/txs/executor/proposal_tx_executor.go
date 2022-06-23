@@ -542,11 +542,20 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	}
 
 	// update State if this proposal is committed
-	CurrentStakerStates := e.ParentState.CurrentStakerChainState()
-	PendingStakerStates := e.ParentState.PendingStakerChainState()
+	currentStakerStates := e.ParentState.CurrentStakerChainState()
+	pendingStakerStates := e.ParentState.PendingStakerChainState()
 	currentSupply := e.ParentState.GetCurrentSupply()
 
-	newlyCurrentStakerStates, newlyPendingStakerStates, updatedSupply, err := UpdateStakerSet(CurrentStakerStates, PendingStakerStates, currentSupply, e.Backend, txTimestamp)
+	newlyCurrentStakerStates,
+		newlyPendingStakerStates,
+		updatedSupply,
+		err := UpdateStakerSet(
+		currentStakerStates,
+		pendingStakerStates,
+		currentSupply,
+		e.Backend,
+		txTimestamp,
+	)
 	if err != nil {
 		return err
 	}
@@ -556,7 +565,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	e.OnCommit.SetCurrentSupply(updatedSupply)
 
 	// State doesn't change if this proposal is aborted
-	e.OnAbort = state.NewVersioned(e.ParentState, CurrentStakerStates, PendingStakerStates)
+	e.OnAbort = state.NewVersioned(e.ParentState, currentStakerStates, pendingStakerStates)
 	e.PrefersCommit = !txTimestamp.After(localTimestamp.Add(SyncBound))
 	return nil
 }
