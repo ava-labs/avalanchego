@@ -8,15 +8,19 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedTx = &BaseTx{}
+var (
+	_ UnsignedTx             = &BaseTx{}
+	_ secp256k1fx.UnsignedTx = &BaseTx{}
+)
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
-	avax.Metadata
-
 	avax.BaseTx `serialize:"true"`
+
+	bytes []byte
 }
 
 func (t *BaseTx) InitCtx(ctx *snow.Context) {
@@ -25,21 +29,12 @@ func (t *BaseTx) InitCtx(ctx *snow.Context) {
 	}
 }
 
-// UTXOs returns the UTXOs transaction is producing.
-func (t *BaseTx) UTXOs() []*avax.UTXO {
-	txID := t.ID()
-	utxos := make([]*avax.UTXO, len(t.Outs))
-	for i, out := range t.Outs {
-		utxos[i] = &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(i),
-			},
-			Asset: avax.Asset{ID: out.AssetID()},
-			Out:   out.Out,
-		}
-	}
-	return utxos
+func (t *BaseTx) Initialize(bytes []byte) {
+	t.bytes = bytes
+}
+
+func (t *BaseTx) Bytes() []byte {
+	return t.bytes
 }
 
 func (t *BaseTx) SyntacticVerify(
@@ -54,9 +49,6 @@ func (t *BaseTx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.Metadata.Verify(); err != nil {
-		return err
-	}
 	if err := t.BaseTx.Verify(ctx); err != nil {
 		return err
 	}

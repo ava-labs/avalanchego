@@ -50,7 +50,7 @@ func TestSetsAndGets(t *testing.T) {
 		Out:   &avax.TestVerifiable{},
 	}
 
-	tx := &txs.Tx{UnsignedTx: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{

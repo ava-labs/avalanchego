@@ -29,7 +29,7 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx txs.Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState state.Diff
@@ -69,7 +69,7 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.vm.blockBuilder.AddVerifiedTx(&pb.Tx); err != nil {
+	if err := pb.vm.blockBuilder.AddVerifiedTx(pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			pb.Tx.ID(),
@@ -83,16 +83,9 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	if err := pb.CommonBlock.initialize(vm, bytes, status, self); err != nil {
 		return err
 	}
-
-	unsignedBytes, err := Codec.Marshal(txs.Version, &pb.Tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
+	if err := pb.Tx.Sign(Codec, nil); err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(txs.Version, &pb.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	pb.Tx.Initialize(unsignedBytes, signedBytes)
 	pb.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
@@ -131,7 +124,7 @@ func (pb *ProposalBlock) Verify() error {
 	executor := proposalTxExecutor{
 		vm:          pb.vm,
 		parentState: parentState,
-		tx:          &pb.Tx,
+		tx:          pb.Tx,
 	}
 	err := pb.Tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -144,12 +137,12 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onAbortState = executor.onAbort
 	pb.prefersCommit = executor.prefersCommit
 
-	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
-	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
+	pb.onCommitState.AddTx(pb.Tx, status.Committed)
+	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
 
 	pb.timestamp = parentState.GetTimestamp()
 
-	pb.vm.blockBuilder.RemoveProposalTx(&pb.Tx)
+	pb.vm.blockBuilder.RemoveProposalTx(pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)
 	return nil
@@ -186,7 +179,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -202,5 +195,5 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx txs.Tx) (*Prop
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	return pb, pb.initialize(vm, bytes, choices.Processing, pb)
+	return pb, pb.CommonBlock.initialize(vm, bytes, choices.Processing, pb)
 }

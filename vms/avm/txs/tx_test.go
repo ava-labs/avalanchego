@@ -122,7 +122,7 @@ func TestTxInvalidCredential(t *testing.T) {
 	c := setupCodec()
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		Unsigned: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
@@ -155,7 +155,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	c := setupCodec()
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		Unsigned: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
@@ -208,7 +208,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	c := setupCodec()
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		Unsigned: &BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{

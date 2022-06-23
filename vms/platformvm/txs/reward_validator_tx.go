@@ -35,7 +35,7 @@ func (tx *RewardValidatorTx) Initialize(unsignedBytes []byte) {
 	tx.unsignedBytes = unsignedBytes
 }
 func (tx *RewardValidatorTx) InitCtx(*snow.Context)               {}
-func (tx *RewardValidatorTx) UnsignedBytes() []byte               { return tx.unsignedBytes }
+func (tx *RewardValidatorTx) Bytes() []byte                       { return tx.unsignedBytes }
 func (tx *RewardValidatorTx) InputIDs() ids.Set                   { return nil }
 func (tx *RewardValidatorTx) Outputs() []*avax.TransferableOutput { return nil }
 func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error { return nil }

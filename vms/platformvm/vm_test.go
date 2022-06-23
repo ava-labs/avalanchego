@@ -660,7 +660,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
+	blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1637,7 +1637,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := txs.Tx{Unsigned: &txs.ImportTx{
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
@@ -1742,7 +1742,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1864,7 +1864,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1993,7 +1993,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2276,7 +2276,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2297,7 +2297,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, *secondAdvanceTimeTx)
+	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, secondAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2525,7 +2525,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *addValidatorTx)
+	addValidatorProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk.Verify()
@@ -2653,7 +2653,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	advanceTimeProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+	advanceTimeProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk.Verify()
@@ -2752,7 +2752,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, *addValidatorTx0)
+	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx0)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk0.Verify()
@@ -2789,7 +2789,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx0)
+	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx0)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk0.Verify()
@@ -2936,7 +2936,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	addValidatorProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, *addValidatorTx1)
+	addValidatorProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx1)
 	assert.NoError(err)
 
 	err = addValidatorProposalBlk1.Verify()
@@ -2973,7 +2973,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	advanceTimeProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx1)
+	advanceTimeProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx1)
 	assert.NoError(err)
 
 	err = advanceTimeProposalBlk1.Verify()

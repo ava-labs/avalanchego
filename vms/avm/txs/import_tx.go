@@ -10,12 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
 	errNoImportInputs = errors.New("no import inputs")
 
-	_ UnsignedTx = &ImportTx{}
+	_ UnsignedTx             = &ImportTx{}
+	_ secp256k1fx.UnsignedTx = &ImportTx{}
 )
 
 // ImportTx is a transaction that imports an asset from another blockchain.
@@ -80,9 +82,6 @@ func (t *ImportTx) SyntacticVerify(
 
 	// We don't call [t.BaseTx.SyntacticVerify] because the flow check performed
 	// here is less strict than the flow check performed in the [BaseTx].
-	if err := t.Metadata.Verify(); err != nil {
-		return err
-	}
 	if err := t.BaseTx.BaseTx.Verify(ctx); err != nil {
 		return err
 	}
