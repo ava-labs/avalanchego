@@ -109,7 +109,7 @@ func (c *CommitBlock) Reject() error {
 //
 // This function also sets onAcceptState if the verification passes.
 func (c *CommitBlock) Verify() error {
-	if err := c.verify(); err != nil {
+	if err := c.verify(false /*enforceStrictness*/); err != nil {
 		return err
 	}
 

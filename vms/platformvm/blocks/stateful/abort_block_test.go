@@ -95,7 +95,7 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 			assert.NoError(err)
 
 			// call verify on it
-			err = blk.commonBlock.verify()
+			err = blk.commonBlock.verify(false /*enforceStrictness*/)
 			assert.ErrorIs(err, test.result)
 		})
 	}

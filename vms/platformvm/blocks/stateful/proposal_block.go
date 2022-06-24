@@ -151,7 +151,7 @@ func (pb *ProposalBlock) setBaseState() {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	if err := pb.verify(); err != nil {
+	if err := pb.verify(false /*enforceStrictness*/); err != nil {
 		return err
 	}
 

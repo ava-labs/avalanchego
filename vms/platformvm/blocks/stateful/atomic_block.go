@@ -96,7 +96,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
-	err := ab.verify()
+	err := ab.verify(true /*enforceStrictness*/)
 	if err != nil {
 		return err
 	}

@@ -592,33 +592,40 @@ func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
 				}
 				state.SortValidatorsByRemoval(toReward)
 
-				s0RewardTx := &txs.Tx{
-					Unsigned: &txs.RewardValidatorTx{
-						TxID: toReward[0].ID(),
-					},
+				for _, rewardTx := range toReward {
+					s0RewardTx := &txs.Tx{
+						Unsigned: &txs.RewardValidatorTx{
+							TxID: rewardTx.ID(),
+						},
+					}
+					assert.NoError(s0RewardTx.Sign(txs.Codec, nil))
+
+					// build proposal block moving ahead chain time
+					// as well as rewarding staker0
+					preferredID := h.fullState.GetLastAccepted()
+					parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
+					assert.NoError(err)
+					block, err := NewProposalBlock(
+						stateless.PostForkVersion,
+						uint64(newTime.Unix()),
+						h.blkVerifier,
+						h.txExecBackend,
+						parentBlk.ID(),
+						parentBlk.Height()+1,
+						s0RewardTx,
+					)
+					assert.NoError(err)
+
+					// verify and accept the block
+					assert.NoError(block.Verify())
+					options, err := block.Options()
+					assert.NoError(err)
+
+					assert.NoError(options[0].Verify())
+
+					assert.NoError(block.Accept())
+					assert.NoError(options[0].Accept())
 				}
-				assert.NoError(s0RewardTx.Sign(txs.Codec, nil))
-
-				// build proposal block moving ahead chain time
-				// as well as rewarding staker0
-				preferredID := h.fullState.GetLastAccepted()
-				parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
-				assert.NoError(err)
-				block, err := NewProposalBlock(
-					stateless.PostForkVersion,
-					uint64(newTime.Unix()),
-					h.blkVerifier,
-					h.txExecBackend,
-					parentBlk.ID(),
-					parentBlk.Height()+1,
-					s0RewardTx,
-				)
-				assert.NoError(err)
-
-				// update staker set
-				assert.NoError(block.Verify())
-				block.onPostForkBaseOptionsState.Apply(h.fullState)
-				block.onCommitState.Apply(h.fullState)
 			}
 			assert.NoError(h.fullState.Commit())
 

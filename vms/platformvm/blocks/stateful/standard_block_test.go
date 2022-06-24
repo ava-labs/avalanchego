@@ -527,7 +527,7 @@ func TestPostForkStandardBlockUpdateStakers(t *testing.T) {
 
 				// update staker set
 				assert.NoError(block.Verify())
-				block.onAcceptState.Apply(h.fullState)
+				assert.NoError(block.Accept())
 			}
 			assert.NoError(h.fullState.Commit())
 

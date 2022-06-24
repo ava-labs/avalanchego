@@ -110,7 +110,7 @@ func (a *AbortBlock) Reject() error {
 //
 // This function also sets onAcceptState if the verification passes.
 func (a *AbortBlock) Verify() error {
-	if err := a.verify(); err != nil {
+	if err := a.verify(false /*enforceStrictness*/); err != nil {
 		return err
 	}
 

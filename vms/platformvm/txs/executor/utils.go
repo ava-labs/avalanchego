@@ -32,14 +32,26 @@ func ValidateProposedChainTime(
 	currentChainTime,
 	nextStakerChangeTime,
 	localTime time.Time,
+	enforceStrictness bool,
 ) error {
-	if !proposedChainTime.After(currentChainTime) {
-		return fmt.Errorf(
-			"%w, proposed timestamp (%s), chain time (%s)",
-			ErrChildBlockEarlierThanParent,
-			proposedChainTime,
-			currentChainTime,
-		)
+	if enforceStrictness {
+		if !proposedChainTime.After(currentChainTime) {
+			return fmt.Errorf(
+				"%w, proposed timestamp (%s), chain time (%s)",
+				ErrChildBlockEarlierThanParent,
+				proposedChainTime,
+				currentChainTime,
+			)
+		}
+	} else {
+		if proposedChainTime.Before(currentChainTime) {
+			return fmt.Errorf(
+				"%w, proposed timestamp (%s), chain time (%s)",
+				ErrChildBlockEarlierThanParent,
+				proposedChainTime,
+				currentChainTime,
+			)
+		}
 	}
 
 	// Only allow timestamp to move forward as far as the time of next staker

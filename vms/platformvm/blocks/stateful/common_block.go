@@ -59,7 +59,7 @@ func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
 	return parent.conflicts(s)
 }
 
-func (c *commonBlock) verify() error {
+func (c *commonBlock) verify(enforceStrictness bool) error {
 	if c == nil {
 		return ErrBlockNil
 	}
@@ -90,7 +90,7 @@ func (c *commonBlock) verify() error {
 		)
 	}
 
-	return c.validateBlockTimestamp()
+	return c.validateBlockTimestamp(enforceStrictness)
 }
 
 func (c *commonBlock) ExpectedChildVersion() uint16 {
@@ -101,7 +101,7 @@ func (c *commonBlock) ExpectedChildVersion() uint16 {
 	return stateless.PostForkVersion
 }
 
-func (c *commonBlock) validateBlockTimestamp() error {
+func (c *commonBlock) validateBlockTimestamp(enforceStrictness bool) error {
 	// verify timestamp only for post fork blocks
 	// Note: atomic blocks have been deprecated before fork introduction,
 	// therefore validateBlockTimestamp for atomic blocks should return
@@ -149,6 +149,7 @@ func (c *commonBlock) validateBlockTimestamp() error {
 			currentChainTime,
 			nextStakerChangeTime,
 			localTime,
+			enforceStrictness,
 		)
 	}
 }

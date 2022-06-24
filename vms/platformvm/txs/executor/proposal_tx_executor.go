@@ -536,6 +536,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		chainTimestamp,
 		nextStakerChangeTime,
 		localTimestamp,
+		true, /*enforceStrictness*/
 	); err != nil {
 		return err
 	}
