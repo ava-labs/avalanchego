@@ -83,5 +83,5 @@ type Config struct {
 	ApricotPhase5Time time.Time
 
 	// Time of the removal of advance time tx
-	AdvanceTimeTxRemovalTime time.Time
+	ApricotPhase6Time time.Time
 }

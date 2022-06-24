@@ -94,7 +94,7 @@ func (c *commonBlock) verify(enforceStrictness bool) error {
 }
 
 func (c *commonBlock) ExpectedChildVersion() uint16 {
-	forkTime := c.txExecutorBackend.Cfg.AdvanceTimeTxRemovalTime
+	forkTime := c.txExecutorBackend.Cfg.ApricotPhase6Time
 	if c.Timestamp().Before(forkTime) {
 		return stateless.PreForkVersion
 	}

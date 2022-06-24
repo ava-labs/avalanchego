@@ -133,7 +133,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	}()
 	now := h.clk.Time()
 	h.clk.Set(now)
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 
 	// setup and store parent block
 	// it's a standard block for simplicity
@@ -519,7 +519,7 @@ func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
 				}
 			}()
 
-			h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+			h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 			h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 
 			addedStakerTxsByEndTime := make(map[time.Time]*txs.Tx, 0)
@@ -667,7 +667,7 @@ func TestPostForkProposalBlockRemoveSubnetValidator(t *testing.T) {
 		}
 	}()
 
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 	h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 
 	// Add a subnet validator to the staker set
@@ -787,7 +787,7 @@ func TestPostForkProposalBlockWhitelistedSubnet(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+			h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 			if whitelist {
 				h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 			}
@@ -878,7 +878,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1033,7 +1033,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator

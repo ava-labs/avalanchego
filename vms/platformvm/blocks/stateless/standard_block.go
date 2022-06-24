@@ -18,10 +18,6 @@ var (
 type StandardBlockIntf interface {
 	CommonBlockIntf
 
-	// StandardCommonComponents return CommonBlockIntf
-	// needed to create a stateful block
-	StandardCommonComponents() CommonBlockIntf
-
 	// DecisionTxs returns list of transactions
 	// contained in the block
 	DecisionTxs() []*txs.Tx
@@ -108,10 +104,6 @@ func (sb *StandardBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (sb *StandardBlock) StandardCommonComponents() CommonBlockIntf {
-	return &sb.CommonBlock
-}
-
 func (sb *StandardBlock) DecisionTxs() []*txs.Tx { return sb.Txs }
 
 type PostForkStandardBlock struct {
@@ -141,10 +133,6 @@ func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error
 	}
 	psb.Txs = txes
 	return nil
-}
-
-func (psb *PostForkStandardBlock) StandardCommonComponents() CommonBlockIntf {
-	return &psb.CommonBlock
 }
 
 func (psb *PostForkStandardBlock) DecisionTxs() []*txs.Tx { return psb.Txs }

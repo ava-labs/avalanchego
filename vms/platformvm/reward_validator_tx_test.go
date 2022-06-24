@@ -27,12 +27,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                   chains.MockManager{},
-			UptimePercentage:         .2,
-			RewardConfig:             defaultRewardConfig,
-			Validators:               validators.NewManager(),
-			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
-			AdvanceTimeTxRemovalTime: mockable.MaxTime,
+			Chains:                 chains.MockManager{},
+			UptimePercentage:       .2,
+			RewardConfig:           defaultRewardConfig,
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			ApricotPhase6Time:      mockable.MaxTime,
 		},
 	}}
 
@@ -66,11 +66,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                   chains.MockManager{},
-			UptimePercentage:         .21,
-			Validators:               validators.NewManager(),
-			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
-			AdvanceTimeTxRemovalTime: mockable.MaxTime,
+			Chains:                 chains.MockManager{},
+			UptimePercentage:       .21,
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			ApricotPhase6Time:      mockable.MaxTime,
 		},
 	}}
 
@@ -231,12 +231,12 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                   chains.MockManager{},
-			UptimePercentage:         .2,
-			RewardConfig:             defaultRewardConfig,
-			Validators:               validators.NewManager(),
-			UptimeLockedCalculator:   uptime.NewLockedCalculator(),
-			AdvanceTimeTxRemovalTime: mockable.MaxTime,
+			Chains:                 chains.MockManager{},
+			UptimePercentage:       .2,
+			RewardConfig:           defaultRewardConfig,
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			ApricotPhase6Time:      mockable.MaxTime,
 		},
 	}}
 

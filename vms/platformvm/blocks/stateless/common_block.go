@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+var _ CommonBlockIntf = &CommonBlock{}
+
 type CommonBlockIntf interface {
 	Initialize(version uint16, bytes []byte) error
 

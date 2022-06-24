@@ -38,7 +38,7 @@ type ProposalBlock struct {
 	*commonBlock
 
 	// TODO ABENEGIA: cleanup
-	// Following advance time tx removal fork, onPostForkBaseOptionsState is the base state
+	// Following Apricot Phase 6 activation, onPostForkBaseOptionsState is the base state
 	// over which both commit and abort states are built
 	onPostForkBaseOptionsState state.Diff
 	// The state that the chain will have if this block's proposal is committed

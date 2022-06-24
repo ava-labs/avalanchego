@@ -57,8 +57,8 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			// activate advance time tx removal fork
-			h.cfg.AdvanceTimeTxRemovalTime = time.Time{}
+			// activate Apricot Phase 6
+			h.cfg.ApricotPhase6Time = time.Time{}
 
 			// setup and store parent block
 			// it's a standard block for simplicity

@@ -128,7 +128,7 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 	}()
 	now := h.clk.Time()
 	h.clk.Set(now)
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 
 	// setup and store parent block
 	// it's a standard block for simplicity
@@ -283,7 +283,7 @@ func TestPostForkStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -474,7 +474,7 @@ func TestPostForkStandardBlockUpdateStakers(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+			h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 			h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 
 			for _, staker := range test.stakers {
@@ -572,7 +572,7 @@ func TestPostForkStandardBlockRemoveSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 	h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 
 	// Add a subnet validator to the staker set
@@ -664,7 +664,7 @@ func TestPostForkStandardBlockWhitelistedSubnet(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+			h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 			if whitelist {
 				h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 			}
@@ -726,7 +726,7 @@ func TestPostForkStandardBlockDelegatorStakerWeight(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.AdvanceTimeTxRemovalTime = time.Time{} // activate advance time tx removal fork
+	h.cfg.ApricotPhase6Time = time.Time{} // activate Apricot Phase 6
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
