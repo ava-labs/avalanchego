@@ -50,10 +50,12 @@ func testSync(t *testing.T, test syncTest) {
 	mockClient.GetCodeIntercept = test.GetCodeIntercept
 
 	s, err := NewEVMStateSyncer(&EVMStateSyncerConfig{
-		Client:    mockClient,
-		Root:      root,
-		DB:        clientDB,
-		BatchSize: 1000, // Use a lower batch size in order to get test coverage of batches being written early.
+		Client:                   mockClient,
+		Root:                     root,
+		DB:                       clientDB,
+		BatchSize:                1000, // Use a lower batch size in order to get test coverage of batches being written early.
+		NumCodeFetchingWorkers:   DefaultNumCodeFetchingWorkers,
+		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
 	})
 	if err != nil {
 		t.Fatal(err)

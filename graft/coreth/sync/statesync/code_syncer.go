@@ -5,81 +5,256 @@ package statesync
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/params"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// codeSyncer creates a separate goroutine with a ctx passed in to fulfill all get code requests.
-// Currently, all requests are actually fulfilled synchronously, so that the ctx can be passed in
-// to the client.
+const (
+	DefaultMaxOutstandingCodeHashes = 5000
+	DefaultNumCodeFetchingWorkers   = 5
+)
+
+var errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
+
+// CodeSyncerConfig defines the configuration of the code syncer
+type CodeSyncerConfig struct {
+	// Maximum number of outstanding code hashes in the queue before the code syncer should block.
+	MaxOutstandingCodeHashes int
+	// Number of worker threads to fetch code from the network
+	NumCodeFetchingWorkers int
+
+	// Client for fetching code from the network
+	Client statesyncclient.Client
+
+	// Database for the code syncer to use.
+	DB ethdb.Database
+}
+
+// codeSyncer syncs code bytes from the network in a seprate thread.
+// Tracks outstanding requests in the DB, so that it will still fulfill them if interrupted.
 type codeSyncer struct {
-	db     ethdb.KeyValueStore
-	client statesyncclient.Client
+	lock sync.Mutex
 
-	codeHashes  chan common.Hash
-	codeResults chan codeResult
+	CodeSyncerConfig
+
+	outstandingCodeHashes ids.Set          // Set of code hashes that we need to fetch from the network.
+	codeHashes            chan common.Hash // Channel of incoming code hash requests
+
+	// Used to set terminal error or pass nil to [errChan] if successful.
+	errOnce sync.Once
+	errChan chan error
+
+	// Passed in details from the context used to start the codeSyncer
+	cancel context.CancelFunc
+	done   <-chan struct{}
 }
 
-// codeResult defines the expected result from a fulfilled or failed code syncer request
-type codeResult struct {
-	codeBytes []byte
-	err       error
-}
-
-func newCodeSyncer(db ethdb.KeyValueStore, client statesyncclient.Client) *codeSyncer {
+// newCodeSyncer returns a a code syncer that will sync code bytes from the network in a separate thread.
+func newCodeSyncer(config CodeSyncerConfig) *codeSyncer {
 	return &codeSyncer{
-		db:          db,
-		client:      client,
-		codeHashes:  make(chan common.Hash, 1),
-		codeResults: make(chan codeResult, 1),
+		CodeSyncerConfig:      config,
+		codeHashes:            make(chan common.Hash, config.MaxOutstandingCodeHashes),
+		outstandingCodeHashes: ids.NewSet(0),
+		errChan:               make(chan error, 1),
 	}
 }
 
-// start a goroutine with ctx for all of the requests to fetch code in a separate goroutine.
+// start the worker thread and populate the code hashes queue with active work.
+// blocks until all outstanding code requests from a previous sync have been
+// queued for fetching (or ctx is cancelled).
 func (c *codeSyncer) start(ctx context.Context) {
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				c.codeResults <- codeResult{
-					err: ctx.Err(),
-				}
-				return
-			case codeHash, ok := <-c.codeHashes:
-				if !ok {
-					return
-				}
-				codeByteSlices, err := c.client.GetCode(ctx, []common.Hash{codeHash})
-				if err != nil {
-					c.codeResults <- codeResult{
-						err: err,
-					}
-					return
-				}
-				// Note: GetCode returns an error if codeBytes length is not 1, so referencing codeBytes[0] is safe.
-				c.codeResults <- codeResult{
-					codeBytes: codeByteSlices[0],
-				}
+	ctx, c.cancel = context.WithCancel(ctx)
+	c.done = ctx.Done()
+	wg := sync.WaitGroup{}
+
+	// Start [numCodeFetchingWorkers] threads to fetch code from the network.
+	for i := 0; i < c.NumCodeFetchingWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			if err := c.work(ctx); err != nil {
+				c.setError(err)
 			}
-		}
+		}()
+	}
+
+	err := c.addCodeToFetchFromDBToQueue()
+	if err != nil {
+		c.setError(err)
+	}
+
+	// Wait for all the worker threads to complete before signalling success via setError(nil).
+	// Note: if any of the worker threads errored already, setError will be a no-op here.
+	go func() {
+		wg.Wait()
+		c.setError(nil)
 	}()
 }
 
-// addCode fetches the code for [codeHash] by adding it the goroutine to be retrieved and synchronously
-// writing it to the database once the request is fulfilled.
-// addCode should not be used concurrently (only called from main trie on leafs callback).
-func (c *codeSyncer) addCode(codeHash common.Hash) error {
-	c.codeHashes <- codeHash
-	codeResult := <-c.codeResults
+// Clean out any codeToFetch markers from the database that are no longer needed and
+// add any outstanding markers to the queue.
+func (c *codeSyncer) addCodeToFetchFromDBToQueue() error {
+	codeToFetchIterator := c.DB.NewIterator(rawdb.CodeToFetchPrefix, nil)
+	defer codeToFetchIterator.Release()
 
-	// Note: this is considered a fatal error.
-	if codeResult.err != nil {
-		return fmt.Errorf("error fetching code bytes for code hash [%s] from network: %w", codeHash, codeResult.err)
+	batch := c.DB.NewBatch()
+	codeHashes := make([]common.Hash, 0)
+	for codeToFetchIterator.Next() {
+		codeToFetchKey := codeToFetchIterator.Key()
+		if len(codeToFetchKey) != len(rawdb.CodeToFetchPrefix)+common.HashLength {
+			continue
+		}
+
+		codeHash := common.BytesToHash(codeToFetchKey[len(rawdb.CodeToFetchPrefix):])
+		// If we already have the codeHash, delete the marker from the database and continue
+		if rawdb.HasCodeWithPrefix(c.DB, codeHash) {
+			rawdb.DeleteCodeToFetch(batch, codeHash)
+			// Write the batch to disk if it has reached the ideal batch size.
+			if batch.ValueSize() > ethdb.IdealBatchSize {
+				if err := batch.Write(); err != nil {
+					return fmt.Errorf("failed to write batch removing old code markers: %w", err)
+				}
+				batch.Reset()
+			}
+			continue
+		}
+
+		codeHashes = append(codeHashes, codeHash)
 	}
-	rawdb.WriteCode(c.db, codeHash, codeResult.codeBytes)
+	if err := codeToFetchIterator.Error(); err != nil {
+		return fmt.Errorf("failed to iterate code entries to fetch: %w", err)
+	}
+	if batch.ValueSize() > 0 {
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("failed to write batch removing old code markers: %w", err)
+		}
+	}
+	return c.addCode(codeHashes)
+}
+
+// work fulfills any incoming requests from the producer channel by fetching code bytes from the network
+// and fulfilling them by updating the database.
+func (c *codeSyncer) work(ctx context.Context) error {
+	codeHashes := make([]common.Hash, 0, params.MaxCodeHashesPerRequest)
+
+	for {
+		select {
+		case <-ctx.Done(): // If ctx is done, set the error to the ctx error since work has been cancelled.
+			return ctx.Err()
+		case codeHash, ok := <-c.codeHashes:
+			// If there are no more [codeHashes], fulfill a last code request for any [codeHashes] previously
+			// read from the channel, then return.
+			if !ok {
+				if len(codeHashes) > 0 {
+					return c.fulfillCodeRequest(ctx, codeHashes)
+				}
+				return nil
+			}
+
+			codeHashes = append(codeHashes, codeHash)
+			// Try to wait for at least [MaxCodeHashesPerRequest] code hashes to batch into a single request
+			// if there's more work remaining.
+			if len(codeHashes) < params.MaxCodeHashesPerRequest {
+				continue
+			}
+			if err := c.fulfillCodeRequest(ctx, codeHashes); err != nil {
+				return err
+			}
+
+			// Reset the codeHashes array
+			codeHashes = codeHashes[:0]
+		}
+	}
+}
+
+// fulfillCodeRequest sends a request for [codeHashes], writes the result to the database, and
+// marks the work as complete.
+// codeHashes should not be empty or contain duplicate hashes.
+// Returns an error if one is encountered, signaling the worker thread to terminate.
+func (c *codeSyncer) fulfillCodeRequest(ctx context.Context, codeHashes []common.Hash) error {
+	codeByteSlices, err := c.Client.GetCode(ctx, codeHashes)
+	if err != nil {
+		return err
+	}
+
+	// Hold the lock while modifying outstandingCodeHashes.
+	c.lock.Lock()
+	batch := c.DB.NewBatch()
+	for i, codeHash := range codeHashes {
+		rawdb.DeleteCodeToFetch(batch, codeHash)
+		c.outstandingCodeHashes.Remove(ids.ID(codeHash))
+		rawdb.WriteCode(batch, codeHash, codeByteSlices[i])
+	}
+	c.lock.Unlock() // Release the lock before writing the batch
+
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("faild to write batch for fulfilled code requests: %w", err)
+	}
 	return nil
 }
+
+// addCode checks if [codeHashes] need to be fetched from the network and adds them to the queue if so.
+// assumes that [codeHashes] are valid non-empty code hashes.
+func (c *codeSyncer) addCode(codeHashes []common.Hash) error {
+	batch := c.DB.NewBatch()
+
+	c.lock.Lock()
+	selectedCodeHashes := make([]common.Hash, 0, len(codeHashes))
+	for _, codeHash := range codeHashes {
+		// Add the code hash to the queue if it's not already on the queue and we do not already have it
+		// in the database.
+		if !c.outstandingCodeHashes.Contains(ids.ID(codeHash)) && !rawdb.HasCodeWithPrefix(c.DB, codeHash) {
+			selectedCodeHashes = append(selectedCodeHashes, codeHash)
+			c.outstandingCodeHashes.Add(ids.ID(codeHash))
+			rawdb.AddCodeToFetch(batch, codeHash)
+		}
+	}
+	c.lock.Unlock()
+
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("failed to write batch of code to fetch markers due to: %w", err)
+	}
+	return c.addHashesToQueue(selectedCodeHashes)
+}
+
+// notifyAccountTrieCompleted notifies the code syncer that there will be no more incoming
+// code hashes from syncing the account trie, so it only needs to compelete its outstanding
+// work.
+// Note: this allows the worker threads to exit and return a nil error.
+func (c *codeSyncer) notifyAccountTrieCompleted() {
+	close(c.codeHashes)
+}
+
+// addHashesToQueue adds [codeHashes] to the queue and blocks until it is able to do so.
+// This should be called after all other operation to add code hashes to the queue has been completed.
+func (c *codeSyncer) addHashesToQueue(codeHashes []common.Hash) error {
+	for _, codeHash := range codeHashes {
+		select {
+		case c.codeHashes <- codeHash:
+		case <-c.done:
+			return errFailedToAddCodeHashesToQueue
+		}
+	}
+	return nil
+}
+
+// setError sets the error to the first error that occurs and adds it to the error channel.
+// If [err] is nil, setError indicates that codeSyncer has finished code syncing successfully.
+func (c *codeSyncer) setError(err error) {
+	c.errOnce.Do(func() {
+		c.cancel()
+		c.errChan <- err
+	})
+}
+
+// Done returns an error channel to indicate the return status of code syncing.
+func (c *codeSyncer) Done() <-chan error { return c.errChan }
