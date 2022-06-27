@@ -82,7 +82,7 @@ func processBlock(block *types.Block, receipts types.Receipts) *slimBlock {
 		reward, _ := tx.EffectiveGasTip(sb.BaseFee)
 		sorter[i] = txGasAndReward{gasUsed: receipts[i].GasUsed, reward: reward}
 	}
-	sort.Sort(sorter)
+	sort.Stable(sorter)
 	sb.Txs = sorter
 	return &sb
 }

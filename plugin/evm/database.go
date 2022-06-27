@@ -19,6 +19,10 @@ func (db Database) Stat(string) (string, error) { return "", database.ErrNotFoun
 // NewBatch implements ethdb.Database
 func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()} }
 
+// NewBatchWithSize implements ethdb.Database
+// TODO: propagate size through avalanchego Database interface
+func (db Database) NewBatchWithSize(size int) ethdb.Batch { return Batch{db.Database.NewBatch()} }
+
 // NewIterator implements ethdb.Database
 //
 // Note: This method assumes that the prefix is NOT part of the start, so there's

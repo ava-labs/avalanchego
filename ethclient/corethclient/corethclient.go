@@ -124,6 +124,7 @@ func (ec *Client) GetProof(ctx context.Context, account common.Address, keys []s
 		Nonce:        uint64(res.Nonce),
 		CodeHash:     res.CodeHash,
 		StorageHash:  res.StorageHash,
+		StorageProof: storageResults,
 	}
 	return &result, err
 }
