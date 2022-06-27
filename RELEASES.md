@@ -1,5 +1,7 @@
 # Release Notes
 
+## [v0.8.13](https://github.com/ava-labs/coreth/releases/tag/v0.8.13)
+
 ## [v0.8.12](https://github.com/ava-labs/coreth/releases/tag/v0.8.12)
 
 - Add peer bandwidth tracking to optimize state sync message routing
