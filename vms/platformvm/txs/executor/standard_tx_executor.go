@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
@@ -58,7 +57,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
-	createBlockchainTxFee := builder.GetCreateBlockchainTxFee(*e.Cfg, timestamp)
+	createBlockchainTxFee := e.Cfg.GetCreateBlockchainTxFee(timestamp)
 	if err := e.SpendHandler.SemanticVerifySpend(
 		e.State,
 		tx,
@@ -112,7 +111,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
-	createSubnetTxFee := builder.GetCreateSubnetTxFee(*e.Cfg, timestamp)
+	createSubnetTxFee := e.Cfg.GetCreateSubnetTxFee(timestamp)
 	if err := e.SpendHandler.SemanticVerifySpend(
 		e.State,
 		tx,
