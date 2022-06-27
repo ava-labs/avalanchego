@@ -160,7 +160,7 @@ func FillAccounts(
 			acc = onAccount(t, i, acc)
 		}
 
-		accBytes, err := rlp.EncodeToBytes(acc)
+		accBytes, err := rlp.EncodeToBytes(&acc)
 		if err != nil {
 			t.Fatalf("failed to rlp encode account: %v", err)
 		}

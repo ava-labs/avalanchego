@@ -28,7 +28,6 @@ package node
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -198,7 +197,7 @@ func getKeyStoreDir(conf *Config) (string, bool, error) {
 	isEphemeral := false
 	if keydir == "" {
 		// There is no datadir.
-		keydir, err = ioutil.TempDir("", "coreth-keystore")
+		keydir, err = os.MkdirTemp("", "coreth-keystore")
 		isEphemeral = true
 	}
 

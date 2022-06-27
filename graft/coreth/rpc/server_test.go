@@ -29,8 +29,8 @@ package rpc
 import (
 	"bufio"
 	"io"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,7 +61,7 @@ func TestServerRegisterName(t *testing.T) {
 }
 
 func TestServer(t *testing.T) {
-	files, err := ioutil.ReadDir("testdata")
+	files, err := os.ReadDir("testdata")
 	if err != nil {
 		t.Fatal("where'd my testdata go?")
 	}
@@ -79,7 +79,7 @@ func TestServer(t *testing.T) {
 
 func runTestScript(t *testing.T, file string) {
 	server := newTestServer()
-	content, err := ioutil.ReadFile(file)
+	content, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,6 @@ func runTestScript(t *testing.T, file string) {
 // 		if err != nil {
 // 			t.Fatal("can't dial:", err)
 // 		}
-// 		defer conn.Close()
 // 		conn.SetDeadline(deadline)
 // 		// Write the request, then half-close the connection so the server stops reading.
 // 		conn.Write([]byte(request))
@@ -151,6 +150,8 @@ func runTestScript(t *testing.T, file string) {
 // 		// Now try to get the response.
 // 		buf := make([]byte, 2000)
 // 		n, err := conn.Read(buf)
+// 		conn.Close()
+//
 // 		if err != nil {
 // 			t.Fatal("read error:", err)
 // 		}

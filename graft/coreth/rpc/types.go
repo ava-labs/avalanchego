@@ -100,7 +100,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-	case "accepted":
+	case "accepted", "finalized": // Include "finalized" as an option for compatibility with FinalizedBlockNumber from geth.
 		*bn = AcceptedBlockNumber
 		return nil
 	}

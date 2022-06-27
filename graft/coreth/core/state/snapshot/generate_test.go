@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********
-// Copyright 2020 The go-ethereum Authors
+// Copyright 2019 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -33,11 +33,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
@@ -823,6 +823,125 @@ func TestGenerateWithIncompleteStorage(t *testing.T) {
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
+	// Signal abortion to the generator and wait for it to tear down
+	stop := make(chan struct{})
+	snap.genAbort <- stop
+	<-stop
+}
+
+func incKey(key []byte) []byte {
+	for i := len(key) - 1; i >= 0; i-- {
+		key[i]++
+		if key[i] != 0x0 {
+			break
+		}
+	}
+	return key
+}
+
+func decKey(key []byte) []byte {
+	for i := len(key) - 1; i >= 0; i-- {
+		key[i]--
+		if key[i] != 0xff {
+			break
+		}
+	}
+	return key
+}
+
+func populateDangling(disk ethdb.KeyValueStore) {
+	populate := func(accountHash common.Hash, keys []string, vals []string) {
+		for i, key := range keys {
+			rawdb.WriteStorageSnapshot(disk, accountHash, hashData([]byte(key)), []byte(vals[i]))
+		}
+	}
+	// Dangling storages of the "first" account
+	populate(common.Hash{}, []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	// Dangling storages of the "last" account
+	populate(common.HexToHash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	// Dangling storages around the account 1
+	hash := decKey(hashData([]byte("acc-1")).Bytes())
+	populate(common.BytesToHash(hash), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+	hash = incKey(hashData([]byte("acc-1")).Bytes())
+	populate(common.BytesToHash(hash), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	// Dangling storages around the account 2
+	hash = decKey(hashData([]byte("acc-2")).Bytes())
+	populate(common.BytesToHash(hash), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+	hash = incKey(hashData([]byte("acc-2")).Bytes())
+	populate(common.BytesToHash(hash), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	// Dangling storages around the account 3
+	hash = decKey(hashData([]byte("acc-3")).Bytes())
+	populate(common.BytesToHash(hash), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+	hash = incKey(hashData([]byte("acc-3")).Bytes())
+	populate(common.BytesToHash(hash), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	// Dangling storages of the random account
+	populate(randomHash(), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+	populate(randomHash(), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+	populate(randomHash(), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+}
+
+// Tests that snapshot generation with dangling storages. Dangling storage means
+// the storage data is existent while the corresponding account data is missing.
+//
+// This test will populate some dangling storages to see if they can be cleaned up.
+func TestGenerateCompleteSnapshotWithDanglingStorage(t *testing.T) {
+	var helper = newHelper()
+	stRoot := helper.makeStorageTrie([]string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	helper.addAccount("acc-1", &Account{Balance: big.NewInt(1), Root: stRoot, CodeHash: emptyCode.Bytes()})
+	helper.addAccount("acc-2", &Account{Balance: big.NewInt(1), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()})
+	helper.addAccount("acc-3", &Account{Balance: big.NewInt(1), Root: stRoot, CodeHash: emptyCode.Bytes()})
+
+	helper.addSnapStorage("acc-1", []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+	helper.addSnapStorage("acc-3", []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	populateDangling(helper.diskdb)
+
+	root, snap := helper.Generate()
+	select {
+	case <-snap.genPending:
+		// Snapshot generation succeeded
+
+	case <-time.After(3 * time.Second):
+		t.Errorf("Snapshot generation failed")
+	}
+	checkSnapRoot(t, snap, root)
+
+	// Signal abortion to the generator and wait for it to tear down
+	stop := make(chan struct{})
+	snap.genAbort <- stop
+	<-stop
+}
+
+// Tests that snapshot generation with dangling storages. Dangling storage means
+// the storage data is existent while the corresponding account data is missing.
+//
+// This test will populate some dangling storages to see if they can be cleaned up.
+func TestGenerateBrokenSnapshotWithDanglingStorage(t *testing.T) {
+	var helper = newHelper()
+	stRoot := helper.makeStorageTrie([]string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
+
+	helper.addTrieAccount("acc-1", &Account{Balance: big.NewInt(1), Root: stRoot, CodeHash: emptyCode.Bytes()})
+	helper.addTrieAccount("acc-2", &Account{Balance: big.NewInt(2), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()})
+	helper.addTrieAccount("acc-3", &Account{Balance: big.NewInt(3), Root: stRoot, CodeHash: emptyCode.Bytes()})
+
+	populateDangling(helper.diskdb)
+
+	root, snap := helper.Generate()
+	select {
+	case <-snap.genPending:
+		// Snapshot generation succeeded
+
+	case <-time.After(3 * time.Second):
+		t.Errorf("Snapshot generation failed")
+	}
+	checkSnapRoot(t, snap, root)
+
 	// Signal abortion to the generator and wait for it to tear down
 	stop := make(chan struct{})
 	snap.genAbort <- stop
