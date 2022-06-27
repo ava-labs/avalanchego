@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"golang.org/x/sync/errgroup"
 )
 
 const defaultNumThreads int = 4
@@ -84,15 +85,17 @@ type stateSyncer struct {
 	batchSize  int
 	client     syncclient.Client
 
-	// pointer to ETA struct, shared with all TrieProgress structs
-	eta SyncETA
+	done chan error
+	eta  SyncETA
 }
 
 type EVMStateSyncerConfig struct {
-	Root      common.Hash
-	Client    syncclient.Client
-	DB        ethdb.Database
-	BatchSize int
+	Root                     common.Hash
+	Client                   syncclient.Client
+	DB                       ethdb.Database
+	BatchSize                int
+	MaxOutstandingCodeHashes int // Maximum number of code hashes in the code syncer queue
+	NumCodeFetchingWorkers   int // Number of code syncing threads
 }
 
 func NewEVMStateSyncer(config *EVMStateSyncerConfig) (*stateSyncer, error) {
@@ -127,8 +130,14 @@ func NewEVMStateSyncer(config *EVMStateSyncerConfig) (*stateSyncer, error) {
 		db:             config.DB,
 		numThreads:     defaultNumThreads,
 		syncer:         syncclient.NewCallbackLeafSyncer(config.Client),
-		codeSyncer:     newCodeSyncer(config.DB, config.Client),
-		eta:            eta,
+		codeSyncer: newCodeSyncer(CodeSyncerConfig{
+			DB:                       config.DB,
+			Client:                   config.Client,
+			MaxOutstandingCodeHashes: config.MaxOutstandingCodeHashes,
+			NumCodeFetchingWorkers:   config.NumCodeFetchingWorkers,
+		}),
+		eta:  eta,
+		done: make(chan error, 1),
 	}, nil
 }
 
@@ -155,9 +164,25 @@ func (s *stateSyncer) Start(ctx context.Context) {
 			OnSyncFailure: s.onSyncFailure,
 		})
 	}
-	// Start the leaf syncer and code syncer goroutines.
-	s.syncer.Start(ctx, s.numThreads, rootTask, storageTasks...)
-	s.codeSyncer.start(ctx)
+
+	// Start the syncer and code syncer.
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		s.syncer.Start(ctx, s.numThreads, rootTask, storageTasks...)
+		err := <-s.syncer.Done()
+		return err
+	})
+	eg.Go(func() error {
+		s.codeSyncer.start(ctx)
+		err := <-s.codeSyncer.Done()
+		return err
+	})
+
+	// The errgroup wait will take care of returning the first error that occurs, or returning
+	// nil if both finish without an error.
+	go func() {
+		s.done <- eg.Wait()
+	}()
 }
 
 func (s *stateSyncer) handleLeafs(root common.Hash, keys [][]byte, values [][]byte) ([]*syncclient.LeafSyncTask, error) {
@@ -169,6 +194,7 @@ func (s *stateSyncer) handleLeafs(root common.Hash, keys [][]byte, values [][]by
 		mainTrie.startTime = time.Now()
 	}
 
+	codeHashes := make([]common.Hash, 0)
 	for i, key := range keys {
 		value := values[i]
 		accountHash := common.BytesToHash(key)
@@ -193,22 +219,30 @@ func (s *stateSyncer) handleLeafs(root common.Hash, keys [][]byte, values [][]by
 
 		// check if this account has code and fetch it
 		codeHash := common.BytesToHash(acc.CodeHash)
-		if codeHash != (common.Hash{}) && codeHash != types.EmptyCodeHash && !rawdb.HasCodeWithPrefix(s.db, codeHash) {
-			if err := s.codeSyncer.addCode(codeHash); err != nil {
-				return nil, err
-			}
+		if codeHash != (common.Hash{}) && codeHash != types.EmptyCodeHash {
+			codeHashes = append(codeHashes, codeHash)
 		}
 
 		// write account snapshot
 		writeAccountSnapshot(mainTrie.batch, accountHash, acc)
-
-		if mainTrie.batch.ValueSize() > mainTrie.batchSize {
-			if err := mainTrie.batch.Write(); err != nil {
-				return nil, err
-			}
-			mainTrie.batch.Reset()
-		}
 	}
+
+	// Add collected code hashes to the code syncer before writing the main trie progress to disk.
+	// This ensures that the main trie will not have progress on disk, unless there is a marker for
+	// the required code bytes.
+	if err := s.codeSyncer.addCode(codeHashes); err != nil {
+		return nil, err
+	}
+	// Only write the main trie batch to disk after we have added any code tasks necessary to disk.
+	// Note: we do not need to check the size of the batch within the loop, since there is a limit of 1024 leaf
+	// keys that will be handled each time.
+	if mainTrie.batch.ValueSize() > mainTrie.batchSize {
+		if err := mainTrie.batch.Write(); err != nil {
+			return nil, err
+		}
+		mainTrie.batch.Reset()
+	}
+
 	if len(keys) > 0 {
 		// notify progress for eta calculations on the last key
 		mainTrie.eta.NotifyProgress(root, mainTrie.startTime, mainTrie.startFrom, keys[len(keys)-1])
@@ -309,6 +343,8 @@ func (s *stateSyncer) onFinish(root common.Hash) error {
 	if root == s.progressMarker.Root {
 		// mark main trie as done.
 		s.progressMarker.MainTrieDone = true
+		// Notify the code syncer that there will be no more code hashes to request.
+		s.codeSyncer.notifyAccountTrieCompleted()
 		return s.checkAllDone()
 	}
 
@@ -385,7 +421,7 @@ func (s *stateSyncer) checkAllDone() error {
 }
 
 // Done returns a channel which produces any error that occurred during syncing or nil on success.
-func (s *stateSyncer) Done() <-chan error { return s.syncer.Done() }
+func (s *stateSyncer) Done() <-chan error { return s.done }
 
 // onSyncFailure writes all in-progress batches to disk to preserve maximum progress
 func (s *stateSyncer) onSyncFailure(error) error {

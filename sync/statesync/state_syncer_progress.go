@@ -84,6 +84,7 @@ func loadProgress(db ethdb.Database, root common.Hash) (*StateSyncProgress, erro
 	return progress, addInProgressTrie(db, root, common.Hash{})
 }
 
+// addInProgressTrie adds a DB marker for an in-progress trie sync.
 func addInProgressTrie(db ethdb.KeyValueWriter, root common.Hash, account common.Hash) error {
 	return db.Put(packKey(root, account), []byte{0x1})
 }
@@ -98,6 +99,7 @@ func removeInProgressStorageTrie(db ethdb.KeyValueWriter, root common.Hash, stor
 	return removeInProgressTrie(db, root, storageTrie.Account)
 }
 
+// removeInProgressTrie removes the DB marker for an in-progress trie sync.
 func removeInProgressTrie(db ethdb.KeyValueWriter, root common.Hash, account common.Hash) error {
 	return db.Delete(packKey(root, account))
 }

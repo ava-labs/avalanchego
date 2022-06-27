@@ -12,13 +12,12 @@ import (
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
-
-const maxCodeHashesPerRequest = 5
 
 // CodeRequestHandler is a peer.RequestHandler for message.CodeRequest
 // serving requested contract code bytes
@@ -51,7 +50,7 @@ func (n *CodeRequestHandler) OnCodeRequest(_ context.Context, nodeID ids.NodeID,
 		n.stats.UpdateCodeReadTime(time.Since(startTime))
 	}()
 
-	if len(codeRequest.Hashes) > maxCodeHashesPerRequest {
+	if len(codeRequest.Hashes) > params.MaxCodeHashesPerRequest {
 		n.stats.IncTooManyHashesRequested()
 		log.Debug("too many hashes requested, dropping request", "nodeID", nodeID, "requestID", requestID, "numHashes", len(codeRequest.Hashes))
 		return nil, nil

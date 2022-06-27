@@ -284,10 +284,12 @@ func (client *stateSyncerClient) syncAtomicTrie(ctx context.Context) error {
 func (client *stateSyncerClient) syncStateTrie(ctx context.Context) error {
 	log.Info("state sync: sync starting", "root", client.syncSummary.BlockRoot)
 	evmSyncer, err := statesync.NewEVMStateSyncer(&statesync.EVMStateSyncerConfig{
-		Client:    client.client,
-		Root:      client.syncSummary.BlockRoot,
-		BatchSize: ethdb.IdealBatchSize,
-		DB:        client.chaindb,
+		Client:                   client.client,
+		Root:                     client.syncSummary.BlockRoot,
+		DB:                       client.chaindb,
+		BatchSize:                ethdb.IdealBatchSize,
+		MaxOutstandingCodeHashes: statesync.DefaultMaxOutstandingCodeHashes,
+		NumCodeFetchingWorkers:   statesync.DefaultNumCodeFetchingWorkers,
 	})
 	if err != nil {
 		return err
