@@ -85,3 +85,17 @@ type Config struct {
 	// Time of the removal of advance time tx
 	ApricotPhase6Time time.Time
 }
+
+func (cfg *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {
+	if t.Before(cfg.ApricotPhase3Time) {
+		return cfg.CreateAssetTxFee
+	}
+	return cfg.CreateBlockchainTxFee
+}
+
+func (cfg *Config) GetCreateSubnetTxFee(t time.Time) uint64 {
+	if t.Before(cfg.ApricotPhase3Time) {
+		return cfg.CreateAssetTxFee
+	}
+	return cfg.CreateSubnetTxFee
+}

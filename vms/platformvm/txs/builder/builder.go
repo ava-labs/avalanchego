@@ -340,7 +340,7 @@ func (b *builder) NewCreateChainTx(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	timestamp := b.state.GetTimestamp()
-	createBlockchainTxFee := GetCreateBlockchainTxFee(b.cfg, timestamp)
+	createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
 	ins, outs, _, signers, err := b.Stake(keys, 0, createBlockchainTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -384,7 +384,7 @@ func (b *builder) NewCreateSubnetTx(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	timestamp := b.state.GetTimestamp()
-	createSubnetTxFee := GetCreateSubnetTxFee(b.cfg, timestamp)
+	createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(timestamp)
 	ins, outs, _, signers, err := b.Stake(keys, 0, createSubnetTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
