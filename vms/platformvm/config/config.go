@@ -83,7 +83,7 @@ type Config struct {
 	ApricotPhase5Time time.Time
 
 	// Time of the removal of advance time tx
-	ApricotPhase6Time time.Time
+	BlueberryTime time.Time
 }
 
 func (cfg *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {

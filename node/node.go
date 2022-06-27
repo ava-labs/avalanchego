@@ -752,7 +752,7 @@ func (n *Node) initVMs() error {
 				ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
 				ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 				ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
-				ApricotPhase6Time:      version.GetApricotPhase6Time(n.Config.NetworkID),
+				BlueberryTime:          version.GetBlueberryTime(n.Config.NetworkID),
 			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{

@@ -66,11 +66,11 @@ var (
 	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	// FIXME: update this before release
-	ApricotPhase6Times = map[uint32]time.Time{
+	BlueberryTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
-	ApricotPhase6DefaultTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
+	BlueberryDefaultTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
 
 	// FIXME: update this before release
 	XChainMigrationTimes = map[uint32]time.Time{
@@ -129,11 +129,11 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return ApricotPhase5DefaultTime
 }
 
-func GetApricotPhase6Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
+func GetBlueberryTime(networkID uint32) time.Time {
+	if upgradeTime, exists := BlueberryTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return ApricotPhase6DefaultTime
+	return BlueberryDefaultTime
 }
 
 func GetXChainMigrationTime(networkID uint32) time.Time {

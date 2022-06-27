@@ -32,7 +32,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			ApricotPhase6Time:      mockable.MaxTime,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -70,7 +70,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			UptimePercentage:       .21,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			ApricotPhase6Time:      mockable.MaxTime,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -236,7 +236,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			ApricotPhase6Time:      mockable.MaxTime,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
