@@ -375,11 +375,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.Build
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	// Note: blocks to be parsed are not verified, so we must used stateless.Codec
 	// rather than stateless.GenesisCodec
-	var statelessBlk stateless.Block
-	if _, err := stateless.Codec.Unmarshal(b, &statelessBlk); err != nil {
-		return nil, err
-	}
-	if err := statelessBlk.Initialize(b); err != nil {
+	statelessBlk, err := stateless.ParseWithCodec(b, stateless.Codec)
+	if err != nil {
 		return nil, err
 	}
 
