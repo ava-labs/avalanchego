@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -39,9 +40,6 @@ const (
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
 	minAddStakerDelay = 2 * syncBound
-
-	// Max number of items allowed in a page
-	maxPageSize = 1024
 )
 
 var (
@@ -370,8 +368,8 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 		endUTXOID ids.ID
 	)
 	limit := int(args.Limit)
-	if limit <= 0 || maxPageSize < limit {
-		limit = maxPageSize
+	if limit <= 0 || builder.MaxPageSize < limit {
+		limit = builder.MaxPageSize
 	}
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
