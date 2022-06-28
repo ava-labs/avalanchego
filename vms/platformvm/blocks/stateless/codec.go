@@ -38,7 +38,7 @@ func init() {
 	Codec = codec.NewDefaultManager()
 
 	preGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	postGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+	postGc := linearcodec.New(postForkTags, math.MaxInt32)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}

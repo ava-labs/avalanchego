@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -48,65 +49,67 @@ func TestStandardBlocks(t *testing.T) {
 	txs, err := testDecisionTxs()
 	assert.NoError(err)
 
-	// build block
-	preForkStdBlk, err := NewStandardBlock(
-		preForkblkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-		txs,
-	)
-	assert.NoError(err)
+	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
+		// build block
+		preForkStdBlk, err := NewStandardBlock(
+			preForkblkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+			txs,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err := ParseWithCodec(preForkStdBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err := ParseWithCodec(preForkStdBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(preForkStdBlk.ID(), parsed.ID())
-	assert.Equal(preForkStdBlk.Bytes(), parsed.Bytes())
-	assert.Equal(preForkStdBlk.Parent(), parsed.Parent())
-	assert.Equal(preForkStdBlk.Height(), parsed.Height())
-	assert.Equal(preForkStdBlk.Version(), parsed.Version())
+		// compare content
+		assert.Equal(preForkStdBlk.ID(), parsed.ID())
+		assert.Equal(preForkStdBlk.Bytes(), parsed.Bytes())
+		assert.Equal(preForkStdBlk.Parent(), parsed.Parent())
+		assert.Equal(preForkStdBlk.Height(), parsed.Height())
+		assert.Equal(preForkStdBlk.Version(), parsed.Version())
 
-	// timestamp is not serialized in pre fork blocks
-	// no matter if block is built with a non-zero timestamp
-	assert.Equal(int64(0), parsed.UnixTimestamp())
+		// timestamp is not serialized in pre fork blocks
+		// no matter if block is built with a non-zero timestamp
+		assert.Equal(int64(0), parsed.UnixTimestamp())
 
-	parsedPreForkStdBlk, ok := parsed.(*StandardBlock)
-	assert.True(ok)
-	assert.Equal(txs, parsedPreForkStdBlk.Txs)
+		parsedPreForkStdBlk, ok := parsed.(*StandardBlock)
+		assert.True(ok)
+		assert.Equal(txs, parsedPreForkStdBlk.Txs)
 
-	// check that post fork standard block can be built and parsed
-	postForkBlkVersion := uint16(PostForkVersion)
+		// check that post fork standard block can be built and parsed
+		postForkBlkVersion := uint16(PostForkVersion)
 
-	// build block
-	postForkStdBlk, err := NewStandardBlock(
-		postForkBlkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-		txs,
-	)
-	assert.NoError(err)
+		// build block
+		postForkStdBlk, err := NewStandardBlock(
+			postForkBlkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+			txs,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err = ParseWithCodec(postForkStdBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err = ParseWithCodec(postForkStdBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(postForkStdBlk.ID(), parsed.ID())
-	assert.Equal(postForkStdBlk.Bytes(), parsed.Bytes())
-	assert.Equal(postForkStdBlk.Parent(), postForkStdBlk.Parent())
-	assert.Equal(postForkStdBlk.Height(), parsed.Height())
-	assert.Equal(postForkStdBlk.Version(), parsed.Version())
-	assert.Equal(postForkStdBlk.UnixTimestamp(), parsed.UnixTimestamp())
-	parsedPostForkStdBlk, ok := parsed.(*PostForkStandardBlock)
-	assert.True(ok)
-	assert.Equal(txs, parsedPostForkStdBlk.Txs)
+		// compare content
+		assert.Equal(postForkStdBlk.ID(), parsed.ID())
+		assert.Equal(postForkStdBlk.Bytes(), parsed.Bytes())
+		assert.Equal(postForkStdBlk.Parent(), postForkStdBlk.Parent())
+		assert.Equal(postForkStdBlk.Height(), parsed.Height())
+		assert.Equal(postForkStdBlk.Version(), parsed.Version())
+		assert.Equal(postForkStdBlk.UnixTimestamp(), parsed.UnixTimestamp())
+		parsedPostForkStdBlk, ok := parsed.(*PostForkStandardBlock)
+		assert.True(ok)
+		assert.Equal(txs, parsedPostForkStdBlk.Txs)
 
-	// backward compatibility check
-	assert.Equal(parsedPreForkStdBlk.Txs, parsedPostForkStdBlk.Txs)
+		// backward compatibility check
+		assert.Equal(parsedPreForkStdBlk.Txs, parsedPostForkStdBlk.Txs)
+	}
 }
 
 func TestProposalBlocks(t *testing.T) {
@@ -119,65 +122,67 @@ func TestProposalBlocks(t *testing.T) {
 	tx, err := testProposalTx()
 	assert.NoError(err)
 
-	// build block
-	preForkProposalBlk, err := NewProposalBlock(
-		preForkblkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-		tx,
-	)
-	assert.NoError(err)
+	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
+		// build block
+		preForkProposalBlk, err := NewProposalBlock(
+			preForkblkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+			tx,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err := ParseWithCodec(preForkProposalBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err := ParseWithCodec(preForkProposalBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(preForkProposalBlk.ID(), parsed.ID())
-	assert.Equal(preForkProposalBlk.Bytes(), parsed.Bytes())
-	assert.Equal(preForkProposalBlk.Parent(), parsed.Parent())
-	assert.Equal(preForkProposalBlk.Height(), parsed.Height())
-	assert.Equal(preForkProposalBlk.Version(), parsed.Version())
+		// compare content
+		assert.Equal(preForkProposalBlk.ID(), parsed.ID())
+		assert.Equal(preForkProposalBlk.Bytes(), parsed.Bytes())
+		assert.Equal(preForkProposalBlk.Parent(), parsed.Parent())
+		assert.Equal(preForkProposalBlk.Height(), parsed.Height())
+		assert.Equal(preForkProposalBlk.Version(), parsed.Version())
 
-	// timestamp is not serialized in pre fork blocks
-	// no matter if block is built with a non-zero timestamp
-	assert.Equal(int64(0), parsed.UnixTimestamp())
+		// timestamp is not serialized in pre fork blocks
+		// no matter if block is built with a non-zero timestamp
+		assert.Equal(int64(0), parsed.UnixTimestamp())
 
-	parsedPreForkProposalBlk, ok := parsed.(*ProposalBlock)
-	assert.True(ok)
-	assert.Equal(tx, parsedPreForkProposalBlk.Tx)
+		parsedPreForkProposalBlk, ok := parsed.(*ProposalBlock)
+		assert.True(ok)
+		assert.Equal(tx, parsedPreForkProposalBlk.Tx)
 
-	// check that post fork standard block can be built and parsed
-	postForkBlkVersion := uint16(PostForkVersion)
+		// check that post fork standard block can be built and parsed
+		postForkBlkVersion := uint16(PostForkVersion)
 
-	// build block
-	postForkProposalBlk, err := NewProposalBlock(
-		postForkBlkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-		tx,
-	)
-	assert.NoError(err)
+		// build block
+		postForkProposalBlk, err := NewProposalBlock(
+			postForkBlkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+			tx,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err = ParseWithCodec(postForkProposalBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err = ParseWithCodec(postForkProposalBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(postForkProposalBlk.ID(), parsed.ID())
-	assert.Equal(postForkProposalBlk.Bytes(), parsed.Bytes())
-	assert.Equal(postForkProposalBlk.Parent(), postForkProposalBlk.Parent())
-	assert.Equal(postForkProposalBlk.Height(), parsed.Height())
-	assert.Equal(postForkProposalBlk.Version(), parsed.Version())
-	assert.Equal(postForkProposalBlk.UnixTimestamp(), parsed.UnixTimestamp())
-	parsedPostForkProposalBlk, ok := parsed.(*PostForkProposalBlock)
-	assert.True(ok)
-	assert.Equal(tx, parsedPostForkProposalBlk.Tx)
+		// compare content
+		assert.Equal(postForkProposalBlk.ID(), parsed.ID())
+		assert.Equal(postForkProposalBlk.Bytes(), parsed.Bytes())
+		assert.Equal(postForkProposalBlk.Parent(), postForkProposalBlk.Parent())
+		assert.Equal(postForkProposalBlk.Height(), parsed.Height())
+		assert.Equal(postForkProposalBlk.Version(), parsed.Version())
+		assert.Equal(postForkProposalBlk.UnixTimestamp(), parsed.UnixTimestamp())
+		parsedPostForkProposalBlk, ok := parsed.(*PostForkProposalBlock)
+		assert.True(ok)
+		assert.Equal(tx, parsedPostForkProposalBlk.Tx)
 
-	// backward compatibility check
-	assert.Equal(parsedPreForkProposalBlk.Tx, parsedPostForkProposalBlk.Tx)
+		// backward compatibility check
+		assert.Equal(parsedPreForkProposalBlk.Tx, parsedPostForkProposalBlk.Tx)
+	}
 }
 
 func TestCommitBlock(t *testing.T) {
@@ -188,53 +193,55 @@ func TestCommitBlock(t *testing.T) {
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
-	// build block
-	preForkCommitBlk, err := NewCommitBlock(
-		preForkblkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-	)
-	assert.NoError(err)
+	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
+		// build block
+		preForkCommitBlk, err := NewCommitBlock(
+			preForkblkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err := ParseWithCodec(preForkCommitBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err := ParseWithCodec(preForkCommitBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(preForkCommitBlk.ID(), parsed.ID())
-	assert.Equal(preForkCommitBlk.Bytes(), parsed.Bytes())
-	assert.Equal(preForkCommitBlk.Parent(), parsed.Parent())
-	assert.Equal(preForkCommitBlk.Height(), parsed.Height())
-	assert.Equal(preForkCommitBlk.Version(), parsed.Version())
+		// compare content
+		assert.Equal(preForkCommitBlk.ID(), parsed.ID())
+		assert.Equal(preForkCommitBlk.Bytes(), parsed.Bytes())
+		assert.Equal(preForkCommitBlk.Parent(), parsed.Parent())
+		assert.Equal(preForkCommitBlk.Height(), parsed.Height())
+		assert.Equal(preForkCommitBlk.Version(), parsed.Version())
 
-	// timestamp is not serialized in pre fork blocks
-	// no matter if block is built with a non-zero timestamp
-	assert.Equal(int64(0), parsed.UnixTimestamp())
+		// timestamp is not serialized in pre fork blocks
+		// no matter if block is built with a non-zero timestamp
+		assert.Equal(int64(0), parsed.UnixTimestamp())
 
-	// check that post fork standard block can be built and parsed
-	postForkBlkVersion := uint16(PostForkVersion)
+		// check that post fork standard block can be built and parsed
+		postForkBlkVersion := uint16(PostForkVersion)
 
-	// build block
-	postForkCommitBlk, err := NewCommitBlock(
-		postForkBlkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-	)
-	assert.NoError(err)
+		// build block
+		postForkCommitBlk, err := NewCommitBlock(
+			postForkBlkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err = ParseWithCodec(postForkCommitBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err = ParseWithCodec(postForkCommitBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(postForkCommitBlk.ID(), parsed.ID())
-	assert.Equal(postForkCommitBlk.Bytes(), parsed.Bytes())
-	assert.Equal(postForkCommitBlk.Parent(), postForkCommitBlk.Parent())
-	assert.Equal(postForkCommitBlk.Height(), parsed.Height())
-	assert.Equal(postForkCommitBlk.Version(), parsed.Version())
-	assert.Equal(postForkCommitBlk.UnixTimestamp(), parsed.UnixTimestamp())
+		// compare content
+		assert.Equal(postForkCommitBlk.ID(), parsed.ID())
+		assert.Equal(postForkCommitBlk.Bytes(), parsed.Bytes())
+		assert.Equal(postForkCommitBlk.Parent(), postForkCommitBlk.Parent())
+		assert.Equal(postForkCommitBlk.Height(), parsed.Height())
+		assert.Equal(postForkCommitBlk.Version(), parsed.Version())
+		assert.Equal(postForkCommitBlk.UnixTimestamp(), parsed.UnixTimestamp())
+	}
 }
 
 func TestAbortBlock(t *testing.T) {
@@ -245,53 +252,55 @@ func TestAbortBlock(t *testing.T) {
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
-	// build block
-	preForkAbortBlk, err := NewAbortBlock(
-		preForkblkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-	)
-	assert.NoError(err)
+	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
+		// build block
+		preForkAbortBlk, err := NewAbortBlock(
+			preForkblkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err := ParseWithCodec(preForkAbortBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err := ParseWithCodec(preForkAbortBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(preForkAbortBlk.ID(), parsed.ID())
-	assert.Equal(preForkAbortBlk.Bytes(), parsed.Bytes())
-	assert.Equal(preForkAbortBlk.Parent(), parsed.Parent())
-	assert.Equal(preForkAbortBlk.Height(), parsed.Height())
-	assert.Equal(preForkAbortBlk.Version(), parsed.Version())
+		// compare content
+		assert.Equal(preForkAbortBlk.ID(), parsed.ID())
+		assert.Equal(preForkAbortBlk.Bytes(), parsed.Bytes())
+		assert.Equal(preForkAbortBlk.Parent(), parsed.Parent())
+		assert.Equal(preForkAbortBlk.Height(), parsed.Height())
+		assert.Equal(preForkAbortBlk.Version(), parsed.Version())
 
-	// timestamp is not serialized in pre fork blocks
-	// no matter if block is built with a non-zero timestamp
-	assert.Equal(int64(0), parsed.UnixTimestamp())
+		// timestamp is not serialized in pre fork blocks
+		// no matter if block is built with a non-zero timestamp
+		assert.Equal(int64(0), parsed.UnixTimestamp())
 
-	// check that post fork standard block can be built and parsed
-	postForkBlkVersion := uint16(PostForkVersion)
+		// check that post fork standard block can be built and parsed
+		postForkBlkVersion := uint16(PostForkVersion)
 
-	// build block
-	postForkAbortBlk, err := NewAbortBlock(
-		postForkBlkVersion,
-		blkTimestamp,
-		parentID,
-		height,
-	)
-	assert.NoError(err)
+		// build block
+		postForkAbortBlk, err := NewAbortBlock(
+			postForkBlkVersion,
+			blkTimestamp,
+			parentID,
+			height,
+		)
+		assert.NoError(err)
 
-	// parse block
-	parsed, err = ParseWithCodec(postForkAbortBlk.Bytes(), Codec)
-	assert.NoError(err)
+		// parse block
+		parsed, err = ParseWithCodec(postForkAbortBlk.Bytes(), cdc)
+		assert.NoError(err)
 
-	// compare content
-	assert.Equal(postForkAbortBlk.ID(), parsed.ID())
-	assert.Equal(postForkAbortBlk.Bytes(), parsed.Bytes())
-	assert.Equal(postForkAbortBlk.Parent(), postForkAbortBlk.Parent())
-	assert.Equal(postForkAbortBlk.Height(), parsed.Height())
-	assert.Equal(postForkAbortBlk.Version(), parsed.Version())
-	assert.Equal(postForkAbortBlk.UnixTimestamp(), parsed.UnixTimestamp())
+		// compare content
+		assert.Equal(postForkAbortBlk.ID(), parsed.ID())
+		assert.Equal(postForkAbortBlk.Bytes(), parsed.Bytes())
+		assert.Equal(postForkAbortBlk.Parent(), postForkAbortBlk.Parent())
+		assert.Equal(postForkAbortBlk.Height(), parsed.Height())
+		assert.Equal(postForkAbortBlk.Version(), parsed.Version())
+		assert.Equal(postForkAbortBlk.UnixTimestamp(), parsed.UnixTimestamp())
+	}
 }
 
 func testDecisionTxs() ([]*txs.Tx, error) {
