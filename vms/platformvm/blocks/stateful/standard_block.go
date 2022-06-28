@@ -102,7 +102,7 @@ func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
-	if err := sb.verify(true /*enforceStrictness*/); err != nil {
+	if err := sb.verify(false /*enforceStrictness*/); err != nil {
 		return err
 	}
 

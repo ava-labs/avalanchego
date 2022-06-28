@@ -203,8 +203,8 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 	assert.NoError(err)
 	assert.Error(postForkChildBlk.Verify())
 
-	// wrong timestamp, non increasing wrt parent
-	childTimestamp = uint64(parentTime.Unix())
+	// wrong timestamp, earlier than parent
+	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
 	postForkChildBlk, err = NewStandardBlock(
 		stateless.PostForkVersion,
 		childTimestamp,
@@ -245,8 +245,8 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 	assert.NoError(err)
 	assert.Error(postForkChildBlk.Verify())
 
-	// valid
-	childTimestamp = uint64(parentTime.Add(time.Second).Unix())
+	// valid block, same timestamp as parent block
+	childTimestamp = uint64(parentTime.Unix())
 	postForkChildBlk, err = NewStandardBlock(
 		stateless.PostForkVersion,
 		childTimestamp,

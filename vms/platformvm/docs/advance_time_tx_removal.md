@@ -18,7 +18,7 @@ Before Blueberry fork activation, `ChainTime` was incremented by an `AdvanceTime
 
 1. *Strict Monotonicity*: proposed time must be *strictly* greater than current `ChainTime`
 2. *Synchronicity*: proposed time must not be later than node’s current time plus a synchronicity bound (currently set to 10 seconds).
-3. *NoSkipping*: proposed time must be smaller or equal to the next staking event, that is start/end of any staker.
+3. *No Skipping*: proposed time must be smaller or equal to the next staking event, that is start/end of any staker.
 
 Note that *Synchronicity* makes sure that `ChainTime` approximate “real” time flow. If we dropped synchronicity requirement, a staker could declare any staking time and immediately push `ChainTime` to the end, so as to pocket a reward without having actually carried out any activity in the “real” time.
 
@@ -29,16 +29,10 @@ Following Blueberry fork activation, `AdvanceTimeTxs` cannot be included anymore
 Validation rules for block timestamps varies slightly depending on block types:
 
 * `CommitBlock`s and `AbortBlock`s timestamp must be equal to the timestamp of the `ProposalBlock` they depend upon
-* `StandardBlock`s are subject to the same validation rules employed for `AdvanceTimeTx`s Specifically:
-  1. *Strict Monotonicity*: block timestamp must be *strictly* greater than current `ChainTime` (which is also its parent timestamp if parent was accepted)
-  2. *Synchronicity*: block timestamp must not be later than node’s current time plus a synchronicity bound (currently set to 10 seconds).
-  3. *NoSkipping*: proposed time must be smaller or equal to the next staking event, that is start/end of any staker.
-* `ProposalBlock`s share `StandardBlock`s rules with the exception of the *strict monotonicity*:
+* `StandardBlock`s and `ProposalBlock`s share `AdvanceTimeTx`s validation rules with the exception of the *strict monotonicity*:
   1. *Monotonicity*: block timestamp must be *greater or equal* to current `ChainTime` (which is also its parent timestamp if parent was accepted)
   2. *Synchronicity*: block timestamp must not be later than node’s current time plus a synchronicity bound (currently set to 10 seconds).
   3. *NoSkipping*: proposed time must be smaller or equal to the next staking event, that is start/end of any staker.
-
-`ProposalBlock`s carry a single transaction subject to voting. The monotonicity check is non strict to accommodate multiple proposal transactions happening at the same `chainTime`. Note that this is not necessary for `StandardBlock`s which can contain multiple transactions that are executed as soon as the block is accepted, without further voting.
 
 ## Serialization changes
 
