@@ -1,0 +1,15 @@
+// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package stateless
+
+import "github.com/ava-labs/avalanchego/codec"
+
+func ParseWithCodec(b []byte, c codec.Manager) (Block, error) {
+	var blk Block
+	if _, err := c.Unmarshal(b, &blk); err != nil {
+		return nil, err
+	}
+
+	return blk, blk.Initialize(b)
+}
