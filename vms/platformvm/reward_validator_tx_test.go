@@ -29,7 +29,7 @@ import (
 )
 
 func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -136,7 +136,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 }
 
 func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -247,7 +247,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -355,7 +355,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()

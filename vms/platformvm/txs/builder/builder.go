@@ -37,8 +37,6 @@ type TxBuilder interface {
 	AtomicTxBuilder
 	DecisionsTxBuilder
 	ProposalsTxBuilder
-
-	ResetAtomicUTXOManager(aum avax.AtomicUTXOManager) // useful for UTs. TODO ABENEGIA: consider find a way to drop this
 }
 
 type AtomicTxBuilder interface {
@@ -192,10 +190,6 @@ type builder struct {
 	clk     mockable.Clock
 	fx      fx.Fx
 	rewards reward.Calculator
-}
-
-func (b *builder) ResetAtomicUTXOManager(aum avax.AtomicUTXOManager) {
-	b.AtomicUTXOManager = aum
 }
 
 func (b *builder) NewImportTx(

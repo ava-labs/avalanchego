@@ -20,7 +20,7 @@ import (
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -148,7 +148,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		}
 	}
 
-	freshVM, _, _ := defaultVM()
+	freshVM, _, _, _ := defaultVM()
 	currentTimestamp := freshVM.internalState.GetTimestamp()
 
 	type test struct {
@@ -312,7 +312,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = tt.AP3Time
 
 			vm.ctx.Lock.Lock()
@@ -357,7 +357,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -522,7 +522,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()

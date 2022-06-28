@@ -61,8 +61,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) *Service {
-	vm, _, _ := defaultVM()
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	vm, _, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
@@ -70,7 +70,7 @@ func defaultService(t *testing.T) *Service {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}
+	return &Service{vm: vm}, mutableSharedMemory
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -124,7 +124,7 @@ func TestExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -152,7 +152,7 @@ func TestImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
@@ -172,7 +172,7 @@ func TestImportKey(t *testing.T) {
 
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
-	service := defaultService(t)
+	service, mutableSharedMemory := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -229,17 +229,14 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
-	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
-
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.AtomicUTXOManager)
+	oldSharedMemory := mutableSharedMemory.SharedMemory
+	mutableSharedMemory.SharedMemory = sm
 
 	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
+	mutableSharedMemory.SharedMemory = oldSharedMemory
 
 	var (
 		arg  = &GetTxStatusArgs{TxID: tx.ID()}
@@ -260,8 +257,7 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal("should have erred because of missing funds")
 	}
 
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	service.vm.ctx.SharedMemory = sm
+	mutableSharedMemory.SharedMemory = sm
 
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
@@ -340,7 +336,7 @@ func TestGetTx(t *testing.T) {
 
 	for _, test := range tests {
 		for _, encoding := range encodings {
-			service := defaultService(t)
+			service, _ := defaultService(t)
 			defaultAddress(t, service)
 			service.vm.ctx.Lock.Lock()
 
@@ -403,7 +399,7 @@ func TestGetTx(t *testing.T) {
 
 // Test method GetBalance
 func TestGetBalance(t *testing.T) {
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -443,7 +439,7 @@ func TestGetBalance(t *testing.T) {
 // Test method GetStake
 func TestGetStake(t *testing.T) {
 	assert := assert.New(t)
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -597,7 +593,7 @@ func TestGetStake(t *testing.T) {
 
 // Test method GetCurrentValidators
 func TestGetCurrentValidators(t *testing.T) {
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -727,7 +723,7 @@ func TestGetCurrentValidators(t *testing.T) {
 func TestGetTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		err := service.vm.Shutdown()
@@ -773,7 +769,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			service := defaultService(t)
+			service, _ := defaultService(t)
 
 			block, err := service.vm.newStandardBlock(ids.GenerateTestID(), 1234, nil)
 			if err != nil {
