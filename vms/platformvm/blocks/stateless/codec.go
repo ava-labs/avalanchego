@@ -17,20 +17,32 @@ const (
 	Version = 0
 )
 
-// Codec does serialization and deserialization
-var Codec codec.Manager
+// GenesisCode allows blocks of larger than usual size to be parsed.
+// While this gives flexibility in accommodating large genesis blocks
+// it must not be used to parse new, unverified blocks which instead
+// must be processed by Codec
+var (
+	Codec        codec.Manager
+	GenesisCodec codec.Manager
+)
 
 func init() {
+	c := linearcodec.NewDefault()
+	Codec = codec.NewDefaultManager()
 	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	Codec = codec.NewManager(math.MaxInt32)
+	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
+	for _, c := range []codec.Registry{c, gc} {
+		errs.Add(
+			RegisterBlockTypes(c),
+			txs.RegisterUnsignedTxsTypes(c),
+		)
+	}
 	errs.Add(
-		RegisterBlockTypes(gc),
-		txs.RegisterUnsignedTxsTypes(gc),
-		Codec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(txs.Version, c),
+		GenesisCodec.RegisterCodec(txs.Version, gc),
 	)
-
 	if errs.Errored() {
 		panic(errs.Err)
 	}
