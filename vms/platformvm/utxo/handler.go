@@ -102,6 +102,8 @@ type Verifier interface {
 	// Verify that [tx] is semantically valid.
 	// [ins] and [outs] are the inputs and outputs of [tx].
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
+	// [outs].
 	// Precondition: [tx] has already been syntactically verified.
 	SemanticVerifySpend(
 		tx txs.UnsignedTx,
@@ -117,6 +119,8 @@ type Verifier interface {
 	// [utxos[i]] is the UTXO being consumed by [ins[i]].
 	// [ins] and [outs] are the inputs and outputs of [tx].
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
+	// [outs].
 	// Precondition: [tx] has already been syntactically verified.
 	SemanticVerifySpendUTXOs(
 		tx txs.UnsignedTx,
@@ -437,11 +441,6 @@ func (h *handler) Authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpend(
 	tx txs.UnsignedTx,
 	utxoDB state.UTXOGetter,
@@ -467,12 +466,6 @@ func (h *handler) SemanticVerifySpend(
 	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// [utxos[i]] is the UTXO being consumed by [ins[i]]
-// Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpendUTXOs(
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
