@@ -46,7 +46,7 @@ func TestAtomicTxImports(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
 	vm.txBuilder.ResetAtomicUTXOManager(vm.AtomicUTXOManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 	utxo := &avax.UTXO{
@@ -60,7 +60,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
