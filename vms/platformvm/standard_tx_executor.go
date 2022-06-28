@@ -58,8 +58,8 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	timestamp := e.state.GetTimestamp()
 	createBlockchainTxFee := e.vm.Config.GetCreateBlockchainTxFee(timestamp)
 	if err := e.vm.utxoHandler.SemanticVerifySpend(
-		e.state,
 		tx,
+		e.state,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
@@ -115,8 +115,8 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	timestamp := e.state.GetTimestamp()
 	createSubnetTxFee := e.vm.Config.GetCreateSubnetTxFee(timestamp)
 	if err := e.vm.utxoHandler.SemanticVerifySpend(
-		e.state,
 		tx,
+		e.state,
 		tx.Ins,
 		tx.Outs,
 		e.tx.Creds,
@@ -226,8 +226,8 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	if err := e.vm.utxoHandler.SemanticVerifySpend(
-		e.state,
 		tx,
+		e.state,
 		tx.Ins,
 		outs,
 		e.tx.Creds,

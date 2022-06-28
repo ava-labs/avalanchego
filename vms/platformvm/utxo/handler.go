@@ -85,10 +85,10 @@ type Spender interface {
 		error,
 	)
 
-	// authorize an operation on behalf of the named subnet with the provided
+	// Authorize an operation on behalf of the named subnet with the provided
 	// keys.
 	Authorize(
-		vs state.Chain,
+		state state.Chain,
 		subnetID ids.ID,
 		keys []*crypto.PrivateKeySECP256K1R,
 	) (
@@ -100,13 +100,12 @@ type Spender interface {
 
 type Verifier interface {
 	// Verify that [tx] is semantically valid.
-	// [db] should not be committed if an error is returned
 	// [ins] and [outs] are the inputs and outputs of [tx].
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// Precondition: [tx] has already been syntactically verified
+	// Precondition: [tx] has already been syntactically verified.
 	SemanticVerifySpend(
-		utxoDB state.UTXOGetter,
 		tx txs.UnsignedTx,
+		utxoDB state.UTXOGetter,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
@@ -115,11 +114,10 @@ type Verifier interface {
 	) error
 
 	// Verify that [tx] is semantically valid.
-	// [db] should not be committed if an error is returned
+	// [utxos[i]] is the UTXO being consumed by [ins[i]].
 	// [ins] and [outs] are the inputs and outputs of [tx].
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// [utxos[i]] is the UTXO being consumed by [ins[i]]
-	// Precondition: [tx] has already been syntactically verified
+	// Precondition: [tx] has already been syntactically verified.
 	SemanticVerifySpendUTXOs(
 		tx txs.UnsignedTx,
 		utxos []*avax.UTXO,
@@ -445,8 +443,8 @@ func (h *handler) Authorize(
 // [creds] are the credentials of [tx], which allow [ins] to be spent.
 // Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpend(
+	tx txs.UnsignedTx,
 	utxoDB state.UTXOGetter,
-	utx txs.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -466,7 +464,7 @@ func (h *handler) SemanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.SemanticVerifySpendUTXOs(utx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
 // Verify that [tx] is semantically valid.
@@ -476,7 +474,7 @@ func (h *handler) SemanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (h *handler) SemanticVerifySpendUTXOs(
-	utx txs.UnsignedTx,
+	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -549,7 +547,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(utx, in, creds[index], out); err != nil {
+		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
