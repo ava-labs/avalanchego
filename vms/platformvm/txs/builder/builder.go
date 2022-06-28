@@ -40,12 +40,12 @@ type TxBuilder interface {
 }
 
 type AtomicTxBuilder interface {
-	// from: chain to import from
+	// chainID: chain to import UTXOs from
 	// to: address of recipient
 	// keys: keys to import the funds
 	// changeAddr: address to send change to, if there is any
 	NewImportTx(
-		from ids.ID,
+		chainID ids.ID,
 		to ids.ShortID,
 		keys []*crypto.PrivateKeySECP256K1R,
 		changeAddr ids.ShortID,
@@ -53,7 +53,7 @@ type AtomicTxBuilder interface {
 
 	// amount: amount of tokens to export
 	// chainID: chain to send the UTXOs to
-	// to: address of chain recipient
+	// to: address of recipient
 	// keys: keys to pay the fee and provide the tokens
 	// changeAddr: address to send change to, if there is any
 	NewExportTx(
