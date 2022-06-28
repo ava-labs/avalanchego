@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
@@ -161,22 +160,20 @@ type ProposalTxBuilder interface {
 func NewTxBuilder(
 	ctx *snow.Context,
 	cfg config.Config,
-	clk mockable.Clock,
+	clk *mockable.Clock,
 	fx fx.Fx,
 	state state.Chain,
-	atoUtxosMan avax.AtomicUTXOManager,
+	atomicUTXOManager avax.AtomicUTXOManager,
 	spendingOps utxos.SpendingOps,
-	rewards reward.Calculator,
 ) TxBuilder {
 	return &builder{
-		AtomicUTXOManager: atoUtxosMan,
+		AtomicUTXOManager: atomicUTXOManager,
 		SpendingOps:       spendingOps,
 		state:             state,
 		cfg:               cfg,
 		ctx:               ctx,
 		clk:               clk,
 		fx:                fx,
-		rewards:           rewards,
 	}
 }
 
@@ -185,11 +182,10 @@ type builder struct {
 	utxos.SpendingOps
 	state state.Chain
 
-	cfg     config.Config
-	ctx     *snow.Context
-	clk     mockable.Clock
-	fx      fx.Fx
-	rewards reward.Calculator
+	cfg config.Config
+	ctx *snow.Context
+	clk *mockable.Clock
+	fx  fx.Fx
 }
 
 func (b *builder) NewImportTx(

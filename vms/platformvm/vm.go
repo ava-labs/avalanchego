@@ -208,12 +208,11 @@ func (vm *VM) Initialize(
 	vm.txBuilder = builder.NewTxBuilder(
 		vm.ctx,
 		vm.Config,
-		vm.clock,
+		&vm.clock,
 		vm.fx,
 		vm.internalState,
 		vm.AtomicUTXOManager,
 		vm.spendHandler,
-		vm.rewards,
 	)
 
 	vm.lastAcceptedID = is.GetLastAccepted()
