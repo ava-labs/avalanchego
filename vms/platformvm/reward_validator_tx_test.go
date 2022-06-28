@@ -263,7 +263,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 	vdrTx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake, // stakeAmt
+		vm.MinValidatorStake, // stakeAmount
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -277,7 +277,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake, // stakeAmt
+		vm.MinDelegatorStake, // stakeAmount
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID
@@ -373,7 +373,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 	vdrTx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake, // stakeAmt
+		vm.MinValidatorStake, // stakeAmount
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -387,7 +387,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake, // stakeAmt
+		vm.MinDelegatorStake, // stakeAmount
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID

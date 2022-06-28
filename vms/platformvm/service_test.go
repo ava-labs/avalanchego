@@ -509,11 +509,11 @@ func TestGetStake(t *testing.T) {
 	oldStake := uint64(defaultWeight)
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
-		stakeAmt,
+		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		delegatorEndTime,
 		delegatorNodeID,
@@ -530,14 +530,14 @@ func TestGetStake(t *testing.T) {
 	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
-	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
+	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
-	assert.EqualValues(oldStake+stakeAmt, uint64(response.Staked))
+	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
 	assert.Len(response.Outputs, 2)
-	// Unmarshal into transferableoutputs
+	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
@@ -546,17 +546,17 @@ func TestGetStake(t *testing.T) {
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = service.vm.MinValidatorStake + 54321
+	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
-		stakeAmt,
+		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
@@ -574,10 +574,10 @@ func TestGetStake(t *testing.T) {
 	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
-	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	// Make sure the delegator has the right stake (old stake + stakeAmount)
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
-	assert.EqualValues(oldStake+stakeAmt, response.Staked)
+	assert.EqualValues(oldStake+stakeAmount, response.Staked)
 	assert.Len(response.Outputs, 3)
 	outputs = make([]avax.TransferableOutput, 3)
 	// Unmarshal
@@ -588,7 +588,7 @@ func TestGetStake(t *testing.T) {
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
@@ -653,13 +653,13 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
-		stakeAmt,
+		stakeAmount,
 		delegatorStartTime,
 		delegatorEndTime,
 		validatorNodeID,
@@ -711,12 +711,12 @@ func TestGetCurrentValidators(t *testing.T) {
 			t.Fatal("wrong start time")
 		case uint64(delegator.EndTime) != delegatorEndTime:
 			t.Fatal("wrong end time")
-		case delegator.GetWeight() != stakeAmt:
+		case delegator.GetWeight() != stakeAmount:
 			t.Fatalf("wrong weight")
 		}
 	}
 	if !found {
-		t.Fatalf("didnt find delegator")
+		t.Fatalf("didn't find delegator")
 	}
 }
 

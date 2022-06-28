@@ -96,7 +96,7 @@ type DecisionTxBuilder interface {
 }
 
 type ProposalTxBuilder interface {
-	// stakeAmt: amount the validator stakes
+	// stakeAmount: amount the validator stakes
 	// startTime: unix time they start validating
 	// endTime: unix time they stop validating
 	// nodeID: ID of the node we want to validate with
@@ -105,7 +105,7 @@ type ProposalTxBuilder interface {
 	// keys: Keys providing the staked tokens
 	// changeAddr: Address to send change to, if there is any
 	NewAddValidatorTx(
-		stakeAmt,
+		stakeAmount,
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
@@ -115,7 +115,7 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
-	// stakeAmt: amount the delegator stakes
+	// stakeAmount: amount the delegator stakes
 	// startTime: unix time they start delegating
 	// endTime: unix time they stop delegating
 	// nodeID: ID of the node we are delegating to
@@ -123,7 +123,7 @@ type ProposalTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
-		stakeAmt,
+		stakeAmount,
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
@@ -408,7 +408,7 @@ func (b *builder) NewCreateSubnetTx(
 }
 
 func (b *builder) NewAddValidatorTx(
-	stakeAmt,
+	stakeAmount,
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
@@ -417,7 +417,7 @@ func (b *builder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmt, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -433,7 +433,7 @@ func (b *builder) NewAddValidatorTx(
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
-			Wght:   stakeAmt,
+			Wght:   stakeAmount,
 		},
 		Stake: lockedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
@@ -451,7 +451,7 @@ func (b *builder) NewAddValidatorTx(
 }
 
 func (b *builder) NewAddDelegatorTx(
-	stakeAmt,
+	stakeAmount,
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
@@ -459,7 +459,7 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmt, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -475,7 +475,7 @@ func (b *builder) NewAddDelegatorTx(
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
-			Wght:   stakeAmt,
+			Wght:   stakeAmount,
 		},
 		Stake: lockedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
