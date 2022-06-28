@@ -673,14 +673,18 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Stat
 		return nil, choices.Processing, err // status does not matter here
 	}
 
+	// Note: stored blocks are verified, so it's safe to marshal them with GenesisBlock
 	blkState := stateBlk{}
-	if _, err := stateless.Codec.Unmarshal(blkBytes, &blkState); err != nil {
+	if _, err := stateless.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	statelessBlk, err := stateless.Parse(blkState.Bytes)
-	if err != nil {
-		return nil, choices.Processing, err // status does not matter here
+	var statelessBlk stateless.Block
+	if _, err := stateless.GenesisCodec.Unmarshal(blkState.Bytes, &statelessBlk); err != nil {
+		return nil, choices.Processing, err
+	}
+	if err := statelessBlk.Initialize(blkState.Bytes); err != nil {
+		return nil, choices.Processing, err
 	}
 	blkState.Blk = statelessBlk
 
@@ -1192,7 +1196,8 @@ func (s *state) writeBlocks() error {
 			sblk  = stateBlk
 		)
 
-		btxBytes, err := stateless.Codec.Marshal(stateless.Version, &sblk)
+		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisBlock
+		btxBytes, err := stateless.GenesisCodec.Marshal(stateless.Version, &sblk)
 		if err != nil {
 			return fmt.Errorf("failed to write blocks with: %w", err)
 		}

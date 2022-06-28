@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
@@ -162,7 +163,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
+	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	spendHandler := utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.internalState)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
@@ -354,8 +355,13 @@ func (vm *VM) Shutdown() error {
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	statelessBlk, err := stateless.Parse(b)
-	if err != nil {
+	// Note: blocks to be parsed are not verified, so we must used stateless.Codec
+	// rather than stateless.GenesisCodec
+	var statelessBlk stateless.Block
+	if _, err := stateless.Codec.Unmarshal(b, &statelessBlk); err != nil {
+		return nil, err
+	}
+	if err := statelessBlk.Initialize(b); err != nil {
 		return nil, err
 	}
 
