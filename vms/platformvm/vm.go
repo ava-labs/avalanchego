@@ -176,7 +176,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.internalState = is
-	vm.spendHandler = utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
+	vm.spendHandler = utxos.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)

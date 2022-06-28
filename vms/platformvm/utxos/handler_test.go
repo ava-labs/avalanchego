@@ -38,7 +38,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 
 	h := &handler{
 		ctx: snow.DefaultContextTest(),
-		clk: mockable.Clock{},
+		clk: &mockable.Clock{},
 		utxosReader: avax.NewUTXOState(
 			memdb.New(),
 			txs.Codec,

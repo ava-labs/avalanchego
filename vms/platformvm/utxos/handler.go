@@ -136,7 +136,7 @@ type SpendHandler interface {
 
 func NewHandler(
 	ctx *snow.Context,
-	clk mockable.Clock,
+	clk *mockable.Clock,
 	utxoReader avax.UTXOReader,
 	fx fx.Fx,
 ) SpendHandler {
@@ -150,7 +150,7 @@ func NewHandler(
 
 type handler struct {
 	ctx         *snow.Context
-	clk         mockable.Clock
+	clk         *mockable.Clock
 	utxosReader avax.UTXOReader
 	fx          fx.Fx
 }
