@@ -216,13 +216,11 @@ func (st *internalStateImpl) GetStatelessBlock(blockID ids.ID) (stateless.Block,
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	var statelessBlk stateless.Block
-	if _, err := stateless.GenesisCodec.Unmarshal(blkState.Bytes, &statelessBlk); err != nil {
+	statelessBlk, err := stateless.ParseWithCodec(blkState.Bytes, stateless.GenesisCodec)
+	if err != nil {
 		return nil, choices.Processing, err
 	}
-	if err := statelessBlk.Initialize(blkState.Bytes); err != nil {
-		return nil, choices.Processing, err
-	}
+
 	blkState.Blk = statelessBlk
 
 	st.blockCache.Put(blockID, blkState)
