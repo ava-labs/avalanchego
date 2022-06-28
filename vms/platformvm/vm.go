@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -90,7 +90,7 @@ type VM struct {
 	dbManager manager.Manager
 
 	internalState InternalState
-	spendHandler  utxos.SpendHandler
+	utxosHandler  utxo.Handler
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -176,7 +176,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.internalState = is
-	vm.spendHandler = utxos.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
+	vm.utxosHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)
@@ -212,7 +212,7 @@ func (vm *VM) Initialize(
 		vm.fx,
 		vm.internalState,
 		vm.AtomicUTXOManager,
-		vm.spendHandler,
+		vm.utxosHandler,
 	)
 
 	vm.lastAcceptedID = is.GetLastAccepted()

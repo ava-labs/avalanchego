@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -32,6 +32,7 @@ var (
 	errNoFunds = errors.New("no spendable funds were found")
 )
 
+// TODO: TxBuilder should be replaced by the P-chain wallet
 type TxBuilder interface {
 	AtomicTxBuilder
 	DecisionTxBuilder
@@ -164,11 +165,11 @@ func NewTxBuilder(
 	fx fx.Fx,
 	state state.Chain,
 	atomicUTXOManager avax.AtomicUTXOManager,
-	spendingOps utxos.SpendingOps,
+	utxoSpender utxo.Spender,
 ) TxBuilder {
 	return &builder{
 		AtomicUTXOManager: atomicUTXOManager,
-		SpendingOps:       spendingOps,
+		Spender:           utxoSpender,
 		state:             state,
 		cfg:               cfg,
 		ctx:               ctx,
@@ -179,7 +180,7 @@ func NewTxBuilder(
 
 type builder struct {
 	avax.AtomicUTXOManager
-	utxos.SpendingOps
+	utxo.Spender
 	state state.Chain
 
 	cfg config.Config

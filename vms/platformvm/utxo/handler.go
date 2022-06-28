@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package utxos
+package utxo
 
 import (
 	"errors"
@@ -23,17 +23,14 @@ import (
 )
 
 var (
-	_ SpendHandler = &handler{}
+	_ Handler = &handler{}
 
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
-func ConsumeInputs(
-	utxoDB state.UTXODeleter,
-	ins []*avax.TransferableInput,
-) {
+func Consume(utxoDB state.UTXODeleter, ins []*avax.TransferableInput) {
 	for _, input := range ins {
 		utxoDB.DeleteUTXO(input.InputID())
 	}
@@ -41,7 +38,7 @@ func ConsumeInputs(
 
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
-func ProduceOutputs(
+func Produce(
 	utxoDB state.UTXOAdder,
 	txID ids.ID,
 	assetID ids.ID,
@@ -59,8 +56,9 @@ func ProduceOutputs(
 	}
 }
 
-// TODO: Stake and Authorize be replaced by similar methods in the P-chain wallet
-type SpendingOps interface {
+// TODO: Stake and Authorize should be replaced by similar methods in the
+//       P-chain wallet
+type Spender interface {
 	// Stake the provided amount while deducting the provided fee.
 	// Arguments:
 	// - [keys] are the owners of the funds
@@ -69,10 +67,10 @@ type SpendingOps interface {
 	// - [changeAddr] is the address that change, if there is any, is sent to
 	// Returns:
 	// - [inputs] the inputs that should be consumed to fund the outputs
-	// - [returnedOutputs] the outputs that should be immediately returned to the
-	//                     UTXO set
-	// - [stakedOutputs] the outputs that should be locked for the duration of the
-	//                   staking period
+	// - [returnedOutputs] the outputs that should be immediately returned to
+	//                     the UTXO set
+	// - [stakedOutputs] the outputs that should be locked for the duration of
+	//                   the staking period
 	// - [signers] the proof of ownership of the funds being moved
 	Stake(
 		keys []*crypto.PrivateKeySECP256K1R,
@@ -87,7 +85,8 @@ type SpendingOps interface {
 		error,
 	)
 
-	// authorize an operation on behalf of the named subnet with the provided keys.
+	// authorize an operation on behalf of the named subnet with the provided
+	// keys.
 	Authorize(
 		vs state.Chain,
 		subnetID ids.ID,
@@ -99,9 +98,7 @@ type SpendingOps interface {
 	)
 }
 
-type SpendHandler interface {
-	SpendingOps
-
+type Verifier interface {
 	// Verify that [tx] is semantically valid.
 	// [db] should not be committed if an error is returned
 	// [ins] and [outs] are the inputs and outputs of [tx].
@@ -134,12 +131,17 @@ type SpendHandler interface {
 	) error
 }
 
+type Handler interface {
+	Spender
+	Verifier
+}
+
 func NewHandler(
 	ctx *snow.Context,
 	clk *mockable.Clock,
 	utxoReader avax.UTXOReader,
 	fx fx.Fx,
-) SpendHandler {
+) Handler {
 	return &handler{
 		ctx:         ctx,
 		clk:         clk,

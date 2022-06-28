@@ -377,10 +377,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			ins, outs, _, signers, err := vm.spendHandler.Stake(keys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := vm.utxosHandler.Stake(keys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
-			subnetAuth, subnetSigners, err := vm.spendHandler.Authorize(vm.internalState, testSubnet1.ID(), keys)
+			subnetAuth, subnetSigners, err := vm.utxosHandler.Authorize(vm.internalState, testSubnet1.ID(), keys)
 			assert.NoError(err)
 
 			signers = append(signers, subnetSigners)
