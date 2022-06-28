@@ -137,7 +137,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.utxosHandler.SemanticVerifySpend(
+		if err := e.vm.utxoHandler.SemanticVerifySpend(
 			e.parentState,
 			tx,
 			tx.Ins,
@@ -300,7 +300,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.utxosHandler.SemanticVerifySpend(
+		if err := e.vm.utxoHandler.SemanticVerifySpend(
 			e.parentState,
 			tx,
 			tx.Ins,
@@ -460,7 +460,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.vm.utxosHandler.SemanticVerifySpend(
+		if err := e.vm.utxoHandler.SemanticVerifySpend(
 			e.parentState,
 			tx,
 			tx.Ins,

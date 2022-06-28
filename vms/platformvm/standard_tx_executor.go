@@ -57,7 +57,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	// Verify the flowcheck
 	timestamp := e.state.GetTimestamp()
 	createBlockchainTxFee := e.vm.Config.GetCreateBlockchainTxFee(timestamp)
-	if err := e.vm.utxosHandler.SemanticVerifySpend(
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		e.state,
 		tx,
 		tx.Ins,
@@ -114,7 +114,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	// Verify the flowcheck
 	timestamp := e.state.GetTimestamp()
 	createSubnetTxFee := e.vm.Config.GetCreateSubnetTxFee(timestamp)
-	if err := e.vm.utxosHandler.SemanticVerifySpend(
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		e.state,
 		tx,
 		tx.Ins,
@@ -181,7 +181,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := e.vm.utxosHandler.SemanticVerifySpendUTXOs(
+		if err := e.vm.utxoHandler.SemanticVerifySpendUTXOs(
 			tx,
 			utxos,
 			ins,
@@ -225,7 +225,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	if err := e.vm.utxosHandler.SemanticVerifySpend(
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		e.state,
 		tx,
 		tx.Ins,

@@ -90,7 +90,7 @@ type VM struct {
 	dbManager manager.Manager
 
 	internalState InternalState
-	utxosHandler  utxo.Handler
+	utxoHandler   utxo.Handler
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -176,7 +176,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.internalState = is
-	vm.utxosHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
+	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)
@@ -212,7 +212,7 @@ func (vm *VM) Initialize(
 		vm.fx,
 		vm.internalState,
 		vm.AtomicUTXOManager,
-		vm.utxosHandler,
+		vm.utxoHandler,
 	)
 
 	vm.lastAcceptedID = is.GetLastAccepted()
