@@ -35,8 +35,8 @@ var (
 
 type TxBuilder interface {
 	AtomicTxBuilder
-	DecisionsTxBuilder
-	ProposalsTxBuilder
+	DecisionTxBuilder
+	ProposalTxBuilder
 }
 
 type AtomicTxBuilder interface {
@@ -65,7 +65,7 @@ type AtomicTxBuilder interface {
 	) (*txs.Tx, error)
 }
 
-type DecisionsTxBuilder interface {
+type DecisionTxBuilder interface {
 	// subnetID: ID of the subnet that validates the new chain
 	// genesisData: byte repr. of genesis state of the new chain
 	// vmID: ID of VM this chain runs
@@ -95,7 +95,7 @@ type DecisionsTxBuilder interface {
 	) (*txs.Tx, error)
 }
 
-type ProposalsTxBuilder interface {
+type ProposalTxBuilder interface {
 	// stakeAmt: amount the validator stakes
 	// startTime: unix time they start validating
 	// endTime: unix time they stop validating
