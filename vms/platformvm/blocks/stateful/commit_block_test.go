@@ -55,8 +55,7 @@ func TestPostForkCommitBlockTimestampChecks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			// activate Apricot Phase 6
-			h.cfg.BlueberryTime = time.Time{}
+			h.cfg.BlueberryTime = time.Time{} // activate Blueberry
 
 			// setup and store parent block
 			// it's a standard block for simplicity

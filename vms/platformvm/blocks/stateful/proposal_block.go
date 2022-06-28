@@ -37,8 +37,7 @@ type ProposalBlock struct {
 	stateless.ProposalBlockIntf
 	*commonBlock
 
-	// TODO ABENEGIA: cleanup
-	// Following Apricot Phase 6 activation, onPostForkBaseOptionsState is the base state
+	// Following Blueberry activation, onPostForkBaseOptionsState is the base state
 	// over which both commit and abort states are built
 	onPostForkBaseOptionsState state.Diff
 	// The state that the chain will have if this block's proposal is committed
