@@ -673,17 +673,18 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, ch
 		return nil, choices.Processing, err // status does not matter here
 	}
 
+	// Note: stored blocks are verified, so it's safe to marshal them with GenesisBlock
 	blkState := stateBlk{}
-	if _, err := stateless.Codec.Unmarshal(blkBytes, &blkState); err != nil {
+	if _, err := stateless.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	statelessBlk, err := stateless.Parse(blkState.Bytes)
+	statelessBlk, err := stateless.ParseWithCodec(blkState.Bytes, stateless.GenesisCodec)
 	if err != nil {
-		return nil, choices.Processing, err // status does not matter here
+		return nil, choices.Processing, err
 	}
-	blkState.Blk = statelessBlk
 
+	blkState.Blk = statelessBlk
 	s.blockCache.Put(blockID, blkState)
 	return statelessBlk, blkState.Status, nil
 }
@@ -1197,7 +1198,9 @@ func (s *state) writeBlocks() error {
 			sblk  = stateBlk
 		)
 
-		btxBytes, err := stateless.Codec.Marshal(stateless.PreForkVersion, &sblk)
+		// Note that here we are marshalling stateBlks, not stateless.Blocks.
+		// We keep stateless.PreForkVersion for backward compatibility
+		btxBytes, err := stateless.GenesisCodec.Marshal(stateless.PreForkVersion, &sblk)
 		if err != nil {
 			return fmt.Errorf("failed to write blocks with: %w", err)
 		}

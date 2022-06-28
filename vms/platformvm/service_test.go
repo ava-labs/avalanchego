@@ -218,7 +218,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	oldAtomicUTXOManager := service.vm.atomicUtxosManager
-	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
+	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, txs.Codec)
 
 	service.vm.atomicUtxosManager = newAtomicUTXOManager
 	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.atomicUtxosManager)
@@ -483,7 +483,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = Codec.Unmarshal(outputBytes, &output)
+		_, err = txs.Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -510,7 +510,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = Codec.Unmarshal(outputBytes, &output)
+		_, err = txs.Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -556,7 +556,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
@@ -598,7 +598,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected

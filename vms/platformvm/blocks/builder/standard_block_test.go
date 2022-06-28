@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -45,7 +46,7 @@ func TestAtomicTxImports(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.ctx.SharedMemory = m.NewSharedMemory(h.ctx.ChainID)
-	h.atomicUtxosMan = avax.NewAtomicUTXOManager(h.ctx.SharedMemory, stateless.Codec)
+	h.atomicUtxosMan = avax.NewAtomicUTXOManager(h.ctx.SharedMemory, txs.Codec)
 	h.txBuilder.ResetAtomicUTXOManager(h.atomicUtxosMan)
 	peerSharedMemory := m.NewSharedMemory(h.ctx.XChainID)
 	utxo := &avax.UTXO{

@@ -59,7 +59,7 @@ func TestStandardBlocks(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err := Parse(preForkStdBlk.Bytes())
+	parsed, err := ParseWithCodec(preForkStdBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -91,7 +91,7 @@ func TestStandardBlocks(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err = Parse(postForkStdBlk.Bytes())
+	parsed, err = ParseWithCodec(postForkStdBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -130,7 +130,7 @@ func TestProposalBlocks(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err := Parse(preForkProposalBlk.Bytes())
+	parsed, err := ParseWithCodec(preForkProposalBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -162,7 +162,7 @@ func TestProposalBlocks(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err = Parse(postForkProposalBlk.Bytes())
+	parsed, err = ParseWithCodec(postForkProposalBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -198,7 +198,7 @@ func TestCommitBlock(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err := Parse(preForkCommitBlk.Bytes())
+	parsed, err := ParseWithCodec(preForkCommitBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -225,7 +225,7 @@ func TestCommitBlock(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err = Parse(postForkCommitBlk.Bytes())
+	parsed, err = ParseWithCodec(postForkCommitBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -255,7 +255,7 @@ func TestAbortBlock(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err := Parse(preForkAbortBlk.Bytes())
+	parsed, err := ParseWithCodec(preForkAbortBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content
@@ -282,7 +282,7 @@ func TestAbortBlock(t *testing.T) {
 	assert.NoError(err)
 
 	// parse block
-	parsed, err = Parse(postForkAbortBlk.Bytes())
+	parsed, err = ParseWithCodec(postForkAbortBlk.Bytes(), Codec)
 	assert.NoError(err)
 
 	// compare content

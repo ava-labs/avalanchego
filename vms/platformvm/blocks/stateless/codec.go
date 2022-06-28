@@ -4,6 +4,8 @@
 package stateless
 
 import (
+	"math"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
@@ -19,27 +21,42 @@ const (
 	postForkTag = "postFork"
 )
 
-// Codec does serialization and deserialization
-var Codec codec.Manager
+// GenesisCode allows blocks of larger than usual size to be parsed.
+// While this gives flexibility in accommodating large genesis blocks
+// it must not be used to parse new, unverified blocks which instead
+// must be processed by Codec
+var (
+	Codec        codec.Manager
+	GenesisCodec codec.Manager
+)
 
 func init() {
 	postForkTags := []string{reflectcodec.DefaultTagName, postForkTag}
+
 	preCdc := linearcodec.NewDefault()
 	postCdc := linearcodec.NewWithTags(postForkTags)
 	Codec = codec.NewDefaultManager()
 
+	preGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+	postGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+	GenesisCodec = codec.NewManager(math.MaxInt32)
+
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{preCdc, postCdc} {
+	for _, c := range []codec.Registry{preCdc, postCdc, preGc, postGc} {
 		errs.Add(
 			RegisterPreForkBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
 		)
 	}
-	errs.Add(RegisterPostForkBlockTypes(postCdc))
+	for _, c := range []codec.Registry{postCdc, postGc} {
+		errs.Add(RegisterPostForkBlockTypes(c))
+	}
 
 	errs.Add(
 		Codec.RegisterCodec(PreForkVersion, preCdc),
 		Codec.RegisterCodec(PostForkVersion, postCdc),
+		GenesisCodec.RegisterCodec(PreForkVersion, preGc),
+		GenesisCodec.RegisterCodec(PostForkVersion, postGc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

@@ -3,9 +3,11 @@
 
 package stateless
 
-func Parse(b []byte) (CommonBlockIntf, error) {
+import "github.com/ava-labs/avalanchego/codec"
+
+func ParseWithCodec(b []byte, c codec.Manager) (CommonBlockIntf, error) {
 	var blk CommonBlockIntf
-	v, err := Codec.Unmarshal(b, &blk)
+	v, err := c.Unmarshal(b, &blk)
 	if err != nil {
 		return nil, err
 	}

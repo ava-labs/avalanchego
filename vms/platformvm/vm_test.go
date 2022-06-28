@@ -1573,7 +1573,7 @@ func TestAtomicImport(t *testing.T) {
 	}
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
 	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
 
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
@@ -1600,7 +1600,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1672,7 +1672,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+	if err := tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2707,7 +2707,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
+	err = signedImportTx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
 	assert.NoError(err)
@@ -2744,11 +2744,11 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
 	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
@@ -3018,7 +3018,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
+	err = signedImportTx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
 	assert.NoError(err)
@@ -3055,11 +3055,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
 	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
