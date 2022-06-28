@@ -46,16 +46,6 @@ import (
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
-var (
-	_ block.ChainVM        = &VM{}
-	_ validators.Connector = &VM{}
-	_ secp256k1fx.VM       = &VM{}
-	_ validators.State     = &VM{}
-
-	errInvalidID      = errors.New("invalid ID")
-	errWrongCacheType = errors.New("unexpectedly cached type")
-)
-
 const (
 	// MaxValidatorWeightFactor is the maximum factor of the validator stake
 	// that is allowed to be placed on a validator.
@@ -68,6 +58,16 @@ const (
 
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
+)
+
+var (
+	_ block.ChainVM        = &VM{}
+	_ validators.Connector = &VM{}
+	_ secp256k1fx.VM       = &VM{}
+	_ validators.State     = &VM{}
+
+	errInvalidID      = errors.New("invalid ID")
+	errWrongCacheType = errors.New("unexpectedly cached type")
 )
 
 type VM struct {
