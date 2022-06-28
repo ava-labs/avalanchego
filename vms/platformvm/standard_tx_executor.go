@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 )
 
@@ -100,7 +99,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
 	e.onAccept = func() error {
-		utils.CreateChain(e.vm.Config, tx, e.tx.ID())
+		e.vm.Config.CreateChain(txID, tx)
 		return nil
 	}
 	return nil

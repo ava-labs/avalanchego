@@ -43,7 +43,6 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var (
@@ -261,7 +260,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		platformutils.CreateChain(vm.Config, tx, chain.ID())
+		vm.Config.CreateChain(chain.ID(), tx)
 	}
 	return nil
 }
