@@ -30,6 +30,7 @@ import (
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
 const (
@@ -2202,7 +2203,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := GenesisCodec.Marshal(txs.Version, utxo)
+		utxoBytes, err := stateless.GenesisCodec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}

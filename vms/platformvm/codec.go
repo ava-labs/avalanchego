@@ -4,8 +4,6 @@
 package platformvm
 
 import (
-	"math"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -13,28 +11,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// Codecs do serialization and deserialization
-var (
-	Codec        codec.Manager
-	GenesisCodec codec.Manager
-)
+// Codec does serialization and deserialization
+var Codec codec.Manager
 
 func init() {
 	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{c, gc} {
-		errs.Add(
-			stateless.RegisterBlockTypes(c),
-			txs.RegisterUnsignedTxsTypes(c),
-		)
-	}
 	errs.Add(
+		stateless.RegisterBlockTypes(c),
+		txs.RegisterUnsignedTxsTypes(c),
 		Codec.RegisterCodec(txs.Version, c),
-		GenesisCodec.RegisterCodec(txs.Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

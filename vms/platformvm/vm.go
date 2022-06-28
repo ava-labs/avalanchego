@@ -368,8 +368,13 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.BuildBlock() }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	statelessBlk, err := stateless.Parse(b)
-	if err != nil {
+	// Note: blocks to be parsed are not verified, so we must used stateless.Codec
+	// rather than stateless.GenesisCodec
+	var statelessBlk stateless.Block
+	if _, err := stateless.Codec.Unmarshal(b, &statelessBlk); err != nil {
+		return nil, err
+	}
+	if err := statelessBlk.Initialize(b); err != nil {
 		return nil, err
 	}
 
