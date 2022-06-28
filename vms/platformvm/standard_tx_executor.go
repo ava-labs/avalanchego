@@ -99,7 +99,10 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.onAccept = func() error { return utils.CreateChain(e.vm.Config, e.tx.Unsigned, e.tx.ID()) }
+	e.onAccept = func() error {
+		utils.CreateChain(e.vm.Config, tx, e.tx.ID())
+		return nil
+	}
 	return nil
 }
 

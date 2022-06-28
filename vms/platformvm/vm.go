@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -256,9 +257,11 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		return err
 	}
 	for _, chain := range chains {
-		if err := platformutils.CreateChain(vm.Config, chain.Unsigned, chain.ID()); err != nil {
-			return err
+		tx, ok := chain.Unsigned.(*txs.CreateChainTx)
+		if !ok {
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
+		platformutils.CreateChain(vm.Config, tx, chain.ID())
 	}
 	return nil
 }

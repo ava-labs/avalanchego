@@ -4,8 +4,6 @@
 package utils
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -15,27 +13,21 @@ import (
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func CreateChain(vmCfg config.Config, utx txs.UnsignedTx, txID ids.ID) error {
-	unsignedTx, ok := utx.(*txs.CreateChainTx)
-	if !ok {
-		return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", utx)
-	}
-
+func CreateChain(vmCfg config.Config, tx *txs.CreateChainTx, txID ids.ID) {
 	if vmCfg.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
-		constants.PrimaryNetworkID != unsignedTx.SubnetID && // All nodes must validate the primary network
-		!vmCfg.WhitelistedSubnets.Contains(unsignedTx.SubnetID) { // This node doesn't validate this blockchain
-		return nil
+		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
+		!vmCfg.WhitelistedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
+		return
 	}
 
 	chainParams := chains.ChainParameters{
 		ID:          txID,
-		SubnetID:    unsignedTx.SubnetID,
-		GenesisData: unsignedTx.GenesisData,
-		VMAlias:     unsignedTx.VMID.String(),
+		SubnetID:    tx.SubnetID,
+		GenesisData: tx.GenesisData,
+		VMAlias:     tx.VMID.String(),
 	}
-	for _, fxID := range unsignedTx.FxIDs {
+	for _, fxID := range tx.FxIDs {
 		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
 	}
 	vmCfg.Chains.CreateChain(chainParams)
-	return nil
 }
