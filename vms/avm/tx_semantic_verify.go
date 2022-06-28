@@ -4,6 +4,8 @@
 package avm
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -90,6 +92,7 @@ func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 		}
 	}
 
+	now := time.Now()
 	for _, out := range tx.ExportedOuts {
 		fxIndex, err := t.vm.getFx(out.Out)
 		if err != nil {
@@ -97,8 +100,15 @@ func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 		}
 
 		assetID := out.AssetID()
-		if assetID != t.vm.ctx.AVAXAssetID && tx.DestinationChain == constants.PlatformChainID {
-			return errWrongAssetID
+		if now.Before(t.vm.BlueberryTime) {
+			// TODO: Remove this check once the Blueberry network upgrade is
+			//       complete.
+			//
+			// Blueberry network upgrade allows exporting of all assets to the
+			// P-chain.
+			if assetID != t.vm.ctx.AVAXAssetID && tx.DestinationChain == constants.PlatformChainID {
+				return errWrongAssetID
+			}
 		}
 
 		if !t.vm.verifyFxUsage(fxIndex, assetID) {
