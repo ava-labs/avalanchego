@@ -28,7 +28,7 @@ const (
 	trieCommitSizeCap          = 10 * units.MiB
 	progressLogUpdate          = 30 * time.Second
 	atomicKeyLength            = wrappers.LongLen + common.HashLength
-	sharedMemoryApplyBatchSize = 2000 // specifies the number of atomic operations to batch progress updates
+	sharedMemoryApplyBatchSize = 10_000 // specifies the number of atomic operations to batch progress updates
 )
 
 var (
