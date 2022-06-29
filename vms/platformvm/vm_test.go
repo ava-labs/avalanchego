@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -62,7 +63,6 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
@@ -136,6 +136,10 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
+
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
@@ -170,8 +174,8 @@ func defaultContext() *snow.Context {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func defaultGenesis() (*p_api.BuildGenesisArgs, []byte) {
-	genesisUTXOs := make([]p_api.UTXO, len(keys))
+func defaultGenesis() (*api.BuildGenesisArgs, []byte) {
+	genesisUTXOs := make([]api.UTXO, len(keys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
@@ -179,30 +183,30 @@ func defaultGenesis() (*p_api.BuildGenesisArgs, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		genesisUTXOs[i] = p_api.UTXO{
+		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]p_api.PrimaryValidator, len(keys))
+	genesisValidators := make([]api.PrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = p_api.PrimaryValidator{
-			Staker: p_api.Staker{
+		genesisValidators[i] = api.PrimaryValidator{
+			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
-			RewardOwner: &p_api.Owner{
+			RewardOwner: &api.Owner{
 				Threshold: 1,
 				Addresses: []string{addr},
 			},
-			Staked: []p_api.UTXO{{
+			Staked: []api.UTXO{{
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
@@ -210,7 +214,7 @@ func defaultGenesis() (*p_api.BuildGenesisArgs, []byte) {
 		}
 	}
 
-	buildGenesisArgs := p_api.BuildGenesisArgs{
+	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   avaxAssetID,
@@ -221,8 +225,8 @@ func defaultGenesis() (*p_api.BuildGenesisArgs, []byte) {
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 
-	buildGenesisResponse := p_api.BuildGenesisReply{}
-	platformvmSS := p_api.StaticService{}
+	buildGenesisResponse := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
@@ -238,15 +242,15 @@ func defaultGenesis() (*p_api.BuildGenesisArgs, []byte) {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func BuildGenesisTest(t *testing.T) (*p_api.BuildGenesisArgs, []byte) {
+func BuildGenesisTest(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	return BuildGenesisTestWithArgs(t, nil)
 }
 
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func BuildGenesisTestWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) (*p_api.BuildGenesisArgs, []byte) {
-	genesisUTXOs := make([]p_api.UTXO, len(keys))
+func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.BuildGenesisArgs, []byte) {
+	genesisUTXOs := make([]api.UTXO, len(keys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
@@ -254,30 +258,30 @@ func BuildGenesisTestWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) (*p_ap
 		if err != nil {
 			t.Fatal(err)
 		}
-		genesisUTXOs[i] = p_api.UTXO{
+		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]p_api.PrimaryValidator, len(keys))
+	genesisValidators := make([]api.PrimaryValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = p_api.PrimaryValidator{
-			Staker: p_api.Staker{
+		genesisValidators[i] = api.PrimaryValidator{
+			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				NodeID:    nodeID,
 			},
-			RewardOwner: &p_api.Owner{
+			RewardOwner: &api.Owner{
 				Threshold: 1,
 				Addresses: []string{addr},
 			},
-			Staked: []p_api.UTXO{{
+			Staked: []api.UTXO{{
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
@@ -285,7 +289,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) (*p_ap
 		}
 	}
 
-	buildGenesisArgs := p_api.BuildGenesisArgs{
+	buildGenesisArgs := api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
@@ -300,8 +304,8 @@ func BuildGenesisTestWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) (*p_ap
 		buildGenesisArgs = *args
 	}
 
-	buildGenesisResponse := p_api.BuildGenesisReply{}
-	platformvmSS := p_api.StaticService{}
+	buildGenesisResponse := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
 		t.Fatalf("problem while building platform chain's genesis state: %v", err)
 	}
@@ -314,7 +318,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) (*p_ap
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM() (*VM, database.Database) {
+func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
@@ -349,7 +353,10 @@ func defaultVM() (*VM, database.Database) {
 	if err != nil {
 		panic(err)
 	}
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -385,10 +392,10 @@ func defaultVM() (*VM, database.Database) {
 		panic(err)
 	}
 
-	return vm, baseDBManager.Current().Database
+	return vm, baseDBManager.Current().Database, msm
 }
 
-func GenesisVMWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
 	if args != nil {
@@ -466,7 +473,7 @@ func GenesisVMWithArgs(t *testing.T, args *p_api.BuildGenesisArgs) ([]byte, chan
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -551,7 +558,7 @@ func TestGenesis(t *testing.T) {
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -631,7 +638,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -696,7 +703,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -771,7 +778,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -809,7 +816,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -892,7 +899,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -975,7 +982,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1074,7 +1081,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1162,7 +1169,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1248,7 +1255,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1263,7 +1270,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1319,7 +1326,7 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's start time (moving the validator from pending to current)
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1550,7 +1557,7 @@ func TestCreateSubnet(t *testing.T) {
 
 // test asset import
 func TestAtomicImport(t *testing.T) {
-	vm, baseDB := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1572,10 +1579,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
-	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
-
+	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	if _, err := vm.txBuilder.NewImportTx(
@@ -1646,7 +1650,7 @@ func TestAtomicImport(t *testing.T) {
 
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2387,7 +2391,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2603,7 +2607,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, baseDB := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM()
 	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -2743,9 +2747,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
 	assert.NoError(err)
 
-	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
-	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
+	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
@@ -2862,7 +2864,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, baseDB := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM()
 	blkVersion := uint16(stateless.PreForkVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -3054,9 +3056,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
 	assert.NoError(err)
 
-	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
-	vm.txBuilder.ResetAtomicUTXOManager(vm.atomicUtxosManager)
+	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)

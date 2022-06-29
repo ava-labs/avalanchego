@@ -16,6 +16,7 @@ import (
 
 func TestNewExportTx(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -31,7 +32,7 @@ func TestNewExportTx(t *testing.T) {
 		shouldVerify       bool
 	}
 
-	sourceKey := preFundedKeys[0]
+	sourceKey := prefundedKeys[0]
 
 	tests := []test{
 		{

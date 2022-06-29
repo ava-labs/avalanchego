@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -26,12 +25,12 @@ func TestAtomicTxImports(t *testing.T) {
 	assert := assert.New(t)
 
 	h := newTestHelpersCollection(t)
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
 		}
 	}()
-	h.ctx.Lock.Lock()
 
 	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
@@ -45,9 +44,8 @@ func TestAtomicTxImports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.ctx.SharedMemory = m.NewSharedMemory(h.ctx.ChainID)
-	h.atomicUtxosMan = avax.NewAtomicUTXOManager(h.ctx.SharedMemory, txs.Codec)
-	h.txBuilder.ResetAtomicUTXOManager(h.atomicUtxosMan)
+
+	h.msm.SharedMemory = m.NewSharedMemory(h.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(h.ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,

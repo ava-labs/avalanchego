@@ -1,11 +1,12 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package executor
+package builder
 
 import (
 	"errors"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -28,25 +30,31 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
+	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxValidatorStake  = 500 * units.MilliAvax
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
@@ -58,35 +66,45 @@ var (
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
+	testSubnet1               *txs.Tx
+	testSubnet1ControlKeys    []*crypto.PrivateKeySECP256K1R
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
-
-	// Used to create and use keys.
-	testKeyfactory crypto.FactorySECP256K1R
+	testKeyFactory = crypto.FactorySECP256K1R{}
 )
 
 const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
+	testNetworkID                 = 10 // To be used in tests
+	defaultWeight                 = 10000
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
+
 type testHelpersCollection struct {
+	BlockBuilder
+	blkVerifier stateful.Verifier
+	mpool       mempool.Mempool
+	sender      *common.SenderTest
+
 	isBootstrapped *utils.AtomicBool
 	cfg            *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
+	msm            *mutableSharedMemory
 	fx             fx.Fx
-	tState         state.State
+	fullState      state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	uptimeMan      uptime.Manager
-	utxosMan       utxos.SpendHandler
+	utxosMan       utxo.Handler
 	txBuilder      tx_builder.Builder
-	execBackend    Backend
+	txExecBackend  executor.Backend
 }
 
-// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
+// TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
 }
@@ -104,70 +122,100 @@ func init() {
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 }
 
-func newTestHelpersCollection() *testHelpersCollection {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
-
-	cfg := defaultCfg()
-	clk := defaultClock()
-
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx := defaultCtx(baseDB)
-
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
-
-	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
-	tState := defaultState(&cfg, ctx, baseDB, rewardsCalc)
-
-	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimeMan := uptime.NewManager(tState)
-	utxosMan := utxos.NewHandler(ctx, clk, tState, fx)
-
-	txBuilder := tx_builder.New(
-		ctx,
-		cfg,
-		clk,
-		fx,
-		tState,
-		atomicUtxosMan,
-		utxosMan,
-		rewardsCalc,
+func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
+	var (
+		res = &testHelpersCollection{}
+		err error
 	)
 
-	execBackend := Backend{
-		Cfg:          &cfg,
-		Ctx:          ctx,
-		Clk:          &clk,
-		Bootstrapped: &isBootstrapped,
-		Fx:           fx,
-		SpendHandler: utxosMan,
-		UptimeMan:    uptimeMan,
+	res.isBootstrapped = &utils.AtomicBool{}
+	res.isBootstrapped.SetValue(true)
+
+	res.cfg = defaultCfg()
+	res.clk = defaultClock()
+
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.ctx, res.msm = defaultCtx(res.baseDB)
+	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
+
+	rewardsCalc := reward.NewCalculator(res.cfg.RewardConfig)
+	res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
+
+	res.atomicUtxosMan = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
+	res.uptimeMan = uptime.NewManager(res.fullState)
+	res.utxosMan = utxo.NewHandler(res.ctx, res.clk, res.fullState, res.fx)
+
+	res.txBuilder = tx_builder.New(
+		res.ctx,
+		*res.cfg,
+		res.clk,
+		res.fx,
+		res.fullState,
+		res.atomicUtxosMan,
+		res.utxosMan,
+	)
+
+	res.txExecBackend = executor.Backend{
+		Cfg:          res.cfg,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		SpendHandler: res.utxosMan,
+		UptimeMan:    res.uptimeMan,
 		Rewards:      rewardsCalc,
 	}
 
-	addSubnet(tState, txBuilder, execBackend)
+	registerer := prometheus.NewRegistry()
+	window := window.New(
+		window.Config{
+			Clock:   res.clk,
+			MaxSize: maxRecentlyAcceptedWindowSize,
+			TTL:     recentlyAcceptedWindowTTL,
+		},
+	)
+	res.sender = &common.SenderTest{T: t}
 
-	return &testHelpersCollection{
-		isBootstrapped: &isBootstrapped,
-		cfg:            &cfg,
-		clk:            &clk,
-		baseDB:         baseDB,
-		ctx:            ctx,
-		fx:             fx,
-		tState:         tState,
-		atomicUtxosMan: atomicUtxosMan,
-		uptimeMan:      uptimeMan,
-		utxosMan:       utxosMan,
-		txBuilder:      txBuilder,
-		execBackend:    execBackend,
+	metrics, err := p_metrics.NewMetrics("", registerer, res.cfg.WhitelistedSubnets)
+	if err != nil {
+		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
+
+	res.mpool, err = mempool.NewMempool("mempool", registerer, res)
+	if err != nil {
+		panic(fmt.Errorf("failed to create mempool: %w", err))
+	}
+	res.blkVerifier = stateful.NewBlockVerifier(
+		res.mpool,
+		res.fullState,
+		res.txExecBackend,
+		metrics,
+		window,
+	)
+	res.BlockBuilder = NewBlockBuilder(
+		res.mpool,
+		res.txBuilder,
+		res.txExecBackend,
+		res.blkVerifier,
+		nil, // toEngine,
+		res.sender,
+	)
+
+	lastAcceptedID := res.fullState.GetLastAccepted()
+	if err := res.BlockBuilder.SetPreference(lastAcceptedID); err != nil {
+		panic(fmt.Errorf("failed setting last accepted block: %w", err))
+	}
+
+	addSubnet(res.fullState, res.txBuilder, res.txExecBackend)
+
+	return res
 }
 
 func addSubnet(
 	tState state.State,
 	txBuilder tx_builder.Builder,
-	execBackend Backend,
+	txExecBackend executor.Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -192,8 +240,8 @@ func addSubnet(
 		tState.PendingStakers(),
 	)
 
-	executor := StandardTxExecutor{
-		Backend: &execBackend,
+	executor := executor.StandardTxExecutor{
+		Backend: &txExecBackend,
 		State:   versionedState,
 		Tx:      testSubnet1,
 	}
@@ -201,7 +249,6 @@ func addSubnet(
 	if err != nil {
 		panic(err)
 	}
-
 	versionedState.AddTx(testSubnet1, status.Committed)
 	versionedState.Apply(tState)
 }
@@ -237,18 +284,10 @@ func defaultState(
 	if err != nil {
 		panic(err)
 	}
-
-	// persist and reload to init a bunch of in-memory stuff
-	if err := tState.Commit(); err != nil {
-		panic(err)
-	}
-	if err := tState.Load(); err != nil {
-		panic(err)
-	}
 	return tState
 }
 
-func defaultCtx(baseDB *versiondb.Database) *snow.Context {
+func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
@@ -261,7 +300,10 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 		panic(err)
 	}
 
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
 
 	ctx.SNLookup = &snLookup{
 		chainsToSubnet: map[ids.ID]ids.ID{
@@ -271,11 +313,11 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 		},
 	}
 
-	return ctx
+	return ctx, msm
 }
 
-func defaultCfg() config.Config {
-	return config.Config{
+func defaultCfg() *config.Config {
+	return &config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
@@ -300,10 +342,10 @@ func defaultCfg() config.Config {
 	}
 }
 
-func defaultClock() mockable.Clock {
+func defaultClock() *mockable.Clock {
 	clk := mockable.Clock{}
 	clk.Set(defaultGenesisTime)
-	return clk
+	return &clk
 }
 
 type fxVMInt struct {
@@ -435,14 +477,14 @@ func internalStateShutdown(t *testHelpersCollection) error {
 		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := t.tState.Commit(); err != nil {
+		if err := t.fullState.Commit(); err != nil {
 			return err
 		}
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		t.tState.Close(),
+		t.fullState.Close(),
 		t.baseDB.Close(),
 	)
 	return errs.Err

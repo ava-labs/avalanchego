@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 var (
@@ -49,12 +49,12 @@ const (
 )
 
 type ProposalTxExecutor struct {
-	// inputs
+	// inputs, to be filled before visitor methods are called
 	*Backend
 	ParentState state.Chain
 	Tx          *txs.Tx
 
-	// outputs
+	// outputs of visitor execution
 	OnCommit      state.Diff
 	OnAbort       state.Diff
 	PrefersCommit bool
@@ -149,8 +149,8 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 		// Verify the flowcheck
 		if err := e.SpendHandler.SemanticVerifySpend(
-			e.ParentState,
 			tx,
+			e.ParentState,
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
@@ -176,16 +176,16 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	e.OnCommit = state.NewDiff(e.ParentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.OnCommit, tx.Ins)
+	utxo.Consume(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.OnAbort = state.NewDiff(e.ParentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.OnAbort, tx.Ins)
+	utxo.Consume(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
+	utxo.Produce(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -312,8 +312,8 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 		// Verify the flowcheck
 		if err := e.SpendHandler.SemanticVerifySpend(
-			e.ParentState,
 			tx,
+			e.ParentState,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
@@ -339,16 +339,16 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	e.OnCommit = state.NewDiff(e.ParentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.OnCommit, tx.Ins)
+	utxo.Consume(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.OnAbort = state.NewDiff(e.ParentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.OnAbort, tx.Ins)
+	utxo.Consume(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.OnAbort, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnAbort, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -472,8 +472,8 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 		// Verify the flowcheck
 		if err := e.SpendHandler.SemanticVerifySpend(
-			e.ParentState,
 			tx,
+			e.ParentState,
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
@@ -484,7 +484,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow SemanticVerification to explicitly check for this
+		// last to allow the verifier visitor to explicitly check for this
 		// error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {
@@ -499,16 +499,16 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	e.OnCommit = state.NewDiff(e.ParentState, currentStakers, newlyPendingStakers)
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.OnCommit, tx.Ins)
+	utxo.Consume(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.OnAbort = state.NewDiff(e.ParentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.OnAbort, tx.Ins)
+	utxo.Consume(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
+	utxo.Produce(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil

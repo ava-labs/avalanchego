@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
@@ -93,7 +93,7 @@ type testHelpersCollection struct {
 	mockedFullState *state.MockState
 	atomicUtxosMan  avax.AtomicUTXOManager
 	uptimeMan       uptime.Manager
-	utxosMan        utxos.SpendHandler
+	utxosMan        utxo.Handler
 	txBuilder       tx_builder.Builder
 	txExecBackend   executor.Backend
 }
@@ -143,30 +143,28 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	if ctrl == nil {
 		res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimeMan = uptime.NewManager(res.fullState)
-		res.utxosMan = utxos.NewHandler(res.ctx, *res.clk, res.fullState, res.fx)
+		res.utxosMan = utxo.NewHandler(res.ctx, res.clk, res.fullState, res.fx)
 		res.txBuilder = tx_builder.New(
 			res.ctx,
 			*res.cfg,
-			*res.clk,
+			res.clk,
 			res.fx,
 			res.fullState,
 			res.atomicUtxosMan,
 			res.utxosMan,
-			rewardsCalc,
 		)
 	} else {
 		res.mockedFullState = state.NewMockState(ctrl)
 		res.uptimeMan = uptime.NewManager(res.mockedFullState)
-		res.utxosMan = utxos.NewHandler(res.ctx, *res.clk, res.mockedFullState, res.fx)
+		res.utxosMan = utxo.NewHandler(res.ctx, res.clk, res.mockedFullState, res.fx)
 		res.txBuilder = tx_builder.New(
 			res.ctx,
 			*res.cfg,
-			*res.clk,
+			res.clk,
 			res.fx,
 			res.mockedFullState,
 			res.atomicUtxosMan,
 			res.utxosMan,
-			rewardsCalc,
 		)
 	}
 
