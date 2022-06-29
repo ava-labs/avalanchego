@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -25,26 +24,10 @@ var (
 	chainID                = ids.ID{5, 4, 3, 2, 1}
 	platformChainID        = ids.Empty.Prefix(0)
 
-	keys  []*crypto.PrivateKeySECP256K1R
-	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
+	keys = crypto.BuildTestKeys()
 
 	assetID = ids.ID{1, 2, 3}
 )
-
-func init() {
-	factory := crypto.FactorySECP256K1R{}
-
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-	} {
-		keyBytes, _ := formatting.Decode(formatting.CB58, key)
-		pk, _ := factory.ToPrivateKey(keyBytes)
-		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
-		addrs = append(addrs, pk.PublicKey().Address())
-	}
-}
 
 func setupCodec() codec.Manager {
 	c := linearcodec.NewDefault()

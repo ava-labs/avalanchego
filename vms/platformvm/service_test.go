@@ -44,7 +44,7 @@ var (
 	// Test user password, must meet minimum complexity/length requirements
 	testPassword = "ShaggyPassword1Zoinks!"
 
-	// Bytes docoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
+	// Bytes decoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
 	testPrivateKey = []byte{
 		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
 		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
@@ -57,7 +57,7 @@ var (
 	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
 
 	encodings = []formatting.Encoding{
-		formatting.JSON, formatting.Hex, formatting.CB58,
+		formatting.JSON, formatting.Hex,
 	}
 )
 
@@ -373,8 +373,8 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else {
 				switch encoding {
-				case formatting.Hex, formatting.CB58:
-					// we're always guaranteed a string for hex/cb58 encodings.
+				case formatting.Hex:
+					// we're always guaranteed a string for hex encodings.
 					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -755,10 +755,6 @@ func TestGetBlock(t *testing.T) {
 		{
 			name:     "json",
 			encoding: formatting.JSON,
-		},
-		{
-			name:     "cb58",
-			encoding: formatting.CB58,
 		},
 		{
 			name:     "hex",
