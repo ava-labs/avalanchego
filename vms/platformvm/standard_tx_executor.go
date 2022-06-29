@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 var _ txs.Visitor = &standardTxExecutor{}
@@ -24,7 +25,7 @@ type standardTxExecutor struct {
 	tx    *txs.Tx
 
 	// outputs
-	onAccept       func() error // may be nil
+	onAccept       func() // may be nil
 	inputs         ids.Set
 	atomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
@@ -55,10 +56,10 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.state.GetTimestamp()
-	createBlockchainTxFee := e.vm.getCreateBlockchainTxFee(timestamp)
-	if err := e.vm.semanticVerifySpend(
-		e.state,
+	createBlockchainTxFee := e.vm.Config.GetCreateBlockchainTxFee(timestamp)
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		tx,
+		e.state,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
@@ -89,15 +90,15 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 	// Add the new chain to the database
 	e.state.AddChain(e.tx)
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.onAccept = func() error { return e.vm.createChain(e.tx) }
+	e.onAccept = func() { e.vm.Config.CreateChain(txID, tx) }
 	return nil
 }
 
@@ -109,10 +110,10 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.state.GetTimestamp()
-	createSubnetTxFee := e.vm.getCreateSubnetTxFee(timestamp)
-	if err := e.vm.semanticVerifySpend(
-		e.state,
+	createSubnetTxFee := e.vm.Config.GetCreateSubnetTxFee(timestamp)
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		tx,
+		e.state,
 		tx.Ins,
 		tx.Outs,
 		e.tx.Creds,
@@ -125,9 +126,9 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 	// Add the new subnet to the database
 	e.state.AddSubnet(e.tx)
 	return nil
@@ -177,7 +178,15 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := e.vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, e.tx.Creds, e.vm.TxFee, e.vm.ctx.AVAXAssetID); err != nil {
+		if err := e.vm.utxoHandler.SemanticVerifySpendUTXOs(
+			tx,
+			utxos,
+			ins,
+			tx.Outs,
+			e.tx.Creds,
+			e.vm.TxFee,
+			e.vm.ctx.AVAXAssetID,
+		); err != nil {
 			return err
 		}
 	}
@@ -185,9 +194,9 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	e.atomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
@@ -213,9 +222,9 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	if err := e.vm.semanticVerifySpend(
-		e.state,
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		tx,
+		e.state,
 		tx.Ins,
 		outs,
 		e.tx.Creds,
@@ -228,9 +237,9 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	txID := e.tx.ID()
 
 	// Consume the UTXOS
-	consumeInputs(e.state, tx.Ins)
+	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	produceOutputs(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {

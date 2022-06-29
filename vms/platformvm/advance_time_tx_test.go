@@ -20,7 +20,7 @@ import (
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -29,7 +29,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime)
+	tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
@@ -60,7 +60,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	assert.NoError(t, err)
 
 	{
-		tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
+		tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,7 +81,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator end time
-	vm, _, _ = defaultVM()
+	vm, _, _, _ = defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -95,7 +95,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 
 	{
 		// Proposes advancing timestamp to 1 second after genesis validators stop validating
-		tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
+		tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // Ensure semantic verification updates the current and pending staker set
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -133,7 +133,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	addPendingValidatorTx, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)
 
-	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(ts *testing.T) {
 			assert := assert.New(ts)
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ctx.Lock.Lock()
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -341,7 +341,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				tx, err := vm.newAddSubnetValidatorTx(
+				tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
 					uint64(staker.startTime.Unix()),
 					uint64(staker.endTime.Unix()),
@@ -363,7 +363,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 
 			for _, newTime := range test.advanceTimeTo {
 				vm.clock.Set(newTime)
-				tx, err := vm.newAdvanceTimeTx(newTime)
+				tx, err := vm.txBuilder.NewAdvanceTimeTx(newTime)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -418,7 +418,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 // when timestamp is advanced and there is a pending staker whose start time
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -432,7 +432,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// Starts after the corre
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
-	tx, err := vm.newAddSubnetValidatorTx(
+	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -458,7 +458,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := keys[1].PublicKey().Address()
-	tx, err = vm.newAddSubnetValidatorTx(
+	tx, err = vm.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
 		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
@@ -484,7 +484,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	// Advance time to the first staker's end time.
 	vm.clock.Set(subnetVdr1EndTime)
-	tx, err = vm.newAdvanceTimeTx(subnetVdr1EndTime)
+	tx, err = vm.txBuilder.NewAdvanceTimeTx(subnetVdr1EndTime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -520,7 +520,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 func TestWhitelistedSubnet(t *testing.T) {
 	for _, whitelist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ctx.Lock.Lock()
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -537,7 +537,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			tx, err := vm.newAddSubnetValidatorTx(
+			tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -561,7 +561,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 			// Advance time to the staker's start time.
 			vm.clock.Set(subnetVdr1StartTime)
-			tx, err = vm.newAdvanceTimeTx(subnetVdr1StartTime)
+			tx, err = vm.txBuilder.NewAdvanceTimeTx(subnetVdr1StartTime)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -584,7 +584,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 }
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -602,7 +602,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)
 
-	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
 	executor := proposalTxExecutor{
@@ -625,7 +625,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
-	addDelegatorTx, err := vm.newAddDelegatorTx(
+	addDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
@@ -641,7 +641,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, vm.internalState.Load())
 
 	// Advance Time
-	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
+	tx, err = vm.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
 	executor = proposalTxExecutor{
@@ -661,7 +661,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 }
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -679,7 +679,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
 	assert.NoError(t, err)
 
-	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
 	executor := proposalTxExecutor{
@@ -702,7 +702,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
-	addDelegatorTx, err := vm.newAddDelegatorTx(
+	addDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
@@ -718,7 +718,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, vm.internalState.Load())
 
 	// Advance Time
-	tx, err = vm.newAdvanceTimeTx(pendingDelegatorStartTime)
+	tx, err = vm.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
 	executor = proposalTxExecutor{
@@ -739,7 +739,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -751,7 +751,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	vm.clock.Set(defaultGenesisTime) // VM's clock reads the genesis time
 
 	// Proposed advancing timestamp to 1 second after sync bound
-	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(syncBound))
+	tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(syncBound))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -771,7 +771,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -780,7 +780,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime)
+	tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -804,7 +804,7 @@ func addPendingValidator(
 	nodeID ids.NodeID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (*txs.Tx, error) {
-	addPendingValidatorTx, err := vm.newAddValidatorTx(
+	addPendingValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),

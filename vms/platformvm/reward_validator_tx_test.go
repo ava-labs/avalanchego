@@ -29,7 +29,7 @@ import (
 )
 
 func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -48,7 +48,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	{
 		// Case 1: Chain timestamp is wrong
-		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		tx, err := vm.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,7 +69,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	{
 		// Case 2: Wrong validator
-		tx, err := vm.newRewardValidatorTx(ids.GenerateTestID())
+		tx, err := vm.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,7 +86,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	}
 
 	// Case 3: Happy path
-	tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+	tx, err := vm.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 }
 
 func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -155,7 +155,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	{
 		// Case 1: Chain timestamp is wrong
-		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		tx, err := vm.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	{
 		// Case 2: Wrong validator
-		tx, err := vm.newRewardValidatorTx(ids.GenerateTestID())
+		tx, err := vm.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +194,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	{
 		// Case 3: Happy path
-		tx, err := vm.newRewardValidatorTx(toRemoveTxID)
+		tx, err := vm.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -247,7 +247,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -262,8 +262,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
-	vdrTx, err := vm.newAddValidatorTx(
-		vm.MinValidatorStake, // stakeAmt
+	vdrTx, err := vm.txBuilder.NewAddValidatorTx(
+		vm.MinValidatorStake, // stakeAmount
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -276,8 +276,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
-	delTx, err := vm.newAddDelegatorTx(
-		vm.MinDelegatorStake, // stakeAmt
+	delTx, err := vm.txBuilder.NewAddDelegatorTx(
+		vm.MinDelegatorStake, // stakeAmount
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID
@@ -303,7 +303,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.True(ok)
 	assert.Equal(vm.MinValidatorStake+vm.MinDelegatorStake, stake)
 
-	tx, err := vm.newRewardValidatorTx(delTx.ID())
+	tx, err := vm.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
 	executor := proposalTxExecutor{
@@ -355,7 +355,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -372,8 +372,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
-	vdrTx, err := vm.newAddValidatorTx(
-		vm.MinValidatorStake, // stakeAmt
+	vdrTx, err := vm.txBuilder.NewAddValidatorTx(
+		vm.MinValidatorStake, // stakeAmount
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -386,8 +386,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
-	delTx, err := vm.newAddDelegatorTx(
-		vm.MinDelegatorStake, // stakeAmt
+	delTx, err := vm.txBuilder.NewAddDelegatorTx(
+		vm.MinDelegatorStake, // stakeAmount
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID
@@ -407,7 +407,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	err = vm.internalState.Load()
 	assert.NoError(err)
 
-	tx, err := vm.newRewardValidatorTx(delTx.ID())
+	tx, err := vm.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
 	executor := proposalTxExecutor{

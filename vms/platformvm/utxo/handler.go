@@ -1,16 +1,18 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package utxo
 
 import (
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -21,26 +23,143 @@ import (
 )
 
 var (
-	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
-	errWrongLocktime                = errors.New("wrong locktime reported")
-	errUnknownOwners                = errors.New("unknown owners")
+	_ Handler = &handler{}
+
 	errCantSign                     = errors.New("can't sign")
+	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
 
-// stake the provided amount while deducting the provided fee.
-// Arguments:
-// - [keys] are the owners of the funds
-// - [amount] is the amount of funds that are trying to be staked
-// - [fee] is the amount of AVAX that should be burned
-// - [changeAddr] is the address that change, if there is any, is sent to
-// Returns:
-// - [inputs] the inputs that should be consumed to fund the outputs
-// - [returnedOutputs] the outputs that should be immediately returned to the
-//                     UTXO set
-// - [stakedOutputs] the outputs that should be locked for the duration of the
-//                   staking period
-// - [signers] the proof of ownership of the funds being moved
-func (vm *VM) stake(
+// Removes the UTXOs consumed by [ins] from the UTXO set
+func Consume(utxoDB state.UTXODeleter, ins []*avax.TransferableInput) {
+	for _, input := range ins {
+		utxoDB.DeleteUTXO(input.InputID())
+	}
+}
+
+// Adds the UTXOs created by [outs] to the UTXO set.
+// [txID] is the ID of the tx that created [outs].
+func Produce(
+	utxoDB state.UTXOAdder,
+	txID ids.ID,
+	assetID ids.ID,
+	outs []*avax.TransferableOutput,
+) {
+	for index, out := range outs {
+		utxoDB.AddUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(index),
+			},
+			Asset: avax.Asset{ID: assetID},
+			Out:   out.Output(),
+		})
+	}
+}
+
+// TODO: Stake and Authorize should be replaced by similar methods in the
+//       P-chain wallet
+type Spender interface {
+	// Spend the provided amount while deducting the provided fee.
+	// Arguments:
+	// - [keys] are the owners of the funds
+	// - [amount] is the amount of funds that are trying to be staked
+	// - [fee] is the amount of AVAX that should be burned
+	// - [changeAddr] is the address that change, if there is any, is sent to
+	// Returns:
+	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [returnedOutputs] the outputs that should be immediately returned to
+	//                     the UTXO set
+	// - [stakedOutputs] the outputs that should be locked for the duration of
+	//                   the staking period
+	// - [signers] the proof of ownership of the funds being moved
+	Spend(
+		keys []*crypto.PrivateKeySECP256K1R,
+		amount uint64,
+		fee uint64,
+		changeAddr ids.ShortID,
+	) (
+		[]*avax.TransferableInput, // inputs
+		[]*avax.TransferableOutput, // returnedOutputs
+		[]*avax.TransferableOutput, // stakedOutputs
+		[][]*crypto.PrivateKeySECP256K1R, // signers
+		error,
+	)
+
+	// Authorize an operation on behalf of the named subnet with the provided
+	// keys.
+	Authorize(
+		state state.Chain,
+		subnetID ids.ID,
+		keys []*crypto.PrivateKeySECP256K1R,
+	) (
+		verify.Verifiable, // Input that names owners
+		[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
+		error,
+	)
+}
+
+type Verifier interface {
+	// Verify that [tx] is semantically valid.
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
+	// [outs].
+	// Precondition: [tx] has already been syntactically verified.
+	SemanticVerifySpend(
+		tx txs.UnsignedTx,
+		utxoDB state.UTXOGetter,
+		ins []*avax.TransferableInput,
+		outs []*avax.TransferableOutput,
+		creds []verify.Verifiable,
+		feeAmount uint64,
+		feeAssetID ids.ID,
+	) error
+
+	// Verify that [tx] is semantically valid.
+	// [utxos[i]] is the UTXO being consumed by [ins[i]].
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
+	// [outs].
+	// Precondition: [tx] has already been syntactically verified.
+	SemanticVerifySpendUTXOs(
+		tx txs.UnsignedTx,
+		utxos []*avax.UTXO,
+		ins []*avax.TransferableInput,
+		outs []*avax.TransferableOutput,
+		creds []verify.Verifiable,
+		feeAmount uint64,
+		feeAssetID ids.ID,
+	) error
+}
+
+type Handler interface {
+	Spender
+	Verifier
+}
+
+func NewHandler(
+	ctx *snow.Context,
+	clk *mockable.Clock,
+	utxoReader avax.UTXOReader,
+	fx fx.Fx,
+) Handler {
+	return &handler{
+		ctx:         ctx,
+		clk:         clk,
+		utxosReader: utxoReader,
+		fx:          fx,
+	}
+}
+
+type handler struct {
+	ctx         *snow.Context
+	clk         *mockable.Clock
+	utxosReader avax.UTXOReader
+	fx          fx.Fx
+}
+
+func (h *handler) Spend(
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
 	fee uint64,
@@ -56,7 +175,7 @@ func (vm *VM) stake(
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, err := avax.GetAllUTXOs(vm.internalState, addrs) // The UTXOs controlled by [keys]
+	utxos, err := avax.GetAllUTXOs(h.utxosReader, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -64,7 +183,7 @@ func (vm *VM) stake(
 	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
-	now := uint64(vm.clock.Time().Unix())
+	now := uint64(h.clk.Time().Unix())
 
 	ins := []*avax.TransferableInput{}
 	returnedOuts := []*avax.TransferableOutput{}
@@ -82,7 +201,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); assetID != vm.ctx.AVAXAssetID {
+		if assetID := utxo.AssetID(); assetID != h.ctx.AVAXAssetID {
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
@@ -111,7 +230,7 @@ func (vm *VM) stake(
 		}
 		in, ok := inIntf.(avax.TransferableIn)
 		if !ok { // should never happen
-			vm.ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
+			h.ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
 			continue
 		}
 
@@ -129,7 +248,7 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
 			In: &stakeable.LockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
@@ -138,7 +257,7 @@ func (vm *VM) stake(
 
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 			Out: &stakeable.LockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
@@ -152,7 +271,7 @@ func (vm *VM) stake(
 			// This input provided more value than was needed to be locked.
 			// Some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &stakeable.LockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
@@ -178,7 +297,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); assetID != vm.ctx.AVAXAssetID {
+		if assetID := utxo.AssetID(); assetID != h.ctx.AVAXAssetID {
 			continue // We only care about burning AVAX, so ignore other assets
 		}
 
@@ -228,14 +347,14 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
 			In:     in,
 		})
 
 		if amountToStake > 0 {
 			// Some of this input was put for staking
 			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToStake,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -250,7 +369,7 @@ func (vm *VM) stake(
 		if remainingValue > 0 {
 			// This input had extra value, so some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: remainingValue,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -272,15 +391,14 @@ func (vm *VM) stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, Codec)    // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, Codec)      // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers)  // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, txs.Codec) // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, txs.Codec)   // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
 
-// authorize an operation on behalf of the named subnet with the provided keys.
-func (vm *VM) authorize(
+func (h *handler) Authorize(
 	state state.Chain,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
@@ -299,20 +417,20 @@ func (vm *VM) authorize(
 	}
 	subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
-		return nil, nil, errWrongTxType
+		return nil, nil, fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
 	}
 
 	// Make sure the owners of the subnet match the provided keys
 	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, nil, errUnknownOwners
+		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
 	}
 
 	// Add the keys to a keychain
 	kc := secp256k1fx.NewKeychain(keys...)
 
 	// Make sure that the operation is valid after a minimum time
-	now := uint64(vm.clock.Time().Unix())
+	now := uint64(h.clk.Time().Unix())
 
 	// Attempt to prove ownership of the subnet
 	indices, signers, matches := kc.Match(owner, now)
@@ -323,14 +441,9 @@ func (vm *VM) authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// Precondition: [tx] has already been syntactically verified
-func (vm *VM) semanticVerifySpend(
+func (h *handler) SemanticVerifySpend(
+	tx txs.UnsignedTx,
 	utxoDB state.UTXOGetter,
-	utx txs.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -350,17 +463,11 @@ func (vm *VM) semanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return vm.semanticVerifySpendUTXOs(utx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
-// Verify that [tx] is semantically valid.
-// [db] should not be committed if an error is returned
-// [ins] and [outs] are the inputs and outputs of [tx].
-// [creds] are the credentials of [tx], which allow [ins] to be spent.
-// [utxos[i]] is the UTXO being consumed by [ins[i]]
-// Precondition: [tx] has already been syntactically verified
-func (vm *VM) semanticVerifySpendUTXOs(
-	utx txs.UnsignedTx,
+func (h *handler) SemanticVerifySpendUTXOs(
+	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -389,7 +496,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	}
 
 	// Time this transaction is being verified
-	now := uint64(vm.clock.Time().Unix())
+	now := uint64(h.clk.Time().Unix())
 
 	// Track the amount of unlocked transfers
 	unlockedProduced := feeAmount
@@ -404,10 +511,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		utxo := utxos[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
+			return fmt.Errorf("utxo asset ID %s doesn't match the fee asset ID %s", assetID, feeAssetID)
 		}
 		if assetID := input.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
+			return fmt.Errorf("input asset ID %s doesn't match the fee asset ID %s", assetID, feeAssetID)
 		}
 
 		out := utxo.Out
@@ -427,13 +534,13 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return errWrongLocktime
+				return fmt.Errorf("expected input %d locktime to be %d but got %d", index, locktime, inner.Locktime)
 			}
 			in = inner.TransferableIn
 		}
 
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := vm.fx.VerifyTransfer(utx, in, creds[index], out); err != nil {
+		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
@@ -450,10 +557,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		owned, ok := out.(fx.Owned)
 		if !ok {
-			return errUnknownOwners
+			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := Codec.Marshal(txs.Version, owner)
+		ownerBytes, err := txs.Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -472,7 +579,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 	for _, out := range outs {
 		if assetID := out.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("got fee asset ID %s, expected %s", assetID, feeAssetID)
+			return fmt.Errorf("output asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
 		}
 
 		output := out.Output()
@@ -496,10 +603,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		owned, ok := output.(fx.Owned)
 		if !ok {
-			return errUnknownOwners
+			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := Codec.Marshal(txs.Version, owner)
+		ownerBytes, err := txs.Codec.Marshal(txs.Version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -547,34 +654,4 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		)
 	}
 	return nil
-}
-
-// Removes the UTXOs consumed by [ins] from the UTXO set
-func consumeInputs(
-	utxoDB state.UTXODeleter,
-	ins []*avax.TransferableInput,
-) {
-	for _, input := range ins {
-		utxoDB.DeleteUTXO(input.InputID())
-	}
-}
-
-// Adds the UTXOs created by [outs] to the UTXO set.
-// [txID] is the ID of the tx that created [outs].
-func produceOutputs(
-	utxoDB state.UTXOAdder,
-	txID ids.ID,
-	assetID ids.ID,
-	outs []*avax.TransferableOutput,
-) {
-	for index, out := range outs {
-		utxoDB.AddUTXO(&avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(index),
-			},
-			Asset: avax.Asset{ID: assetID},
-			Out:   out.Output(),
-		})
-	}
 }

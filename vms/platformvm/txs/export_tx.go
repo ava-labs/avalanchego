@@ -18,7 +18,7 @@ var (
 	_ UnsignedTx             = &ExportTx{}
 	_ secp256k1fx.UnsignedTx = &ExportTx{}
 
-	errWrongLocktime   = errors.New("wrong locktime reported")
+	ErrWrongLocktime   = errors.New("wrong locktime reported")
 	errNoExportOutputs = errors.New("no export outputs")
 )
 
@@ -64,7 +64,7 @@ func (tx *ExportTx) SyntacticVerify(ctx *snow.Context) error {
 			return fmt.Errorf("output failed verification: %w", err)
 		}
 		if _, ok := out.Output().(*stakeable.LockOut); ok {
-			return errWrongLocktime
+			return ErrWrongLocktime
 		}
 	}
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {

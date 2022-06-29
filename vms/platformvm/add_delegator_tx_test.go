@@ -20,7 +20,7 @@ import (
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -42,7 +42,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: Wrong network ID
-	tx, err := vm.newAddDelegatorTx(
+	tx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -65,7 +65,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: Valid
-	if tx, err = vm.newAddDelegatorTx(
+	if tx, err = vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -97,7 +97,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 	// [addMinStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the minimum staking amount
 	addMinStakeValidator := func(vm *VM) {
-		tx, err := vm.newAddValidatorTx(
+		tx, err := vm.txBuilder.NewAddValidatorTx(
 			vm.MinValidatorStake,                    // stake amount
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
@@ -124,7 +124,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 	// [addMaxStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the maximum staking amount
 	addMaxStakeValidator := func(vm *VM) {
-		tx, err := vm.newAddValidatorTx(
+		tx, err := vm.txBuilder.NewAddValidatorTx(
 			vm.MaxValidatorStake,                    // stake amount
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
@@ -148,7 +148,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		}
 	}
 
-	freshVM, _, _ := defaultVM()
+	freshVM, _, _, _ := defaultVM()
 	currentTimestamp := freshVM.internalState.GetTimestamp()
 
 	type test struct {
@@ -312,7 +312,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = tt.AP3Time
 
 			vm.ctx.Lock.Lock()
@@ -323,7 +323,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			tx, err := vm.newAddDelegatorTx(
+			tx, err := vm.txBuilder.NewAddDelegatorTx(
 				tt.stakeAmount,
 				tt.startTime,
 				tt.endTime,
@@ -357,7 +357,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -375,7 +375,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	id := key.PublicKey().Address()
 
 	// create valid tx
-	addValidatorTx, err := vm.newAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -407,7 +407,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	addFirstDelegatorTx, err := vm.newAddDelegatorTx(
+	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
 		uint64(firstDelegatorStartTime.Unix()),
 		uint64(firstDelegatorEndTime.Unix()),
@@ -440,7 +440,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.clock.Set(secondDelegatorStartTime.Add(-10 * syncBound))
 
 	// create valid tx
-	addSecondDelegatorTx, err := vm.newAddDelegatorTx(
+	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake,
 		uint64(secondDelegatorStartTime.Unix()),
 		uint64(secondDelegatorEndTime.Unix()),
@@ -464,7 +464,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	addThirdDelegatorTx, err := vm.newAddDelegatorTx(
+	addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 		vm.MinDelegatorStake,
 		uint64(thirdDelegatorStartTime.Unix()),
 		uint64(thirdDelegatorEndTime.Unix()),
@@ -522,7 +522,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -540,7 +540,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			changeAddr := keys[0].PublicKey().Address()
 
 			// create valid tx
-			addValidatorTx, err := vm.newAddValidatorTx(
+			addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
 				validatorStake,
 				uint64(validatorStartTime.Unix()),
 				uint64(validatorEndTime.Unix()),
@@ -563,7 +563,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
 
 			// create valid tx
-			addFirstDelegatorTx, err := vm.newAddDelegatorTx(
+			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 				delegator1Stake,
 				uint64(delegator1StartTime.Unix()),
 				uint64(delegator1EndTime.Unix()),
@@ -585,7 +585,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
 
 			// create valid tx
-			addSecondDelegatorTx, err := vm.newAddDelegatorTx(
+			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 				delegator2Stake,
 				uint64(delegator2StartTime.Unix()),
 				uint64(delegator2EndTime.Unix()),
@@ -607,7 +607,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
 
 			// create valid tx
-			addThirdDelegatorTx, err := vm.newAddDelegatorTx(
+			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 				delegator3Stake,
 				uint64(delegator3StartTime.Unix()),
 				uint64(delegator3EndTime.Unix()),
@@ -629,7 +629,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			verifyAndAcceptProposalCommitment(assert, addThirdDelegatorBlock)
 
 			// create valid tx
-			addFourthDelegatorTx, err := vm.newAddDelegatorTx(
+			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 				delegator4Stake,
 				uint64(delegator4StartTime.Unix()),
 				uint64(delegator4EndTime.Unix()),

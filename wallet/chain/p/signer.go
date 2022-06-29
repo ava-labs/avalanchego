@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -249,7 +248,7 @@ func (s *signer) getSubnetSigners(ctx stdcontext.Context, subnetID ids.ID, subne
 }
 
 func (s *signer) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := platformvm.Codec.Marshal(txs.Version, &tx.Unsigned)
+	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
@@ -305,7 +304,7 @@ func (s *signer) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) er
 		}
 	}
 
-	signedBytes, err := platformvm.Codec.Marshal(txs.Version, tx)
+	signedBytes, err := txs.Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}
