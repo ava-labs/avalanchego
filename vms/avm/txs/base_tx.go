@@ -8,19 +8,33 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedTx = &BaseTx{}
+var (
+	_ UnsignedTx             = &BaseTx{}
+	_ secp256k1fx.UnsignedTx = &BaseTx{}
+)
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
+
+	bytes []byte
 }
 
 func (t *BaseTx) InitCtx(ctx *snow.Context) {
 	for _, out := range t.Outs {
 		out.InitCtx(ctx)
 	}
+}
+
+func (t *BaseTx) Initialize(bytes []byte) {
+	t.bytes = bytes
+}
+
+func (t *BaseTx) Bytes() []byte {
+	return t.bytes
 }
 
 func (t *BaseTx) SyntacticVerify(
@@ -35,7 +49,7 @@ func (t *BaseTx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.MetadataVerify(ctx); err != nil {
+	if err := t.BaseTx.Verify(ctx); err != nil {
 		return err
 	}
 

@@ -157,6 +157,10 @@ type peer struct {
 	lastSent, lastReceived int64
 }
 
+// Start a new peer instance.
+//
+// Invariant: There must only be one peer running at a time with a reference to
+// the same [config.InboundMsgThrottler].
 func Start(
 	config *Config,
 	conn net.Conn,
@@ -336,11 +340,23 @@ func (p *peer) readMessages() {
 		}
 
 		// Wait until the throttler says we can proceed to read the message.
+		//
 		// Invariant: When done processing this message, onFinishedHandling() is
 		// called exactly once. If this is not honored, the message throttler
 		// will leak until no new messages can be read. You can look at message
 		// throttler metrics to verify that there is no leak.
-		onFinishedHandling := p.InboundMsgThrottler.Acquire(p.onClosingCtx, uint64(msgLen), p.id)
+		//
+		// Invariant: There must only be one call to Acquire at any given time
+		// with the same nodeID. In this package, only this goroutine ever
+		// performs Acquire. Additionally, we ensure that this goroutine has
+		// exited before calling [Network.Disconnected] to guarantee that there
+		// can't be multiple instances of this goroutine running over different
+		// peer instances.
+		onFinishedHandling := p.InboundMsgThrottler.Acquire(
+			p.onClosingCtx,
+			uint64(msgLen),
+			p.id,
+		)
 
 		// If the peer is shutting down, there's no need to read the message.
 		if p.onClosingCtx.Err() != nil {

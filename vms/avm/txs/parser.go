@@ -116,16 +116,16 @@ func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
 		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
 	}
 
-	unsignedBytes, err := cm.Marshal(CodecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := cm.Marshal(CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return nil, err
 	}
-	tx.UnsignedTx.Initialize(unsignedBytes, bytes)
+	tx.Initialize(unsignedBytes, bytes)
 	return tx, nil
 }
 
 func initializeTx(cm codec.Manager, tx *Tx) error {
-	unsignedBytes, err := cm.Marshal(CodecVersion, tx.UnsignedTx)
+	unsignedBytes, err := cm.Marshal(CodecVersion, tx.Unsigned)
 	if err != nil {
 		return err
 	}
@@ -133,6 +133,6 @@ func initializeTx(cm codec.Manager, tx *Tx) error {
 	if err != nil {
 		return err
 	}
-	tx.UnsignedTx.Initialize(unsignedBytes, signedBytes)
+	tx.Initialize(unsignedBytes, signedBytes)
 	return nil
 }

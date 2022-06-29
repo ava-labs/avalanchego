@@ -30,9 +30,11 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
+	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -42,7 +44,7 @@ var (
 	// Test user password, must meet minimum complexity/length requirements
 	testPassword = "ShaggyPassword1Zoinks!"
 
-	// Bytes docoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
+	// Bytes decoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
 	testPrivateKey = []byte{
 		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
 		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
@@ -55,12 +57,12 @@ var (
 	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
 
 	encodings = []formatting.Encoding{
-		formatting.JSON, formatting.Hex, formatting.CB58,
+		formatting.JSON, formatting.Hex,
 	}
 )
 
-func defaultService(t *testing.T) *Service {
-	vm, _, _ := defaultVM()
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	vm, _, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -68,7 +70,7 @@ func defaultService(t *testing.T) *Service {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}
+	return &Service{vm: vm}, mutableSharedMemory
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -122,7 +124,7 @@ func TestExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -150,7 +152,7 @@ func TestImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
@@ -170,7 +172,7 @@ func TestImportKey(t *testing.T) {
 
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
-	service := defaultService(t)
+	service, mutableSharedMemory := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -212,7 +214,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,15 +229,14 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
-	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
+	oldSharedMemory := mutableSharedMemory.SharedMemory
+	mutableSharedMemory.SharedMemory = sm
 
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	tx, err := service.vm.newImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
+	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
+	mutableSharedMemory.SharedMemory = oldSharedMemory
 
 	var (
 		arg  = &GetTxStatusArgs{TxID: tx.ID()}
@@ -253,11 +254,10 @@ func TestGetTxStatus(t *testing.T) {
 
 	// put the chain in existing chain list
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
-		t.Fatal("should have errored because of missing funds")
+		t.Fatal("should have erred because of missing funds")
 	}
 
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	service.vm.ctx.SharedMemory = sm
+	mutableSharedMemory.SharedMemory = sm
 
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
@@ -287,14 +287,14 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service) (*Tx, error)
+		createTx    func(service *Service) (*txs.Tx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(service *Service) (*Tx, error) {
-				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
+			func(service *Service) (*txs.Tx, error) {
+				return service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
 					constants.AVMID,
@@ -307,8 +307,8 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func(service *Service) (*Tx, error) {
-				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
+			func(service *Service) (*txs.Tx, error) {
+				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(syncBound).Add(defaultMinStakingDuration).Unix()),
@@ -322,8 +322,8 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func(service *Service) (*Tx, error) {
-				return service.vm.newExportTx( // Test GetTx works for proposal blocks
+			func(service *Service) (*txs.Tx, error) {
+				return service.vm.txBuilder.NewExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
@@ -336,7 +336,7 @@ func TestGetTx(t *testing.T) {
 
 	for _, test := range tests {
 		for _, encoding := range encodings {
-			service := defaultService(t)
+			service, _ := defaultService(t)
 			defaultAddress(t, service)
 			service.vm.ctx.Lock.Lock()
 
@@ -373,8 +373,8 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else {
 				switch encoding {
-				case formatting.Hex, formatting.CB58:
-					// we're always guaranteed a string for hex/cb58 encodings.
+				case formatting.Hex:
+					// we're always guaranteed a string for hex encodings.
 					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -399,7 +399,7 @@ func TestGetTx(t *testing.T) {
 
 // Test method GetBalance
 func TestGetBalance(t *testing.T) {
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -439,7 +439,7 @@ func TestGetBalance(t *testing.T) {
 // Test method GetStake
 func TestGetStake(t *testing.T) {
 	assert := assert.New(t)
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -509,11 +509,11 @@ func TestGetStake(t *testing.T) {
 	oldStake := uint64(defaultWeight)
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
-	tx, err := service.vm.newAddDelegatorTx(
-		stakeAmt,
+	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		delegatorEndTime,
 		delegatorNodeID,
@@ -527,17 +527,17 @@ func TestGetStake(t *testing.T) {
 	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	assert.NoError(err)
-	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
-	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
+	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
-	assert.EqualValues(oldStake+stakeAmt, uint64(response.Staked))
+	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
 	assert.Len(response.Outputs, 2)
-	// Unmarshal into transferableoutputs
+	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
@@ -546,17 +546,17 @@ func TestGetStake(t *testing.T) {
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = service.vm.MinValidatorStake + 54321
+	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
-	tx, err = service.vm.newAddValidatorTx(
-		stakeAmt,
+	tx, err = service.vm.txBuilder.NewAddValidatorTx(
+		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
@@ -571,13 +571,13 @@ func TestGetStake(t *testing.T) {
 	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	assert.NoError(err)
-	err = service.vm.internalState.(*internalStateImpl).loadPendingValidators()
+	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
-	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	// Make sure the delegator has the right stake (old stake + stakeAmount)
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
-	assert.EqualValues(oldStake+stakeAmt, response.Staked)
+	assert.EqualValues(oldStake+stakeAmount, response.Staked)
 	assert.Len(response.Outputs, 3)
 	outputs = make([]avax.TransferableOutput, 3)
 	// Unmarshal
@@ -588,12 +588,12 @@ func TestGetStake(t *testing.T) {
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
 func TestGetCurrentValidators(t *testing.T) {
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -620,10 +620,10 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, vdr := range genesis.Validators {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
-			gotVdr, ok := response.Validators[i].(APIPrimaryValidator)
+			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
 			switch {
 			case !ok:
-				t.Fatal("expected APIPrimaryValidator")
+				t.Fatal("expected pchainapi.PrimaryValidator")
 			case gotVdr.NodeID != vdr.NodeID:
 			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
@@ -653,13 +653,13 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
-	tx, err := service.vm.newAddDelegatorTx(
-		stakeAmt,
+	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+		stakeAmount,
 		delegatorStartTime,
 		delegatorEndTime,
 		validatorNodeID,
@@ -677,7 +677,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	err = service.vm.internalState.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -695,7 +695,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Make sure the delegator is there
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
-		vdr := response.Validators[i].(APIPrimaryValidator)
+		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
 		if vdr.NodeID != validatorNodeID {
 			continue
 		}
@@ -711,19 +711,19 @@ func TestGetCurrentValidators(t *testing.T) {
 			t.Fatal("wrong start time")
 		case uint64(delegator.EndTime) != delegatorEndTime:
 			t.Fatal("wrong end time")
-		case delegator.weight() != stakeAmt:
+		case delegator.GetWeight() != stakeAmount:
 			t.Fatalf("wrong weight")
 		}
 	}
 	if !found {
-		t.Fatalf("didnt find delegator")
+		t.Fatalf("didn't find delegator")
 	}
 }
 
 func TestGetTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		err := service.vm.Shutdown()
@@ -757,10 +757,6 @@ func TestGetBlock(t *testing.T) {
 			encoding: formatting.JSON,
 		},
 		{
-			name:     "cb58",
-			encoding: formatting.CB58,
-		},
-		{
 			name:     "hex",
 			encoding: formatting.Hex,
 		},
@@ -769,7 +765,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			service := defaultService(t)
+			service, _ := defaultService(t)
 
 			block, err := service.vm.newStandardBlock(ids.GenerateTestID(), 1234, nil)
 			if err != nil {

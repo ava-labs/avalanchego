@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ Client = &client{}
@@ -432,7 +434,7 @@ func (c *client) AddValidator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		APIStaker: APIStaker{
+		Staker: platformapi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -463,7 +465,8 @@ func (c *client) AddDelegator(
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
-		}, APIStaker: APIStaker{
+		},
+		Staker: platformapi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -494,7 +497,7 @@ func (c *client) AddSubnetValidator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		APIStaker: APIStaker{
+		Staker: platformapi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),

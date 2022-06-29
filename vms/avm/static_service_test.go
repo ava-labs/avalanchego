@@ -6,6 +6,7 @@ package avm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -25,11 +26,11 @@ func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()
 	addrMap := map[string]string{}
 	for _, addrStr := range addrStrArray {
-		b, err := formatting.Decode(formatting.CB58, addrStr)
+		addr, err := ids.ShortFromString(addrStr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		addrMap[addrStr], err = address.FormatBech32(testHRP, b)
+		addrMap[addrStr], err = address.FormatBech32(testHRP, addr[:])
 		if err != nil {
 			t.Fatal(err)
 		}

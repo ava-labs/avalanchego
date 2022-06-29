@@ -6,11 +6,10 @@ package p
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	pChainValidator "github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var _ Wallet = &walletWithOptions{}
@@ -48,13 +47,13 @@ func (w *walletWithOptions) IssueBaseTx(
 }
 
 func (w *walletWithOptions) IssueAddValidatorTx(
-	validator *pChainValidator.Validator,
+	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueAddValidatorTx(
-		validator,
+		vdr,
 		rewardsOwner,
 		shares,
 		common.UnionOptions(w.options, options)...,
@@ -62,22 +61,22 @@ func (w *walletWithOptions) IssueAddValidatorTx(
 }
 
 func (w *walletWithOptions) IssueAddSubnetValidatorTx(
-	validator *pChainValidator.SubnetValidator,
+	vdr *validator.SubnetValidator,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueAddSubnetValidatorTx(
-		validator,
+		vdr,
 		common.UnionOptions(w.options, options)...,
 	)
 }
 
 func (w *walletWithOptions) IssueAddDelegatorTx(
-	validator *pChainValidator.Validator,
+	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueAddDelegatorTx(
-		validator,
+		vdr,
 		rewardsOwner,
 		common.UnionOptions(w.options, options)...,
 	)
@@ -136,7 +135,7 @@ func (w *walletWithOptions) IssueExportTx(
 }
 
 func (w *walletWithOptions) IssueUnsignedTx(
-	utx platformvm.UnsignedTx,
+	utx txs.UnsignedTx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueUnsignedTx(
@@ -146,7 +145,7 @@ func (w *walletWithOptions) IssueUnsignedTx(
 }
 
 func (w *walletWithOptions) IssueTx(
-	tx *platformvm.Tx,
+	tx *txs.Tx,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueTx(

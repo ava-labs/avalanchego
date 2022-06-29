@@ -6,8 +6,8 @@ package genesis
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -134,9 +134,9 @@ var (
 
 func init() {
 	errs := wrappers.Errs{}
-	vmrqBytes, err := formatting.Decode(formatting.CB58, VMRQKeyStr)
+	vmrqBytes, err := cb58.Decode(VMRQKeyStr)
 	errs.Add(err)
-	ewoqBytes, err := formatting.Decode(formatting.CB58, EWOQKeyStr)
+	ewoqBytes, err := cb58.Decode(EWOQKeyStr)
 	errs.Add(err)
 
 	factory := crypto.FactorySECP256K1R{}

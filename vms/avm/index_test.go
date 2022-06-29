@@ -271,7 +271,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	}
 
 	var inputUTXOs []*avax.UTXO //nolint:prealloc
-	for _, utxoID := range tx.InputUTXOs() {
+	for _, utxoID := range tx.Unsigned.InputUTXOs() {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
 			t.Fatal(err)
@@ -494,32 +494,30 @@ func signTX(codec codec.Manager, tx *txs.Tx, key *crypto.PrivateKeySECP256K1R) e
 }
 
 func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
-	return &txs.Tx{
-		UnsignedTx: &txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: chainID,
-				Ins: []*avax.TransferableInput{{
-					UTXOID: utxoID,
-					Asset:  txAssetID,
-					In: &secp256k1fx.TransferInput{
-						Amt:   1000,
-						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+	return &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: utxoID,
+				Asset:  txAssetID,
+				In: &secp256k1fx.TransferInput{
+					Amt:   1000,
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: txAssetID,
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     address,
 					},
-				}},
-				Outs: []*avax.TransferableOutput{{
-					Asset: txAssetID,
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1000,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     address,
-						},
-					},
-				}},
-			},
+				},
+			}},
 		},
-	}
+	}}
 }
 
 func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message, config Config) *VM {

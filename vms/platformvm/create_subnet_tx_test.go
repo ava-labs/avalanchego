@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -46,7 +48,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -56,12 +58,12 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			ins, outs, _, signers, err := vm.stake(keys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := vm.utxoHandler.Spend(keys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
 			// Create the tx
-			utx := &UnsignedCreateSubnetTx{
-				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			utx := &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    vm.ctx.NetworkID,
 					BlockchainID: vm.ctx.ChainID,
 					Ins:          ins,
@@ -69,18 +71,23 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				}},
 				Owner: &secp256k1fx.OutputOwners{},
 			}
-			tx := &Tx{UnsignedTx: utx}
+			tx := &txs.Tx{Unsigned: utx}
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			vs := newVersionedState(
+			state := state.NewDiff(
 				vm.internalState,
-				vm.internalState.CurrentStakerChainState(),
-				vm.internalState.PendingStakerChainState(),
+				vm.internalState.CurrentStakers(),
+				vm.internalState.PendingStakers(),
 			)
-			vs.SetTimestamp(test.time)
+			state.SetTimestamp(test.time)
 
-			_, err = utx.Execute(vm, vs, tx)
+			executor := standardTxExecutor{
+				vm:    vm,
+				state: state,
+				tx:    tx,
+			}
+			err = tx.Unsigned.Visit(&executor)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}
