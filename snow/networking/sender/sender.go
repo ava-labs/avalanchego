@@ -21,15 +21,15 @@ import (
 var _ common.Sender = &sender{}
 
 type GossipConfig struct {
-	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize"   yaml:"gossipAcceptedFrontierValidatorSize"`
-	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize"yaml:"gossipAcceptedFrontierNonValidatorSize"`
-	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize"        yaml:"gossipAcceptedFrontierPeerSize"`
-	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize"           yaml:"gossipOnAcceptValidatorSize"`
-	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize"        yaml:"gossipOnAcceptNonValidatorSize"`
-	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize"                yaml:"gossipOnAcceptPeerSize"`
-	AppGossipValidatorSize           uint `json:"appGossipValidatorSize"                yaml:"appGossipValidatorSize"`
-	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize"             yaml:"appGossipNonValidatorSize"`
-	AppGossipPeerSize                uint `json:"appGossipPeerSize"                     yaml:"appGossipPeerSize"`
+	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize" yaml:"gossipAcceptedFrontierValidatorSize"`
+	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize" yaml:"gossipAcceptedFrontierNonValidatorSize"`
+	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize" yaml:"gossipAcceptedFrontierPeerSize"`
+	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize" yaml:"gossipOnAcceptValidatorSize"`
+	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize" yaml:"gossipOnAcceptNonValidatorSize"`
+	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize" yaml:"gossipOnAcceptPeerSize"`
+	AppGossipValidatorSize           uint `json:"appGossipValidatorSize" yaml:"appGossipValidatorSize"`
+	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize" yaml:"appGossipNonValidatorSize"`
+	AppGossipPeerSize                uint `json:"appGossipPeerSize" yaml:"appGossipPeerSize"`
 }
 
 // sender is a wrapper around an ExternalSender.
