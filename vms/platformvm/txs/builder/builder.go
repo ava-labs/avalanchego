@@ -239,7 +239,7 @@ func (b *builder) NewImportTx(
 	outs := []*avax.TransferableOutput{}
 	if importedAmount < b.cfg.TxFee { // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
-		ins, outs, _, baseSigners, err = b.Stake(keys, 0, b.cfg.TxFee-importedAmount, changeAddr)
+		ins, outs, _, baseSigners, err = b.Spend(keys, 0, b.cfg.TxFee-importedAmount, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
@@ -287,7 +287,7 @@ func (b *builder) NewExportTx(
 	if err != nil {
 		return nil, fmt.Errorf("amount (%d) + tx fee(%d) overflows", amount, b.cfg.TxFee)
 	}
-	ins, outs, _, signers, err := b.Stake(keys, 0, toBurn, changeAddr)
+	ins, outs, _, signers, err := b.Spend(keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -331,7 +331,7 @@ func (b *builder) NewCreateChainTx(
 ) (*txs.Tx, error) {
 	timestamp := b.state.GetTimestamp()
 	createBlockchainTxFee := b.cfg.GetCreateBlockchainTxFee(timestamp)
-	ins, outs, _, signers, err := b.Stake(keys, 0, createBlockchainTxFee, changeAddr)
+	ins, outs, _, signers, err := b.Spend(keys, 0, createBlockchainTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -375,7 +375,7 @@ func (b *builder) NewCreateSubnetTx(
 ) (*txs.Tx, error) {
 	timestamp := b.state.GetTimestamp()
 	createSubnetTxFee := b.cfg.GetCreateSubnetTxFee(timestamp)
-	ins, outs, _, signers, err := b.Stake(keys, 0, createSubnetTxFee, changeAddr)
+	ins, outs, _, signers, err := b.Spend(keys, 0, createSubnetTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -413,7 +413,7 @@ func (b *builder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -423,7 +423,7 @@ func (b *builder) NewAddValidatorTx(
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
 			Ins:          ins,
-			Outs:         unlockedOuts,
+			Outs:         unstakedOuts,
 		}},
 		Validator: validator.Validator{
 			NodeID: nodeID,
@@ -431,7 +431,7 @@ func (b *builder) NewAddValidatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
-		Stake: lockedOuts,
+		Stake: stakedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
@@ -455,7 +455,7 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -496,7 +496,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, outs, _, signers, err := b.Stake(keys, 0, b.cfg.TxFee, changeAddr)
+	ins, outs, _, signers, err := b.Spend(keys, 0, b.cfg.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

@@ -57,9 +57,7 @@ func (ddb *doubleDecisionBlock) updateState() error {
 		child.setBaseState()
 	}
 	if ddb.onAcceptFunc != nil {
-		if err := ddb.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute OnAcceptFunc: %w", err)
-		}
+		ddb.onAcceptFunc()
 	}
 
 	// remove this block and its parent from memory

@@ -12,7 +12,7 @@ type decisionBlock struct {
 	onAcceptState state.Diff
 
 	// to be executed if this block is accepted
-	onAcceptFunc func() error
+	onAcceptFunc func()
 }
 
 // From CommonDecisionBlock
