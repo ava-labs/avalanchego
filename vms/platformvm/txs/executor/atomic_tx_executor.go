@@ -15,12 +15,12 @@ var _ txs.Visitor = &AtomicTxExecutor{}
 // atomicTxExecutor is used to execute atomic transactions pre-AP5. After AP5
 // the execution was moved to be performed inside of the standardTxExecutor.
 type AtomicTxExecutor struct {
-	// inputs
+	// inputs, to be filled before visitor methods are called
 	*Backend
 	ParentState state.Chain
 	Tx          *txs.Tx
 
-	// outputs
+	// outputs of visitor execution
 	OnAccept       state.Diff
 	Inputs         ids.Set
 	AtomicRequests map[ids.ID]*atomic.Requests

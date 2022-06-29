@@ -61,8 +61,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) *Service {
-	vm, _, _ := defaultVM()
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	vm, _, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
@@ -70,7 +70,7 @@ func defaultService(t *testing.T) *Service {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}
+	return &Service{vm: vm}, mutableSharedMemory
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -124,7 +124,7 @@ func TestExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -152,7 +152,7 @@ func TestImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
@@ -172,7 +172,7 @@ func TestImportKey(t *testing.T) {
 
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
-	service := defaultService(t)
+	service, mutableSharedMemory := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -229,17 +229,14 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
-	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, txs.Codec)
-
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	service.vm.txBuilder.ResetAtomicUTXOManager(service.vm.AtomicUTXOManager)
+	oldSharedMemory := mutableSharedMemory.SharedMemory
+	mutableSharedMemory.SharedMemory = sm
 
 	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
+	mutableSharedMemory.SharedMemory = oldSharedMemory
 
 	var (
 		arg  = &GetTxStatusArgs{TxID: tx.ID()}
@@ -260,8 +257,7 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal("should have erred because of missing funds")
 	}
 
-	service.vm.AtomicUTXOManager = newAtomicUTXOManager
-	service.vm.ctx.SharedMemory = sm
+	mutableSharedMemory.SharedMemory = sm
 
 	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
@@ -340,7 +336,7 @@ func TestGetTx(t *testing.T) {
 
 	for _, test := range tests {
 		for _, encoding := range encodings {
-			service := defaultService(t)
+			service, _ := defaultService(t)
 			defaultAddress(t, service)
 			service.vm.ctx.Lock.Lock()
 
@@ -403,7 +399,7 @@ func TestGetTx(t *testing.T) {
 
 // Test method GetBalance
 func TestGetBalance(t *testing.T) {
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -443,7 +439,7 @@ func TestGetBalance(t *testing.T) {
 // Test method GetStake
 func TestGetStake(t *testing.T) {
 	assert := assert.New(t)
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -513,11 +509,11 @@ func TestGetStake(t *testing.T) {
 	oldStake := uint64(defaultWeight)
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
-		stakeAmt,
+		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		delegatorEndTime,
 		delegatorNodeID,
@@ -534,14 +530,14 @@ func TestGetStake(t *testing.T) {
 	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
-	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
+	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
-	assert.EqualValues(oldStake+stakeAmt, uint64(response.Staked))
+	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
 	assert.Len(response.Outputs, 2)
-	// Unmarshal into transferableoutputs
+	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
@@ -550,17 +546,17 @@ func TestGetStake(t *testing.T) {
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = service.vm.MinValidatorStake + 54321
+	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
-		stakeAmt,
+		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		pendingStakerEndTime,
 		pendingStakerNodeID,
@@ -578,10 +574,10 @@ func TestGetStake(t *testing.T) {
 	err = service.vm.internalState.Load()
 	assert.NoError(err)
 
-	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	// Make sure the delegator has the right stake (old stake + stakeAmount)
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
-	assert.EqualValues(oldStake+stakeAmt, response.Staked)
+	assert.EqualValues(oldStake+stakeAmount, response.Staked)
 	assert.Len(response.Outputs, 3)
 	outputs = make([]avax.TransferableOutput, 3)
 	// Unmarshal
@@ -592,12 +588,12 @@ func TestGetStake(t *testing.T) {
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmt+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
 func TestGetCurrentValidators(t *testing.T) {
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -657,13 +653,13 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	// Add a delegator
-	stakeAmt := service.vm.MinDelegatorStake + 12345
+	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
-		stakeAmt,
+		stakeAmount,
 		delegatorStartTime,
 		delegatorEndTime,
 		validatorNodeID,
@@ -715,19 +711,19 @@ func TestGetCurrentValidators(t *testing.T) {
 			t.Fatal("wrong start time")
 		case uint64(delegator.EndTime) != delegatorEndTime:
 			t.Fatal("wrong end time")
-		case delegator.GetWeight() != stakeAmt:
+		case delegator.GetWeight() != stakeAmount:
 			t.Fatalf("wrong weight")
 		}
 	}
 	if !found {
-		t.Fatalf("didnt find delegator")
+		t.Fatalf("didn't find delegator")
 	}
 }
 
 func TestGetTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
-	service := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		err := service.vm.Shutdown()
@@ -772,7 +768,7 @@ func TestGetBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			service := defaultService(t)
+			service, _ := defaultService(t)
 
 			block, err := p_block.NewStandardBlock(
 				service.vm.blkVerifier,

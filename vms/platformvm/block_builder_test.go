@@ -20,7 +20,7 @@ import (
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -59,7 +59,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 // func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 // 	assert := assert.New(t)
 
-// 	vm, _, _ := defaultVM()
+// 	vm, _, _, _ := defaultVM()
 // 	vm.ctx.Lock.Lock()
 // 	defer func() {
 // 		err := vm.Shutdown()
@@ -89,7 +89,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -28,11 +29,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -41,13 +44,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
-	p_api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	platformutils "github.com/ava-labs/avalanchego/vms/platformvm/utils"
 )
 
 var (
@@ -86,7 +86,7 @@ type VM struct {
 	dbManager manager.Manager
 
 	internalState state.State
-	spendHandler  utxos.SpendHandler
+	utxoHandler   utxo.Handler
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -174,19 +174,18 @@ func (vm *VM) Initialize(
 
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	vm.spendHandler = utxos.NewHandler(vm.ctx, vm.clock, vm.internalState, vm.fx)
+	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.internalState)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
 	vm.txBuilder = builder.NewTxBuilder(
 		vm.ctx,
 		vm.Config,
-		vm.clock,
+		&vm.clock,
 		vm.fx,
 		vm.internalState,
 		vm.AtomicUTXOManager,
-		vm.spendHandler,
-		vm.rewards,
+		vm.utxoHandler,
 	)
 
 	vm.txExecutorBackend = executor.Backend{
@@ -194,7 +193,7 @@ func (vm *VM) Initialize(
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
-		SpendHandler: vm.spendHandler,
+		SpendHandler: vm.utxoHandler,
 		UptimeMan:    vm.uptimeManager,
 		Rewards:      vm.rewards,
 		Bootstrapped: &vm.bootstrapped,
@@ -281,9 +280,11 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		return err
 	}
 	for _, chain := range chains {
-		if err := platformutils.CreateChain(vm.Config, chain.Unsigned, chain.ID()); err != nil {
-			return err
+		tx, ok := chain.Unsigned.(*txs.CreateChainTx)
+		if !ok {
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
+		vm.Config.CreateChain(chain.ID(), tx)
 	}
 	return nil
 }
@@ -450,7 +451,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	if err := server.RegisterService(&p_api.StaticService{}, "platform"); err != nil {
+	if err := server.RegisterService(&api.StaticService{}, "platform"); err != nil {
 		return nil, err
 	}
 
@@ -527,11 +528,11 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 			if diff.Decrease {
 				// The validator's weight was decreased at this block, so in the
 				// prior block it was higher.
-				op = safemath.Add64
+				op = math.Add64
 			} else {
 				// The validator's weight was increased at this block, so in the
 				// prior block it was lower.
-				op = safemath.Sub64
+				op = math.Sub64
 			}
 
 			newWeight, err := op(vdrSet[nodeID], diff.Amount)
@@ -645,7 +646,7 @@ func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
 		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
-		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())
+		connectedStake, err = math.Add64(connectedStake, vdr.Weight())
 		if err != nil {
 			return 0, err
 		}

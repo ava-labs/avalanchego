@@ -23,7 +23,7 @@ import (
 )
 
 func TestAtomicTxImports(t *testing.T) {
-	vm, baseDB, _ := defaultVM()
+	vm, baseDB, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -45,9 +45,8 @@ func TestAtomicTxImports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, txs.Codec)
-	vm.txBuilder.ResetAtomicUTXOManager(vm.AtomicUTXOManager)
+
+	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
