@@ -521,7 +521,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.CreateSubnetTx but got %T", subnetTx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
 		}
 		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 		if !ok {
@@ -1819,7 +1819,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			chainID := chainTx.ID()
 			chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 			if !ok {
-				return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", chainTx.Unsigned)
+				return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
 			}
 			response.Blockchains = append(response.Blockchains, APIBlockchain{
 				ID:       chainID,
@@ -1838,7 +1838,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		chainID := chainTx.ID()
 		chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *unsigned.CreateChainTx but got %T", chainTx.Unsigned)
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
 		}
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chainID,

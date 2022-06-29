@@ -185,6 +185,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert := assert.New(t)
 
 			h := newTestHelpersCollection(t)
+			h.cfg.ApricotPhase3Time = test.ap3Time
 			defer func() {
 				if err := internalStateShutdown(h); err != nil {
 					t.Fatal(err)

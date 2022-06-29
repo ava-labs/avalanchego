@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 type Backend struct {
@@ -19,7 +19,7 @@ type Backend struct {
 	Ctx          *snow.Context
 	Clk          *mockable.Clock
 	Fx           fx.Fx
-	SpendHandler utxos.SpendHandler
+	SpendHandler utxo.Handler
 	UptimeMan    uptime.Manager
 	Rewards      reward.Calculator
 	Bootstrapped *utils.AtomicBool

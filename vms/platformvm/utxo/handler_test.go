@@ -1,11 +1,13 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package utxos
+package utxo
 
 import (
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
 )
 
 var _ txs.UnsignedTx = &dummyUnsignedTx{}
@@ -38,7 +39,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 
 	h := &handler{
 		ctx: snow.DefaultContextTest(),
-		clk: mockable.Clock{},
+		clk: &mockable.Clock{},
 		utxosReader: avax.NewUTXOState(
 			memdb.New(),
 			txs.Codec,
@@ -228,10 +229,6 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			assetID:   h.ctx.AVAXAssetID,
 			shouldErr: false,
 		},
-		///////////////////////////////////////////////////////////////////////
-		///////////////////////////////////////////////////////////////////////
-		///////////////////////////////////////////////////////////////////////
-
 		{
 			description: "locked one input, no outputs, positive fee",
 			utxos: []*avax.UTXO{{
