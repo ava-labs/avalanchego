@@ -25,7 +25,7 @@ type StandardTxExecutor struct {
 	Tx    *txs.Tx
 
 	// outputs of visitor execution
-	OnAccept       func() error // may be nil
+	OnAccept       func()
 	Inputs         ids.Set
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
@@ -98,10 +98,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.OnAccept = func() error {
-		e.Cfg.CreateChain(txID, tx)
-		return nil
-	}
+	e.OnAccept = func() { e.Cfg.CreateChain(txID, tx) }
 	return nil
 }
 

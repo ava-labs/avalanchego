@@ -372,7 +372,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			ins, outs, _, signers, err := h.utxosMan.Stake(prefundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := h.utxosMan.Spend(prefundedKeys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
 			subnetAuth, subnetSigners, err := h.utxosMan.Authorize(h.tState, testSubnet1.ID(), prefundedKeys)
