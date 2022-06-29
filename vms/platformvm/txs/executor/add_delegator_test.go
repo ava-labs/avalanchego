@@ -24,7 +24,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		}
 	}()
 
-	rewardAddress := preFundedKeys[0].PublicKey().Address()
+	rewardAddress := prefundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
 	// Case : tx is nil
@@ -43,7 +43,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -65,7 +65,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddDelegatorTxExecute(t *testing.T) {
 	dummyHeight := uint64(1)
-	rewardAddress := preFundedKeys[0].PublicKey().Address()
+	rewardAddress := prefundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
 	factory := crypto.FactorySECP256K1R{}
@@ -99,7 +99,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			newValidatorID,               // node ID
 			rewardAddress,                // Reward Address
 			reward.PercentDenominator,    // Shares
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			ids.ShortEmpty,
 		)
 		if err != nil {
@@ -126,7 +126,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			newValidatorID,               // node ID
 			rewardAddress,                // Reward Address
 			reward.PercentDenominator,    // Shared
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			ids.ShortEmpty,
 		)
 		if err != nil {
@@ -166,7 +166,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -178,7 +178,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime * 2).Unix()),
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -190,7 +190,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -202,7 +202,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -214,7 +214,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       newValidatorEndTime,
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -226,7 +226,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -238,7 +238,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     false,
@@ -250,7 +250,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Unix()),            // end time
 			nodeID:        nodeID,                                           // node ID
 			rewardAddress: rewardAddress,                                    // Reward Address
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]}, // tx fee payer
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]}, // tx fee payer
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -262,11 +262,11 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Unix()),            // end time
 			nodeID:        nodeID,                                           // node ID
 			rewardAddress: rewardAddress,                                    // Reward Address
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[1]}, // tx fee payer
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[1]}, // tx fee payer
 			setup: func(target *testHelpersCollection) { // Remove all UTXOs owned by keys[1]
 				dummyHeight := uint64(1)
 				utxoIDs, err := target.tState.UTXOIDs(
-					preFundedKeys[1].PublicKey().Address().Bytes(),
+					prefundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
 				if err != nil {
@@ -289,7 +289,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       defaultValidateEndTime,
 			shouldErr:     false,
@@ -301,7 +301,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,

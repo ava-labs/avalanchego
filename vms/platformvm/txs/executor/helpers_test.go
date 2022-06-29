@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -55,7 +55,7 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             []*crypto.PrivateKeySECP256K1R
+	prefundedKeys             []*crypto.PrivateKeySECP256K1R
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
@@ -73,17 +73,22 @@ const (
 	defaultWeight = 10000
 )
 
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
+
 type testHelpersCollection struct {
 	isBootstrapped *utils.AtomicBool
 	cfg            *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
+	msm            *mutableSharedMemory
 	fx             fx.Fx
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	uptimeMan      uptime.Manager
-	utxosMan       utxos.SpendHandler
+	utxosMan       utxo.Handler
 	txBuilder      builder.TxBuilder
 	execBackend    Backend
 }
@@ -102,8 +107,8 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 }
 
 func init() {
-	preFundedKeys = defaultKeys()
-	testSubnet1ControlKeys = preFundedKeys[0:3]
+	prefundedKeys = defaultKeys()
+	testSubnet1ControlKeys = prefundedKeys[0:3]
 }
 
 func newTestHelpersCollection() *testHelpersCollection {
@@ -115,7 +120,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx := defaultCtx(baseDB)
+	ctx, msm := defaultCtx(baseDB)
 
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
@@ -124,12 +129,12 @@ func newTestHelpersCollection() *testHelpersCollection {
 
 	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimeMan := uptime.NewManager(tState)
-	utxosMan := utxos.NewHandler(ctx, clk, tState, fx)
+	utxosMan := utxo.NewHandler(ctx, &clk, tState, fx)
 
 	txBuilder := builder.NewTxBuilder(
-		ctx, cfg, clk, fx,
+		ctx, cfg, &clk, fx,
 		tState, atomicUtxosMan,
-		utxosMan, rewardsCalc)
+		utxosMan)
 
 	execBackend := Backend{
 		Cfg:          &cfg,
@@ -150,6 +155,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 		clk:            &clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
+		msm:            msm,
 		fx:             fx,
 		tState:         tState,
 		atomicUtxosMan: atomicUtxosMan,
@@ -170,12 +176,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			preFundedKeys[0].PublicKey().Address(),
-			preFundedKeys[1].PublicKey().Address(),
-			preFundedKeys[2].PublicKey().Address(),
+			prefundedKeys[0].PublicKey().Address(),
+			prefundedKeys[1].PublicKey().Address(),
+			prefundedKeys[2].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
-		preFundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		prefundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
 		panic(err)
@@ -245,7 +251,7 @@ func defaultState(
 	return tState
 }
 
-func defaultCtx(baseDB *versiondb.Database) *snow.Context {
+func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
@@ -258,7 +264,10 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 		panic(err)
 	}
 
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
 
 	ctx.SNLookup = &snLookup{
 		chainsToSubnet: map[ids.ID]ids.ID{
@@ -268,7 +277,7 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 		},
 	}
 
-	return ctx
+	return ctx, msm
 }
 
 func defaultCfg() config.Config {
@@ -366,9 +375,9 @@ func initializeState(tState state.State, ctx *snow.Context) {
 }
 
 func buildGenesisTest(ctx *snow.Context) []byte {
-	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
+	genesisUTXOs := make([]api.UTXO, len(prefundedKeys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	for i, key := range preFundedKeys {
+	for i, key := range prefundedKeys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(hrp, id.Bytes())
 		if err != nil {
@@ -380,8 +389,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
+	genesisValidators := make([]api.PrimaryValidator, len(prefundedKeys))
+	for i, key := range prefundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {

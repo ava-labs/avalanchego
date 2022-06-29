@@ -22,6 +22,7 @@ import (
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -163,6 +164,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -175,7 +177,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
+		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0], prefundedKeys[1]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -203,6 +205,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -255,6 +258,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -294,6 +298,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -367,10 +372,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			ins, outs, _, signers, err := h.utxosMan.Stake(preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := h.utxosMan.Stake(prefundedKeys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
-			subnetAuth, subnetSigners, err := h.utxosMan.Authorize(h.tState, testSubnet1.ID(), preFundedKeys)
+			subnetAuth, subnetSigners, err := h.utxosMan.Authorize(h.tState, testSubnet1.ID(), prefundedKeys)
 			assert.NoError(err)
 
 			signers = append(signers, subnetSigners)
