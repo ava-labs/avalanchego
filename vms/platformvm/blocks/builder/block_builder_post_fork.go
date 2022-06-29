@@ -74,8 +74,9 @@ func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Chain) ([]*txs.Tx, tim
 // to be issued. Returns the calculated time, true/false if a standard block could be issued,
 // finally error.
 func (b *blockBuilder) nextStandardPostForkBlkTimestamp(preBlkState state.Chain) (time.Time, bool, error) {
-	minNextTimestamp := preBlkState.GetTimestamp()
+	nextBlkTime := b.txExecutorBackend.Clk.Time()
 
+	minNextTimestamp := preBlkState.GetTimestamp()
 	maxNextTimeStamp, err := preBlkState.GetNextStakerChangeTime()
 	if err != nil {
 		return time.Time{}, false, err
@@ -84,7 +85,6 @@ func (b *blockBuilder) nextStandardPostForkBlkTimestamp(preBlkState state.Chain)
 		maxNextTimeStamp = mt
 	}
 
-	nextBlkTime := b.txExecutorBackend.Clk.Time()
 	if !nextBlkTime.After(minNextTimestamp) {
 		nextBlkTime = minNextTimestamp.Add(time.Second)
 	}
