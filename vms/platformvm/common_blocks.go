@@ -251,7 +251,7 @@ type CommonDecisionBlock struct {
 	onAcceptState state.Diff
 
 	// to be executed if this block is accepted
-	onAcceptFunc func() error
+	onAcceptFunc func()
 }
 
 func (cdb *CommonDecisionBlock) free() {
@@ -316,9 +316,7 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 		child.setBaseState()
 	}
 	if ddb.onAcceptFunc != nil {
-		if err := ddb.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute OnAcceptFunc: %w", err)
-		}
+		ddb.onAcceptFunc()
 	}
 
 	// remove this block and its parent from memory

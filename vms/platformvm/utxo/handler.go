@@ -59,7 +59,7 @@ func Produce(
 // TODO: Stake and Authorize should be replaced by similar methods in the
 //       P-chain wallet
 type Spender interface {
-	// Stake the provided amount while deducting the provided fee.
+	// Spend the provided amount while deducting the provided fee.
 	// Arguments:
 	// - [keys] are the owners of the funds
 	// - [amount] is the amount of funds that are trying to be staked
@@ -72,7 +72,7 @@ type Spender interface {
 	// - [stakedOutputs] the outputs that should be locked for the duration of
 	//                   the staking period
 	// - [signers] the proof of ownership of the funds being moved
-	Stake(
+	Spend(
 		keys []*crypto.PrivateKeySECP256K1R,
 		amount uint64,
 		fee uint64,
@@ -159,7 +159,7 @@ type handler struct {
 	fx          fx.Fx
 }
 
-func (h *handler) Stake(
+func (h *handler) Spend(
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
 	fee uint64,
