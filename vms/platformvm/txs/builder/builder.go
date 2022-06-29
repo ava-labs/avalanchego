@@ -16,13 +16,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+// Max number of items allowed in a page
+const MaxPageSize = 1024
 
 var (
 	_ TxBuilder = &builder{}
@@ -30,24 +32,20 @@ var (
 	errNoFunds = errors.New("no spendable funds were found")
 )
 
-// Max number of items allowed in a page
-const MaxPageSize = 1024
-
+// TODO: TxBuilder should be replaced by the P-chain wallet
 type TxBuilder interface {
 	AtomicTxBuilder
-	DecisionsTxBuilder
-	ProposalsTxBuilder
-
-	ResetAtomicUTXOManager(aum avax.AtomicUTXOManager) // useful for UTs. TODO: consider find a way to drop this
+	DecisionTxBuilder
+	ProposalTxBuilder
 }
 
 type AtomicTxBuilder interface {
-	// from: chain to import from
+	// chainID: chain to import UTXOs from
 	// to: address of recipient
 	// keys: keys to import the funds
 	// changeAddr: address to send change to, if there is any
 	NewImportTx(
-		from ids.ID,
+		chainID ids.ID,
 		to ids.ShortID,
 		keys []*crypto.PrivateKeySECP256K1R,
 		changeAddr ids.ShortID,
@@ -55,7 +53,7 @@ type AtomicTxBuilder interface {
 
 	// amount: amount of tokens to export
 	// chainID: chain to send the UTXOs to
-	// to: address of chain recipient
+	// to: address of recipient
 	// keys: keys to pay the fee and provide the tokens
 	// changeAddr: address to send change to, if there is any
 	NewExportTx(
@@ -67,7 +65,7 @@ type AtomicTxBuilder interface {
 	) (*txs.Tx, error)
 }
 
-type DecisionsTxBuilder interface {
+type DecisionTxBuilder interface {
 	// subnetID: ID of the subnet that validates the new chain
 	// genesisData: byte repr. of genesis state of the new chain
 	// vmID: ID of VM this chain runs
@@ -97,8 +95,8 @@ type DecisionsTxBuilder interface {
 	) (*txs.Tx, error)
 }
 
-type ProposalsTxBuilder interface {
-	// stakeAmt: amount the validator stakes
+type ProposalTxBuilder interface {
+	// stakeAmount: amount the validator stakes
 	// startTime: unix time they start validating
 	// endTime: unix time they stop validating
 	// nodeID: ID of the node we want to validate with
@@ -107,7 +105,7 @@ type ProposalsTxBuilder interface {
 	// keys: Keys providing the staked tokens
 	// changeAddr: Address to send change to, if there is any
 	NewAddValidatorTx(
-		stakeAmt,
+		stakeAmount,
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
@@ -117,7 +115,7 @@ type ProposalsTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
-	// stakeAmt: amount the delegator stakes
+	// stakeAmount: amount the delegator stakes
 	// startTime: unix time they start delegating
 	// endTime: unix time they stop delegating
 	// nodeID: ID of the node we are delegating to
@@ -125,7 +123,7 @@ type ProposalsTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
-		stakeAmt,
+		stakeAmount,
 		startTime,
 		endTime uint64,
 		nodeID ids.NodeID,
@@ -163,39 +161,32 @@ type ProposalsTxBuilder interface {
 func NewTxBuilder(
 	ctx *snow.Context,
 	cfg config.Config,
-	clk mockable.Clock,
+	clk *mockable.Clock,
 	fx fx.Fx,
 	state state.Chain,
-	atoUtxosMan avax.AtomicUTXOManager,
-	spendingOps utxos.SpendingOps,
-	rewards reward.Calculator,
+	atomicUTXOManager avax.AtomicUTXOManager,
+	utxoSpender utxo.Spender,
 ) TxBuilder {
 	return &builder{
-		AtomicUTXOManager: atoUtxosMan,
-		SpendingOps:       spendingOps,
+		AtomicUTXOManager: atomicUTXOManager,
+		Spender:           utxoSpender,
 		state:             state,
 		cfg:               cfg,
 		ctx:               ctx,
 		clk:               clk,
 		fx:                fx,
-		rewards:           rewards,
 	}
 }
 
 type builder struct {
 	avax.AtomicUTXOManager
-	utxos.SpendingOps
+	utxo.Spender
 	state state.Chain
 
-	cfg     config.Config
-	ctx     *snow.Context
-	clk     mockable.Clock
-	fx      fx.Fx
-	rewards reward.Calculator
-}
-
-func (b *builder) ResetAtomicUTXOManager(aum avax.AtomicUTXOManager) {
-	b.AtomicUTXOManager = aum
+	cfg config.Config
+	ctx *snow.Context
+	clk *mockable.Clock
+	fx  fx.Fx
 }
 
 func (b *builder) NewImportTx(
@@ -414,7 +405,7 @@ func (b *builder) NewCreateSubnetTx(
 }
 
 func (b *builder) NewAddValidatorTx(
-	stakeAmt,
+	stakeAmount,
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
@@ -423,7 +414,7 @@ func (b *builder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmt, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -439,7 +430,7 @@ func (b *builder) NewAddValidatorTx(
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
-			Wght:   stakeAmt,
+			Wght:   stakeAmount,
 		},
 		Stake: lockedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
@@ -457,7 +448,7 @@ func (b *builder) NewAddValidatorTx(
 }
 
 func (b *builder) NewAddDelegatorTx(
-	stakeAmt,
+	stakeAmount,
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
@@ -465,7 +456,7 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmt, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Stake(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -481,7 +472,7 @@ func (b *builder) NewAddDelegatorTx(
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,
-			Wght:   stakeAmt,
+			Wght:   stakeAmount,
 		},
 		Stake: lockedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{

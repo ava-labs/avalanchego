@@ -21,6 +21,7 @@ import (
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -46,6 +47,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -80,6 +82,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 
 	// Case: Timestamp is after next validator end time
 	h = newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -112,6 +115,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -328,6 +332,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 		t.Run(test.description, func(ts *testing.T) {
 			assert := assert.New(ts)
 			h := newTestHelpersCollection()
+			h.ctx.Lock.Lock()
 			defer func() {
 				if err := internalStateShutdown(h); err != nil {
 					t.Fatal(err)
@@ -426,6 +431,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -527,6 +533,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 	for _, whitelist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
 			h := newTestHelpersCollection()
+			h.ctx.Lock.Lock()
 			defer func() {
 				if err := internalStateShutdown(h); err != nil {
 					t.Fatal(err)
@@ -589,6 +596,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -667,6 +675,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -745,6 +754,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -774,6 +784,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)

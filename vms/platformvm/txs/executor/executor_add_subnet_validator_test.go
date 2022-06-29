@@ -18,6 +18,7 @@ import (
 
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -137,6 +138,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -568,6 +570,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 // Test that marshalling/unmarshalling works
 func TestAddSubnetValidatorMarshal(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)

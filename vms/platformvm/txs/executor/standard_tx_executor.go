@@ -13,8 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utils"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 var _ txs.Visitor = &StandardTxExecutor{}
@@ -59,8 +58,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	timestamp := e.State.GetTimestamp()
 	createBlockchainTxFee := e.Cfg.GetCreateBlockchainTxFee(timestamp)
 	if err := e.SpendHandler.SemanticVerifySpend(
-		e.State,
 		tx,
+		e.State,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
@@ -91,15 +90,18 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.State, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 	// Add the new chain to the database
 	e.State.AddChain(e.Tx)
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.OnAccept = func() error { return utils.CreateChain(*e.Cfg, e.Tx.Unsigned, e.Tx.ID()) }
+	e.OnAccept = func() error {
+		e.Cfg.CreateChain(txID, tx)
+		return nil
+	}
 	return nil
 }
 
@@ -113,8 +115,8 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	timestamp := e.State.GetTimestamp()
 	createSubnetTxFee := e.Cfg.GetCreateSubnetTxFee(timestamp)
 	if err := e.SpendHandler.SemanticVerifySpend(
-		e.State,
 		tx,
+		e.State,
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
@@ -127,9 +129,9 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.State, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 	// Add the new subnet to the database
 	e.State.AddSubnet(e.Tx)
 	return nil
@@ -195,9 +197,9 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.State, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
@@ -224,8 +226,8 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	if err := e.SpendHandler.SemanticVerifySpend(
-		e.State,
 		tx,
+		e.State,
 		tx.Ins,
 		outs,
 		e.Tx.Creds,
@@ -238,9 +240,9 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxos.ConsumeInputs(e.State, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxos.ProduceOutputs(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {

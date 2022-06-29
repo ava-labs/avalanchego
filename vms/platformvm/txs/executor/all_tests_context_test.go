@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxos"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -73,17 +73,22 @@ const (
 	defaultWeight = 10000
 )
 
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
+
 type testHelpersCollection struct {
 	isBootstrapped *utils.AtomicBool
 	cfg            *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
+	msm            *mutableSharedMemory
 	fx             fx.Fx
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	uptimeMan      uptime.Manager
-	utxosMan       utxos.SpendHandler
+	utxosMan       utxo.Handler
 	txBuilder      builder.TxBuilder
 	execBackend    Backend
 }
@@ -115,7 +120,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx := defaultCtx(baseDB)
+	ctx, msm := defaultCtx(baseDB)
 
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
@@ -124,12 +129,12 @@ func newTestHelpersCollection() *testHelpersCollection {
 
 	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimeMan := uptime.NewManager(tState)
-	utxosMan := utxos.NewHandler(ctx, clk, tState, fx)
+	utxosMan := utxo.NewHandler(ctx, &clk, tState, fx)
 
 	txBuilder := builder.NewTxBuilder(
-		ctx, cfg, clk, fx,
+		ctx, cfg, &clk, fx,
 		tState, atomicUtxosMan,
-		utxosMan, rewardsCalc)
+		utxosMan)
 
 	execBackend := Backend{
 		Cfg:          &cfg,
@@ -150,6 +155,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 		clk:            &clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
+		msm:            msm,
 		fx:             fx,
 		tState:         tState,
 		atomicUtxosMan: atomicUtxosMan,
@@ -245,7 +251,7 @@ func defaultState(
 	return tState
 }
 
-func defaultCtx(baseDB *versiondb.Database) *snow.Context {
+func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
@@ -258,7 +264,10 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 		panic(err)
 	}
 
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
 
 	ctx.SNLookup = &snLookup{
 		chainsToSubnet: map[ids.ID]ids.ID{
@@ -268,7 +277,7 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 		},
 	}
 
-	return ctx
+	return ctx, msm
 }
 
 func defaultCfg() config.Config {
