@@ -25,7 +25,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		}
 	}()
 
-	nodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
+	nodeID := ids.NodeID(prefundedKeys[0].PublicKey().Address())
 
 	// Case: tx is nil
 	var unsignedTx *txs.AddSubnetValidatorTx
@@ -145,7 +145,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 	}()
 
-	nodeID := preFundedKeys[0].PublicKey().Address()
+	nodeID := prefundedKeys[0].PublicKey().Address()
 
 	{
 		// Case: Proposed validator currently validating primary network
@@ -222,7 +222,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		pendingDSValidatorID,       // node ID
 		nodeID,                     // reward address
 		reward.PercentDenominator,  // shares
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -506,14 +506,14 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], preFundedKeys[1]},
+			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], prefundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Replace a valid signature with one from keys[3]
-		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
+		sig, err := prefundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -582,7 +582,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		ids.NodeID(preFundedKeys[0].PublicKey().Address()),
+		ids.NodeID(prefundedKeys[0].PublicKey().Address()),
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,

@@ -19,12 +19,12 @@ import (
 var _ txs.Visitor = &StandardTxExecutor{}
 
 type StandardTxExecutor struct {
-	// inputs
+	// inputs, to be filled before visitor methods are called
 	*Backend
 	State state.Diff // state is expected to be modified
 	Tx    *txs.Tx
 
-	// outputs
+	// outputs of visitor execution
 	OnAccept       func() error // may be nil
 	Inputs         ids.Set
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil

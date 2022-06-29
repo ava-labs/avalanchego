@@ -49,12 +49,12 @@ const (
 )
 
 type ProposalTxExecutor struct {
-	// inputs
+	// inputs, to be filled before visitor methods are called
 	*Backend
 	ParentState state.Chain
 	Tx          *txs.Tx
 
-	// outputs
+	// outputs of visitor execution
 	OnCommit      state.Diff
 	OnAbort       state.Diff
 	PrefersCommit bool
@@ -484,7 +484,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow SemanticVerification to explicitly check for this
+		// last to allow the verifier visitor to explicitly check for this
 		// error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {

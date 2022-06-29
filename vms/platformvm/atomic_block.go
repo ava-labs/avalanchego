@@ -71,8 +71,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 func (ab *AtomicBlock) Verify() error {
 	blkID := ab.ID()
 
-	err := ab.CommonDecisionBlock.Verify()
-	if err != nil {
+	if err := ab.CommonDecisionBlock.Verify(); err != nil {
 		return err
 	}
 
