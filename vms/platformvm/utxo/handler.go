@@ -511,10 +511,10 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		utxo := utxos[index] // The UTXO consumed by [input]
 
 		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("utxo asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
+			return fmt.Errorf("utxo asset ID %s doesn't match the fee asset ID %s", assetID, feeAssetID)
 		}
 		if assetID := input.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("input asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
+			return fmt.Errorf("input asset ID %s doesn't match the fee asset ID %s", assetID, feeAssetID)
 		}
 
 		out := utxo.Out
@@ -534,7 +534,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return txs.ErrWrongLocktime
+				return fmt.Errorf("expected input %d locktime to be %d but got %d", index, locktime, inner.Locktime)
 			}
 			in = inner.TransferableIn
 		}
