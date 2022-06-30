@@ -43,8 +43,8 @@ type UnsignedExportTx struct {
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set {
 	set := ids.NewSet(len(tx.Ins))
 	for _, in := range tx.Ins {
-		// Total populated bytes is 20 (Address) + 8 (Nonce), however, we allocate
-		// 32 bytes to make ids.ID casting easier.
+		// Total populated bytes is exactly 32 bytes.
+		// 8 (Nonce) + 4 (Address Length) + 20 (Address)
 		var rawID [32]byte
 		packer := wrappers.Packer{Bytes: rawID[:]}
 		packer.PackLong(in.Nonce)
