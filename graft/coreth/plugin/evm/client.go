@@ -63,7 +63,7 @@ func NewCChainClient(uri string) Client {
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *client) IssueTx(ctx context.Context, txBytes []byte) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
 		return res.TxID, fmt.Errorf("problem hex encoding bytes: %w", err)
 	}

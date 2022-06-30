@@ -386,7 +386,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		str, err := formatting.EncodeWithChecksum(args.Encoding, b)
+		str, err := formatting.Encode(args.Encoding, b)
 		if err != nil {
 			return fmt.Errorf("problem encoding utxo: %w", err)
 		}
@@ -472,7 +472,7 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 		return fmt.Errorf("could not find tx %s", args.TxID)
 	}
 
-	txBytes, err := formatting.EncodeWithChecksum(args.Encoding, tx.SignedBytes())
+	txBytes, err := formatting.Encode(args.Encoding, tx.SignedBytes())
 	if err != nil {
 		return err
 	}
