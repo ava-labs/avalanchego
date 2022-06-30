@@ -7,9 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -23,26 +21,7 @@ type dummyBlkTimer struct{}
 
 func (bt *dummyBlkTimer) ResetBlockTimer() {}
 
-var preFundedKeys []*crypto.PrivateKeySECP256K1R
-
-func init() {
-	dummyCtx := snow.DefaultContextTest()
-	preFundedKeys = make([]*crypto.PrivateKeySECP256K1R, 0)
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		dummyCtx.Log.AssertNoError(err)
-		pk, err := factory.ToPrivateKey(privKeyBytes)
-		dummyCtx.Log.AssertNoError(err)
-		preFundedKeys = append(preFundedKeys, pk.(*crypto.PrivateKeySECP256K1R))
-	}
-}
+var preFundedKeys = crypto.BuildTestKeys()
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
