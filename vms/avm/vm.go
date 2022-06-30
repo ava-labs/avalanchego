@@ -110,7 +110,7 @@ type VM struct {
 	uniqueTxs cache.Deduplicator
 }
 
-func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return nil
 }
 

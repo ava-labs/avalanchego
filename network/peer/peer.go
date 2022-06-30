@@ -68,7 +68,7 @@ type Peer interface {
 
 	// Version returns the claimed node version this peer is running. It should
 	// only be called after [Ready] returns true.
-	Version() version.Application
+	Version() *version.Application
 
 	// TrackedSubnets returns the subnets this peer is running. It should only
 	// be called after [Ready] returns true.
@@ -117,7 +117,7 @@ type peer struct {
 	ip *SignedIP
 	// version is the claimed version the peer is running that we received in
 	// the Version message.
-	version version.Application
+	version *version.Application
 	// trackedSubnets is the subset of subnetIDs the peer sent us in the Version
 	// message that we are also tracking.
 	trackedSubnets ids.Set
@@ -239,7 +239,7 @@ func (p *peer) Info() Info {
 
 func (p *peer) IP() *SignedIP { return p.ip }
 
-func (p *peer) Version() version.Application { return p.version }
+func (p *peer) Version() *version.Application { return p.version }
 
 func (p *peer) TrackedSubnets() ids.Set { return p.trackedSubnets }
 
@@ -623,7 +623,7 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	}
 
 	peerVersionStr := msg.Get(message.VersionStr).(string)
-	peerVersion, err := p.VersionParser.Parse(peerVersionStr)
+	peerVersion, err := version.ParseApplication(peerVersionStr)
 	if err != nil {
 		p.Log.Debug(
 			"version of %s could not be parsed: %s",

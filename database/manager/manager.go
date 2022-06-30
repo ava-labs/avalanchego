@@ -82,7 +82,7 @@ func NewRocksDB(
 	dbDirPath string,
 	dbConfig []byte,
 	log logging.Logger,
-	currentVersion version.Version,
+	currentVersion *version.Semantic,
 	namespace string,
 	reg prometheus.Registerer,
 ) (Manager, error) {
@@ -105,7 +105,7 @@ func NewLevelDB(
 	dbDirPath string,
 	dbConfig []byte,
 	log logging.Logger,
-	currentVersion version.Version,
+	currentVersion *version.Semantic,
 	namespace string,
 	reg prometheus.Registerer,
 ) (Manager, error) {
@@ -129,7 +129,7 @@ func new(
 	dbDirPath string,
 	dbConfig []byte,
 	log logging.Logger,
-	currentVersion version.Version,
+	currentVersion *version.Semantic,
 	namespace string,
 	reg prometheus.Registerer,
 ) (Manager, error) {
@@ -170,7 +170,7 @@ func new(
 			return nil
 		}
 		_, dbName := filepath.Split(path)
-		dbVersion, err := version.DefaultParser.Parse(dbName)
+		dbVersion, err := version.Parse(dbName)
 		if err != nil {
 			// If the database directory contains any directories that don't
 			// match the expected version format, ignore them.
@@ -218,7 +218,7 @@ func new(
 
 // NewMemDB returns a database manager with a single memdb instance with
 // [currentVersion].
-func NewMemDB(currentVersion version.Version) Manager {
+func NewMemDB(currentVersion *version.Semantic) Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{

@@ -119,7 +119,7 @@ type EngineTest struct {
 	StateSummaryFrontierF     func(nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF  func(nodeID ids.NodeID, requestID uint32, keys []uint64) error
 	AcceptedStateSummaryF     func(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
-	ConnectedF                func(nodeID ids.NodeID, nodeVersion version.Application) error
+	ConnectedF                func(nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF             func(nodeID ids.NodeID) error
 	HealthF                   func() (interface{}, error)
 	GetVMF                    func() VM
@@ -581,7 +581,7 @@ func (e *EngineTest) ChitsV2(nodeID ids.NodeID, requestID uint32, containerIDs [
 	return errChitsV2
 }
 
-func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if e.ConnectedF != nil {
 		return e.ConnectedF(nodeID, nodeVersion)
 	}

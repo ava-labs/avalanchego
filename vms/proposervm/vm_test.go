@@ -144,7 +144,7 @@ func initTestProposerVM(
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 
 	// pre-insert resetOccurred key to make VM not spinning height reindexing
@@ -880,7 +880,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
-	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	toEngine := make(chan common.Message, 1)
 	var toScheduler chan<- common.Message
 
@@ -1189,7 +1189,7 @@ func TestInnerVMRollback(t *testing.T) {
 		return nil
 	}
 
-	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	proVM := New(coreVM, time.Time{}, 0)
 
@@ -1828,7 +1828,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil)
@@ -2006,7 +2006,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil)

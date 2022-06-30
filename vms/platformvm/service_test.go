@@ -65,7 +65,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
+	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
 	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}

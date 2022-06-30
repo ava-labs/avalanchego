@@ -796,7 +796,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -886,7 +886,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -991,7 +991,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1098,7 +1098,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1205,7 +1205,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1313,7 +1313,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1418,7 +1418,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
