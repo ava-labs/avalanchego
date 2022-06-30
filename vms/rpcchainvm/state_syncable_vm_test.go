@@ -473,7 +473,7 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
 	ctx := snow.DefaultContextTest()
-	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
 	assert.NoError(vm.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil))

@@ -50,7 +50,7 @@ func (s *startup) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeig
 	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 
-func (s *startup) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (s *startup) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

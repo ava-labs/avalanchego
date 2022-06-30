@@ -117,7 +117,6 @@ func StartTestPeer(
 			),
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(networkID),
-			VersionParser:        version.DefaultApplicationParser,
 			MySubnets:            ids.Set{},
 			Beacons:              validators.NewSet(),
 			NetworkID:            networkID,

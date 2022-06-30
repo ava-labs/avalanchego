@@ -33,6 +33,7 @@ type Tracker interface {
 type Calculator interface {
 	CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error)
 	CalculateUptimePercent(nodeID ids.NodeID) (float64, error)
+	// CalculateUptimePercentFrom expects [startTime] to be truncated (floored) to the nearest second
 	CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.Time) (float64, error)
 }
 
@@ -58,7 +59,7 @@ func NewManager(state State) Manager {
 }
 
 func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
-	currentLocalTime := m.clock.Time()
+	currentLocalTime := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
 		upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
 		if err != nil {
@@ -82,7 +83,7 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 }
 
 func (m *manager) Shutdown(nodeIDs []ids.NodeID) error {
-	currentLocalTime := m.clock.Time()
+	currentLocalTime := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
 		if _, connected := m.connections[nodeID]; connected {
 			if err := m.Disconnect(nodeID); err != nil {
@@ -110,7 +111,7 @@ func (m *manager) Shutdown(nodeIDs []ids.NodeID) error {
 }
 
 func (m *manager) Connect(nodeID ids.NodeID) error {
-	m.connections[nodeID] = m.clock.Time()
+	m.connections[nodeID] = m.clock.UnixTime()
 	return nil
 }
 
@@ -143,7 +144,7 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 		return 0, time.Time{}, err
 	}
 
-	currentLocalTime := m.clock.Time()
+	currentLocalTime := m.clock.UnixTime()
 	// If we are in a weird reality where time has gone backwards, make sure
 	// that we don't double count or delete any uptime.
 	if currentLocalTime.Before(lastUpdated) {

@@ -47,8 +47,8 @@ type Index interface {
 	GetContainerByIndex(index uint64) (Container, error)
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
-	GetIndex(containerID ids.ID) (uint64, error)
-	GetContainerByID(containerID ids.ID) (Container, error)
+	GetIndex(id ids.ID) (uint64, error)
+	GetContainerByID(id ids.ID) (Container, error)
 	io.Closer
 }
 
@@ -246,19 +246,19 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 }
 
 // Returns database.ErrNotFound if the container is not indexed as accepted
-func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
+func (i *index) GetIndex(id ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return database.GetUInt64(i.containerToIndex, containerID[:])
+	return database.GetUInt64(i.containerToIndex, id[:])
 }
 
-func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
+func (i *index) GetContainerByID(id ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	// Read index from database
-	indexBytes, err := i.containerToIndex.Get(containerID[:])
+	indexBytes, err := i.containerToIndex.Get(id[:])
 	if err != nil {
 		return Container{}, err
 	}

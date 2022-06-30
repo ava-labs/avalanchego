@@ -17,16 +17,16 @@ var _ Client = &client{}
 
 // Client interface for the Avalanche Platform Info API Endpoint
 type Client interface {
-	StartCPUProfiler(context.Context, ...rpc.Option) (bool, error)
-	StopCPUProfiler(context.Context, ...rpc.Option) (bool, error)
-	MemoryProfile(context.Context, ...rpc.Option) (bool, error)
-	LockProfile(context.Context, ...rpc.Option) (bool, error)
-	Alias(ctx context.Context, endpoint string, alias string, options ...rpc.Option) (bool, error)
-	AliasChain(ctx context.Context, chainID string, alias string, options ...rpc.Option) (bool, error)
+	StartCPUProfiler(context.Context, ...rpc.Option) error
+	StopCPUProfiler(context.Context, ...rpc.Option) error
+	MemoryProfile(context.Context, ...rpc.Option) error
+	LockProfile(context.Context, ...rpc.Option) error
+	Alias(ctx context.Context, endpoint string, alias string, options ...rpc.Option) error
+	AliasChain(ctx context.Context, chainID string, alias string, options ...rpc.Option) error
 	GetChainAliases(ctx context.Context, chainID string, options ...rpc.Option) ([]string, error)
-	Stacktrace(context.Context, ...rpc.Option) (bool, error)
+	Stacktrace(context.Context, ...rpc.Option) error
 	LoadVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error)
-	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) (bool, error)
+	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) error
 	GetLoggerLevel(ctx context.Context, loggerName string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error)
 }
@@ -44,46 +44,34 @@ func NewClient(uri string) Client {
 	)}
 }
 
-func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, res, options...)
-	return res.Success, err
+func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, res, options...)
-	return res.Success, err
+func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, res, options...)
-	return res.Success, err
+func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "lockProfile", struct{}{}, res, options...)
-	return res.Success, err
+func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "lockProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "alias", &AliasArgs{
+func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "alias", &AliasArgs{
 		Endpoint: endpoint,
 		Alias:    alias,
-	}, res, options...)
-	return res.Success, err
+	}, &api.EmptyReply{}, options...)
 }
 
-func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
+func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
 		Chain: chain,
 		Alias: alias,
-	}, res, options...)
-	return res.Success, err
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetChainAliases(ctx context.Context, chain string, options ...rpc.Option) ([]string, error) {
@@ -94,10 +82,8 @@ func (c *client) GetChainAliases(ctx context.Context, chain string, options ...r
 	return res.Aliases, err
 }
 
-func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "stacktrace", struct{}{}, res, options...)
-	return res.Success, err
+func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "stacktrace", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LoadVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error) {
@@ -112,9 +98,8 @@ func (c *client) SetLoggerLevel(
 	logLevel,
 	displayLevel string,
 	options ...rpc.Option,
-) (bool, error) {
+) error {
 	var (
-		res             = &api.SuccessResponse{}
 		logLevelArg     logging.Level
 		displayLevelArg logging.Level
 		err             error
@@ -122,26 +107,20 @@ func (c *client) SetLoggerLevel(
 	if len(logLevel) > 0 {
 		logLevelArg, err = logging.ToLevel(logLevel)
 		if err != nil {
-			return false, fmt.Errorf("couldn't parse %q to log level", logLevel)
+			return fmt.Errorf("couldn't parse %q to log level", logLevel)
 		}
 	}
 	if len(displayLevel) > 0 {
 		displayLevelArg, err = logging.ToLevel(displayLevel)
 		if err != nil {
-			return false, fmt.Errorf("couldn't parse %q to log level", displayLevel)
+			return fmt.Errorf("couldn't parse %q to log level", displayLevel)
 		}
 	}
-	err = c.requester.SendRequest(
-		ctx,
-		"setLoggerLevel",
-		&SetLoggerLevelArgs{
-			LoggerName:   loggerName,
-			LogLevel:     &logLevelArg,
-			DisplayLevel: &displayLevelArg,
-		},
-		res,
-		options...)
-	return res.Success, err
+	return c.requester.SendRequest(ctx, "setLoggerLevel", &SetLoggerLevelArgs{
+		LoggerName:   loggerName,
+		LogLevel:     &logLevelArg,
+		DisplayLevel: &displayLevelArg,
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetLoggerLevel(

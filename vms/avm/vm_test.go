@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -65,7 +66,7 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		keyBytes, _ := formatting.Decode(formatting.CB58, key)
+		keyBytes, _ := cb58.Decode(key)
 		pk, _ := factory.ToPrivateKey(keyBytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 		addrs = append(addrs, pk.PublicKey().Address())
@@ -266,7 +267,7 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 
 	ctx := NewContext(tb)
 
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -459,14 +460,14 @@ func TestInvalidGenesis(t *testing.T) {
 	}()
 
 	err := vm.Initialize(
-		ctx, // context
-		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
-		nil,                          // genesisState
-		nil,                          // upgradeBytes
-		nil,                          // configBytes
-		make(chan common.Message, 1), // engineMessenger
-		nil,                          // fxs
-		nil,                          // AppSender
+		ctx,                                     // context
+		manager.NewMemDB(version.Semantic1_0_0), // dbManager
+		nil,                                     // genesisState
+		nil,                                     // upgradeBytes
+		nil,                                     // configBytes
+		make(chan common.Message, 1),            // engineMessenger
+		nil,                                     // fxs
+		nil,                                     // AppSender
 	)
 	if err == nil {
 		t.Fatalf("Should have erred due to an invalid genesis")
@@ -486,12 +487,12 @@ func TestInvalidFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		ctx, // context
-		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
-		genesisBytes,                 // genesisState
-		nil,                          // upgradeBytes
-		nil,                          // configBytes
-		make(chan common.Message, 1), // engineMessenger
+		ctx,                                     // context
+		manager.NewMemDB(version.Semantic1_0_0), // dbManager
+		genesisBytes,                            // genesisState
+		nil,                                     // upgradeBytes
+		nil,                                     // configBytes
+		make(chan common.Message, 1),            // engineMessenger
 		[]*common.Fx{ // fxs
 			nil,
 		},
@@ -515,12 +516,12 @@ func TestFxInitializationFailure(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		ctx, // context
-		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
-		genesisBytes,                 // genesisState
-		nil,                          // upgradeBytes
-		nil,                          // configBytes
-		make(chan common.Message, 1), // engineMessenger
+		ctx,                                     // context
+		manager.NewMemDB(version.Semantic1_0_0), // dbManager
+		genesisBytes,                            // genesisState
+		nil,                                     // upgradeBytes
+		nil,                                     // configBytes
+		make(chan common.Message, 1),            // engineMessenger
 		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{
@@ -618,7 +619,7 @@ func TestIssueNFT(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -766,7 +767,7 @@ func TestIssueProperty(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1464,7 +1465,7 @@ func TestIssueImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -1641,7 +1642,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -1753,7 +1754,7 @@ func TestIssueExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -1881,7 +1882,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))

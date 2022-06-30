@@ -112,7 +112,7 @@ func (mr *MockChainVMMockRecorder) BuildBlock() *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *MockChainVM) Connected(id ids.NodeID, nodeVersion version.Application) error {
+func (m *MockChainVM) Connected(id ids.NodeID, nodeVersion *version.Application) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Connected", id, nodeVersion)
 	ret0, _ := ret[0].(error)

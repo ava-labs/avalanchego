@@ -21,7 +21,7 @@ type testNetwork struct {
 
 	networkID uint32
 	ip        ips.IPPort
-	version   version.Application
+	version   *version.Application
 	signer    crypto.Signer
 	subnets   ids.Set
 
@@ -33,7 +33,7 @@ func NewTestNetwork(
 	mc message.Creator,
 	networkID uint32,
 	ipPort ips.IPPort,
-	version version.Application,
+	version *version.Application,
 	signer crypto.Signer,
 	subnets ids.Set,
 	uptime uint8,
