@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -46,8 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 var (
@@ -103,14 +102,14 @@ type VM struct {
 
 	// Key: block ID
 	// Value: the block
-	currentBlocks map[ids.ID]p_block.Block
+	currentBlocks map[ids.ID]stateful.Block
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
 	txBuilder         builder.TxBuilder
 	txExecutorBackend executor.Backend
-	blkVerifier       p_block.Verifier
+	blkVerifier       stateful.Verifier
 }
 
 // Initialize this blockchain.
@@ -157,7 +156,7 @@ func (vm *VM) Initialize(
 	)
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-	vm.currentBlocks = make(map[ids.ID]p_block.Block)
+	vm.currentBlocks = make(map[ids.ID]stateful.Block)
 	if vm.internalState, err = NewState(
 		vm,
 		vm.dbManager.Current().Database,
@@ -383,7 +382,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	return p_block.MakeStateful(
+	return stateful.MakeStateful(
 		statelessBlk,
 		vm.blkVerifier,
 		vm.txExecutorBackend,
@@ -411,7 +410,7 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return nil
 }
 
-func (vm *VM) Preferred() (p_block.Block, error) {
+func (vm *VM) Preferred() (stateful.Block, error) {
 	return vm.blkVerifier.GetStatefulBlock(vm.preferred)
 }
 

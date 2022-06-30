@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -60,7 +61,6 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 var (
@@ -599,16 +599,16 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
-	_, ok = options[1].(*p_block.AbortBlock)
+	_, ok = options[1].(*stateful.AbortBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
@@ -668,7 +668,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	blk, err := p_block.NewProposalBlock(
+	blk, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -738,13 +738,13 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
+	} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -851,15 +851,15 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -934,15 +934,15 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -996,15 +996,15 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1037,15 +1037,15 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block = blk.(*p_block.ProposalBlock)
+	block = blk.(*stateful.ProposalBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*p_block.CommitBlock)
+	commit, ok = options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1095,12 +1095,12 @@ func TestRewardValidatorReject(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
+	} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1128,12 +1128,12 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block = blk.(*p_block.ProposalBlock)
+	block = blk.(*stateful.ProposalBlock)
 	if options, err := block.Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
+	} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1181,12 +1181,12 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
+	} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1214,12 +1214,12 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block = blk.(*p_block.ProposalBlock)
-	if options, err := blk.(*p_block.ProposalBlock).Options(); err != nil { // Assert preferences are correct
+	block = blk.(*stateful.ProposalBlock)
+	if options, err := blk.(*stateful.ProposalBlock).Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
+	} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1397,15 +1397,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block := blk.(*p_block.ProposalBlock)
+	block := blk.(*stateful.ProposalBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil { // Accept the block
 		t.Fatal(err)
@@ -1445,15 +1445,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block = blk.(*p_block.ProposalBlock)
+	block = blk.(*stateful.ProposalBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*p_block.CommitBlock)
+	commit, ok = options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1501,15 +1501,15 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block = blk.(*p_block.ProposalBlock)
+	block = blk.(*stateful.ProposalBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*p_block.CommitBlock)
+	commit, ok = options[0].(*stateful.CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*p_block.AbortBlock); !ok {
+	} else if abort, ok := options[1].(*stateful.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1679,7 +1679,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	blk, err := p_block.NewAtomicBlock(
+	blk, err := stateful.NewAtomicBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -1762,7 +1762,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		firstVM.blkVerifier,
 		firstVM.txExecutorBackend,
 		preferredID,
@@ -1890,7 +1890,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		firstVM.blkVerifier,
 		firstVM.txExecutorBackend,
 		preferredID,
@@ -2025,7 +2025,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := p_block.NewProposalBlock(
+	advanceTimeBlk, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2314,7 +2314,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := p_block.NewProposalBlock(
+	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2341,11 +2341,11 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := p_block.NewProposalBlock(
+	secondAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		firstOption.ID(),
-		firstOption.(p_block.Block).Height()+1,
+		firstOption.(stateful.Block).Height()+1,
 		secondAdvanceTimeTx,
 	)
 	if err != nil {
@@ -2519,7 +2519,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := p_block.NewStandardBlock(
+	addSubnetBlk0, err := stateful.NewStandardBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2529,7 +2529,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := p_block.NewStandardBlock(
+	addSubnetBlk1, err := stateful.NewStandardBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2539,7 +2539,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := p_block.NewStandardBlock(
+	addSubnetBlk2, err := stateful.NewStandardBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		addSubnetBlk1.ID(),
@@ -2610,7 +2610,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk, err := p_block.NewProposalBlock(
+	addValidatorProposalBlk, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2627,7 +2627,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*p_block.CommitBlock)
+	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*stateful.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit.Verify()
@@ -2684,7 +2684,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	importBlk, err := p_block.NewStandardBlock(
+	importBlk, err := stateful.NewStandardBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2749,7 +2749,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	advanceTimeProposalBlk, err := p_block.NewProposalBlock(
+	advanceTimeProposalBlk, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2768,7 +2768,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*p_block.CommitBlock)
+	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*stateful.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -2854,7 +2854,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := p_block.NewProposalBlock(
+	addValidatorProposalBlk0, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2871,7 +2871,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*p_block.CommitBlock)
+	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*stateful.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -2897,7 +2897,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	advanceTimeProposalBlk0, err := p_block.NewProposalBlock(
+	advanceTimeProposalBlk0, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2916,7 +2916,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*p_block.CommitBlock)
+	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*stateful.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -2979,7 +2979,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	importBlk, err := p_block.NewStandardBlock(
+	importBlk, err := stateful.NewStandardBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -3055,7 +3055,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	addValidatorProposalBlk1, err := p_block.NewProposalBlock(
+	addValidatorProposalBlk1, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -3072,7 +3072,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*p_block.CommitBlock)
+	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*stateful.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -3098,7 +3098,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	advanceTimeProposalBlk1, err := p_block.NewProposalBlock(
+	advanceTimeProposalBlk1, err := stateful.NewProposalBlock(
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -3117,7 +3117,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*p_block.CommitBlock)
+	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*stateful.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()

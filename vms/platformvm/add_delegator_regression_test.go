@@ -10,11 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/stretchr/testify/assert"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -328,15 +327,15 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Bl
 	assert.NoError(err)
 
 	// Assert preferences are correct
-	proposalBlk := blk.(*p_block.ProposalBlock)
+	proposalBlk := blk.(*stateful.ProposalBlock)
 	options, err := proposalBlk.Options()
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*p_block.CommitBlock)
+	commit, ok := options[0].(*stateful.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*p_block.AbortBlock)
+	abort, ok := options[1].(*stateful.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	err = commit.Verify()

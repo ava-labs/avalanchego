@@ -15,11 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 func TestAtomicTxImports(t *testing.T) {
@@ -98,5 +97,5 @@ func TestAtomicTxImports(t *testing.T) {
 	// Ensure transaction is in the committed state
 	assert.Equal(txStatus, status.Committed)
 	// Ensure standard block contains one atomic transaction
-	assert.Equal(b.(*p_block.StandardBlock).Inputs.Len(), 1)
+	assert.Equal(b.(*stateful.StandardBlock).Inputs.Len(), 1)
 }

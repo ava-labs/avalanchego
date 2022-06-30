@@ -16,12 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 // TargetBlockSize is maximum number of transaction bytes to place into a
@@ -65,8 +64,6 @@ func (b *blockBuilder) Initialize(
 	b.toEngine = toEngine
 	b.Mempool = mempool
 
-	b.vm.ctx.Log.Verbo("initializing platformVM mempool")
-
 	b.timer = timer.NewTimer(func() {
 		b.vm.ctx.Lock.Lock()
 		defer b.vm.ctx.Lock.Unlock()
@@ -94,7 +91,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return fmt.Errorf("expected Decision block but got %T", preferred)
@@ -134,7 +131,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
@@ -144,7 +141,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
-		return p_block.NewStandardBlock(
+		return stateful.NewStandardBlock(
 			b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
@@ -163,7 +160,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(
+		return stateful.NewProposalBlock(
 			b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
@@ -182,7 +179,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(
+		return stateful.NewProposalBlock(
 			b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
@@ -212,7 +209,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(
+		return stateful.NewProposalBlock(
 			b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
@@ -221,7 +218,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		)
 	}
 
-	return p_block.NewProposalBlock(
+	return stateful.NewProposalBlock(
 		b.vm.blkVerifier,
 		b.vm.txExecutorBackend,
 		preferredID,
@@ -243,7 +240,7 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		b.vm.ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)

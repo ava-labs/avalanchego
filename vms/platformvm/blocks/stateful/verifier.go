@@ -19,7 +19,6 @@ type Verifier interface {
 	state.State
 	SetHeight(height uint64)
 
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
 	AddStatelessBlock(block stateless.Block, status choices.Status)
 	StateContentForApply() state.State
 	GetMutableState() state.Chain
