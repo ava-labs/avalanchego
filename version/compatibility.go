@@ -11,56 +11,57 @@ import (
 )
 
 var (
-	errIncompatible               = errors.New("peers version is incompatible")
-	errMaskable                   = errors.New("peers version is maskable")
-	_               Compatibility = &compatibility{}
+	errIncompatible = errors.New("peers version is incompatible")
+	errMaskable     = errors.New("peers version is maskable")
+
+	_ Compatibility = &compatibility{}
 )
 
 // Compatibility a utility for checking the compatibility of peer versions
 type Compatibility interface {
 	// Returns the local version
-	Version() Application
+	Version() *Application
 
 	// Returns nil if the provided version is compatible with the local version.
 	// This means that the version is connectable and that consensus messages
 	// can be made to them.
-	Compatible(Application) error
+	Compatible(*Application) error
 
 	// Returns nil if the provided version shouldn't be masked. This means that
 	// the version is connectable but not compatible. The version is so old that
 	// it should just be masked.
-	Unmaskable(Application) error
+	Unmaskable(*Application) error
 
 	// Returns nil if the provided version will not be masked by this version.
-	WontMask(Application) error
+	WontMask(*Application) error
 
 	// Returns when additional masking will occur.
 	MaskTime() time.Time
 }
 
 type compatibility struct {
-	version Application
+	version *Application
 
-	minCompatable     Application
+	minCompatable     *Application
 	minCompatableTime time.Time
-	prevMinCompatable Application
+	prevMinCompatable *Application
 
-	minUnmaskable     Application
+	minUnmaskable     *Application
 	minUnmaskableTime time.Time
-	prevMinUnmaskable Application
+	prevMinUnmaskable *Application
 
 	clock mockable.Clock
 }
 
 // NewCompatibility returns a compatibility checker with the provided options
 func NewCompatibility(
-	version Application,
-	minCompatable Application,
+	version *Application,
+	minCompatable *Application,
 	minCompatableTime time.Time,
-	prevMinCompatable Application,
-	minUnmaskable Application,
+	prevMinCompatable *Application,
+	minUnmaskable *Application,
 	minUnmaskableTime time.Time,
-	prevMinUnmaskable Application,
+	prevMinUnmaskable *Application,
 ) Compatibility {
 	return &compatibility{
 		version:           version,
@@ -73,9 +74,9 @@ func NewCompatibility(
 	}
 }
 
-func (c *compatibility) Version() Application { return c.version }
+func (c *compatibility) Version() *Application { return c.version }
 
-func (c *compatibility) Compatible(peer Application) error {
+func (c *compatibility) Compatible(peer *Application) error {
 	if err := c.version.Compatible(peer); err != nil {
 		return err
 	}
@@ -99,7 +100,7 @@ func (c *compatibility) Compatible(peer Application) error {
 	return errIncompatible
 }
 
-func (c *compatibility) Unmaskable(peer Application) error {
+func (c *compatibility) Unmaskable(peer *Application) error {
 	if err := c.Compatible(peer); err != nil {
 		return err
 	}
@@ -123,7 +124,7 @@ func (c *compatibility) Unmaskable(peer Application) error {
 	return errMaskable
 }
 
-func (c *compatibility) WontMask(peer Application) error {
+func (c *compatibility) WontMask(peer *Application) error {
 	if err := c.Compatible(peer); err != nil {
 		return err
 	}

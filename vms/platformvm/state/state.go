@@ -653,8 +653,8 @@ func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAcce
 func (s *state) SetHeight(height uint64)             { s.currentHeight = height }
 
 func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
-	if blkState, exists := s.addedBlocks[blockID]; exists {
-		return blkState.Blk, blkState.Status, nil
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk.Blk, blk.Status, nil
 	}
 	if blkIntf, cached := s.blockCache.Get(blockID); cached {
 		if blkIntf == nil {
@@ -679,7 +679,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Stat
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	statelessBlk, err := stateless.ParseWithCodec(blkState.Bytes, stateless.GenesisCodec)
+	statelessBlk, err := stateless.Parse(blkState.Bytes, stateless.GenesisCodec)
 	if err != nil {
 		return nil, choices.Processing, err
 	}

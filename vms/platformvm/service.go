@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -29,8 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
 const (
@@ -404,7 +404,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
-		response.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, bytes)
+		response.UTXOs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %w", utxo.InputID(), err)
 		}
@@ -1674,14 +1674,14 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 		return false, err
 	}
 
-	block, ok := blockIntf.(p_block.Decision)
+	block, ok := blockIntf.(stateful.Decision)
 	if !ok {
 		parentBlkID := blockIntf.Parent()
 		parentBlockIntf, err := service.vm.GetBlock(parentBlkID)
 		if err != nil {
 			return false, err
 		}
-		block, ok = parentBlockIntf.(p_block.Decision)
+		block, ok = parentBlockIntf.(stateful.Decision)
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
@@ -1888,7 +1888,7 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 		return nil
 	}
 
-	response.Tx, err = formatting.EncodeWithChecksum(args.Encoding, txBytes)
+	response.Tx, err = formatting.Encode(args.Encoding, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as a string: %w", err)
 	}
@@ -1936,7 +1936,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	block, ok := preferred.(p_block.Decision)
+	block, ok := preferred.(stateful.Decision)
 	if !ok {
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
@@ -2113,7 +2113,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
-		response.Outputs[i], err = formatting.EncodeWithChecksum(args.Encoding, bytes)
+		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
 		}
@@ -2224,7 +2224,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}
 
-		utxoStr, err := formatting.EncodeWithChecksum(args.Encoding, utxoBytes)
+		utxoStr, err := formatting.Encode(args.Encoding, utxoBytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode utxo as a string: %w", err)
 		}
@@ -2290,7 +2290,7 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 		return nil
 	}
 
-	response.Block, err = formatting.EncodeWithChecksum(args.Encoding, block.Bytes())
+	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
 	}

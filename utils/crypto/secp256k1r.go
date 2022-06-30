@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -199,7 +199,7 @@ func (k *PrivateKeySECP256K1R) Bytes() []byte {
 func (k *PrivateKeySECP256K1R) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	keyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, k.Bytes())
+	keyStr, _ := cb58.Encode(k.Bytes())
 	return PrivateKeyPrefix + keyStr
 }
 
@@ -230,7 +230,7 @@ func (k *PrivateKeySECP256K1R) UnmarshalJSON(b []byte) error {
 	}
 
 	strNoPrefix := strNoQuotes[len(PrivateKeyPrefix):]
-	keyBytes, err := formatting.Decode(formatting.CB58, strNoPrefix)
+	keyBytes, err := cb58.Decode(strNoPrefix)
 	if err != nil {
 		return err
 	}

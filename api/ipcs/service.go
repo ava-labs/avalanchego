@@ -84,7 +84,7 @@ type UnpublishBlockchainArgs struct {
 }
 
 // UnpublishBlockchain closes publishing of a blockchainID
-func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *api.SuccessResponse) error {
+func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, _ *api.EmptyReply) error {
 	ipc.log.Debug("IPCs: UnpublishBlockchain called with BlockchainID: %s", args.BlockchainID)
 
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
@@ -98,7 +98,6 @@ func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockc
 		return fmt.Errorf("blockchainID not publishing: %s", chainID)
 	}
 
-	reply.Success = true
 	return err
 }
 

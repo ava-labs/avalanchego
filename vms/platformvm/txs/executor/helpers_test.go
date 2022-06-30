@@ -86,7 +86,7 @@ type testHelpersCollection struct {
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	uptimeMan      uptime.Manager
-	utxosMan       utxo.Handler
+	utxosHandler   utxo.Handler
 	txBuilder      tx_builder.Builder
 	execBackend    Backend
 }
@@ -105,7 +105,7 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 }
 
 func init() {
-	prefundedKeys = defaultKeys()
+	prefundedKeys = crypto.BuildTestKeys()
 	testSubnet1ControlKeys = prefundedKeys[0:3]
 }
 
@@ -116,7 +116,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 	cfg := defaultCfg()
 	clk := defaultClock()
 
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
@@ -163,7 +163,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 		tState:         tState,
 		atomicUtxosMan: atomicUtxosMan,
 		uptimeMan:      uptimeMan,
-		utxosMan:       utxosMan,
+		utxosHandler:   utxosMan,
 		txBuilder:      txBuilder,
 		execBackend:    execBackend,
 	}
@@ -341,26 +341,6 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	return res
 }
 
-func defaultKeys() []*crypto.PrivateKeySECP256K1R {
-	dummyCtx := snow.DefaultContextTest()
-	res := make([]*crypto.PrivateKeySECP256K1R, 0)
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		dummyCtx.Log.AssertNoError(err)
-		pk, err := factory.ToPrivateKey(privKeyBytes)
-		dummyCtx.Log.AssertNoError(err)
-		res = append(res, pk.(*crypto.PrivateKeySECP256K1R))
-	}
-	return res
-}
-
 func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisUTXOs := make([]api.UTXO, len(prefundedKeys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
@@ -409,7 +389,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.CB58,
+		Encoding:      formatting.Hex,
 	}
 
 	buildGenesisResponse := api.BuildGenesisReply{}

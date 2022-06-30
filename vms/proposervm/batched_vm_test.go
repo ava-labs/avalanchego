@@ -913,7 +913,7 @@ func initTestRemoteProposerVM(
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {

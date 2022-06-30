@@ -5,7 +5,7 @@ package stateless
 
 import "github.com/ava-labs/avalanchego/codec"
 
-func ParseWithCodec(b []byte, c codec.Manager) (Block, error) {
+func Parse(b []byte, c codec.Manager) (Block, error) {
 	var blk Block
 	if _, err := c.Unmarshal(b, &blk); err != nil {
 		return nil, err

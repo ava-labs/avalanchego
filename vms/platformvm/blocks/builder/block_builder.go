@@ -14,12 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
@@ -42,7 +42,7 @@ type BlockBuilder interface {
 
 	StartTimer()
 	SetPreference(blockID ids.ID) error
-	Preferred() (p_block.Block, error)
+	Preferred() (stateful.Block, error)
 	AddUnverifiedTx(tx *txs.Tx) error
 	BuildBlock() (snowman.Block, error)
 	Shutdown()
@@ -55,7 +55,7 @@ type blockBuilder struct {
 
 	txBuilder         p_tx_builder.Builder
 	txExecutorBackend executor.Backend
-	blkVerifier       p_block.Verifier
+	blkVerifier       stateful.Verifier
 
 	// ID of the preferred block to build on top of
 	preferredBlockID ids.ID
@@ -74,7 +74,7 @@ func NewBlockBuilder(
 	mempool mempool.Mempool,
 	txBuilder p_tx_builder.Builder,
 	txExecutorBackend executor.Backend,
-	blkVerifier p_block.Verifier,
+	blkVerifier stateful.Verifier,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
 ) BlockBuilder {
@@ -116,7 +116,7 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) error {
 	return nil
 }
 
-func (b *blockBuilder) Preferred() (p_block.Block, error) {
+func (b *blockBuilder) Preferred() (stateful.Block, error) {
 	return b.blkVerifier.GetStatefulBlock(b.preferredBlockID)
 }
 
@@ -137,7 +137,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return fmt.Errorf("expected Decision block but got %T", preferred)
@@ -177,7 +177,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
@@ -187,7 +187,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
-		return p_block.NewStandardBlock(
+		return stateful.NewStandardBlock(
 			b.blkVerifier,
 			b.txExecutorBackend,
 			preferredID,
@@ -206,7 +206,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(
+		return stateful.NewProposalBlock(
 			b.blkVerifier,
 			b.txExecutorBackend,
 			preferredID,
@@ -225,7 +225,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(
+		return stateful.NewProposalBlock(
 			b.blkVerifier,
 			b.txExecutorBackend,
 			preferredID,
@@ -255,7 +255,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return p_block.NewProposalBlock(
+		return stateful.NewProposalBlock(
 			b.blkVerifier,
 			b.txExecutorBackend,
 			preferredID,
@@ -264,7 +264,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		)
 	}
 
-	return p_block.NewProposalBlock(
+	return stateful.NewProposalBlock(
 		b.blkVerifier,
 		b.txExecutorBackend,
 		preferredID,
@@ -298,7 +298,7 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
-	preferredDecision, ok := preferred.(p_block.Decision)
+	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		b.txExecutorBackend.Ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)

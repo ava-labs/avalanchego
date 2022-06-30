@@ -57,7 +57,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				}
 			}()
 
-			ins, outs, _, signers, err := h.utxosMan.Spend(prefundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := h.utxosHandler.Spend(prefundedKeys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
 			// Create the tx

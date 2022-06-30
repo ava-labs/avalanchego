@@ -251,7 +251,7 @@ func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }
 

@@ -198,7 +198,7 @@ func newTxMetrics(namespace string, name string) prometheus.Counter {
 func (m *Metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
 func (m *Metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
 
-func (m *Metrics) RegisterBlock(b stateless.Block) error {
+func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
 	case *stateless.AbortBlock:
 		m.numAbortBlocks.Inc()

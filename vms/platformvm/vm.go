@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -47,16 +48,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p_blk_builder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
-	_ block.ChainVM        = &VM{}
-	_ validators.Connector = &VM{}
-	_ secp256k1fx.VM       = &VM{}
-	_ validators.State     = &VM{}
+	_ block.ChainVM    = &VM{}
+	_ secp256k1fx.VM   = &VM{}
+	_ validators.State = &VM{}
 
 	errWrongCacheType = errors.New("unexpectedly cached type")
 )
@@ -99,7 +98,7 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	blkVerifier       p_block.Verifier
+	blkVerifier       stateful.Verifier
 	txBuilder         p_tx_builder.Builder
 	txExecutorBackend executor.Backend
 }
@@ -195,7 +194,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
-	vm.blkVerifier = p_block.NewBlockVerifier(
+	vm.blkVerifier = stateful.NewBlockVerifier(
 		mempool,
 		vm.internalState,
 		vm.txExecutorBackend,
@@ -358,7 +357,7 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	// Note: blocks to be parsed are not verified, so we must used stateless.Codec
 	// rather than stateless.GenesisCodec
-	statelessBlk, err := stateless.ParseWithCodec(b, stateless.Codec)
+	statelessBlk, err := stateless.Parse(b, stateless.Codec)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +369,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	return p_block.MakeStateful(
+	return stateful.MakeStateful(
 		statelessBlk,
 		vm.blkVerifier,
 		vm.txExecutorBackend,
@@ -392,7 +391,7 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.BlockBuilder.SetPreference(blkID)
 }
 
-func (vm *VM) Preferred() (p_block.Block, error) {
+func (vm *VM) Preferred() (stateful.Block, error) {
 	return vm.BlockBuilder.Preferred()
 }
 
@@ -442,7 +441,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-func (vm *VM) Connected(vdrID ids.NodeID, _ version.Application) error {
+func (vm *VM) Connected(vdrID ids.NodeID, _ *version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
