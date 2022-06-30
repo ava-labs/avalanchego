@@ -190,8 +190,8 @@ func (st *internalStateImpl) SetHeight(height uint64) {
 }
 
 func (st *internalStateImpl) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
-	if blkState, exists := st.addedBlocks[blockID]; exists {
-		return blkState.Blk, blkState.Status, nil
+	if blk, exists := st.addedBlocks[blockID]; exists {
+		return blk.Blk, blk.Status, nil
 	}
 	if blkIntf, cached := st.blockCache.Get(blockID); cached {
 		if blkIntf == nil {
@@ -210,13 +210,13 @@ func (st *internalStateImpl) GetStatelessBlock(blockID ids.ID) (stateless.Block,
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	// Note: stored blocks are verified, so it's safe to marshal them with GenesisBlock
+	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
 	blkState := stateBlk{}
 	if _, err := stateless.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	statelessBlk, err := stateless.ParseWithCodec(blkState.Bytes, stateless.GenesisCodec)
+	statelessBlk, err := stateless.Parse(blkState.Bytes, stateless.GenesisCodec)
 	if err != nil {
 		return nil, choices.Processing, err
 	}
@@ -277,15 +277,15 @@ func (st *internalStateImpl) writeBlocks() error {
 			stBlk = stateBlk
 		)
 
-		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisBlock
-		btxBytes, err := stateless.GenesisCodec.Marshal(stateless.Version, &stBlk)
+		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
+		blockBytes, err := stateless.GenesisCodec.Marshal(stateless.Version, &stBlk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal state block: %w", err)
 		}
 
 		delete(st.addedBlocks, blkID)
 		st.blockCache.Put(blkID, stateBlk)
-		if err = st.blockDB.Put(blkID[:], btxBytes); err != nil {
+		if err = st.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block: %w", err)
 		}
 	}

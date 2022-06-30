@@ -32,9 +32,6 @@ const (
 
 var (
 	ErrUnknownTxType     = errors.New("unknown transaction type")
-	ErrDuplicatedTx      = errors.New("duplicated transaction")
-	ErrConflictingTx     = errors.New("conflicting transaction")
-	ErrTxTooBig          = errors.New("tx too big")
 	ErrMempoolFull       = errors.New("mempool is full")
 	ErrCorruptedReason   = errors.New("tx validity corrupted")
 	ErrMempoolReentrancy = errors.New("mempool reentrancy")
@@ -164,20 +161,25 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
-		return ErrDuplicatedTx
+		return fmt.Errorf("duplicate tx %s", txID)
 	}
 
 	txBytes := tx.Bytes()
 	if len(txBytes) > TargetTxSize {
-		return ErrTxTooBig
+		return fmt.Errorf("tx %s size (%d) > target size (%d)", txID, len(txBytes), TargetTxSize)
 	}
 	if len(txBytes) > m.bytesAvailable {
-		return ErrMempoolFull
+		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",
+			ErrMempoolFull,
+			txID,
+			len(txBytes),
+			m.bytesAvailable,
+		)
 	}
 
 	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
-		return ErrConflictingTx
+		return fmt.Errorf("tx %s conflicts with a transaction in the mempool", txID)
 	}
 
 	switch tx.Unsigned.(type) {
