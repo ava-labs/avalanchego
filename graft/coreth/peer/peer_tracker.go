@@ -11,8 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	utils_math "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/coreth/metrics"
+
 	"github.com/ethereum/go-ethereum/log"
+
+	"github.com/ava-labs/coreth/metrics"
 )
 
 const (
@@ -30,7 +32,7 @@ const (
 
 // information we track on a given peer
 type peerInfo struct {
-	version   version.Application
+	version   *version.Application
 	bandwidth utils_math.Averager
 }
 
@@ -92,7 +94,7 @@ func (p *peerTracker) getResponsivePeer() (ids.NodeID, utils_math.Averager, bool
 	return nodeID, peer.bandwidth, true
 }
 
-func (p *peerTracker) GetAnyPeer(minVersion version.Application) (ids.NodeID, bool) {
+func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool) {
 	if p.shouldTrackNewPeer() {
 		for nodeID := range p.peers {
 			// if minVersion is specified and peer's version is less, skip
@@ -159,7 +161,7 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 }
 
 // Connected should be called when [nodeID] connects to this node
-func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion version.Application) {
+func (p *peerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
 	if peer := p.peers[nodeID]; peer != nil {
 		// Peer is already connected, update the version if it has changed.
 		// Log a warning message since the consensus engine should never call Connected on a peer

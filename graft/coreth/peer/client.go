@@ -23,7 +23,7 @@ type NetworkClient interface {
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
-	RequestAny(minVersion version.Application, request []byte) ([]byte, ids.NodeID, error)
+	RequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
 
 	// Request synchronously sends request to the selected nodeID
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
@@ -54,7 +54,7 @@ func NewNetworkClient(network Network) NetworkClient {
 // node version greater than or equal to minVersion.
 // Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 // the request should be retried.
-func (c *client) RequestAny(minVersion version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (c *client) RequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	waitingHandler := newWaitingResponseHandler()
 	nodeID, err := c.network.RequestAny(minVersion, request, waitingHandler)
 	if err != nil {

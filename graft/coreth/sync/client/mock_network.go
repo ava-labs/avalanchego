@@ -18,7 +18,7 @@ var _ peer.NetworkClient = &mockNetwork{}
 type mockNetwork struct {
 	// captured request data
 	numCalls         uint
-	requestedVersion version.Application
+	requestedVersion *version.Application
 	request          []byte
 
 	// response mocking for RequestAny and Request calls
@@ -28,7 +28,7 @@ type mockNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-func (t *mockNetwork) RequestAny(minVersion version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (t *mockNetwork) RequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no mocked response to return in mockNetwork")
 	}
