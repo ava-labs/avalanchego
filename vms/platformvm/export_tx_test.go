@@ -11,10 +11,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 func TestNewExportTx(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -57,7 +58,7 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
-			tx, err := vm.newExportTx(defaultBalance-defaultTxFee, tt.destinationChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			tx, err := vm.txBuilder.NewExportTx(defaultBalance-defaultTxFee, tt.destinationChainID, to, tt.sourceKeys, ids.ShortEmpty)
 			if tt.shouldErr {
 				assert.Error(err)
 				return
@@ -72,14 +73,19 @@ func TestNewExportTx(t *testing.T) {
 			assert.True(ok)
 
 			preferredState := preferredDecision.onAccept()
-			fakedState := newVersionedState(
+			fakedState := state.NewDiff(
 				preferredState,
-				preferredState.CurrentStakerChainState(),
-				preferredState.PendingStakerChainState(),
+				preferredState.CurrentStakers(),
+				preferredState.PendingStakers(),
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			err = tx.UnsignedTx.SemanticVerify(vm, fakedState, tx)
+			verifier := mempoolTxVerifier{
+				vm:          vm,
+				parentState: fakedState,
+				tx:          tx,
+			}
+			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {

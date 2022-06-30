@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 )
 
 const (
@@ -34,21 +36,21 @@ var (
 )
 
 type Mempool interface {
-	Add(tx *Tx) error
+	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
-	Get(txID ids.ID) *Tx
+	Get(txID ids.ID) *txs.Tx
 
-	AddDecisionTx(tx *Tx)
-	AddProposalTx(tx *Tx)
+	AddDecisionTx(tx *txs.Tx)
+	AddProposalTx(tx *txs.Tx)
 
 	HasDecisionTxs() bool
 	HasProposalTx() bool
 
-	RemoveDecisionTxs(txs []*Tx)
-	RemoveProposalTx(tx *Tx)
+	RemoveDecisionTxs(txs []*txs.Tx)
+	RemoveProposalTx(tx *txs.Tx)
 
-	PopDecisionTxs(maxTxsBytes int) []*Tx
-	PopProposalTx() *Tx
+	PopDecisionTxs(maxTxsBytes int) []*txs.Tx
+	PopProposalTx() *txs.Tx
 
 	// Note: dropped txs are added to droppedTxIDs but not
 	// not evicted from unissued decision/proposal txs.
@@ -64,8 +66,8 @@ type mempool struct {
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
-	unissuedDecisionTxs TxHeap
-	unissuedProposalTxs TxHeap
+	unissuedDecisionTxs txheap.Heap
+	unissuedProposalTxs txheap.Heap
 	unknownTxs          prometheus.Counter
 
 	// Key: Tx ID
@@ -85,8 +87,8 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 		return nil, err
 	}
 
-	unissuedDecisionTxs, err := NewTxHeapWithMetrics(
-		NewTxHeapByAge(),
+	unissuedDecisionTxs, err := txheap.NewWithMetrics(
+		txheap.NewByAge(),
 		fmt.Sprintf("%s_decision_txs", namespace),
 		registerer,
 	)
@@ -94,8 +96,8 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 		return nil, err
 	}
 
-	unissuedProposalTxs, err := NewTxHeapWithMetrics(
-		NewTxHeapByStartTime(),
+	unissuedProposalTxs, err := txheap.NewWithMetrics(
+		txheap.NewByStartTime(),
 		fmt.Sprintf("%s_proposal_txs", namespace),
 		registerer,
 	)
@@ -124,7 +126,7 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 	}, nil
 }
 
-func (m *mempool) Add(tx *Tx) error {
+func (m *mempool) Add(tx *txs.Tx) error {
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
@@ -134,19 +136,19 @@ func (m *mempool) Add(tx *Tx) error {
 		return errMempoolFull
 	}
 
-	inputs := tx.InputIDs()
+	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
 		return errConflictingTx
 	}
 
-	switch tx.UnsignedTx.(type) {
-	case TimedTx:
+	switch tx.Unsigned.(type) {
+	case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
 		m.AddProposalTx(tx)
-	case UnsignedDecisionTx:
+	case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
 		m.AddDecisionTx(tx)
 	default:
 		m.unknownTxs.Inc()
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.UnsignedTx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
 	}
 
 	// Mark these UTXOs as consumed in the mempool
@@ -161,19 +163,19 @@ func (m *mempool) Has(txID ids.ID) bool {
 	return m.Get(txID) != nil
 }
 
-func (m *mempool) Get(txID ids.ID) *Tx {
+func (m *mempool) Get(txID ids.ID) *txs.Tx {
 	if tx := m.unissuedDecisionTxs.Get(txID); tx != nil {
 		return tx
 	}
 	return m.unissuedProposalTxs.Get(txID)
 }
 
-func (m *mempool) AddDecisionTx(tx *Tx) {
+func (m *mempool) AddDecisionTx(tx *txs.Tx) {
 	m.unissuedDecisionTxs.Add(tx)
 	m.register(tx)
 }
 
-func (m *mempool) AddProposalTx(tx *Tx) {
+func (m *mempool) AddProposalTx(tx *txs.Tx) {
 	m.unissuedProposalTxs.Add(tx)
 	m.register(tx)
 }
@@ -182,7 +184,7 @@ func (m *mempool) HasDecisionTxs() bool { return m.unissuedDecisionTxs.Len() > 0
 
 func (m *mempool) HasProposalTx() bool { return m.unissuedProposalTxs.Len() > 0 }
 
-func (m *mempool) RemoveDecisionTxs(txs []*Tx) {
+func (m *mempool) RemoveDecisionTxs(txs []*txs.Tx) {
 	for _, tx := range txs {
 		txID := tx.ID()
 		if m.unissuedDecisionTxs.Remove(txID) != nil {
@@ -191,15 +193,15 @@ func (m *mempool) RemoveDecisionTxs(txs []*Tx) {
 	}
 }
 
-func (m *mempool) RemoveProposalTx(tx *Tx) {
+func (m *mempool) RemoveProposalTx(tx *txs.Tx) {
 	txID := tx.ID()
 	if m.unissuedProposalTxs.Remove(txID) != nil {
 		m.deregister(tx)
 	}
 }
 
-func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*Tx {
-	var txs []*Tx
+func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*txs.Tx {
+	var txs []*txs.Tx
 	for m.unissuedDecisionTxs.Len() > 0 {
 		tx := m.unissuedDecisionTxs.Peek()
 		txBytes := tx.Bytes()
@@ -215,7 +217,7 @@ func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*Tx {
 	return txs
 }
 
-func (m *mempool) PopProposalTx() *Tx {
+func (m *mempool) PopProposalTx() *txs.Tx {
 	tx := m.unissuedProposalTxs.RemoveTop()
 	m.deregister(tx)
 	return tx
@@ -233,17 +235,17 @@ func (m *mempool) GetDropReason(txID ids.ID) (string, bool) {
 	return reason.(string), true
 }
 
-func (m *mempool) register(tx *Tx) {
+func (m *mempool) register(tx *txs.Tx) {
 	txBytes := tx.Bytes()
 	m.bytesAvailable -= len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 }
 
-func (m *mempool) deregister(tx *Tx) {
+func (m *mempool) deregister(tx *txs.Tx) {
 	txBytes := tx.Bytes()
 	m.bytesAvailable += len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 
-	inputs := tx.InputIDs()
+	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
 }

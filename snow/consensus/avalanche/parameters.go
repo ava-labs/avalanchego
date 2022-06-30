@@ -13,8 +13,8 @@ import (
 // optimal number of parents
 type Parameters struct {
 	snowball.Parameters
-	Parents   int `json:"parents"`
-	BatchSize int `json:"batchSize"`
+	Parents   int `json:"parents" yaml:"parents"`
+	BatchSize int `json:"batchSize" yaml:"batchSize"`
 }
 
 // Valid returns nil if the parameters describe a valid initialization.

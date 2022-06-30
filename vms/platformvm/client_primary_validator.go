@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 // ClientStaker is the representation of a staker sent via client.
@@ -53,7 +54,7 @@ type ClientPrimaryDelegator struct {
 	PotentialReward *uint64
 }
 
-func apiStakerToClientStaker(validator APIStaker) ClientStaker {
+func apiStakerToClientStaker(validator api.Staker) ClientStaker {
 	return ClientStaker{
 		TxID:        validator.TxID,
 		StartTime:   uint64(validator.StartTime),
@@ -64,7 +65,7 @@ func apiStakerToClientStaker(validator APIStaker) ClientStaker {
 	}
 }
 
-func apiOwnerToClientOwner(rewardOwner *APIOwner) (*ClientOwner, error) {
+func apiOwnerToClientOwner(rewardOwner *api.Owner) (*ClientOwner, error) {
 	if rewardOwner == nil {
 		return nil, nil
 	}
@@ -85,7 +86,7 @@ func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrim
 			return nil, err
 		}
 
-		var apiValidator APIPrimaryValidator
+		var apiValidator api.PrimaryValidator
 		err = json.Unmarshal(validatorMapJSON, &apiValidator)
 		if err != nil {
 			return nil, err
@@ -104,14 +105,14 @@ func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrim
 			}
 
 			clientDelegators[j] = ClientPrimaryDelegator{
-				ClientStaker:    apiStakerToClientStaker(apiDelegator.APIStaker),
+				ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
 				RewardOwner:     rewardOwner,
 				PotentialReward: (*uint64)(apiDelegator.PotentialReward),
 			}
 		}
 
 		clientValidators[i] = ClientPrimaryValidator{
-			ClientStaker:    apiStakerToClientStaker(apiValidator.APIStaker),
+			ClientStaker:    apiStakerToClientStaker(apiValidator.Staker),
 			RewardOwner:     rewardOwner,
 			PotentialReward: (*uint64)(apiValidator.PotentialReward),
 			DelegationFee:   float32(apiValidator.DelegationFee),

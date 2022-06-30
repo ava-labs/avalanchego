@@ -50,7 +50,7 @@ type ImportUserArgs struct {
 	api.UserPass
 	// The string representation of the user
 	User string `json:"user"`
-	// The encoding of [User] ("hex" or "cb58")
+	// The encoding of [User] ("hex")
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
@@ -70,14 +70,14 @@ func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.S
 type ExportUserArgs struct {
 	// The username and password
 	api.UserPass
-	// The encoding for the exported user ("hex" or "cb58")
+	// The encoding for the exported user ("hex")
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
 type ExportUserReply struct {
 	// String representation of the user
 	User string `json:"user"`
-	// The encoding for the exported user ("hex" or "cb58")
+	// The encoding for the exported user ("hex")
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
@@ -90,7 +90,7 @@ func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Expor
 	}
 
 	// Encode the user from bytes to string
-	reply.User, err = formatting.EncodeWithChecksum(args.Encoding, userBytes)
+	reply.User, err = formatting.Encode(args.Encoding, userBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode user to string: %w", err)
 	}
@@ -103,7 +103,7 @@ func CreateTestKeystore() (Keystore, error) {
 	dbManager, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1_0_0,
+			Version:  version.Semantic1_0_0,
 		},
 	})
 	if err != nil {

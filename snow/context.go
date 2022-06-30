@@ -57,10 +57,16 @@ type Context struct {
 	StakingCertLeaf   *x509.Certificate // block certificate
 }
 
+// Expose gatherer interface for unit testing.
+type Registerer interface {
+	prometheus.Registerer
+	prometheus.Gatherer
+}
+
 type ConsensusContext struct {
 	*Context
 
-	Registerer prometheus.Registerer
+	Registerer Registerer
 
 	// DecisionAcceptor is the callback that will be fired whenever a VM is
 	// notified that their object, either a block in snowman or a transaction

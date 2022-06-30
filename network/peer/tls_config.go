@@ -17,5 +17,6 @@ func TLSConfig(cert tls.Certificate) *tls.Config {
 		// During our security audit by Quantstamp, this was investigated
 		// and confirmed to be safe and correct.
 		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionTLS13,
 	}
 }

@@ -61,7 +61,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 
 	for e := w.pendingTxOrdering.Front(); e != nil; e = e.Next() {
 		tx := e.Value.(*txs.Tx)
-		for _, inputUTXO := range tx.InputUTXOs() {
+		for _, inputUTXO := range tx.Unsigned.InputUTXOs() {
 			if inputUTXO.Symbolic() {
 				continue
 			}
@@ -236,7 +236,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	codec := w.vm.parser.Codec()
 	avax.SortTransferableOutputs(outs, codec)
 
-	tx := txs.Tx{UnsignedTx: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,
 		BlockchainID: w.vm.ctx.ChainID,
 		Outs:         outs,

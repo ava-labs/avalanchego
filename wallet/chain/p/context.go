@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm"
 )
 
@@ -16,7 +15,6 @@ var _ Context = &context{}
 
 type Context interface {
 	NetworkID() uint32
-	HRP() string
 	AVAXAssetID() ids.ID
 	BaseTxFee() uint64
 	CreateSubnetTxFee() uint64
@@ -25,7 +23,6 @@ type Context interface {
 
 type context struct {
 	networkID             uint32
-	hrp                   string
 	avaxAssetID           ids.ID
 	baseTxFee             uint64
 	createSubnetTxFee     uint64
@@ -76,7 +73,6 @@ func NewContext(
 ) Context {
 	return &context{
 		networkID:             networkID,
-		hrp:                   constants.GetHRP(networkID),
 		avaxAssetID:           avaxAssetID,
 		baseTxFee:             baseTxFee,
 		createSubnetTxFee:     createSubnetTxFee,
@@ -85,7 +81,6 @@ func NewContext(
 }
 
 func (c *context) NetworkID() uint32             { return c.networkID }
-func (c *context) HRP() string                   { return c.hrp }
 func (c *context) AVAXAssetID() ids.ID           { return c.avaxAssetID }
 func (c *context) BaseTxFee() uint64             { return c.baseTxFee }
 func (c *context) CreateSubnetTxFee() uint64     { return c.createSubnetTxFee }

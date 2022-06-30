@@ -16,11 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestNewImportTx(t *testing.T) {
-	vm, baseDB, _ := defaultVM()
+	vm, baseDB, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -77,7 +79,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,16 +129,15 @@ func TestNewImportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm.ctx.SharedMemory = tt.sharedMemory
-			vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
-			tx, err := vm.newImportTx(tt.sourceChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			mutableSharedMemory.SharedMemory = tt.sharedMemory
+			tx, err := vm.txBuilder.NewImportTx(tt.sourceChainID, to, tt.sourceKeys, ids.ShortEmpty)
 			if tt.shouldErr {
 				assert.Error(err)
 				return
 			}
 			assert.NoError(err)
 
-			unsignedTx := tx.UnsignedTx.(*UnsignedImportTx)
+			unsignedTx := tx.Unsigned.(*txs.ImportTx)
 			assert.NotEmpty(unsignedTx.ImportedInputs)
 			assert.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
 
@@ -162,14 +163,19 @@ func TestNewImportTx(t *testing.T) {
 			assert.True(ok)
 
 			preferredState := preferredDecision.onAccept()
-			fakedState := newVersionedState(
+			fakedState := state.NewDiff(
 				preferredState,
-				preferredState.CurrentStakerChainState(),
-				preferredState.PendingStakerChainState(),
+				preferredState.CurrentStakers(),
+				preferredState.PendingStakers(),
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			err = tx.UnsignedTx.SemanticVerify(vm, fakedState, tx)
+			verifier := mempoolTxVerifier{
+				vm:          vm,
+				parentState: fakedState,
+				tx:          tx,
+			}
+			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {
 				assert.NoError(err)
 			} else {
