@@ -44,7 +44,7 @@ func TestKeychainGetUnknownAddr(t *testing.T) {
 func TestKeychainAdd(t *testing.T) {
 	kc := NewKeychain()
 
-	skBytes, err := formatting.Decode(formatting.HexNoChecksum, keys[0])
+	skBytes, err := formatting.Decode(formatting.HexNC, keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestKeychainMatch(t *testing.T) {
 
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		skBytes, err := formatting.Decode(formatting.HexNoChecksum, keyStr)
+		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +167,7 @@ func TestKeychainSpendMint(t *testing.T) {
 
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		skBytes, err := formatting.Decode(formatting.HexNoChecksum, keyStr)
+		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -228,7 +228,7 @@ func TestKeychainSpendTransfer(t *testing.T) {
 
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		skBytes, err := formatting.Decode(formatting.HexNoChecksum, keyStr)
+		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,7 +297,7 @@ func TestKeychainSpendTransfer(t *testing.T) {
 func TestKeychainString(t *testing.T) {
 	kc := NewKeychain()
 
-	skBytes, err := formatting.Decode(formatting.HexNoChecksum, keys[0])
+	skBytes, err := formatting.Decode(formatting.HexNC, keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestKeychainString(t *testing.T) {
 func TestKeychainPrefixedString(t *testing.T) {
 	kc := NewKeychain()
 
-	skBytes, err := formatting.Decode(formatting.HexNoChecksum, keys[0])
+	skBytes, err := formatting.Decode(formatting.HexNC, keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}

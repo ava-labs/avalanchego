@@ -23,7 +23,7 @@ type Credential struct {
 func (cr *Credential) MarshalJSON() ([]byte, error) {
 	signatures := make([]string, len(cr.Sigs))
 	for i, sig := range cr.Sigs {
-		sigStr, err := formatting.Encode(formatting.HexNoChecksum, sig[:])
+		sigStr, err := formatting.Encode(formatting.HexNC, sig[:])
 		if err != nil {
 			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
 		}
