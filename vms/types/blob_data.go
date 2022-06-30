@@ -13,7 +13,7 @@ import (
 type JSONByteSlice []byte
 
 func (b JSONByteSlice) MarshalJSON() ([]byte, error) {
-	hexData, err := formatting.Encode(formatting.HexNoChecksum, b)
+	hexData, err := formatting.Encode(formatting.HexNC, b)
 	if err != nil {
 		return nil, err
 	}

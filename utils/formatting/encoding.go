@@ -34,10 +34,10 @@ type Encoding uint8
 const (
 	// Hex specifies a hex plus 4 byte checksum encoding format
 	Hex Encoding = iota
-	// HexNoChecksum specifies a hex encoding format
-	HexNoChecksum
-	// HexWithChecksum specifies a hex plus 4 byte checksum encoding format
-	HexWithChecksum
+	// HexNC specifies a hex encoding format
+	HexNC
+	// HexC specifies a hex plus 4 byte checksum encoding format
+	HexC
 	// JSON specifies the JSON encoding format
 	JSON
 )
@@ -46,10 +46,10 @@ func (enc Encoding) String() string {
 	switch enc {
 	case Hex:
 		return "hex"
-	case HexNoChecksum:
-		return "hexNoChecksum"
-	case HexWithChecksum:
-		return "hexWithChecksum"
+	case HexNC:
+		return "hexnc"
+	case HexC:
+		return "hexc"
 	case JSON:
 		return "json"
 	default:
@@ -59,7 +59,7 @@ func (enc Encoding) String() string {
 
 func (enc Encoding) valid() bool {
 	switch enc {
-	case Hex, HexNoChecksum, HexWithChecksum, JSON:
+	case Hex, HexNC, HexC, JSON:
 		return true
 	}
 	return false
@@ -80,10 +80,10 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 	switch strings.ToLower(str) {
 	case `"hex"`:
 		*enc = Hex
-	case `"hexnochecksum"`:
-		*enc = HexNoChecksum
-	case `"hexwithchecksum"`:
-		*enc = HexWithChecksum
+	case `"hexnc"`:
+		*enc = HexNC
+	case `"hexc"`:
+		*enc = HexC
 	case `"json"`:
 		*enc = JSON
 	default:
@@ -100,7 +100,7 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 	}
 
 	switch encoding {
-	case Hex, HexWithChecksum:
+	case Hex, HexC:
 		bytesLen := len(bytes)
 		if bytesLen > math.MaxInt32-checksumLen {
 			return "", errEncodingOverFlow
@@ -112,7 +112,7 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 	}
 
 	switch encoding {
-	case Hex, HexNoChecksum, HexWithChecksum:
+	case Hex, HexNC, HexC:
 		return fmt.Sprintf("0x%x", bytes), nil
 	case JSON:
 		// JSON Marshal does not support []byte input and we rely on the
@@ -140,7 +140,7 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 		err          error
 	)
 	switch encoding {
-	case Hex, HexNoChecksum, HexWithChecksum:
+	case Hex, HexNC, HexC:
 		if !strings.HasPrefix(str, hexPrefix) {
 			return nil, errMissingHexPrefix
 		}
@@ -157,7 +157,7 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 	}
 
 	switch encoding {
-	case Hex, HexWithChecksum:
+	case Hex, HexC:
 		if len(decodedBytes) < checksumLen {
 			return nil, errMissingChecksum
 		}
