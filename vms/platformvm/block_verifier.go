@@ -63,9 +63,9 @@ func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (stateful.Block, error) {
 	return stateful.MakeStateful(statelessBlk, bv, bv.Backend, blkStatus)
 }
 
-func (bv *blkVerifier) StateContentForApply() state.State { return bv.InternalState }
+func (bv *blkVerifier) GetState() state.State { return bv.InternalState }
 
-func (bv *blkVerifier) GetMutableState() state.Chain { return bv.InternalState }
+func (bv *blkVerifier) GetChainState() state.Chain { return bv.InternalState }
 
 func (bv *blkVerifier) CacheVerifiedBlock(blk stateful.Block) {
 	bv.verifiedBlksCache[blk.ID()] = blk

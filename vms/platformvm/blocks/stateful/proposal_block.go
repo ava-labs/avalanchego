@@ -122,8 +122,8 @@ func (pb *ProposalBlock) Reject() error {
 }
 
 func (pb *ProposalBlock) setBaseState() {
-	pb.onCommitState.SetBase(pb.verifier.GetMutableState())
-	pb.onAbortState.SetBase(pb.verifier.GetMutableState())
+	pb.onCommitState.SetBase(pb.verifier.GetChainState())
+	pb.onAbortState.SetBase(pb.verifier.GetChainState())
 }
 
 // Verify this block is valid.

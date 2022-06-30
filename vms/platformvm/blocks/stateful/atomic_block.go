@@ -171,12 +171,12 @@ func (ab *AtomicBlock) Accept() error {
 
 	ab.accept()
 	ab.verifier.AddStatelessBlock(ab.AtomicBlock, ab.Status())
-	if err := ab.verifier.RegisterBlock(ab.AtomicBlock); err != nil {
+	if err := ab.verifier.MarkAccepted(ab.AtomicBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 
 	// Update the state of the chain in the database
-	ab.onAcceptState.Apply(ab.verifier.StateContentForApply())
+	ab.onAcceptState.Apply(ab.verifier.GetState())
 
 	defer ab.verifier.Abort()
 	batch, err := ab.verifier.CommitBatch()

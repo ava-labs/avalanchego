@@ -20,8 +20,8 @@ type Verifier interface {
 	SetHeight(height uint64)
 
 	AddStatelessBlock(block stateless.Block, status choices.Status)
-	StateContentForApply() state.State
-	GetMutableState() state.Chain
+	GetState() state.State
+	GetChainState() state.Chain
 	Abort()
 	Commit() error
 	CommitBatch() (database.Batch, error)
