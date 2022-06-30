@@ -103,7 +103,7 @@ func CreateTestKeystore() (Keystore, error) {
 	dbManager, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1_0_0,
+			Version:  version.Semantic1_0_0,
 		},
 	})
 	if err != nil {

@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -84,12 +86,7 @@ func (m *blockBuilder) Initialize(
 }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
-	// Initialize the transaction
-	if err := tx.Sign(Codec, nil); err != nil {
-		return err
-	}
-
+func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	if m.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -110,7 +107,13 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 	}
 
 	preferredState := preferredDecision.onAccept()
-	if err := tx.UnsignedTx.SemanticVerify(m.vm, preferredState, tx); err != nil {
+	verifier := mempoolTxVerifier{
+		vm:          m.vm,
+		parentState: preferredState,
+		tx:          tx,
+	}
+	err = tx.Unsigned.Visit(&verifier)
+	if err != nil {
 		m.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -122,7 +125,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 }
 
 // AddVerifiedTx attempts to add a transaction to the mempool
-func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
+func (m *blockBuilder) AddVerifiedTx(tx *txs.Tx) error {
 	if m.dropIncoming {
 		return errMempoolReentrancy
 	}
@@ -175,11 +178,11 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldReward {
-		rewardValidatorTx, err := m.vm.newRewardValidatorTx(stakerTxID)
+		rewardValidatorTx, err := m.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
 			return nil, err
 		}
-		return m.vm.newProposalBlock(preferredID, nextHeight, *rewardValidatorTx)
+		return m.vm.newProposalBlock(preferredID, nextHeight, rewardValidatorTx)
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -188,11 +191,11 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldAdvanceTime {
-		advanceTimeTx, err := m.vm.newAdvanceTimeTx(nextChainTime)
+		advanceTimeTx, err := m.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
 		if err != nil {
 			return nil, err
 		}
-		return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
+		return m.vm.newProposalBlock(preferredID, nextHeight, advanceTimeTx)
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -203,7 +206,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Get the proposal transaction that should be issued.
 	tx := m.PopProposalTx()
-	startTime := tx.UnsignedTx.(TimedTx).StartTime()
+	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
@@ -212,14 +215,14 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if startTime.After(maxChainStartTime) {
 		m.AddProposalTx(tx)
 
-		advanceTimeTx, err := m.vm.newAdvanceTimeTx(m.vm.clock.Time())
+		advanceTimeTx, err := m.vm.txBuilder.NewAdvanceTimeTx(m.vm.clock.Time())
 		if err != nil {
 			return nil, err
 		}
-		return m.vm.newProposalBlock(preferredID, nextHeight, *advanceTimeTx)
+		return m.vm.newProposalBlock(preferredID, nextHeight, advanceTimeTx)
 	}
 
-	return m.vm.newProposalBlock(preferredID, nextHeight, *tx)
+	return m.vm.newProposalBlock(preferredID, nextHeight, tx)
 }
 
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
@@ -270,7 +273,7 @@ func (m *blockBuilder) ResetTimer() {
 	}
 
 	now := m.vm.clock.Time()
-	nextStakerChangeTime, err := getNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
@@ -297,29 +300,29 @@ func (m *blockBuilder) Shutdown() {
 
 // getStakerToReward return the staker txID to remove from the primary network
 // staking set, if one exists.
-func (m *blockBuilder) getStakerToReward(preferredState MutableState) (ids.ID, bool, error) {
+func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
 	}
 
-	currentStakers := preferredState.CurrentStakerChainState()
+	currentStakers := preferredState.CurrentStakers()
 	tx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		return ids.Empty, false, err
 	}
 
-	staker, ok := tx.UnsignedTx.(TimedTx)
+	staker, ok := tx.Unsigned.(txs.StakerTx)
 	if !ok {
-		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.UnsignedTx)
+		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
 	}
 	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
-func (m *blockBuilder) getNextChainTime(preferredState MutableState) (time.Time, bool, error) {
-	nextStakerChangeTime, err := getNextStakerChangeTime(preferredState)
+func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
+	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		return time.Time{}, false, err
 	}
@@ -339,7 +342,7 @@ func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	syncTime := now.Add(syncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
-		startTime := tx.UnsignedTx.(TimedTx).StartTime()
+		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
 			m.AddProposalTx(tx)
 			return true

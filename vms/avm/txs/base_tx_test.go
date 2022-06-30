@@ -83,7 +83,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	tx := &Tx{Unsigned: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
@@ -223,9 +223,7 @@ func TestBaseTxGetters(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
-
-	txID := tx.ID()
+	tx.Initialize(nil)
 
 	if assets := tx.AssetIDs(); assets.Len() != 1 {
 		t.Fatalf("Wrong number of assets returned")
@@ -235,14 +233,6 @@ func TestBaseTxGetters(t *testing.T) {
 		t.Fatalf("Wrong number of consumed assets returned")
 	} else if !assets.Contains(assetID) {
 		t.Fatalf("Wrong consumed asset returned")
-	} else if utxos := tx.UTXOs(); len(utxos) != 1 {
-		t.Fatalf("Wrong number of utxos returned")
-	} else if utxo := utxos[0]; utxo.TxID != txID {
-		t.Fatalf("Wrong tx ID returned")
-	} else if utxoIndex := utxo.OutputIndex; utxoIndex != 0 {
-		t.Fatalf("Wrong output index returned")
-	} else if gotAssetID := utxo.AssetID(); gotAssetID != assetID {
-		t.Fatalf("Wrong asset ID returned")
 	}
 }
 
@@ -282,7 +272,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
@@ -326,7 +316,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 		}},
 		Memo: make([]byte, avax.MaxMemoSize+1),
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatal("should have failed because memo is too large")
@@ -379,7 +369,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong networkID should have erred")
@@ -422,7 +412,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong chain ID should have erred")
@@ -456,7 +446,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid output should have erred")
@@ -513,7 +503,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 			},
 		},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Unsorted outputs should have erred")
@@ -539,7 +529,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 		}},
 		Ins: []*avax.TransferableInput{nil},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid input should have erred")
@@ -602,7 +592,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 			},
 		},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Input overflow should have erred")
@@ -657,7 +647,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Output overflow should have erred")
@@ -700,52 +690,10 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil, nil)
+	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Insufficient funds should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
-		t.Fatalf("Uninitialized tx should have erred")
 	}
 }
 

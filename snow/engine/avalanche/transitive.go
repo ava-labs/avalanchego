@@ -202,6 +202,10 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.attemptToIssueTxs()
 }
 
+func (t *Transitive) ChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, _ ids.ID) error {
+	return t.Chits(nodeID, requestID, votes)
+}
+
 func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.Chits(nodeID, requestID, nil)
 }
@@ -226,7 +230,7 @@ func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }
 

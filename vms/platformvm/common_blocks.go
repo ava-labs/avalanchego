@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 // When one stakes, one must specify the time one will start to validate and
@@ -123,7 +124,7 @@ type decision interface {
 	//    been verified.
 	// 2) The state of the chain after this block is accepted, if this block was
 	//    verified successfully.
-	onAccept() MutableState
+	onAccept() state.Chain
 }
 
 // CommonBlock contains fields and methods common to all blocks in this VM.
@@ -247,10 +248,10 @@ type CommonDecisionBlock struct {
 	CommonBlock `serialize:"true"`
 
 	// state of the chain if this block is accepted
-	onAcceptState VersionedState
+	onAcceptState state.Diff
 
 	// to be executed if this block is accepted
-	onAcceptFunc func() error
+	onAcceptFunc func()
 }
 
 func (cdb *CommonDecisionBlock) free() {
@@ -262,7 +263,7 @@ func (cdb *CommonDecisionBlock) setBaseState() {
 	cdb.onAcceptState.SetBase(cdb.vm.internalState)
 }
 
-func (cdb *CommonDecisionBlock) onAccept() MutableState {
+func (cdb *CommonDecisionBlock) onAccept() state.Chain {
 	if cdb.Status().Decided() || cdb.onAcceptState == nil {
 		return cdb.vm.internalState
 	}
@@ -315,9 +316,7 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 		child.setBaseState()
 	}
 	if ddb.onAcceptFunc != nil {
-		if err := ddb.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute OnAcceptFunc: %w", err)
-		}
+		ddb.onAcceptFunc()
 	}
 
 	// remove this block and its parent from memory

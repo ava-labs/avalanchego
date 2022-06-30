@@ -58,7 +58,7 @@ type ChainRouter struct {
 	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
-	peers        map[ids.NodeID]version.Application
+	peers        map[ids.NodeID]*version.Application
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched        map[ids.NodeID]ids.Set
@@ -100,7 +100,7 @@ func (cr *ChainRouter) Initialize(
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
-	cr.peers = make(map[ids.NodeID]version.Application)
+	cr.peers = make(map[ids.NodeID]*version.Application)
 	cr.peers[nodeID] = version.CurrentApp
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
@@ -296,7 +296,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 }
 
 // Connected routes an incoming notification that a validator was just connected
-func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion version.Application) {
+func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -457,7 +457,6 @@ func (cr *ChainRouter) clearRequest(
 ) (ids.ID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
 	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
-
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
@@ -474,6 +473,10 @@ func (cr *ChainRouter) clearRequest(
 // Assumes [cr.lock] is held.
 // Assumes [message.Op] is an alias of byte.
 func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) ids.ID {
+	// Make sure to standardize chits messages.
+	if op == message.ChitsV2 {
+		op = message.Chits
+	}
 	copy(cr.requestIDBytes, nodeID[:])
 	copy(cr.requestIDBytes[hashing.AddrLen:], chainID[:])
 	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], requestID)

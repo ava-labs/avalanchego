@@ -413,7 +413,7 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 	return handlers, nil
 }
 
-func (vm *VMClient) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (vm *VMClient) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(context.Background(), &vmpb.ConnectedRequest{
 		NodeId:  nodeID[:],
 		Version: nodeVersion.String(),

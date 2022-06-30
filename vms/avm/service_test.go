@@ -796,7 +796,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -886,7 +886,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -991,7 +991,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1098,7 +1098,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1205,7 +1205,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1313,7 +1313,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1418,7 +1418,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
+		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1540,7 +1540,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
 }
 
 func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *txs.Tx {
-	return &txs.Tx{UnsignedTx: &txs.BaseTx{
+	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1575,7 +1575,7 @@ func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *txs.
 }
 
 func buildExportTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *txs.Tx {
-	return &txs.Tx{UnsignedTx: &txs.ExportTx{
+	return &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
@@ -1608,7 +1608,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *tx
 }
 
 func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *txs.Tx {
-	return &txs.Tx{UnsignedTx: &txs.CreateAssetTx{
+	return &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
@@ -1616,56 +1616,60 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *txs.Tx {
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
-		States: []*txs.InitialState{{
-			FxIndex: 0,
-			Outs: []verify.State{
-				&secp256k1fx.MintOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				}, &secp256k1fx.MintOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-			},
-		}, {
-			FxIndex: 1,
-			Outs: []verify.State{
-				&nftfx.MintOutput{
-					GroupID: 1,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-				&nftfx.MintOutput{
-					GroupID: 2,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
+		States: []*txs.InitialState{
+			{
+				FxIndex: 0,
+				Outs: []verify.State{
+					&secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
+					}, &secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
 					},
 				},
 			},
-		}, {
-			FxIndex: 2,
-			Outs: []verify.State{
-				&propertyfx.MintOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			{
+				FxIndex: 1,
+				Outs: []verify.State{
+					&nftfx.MintOutput{
+						GroupID: 1,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
 					},
-				},
-				&propertyfx.MintOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					&nftfx.MintOutput{
+						GroupID: 2,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{key.PublicKey().Address()},
+						},
 					},
 				},
 			},
-		}},
+			{
+				FxIndex: 2,
+				Outs: []verify.State{
+					&propertyfx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+					&propertyfx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				},
+			},
+		},
 	}}
 }
 
@@ -1743,7 +1747,7 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *crypto.PrivateKeySECP256K1R, ou
 }
 
 func buildOperationTxWithOp(op ...*txs.Operation) *txs.Tx {
-	return &txs.Tx{UnsignedTx: &txs.OperationTx{
+	return &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,

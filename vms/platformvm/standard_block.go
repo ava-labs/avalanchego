@@ -10,7 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -25,11 +27,13 @@ var (
 type StandardBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Txs []*Tx `serialize:"true" json:"txs"`
+	Txs []*txs.Tx `serialize:"true" json:"txs"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transactions
 	inputs ids.Set
+
+	atomicRequests map[ids.ID]*atomic.Requests
 }
 
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
@@ -40,7 +44,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		if err := tx.Sign(Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
-		tx.InitCtx(vm.ctx)
+		tx.Unsigned.InitCtx(vm.ctx)
 	}
 	return nil
 }
@@ -86,46 +90,55 @@ func (sb *StandardBlock) Verify() error {
 	}
 
 	parentState := parent.onAccept()
-	sb.onAcceptState = newVersionedState(
+	sb.onAcceptState = state.NewDiff(
 		parentState,
-		parentState.CurrentStakerChainState(),
-		parentState.PendingStakerChainState(),
+		parentState.CurrentStakers(),
+		parentState.PendingStakers(),
 	)
 
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.inputs.Clear()
+	sb.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
-	funcs := make([]func() error, 0, len(sb.Txs))
+	funcs := make([]func(), 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		txID := tx.ID()
-
-		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
-		if !ok {
-			return errWrongTxType
+		executor := standardTxExecutor{
+			vm:    sb.vm,
+			state: sb.onAcceptState,
+			tx:    tx,
 		}
-
-		inputUTXOs := utx.InputUTXOs()
-		// ensure it doesn't overlap with current input batch
-		if sb.inputs.Overlaps(inputUTXOs) {
-			return errConflictingBatchTxs
-		}
-		// Add UTXOs to batch
-		sb.inputs.Union(inputUTXOs)
-
-		onAccept, err := utx.Execute(sb.vm, sb.onAcceptState, tx)
+		err := tx.Unsigned.Visit(&executor)
 		if err != nil {
+			txID := tx.ID()
 			sb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
 		}
 
+		if sb.inputs.Overlaps(executor.inputs) {
+			return errConflictingBatchTxs
+		}
+		sb.inputs.Union(executor.inputs)
+
 		sb.onAcceptState.AddTx(tx, status.Committed)
-		if onAccept != nil {
-			funcs = append(funcs, onAccept)
+		if executor.onAccept != nil {
+			funcs = append(funcs, executor.onAccept)
+		}
+
+		for chainID, txRequests := range executor.atomicRequests {
+			// Add/merge in the atomic requests represented by [tx]
+			chainRequests, exists := sb.atomicRequests[chainID]
+			if !exists {
+				sb.atomicRequests[chainID] = txRequests
+				continue
+			}
+
+			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
+			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
 		}
 	}
 
 	if sb.inputs.Len() > 0 {
-		// ensure it doesnt conflict with the parent block
+		// ensure it doesn't conflict with the parent block
 		conflicts, err := parentIntf.conflicts(sb.inputs)
 		if err != nil {
 			return err
@@ -138,13 +151,10 @@ func (sb *StandardBlock) Verify() error {
 	if numFuncs := len(funcs); numFuncs == 1 {
 		sb.onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		sb.onAcceptFunc = func() error {
+		sb.onAcceptFunc = func() {
 			for _, f := range funcs {
-				if err := f(); err != nil {
-					return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
-				}
+				f()
 			}
-			return nil
 		}
 	}
 
@@ -159,36 +169,6 @@ func (sb *StandardBlock) Verify() error {
 func (sb *StandardBlock) Accept() error {
 	blkID := sb.ID()
 	sb.vm.ctx.Log.Verbo("accepting block with ID %s", blkID)
-
-	// Set up the shared memory operations
-	sharedMemoryOps := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range sb.Txs {
-		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
-		if !ok {
-			return errWrongTxType
-		}
-
-		// Get the shared memory operations this transaction is performing
-		chainID, txRequests, err := utx.AtomicOperations()
-		if err != nil {
-			return err
-		}
-
-		// Only [AtomicTx]s will return operations to be applied to shared memory
-		if txRequests == nil {
-			continue
-		}
-
-		// Add/merge in the atomic requests represented by [tx]
-		chainRequests, exists := sharedMemoryOps[chainID]
-		if !exists {
-			sharedMemoryOps[chainID] = txRequests
-			continue
-		}
-
-		chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
-		chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
-	}
 
 	if err := sb.CommonDecisionBlock.Accept(); err != nil {
 		return fmt.Errorf("failed to accept CommonDecisionBlock: %w", err)
@@ -207,7 +187,7 @@ func (sb *StandardBlock) Accept() error {
 		)
 	}
 
-	if err := sb.vm.ctx.SharedMemory.Apply(sharedMemoryOps, batch); err != nil {
+	if err := sb.vm.ctx.SharedMemory.Apply(sb.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
@@ -215,9 +195,7 @@ func (sb *StandardBlock) Accept() error {
 		child.setBaseState()
 	}
 	if sb.onAcceptFunc != nil {
-		if err := sb.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
-		}
+		sb.onAcceptFunc()
 	}
 
 	sb.free()
@@ -246,7 +224,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txSlice []*txs.Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
@@ -254,13 +232,13 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 				Hght:   height,
 			},
 		},
-		Txs: txs,
+		Txs: txSlice,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(sb)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

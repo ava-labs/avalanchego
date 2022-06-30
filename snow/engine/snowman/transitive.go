@@ -217,6 +217,10 @@ func (t *Transitive) Chits(vdr ids.NodeID, requestID uint32, votes []ids.ID) err
 	return t.buildBlocks()
 }
 
+func (t *Transitive) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
+	return t.Chits(vdr, requestID, []ids.ID{vote})
+}
+
 func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
@@ -247,7 +251,7 @@ func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }
 

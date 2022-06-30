@@ -119,7 +119,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
 	for i, vDBReq := range req.DbServers {
-		version, err := version.DefaultParser.Parse(vDBReq.Version)
+		version, err := version.Parse(vDBReq.Version)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
@@ -347,7 +347,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*e
 		return nil, err
 	}
 
-	peerVersion, err := version.DefaultApplicationParser.Parse(req.Version)
+	peerVersion, err := version.ParseApplication(req.Version)
 	if err != nil {
 		return nil, err
 	}

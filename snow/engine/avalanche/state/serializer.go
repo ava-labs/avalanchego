@@ -163,3 +163,17 @@ func (s *Serializer) getUniqueVertex(vtxID ids.ID) (*uniqueVertex, error) {
 	}
 	return vtx, nil
 }
+
+func (s *Serializer) StopVertexAccepted() (bool, error) {
+	edge := s.Edge()
+	if len(edge) != 1 {
+		return false, nil
+	}
+
+	vtx, err := s.getUniqueVertex(edge[0])
+	if err != nil {
+		return false, err
+	}
+
+	return vtx.v.vtx.StopVertex(), nil
+}
