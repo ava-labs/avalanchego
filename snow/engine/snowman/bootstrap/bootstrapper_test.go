@@ -165,7 +165,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	vm.CantSetState = false
 	vm.CantConnected = true
-	vm.ConnectedF = func(ids.NodeID, version.Application) error { return nil }
+	vm.ConnectedF = func(ids.NodeID, *version.Application) error { return nil }
 
 	frontierRequested := false
 	sender.CantSendGetAcceptedFrontier = false

@@ -58,7 +58,7 @@ type ChainRouter struct {
 	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
-	peers        map[ids.NodeID]version.Application
+	peers        map[ids.NodeID]*version.Application
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched        map[ids.NodeID]ids.Set
@@ -100,7 +100,7 @@ func (cr *ChainRouter) Initialize(
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
-	cr.peers = make(map[ids.NodeID]version.Application)
+	cr.peers = make(map[ids.NodeID]*version.Application)
 	cr.peers[nodeID] = version.CurrentApp
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
@@ -296,7 +296,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 }
 
 // Connected routes an incoming notification that a validator was just connected
-func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion version.Application) {
+func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 

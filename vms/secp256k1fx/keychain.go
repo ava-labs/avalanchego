@@ -120,7 +120,7 @@ func (kc *Keychain) PrefixedString(prefix string) string {
 	for i, key := range kc.Keys {
 		// We assume that the maximum size of a byte slice that
 		// can be stringified is at least the length of a SECP256K1 private key
-		keyStr, _ := formatting.EncodeWithChecksum(defaultEncoding, key.Bytes())
+		keyStr, _ := formatting.Encode(formatting.HexNC, key.Bytes())
 		s.WriteString(fmt.Sprintf(format,
 			prefix,
 			i,

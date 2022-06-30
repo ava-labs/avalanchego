@@ -88,7 +88,7 @@ type testHelpersCollection struct {
 	tState         state.State
 	atomicUtxosMan avax.AtomicUTXOManager
 	uptimeMan      uptime.Manager
-	utxosMan       utxo.Handler
+	utxosHandler   utxo.Handler
 	txBuilder      builder.TxBuilder
 	execBackend    Backend
 }
@@ -160,7 +160,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 		tState:         tState,
 		atomicUtxosMan: atomicUtxosMan,
 		uptimeMan:      uptimeMan,
-		utxosMan:       utxosMan,
+		utxosHandler:   utxosMan,
 		txBuilder:      txBuilder,
 		execBackend:    execBackend,
 	}
