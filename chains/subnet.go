@@ -30,8 +30,8 @@ type SubnetConfig struct {
 	sender.GossipConfig
 
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
-	ValidatorOnly       bool                 `json:"validatorOnly"`
-	ConsensusParameters avalanche.Parameters `json:"consensusParameters"`
+	ValidatorOnly       bool                 `json:"validatorOnly" yaml:"validatorOnly"`
+	ConsensusParameters avalanche.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 }
 
 type subnet struct {

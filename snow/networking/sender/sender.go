@@ -21,15 +21,15 @@ import (
 var _ common.Sender = &sender{}
 
 type GossipConfig struct {
-	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize"`
-	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize"`
-	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize"`
-	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize"`
-	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize"`
-	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize"`
-	AppGossipValidatorSize           uint `json:"appGossipValidatorSize"`
-	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize"`
-	AppGossipPeerSize                uint `json:"appGossipPeerSize"`
+	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize" yaml:"gossipAcceptedFrontierValidatorSize"`
+	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize" yaml:"gossipAcceptedFrontierNonValidatorSize"`
+	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize" yaml:"gossipAcceptedFrontierPeerSize"`
+	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize" yaml:"gossipOnAcceptValidatorSize"`
+	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize" yaml:"gossipOnAcceptNonValidatorSize"`
+	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize" yaml:"gossipOnAcceptPeerSize"`
+	AppGossipValidatorSize           uint `json:"appGossipValidatorSize" yaml:"appGossipValidatorSize"`
+	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize" yaml:"appGossipNonValidatorSize"`
+	AppGossipPeerSize                uint `json:"appGossipPeerSize" yaml:"appGossipPeerSize"`
 }
 
 // sender is a wrapper around an ExternalSender.
@@ -786,6 +786,53 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 			s.ctx.ChainID,
 			requestID,
 			votes,
+		)
+	}
+}
+
+// SendChitsV2 sends chits V2
+func (s *sender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
+	s.ctx.Log.Verbo(
+		"Sending Chits V2 to node %s. RequestID: %d. Votes: %s. Vote: %s",
+		nodeID,
+		requestID,
+		votes,
+		vote,
+	)
+
+	// If [nodeID] is myself, send this message directly
+	// to my own router rather than sending it over the network
+	if nodeID == s.ctx.NodeID {
+		inMsg := s.msgCreator.InboundChitsV2(s.ctx.ChainID, requestID, votes, vote, nodeID)
+		go s.router.HandleInbound(inMsg)
+		return
+	}
+
+	// Create the outbound message.
+	outMsg, err := s.msgCreator.ChitsV2(s.ctx.ChainID, requestID, votes, vote)
+	if err != nil {
+		s.ctx.Log.Error(
+			"failed to build ChitsV2(%s, %d, %s, %s): %s",
+			s.ctx.ChainID,
+			requestID,
+			votes,
+			vote,
+			err,
+		)
+		return
+	}
+
+	// Send the message over the network.
+	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs.Add(nodeID)
+	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
+		s.ctx.Log.Debug(
+			"failed to send ChitsV2(%s, %s, %d, %s, %s)",
+			nodeID,
+			s.ctx.ChainID,
+			requestID,
+			votes,
+			vote,
 		)
 	}
 }

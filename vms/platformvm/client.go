@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ Client = &client{}
@@ -432,7 +434,7 @@ func (c *client) AddValidator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		APIStaker: APIStaker{
+		Staker: platformapi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -463,7 +465,8 @@ func (c *client) AddDelegator(
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
-		}, APIStaker: APIStaker{
+		},
+		Staker: platformapi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -494,7 +497,7 @@ func (c *client) AddSubnetValidator(
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr.String()},
 		},
-		APIStaker: APIStaker{
+		Staker: platformapi.Staker{
 			NodeID:      nodeID,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
@@ -587,7 +590,7 @@ func (c *client) CreateBlockchain(
 	genesisData []byte,
 	options ...rpc.Option,
 ) (ids.ID, error) {
-	genesisDataStr, err := formatting.EncodeWithChecksum(formatting.Hex, genesisData)
+	genesisDataStr, err := formatting.Encode(formatting.Hex, genesisData)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -640,7 +643,7 @@ func (c *client) GetBlockchains(ctx context.Context, options ...rpc.Option) ([]A
 }
 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
-	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}

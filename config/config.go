@@ -565,7 +565,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
 	ipResolutionFreq := v.GetDuration(DynamicUpdateDurationKey)
 	if v.IsSet(PublicIPResolutionFreqKey) {
-		ipResolutionService = v.GetString(PublicIPResolutionFreqKey)
+		ipResolutionFreq = v.GetDuration(PublicIPResolutionFreqKey)
 	}
 	if ipResolutionFreq <= 0 {
 		return node.IPConfig{}, fmt.Errorf("%q must be > 0", PublicIPResolutionFreqKey)

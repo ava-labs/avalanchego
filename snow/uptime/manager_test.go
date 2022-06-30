@@ -32,7 +32,7 @@ func TestStartTracking(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestStartTrackingDBError(t *testing.T) {
@@ -85,7 +85,7 @@ func TestStartTrackingInThePast(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(startTime, lastUpdated)
+	assert.Equal(startTime.Truncate(time.Second), lastUpdated)
 }
 
 func TestShutdownDecreasesUptime(t *testing.T) {
@@ -119,7 +119,7 @@ func TestShutdownDecreasesUptime(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestShutdownIncreasesUptime(t *testing.T) {
@@ -156,7 +156,7 @@ func TestShutdownIncreasesUptime(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestShutdownDisconnectedNonValidator(t *testing.T) {
@@ -219,7 +219,7 @@ func TestShutdownNonConnectedPast(t *testing.T) {
 	duration, lastUpdated, err := s.GetUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(startTime, lastUpdated)
+	assert.Equal(startTime.Truncate(time.Second), lastUpdated)
 }
 
 func TestShutdownNonConnectedDBError(t *testing.T) {
@@ -270,7 +270,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 
 	err = up.Connect(nodeID0)
 	assert.NoError(err)
@@ -284,7 +284,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 	duration, lastUpdated, err = up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 
 	err = up.Disconnect(nodeID0)
 	assert.NoError(err)
@@ -298,7 +298,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 	duration, lastUpdated, err = up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
@@ -330,7 +330,7 @@ func TestConnectAndDisconnectBeforeTracking(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(2*time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestUnrelatedNodeDisconnect(t *testing.T) {
@@ -353,7 +353,7 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 
 	err = up.Connect(nodeID0)
 	assert.NoError(err)
@@ -367,7 +367,7 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	duration, lastUpdated, err = up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 
 	err = up.Disconnect(nodeID1)
 	assert.NoError(err)
@@ -378,7 +378,7 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	duration, lastUpdated, err = up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(2*time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
@@ -398,7 +398,7 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	assert.NoError(err)
@@ -433,7 +433,7 @@ func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(2*time.Second, duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
@@ -464,7 +464,7 @@ func TestCalculateUptimeWhenConnectedInFuture(t *testing.T) {
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	assert.NoError(err)
 	assert.Equal(time.Duration(0), duration)
-	assert.Equal(currentTime, lastUpdated)
+	assert.Equal(up.clock.UnixTime(), lastUpdated)
 }
 
 func TestCalculateUptimeNonValidator(t *testing.T) {
@@ -494,7 +494,7 @@ func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 	up := NewManager(s).(*manager)
 	up.clock.Set(currentTime)
 
-	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
+	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime.Truncate(time.Second))
 	assert.NoError(err)
 	assert.Equal(float64(1), uptime)
 }
@@ -517,4 +517,51 @@ func TestCalculateUptimePercentage(t *testing.T) {
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	assert.NoError(err)
 	assert.Equal(float64(0), uptime)
+}
+
+func TestShutdownUnixTimeRegression(t *testing.T) {
+	assert := assert.New(t)
+
+	nodeID0 := ids.GenerateTestNodeID()
+	currentTime := time.Now()
+	startTime := currentTime
+
+	s := NewTestState()
+	s.AddNode(nodeID0, startTime)
+
+	up := NewManager(s).(*manager)
+	up.clock.Set(currentTime)
+
+	err := up.StartTracking([]ids.NodeID{nodeID0})
+	assert.NoError(err)
+
+	err = up.Connect(nodeID0)
+	assert.NoError(err)
+
+	currentTime = startTime.Add(time.Second)
+	up.clock.Set(currentTime)
+
+	err = up.Shutdown([]ids.NodeID{nodeID0})
+	assert.NoError(err)
+
+	currentTime = startTime.Add(time.Second)
+	up.clock.Set(currentTime)
+
+	up = NewManager(s).(*manager)
+
+	currentTime = startTime.Add(time.Second)
+	up.clock.Set(currentTime)
+
+	err = up.StartTracking([]ids.NodeID{nodeID0})
+	assert.NoError(err)
+
+	err = up.Connect(nodeID0)
+	assert.NoError(err)
+
+	currentTime = startTime.Add(time.Second)
+	up.clock.Set(currentTime)
+
+	perc, err := up.CalculateUptimePercent(nodeID0)
+	assert.NoError(err)
+	assert.GreaterOrEqual(float64(1), perc)
 }

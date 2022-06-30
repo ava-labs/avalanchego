@@ -48,7 +48,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	}
 
 	log := fx.VM.Logger()
-	log.Debug("initializing secp561k1 fx")
+	log.Debug("initializing secp256k1 fx")
 
 	fx.SECPFactory = crypto.FactorySECP256K1R{
 		Cache: cache.LRU{Size: defaultCacheSize},
@@ -80,7 +80,7 @@ func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
 // VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
 func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
-	tx, ok := txIntf.(Tx)
+	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -103,7 +103,7 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 }
 
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
-	tx, ok := txIntf.(Tx)
+	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -125,7 +125,7 @@ func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []
 	return fx.verifyOperation(tx, op, cred, out)
 }
 
-func (fx *Fx) verifyOperation(tx Tx, op *MintOperation, cred *Credential, utxo *MintOutput) error {
+func (fx *Fx) verifyOperation(tx UnsignedTx, op *MintOperation, cred *Credential, utxo *MintOutput) error {
 	if err := verify.All(op, cred, utxo); err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (fx *Fx) verifyOperation(tx Tx, op *MintOperation, cred *Credential, utxo *
 }
 
 func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) error {
-	tx, ok := txIntf.(Tx)
+	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -156,19 +156,19 @@ func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) err
 }
 
 // VerifySpend ensures that the utxo can be sent to any address
-func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *TransferOutput) error {
+func (fx *Fx) VerifySpend(utx UnsignedTx, in *TransferInput, cred *Credential, utxo *TransferOutput) error {
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
 	} else if utxo.Amt != in.Amt {
 		return fmt.Errorf("utxo amount and input amount should be same but are %d and %d", utxo.Amt, in.Amt)
 	}
 
-	return fx.VerifyCredentials(tx, &in.Input, cred, &utxo.OutputOwners)
+	return fx.VerifyCredentials(utx, &in.Input, cred, &utxo.OutputOwners)
 }
 
 // VerifyCredentials ensures that the output can be spent by the input with the
 // credential. A nil return values means the output can be spent.
-func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputOwners) error {
+func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out *OutputOwners) error {
 	numSigs := len(in.SigIndices)
 	switch {
 	case out.Locktime > fx.VM.Clock().Unix():
@@ -183,7 +183,7 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 		return nil
 	}
 
-	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
+	txHash := hashing.ComputeHash256(utx.Bytes())
 	for i, index := range in.SigIndices {
 		// Make sure the input references an address that exists
 		if index >= uint32(len(out.Addrs)) {

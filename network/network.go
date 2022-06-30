@@ -214,7 +214,6 @@ func NewNetwork(
 		Network:              nil, // This is set below.
 		Router:               router,
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
-		VersionParser:        version.DefaultApplicationParser,
 		MySubnets:            config.WhitelistedSubnets,
 		Beacons:              config.Beacons,
 		NetworkID:            config.NetworkID,
@@ -994,6 +993,9 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 
 	n.peerConfig.Log.Verbo("starting handshake with %s", nodeID)
 
+	// peer.Start requires there is only ever one peer instance running with the
+	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above
+	// de-duplications for [connectingPeers] and [connectedPeers].
 	peer := peer.Start(
 		n.peerConfig,
 		tlsConn,

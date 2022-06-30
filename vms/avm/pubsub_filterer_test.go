@@ -28,7 +28,7 @@ func TestFilter(t *testing.T) {
 	assert := assert.New(t)
 
 	addrID := ids.ShortID{1}
-	tx := txs.Tx{UnsignedTx: &txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		Outs: []*avax.TransferableOutput{
 			{
 				Out: &secp256k1fx.TransferOutput{

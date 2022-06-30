@@ -9,8 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -37,12 +37,12 @@ var (
 )
 
 func init() {
-	b, err := formatting.Decode(formatting.CB58, "31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	b, err := cb58.Decode("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
 	if err != nil {
 		panic(err)
 	}
 	copy(addr2[:], b)
-	b, err = formatting.Decode(formatting.CB58, "c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	b, err = cb58.Decode("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 	if err := fx.Bootstrapped(); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -163,7 +163,7 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	in := &TransferInput{
 		Amt: 1,
 		Input: Input{
@@ -192,7 +192,7 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -225,7 +225,7 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -259,7 +259,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -298,7 +298,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -337,7 +337,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -376,7 +376,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -416,7 +416,7 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -453,7 +453,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -496,7 +496,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	if err := fx.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -546,7 +546,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 	if err := fx.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -593,7 +593,7 @@ func TestFxVerifyOperation(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -704,7 +704,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -737,7 +737,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -788,7 +788,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -844,7 +844,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	op := &MintOperation{
 		MintInput: Input{
 			SigIndices: []uint32{0},
@@ -892,7 +892,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -945,7 +945,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
-	tx := &TestTx{Bytes: txBytes}
+	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -1003,7 +1003,7 @@ func TestVerifyPermission(t *testing.T) {
 
 	type test struct {
 		description string
-		tx          Tx
+		tx          UnsignedTx
 		in          *Input
 		cred        *Credential
 		cg          *OutputOwners
@@ -1012,7 +1012,7 @@ func TestVerifyPermission(t *testing.T) {
 	tests := []test{
 		{
 			"threshold 0, no sigs, has addrs",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
 			&OutputOwners{
@@ -1023,7 +1023,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 0, no sigs, no addrs",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
 			&OutputOwners{
@@ -1034,7 +1034,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 1, 1 sig",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{
@@ -1045,7 +1045,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 0, 1 sig (too many sigs)",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{
@@ -1056,7 +1056,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 1, 0 sigs (too few sigs)",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
 			&OutputOwners{
@@ -1067,7 +1067,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 1, 1 incorrect sig",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{
@@ -1078,7 +1078,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"repeated sig",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
 			&OutputOwners{
@@ -1089,7 +1089,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 2, repeated address and repeated sig",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 1}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
 			&OutputOwners{
@@ -1100,7 +1100,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 2, 2 sigs",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 1}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
@@ -1111,7 +1111,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 2, 2 sigs reversed (should be sorted)",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{1, 0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sig2Bytes, sigBytes}},
 			&OutputOwners{
@@ -1122,7 +1122,7 @@ func TestVerifyPermission(t *testing.T) {
 		},
 		{
 			"threshold 1, 1 sig, index out of bounds",
-			&TestTx{Bytes: txBytes},
+			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{1}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{

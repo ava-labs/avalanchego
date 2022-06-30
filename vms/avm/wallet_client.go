@@ -64,7 +64,7 @@ func NewWalletClient(uri, chain string) WalletClient {
 }
 
 func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
-	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
+	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}

@@ -39,6 +39,7 @@ var (
 	errPullQuery                     = errors.New("unexpectedly called PullQuery")
 	errQueryFailed                   = errors.New("unexpectedly called QueryFailed")
 	errChits                         = errors.New("unexpectedly called Chits")
+	errChitsV2                       = errors.New("unexpectedly called ChitsV2")
 	errStart                         = errors.New("unexpectedly called Start")
 
 	_ Engine = &EngineTest{}
@@ -87,6 +88,7 @@ type EngineTest struct {
 	CantPullQuery,
 	CantQueryFailed,
 	CantChits,
+	CantChitsV2,
 
 	CantConnected,
 	CantDisconnected,
@@ -110,13 +112,14 @@ type EngineTest struct {
 	PutF, PushQueryF                                   func(nodeID ids.NodeID, requestID uint32, container []byte) error
 	AncestorsF                                         func(nodeID ids.NodeID, requestID uint32, containers [][]byte) error
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error
+	ChitsV2F                                           func(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID, containerID ids.ID) error
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(nodeID ids.NodeID, requestID uint32) error
 	StateSummaryFrontierF     func(nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF  func(nodeID ids.NodeID, requestID uint32, keys []uint64) error
 	AcceptedStateSummaryF     func(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
-	ConnectedF                func(nodeID ids.NodeID, nodeVersion version.Application) error
+	ConnectedF                func(nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF             func(nodeID ids.NodeID) error
 	HealthF                   func() (interface{}, error)
 	GetVMF                    func() VM
@@ -565,7 +568,20 @@ func (e *EngineTest) Chits(nodeID ids.NodeID, requestID uint32, containerIDs []i
 	return errChits
 }
 
-func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (e *EngineTest) ChitsV2(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID, containerID ids.ID) error {
+	if e.ChitsV2F != nil {
+		return e.ChitsV2F(nodeID, requestID, containerIDs, containerID)
+	}
+	if !e.CantChitsV2 {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatal(errChitsV2)
+	}
+	return errChitsV2
+}
+
+func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if e.ConnectedF != nil {
 		return e.ConnectedF(nodeID, nodeVersion)
 	}

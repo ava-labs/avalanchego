@@ -63,7 +63,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	}
 
 	// Preload DB with key showing height index has been purged of rejected blocks
-	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 	stopHeightReindexing(t, innerVM, dbManager)
 

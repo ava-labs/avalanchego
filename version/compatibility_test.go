@@ -12,13 +12,33 @@ import (
 )
 
 func TestCompatibility(t *testing.T) {
-	v := NewDefaultApplication("avalanche", 1, 4, 3)
-	minCompatable := NewDefaultApplication("avalanche", 1, 4, 0)
+	v := &Application{
+		Major: 1,
+		Minor: 4,
+		Patch: 3,
+	}
+	minCompatable := &Application{
+		Major: 1,
+		Minor: 4,
+		Patch: 0,
+	}
 	minCompatableTime := time.Unix(9000, 0)
-	prevMinCompatable := NewDefaultApplication("avalanche", 1, 3, 0)
-	minUnmaskable := NewDefaultApplication("avalanche", 1, 2, 0)
+	prevMinCompatable := &Application{
+		Major: 1,
+		Minor: 3,
+		Patch: 0,
+	}
+	minUnmaskable := &Application{
+		Major: 1,
+		Minor: 2,
+		Patch: 0,
+	}
 	minUnmaskableTime := time.Unix(7000, 0)
-	prevMinUnmaskable := NewDefaultApplication("avalanche", 1, 1, 0)
+	prevMinUnmaskable := &Application{
+		Major: 1,
+		Minor: 1,
+		Patch: 0,
+	}
 
 	compatibility := NewCompatibility(
 		v,
@@ -33,7 +53,7 @@ func TestCompatibility(t *testing.T) {
 	assert.Equal(t, minUnmaskableTime, compatibility.MaskTime())
 
 	tests := []struct {
-		peer        Application
+		peer        *Application
 		time        time.Time
 		connectable bool
 		compatible  bool
@@ -41,7 +61,11 @@ func TestCompatibility(t *testing.T) {
 		wontMask    bool
 	}{
 		{
-			peer:        NewDefaultApplication("avalanche", 1, 5, 0),
+			peer: &Application{
+				Major: 1,
+				Minor: 5,
+				Patch: 0,
+			},
 			time:        minCompatableTime,
 			connectable: true,
 			compatible:  true,
@@ -49,7 +73,11 @@ func TestCompatibility(t *testing.T) {
 			wontMask:    true,
 		},
 		{
-			peer:        NewDefaultApplication("avalanche", 1, 3, 5),
+			peer: &Application{
+				Major: 1,
+				Minor: 3,
+				Patch: 5,
+			},
 			time:        time.Unix(8500, 0),
 			connectable: true,
 			compatible:  true,
@@ -57,7 +85,11 @@ func TestCompatibility(t *testing.T) {
 			wontMask:    true,
 		},
 		{
-			peer:        NewDefaultApplication("ava", 1, 5, 0),
+			peer: &Application{
+				Major: 0,
+				Minor: 1,
+				Patch: 0,
+			},
 			time:        minCompatableTime,
 			connectable: false,
 			compatible:  false,
@@ -65,15 +97,11 @@ func TestCompatibility(t *testing.T) {
 			wontMask:    false,
 		},
 		{
-			peer:        NewDefaultApplication("avalanche", 0, 1, 0),
-			time:        minCompatableTime,
-			connectable: false,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
-		},
-		{
-			peer:        NewDefaultApplication("avalanche", 1, 3, 5),
+			peer: &Application{
+				Major: 1,
+				Minor: 3,
+				Patch: 5,
+			},
 			time:        minCompatableTime,
 			connectable: true,
 			compatible:  false,
@@ -81,7 +109,11 @@ func TestCompatibility(t *testing.T) {
 			wontMask:    false,
 		},
 		{
-			peer:        NewDefaultApplication("avalanche", 1, 2, 5),
+			peer: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 5,
+			},
 			time:        time.Unix(8500, 0),
 			connectable: true,
 			compatible:  false,
@@ -89,7 +121,11 @@ func TestCompatibility(t *testing.T) {
 			wontMask:    false,
 		},
 		{
-			peer:        NewDefaultApplication("avalanche", 1, 1, 5),
+			peer: &Application{
+				Major: 1,
+				Minor: 1,
+				Patch: 5,
+			},
 			time:        time.Unix(7500, 0),
 			connectable: true,
 			compatible:  false,
@@ -97,7 +133,11 @@ func TestCompatibility(t *testing.T) {
 			wontMask:    false,
 		},
 		{
-			peer:        NewDefaultApplication("avalanche", 1, 1, 5),
+			peer: &Application{
+				Major: 1,
+				Minor: 1,
+				Patch: 5,
+			},
 			time:        time.Unix(6500, 0),
 			connectable: true,
 			compatible:  false,

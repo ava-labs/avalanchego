@@ -30,7 +30,13 @@ func (c *Clock) Time() time.Time {
 	return time.Now()
 }
 
-// Unix returns the unix time on this clock.
+// Time returns the unix time on this clock
+func (c *Clock) UnixTime() time.Time {
+	resTime := c.Time()
+	return resTime.Truncate(time.Second)
+}
+
+// Unix returns the unix timestamp on this clock.
 func (c *Clock) Unix() uint64 {
 	unix := c.Time().Unix()
 	if unix < 0 {

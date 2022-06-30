@@ -28,29 +28,29 @@ const (
 
 // Parameters required for snowball consensus
 type Parameters struct {
-	K                 int `json:"k"`
-	Alpha             int `json:"alpha"`
-	BetaVirtuous      int `json:"betaVirtuous"`
-	BetaRogue         int `json:"betaRogue"`
-	ConcurrentRepolls int `json:"concurrentRepolls"`
-	OptimalProcessing int `json:"optimalProcessing"`
+	K                 int `json:"k" yaml:"k"`
+	Alpha             int `json:"alpha" yaml:"alpha"`
+	BetaVirtuous      int `json:"betaVirtuous" yaml:"betaVirtuous"`
+	BetaRogue         int `json:"betaRogue" yaml:"betaRogue"`
+	ConcurrentRepolls int `json:"concurrentRepolls" yaml:"concurrentRepolls"`
+	OptimalProcessing int `json:"optimalProcessing" yaml:"optimalProcessing"`
 
 	// Reports unhealthy if more than this number of items are outstanding.
-	MaxOutstandingItems int `json:"maxOutstandingItems"`
+	MaxOutstandingItems int `json:"maxOutstandingItems" yaml:"maxOutstandingItems"`
 
 	// Reports unhealthy if there is an item processing for longer than this
 	// duration.
-	MaxItemProcessingTime time.Duration `json:"maxItemProcessingTime"`
+	MaxItemProcessingTime time.Duration `json:"maxItemProcessingTime" yaml:"maxItemProcessingTime"`
 
 	// If this node is a validator, when a container is inserted into consensus,
 	// send a Push Query to this many validators and a Pull Query to the other
 	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
-	MixedQueryNumPushVdr int `json:"mixedQueryNumPushVdr"`
+	MixedQueryNumPushVdr int `json:"mixedQueryNumPushVdr" yaml:"mixedQueryNumPushVdr"`
 
 	// If this node is not a validator, when a container is inserted into consensus,
 	// send a Push Query to this many validators and a Pull Query to the other
 	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
-	MixedQueryNumPushNonVdr int `json:"mixedQueryNumPushNonVdr"`
+	MixedQueryNumPushNonVdr int `json:"mixedQueryNumPushNonVdr" yaml:"mixedQueryNumPushNonVdr"`
 }
 
 // Verify returns nil if the parameters describe a valid initialization.
