@@ -45,11 +45,9 @@ func (c *client) PublishBlockchain(ctx context.Context, blockchainID string, opt
 }
 
 func (c *client) UnpublishBlockchain(ctx context.Context, blockchainID string, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "unpublishBlockchain", &UnpublishBlockchainArgs{
+	return c.requester.SendRequest(ctx, "unpublishBlockchain", &UnpublishBlockchainArgs{
 		BlockchainID: blockchainID,
-	}, res, options...)
-	return err
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetPublishedBlockchains(ctx context.Context, options ...rpc.Option) ([]ids.ID, error) {
