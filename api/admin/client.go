@@ -45,45 +45,33 @@ func NewClient(uri string) Client {
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "lockProfile", struct{}{}, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "lockProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "alias", &AliasArgs{
+	return c.requester.SendRequest(ctx, "alias", &AliasArgs{
 		Endpoint: endpoint,
 		Alias:    alias,
-	}, res, options...)
-	return err
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
+	return c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
 		Chain: chain,
 		Alias: alias,
-	}, res, options...)
-	return err
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetChainAliases(ctx context.Context, chain string, options ...rpc.Option) ([]string, error) {
@@ -95,9 +83,7 @@ func (c *client) GetChainAliases(ctx context.Context, chain string, options ...r
 }
 
 func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "stacktrace", struct{}{}, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "stacktrace", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LoadVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error) {
@@ -114,7 +100,6 @@ func (c *client) SetLoggerLevel(
 	options ...rpc.Option,
 ) error {
 	var (
-		res             = &api.EmptyReply{}
 		logLevelArg     logging.Level
 		displayLevelArg logging.Level
 		err             error
@@ -135,7 +120,7 @@ func (c *client) SetLoggerLevel(
 		LoggerName:   loggerName,
 		LogLevel:     &logLevelArg,
 		DisplayLevel: &displayLevelArg,
-	}, res, options...)
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetLoggerLevel(
