@@ -11,10 +11,8 @@ import (
 
 // This file contains structs used in arguments and responses in services
 
-// SuccessResponse indicates success of an API call
-type SuccessResponse struct {
-	Success bool `json:"success"`
-}
+// EmptyReply indicates that an api doesn't have a response to return.
+type EmptyReply struct{}
 
 // JSONTxID contains the ID of a transaction
 type JSONTxID struct {

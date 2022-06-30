@@ -19,17 +19,15 @@ type service struct {
 	ks *keystore
 }
 
-func (s *service) CreateUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
+func (s *service) CreateUser(_ *http.Request, args *api.UserPass, _ *api.EmptyReply) error {
 	s.ks.log.Debug("Keystore: CreateUser called with %.*s", maxUserLen, args.Username)
 
-	reply.Success = true
 	return s.ks.CreateUser(args.Username, args.Password)
 }
 
-func (s *service) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
+func (s *service) DeleteUser(_ *http.Request, args *api.UserPass, _ *api.EmptyReply) error {
 	s.ks.log.Debug("Keystore: DeleteUser called with %s", args.Username)
 
-	reply.Success = true
 	return s.ks.DeleteUser(args.Username, args.Password)
 }
 
@@ -54,7 +52,7 @@ type ImportUserArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.SuccessResponse) error {
+func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, _ *api.EmptyReply) error {
 	s.ks.log.Debug("Keystore: ImportUser called for %s", args.Username)
 
 	// Decode the user from string to bytes
@@ -63,7 +61,6 @@ func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.S
 		return fmt.Errorf("couldn't decode 'user' to bytes: %w", err)
 	}
 
-	reply.Success = true
 	return s.ks.ImportUser(args.Username, args.Password, user)
 }
 
