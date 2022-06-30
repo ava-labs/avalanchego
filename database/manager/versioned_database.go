@@ -12,7 +12,7 @@ import (
 
 type VersionedDatabase struct {
 	Database database.Database
-	Version  version.Version
+	Version  *version.Semantic
 }
 
 // Close the underlying database

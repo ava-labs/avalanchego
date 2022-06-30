@@ -18,7 +18,7 @@ type Client interface {
 	// PublishBlockchain requests the node to begin publishing consensus and decision events
 	PublishBlockchain(ctx context.Context, chainID string, options ...rpc.Option) (*PublishBlockchainReply, error)
 	// UnpublishBlockchain requests the node to stop publishing consensus and decision events
-	UnpublishBlockchain(ctx context.Context, chainID string, options ...rpc.Option) (bool, error)
+	UnpublishBlockchain(ctx context.Context, chainID string, options ...rpc.Option) error
 	// GetPublishedBlockchains requests the node to get blockchains being published
 	GetPublishedBlockchains(ctx context.Context, options ...rpc.Option) ([]ids.ID, error)
 }
@@ -44,12 +44,10 @@ func (c *client) PublishBlockchain(ctx context.Context, blockchainID string, opt
 	return res, err
 }
 
-func (c *client) UnpublishBlockchain(ctx context.Context, blockchainID string, options ...rpc.Option) (bool, error) {
-	res := &api.SuccessResponse{}
-	err := c.requester.SendRequest(ctx, "unpublishBlockchain", &UnpublishBlockchainArgs{
+func (c *client) UnpublishBlockchain(ctx context.Context, blockchainID string, options ...rpc.Option) error {
+	return c.requester.SendRequest(ctx, "unpublishBlockchain", &UnpublishBlockchainArgs{
 		BlockchainID: blockchainID,
-	}, res, options...)
-	return res.Success, err
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetPublishedBlockchains(ctx context.Context, options ...rpc.Option) ([]ids.ID, error) {

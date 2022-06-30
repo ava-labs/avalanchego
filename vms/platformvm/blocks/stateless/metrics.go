@@ -6,5 +6,5 @@ package stateless
 type Metrics interface {
 	MarkAcceptedOptionVote()
 	MarkRejectedOptionVote()
-	RegisterBlock(b CommonBlockIntf) error
+	MarkAccepted(b CommonBlockIntf) error
 }

@@ -9,35 +9,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
 
-var preFundedKeys []*crypto.PrivateKeySECP256K1R
-
-func init() {
-	dummyCtx := snow.DefaultContextTest()
-	preFundedKeys = make([]*crypto.PrivateKeySECP256K1R, 0)
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
-		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
-	} {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
-		dummyCtx.Log.AssertNoError(err)
-		pk, err := factory.ToPrivateKey(privKeyBytes)
-		dummyCtx.Log.AssertNoError(err)
-		preFundedKeys = append(preFundedKeys, pk.(*crypto.PrivateKeySECP256K1R))
-	}
-}
+var preFundedKeys = crypto.BuildTestKeys()
 
 func TestStandardBlocks(t *testing.T) {
 	// check preFork standard block can be built and parsed
@@ -61,7 +40,7 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := ParseWithCodec(preForkStdBlk.Bytes(), cdc)
+		parsed, err := Parse(preForkStdBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -93,7 +72,7 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = ParseWithCodec(postForkStdBlk.Bytes(), cdc)
+		parsed, err = Parse(postForkStdBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -134,7 +113,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := ParseWithCodec(preForkProposalBlk.Bytes(), cdc)
+		parsed, err := Parse(preForkProposalBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -166,7 +145,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = ParseWithCodec(postForkProposalBlk.Bytes(), cdc)
+		parsed, err = Parse(postForkProposalBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -204,7 +183,7 @@ func TestCommitBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := ParseWithCodec(preForkCommitBlk.Bytes(), cdc)
+		parsed, err := Parse(preForkCommitBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -231,7 +210,7 @@ func TestCommitBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = ParseWithCodec(postForkCommitBlk.Bytes(), cdc)
+		parsed, err = Parse(postForkCommitBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -263,7 +242,7 @@ func TestAbortBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := ParseWithCodec(preForkAbortBlk.Bytes(), cdc)
+		parsed, err := Parse(preForkAbortBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
@@ -290,7 +269,7 @@ func TestAbortBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = ParseWithCodec(postForkAbortBlk.Bytes(), cdc)
+		parsed, err = Parse(postForkAbortBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content

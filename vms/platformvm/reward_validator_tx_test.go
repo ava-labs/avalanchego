@@ -22,7 +22,7 @@ import (
 
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := manager.NewMemDB(version.DefaultVersion1_0_0)
+	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
@@ -227,7 +227,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := manager.NewMemDB(version.DefaultVersion1_0_0)
+	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{

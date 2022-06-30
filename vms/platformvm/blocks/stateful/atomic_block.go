@@ -172,7 +172,7 @@ func (ab *AtomicBlock) Accept() error {
 
 	ab.accept()
 	ab.verifier.AddStatelessBlock(ab.AtomicBlockIntf, ab.Status())
-	if err := ab.verifier.RegisterBlock(ab.AtomicBlockIntf); err != nil {
+	if err := ab.verifier.MarkAccepted(ab.AtomicBlockIntf); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 

@@ -214,7 +214,7 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) erro
 	return b.fetch(vtxID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}

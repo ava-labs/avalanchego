@@ -25,7 +25,7 @@ type StandardTxExecutor struct {
 	Tx    *txs.Tx
 
 	// outputs of visitor execution
-	OnAccept       func()
+	OnAccept       func() // may be nil
 	Inputs         ids.Set
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
