@@ -39,9 +39,7 @@ func NewClient(uri string) Client {
 }
 
 func (c *client) CreateUser(ctx context.Context, user api.UserPass, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "createUser", &user, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "createUser", &user, &api.EmptyReply{}, options...)
 }
 
 func (c *client) ListUsers(ctx context.Context, options ...rpc.Option) ([]string, error) {
@@ -67,17 +65,13 @@ func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []by
 		return err
 	}
 
-	res := &api.EmptyReply{}
-	err = c.requester.SendRequest(ctx, "importUser", &ImportUserArgs{
+	return c.requester.SendRequest(ctx, "importUser", &ImportUserArgs{
 		UserPass: user,
 		User:     accountStr,
 		Encoding: formatting.Hex,
-	}, res, options...)
-	return err
+	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) DeleteUser(ctx context.Context, user api.UserPass, options ...rpc.Option) error {
-	res := &api.EmptyReply{}
-	err := c.requester.SendRequest(ctx, "deleteUser", &user, res, options...)
-	return err
+	return c.requester.SendRequest(ctx, "deleteUser", &user, &api.EmptyReply{}, options...)
 }
