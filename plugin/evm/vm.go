@@ -734,7 +734,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		}
 
 		// Ensure that adding [tx] to the block will not exceed the block size soft limit.
-		txSize := len(tx.Bytes())
+		txSize := len(tx.SignedBytes())
 		if size+txSize > targetAtomicTxsSize {
 			vm.mempool.CancelCurrentTx(tx.ID())
 			break

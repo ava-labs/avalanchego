@@ -286,7 +286,7 @@ func (n *pushGossiper) gossipAtomicTx(tx *Tx) error {
 	n.recentAtomicTxs.Put(txID, nil)
 
 	msg := message.AtomicTxGossip{
-		Tx: tx.Bytes(),
+		Tx: tx.SignedBytes(),
 	}
 	msgBytes, err := message.BuildGossipMessage(n.codec, msg)
 	if err != nil {

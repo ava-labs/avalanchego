@@ -94,8 +94,8 @@ type UnsignedTx interface {
 	ID() ids.ID
 	GasUsed(fixedFee bool) (uint64, error)
 	Burned(assetID ids.ID) (uint64, error)
-	UnsignedBytes() []byte
 	Bytes() []byte
+	SignedBytes() []byte
 }
 
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
