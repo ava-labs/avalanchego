@@ -4,8 +4,6 @@
 package stateful
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -20,6 +18,12 @@ var (
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.
 type AbortBlock struct {
+	// TODO set this field
+	verifier2 Verifier2
+	// TODO set this field
+	acceptor Acceptor
+	// TODO set this field
+	rejector Rejector
 	*stateless.AbortBlock
 	*doubleDecisionBlock
 
@@ -30,7 +34,7 @@ type AbortBlock struct {
 // block, has ID [parentID]. Additionally the block will track if it was
 // originally preferred or not for metrics.
 func NewAbortBlock(
-	verifier Verifier,
+	verifier Verifier2,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -45,7 +49,7 @@ func NewAbortBlock(
 
 func toStatefulAbortBlock(
 	statelessBlk *stateless.AbortBlock,
-	verifier Verifier,
+	verifier Verifier2,
 	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
@@ -69,37 +73,11 @@ func toStatefulAbortBlock(
 }
 
 func (a *AbortBlock) Accept() error {
-	if a.txExecutorBackend.Bootstrapped.GetValue() {
-		if a.wasPreferred {
-			a.verifier.MarkAcceptedOptionVote()
-		} else {
-			a.verifier.MarkRejectedOptionVote()
-		}
-	}
-
-	if err := a.doubleDecisionBlock.acceptParent(); err != nil {
-		return err
-	}
-	a.accept()
-	a.verifier.AddStatelessBlock(a.AbortBlock, a.Status())
-	if err := a.verifier.MarkAccepted(a.AbortBlock); err != nil {
-		return fmt.Errorf("failed to accept accept option block %s: %w", a.ID(), err)
-	}
-
-	return a.doubleDecisionBlock.updateState()
+	return a.acceptor.acceptAbortBlock(a)
 }
 
 func (a *AbortBlock) Reject() error {
-	a.txExecutorBackend.Ctx.Log.Verbo(
-		"Rejecting Abort Block %s at height %d with parent %s",
-		a.ID(),
-		a.Height(),
-		a.Parent(),
-	)
-
-	defer a.reject()
-	a.verifier.AddStatelessBlock(a.AbortBlock, a.Status())
-	return a.verifier.Commit()
+	return a.rejector.rejectAbortBlock(a)
 }
 
 // Verify this block performs a valid state transition.
@@ -108,25 +86,5 @@ func (a *AbortBlock) Reject() error {
 //
 // This function also sets onAcceptState if the verification passes.
 func (a *AbortBlock) Verify() error {
-	if err := a.verify(); err != nil {
-		return err
-	}
-
-	parentIntf, err := a.parentBlock()
-	if err != nil {
-		return err
-	}
-
-	// The parent of an Abort block should always be a proposal
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
-	a.onAcceptState = parent.onAbortState
-	a.timestamp = a.onAcceptState.GetTimestamp()
-
-	a.verifier.CacheVerifiedBlock(a)
-	parent.addChild(a)
-	return nil
+	return a.verifier2.verifyAbortBlock(a)
 }

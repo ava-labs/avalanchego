@@ -86,6 +86,11 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	}
 
 	// Get the preferred block (which we want to build off)
+	preferredState, err := b.vm.onAccept(b)
+	if err != nil {
+		return err
+	}
+	/* TODO remove
 	preferred, err := b.vm.Preferred()
 	if err != nil {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
@@ -97,6 +102,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
 	preferredState := preferredDecision.OnAccept()
+	*/
 	verifier := executor.MempoolTxVerifier{
 		Backend:     &b.vm.txExecutorBackend,
 		ParentState: preferredState,
@@ -131,18 +137,24 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
+	preferredState, err := b.vm.onAccept(preferred)
+	if err != nil {
+		return nil, err
+	}
+	/* TODO remove
 	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
 	}
 	preferredState := preferredDecision.OnAccept()
+	*/
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		return stateful.NewStandardBlock(
-			b.vm.blkVerifier,
+			nil, // TODO remove b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -161,7 +173,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			b.vm.blkVerifier,
+			nil, // TODO remove b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -180,7 +192,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			b.vm.blkVerifier,
+			nil, // TODO remove b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -210,7 +222,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			b.vm.blkVerifier,
+			nil, // TODO remove b.vm.blkVerifier,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -219,7 +231,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	return stateful.NewProposalBlock(
-		b.vm.blkVerifier,
+		nil, // TODO remove b.vm.blkVerifier,
 		b.vm.txExecutorBackend,
 		preferredID,
 		nextHeight,
@@ -240,6 +252,12 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
+	preferredState, err := b.vm.onAccept(preferred)
+	if err != nil {
+		return
+	}
+	/* TODO remove
+
 	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
@@ -247,7 +265,7 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 	preferredState := preferredDecision.OnAccept()
-
+	*/
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {
 		b.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)

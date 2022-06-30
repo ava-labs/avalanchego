@@ -1,0 +1,258 @@
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package stateful
+
+import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+)
+
+var _ Acceptor = &acceptor{}
+
+type Acceptor interface {
+	acceptProposalBlock(b *ProposalBlock) error
+	acceptAtomicBlock(b *AtomicBlock) error
+	acceptStandardBlock(b *StandardBlock) error
+	acceptCommitBlock(b *CommitBlock) error
+	acceptAbortBlock(b *AbortBlock) error
+}
+
+func NewAcceptor() Acceptor {
+	// TODO implement
+	return &acceptor{}
+}
+
+type acceptor struct {
+	backend
+}
+
+func (a *acceptor) acceptProposalBlock(b *ProposalBlock) error {
+	blkID := b.ID()
+	b.txExecutorBackend.Ctx.Log.Verbo(
+		"Accepting Proposal Block %s at height %d with parent %s",
+		blkID,
+		b.Height(),
+		b.Parent(),
+	)
+
+	b.status = choices.Accepted
+	a.setLastAccepted(blkID)
+	return nil
+}
+
+func (a *acceptor) acceptAtomicBlock(b *AtomicBlock) error {
+	blkID := b.ID()
+
+	b.txExecutorBackend.Ctx.Log.Verbo(
+		"Accepting Atomic Block %s at height %d with parent %s",
+		blkID,
+		b.Height(),
+		b.Parent(),
+	)
+
+	a.commonAccept(b.baseBlk)
+	a.addStatelessBlock(b.AtomicBlock, b.Status())
+	if err := a.markAccepted(b.AtomicBlock); err != nil {
+		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
+	}
+
+	// Update the state of the chain in the database
+	b.onAcceptState.Apply(a.getState())
+
+	defer a.abort()
+	batch, err := a.commitBatch()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
+	}
+
+	if err = b.txExecutorBackend.Ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+		return fmt.Errorf(
+			"failed to atomically accept tx %s in block %s: %w",
+			b.AtomicBlock.Tx.ID(),
+			blkID,
+			err,
+		)
+	}
+
+	for _, child := range b.children {
+		a.setBaseState(child)
+	}
+	if b.onAcceptFunc != nil {
+		b.onAcceptFunc()
+	}
+
+	b.free()
+	return nil
+}
+
+func (a *acceptor) acceptStandardBlock(b *StandardBlock) error {
+	blkID := b.ID()
+	b.txExecutorBackend.Ctx.Log.Verbo("accepting block with ID %s", blkID)
+
+	a.commonAccept(b.baseBlk)
+	a.addStatelessBlock(b.StandardBlock, b.Status())
+	if err := a.markAccepted(b.StandardBlock); err != nil {
+		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
+	}
+
+	// Update the state of the chain in the database
+	b.onAcceptState.Apply(a.getState())
+
+	defer a.abort()
+	batch, err := a.commitBatch()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
+	}
+
+	if err := b.txExecutorBackend.Ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+	}
+
+	for _, child := range b.children {
+		a.setBaseState(child)
+	}
+	if b.onAcceptFunc != nil {
+		b.onAcceptFunc()
+	}
+
+	b.free()
+	return nil
+}
+
+func (a *acceptor) acceptCommitBlock(b *CommitBlock) error {
+	if b.txExecutorBackend.Bootstrapped.GetValue() {
+		if b.wasPreferred {
+			a.markAcceptedOptionVote()
+		} else {
+			a.markRejectedOptionVote()
+		}
+	}
+
+	if err := a.acceptParentDoubleDecisionBlock(b.doubleDecisionBlock); err != nil {
+		return err
+	}
+	a.commonAccept(b.baseBlk)
+	a.addStatelessBlock(b.CommitBlock, b.Status())
+	if err := a.markAccepted(b.CommitBlock); err != nil {
+		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
+	}
+
+	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
+}
+
+func (a *acceptor) acceptAbortBlock(b *AbortBlock) error {
+	if b.txExecutorBackend.Bootstrapped.GetValue() {
+		if b.wasPreferred {
+			a.markAcceptedOptionVote()
+		} else {
+			a.markRejectedOptionVote()
+		}
+	}
+
+	if err := a.acceptParentDoubleDecisionBlock(b.doubleDecisionBlock); err != nil {
+		return err
+	}
+	a.commonAccept(b.baseBlk)
+	a.addStatelessBlock(b.AbortBlock, b.Status())
+	if err := a.markAccepted(b.AbortBlock); err != nil {
+		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
+	}
+
+	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
+}
+
+// TODO
+func (a *acceptor) GetLastAccepted() ids.ID { return ids.Empty }
+
+func (a *acceptor) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) error {
+	parentIntf, err := a.parent(b.baseBlk)
+	if err != nil {
+		return err
+	}
+
+	parent, ok := parentIntf.(*ProposalBlock)
+	if !ok {
+		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
+		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
+	}
+
+	// Update the state of the chain in the database
+	b.onAcceptState.Apply(a.getState())
+	if err := a.commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
+	}
+
+	for _, child := range b.children {
+		a.setBaseState(child)
+	}
+	if b.onAcceptFunc != nil {
+		b.onAcceptFunc()
+	}
+
+	// remove this block and its parent from memory
+	parent.free()
+	b.free()
+	return nil
+}
+
+func (a *acceptor) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) error {
+	blkID := b.baseBlk.ID()
+	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
+
+	parentIntf, err := a.parent(b.baseBlk)
+	if err != nil {
+		return err
+	}
+
+	parent, ok := parentIntf.(*ProposalBlock)
+	if !ok {
+		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
+		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
+	}
+
+	if err := parent.Accept(); err != nil {
+		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
+	}
+	a.addStatelessBlock(parent, parent.Status())
+
+	return nil
+}
+
+func (a *acceptor) setBaseState(b Block) {
+	switch b := b.(type) {
+	case *AbortBlock:
+		b.onAcceptState.SetBase(a.getState())
+	case *CommitBlock:
+		b.onAcceptState.SetBase(a.getState())
+	case *ProposalBlock:
+		b.onCommitState.SetBase(a.getState())
+		b.onAbortState.SetBase(a.getState())
+	}
+}
+
+func (a *acceptor) commonAccept(b *stateless.CommonBlock) {
+	blkID := b.ID()
+
+	//b.status = choices.Accepted
+	a.setLastAccepted(blkID)
+	a.setHeight(b.Height())
+	a.addToRecentlyAcceptedWindows(blkID)
+}
+
+// TODO
+func (a *acceptor) setHeight(height uint64) {}
+
+// TODO
+func (a *acceptor) addToRecentlyAcceptedWindows(blkID ids.ID) {}

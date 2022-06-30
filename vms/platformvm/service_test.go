@@ -767,7 +767,7 @@ func TestGetBlock(t *testing.T) {
 			service, _ := defaultService(t)
 
 			block, err := stateful.NewStandardBlock(
-				service.vm.blkVerifier,
+				nil, // TODO remove b.vm.blkVerifier,
 				service.vm.txExecutorBackend,
 				ids.GenerateTestID(),
 				1234,
@@ -777,8 +777,10 @@ func TestGetBlock(t *testing.T) {
 				t.Fatal("couldn't create block: %w", err)
 			}
 
+			/* TODO fix this
 			statelessBlk := block.StandardBlock
 			service.vm.blkVerifier.AddStatelessBlock(statelessBlk, block.Status())
+			*/
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),

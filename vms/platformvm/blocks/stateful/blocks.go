@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var ErrBlockNil = errors.New("block is nil")
@@ -16,9 +15,10 @@ var ErrBlockNil = errors.New("block is nil")
 type Block interface {
 	snowman.Block
 
+	// TODO remove
 	// parent returns the parent block, similarly to Parent. However, it
 	// provides the more specific Block interface.
-	parentBlock() (Block, error)
+	// parentBlock() (Block, error)
 
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.
@@ -33,8 +33,9 @@ type Block interface {
 	// free all the references of this block from the vm's memory
 	free()
 
+	// TODO remove
 	// Set the block's underlying state to the chain's internal state
-	setBaseState()
+	// setBaseState()
 }
 
 // A Decision block (either Commit, Abort, or DecisionBlock) represents a
@@ -42,11 +43,12 @@ type Block interface {
 // if its parent is a proposal. Otherwise, the changes are committed
 // immediately.
 type Decision interface {
+	// TODO move this spec
 	// This function should only be called after Verify is called.
 	// OnAccept returns:
 	// 1) The current state of the chain, if this block is decided or hasn't
 	//    been verified.
 	// 2) The state of the chain after this block is accepted, if this block was
 	//    verified successfully.
-	OnAccept() state.Chain
+	// OnAccept() state.Chain
 }

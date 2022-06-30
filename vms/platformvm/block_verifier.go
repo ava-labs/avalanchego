@@ -3,16 +3,7 @@
 
 package platformvm
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-)
-
+/* TODO remove?
 var _ stateful.Verifier = &blkVerifier{}
 
 func NewBlockVerifier(
@@ -82,3 +73,5 @@ func (bv *blkVerifier) GetRecentlyAcceptedWindows() *window.Window {
 func (bv *blkVerifier) AddToRecentlyAcceptedWindows(blkID ids.ID) {
 	bv.recentlyAccepted.Add(blkID)
 }
+
+*/

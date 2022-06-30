@@ -17,17 +17,24 @@ type decisionBlock struct {
 
 // From CommonDecisionBlock
 func (d *decisionBlock) free() {
+	d.freer.freeDecisionBlock(d)
+	/* TODO remove
 	d.commonBlock.free()
 	d.onAcceptState = nil
+	*/
 }
 
+/* TODO remove
 func (d *decisionBlock) setBaseState() {
 	d.onAcceptState.SetBase(d.verifier.GetChainState())
 }
+*/
 
+/*
 func (d *decisionBlock) OnAccept() state.Chain {
 	if d.Status().Decided() || d.onAcceptState == nil {
 		return d.verifier.GetChainState()
 	}
 	return d.onAcceptState
 }
+*/

@@ -4,8 +4,6 @@
 package stateful
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -20,6 +18,12 @@ var (
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
 type CommitBlock struct {
+	// TODO set this field
+	verifier2 Verifier2
+	// TODO set this field
+	acceptor Acceptor
+	// TODO set this field
+	rejector Rejector
 	*stateless.CommitBlock
 	*doubleDecisionBlock
 
@@ -30,7 +34,7 @@ type CommitBlock struct {
 // proposal block, has ID [parentID]. Additionally the block will track if it
 // was originally preferred or not for metrics.
 func NewCommitBlock(
-	verifier Verifier,
+	verifier Verifier2,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -46,7 +50,7 @@ func NewCommitBlock(
 
 func toStatefulCommitBlock(
 	statelessBlk *stateless.CommitBlock,
-	verifier Verifier,
+	verifier Verifier2,
 	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
@@ -70,35 +74,11 @@ func toStatefulCommitBlock(
 }
 
 func (c *CommitBlock) Accept() error {
-	if c.txExecutorBackend.Bootstrapped.GetValue() {
-		if c.wasPreferred {
-			c.verifier.MarkAcceptedOptionVote()
-		} else {
-			c.verifier.MarkRejectedOptionVote()
-		}
-	}
-
-	if err := c.doubleDecisionBlock.acceptParent(); err != nil {
-		return err
-	}
-	c.accept()
-	c.verifier.AddStatelessBlock(c.CommitBlock, c.Status())
-	if err := c.verifier.MarkAccepted(c.CommitBlock); err != nil {
-		return fmt.Errorf("failed to accept accept option block %s: %w", c.ID(), err)
-	}
-
-	return c.doubleDecisionBlock.updateState()
+	return c.acceptor.acceptCommitBlock(c)
 }
 
 func (c *CommitBlock) Reject() error {
-	c.txExecutorBackend.Ctx.Log.Verbo(
-		"Rejecting CommitBlock Block %s at height %d with parent %s",
-		c.ID(), c.Height(), c.Parent(),
-	)
-
-	defer c.reject()
-	c.verifier.AddStatelessBlock(c.CommitBlock, c.Status())
-	return c.verifier.Commit()
+	return c.rejector.rejectCommitBlock(c)
 }
 
 // Verify this block performs a valid state transition.
@@ -107,25 +87,5 @@ func (c *CommitBlock) Reject() error {
 //
 // This function also sets onAcceptState if the verification passes.
 func (c *CommitBlock) Verify() error {
-	if err := c.verify(); err != nil {
-		return err
-	}
-
-	parentIntf, err := c.parentBlock()
-	if err != nil {
-		return err
-	}
-
-	// The parent of a Commit block should always be a proposal
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
-	c.onAcceptState = parent.onCommitState
-	c.timestamp = c.onAcceptState.GetTimestamp()
-
-	c.verifier.CacheVerifiedBlock(c)
-	parent.addChild(c)
-	return nil
+	return c.verifier2.verifyCommitBlock(c)
 }

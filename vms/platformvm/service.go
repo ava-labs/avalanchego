@@ -1656,11 +1656,15 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
+	/* TODO fix this
 	blockIntf, err := service.vm.blkVerifier.GetStatefulBlock(blockID)
 	if err != nil {
 		return false, err
 	}
+	*/
+	var blockIntf stateful.Block // TODO remove this in fix above
 
+	/* TODO remove
 	block, ok := blockIntf.(stateful.Decision)
 	if !ok {
 		parentBlkID := blockIntf.Parent()
@@ -1673,7 +1677,11 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 			return false, errMissingDecisionBlock
 		}
 	}
-	state := block.OnAccept()
+	*/
+	state, err := service.vm.onAccept(blockIntf)
+	if err != nil {
+		return false, err
+	}
 
 	tx, _, err := state.GetTx(chainID)
 	if err == database.ErrNotFound {
@@ -1682,7 +1690,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	if err != nil {
 		return false, err
 	}
-	_, ok = tx.Unsigned.(*txs.CreateChainTx)
+	_, ok := tx.Unsigned.(*txs.CreateChainTx)
 	return ok, nil
 }
 
@@ -1923,12 +1931,18 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
+	/* TODO remove
 	block, ok := preferred.(stateful.Decision)
 	if !ok {
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
+	*/
 
-	onAccept := block.OnAccept()
+	onAccept, err := service.vm.onAccept(preferred)
+	if err != nil {
+		return err
+	}
+
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.

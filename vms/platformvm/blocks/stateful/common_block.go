@@ -4,7 +4,6 @@
 package stateful
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,19 +14,25 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	baseBlk   *stateless.CommonBlock
-	timestamp time.Time // Time this block was proposed at
-	status    choices.Status
-	children  []Block
+	conflictChecker           // TODO set this field
+	verifier        Verifier2 // TODO embed? And make sure this is set
+	acceptor                  // TODO set this field
+	timestamper               // TODO set this field
+	freer                     // TODO set this field
+	baseBlk         *stateless.CommonBlock
+	timestamp       time.Time // Time this block was proposed at
+	status          choices.Status
+	children        []Block
 
-	verifier          Verifier
 	txExecutorBackend executor.Backend
 }
 
+/* TODO remove
 func (c *commonBlock) parentBlock() (Block, error) {
 	parentBlkID := c.baseBlk.Parent()
 	return c.verifier.GetStatefulBlock(parentBlkID)
 }
+*/
 
 func (c *commonBlock) addChild(child Block) {
 	c.children = append(c.children, child)
@@ -40,13 +45,15 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.verifier.GetLastAccepted() {
-		return c.verifier.GetTimestamp()
+	if c.baseBlk.ID() == c.acceptor.GetLastAccepted() {
+		return c.Timestamp()
 	}
 	return c.timestamp
 }
 
 func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
+	return c.conflictChecker.conflictsCommonBlock(c, s)
+	/* TODO remove
 	if c.Status() == choices.Accepted {
 		return false, nil
 	}
@@ -55,32 +62,40 @@ func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
 		return false, err
 	}
 	return parent.conflicts(s)
+	*/
 }
 
 func (c *commonBlock) verify() error {
 	if c == nil {
 		return ErrBlockNil
 	}
+	return c.verifier.verifyCommonBlock(c)
 
-	parent, err := c.parentBlock()
-	if err != nil {
-		return err
-	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
-		return fmt.Errorf(
-			"expected block to have height %d, but found %d",
-			expectedHeight,
-			c.baseBlk.Height(),
-		)
-	}
-	return nil
+	/*
+		parent, err := c.parentBlock()
+		if err != nil {
+			return err
+		}
+		if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
+			return fmt.Errorf(
+				"expected block to have height %d, but found %d",
+				expectedHeight,
+				c.baseBlk.Height(),
+			)
+		}
+		return nil
+	*/
 }
 
 func (c *commonBlock) free() {
+	c.freer.freeCommonBlock(c)
+	/* TODO remove
 	c.verifier.DropVerifiedBlock(c.baseBlk.ID())
 	c.children = nil
+	*/
 }
 
+/* TODO remove
 func (c *commonBlock) accept() {
 	blkID := c.baseBlk.ID()
 
@@ -89,6 +104,7 @@ func (c *commonBlock) accept() {
 	c.verifier.SetHeight(c.baseBlk.Height())
 	c.verifier.AddToRecentlyAcceptedWindows(blkID)
 }
+*/
 
 func (c *commonBlock) reject() {
 	defer c.free()
