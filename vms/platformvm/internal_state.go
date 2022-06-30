@@ -302,7 +302,6 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		return err
 	}
 	st.AddStatelessBlock(genesisBlock, choices.Accepted)
-	st.SetLastAccepted(genesisBlock.ID())
 
 	genesisState, err := genesis.ParseState(genesisBytes)
 	if err != nil {
