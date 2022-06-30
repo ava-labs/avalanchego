@@ -27,6 +27,8 @@ type Semantic struct {
 	str atomic.Value
 }
 
+// The only difference here between Semantic and Application is that Semantic
+// prepends "v" rather than "avalanche/".
 func (s *Semantic) String() string {
 	strIntf := s.str.Load()
 	if strIntf != nil {
