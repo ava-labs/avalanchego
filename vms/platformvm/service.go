@@ -398,7 +398,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
-		response.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, bytes)
+		response.UTXOs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %w", utxo.InputID(), err)
 		}
@@ -1871,7 +1871,7 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 		return nil
 	}
 
-	response.Tx, err = formatting.EncodeWithChecksum(args.Encoding, txBytes)
+	response.Tx, err = formatting.Encode(args.Encoding, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as a string: %w", err)
 	}
@@ -2093,7 +2093,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
-		response.Outputs[i], err = formatting.EncodeWithChecksum(args.Encoding, bytes)
+		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
 		}
@@ -2204,7 +2204,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}
 
-		utxoStr, err := formatting.EncodeWithChecksum(args.Encoding, utxoBytes)
+		utxoStr, err := formatting.Encode(args.Encoding, utxoBytes)
 		if err != nil {
 			return fmt.Errorf("couldn't encode utxo as a string: %w", err)
 		}
@@ -2270,7 +2270,7 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 		return nil
 	}
 
-	response.Block, err = formatting.EncodeWithChecksum(args.Encoding, block.Bytes())
+	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
 	}

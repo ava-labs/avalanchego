@@ -16,13 +16,13 @@ func TestEncodingMarshalJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(jsonBytes) != "\"hex\"" {
+	if string(jsonBytes) != `"hex"` {
 		t.Fatal("should be 'hex'")
 	}
 }
 
 func TestEncodingUnmarshalJSON(t *testing.T) {
-	jsonBytes := []byte("\"hex\"")
+	jsonBytes := []byte(`"hex"`)
 	var enc Encoding
 	if err := json.Unmarshal(jsonBytes, &enc); err != nil {
 		t.Fatal(err)
@@ -33,12 +33,12 @@ func TestEncodingUnmarshalJSON(t *testing.T) {
 
 	jsonBytes = []byte("")
 	if err := json.Unmarshal(jsonBytes, &enc); err == nil {
-		t.Fatal("should have errored due to invalid encoding")
+		t.Fatal("should have erred due to invalid encoding")
 	}
 
-	jsonBytes = []byte("\"\"")
+	jsonBytes = []byte(`""`)
 	if err := json.Unmarshal(jsonBytes, &enc); err == nil {
-		t.Fatal("should have errored due to invalid encoding")
+		t.Fatal("should have erred due to invalid encoding")
 	}
 }
 
@@ -81,7 +81,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, test := range tests {
 		// Encode the bytes
-		strResult, err := EncodeWithChecksum(test.encoding, test.bytes)
+		strResult, err := Encode(test.encoding, test.bytes)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +99,7 @@ func TestEncodeDecode(t *testing.T) {
 
 // Test that encoding nil bytes works
 func TestEncodeNil(t *testing.T) {
-	str, err := EncodeWithChecksum(Hex, nil)
+	str, err := Encode(Hex, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestDecodeHexInvalid(t *testing.T) {
 }
 
 func TestDecodeNil(t *testing.T) {
-	if result, err := Decode(Hex, ""); result != nil || err != nil {
-		t.Fatal("should both be nil")
+	if result, err := Decode(Hex, ""); err != nil || len(result) != 0 {
+		t.Fatal("decoding the empty string should return an empty byte slice")
 	}
 }

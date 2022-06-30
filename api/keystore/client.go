@@ -62,7 +62,7 @@ func (c *client) ExportUser(ctx context.Context, user api.UserPass, options ...r
 }
 
 func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []byte, options ...rpc.Option) (bool, error) {
-	accountStr, err := formatting.EncodeWithChecksum(formatting.Hex, account)
+	accountStr, err := formatting.Encode(formatting.Hex, account)
 	if err != nil {
 		return false, err
 	}

@@ -34,6 +34,10 @@ type Encoding uint8
 const (
 	// Hex specifies a hex plus 4 byte checksum encoding format
 	Hex Encoding = iota
+	// HexNC specifies a hex encoding format
+	HexNC
+	// HexC specifies a hex plus 4 byte checksum encoding format
+	HexC
 	// JSON specifies the JSON encoding format
 	JSON
 )
@@ -42,6 +46,10 @@ func (enc Encoding) String() string {
 	switch enc {
 	case Hex:
 		return "hex"
+	case HexNC:
+		return "hexnc"
+	case HexC:
+		return "hexc"
 	case JSON:
 		return "json"
 	default:
@@ -51,7 +59,7 @@ func (enc Encoding) String() string {
 
 func (enc Encoding) valid() bool {
 	switch enc {
-	case Hex, JSON:
+	case Hex, HexNC, HexC, JSON:
 		return true
 	}
 	return false
@@ -70,9 +78,13 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	switch strings.ToLower(str) {
-	case "\"hex\"":
+	case `"hex"`:
 		*enc = Hex
-	case "\"json\"":
+	case `"hexnc"`:
+		*enc = HexNC
+	case `"hexc"`:
+		*enc = HexC
+	case `"json"`:
 		*enc = JSON
 	default:
 		return errInvalidEncoding
@@ -80,42 +92,27 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// EncodeWithChecksum [bytes] to a string using the given encoding format
-// [bytes] may be nil, in which case it will be treated the same
-// as an empty slice.
-// This function includes a checksum in the encoded string.
-func EncodeWithChecksum(encoding Encoding, bytes []byte) (string, error) {
+// Encode [bytes] to a string using the given encoding format [bytes] may be
+// nil, in which case it will be treated the same as an empty slice.
+func Encode(encoding Encoding, bytes []byte) (string, error) {
 	if !encoding.valid() {
 		return "", errInvalidEncoding
 	}
 
-	bytesLen := len(bytes)
-	if bytesLen > math.MaxInt32-checksumLen {
-		return "", errEncodingOverFlow
-	}
-	checked := make([]byte, bytesLen+checksumLen)
-	copy(checked, bytes)
-	copy(checked[len(bytes):], hashing.Checksum(bytes, checksumLen))
-	return encode(encoding, checked)
-}
-
-// EncodeWithoutChecksum [bytes] to a string using the given encoding format
-// [bytes] may be nil, in which case it will be treated the same
-// as an empty slice.
-// Unlike EncodeWithChecksum, this function does not include a checksum in the
-// encoded string.
-func EncodeWithoutChecksum(encoding Encoding, bytes []byte) (string, error) {
-	if !encoding.valid() {
-		return "", errInvalidEncoding
-	}
-	return encode(encoding, bytes)
-}
-
-// encode encodes given [bytes] to [encoding] format
-// validateEncoding([encoding],[bytes]) should be called before this
-func encode(encoding Encoding, bytes []byte) (string, error) {
 	switch encoding {
-	case Hex:
+	case Hex, HexC:
+		bytesLen := len(bytes)
+		if bytesLen > math.MaxInt32-checksumLen {
+			return "", errEncodingOverFlow
+		}
+		checked := make([]byte, bytesLen+checksumLen)
+		copy(checked, bytes)
+		copy(checked[len(bytes):], hashing.Checksum(bytes, checksumLen))
+		bytes = checked
+	}
+
+	switch encoding {
+	case Hex, HexNC, HexC:
 		return fmt.Sprintf("0x%x", bytes), nil
 	case JSON:
 		// JSON Marshal does not support []byte input and we rely on the
@@ -133,6 +130,7 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 	switch {
 	case !encoding.valid():
 		return nil, errInvalidEncoding
+		// TODO: remove the empty string check and enforce the correct format.
 	case len(str) == 0:
 		return nil, nil
 	}
@@ -142,7 +140,7 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 		err          error
 	)
 	switch encoding {
-	case Hex:
+	case Hex, HexNC, HexC:
 		if !strings.HasPrefix(str, hexPrefix) {
 			return nil, errMissingHexPrefix
 		}
@@ -154,18 +152,22 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 	default:
 		return nil, errInvalidEncoding
 	}
-
 	if err != nil {
 		return nil, err
 	}
-	if len(decodedBytes) < checksumLen {
-		return nil, errMissingChecksum
+
+	switch encoding {
+	case Hex, HexC:
+		if len(decodedBytes) < checksumLen {
+			return nil, errMissingChecksum
+		}
+		// Verify the checksum
+		rawBytes := decodedBytes[:len(decodedBytes)-checksumLen]
+		checksum := decodedBytes[len(decodedBytes)-checksumLen:]
+		if !bytes.Equal(checksum, hashing.Checksum(rawBytes, checksumLen)) {
+			return nil, errBadChecksum
+		}
+		decodedBytes = rawBytes
 	}
-	// Verify the checksum
-	rawBytes := decodedBytes[:len(decodedBytes)-checksumLen]
-	checksum := decodedBytes[len(decodedBytes)-checksumLen:]
-	if !bytes.Equal(checksum, hashing.Checksum(rawBytes, checksumLen)) {
-		return nil, errBadChecksum
-	}
-	return rawBytes, nil
+	return decodedBytes, nil
 }
