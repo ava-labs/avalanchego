@@ -472,7 +472,7 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 		return fmt.Errorf("could not find tx %s", args.TxID)
 	}
 
-	txBytes, err := formatting.EncodeWithChecksum(args.Encoding, tx.Bytes())
+	txBytes, err := formatting.EncodeWithChecksum(args.Encoding, tx.SignedBytes())
 	if err != nil {
 		return err
 	}

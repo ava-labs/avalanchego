@@ -109,7 +109,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	// gossip tx and check it is accepted and gossiped
 	msg := message.AtomicTxGossip{
-		Tx: tx.Bytes(),
+		Tx: tx.SignedBytes(),
 	}
 	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
@@ -132,7 +132,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	// show that conflicting tx is not added to mempool
 	msg = message.AtomicTxGossip{
-		Tx: conflictingTx.Bytes(),
+		Tx: conflictingTx.SignedBytes(),
 	}
 	msgBytes, err = message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
@@ -189,7 +189,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	// and is not re-gossipped.
 	nodeID := ids.GenerateTestNodeID()
 	msg := message.AtomicTxGossip{
-		Tx: tx.Bytes(),
+		Tx: tx.SignedBytes(),
 	}
 	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)
@@ -207,7 +207,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	// to the network.
 	nodeID = ids.GenerateTestNodeID()
 	msg = message.AtomicTxGossip{
-		Tx: conflictingTx.Bytes(),
+		Tx: conflictingTx.SignedBytes(),
 	}
 	msgBytes, err = message.BuildGossipMessage(vm.networkCodec, msg)
 	assert.NoError(err)

@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 )
 
-type TestTx struct {
+type TestUnsignedTx struct {
 	GasUsedV                    uint64           `serialize:"true"`
 	AcceptRequestsBlockchainIDV ids.ID           `serialize:"true"`
 	AcceptRequestsV             *atomic.Requests `serialize:"true"`
@@ -27,50 +27,50 @@ type TestTx struct {
 	IDV                         ids.ID `serialize:"true" json:"id"`
 	BurnedV                     uint64 `serialize:"true"`
 	UnsignedBytesV              []byte
-	BytesV                      []byte
+	SignedBytesV                []byte
 	InputUTXOsV                 ids.Set
 	SemanticVerifyV             error
 	EVMStateTransferV           error
 }
 
-var _ UnsignedAtomicTx = &TestTx{}
+var _ UnsignedAtomicTx = &TestUnsignedTx{}
 
 // GasUsed implements the UnsignedAtomicTx interface
-func (t *TestTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUsedV, nil }
+func (t *TestUnsignedTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUsedV, nil }
 
 // Verify implements the UnsignedAtomicTx interface
-func (t *TestTx) Verify(ctx *snow.Context, rules params.Rules) error { return t.VerifyV }
+func (t *TestUnsignedTx) Verify(ctx *snow.Context, rules params.Rules) error { return t.VerifyV }
 
 // AtomicOps implements the UnsignedAtomicTx interface
-func (t *TestTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
+func (t *TestUnsignedTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
 	return t.AcceptRequestsBlockchainIDV, t.AcceptRequestsV, nil
 }
 
 // Initialize implements the UnsignedAtomicTx interface
-func (t *TestTx) Initialize(unsignedBytes, signedBytes []byte) {}
+func (t *TestUnsignedTx) Initialize(unsignedBytes, signedBytes []byte) {}
 
 // ID implements the UnsignedAtomicTx interface
-func (t *TestTx) ID() ids.ID { return t.IDV }
+func (t *TestUnsignedTx) ID() ids.ID { return t.IDV }
 
 // Burned implements the UnsignedAtomicTx interface
-func (t *TestTx) Burned(assetID ids.ID) (uint64, error) { return t.BurnedV, nil }
-
-// UnsignedBytes implements the UnsignedAtomicTx interface
-func (t *TestTx) UnsignedBytes() []byte { return t.UnsignedBytesV }
+func (t *TestUnsignedTx) Burned(assetID ids.ID) (uint64, error) { return t.BurnedV, nil }
 
 // Bytes implements the UnsignedAtomicTx interface
-func (t *TestTx) Bytes() []byte { return t.BytesV }
+func (t *TestUnsignedTx) Bytes() []byte { return t.UnsignedBytesV }
+
+// SignedBytes implements the UnsignedAtomicTx interface
+func (t *TestUnsignedTx) SignedBytes() []byte { return t.SignedBytesV }
 
 // InputUTXOs implements the UnsignedAtomicTx interface
-func (t *TestTx) InputUTXOs() ids.Set { return t.InputUTXOsV }
+func (t *TestUnsignedTx) InputUTXOs() ids.Set { return t.InputUTXOsV }
 
 // SemanticVerify implements the UnsignedAtomicTx interface
-func (t *TestTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error {
+func (t *TestUnsignedTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error {
 	return t.SemanticVerifyV
 }
 
 // EVMStateTransfer implements the UnsignedAtomicTx interface
-func (t *TestTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
+func (t *TestUnsignedTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
 	return t.EVMStateTransferV
 }
 
@@ -80,7 +80,7 @@ func testTxCodec() codec.Manager {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		c.RegisterType(&TestTx{}),
+		c.RegisterType(&TestUnsignedTx{}),
 		c.RegisterType(&atomic.Element{}),
 		c.RegisterType(&atomic.Requests{}),
 		codec.RegisterCodec(codecVersion, c),
@@ -96,7 +96,7 @@ var blockChainID = ids.GenerateTestID()
 
 func testDataImportTx() *Tx {
 	return &Tx{
-		UnsignedAtomicTx: &TestTx{
+		UnsignedAtomicTx: &TestUnsignedTx{
 			IDV:                         ids.GenerateTestID(),
 			AcceptRequestsBlockchainIDV: blockChainID,
 			AcceptRequestsV: &atomic.Requests{
@@ -111,7 +111,7 @@ func testDataImportTx() *Tx {
 
 func testDataExportTx() *Tx {
 	return &Tx{
-		UnsignedAtomicTx: &TestTx{
+		UnsignedAtomicTx: &TestUnsignedTx{
 			IDV:                         ids.GenerateTestID(),
 			AcceptRequestsBlockchainIDV: blockChainID,
 			AcceptRequestsV: &atomic.Requests{
