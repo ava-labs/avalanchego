@@ -17,10 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/ava-labs/coreth/trie"
 
 	"github.com/stretchr/testify/assert"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -91,7 +93,7 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		b, _ = formatting.Decode(formatting.CB58, key)
+		b, _ = cb58.Decode(key)
 		pk, _ := factory.ToPrivateKey(b)
 		secpKey := pk.(*crypto.PrivateKeySECP256K1R)
 		testKeys = append(testKeys, secpKey)
@@ -168,7 +170,11 @@ func setupGenesis(t *testing.T,
 	genesisBytes := BuildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
-	baseDBManager := manager.NewMemDB(version.NewDefaultVersion(1, 4, 5))
+	baseDBManager := manager.NewMemDB(&version.Semantic{
+		Major: 1,
+		Minor: 4,
+		Patch: 5,
+	})
 
 	m := &atomic.Memory{}
 	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -178,7 +184,14 @@ func setupGenesis(t *testing.T,
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
+	userKeystore := keystore.New(
+		logging.NoLog{},
+		manager.NewMemDB(&version.Semantic{
+			Major: 1,
+			Minor: 4,
+			Patch: 5,
+		}),
+	)
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
