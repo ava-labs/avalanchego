@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -44,7 +44,7 @@ var (
 	// Test user password, must meet minimum complexity/length requirements
 	testPassword = "ShaggyPassword1Zoinks!"
 
-	// Bytes docoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
+	// Bytes decoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
 	testPrivateKey = []byte{
 		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
 		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
@@ -57,7 +57,7 @@ var (
 	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
 
 	encodings = []formatting.Encoding{
-		formatting.JSON, formatting.Hex, formatting.CB58,
+		formatting.JSON, formatting.Hex,
 	}
 )
 
@@ -65,7 +65,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
+	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
 	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*p_block.StandardBlock); !ok {
+	} else if blk, ok := block.(*stateful.StandardBlock); !ok {
 		t.Fatalf("should be *StandardBlock but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -359,10 +359,10 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else if err := block.Accept(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if blk, ok := block.(*p_block.ProposalBlock); ok { // For proposal blocks, commit them
+			} else if blk, ok := block.(*stateful.ProposalBlock); ok { // For proposal blocks, commit them
 				if options, err := blk.Options(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if commit, ok := options[0].(*p_block.CommitBlock); !ok {
+				} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
 					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 				} else if err := commit.Verify(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -373,8 +373,8 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else {
 				switch encoding {
-				case formatting.Hex, formatting.CB58:
-					// we're always guaranteed a string for hex/cb58 encodings.
+				case formatting.Hex:
+					// we're always guaranteed a string for hex encodings.
 					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -757,10 +757,6 @@ func TestGetBlock(t *testing.T) {
 			encoding: formatting.JSON,
 		},
 		{
-			name:     "cb58",
-			encoding: formatting.CB58,
-		},
-		{
 			name:     "hex",
 			encoding: formatting.Hex,
 		},
@@ -770,7 +766,7 @@ func TestGetBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			service, _ := defaultService(t)
 
-			block, err := p_block.NewStandardBlock(
+			block, err := stateful.NewStandardBlock(
 				service.vm.blkVerifier,
 				service.vm.txExecutorBackend,
 				ids.GenerateTestID(),

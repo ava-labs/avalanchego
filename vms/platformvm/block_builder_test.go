@@ -10,9 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
@@ -44,7 +43,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blkIntf, err := vm.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
-	blk, ok := blkIntf.(*p_block.StandardBlock)
+	blk, ok := blkIntf.(*stateful.StandardBlock)
 	assert.True(ok, "expected standard block")
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")

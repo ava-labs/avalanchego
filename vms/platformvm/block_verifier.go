@@ -6,15 +6,14 @@ package platformvm
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/window"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-
-	p_block "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 )
 
-var _ p_block.Verifier = &blkVerifier{}
+var _ stateful.Verifier = &blkVerifier{}
 
 func NewBlockVerifier(
 	mempool mempool.Mempool,
@@ -22,14 +21,14 @@ func NewBlockVerifier(
 	txExecutorBackend executor.Backend,
 	blkMetrics stateless.Metrics,
 	windows *window.Window,
-) p_block.Verifier {
+) stateful.Verifier {
 	return &blkVerifier{
-		Mempool:          mempool,
-		State:            internalState,
-		Backend:          txExecutorBackend,
-		Metrics:          blkMetrics,
-		currentBlksCache: make(map[ids.ID]p_block.Block),
-		recentlyAccepted: windows,
+		Mempool:           mempool,
+		State:             internalState,
+		Backend:           txExecutorBackend,
+		Metrics:           blkMetrics,
+		verifiedBlksCache: make(map[ids.ID]stateful.Block),
+		recentlyAccepted:  windows,
 	}
 }
 
@@ -39,18 +38,21 @@ type blkVerifier struct {
 	executor.Backend
 	stateless.Metrics
 
-	// Key: block ID
-	// Value: the block
-	currentBlksCache map[ids.ID]p_block.Block
+	// verifiedBlksCache holds the blockID -> stateful.Block
+	// mapping of all blocks verified but not yet accepted/rejected
+	verifiedBlksCache map[ids.ID]stateful.Block
 
+	// recentlyAccepted is a sliding window of blocks
+	// that were recently accepted. It's used to support
+	// snowman++ protocol
 	recentlyAccepted *window.Window
 }
 
 func (bv *blkVerifier) SetHeight(height uint64) { bv.State.SetHeight(height) }
 
-func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (p_block.Block, error) {
+func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (stateful.Block, error) {
 	// If block is in memory, return it.
-	if blk, exists := bv.currentBlksCache[blkID]; exists {
+	if blk, exists := bv.verifiedBlksCache[blkID]; exists {
 		return blk, nil
 	}
 
@@ -58,15 +60,15 @@ func (bv *blkVerifier) GetStatefulBlock(blkID ids.ID) (p_block.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p_block.MakeStateful(statelessBlk, bv, bv.Backend, blkStatus)
+	return stateful.MakeStateful(statelessBlk, bv, bv.Backend, blkStatus)
 }
 
-func (bv *blkVerifier) CacheVerifiedBlock(blk p_block.Block) {
-	bv.currentBlksCache[blk.ID()] = blk
+func (bv *blkVerifier) CacheVerifiedBlock(blk stateful.Block) {
+	bv.verifiedBlksCache[blk.ID()] = blk
 }
 
 func (bv *blkVerifier) DropVerifiedBlock(blkID ids.ID) {
-	delete(bv.currentBlksCache, blkID)
+	delete(bv.verifiedBlksCache, blkID)
 }
 
 func (bv *blkVerifier) GetRecentlyAcceptedWindows() *window.Window {

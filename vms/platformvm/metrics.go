@@ -196,7 +196,7 @@ func (m *metrics) Initialize(
 func (m *metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
 func (m *metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
 
-func (m *metrics) RegisterBlock(b stateless.Block) error {
+func (m *metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
 	case *stateless.AbortBlock:
 		m.numAbortBlocks.Inc()

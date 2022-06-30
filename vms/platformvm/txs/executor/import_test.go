@@ -23,6 +23,7 @@ import (
 
 func TestNewImportTx(t *testing.T) {
 	h := newTestHelpersCollection()
+	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)

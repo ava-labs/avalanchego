@@ -165,11 +165,11 @@ func (_m *Engine) ChitsV2(validatorID ids.NodeID, requestID uint32, containerIDs
 }
 
 // Connected provides a mock function with given fields: id, nodeVersion
-func (_m *Engine) Connected(id ids.NodeID, nodeVersion version.Application) error {
+func (_m *Engine) Connected(id ids.NodeID, nodeVersion *version.Application) error {
 	ret := _m.Called(id, nodeVersion)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.NodeID, version.Application) error); ok {
+	if rf, ok := ret.Get(0).(func(ids.NodeID, *version.Application) error); ok {
 		r0 = rf(id, nodeVersion)
 	} else {
 		r0 = ret.Error(0)

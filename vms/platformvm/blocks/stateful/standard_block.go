@@ -200,7 +200,7 @@ func (sb *StandardBlock) Accept() error {
 
 	sb.accept()
 	sb.verifier.AddStatelessBlock(sb.StandardBlock, sb.Status())
-	if err := sb.verifier.RegisterBlock(sb.StandardBlock); err != nil {
+	if err := sb.verifier.MarkAccepted(sb.StandardBlock); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
 
