@@ -113,3 +113,7 @@ func (ab *AtomicBlock) Reject() error {
 func (ab *AtomicBlock) free() {
 	ab.freeAtomicBlock(ab)
 }
+
+func (a *AtomicBlock) setBaseState() {
+	a.Manager.setBaseStateAtomicBlock(a)
+}

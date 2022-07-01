@@ -116,3 +116,7 @@ func (sb *StandardBlock) Reject() error {
 func (sb *StandardBlock) free() {
 	sb.freeStandardBlock(sb)
 }
+
+func (a *StandardBlock) setBaseState() {
+	a.Manager.setBaseStateStandardBlock(a)
+}

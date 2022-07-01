@@ -146,3 +146,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	}
 	return [2]snowman.Block{abort, commit}, nil
 }
+
+func (a *ProposalBlock) setBaseState() {
+	a.Manager.setBaseStateProposalBlock(a)
+}

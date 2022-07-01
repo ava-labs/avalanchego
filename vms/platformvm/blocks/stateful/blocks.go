@@ -34,9 +34,8 @@ type Block interface {
 	// free all the references of this block from the vm's memory
 	free()
 
-	// TODO remove
 	// Set the block's underlying state to the chain's internal state
-	// setBaseState()
+	setBaseState()
 }
 
 // A Decision block (either Commit, Abort, or DecisionBlock) represents a

@@ -22,6 +22,7 @@ type Manager interface {
 	verifier
 	acceptor
 	rejector
+	baseStateSetter // TODO set this
 	conflictChecker
 	freer
 	chainState
@@ -58,6 +59,7 @@ func NewManager(
 		verifier:        &verifierImpl{backend: backend},
 		acceptor:        &acceptorImpl{backend: backend},
 		rejector:        &rejectorImpl{backend: backend},
+		baseStateSetter: &baseStateSetterImpl{State: state},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
 		freer:           &freerImpl{backend: backend},
 	}
@@ -72,6 +74,7 @@ type manager struct {
 	verifier
 	acceptor
 	rejector
+	baseStateSetter
 	conflictChecker
 	freer
 	state state.State
