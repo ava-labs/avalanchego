@@ -108,3 +108,7 @@ func (ab *AtomicBlock) Accept() error {
 func (ab *AtomicBlock) Reject() error {
 	return ab.rejectAtomicBlock(ab)
 }
+
+func (ab *AtomicBlock) free() {
+	ab.freeAtomicBlock(ab)
+}

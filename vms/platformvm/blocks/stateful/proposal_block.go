@@ -44,7 +44,7 @@ type ProposalBlock struct {
 // The parent of this block has ID [parentID].
 // The parent must be a decision block.
 func NewProposalBlock(
-	verifier verifier,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -55,21 +55,21 @@ func NewProposalBlock(
 		return nil, err
 	}
 
-	return toStatefulProposalBlock(statelessBlk, verifier, txExecutorBackend, choices.Processing)
+	return toStatefulProposalBlock(statelessBlk, manager, txExecutorBackend, choices.Processing)
 }
 
 func toStatefulProposalBlock(
 	statelessBlk *stateless.ProposalBlock,
-	verifier verifier,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		ProposalBlock: statelessBlk,
+		Manager:       manager,
 		commonBlock: &commonBlock{
 			baseBlk:           &statelessBlk.CommonBlock,
 			status:            status,
-			verifier:          verifier,
 			txExecutorBackend: txExecutorBackend,
 		},
 	}
@@ -79,7 +79,7 @@ func toStatefulProposalBlock(
 }
 
 func (pb *ProposalBlock) free() {
-	pb.freer.freeProposalBlock(pb)
+	pb.freeProposalBlock(pb)
 	/* TODO remove
 	pb.commonBlock.free()
 	pb.onCommitState = nil

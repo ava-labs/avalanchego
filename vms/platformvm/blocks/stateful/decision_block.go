@@ -6,6 +6,7 @@ package stateful
 import "github.com/ava-labs/avalanchego/vms/platformvm/state"
 
 type decisionBlock struct {
+	Manager // TODO set this
 	*commonBlock
 
 	// state of the chain if this block is accepted
@@ -15,14 +16,13 @@ type decisionBlock struct {
 	onAcceptFunc func()
 }
 
+/*
 // From CommonDecisionBlock
 func (d *decisionBlock) free() {
-	d.freer.freeDecisionBlock(d)
-	/* TODO remove
 	d.commonBlock.free()
 	d.onAcceptState = nil
-	*/
 }
+*/
 
 /* TODO remove
 func (d *decisionBlock) setBaseState() {

@@ -88,3 +88,7 @@ func (c *CommitBlock) Reject() error {
 func (c *CommitBlock) conflicts(s ids.Set) (bool, error) {
 	return c.conflictsCommitBlock(c, s)
 }
+
+func (c *CommitBlock) free() {
+	c.freeCommitBlock(c)
+}

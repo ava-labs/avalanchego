@@ -4,11 +4,7 @@
 package stateful
 
 import (
-	"errors"
-
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var _ Manager = &manager{}
@@ -19,30 +15,20 @@ type Manager interface {
 	rejector
 	conflictChecker
 	freer
-	MakeStateful(
-		statelessBlk stateless.Block,
-		txExecutorBackend executor.Backend,
-		status choices.Status,
-	) (Block, error)
 }
 
 // TODO: implement
-func NewManager() Manager {
-	return &manager{}
+func NewManager(state state.State) Manager {
+	return &manager{
+		state: state,
+	}
 }
 
 type manager struct {
+	state state.State
 	verifier
 	acceptor
 	rejector
 	conflictChecker
 	freer
-}
-
-func (m *manager) MakeStateful(
-	statelessBlk stateless.Block,
-	txExecutorBackend executor.Backend,
-	status choices.Status,
-) (Block, error) {
-	return nil, errors.New("TODO")
 }

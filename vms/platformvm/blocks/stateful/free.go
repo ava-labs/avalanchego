@@ -9,8 +9,11 @@ type freer interface {
 	// TODO is this interface right?
 	// What about other block types?
 	freeProposalBlock(b *ProposalBlock)
-	freeDecisionBlock(b *decisionBlock)
 	freeCommonBlock(b *commonBlock)
+	freeAtomicBlock(b *AtomicBlock)
+	freeCommitBlock(b *CommitBlock)
+	freeAbortBlock(b *AbortBlock)
+	freeStandardBlock(b *StandardBlock)
 }
 
 func NewFreer() freer {
@@ -26,6 +29,22 @@ func (f *freerImpl) freeProposalBlock(b *ProposalBlock) {
 	f.freeCommonBlock(b.commonBlock)
 	b.onCommitState = nil
 	b.onAbortState = nil
+}
+
+func (f *freerImpl) freeAtomicBlock(b *AtomicBlock) {
+	f.freeDecisionBlock(b.decisionBlock)
+}
+
+func (f *freerImpl) freeAbortBlock(b *AbortBlock) {
+	f.freeDecisionBlock(&b.decisionBlock)
+}
+
+func (f *freerImpl) freeCommitBlock(b *CommitBlock) {
+	f.freeDecisionBlock(&b.decisionBlock)
+}
+
+func (f *freerImpl) freeStandardBlock(b *StandardBlock) {
+	f.freeDecisionBlock(b.decisionBlock)
 }
 
 func (f *freerImpl) freeDecisionBlock(b *decisionBlock) {

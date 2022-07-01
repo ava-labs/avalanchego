@@ -151,6 +151,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
 	}
 
+	defer b.free()
 	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
 }
 
@@ -172,6 +173,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
 	}
 
+	defer b.free()
 	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
 }
 
@@ -202,7 +204,6 @@ func (a *acceptorImpl) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) er
 
 	// remove this block and its parent from memory
 	parent.free()
-	b.free()
 	return nil
 }
 

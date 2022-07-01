@@ -35,7 +35,7 @@ type verifierImpl struct {
 }
 
 func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
-	if err := b.verify(); err != nil {
+	if err := v.verifyCommonBlock(b.commonBlock); err != nil {
 		return err
 	}
 
@@ -83,7 +83,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 }
 
 func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
-	if err := b.verify(); err != nil {
+	if err := v.verifyCommonBlock(b.commonBlock); err != nil {
 		return err
 	}
 
@@ -149,7 +149,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 }
 
 func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
-	if err := b.verify(); err != nil {
+	if err := v.verifyCommonBlock(b.commonBlock); err != nil {
 		return err
 	}
 
@@ -246,7 +246,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 }
 
 func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
-	if err := b.verify(); err != nil {
+	if err := v.verifyCommonBlock(b.commonBlock); err != nil {
 		return err
 	}
 
@@ -270,7 +270,7 @@ func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 }
 
 func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
-	if err := b.verify(); err != nil {
+	if err := v.verifyCommonBlock(b.commonBlock); err != nil {
 		return err
 	}
 

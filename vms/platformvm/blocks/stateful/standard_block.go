@@ -24,12 +24,7 @@ var (
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
-	// TODO set this field
-	verifier2 verifier
-	// TODO set this field
-	acceptor acceptor
-	// TODO set this field
-	rejector rejector
+	Manager
 	*stateless.StandardBlock
 	*decisionBlock
 
@@ -43,7 +38,7 @@ type StandardBlock struct {
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewStandardBlock(
-	verifier verifier,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -53,22 +48,22 @@ func NewStandardBlock(
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulStandardBlock(statelessBlk, verifier, txExecutorBackend, choices.Processing)
+	return toStatefulStandardBlock(statelessBlk, manager, txExecutorBackend, choices.Processing)
 }
 
 func toStatefulStandardBlock(
 	statelessBlk *stateless.StandardBlock,
-	verifier verifier,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		StandardBlock: statelessBlk,
+		Manager:       manager,
 		decisionBlock: &decisionBlock{
 			commonBlock: &commonBlock{
 				baseBlk:           &statelessBlk.CommonBlock,
 				status:            status,
-				verifier:          verifier,
 				txExecutorBackend: txExecutorBackend,
 			},
 		},
@@ -106,13 +101,17 @@ func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
-	return sb.verifier2.verifyStandardBlock(sb)
+	return sb.verifyStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Accept() error {
-	return sb.acceptor.acceptStandardBlock(sb)
+	return sb.acceptStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Reject() error {
-	return sb.rejector.rejectStandardBlock(sb)
+	return sb.rejectStandardBlock(sb)
+}
+
+func (sb *StandardBlock) free() {
+	sb.freeStandardBlock(sb)
 }

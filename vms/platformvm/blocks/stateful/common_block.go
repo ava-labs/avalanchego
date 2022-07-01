@@ -13,15 +13,12 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	conflictChecker // TODO set this field
-	verifier        // TODO set this field
-	acceptor        // TODO set this field
-	timestamper     // TODO set this field
-	freer           // TODO set this field
-	baseBlk         *stateless.CommonBlock
-	timestamp       time.Time // Time this block was proposed at
-	status          choices.Status
-	children        []Block
+	timestamper    // TODO set this field
+	lastAccepteder // TODO set this field
+	baseBlk        *stateless.CommonBlock
+	timestamp      time.Time // Time this block was proposed at
+	status         choices.Status
+	children       []Block
 
 	txExecutorBackend executor.Backend
 }
@@ -44,12 +41,13 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.acceptor.GetLastAccepted() {
+	if c.baseBlk.ID() == c.GetLastAccepted() {
 		return c.Timestamp()
 	}
 	return c.timestamp
 }
 
+// TODO remove
 // func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
 // 	return c.conflictChecker.conflictsCommonBlock(c, s)
 // 	/* TODO remove
@@ -64,27 +62,27 @@ func (c *commonBlock) Timestamp() time.Time {
 // 	*/
 // }
 
-func (c *commonBlock) verify() error {
-	if c == nil {
-		return ErrBlockNil
-	}
-	return c.verifier.verifyCommonBlock(c)
+// func (c *commonBlock) verify() error {
+// 	if c == nil {
+// 		return ErrBlockNil
+// 	}
+// 	return c.verifier.verifyCommonBlock(c)
 
-	/* TODO remove
-	parent, err := c.parentBlock()
-	if err != nil {
-		return err
-	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
-		return fmt.Errorf(
-			"expected block to have height %d, but found %d",
-			expectedHeight,
-			c.baseBlk.Height(),
-		)
-	}
-	return nil
-	*/
-}
+// 	/* TODO remove
+// 	parent, err := c.parentBlock()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
+// 		return fmt.Errorf(
+// 			"expected block to have height %d, but found %d",
+// 			expectedHeight,
+// 			c.baseBlk.Height(),
+// 		)
+// 	}
+// 	return nil
+// 	*/
+// }
 
 /*TODO remove
 func (c *commonBlock) free() {

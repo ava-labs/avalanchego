@@ -93,3 +93,7 @@ func (a *AbortBlock) Reject() error {
 func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
 	return a.conflictsAbortBlock(a, s)
 }
+
+func (a *AbortBlock) free() {
+	a.Manager.freeAbortBlock(a)
+}
