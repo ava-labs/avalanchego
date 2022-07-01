@@ -5,6 +5,7 @@ builds:
     binary: subnet-evm
     flags:
       - -v
+    ldflags: -X github.com/ava-labs/subnet-evm/plugin/evm.Version=v{{.Version}}
     ignore:
       - goos: darwin
         goarch: 386
