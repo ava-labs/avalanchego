@@ -84,9 +84,12 @@ func toStatefulProposalBlock(
 }
 
 func (pb *ProposalBlock) free() {
+	pb.freer.freeProposalBlock(pb)
+	/* TODO remove
 	pb.commonBlock.free()
 	pb.onCommitState = nil
 	pb.onAbortState = nil
+	*/
 }
 
 func (pb *ProposalBlock) Accept() error {
