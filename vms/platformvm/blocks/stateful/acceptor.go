@@ -136,9 +136,9 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	if b.txExecutorBackend.Bootstrapped.GetValue() {
 		if b.wasPreferred {
-			a.markAcceptedOptionVote()
+			a.MarkAcceptedOptionVote()
 		} else {
-			a.markRejectedOptionVote()
+			a.MarkRejectedOptionVote()
 		}
 	}
 
@@ -158,9 +158,9 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	if b.txExecutorBackend.Bootstrapped.GetValue() {
 		if b.wasPreferred {
-			a.markAcceptedOptionVote()
+			a.MarkAcceptedOptionVote()
 		} else {
-			a.markRejectedOptionVote()
+			a.MarkRejectedOptionVote()
 		}
 	}
 

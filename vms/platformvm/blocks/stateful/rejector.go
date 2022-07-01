@@ -36,7 +36,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 	b.onCommitState = nil
 	b.onAbortState = nil
 
-	if err := r.add(b.Tx); err != nil {
+	if err := r.Add(b.Tx); err != nil {
 		b.txExecutorBackend.Ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			b.Tx.ID(),
@@ -57,7 +57,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 		b.Parent(),
 	)
 
-	if err := r.add(b.Tx); err != nil {
+	if err := r.Add(b.Tx); err != nil {
 		b.txExecutorBackend.Ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			b.Tx.ID(),
@@ -79,7 +79,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 	)
 
 	for _, tx := range b.Txs {
-		if err := r.add(tx); err != nil {
+		if err := r.Add(tx); err != nil {
 			b.txExecutorBackend.Ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),

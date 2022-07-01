@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
@@ -31,6 +31,7 @@ type heightSetter interface {
 
 type backend struct {
 	mempool.Mempool
+	metrics.Metrics
 	versionDB
 	lastAccepteder
 	blockState
@@ -45,18 +46,6 @@ func (b *backend) markAccepted(blk stateless.Block) error {
 func (b *backend) getState() state.State {
 	// TODO
 	return nil
-}
-
-func (b *backend) add(*txs.Tx) error {
-	return errors.New("TODO")
-}
-
-func (b *backend) markAcceptedOptionVote() {
-	// TODO
-}
-
-func (b *backend) markRejectedOptionVote() {
-	// TODO
 }
 
 // TODO do we even need this or can we just pass parent ID into getStatefulBlock?
