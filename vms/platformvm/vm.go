@@ -417,10 +417,6 @@ func (vm *VM) Preferred() (stateful.Block, error) {
 	return vm.manager.GetStatefulBlock(vm.preferred)
 }
 
-func (vm *VM) onAccept(b stateful.Block) (state.Chain, error) {
-	return nil, errors.New("TODO")
-}
-
 func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var ErrBlockNil = errors.New("block is nil")
@@ -50,5 +51,5 @@ type Decision interface {
 	//    been verified.
 	// 2) The state of the chain after this block is accepted, if this block was
 	//    verified successfully.
-	// OnAccept() state.Chain
+	OnAccept() state.Chain
 }

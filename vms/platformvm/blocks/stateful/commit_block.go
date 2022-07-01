@@ -55,6 +55,7 @@ func toStatefulCommitBlock(
 		Manager:     manager,
 		doubleDecisionBlock: &doubleDecisionBlock{
 			decisionBlock: decisionBlock{
+				chainState: manager,
 				commonBlock: &commonBlock{
 					baseBlk:           &statelessBlk.CommonBlock,
 					status:            status,

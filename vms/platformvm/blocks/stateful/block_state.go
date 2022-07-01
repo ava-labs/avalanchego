@@ -18,10 +18,9 @@ type blockState interface {
 	AddStatelessBlock(block stateless.Block, status choices.Status)
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
 	GetStatefulBlock(blkID ids.ID) (Block, error)
-	// TODO rename to pinVerifiedBlock
-	cacheVerifiedBlock(blk Block)
+	pinVerifiedBlock(blk Block)
 	// TODO rename to unpinVerifiedBlock
-	dropVerifiedBlock(id ids.ID)
+	unpinVerifiedBlock(id ids.ID)
 }
 
 type blockStateImpl struct {
@@ -65,10 +64,10 @@ func (b *blockStateImpl) GetStatelessBlock(blockID ids.ID) (stateless.Block, cho
 	return nil, choices.Unknown, errors.New("TODO")
 }
 
-func (b *blockStateImpl) cacheVerifiedBlock(blk Block) {
+func (b *blockStateImpl) pinVerifiedBlock(blk Block) {
 	b.verifiedBlks[blk.ID()] = blk
 }
 
-func (b *blockStateImpl) dropVerifiedBlock(id ids.ID) {
+func (b *blockStateImpl) unpinVerifiedBlock(id ids.ID) {
 	delete(b.verifiedBlks, id)
 }

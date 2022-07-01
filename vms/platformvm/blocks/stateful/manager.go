@@ -13,6 +13,10 @@ import (
 
 var _ Manager = &manager{}
 
+type chainState interface {
+	GetState() state.State
+}
+
 type Manager interface {
 	blockState
 	verifier
@@ -20,6 +24,7 @@ type Manager interface {
 	rejector
 	conflictChecker
 	freer
+	chainState
 }
 
 func NewManager(
@@ -70,4 +75,8 @@ type manager struct {
 	conflictChecker
 	freer
 	state state.State
+}
+
+func (m *manager) GetState() state.State {
+	return m.state
 }

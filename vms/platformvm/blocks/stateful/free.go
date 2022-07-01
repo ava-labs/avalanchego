@@ -53,6 +53,6 @@ func (f *freerImpl) freeDecisionBlock(b *decisionBlock) {
 }
 
 func (f *freerImpl) freeCommonBlock(b *commonBlock) {
-	f.dropVerifiedBlock(b.baseBlk.ID())
+	f.unpinVerifiedBlock(b.baseBlk.ID())
 	b.children = nil
 }

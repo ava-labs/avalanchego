@@ -77,7 +77,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	b.timestamp = parentState.GetTimestamp()
 
 	v.RemoveProposalTx(b.Tx)
-	v.cacheVerifiedBlock(b)
+	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
 }
@@ -143,7 +143,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 	}
 
 	v.RemoveDecisionTxs([]*txs.Tx{b.Tx})
-	v.cacheVerifiedBlock(b)
+	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
 }
@@ -240,7 +240,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 	b.timestamp = b.onAcceptState.GetTimestamp()
 
 	v.RemoveDecisionTxs(b.Txs)
-	v.cacheVerifiedBlock(b)
+	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
 }
@@ -264,7 +264,7 @@ func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 	b.onAcceptState = parent.onCommitState
 	b.timestamp = b.onAcceptState.GetTimestamp()
 
-	v.cacheVerifiedBlock(b)
+	v.pinVerifiedBlock(b)
 	parent.addChild(b)
 	return nil
 }
@@ -288,7 +288,7 @@ func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
 	b.onAcceptState = parent.onAbortState
 	b.timestamp = b.onAcceptState.GetTimestamp()
 
-	v.cacheVerifiedBlock(b)
+	v.pinVerifiedBlock(b)
 	parent.addChild(b)
 	return nil
 }

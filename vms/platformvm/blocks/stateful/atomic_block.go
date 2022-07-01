@@ -61,6 +61,7 @@ func toStatefulAtomicBlock(
 		AtomicBlock: statelessBlk,
 		Manager:     manager,
 		decisionBlock: &decisionBlock{
+			chainState: manager,
 			commonBlock: &commonBlock{
 				baseBlk:           &statelessBlk.CommonBlock,
 				status:            status,
