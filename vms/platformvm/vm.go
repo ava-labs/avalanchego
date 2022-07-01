@@ -110,8 +110,7 @@ type VM struct {
 
 	txBuilder         builder.TxBuilder
 	txExecutorBackend executor.Backend
-	// TODO remove
-	//blkVerifier       stateful.Verifier
+	manager           stateful.Manager
 }
 
 // Initialize this blockchain.
@@ -201,15 +200,15 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
-	/* TODO remove
-	vm.blkVerifier = NewBlockVerifier(
+	vm.manager = stateful.NewManager(
 		mempool,
+		vm.Metrics,
+		vm.internalState,
+		vm.internalState,
+		vm.internalState,
 		vm.internalState,
 		vm.txExecutorBackend,
-		&vm.Metrics,
-		vm.recentlyAccepted,
 	)
-	*/
 
 	if err := vm.blockBuilder.Initialize(
 		mempool,
@@ -388,15 +387,14 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 
 	return stateful.MakeStateful(
 		statelessBlk,
-		nil, // TODO Manager
+		vm.manager,
 		vm.txExecutorBackend,
 		choices.Processing,
 	)
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return nil, errors.New("TODO")
-	// return vm.blkVerifier.GetStatefulBlock(blkID)
+	return vm.manager.GetStatefulBlock(blkID)
 }
 
 // LastAccepted returns the block most recently accepted
@@ -416,11 +414,10 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 }
 
 func (vm *VM) Preferred() (stateful.Block, error) {
-	return nil, errors.New("TODO")
-	// return vm.blkVerifier.GetStatefulBlock(vm.preferred)
+	return vm.manager.GetStatefulBlock(vm.preferred)
 }
 
-func (vm *VM) onAccept(b stateful.Decision) (state.Chain, error) {
+func (vm *VM) onAccept(b stateful.Block) (state.Chain, error) {
 	return nil, errors.New("TODO")
 }
 

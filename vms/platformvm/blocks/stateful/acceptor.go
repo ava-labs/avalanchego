@@ -65,8 +65,8 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
 
-	defer a.abort()
-	batch, err := a.commitBatch()
+	defer a.Abort()
+	batch, err := a.CommitBatch()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to commit VM's database for block %s: %w",
@@ -108,8 +108,8 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
 
-	defer a.abort()
-	batch, err := a.commitBatch()
+	defer a.Abort()
+	batch, err := a.CommitBatch()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to commit VM's database for block %s: %w",
@@ -191,7 +191,7 @@ func (a *acceptorImpl) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) er
 
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
-	if err := a.commit(); err != nil {
+	if err := a.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 

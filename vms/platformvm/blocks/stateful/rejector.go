@@ -46,7 +46,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 
 	defer r.commonReject(b.commonBlock)
 	r.AddStatelessBlock(b.ProposalBlock, b.Status())
-	return r.commit()
+	return r.Commit()
 }
 
 func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
@@ -67,7 +67,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 
 	defer r.commonReject(b.commonBlock)
 	r.AddStatelessBlock(b.AtomicBlock, b.Status())
-	return r.commit()
+	return r.Commit()
 }
 
 func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
@@ -90,7 +90,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 
 	defer r.commonReject(b.commonBlock)
 	r.AddStatelessBlock(b.StandardBlock, b.Status())
-	return r.commit()
+	return r.Commit()
 }
 
 func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
@@ -101,7 +101,7 @@ func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 
 	defer r.commonReject(b.commonBlock)
 	r.AddStatelessBlock(b.CommitBlock, b.Status())
-	return r.commit()
+	return r.Commit()
 }
 
 func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
@@ -114,7 +114,7 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 
 	defer r.commonReject(b.commonBlock)
 	r.AddStatelessBlock(b.AbortBlock, b.Status())
-	return r.commit()
+	return r.Commit()
 }
 
 func (r *rejectorImpl) commonReject(b *commonBlock) {

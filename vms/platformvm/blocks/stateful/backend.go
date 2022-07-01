@@ -18,9 +18,9 @@ type lastAccepteder interface {
 }
 
 type versionDB interface {
-	abort()
-	commitBatch() (database.Batch, error)
-	commit() error
+	Abort()
+	CommitBatch() (database.Batch, error)
+	Commit() error
 }
 
 type heightSetter interface {
@@ -30,21 +30,22 @@ type heightSetter interface {
 type backend struct {
 	mempool.Mempool
 	metrics.Metrics
+	// TODO consolidate state fields below
 	versionDB
 	lastAccepteder
 	blockState
 	heightSetter
+	state state.State
 }
 
 func (b *backend) getState() state.State {
-	// TODO
-	return nil
+	return b.state
 }
 
 // TODO do we even need this or can we just pass parent ID into getStatefulBlock?
 func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
 	parentBlkID := blk.Parent()
-	return b.getStatefulBlock(parentBlkID)
+	return b.GetStatefulBlock(parentBlkID)
 }
 
 // TODO implement

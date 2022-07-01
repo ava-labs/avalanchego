@@ -85,17 +85,18 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	// Get the preferred block (which we want to build off)
-	preferredState, err := b.vm.onAccept(b)
-	if err != nil {
-		return err
-	}
-	/* TODO remove
 	preferred, err := b.vm.Preferred()
 	if err != nil {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
+	// Get the preferred block (which we want to build off)
+	preferredState, err := b.vm.onAccept(preferred)
+	if err != nil {
+		return err
+	}
+
+	/* TODO remove
 	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block

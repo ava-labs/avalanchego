@@ -17,7 +17,7 @@ var _ blockState = &blockStateImpl{}
 type blockState interface {
 	AddStatelessBlock(block stateless.Block, status choices.Status)
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	getStatefulBlock(blkID ids.ID) (Block, error)
+	GetStatefulBlock(blkID ids.ID) (Block, error)
 	// TODO rename to pinVerifiedBlock
 	cacheVerifiedBlock(blk Block)
 	// TODO rename to unpinVerifiedBlock
@@ -38,7 +38,7 @@ func newBlockState() blockState {
 }
 */
 
-func (b *blockStateImpl) getStatefulBlock(blkID ids.ID) (Block, error) {
+func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 	// If block is in memory, return it.
 	if blk, exists := b.verifiedBlks[blkID]; exists {
 		return blk, nil
