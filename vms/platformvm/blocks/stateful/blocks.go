@@ -16,12 +16,6 @@ var ErrBlockNil = errors.New("block is nil")
 type Block interface {
 	snowman.Block
 
-	/* TODO remove
-	// parent returns the parent block, similarly to Parent. However, it
-	 provides the more specific Block interface.
-	 parentBlock() (Block, error)
-	*/
-
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.
 	conflicts(ids.Set) (bool, error)
@@ -44,7 +38,6 @@ type Block interface {
 // if its parent is a proposal. Otherwise, the changes are committed
 // immediately.
 type Decision interface {
-	// TODO move this spec
 	// This function should only be called after Verify is called.
 	// OnAccept returns:
 	// 1) The current state of the chain, if this block is decided or hasn't

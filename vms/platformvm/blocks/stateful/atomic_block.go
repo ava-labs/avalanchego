@@ -80,19 +80,6 @@ func toStatefulAtomicBlock(
 // any of this block's non-accepted ancestors or itself.
 func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 	return ab.conflictsAtomicBlock(ab, s)
-	/* TODO remove
-	if ab.Status() == choices.Accepted {
-		return false, nil
-	}
-	if ab.inputs.Overlaps(s) {
-		return true, nil
-	}
-	parent, err := ab.parentBlock()
-	if err != nil {
-		return false, err
-	}
-	return parent.conflicts(s)
-	*/
 }
 
 // Verify this block performs a valid state transition.

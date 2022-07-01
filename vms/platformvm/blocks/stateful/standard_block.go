@@ -83,19 +83,6 @@ func toStatefulStandardBlock(
 // any of this block's non-accepted ancestors or itself.
 func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
 	return sb.conflictsStandardBlock(sb, s)
-	/* TODO remove
-	if sb.status == choices.Accepted {
-		return false, nil
-	}
-	if sb.Inputs.Overlaps(s) {
-		return true, nil
-	}
-	parent, err := sb.parentBlock()
-	if err != nil {
-		return false, err
-	}
-	return parent.conflicts(s)
-	*/
 }
 
 // Verify this block performs a valid state transition.

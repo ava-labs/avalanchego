@@ -22,17 +22,3 @@ func (d *decisionBlock) OnAccept() state.Chain {
 	}
 	return d.onAcceptState
 }
-
-/* TODO remove
-// From CommonDecisionBlock
-func (d *decisionBlock) free() {
-	d.commonBlock.free()
-	d.onAcceptState = nil
-}
-*/
-
-/* TODO remove
-func (d *decisionBlock) setBaseState() {
-	d.onAcceptState.SetBase(d.verifier.GetChainState())
-}
-*/

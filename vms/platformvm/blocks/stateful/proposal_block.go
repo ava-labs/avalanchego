@@ -81,11 +81,6 @@ func toStatefulProposalBlock(
 
 func (pb *ProposalBlock) free() {
 	pb.freeProposalBlock(pb)
-	/* TODO remove
-	pb.commonBlock.free()
-	pb.onCommitState = nil
-	pb.onAbortState = nil
-	*/
 }
 
 // Verify this block is valid.
@@ -108,13 +103,6 @@ func (pb *ProposalBlock) Reject() error {
 func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
 	return pb.conflictsProposalBlock(pb, s)
 }
-
-/* TODO remove
-func (pb *ProposalBlock) setBaseState() {
-	pb.onCommitState.SetBase(pb.verifier.GetChainState())
-	pb.onAbortState.SetBase(pb.verifier.GetChainState())
-}
-*/
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {

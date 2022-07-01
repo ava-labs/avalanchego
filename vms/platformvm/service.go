@@ -46,9 +46,6 @@ const (
 )
 
 var (
-	/* TODO remove
-	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
-	*/
 	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
 	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
 	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")

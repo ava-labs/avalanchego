@@ -232,6 +232,6 @@ func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	// a.addToRecentlyAcceptedWindows(blkID)
 }
 
-/* TODO
+/* TODO do we need this?
 func (a *acceptorImpl) addToRecentlyAcceptedWindows(blkID ids.ID) {}
 */
