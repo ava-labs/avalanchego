@@ -4,6 +4,8 @@
 package stateful
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -15,6 +17,10 @@ var _ Manager = &manager{}
 
 type chainState interface {
 	GetState() state.State
+}
+
+type timestampGetter interface {
+	GetTimestamp() time.Time
 }
 
 type Manager interface {
@@ -90,9 +96,3 @@ type manager struct {
 func (m *manager) GetState() state.State {
 	return m.state
 }
-
-/* TODO fix
-func (m *manager) LastAccepted() time.Time {
-	return m.state.LastAccepted()
-}
-*/

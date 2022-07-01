@@ -24,7 +24,7 @@ var (
 // AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	Manager // TODO set
+	Manager
 	*stateless.AtomicBlock
 	*decisionBlock
 

@@ -18,7 +18,7 @@ var (
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
 type CommitBlock struct {
-	Manager // TODO set
+	Manager
 	*stateless.CommitBlock
 	*doubleDecisionBlock
 

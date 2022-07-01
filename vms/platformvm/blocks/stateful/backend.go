@@ -30,7 +30,7 @@ type heightSetter interface {
 type backend struct {
 	mempool.Mempool
 	metrics.Metrics
-	// TODO consolidate state fields below
+	// TODO consolidate state fields below?
 	versionDB
 	lastAccepteder
 	blockState
@@ -46,10 +46,4 @@ func (b *backend) getState() state.State {
 func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
 	parentBlkID := blk.Parent()
 	return b.GetStatefulBlock(parentBlkID)
-}
-
-// TODO implement
-// TODO specify what type block should be
-func (b *backend) onAccept(blk Block) state.Chain {
-	return nil
 }

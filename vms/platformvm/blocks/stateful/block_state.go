@@ -19,7 +19,6 @@ type blockState interface {
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
 	GetStatefulBlock(blkID ids.ID) (Block, error)
 	pinVerifiedBlock(blk Block)
-	// TODO rename to unpinVerifiedBlock
 	unpinVerifiedBlock(id ids.ID)
 }
 
@@ -30,12 +29,6 @@ type blockStateImpl struct {
 	verifiedBlks      map[ids.ID]Block
 	txExecutorBackend executor.Backend
 }
-
-/* TODO
-func newBlockState() blockState {
-	return &blockStateImpl{}
-}
-*/
 
 func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 	// If block is in memory, return it.

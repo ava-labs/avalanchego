@@ -40,7 +40,12 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	}
 
 	// parentState is the state if this block's parent is accepted
-	parentState := v.onAccept(parentIntf)
+	parent, ok := parentIntf.(Decision)
+	if !ok {
+		return fmt.Errorf("expected *DecisionBlock but got %T", parentIntf)
+	}
+
+	parentState := parent.OnAccept()
 
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &b.txExecutorBackend,
@@ -79,16 +84,14 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 		return err
 	}
 
-	/* TODO remove
 	// AtomicBlock is not a modifier on a proposal block, so its parent must be
 	// a decision.
 	parent, ok := parentIntf.(Decision)
 	if !ok {
 		return fmt.Errorf("expected Decision block but got %T", parentIntf)
 	}
-	*/
 
-	parentState := v.onAccept(parentIntf)
+	parentState := parent.OnAccept()
 
 	cfg := b.txExecutorBackend.Cfg
 	currentTimestamp := parentState.GetTimestamp()
@@ -145,16 +148,14 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		return err
 	}
 
-	/* TODO remove
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
 	parent, ok := parentIntf.(Decision)
 	if !ok {
 		return fmt.Errorf("expected Decision block but got %T", parentIntf)
 	}
-	*/
+	parentState := parent.OnAccept()
 
-	parentState := v.onAccept(parentIntf)
 	b.onAcceptState = state.NewDiff(
 		parentState,
 		parentState.CurrentStakers(),

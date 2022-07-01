@@ -223,25 +223,6 @@ func (a *acceptorImpl) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) e
 	return nil
 }
 
-/*
-// TODO document acceptable input types
-func (a *acceptorImpl) setBaseState(b Block) {
-	switch b := b.(type) {
-	case *AbortBlock:
-		b.onAcceptState.SetBase(a.getState())
-	case *CommitBlock:
-		b.onAcceptState.SetBase(a.getState())
-	case *AtomicBlock:
-		b.onAcceptState.SetBase(a.getState())
-	case *StandardBlock:
-		b.onAcceptState.SetBase(a.getState())
-	case *ProposalBlock:
-		b.onCommitState.SetBase(a.getState())
-		b.onAbortState.SetBase(a.getState())
-	}
-}
-*/
-
 func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
