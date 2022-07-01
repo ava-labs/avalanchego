@@ -6,7 +6,6 @@ package stateful
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -51,19 +50,19 @@ func (c *commonBlock) Timestamp() time.Time {
 	return c.timestamp
 }
 
-func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
-	return c.conflictChecker.conflictsCommonBlock(c, s)
-	/* TODO remove
-	if c.Status() == choices.Accepted {
-		return false, nil
-	}
-	parent, err := c.parentBlock()
-	if err != nil {
-		return false, err
-	}
-	return parent.conflicts(s)
-	*/
-}
+// func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
+// 	return c.conflictChecker.conflictsCommonBlock(c, s)
+// 	/* TODO remove
+// 	if c.Status() == choices.Accepted {
+// 		return false, nil
+// 	}
+// 	parent, err := c.parentBlock()
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	return parent.conflicts(s)
+// 	*/
+// }
 
 func (c *commonBlock) verify() error {
 	if c == nil {

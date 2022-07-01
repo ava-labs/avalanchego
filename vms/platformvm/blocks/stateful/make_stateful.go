@@ -13,10 +13,7 @@ import (
 
 func MakeStateful(
 	statelessBlk stateless.Block,
-	verifier verifier,
-	acceptor acceptor,
-	rejector rejector,
-	freer freer,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (Block, error) {
@@ -24,26 +21,23 @@ func MakeStateful(
 	case *stateless.AbortBlock:
 		return toStatefulAbortBlock(
 			sb,
-			verifier,
-			acceptor,
-			rejector,
-			freer,
+			manager,
 			txExecutorBackend,
 			false, /*wasPreferred*/
 			status,
 		)
 
 	case *stateless.AtomicBlock:
-		return toStatefulAtomicBlock(sb, verifier, txExecutorBackend, status)
+		return toStatefulAtomicBlock(sb, manager, txExecutorBackend, status)
 
 	case *stateless.CommitBlock:
-		return toStatefulCommitBlock(sb, verifier, txExecutorBackend, false /*wasPreferred*/, status)
+		return toStatefulCommitBlock(sb, manager, txExecutorBackend, false /*wasPreferred*/, status)
 
 	case *stateless.ProposalBlock:
-		return toStatefulProposalBlock(sb, verifier, txExecutorBackend, status)
+		return toStatefulProposalBlock(sb, manager, txExecutorBackend, status)
 
 	case *stateless.StandardBlock:
-		return toStatefulStandardBlock(sb, verifier, txExecutorBackend, status)
+		return toStatefulStandardBlock(sb, manager, txExecutorBackend, status)
 
 	default:
 		return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)

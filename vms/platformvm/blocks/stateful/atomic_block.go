@@ -24,10 +24,7 @@ var (
 // AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	// TODO set this field
-	acceptor acceptor
-	// TODO set this field
-	rejector rejector
+	Manager // TODO set
 	*stateless.AtomicBlock
 	*decisionBlock
 
@@ -41,7 +38,7 @@ type AtomicBlock struct {
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewAtomicBlock(
-	verifier verifier,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -51,22 +48,22 @@ func NewAtomicBlock(
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulAtomicBlock(statelessBlk, verifier, txExecutorBackend, choices.Processing)
+	return toStatefulAtomicBlock(statelessBlk, manager, txExecutorBackend, choices.Processing)
 }
 
 func toStatefulAtomicBlock(
 	statelessBlk *stateless.AtomicBlock,
-	verifier verifier,
+	manager Manager,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		AtomicBlock: statelessBlk,
+		Manager:     manager,
 		decisionBlock: &decisionBlock{
 			commonBlock: &commonBlock{
 				baseBlk:           &statelessBlk.CommonBlock,
 				status:            status,
-				verifier:          verifier,
 				txExecutorBackend: txExecutorBackend,
 			},
 		},
@@ -101,13 +98,13 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
-	return ab.verifier.verifyAtomicBlock(ab)
+	return ab.verifyAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) Accept() error {
-	return ab.acceptor.acceptAtomicBlock(ab)
+	return ab.acceptAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) Reject() error {
-	return ab.rejector.rejectAtomicBlock(ab)
+	return ab.rejectAtomicBlock(ab)
 }

@@ -89,10 +89,7 @@ func (b *backend) getStatefulBlock(blkID ids.ID) (Block, error) {
 	}
 	return MakeStateful(
 		statelessBlk,
-		nil, // TODO verifier
-		nil, // TODO acceptor
-		nil, // TODO rejector
-		nil, // TODO freer
+		nil, // TODO manager
 		b.txExecutorBackend,
 		blkStatus,
 	)

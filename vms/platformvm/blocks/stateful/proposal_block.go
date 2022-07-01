@@ -29,12 +29,7 @@ var _ Block = &ProposalBlock{}
 // is accepted and followed by an accepted Commit block
 type ProposalBlock struct {
 	// TODO set this field
-	verifier2 verifier
-	// TODO set this field
-	acceptor acceptor
-	// TODO set this field
-	rejector rejector
-	// TODO set this field
+	Manager
 	*stateless.ProposalBlock
 	*commonBlock
 
@@ -92,12 +87,25 @@ func (pb *ProposalBlock) free() {
 	*/
 }
 
+// Verify this block is valid.
+//
+// The parent block must either be a Commit or an Abort block.
+//
+// If this block is valid, this function also sets pas.onCommit and pas.onAbort.
+func (pb *ProposalBlock) Verify() error {
+	return pb.verifyProposalBlock(pb)
+}
+
 func (pb *ProposalBlock) Accept() error {
-	return pb.acceptor.acceptProposalBlock(pb)
+	return pb.acceptProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Reject() error {
-	return pb.rejector.rejectProposalBlock(pb)
+	return pb.rejectProposalBlock(pb)
+}
+
+func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
+	return pb.conflictsProposalBlock(pb, s)
 }
 
 /* TODO remove
@@ -107,21 +115,12 @@ func (pb *ProposalBlock) setBaseState() {
 }
 */
 
-// Verify this block is valid.
-//
-// The parent block must either be a Commit or an Abort block.
-//
-// If this block is valid, this function also sets pas.onCommit and pas.onAbort.
-func (pb *ProposalBlock) Verify() error {
-	return pb.verifier2.verifyProposalBlock(pb)
-}
-
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
 
-	commit, err := NewCommitBlock(pb.verifier, pb.txExecutorBackend, blkID, nextHeight, pb.prefersCommit)
+	commit, err := NewCommitBlock(pb.Manager, pb.txExecutorBackend, blkID, nextHeight, pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
@@ -129,10 +128,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 	abort, err := NewAbortBlock(
-		pb.verifier,
-		nil,
-		nil,
-		nil,
+		pb.Manager,
 		pb.txExecutorBackend,
 		blkID,
 		nextHeight,

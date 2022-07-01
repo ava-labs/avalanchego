@@ -4,22 +4,24 @@
 package stateful
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
 var _ conflictChecker = &conflictCheckerImpl{}
 
 type conflictChecker interface {
+	conflictsProposalBlock(b *ProposalBlock, s ids.Set) (bool, error)
 	conflictsAtomicBlock(b *AtomicBlock, s ids.Set) (bool, error)
+	conflictsCommitBlock(b *CommitBlock, s ids.Set) (bool, error)
+	conflictsAbortBlock(b *AbortBlock, s ids.Set) (bool, error)
 	conflictsStandardBlock(b *StandardBlock, s ids.Set) (bool, error)
 	conflictsCommonBlock(b *commonBlock, s ids.Set) (bool, error)
 }
 
-type conflictCheckerImpl struct{}
+type conflictCheckerImpl struct {
+	backend
+}
 
 // TODO
 func NewConflictChecker() conflictChecker {
@@ -54,17 +56,25 @@ func (c *conflictCheckerImpl) conflictsStandardBlock(b *StandardBlock, s ids.Set
 	return parent.conflicts(s)
 }
 
+func (c *conflictCheckerImpl) conflictsProposalBlock(b *ProposalBlock, s ids.Set) (bool, error) {
+	return c.conflictsCommonBlock(b.commonBlock, s)
+}
+
+func (c *conflictCheckerImpl) conflictsAbortBlock(b *AbortBlock, s ids.Set) (bool, error) {
+	return c.conflictsCommonBlock(b.commonBlock, s)
+}
+
+func (c *conflictCheckerImpl) conflictsCommitBlock(b *CommitBlock, s ids.Set) (bool, error) {
+	return c.conflictsCommonBlock(b.commonBlock, s)
+}
+
 func (c *conflictCheckerImpl) conflictsCommonBlock(b *commonBlock, s ids.Set) (bool, error) {
 	if b.Status() == choices.Accepted {
 		return false, nil
 	}
-	parent, err := c.parent(b.baseBlk)
+	parent, err := c.backend.parent(b.baseBlk)
 	if err != nil {
 		return false, err
 	}
 	return parent.conflicts(s)
-}
-
-func (c *conflictCheckerImpl) parent(b *stateless.CommonBlock) (*commonBlock, error) {
-	return nil, errors.New("TODO")
 }
