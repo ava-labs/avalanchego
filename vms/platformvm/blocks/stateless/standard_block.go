@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	_ StandardBlockIntf = &StandardBlock{}
-	_ StandardBlockIntf = &PostForkStandardBlock{}
+	_ StandardBlockIntf = &ApricotStandardBlock{}
+	_ StandardBlockIntf = &BlueberryStandardBlock{}
 )
 
 type StandardBlockIntf interface {
@@ -39,8 +39,8 @@ func NewStandardBlock(
 	}
 
 	switch version {
-	case PreForkVersion:
-		res := &StandardBlock{
+	case ApricotVersion:
+		res := &ApricotStandardBlock{
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
@@ -58,12 +58,12 @@ func NewStandardBlock(
 
 		return res, res.Initialize(version, bytes)
 
-	case PostForkVersion:
+	case BlueberryVersion:
 		txsBytes := make([][]byte, 0, len(txes))
 		for _, tx := range txes {
 			txsBytes = append(txsBytes, tx.Bytes())
 		}
-		res := &PostForkStandardBlock{
+		res := &BlueberryStandardBlock{
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
@@ -86,13 +86,13 @@ func NewStandardBlock(
 	}
 }
 
-type StandardBlock struct {
+type ApricotStandardBlock struct {
 	CommonBlock `serialize:"true"`
 
 	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (sb *StandardBlock) Initialize(version uint16, bytes []byte) error {
+func (sb *ApricotStandardBlock) Initialize(version uint16, bytes []byte) error {
 	if err := sb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
@@ -104,17 +104,17 @@ func (sb *StandardBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (sb *StandardBlock) DecisionTxs() []*txs.Tx { return sb.Txs }
+func (sb *ApricotStandardBlock) DecisionTxs() []*txs.Tx { return sb.Txs }
 
-type PostForkStandardBlock struct {
+type BlueberryStandardBlock struct {
 	CommonBlock `serialize:"true"`
 
-	TxsBytes [][]byte `serialize:"false" postFork:"true" json:"txs"`
+	TxsBytes [][]byte `serialize:"false" blueberry:"true" json:"txs"`
 
 	Txs []*txs.Tx
 }
 
-func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error {
+func (psb *BlueberryStandardBlock) Initialize(version uint16, bytes []byte) error {
 	if err := psb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
@@ -124,7 +124,7 @@ func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error
 		var tx txs.Tx
 		_, err := txs.Codec.Unmarshal(txBytes, &tx)
 		if err != nil {
-			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
+			return fmt.Errorf("failed unmarshalling tx in blueberry block: %w", err)
 		}
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
@@ -135,4 +135,4 @@ func (psb *PostForkStandardBlock) Initialize(version uint16, bytes []byte) error
 	return nil
 }
 
-func (psb *PostForkStandardBlock) DecisionTxs() []*txs.Tx { return psb.Txs }
+func (psb *BlueberryStandardBlock) DecisionTxs() []*txs.Tx { return psb.Txs }

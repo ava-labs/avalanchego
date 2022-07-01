@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
+func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 	assert := assert.New(t)
 
 	h := newTestHelpersCollection(t, nil)
@@ -27,7 +27,7 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 
 	now := defaultGenesisTime.Add(time.Hour)
 	h.clk.Set(now)
-	blkVersion := uint16(stateless.PostForkVersion)
+	blkVersion := uint16(stateless.BlueberryVersion)
 
 	tests := []struct {
 		description string
@@ -66,7 +66,7 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 			parentTx, err := testProposalTx()
 			assert.NoError(err)
 
-			postForkParentBlk, err := NewProposalBlock(
+			blueberryParentBlk, err := NewProposalBlock(
 				parentVersion,
 				uint64(test.parentTime.Unix()),
 				h.blkVerifier,
@@ -77,7 +77,7 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 			)
 			assert.NoError(err)
 			assert.NoError(err)
-			h.fullState.AddStatelessBlock(postForkParentBlk, choices.Accepted)
+			h.fullState.AddStatelessBlock(blueberryParentBlk, choices.Accepted)
 
 			// build and verify child block
 			childVersion := blkVersion
@@ -87,7 +87,7 @@ func TestPostForkAbortBlockTimestampChecks(t *testing.T) {
 				uint64(test.childTime.Unix()),
 				h.blkVerifier,
 				h.txExecBackend,
-				postForkParentBlk.ID(),
+				blueberryParentBlk.ID(),
 				childHeight,
 				true, // wasPreferred
 			)

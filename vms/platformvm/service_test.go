@@ -769,11 +769,11 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			service, _ := defaultService(t)
-			blkVersion := uint16(stateless.PreForkVersion)
+			blkVersion := uint16(stateless.ApricotVersion)
 
 			block, err := stateful.NewStandardBlock(
 				blkVersion,
-				0, // preFork timestamp is not serialized
+				0, // apricot timestamp is not serialized
 				service.vm.blkVerifier,
 				service.vm.txExecutorBackend,
 				ids.GenerateTestID(),

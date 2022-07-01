@@ -37,9 +37,9 @@ type ProposalBlock struct {
 	stateless.ProposalBlockIntf
 	*commonBlock
 
-	// Following Blueberry activation, onPostForkBaseOptionsState is the base state
+	// Following Blueberry activation, onBlueberryBaseOptionsState is the base state
 	// over which both commit and abort states are built
-	onPostForkBaseOptionsState state.Diff
+	onBlueberryBaseOptionsState state.Diff
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState state.Diff
 	// The state that the chain will have if this block's proposal is aborted
@@ -105,8 +105,8 @@ func (pb *ProposalBlock) Accept() error {
 
 	// Update the state of the chain in the database
 	// apply baseOptionState first
-	if pb.Version() == stateless.PostForkVersion {
-		pb.onPostForkBaseOptionsState.Apply(pb.verifier)
+	if pb.Version() == stateless.BlueberryVersion {
+		pb.onBlueberryBaseOptionsState.Apply(pb.verifier)
 	}
 
 	pb.status = choices.Accepted
@@ -154,7 +154,7 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	if pb.Version() == stateless.PostForkVersion {
+	if pb.Version() == stateless.BlueberryVersion {
 		if _, ok := pb.ProposalTx().Unsigned.(*txs.AdvanceTimeTx); ok {
 			return ErrAdvanceTimeTxCannotBeIncluded
 		}
@@ -177,14 +177,14 @@ func (pb *ProposalBlock) Verify() error {
 	blkVersion := pb.Version()
 	var txExecutor executor.ProposalTxExecutor
 	switch blkVersion {
-	case stateless.PreForkVersion:
+	case stateless.ApricotVersion:
 		txExecutor = executor.ProposalTxExecutor{
 			Backend:     &pb.txExecutorBackend,
 			ParentState: parentState,
 			Tx:          tx,
 		}
 
-	case stateless.PostForkVersion:
+	case stateless.BlueberryVersion:
 		// Having verifier block timestamp, we update staker set
 		// before processing block transaction
 		var (
@@ -217,7 +217,7 @@ func (pb *ProposalBlock) Verify() error {
 		baseOptionsState.SetTimestamp(nextChainTime)
 		baseOptionsState.SetCurrentSupply(updatedSupply)
 
-		pb.onPostForkBaseOptionsState = baseOptionsState
+		pb.onBlueberryBaseOptionsState = baseOptionsState
 		txExecutor = executor.ProposalTxExecutor{
 			Backend:     &pb.txExecutorBackend,
 			ParentState: baseOptionsState,

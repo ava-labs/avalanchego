@@ -96,18 +96,18 @@ func (c *commonBlock) verify(enforceStrictness bool) error {
 func (c *commonBlock) ExpectedChildVersion() uint16 {
 	forkTime := c.txExecutorBackend.Cfg.BlueberryTime
 	if c.Timestamp().Before(forkTime) {
-		return stateless.PreForkVersion
+		return stateless.ApricotVersion
 	}
-	return stateless.PostForkVersion
+	return stateless.BlueberryVersion
 }
 
 func (c *commonBlock) validateBlockTimestamp(enforceStrictness bool) error {
-	// verify timestamp only for post fork blocks
-	// Note: atomic blocks have been deprecated before fork introduction,
+	// verify timestamp only for blueberry blocks
+	// Note: atomic blocks have been deprecated before blueberry fork activation,
 	// therefore validateBlockTimestamp for atomic blocks should return
-	// immediately as they should all have PreForkVersion.
+	// immediately as they should all have ApricotVersion.
 	// We do not bother distinguishing atomic blocks below.
-	if c.commonStatelessBlk.Version() == stateless.PreForkVersion {
+	if c.commonStatelessBlk.Version() == stateless.ApricotVersion {
 		return nil
 	}
 

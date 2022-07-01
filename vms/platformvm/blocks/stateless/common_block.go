@@ -34,8 +34,8 @@ type CommonBlock struct {
 	Hght uint64 `serialize:"true" json:"height"`
 
 	// Time this block was proposed at. Note that this
-	// is serialized for post fork blocks only
-	BlkTimestamp uint64 `serialize:"false" postFork:"true" json:"time"`
+	// is serialized for blueberry blocks only
+	BlkTimestamp uint64 `serialize:"false" blueberry:"true" json:"time"`
 
 	// Codec version used to serialized/deserialize the block
 	version uint16

@@ -45,7 +45,7 @@ type test struct {
 	expectedSubnetStakers map[ids.NodeID]stakerStatus
 }
 
-func TestPreForkStandardBlockTimeVerification(t *testing.T) {
+func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -59,11 +59,11 @@ func TestPreForkStandardBlockTimeVerification(t *testing.T) {
 
 	// setup and store parent block
 	// it's a standard block for simplicity
-	blksVersion := uint16(stateless.PreForkVersion)
+	blksVersion := uint16(stateless.ApricotVersion)
 	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
-	preForkParentBlk, err := stateless.NewStandardBlock(
+	apricotParentBlk, err := stateless.NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
@@ -77,45 +77,45 @@ func TestPreForkStandardBlockTimeVerification(t *testing.T) {
 	currentSupply := uint64(1000)
 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
 		func(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
-			if blockID == preForkParentBlk.ID() {
-				return preForkParentBlk, choices.Accepted, nil
+			if blockID == apricotParentBlk.ID() {
+				return apricotParentBlk, choices.Accepted, nil
 			}
 			return nil, choices.Rejected, database.ErrNotFound
 		}).AnyTimes()
-	h.mockedFullState.EXPECT().GetLastAccepted().Return(preForkParentBlk.ID()).AnyTimes()
+	h.mockedFullState.EXPECT().GetLastAccepted().Return(apricotParentBlk.ID()).AnyTimes()
 	h.mockedFullState.EXPECT().CurrentStakers().AnyTimes()
 	h.mockedFullState.EXPECT().PendingStakers().AnyTimes()
 	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	h.mockedFullState.EXPECT().GetCurrentSupply().Return(currentSupply).AnyTimes()
 
 	// wrong height
-	preForkChildBlk, err := NewStandardBlock(
+	apricotChildBlk, err := NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
-		preForkParentBlk.ID(),
-		preForkParentBlk.Height(),
+		apricotParentBlk.ID(),
+		apricotParentBlk.Height(),
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.Error(preForkChildBlk.Verify())
+	assert.Error(apricotChildBlk.Verify())
 
 	// valid height
-	preForkChildBlk, err = NewStandardBlock(
-		stateless.PreForkVersion,
+	apricotChildBlk, err = NewStandardBlock(
+		stateless.ApricotVersion,
 		uint64(parentTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
-		preForkParentBlk.ID(),
-		preForkParentBlk.Height()+1,
+		apricotParentBlk.ID(),
+		apricotParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.NoError(preForkChildBlk.Verify())
+	assert.NoError(apricotChildBlk.Verify())
 }
 
-func TestPostForkStandardBlockTimeVerification(t *testing.T) {
+func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -132,11 +132,11 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 
 	// setup and store parent block
 	// it's a standard block for simplicity
-	parentVersion := uint16(stateless.PostForkVersion)
+	parentVersion := uint16(stateless.BlueberryVersion)
 	parentTime := now
 	parentHeight := uint64(2022)
 
-	postForkParentBlk, err := stateless.NewStandardBlock(
+	blueberryParentBlk, err := stateless.NewStandardBlock(
 		parentVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
@@ -151,12 +151,12 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 	currentSupply := uint64(1000)
 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
 		func(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
-			if blockID == postForkParentBlk.ID() {
-				return postForkParentBlk, choices.Accepted, nil
+			if blockID == blueberryParentBlk.ID() {
+				return blueberryParentBlk, choices.Accepted, nil
 			}
 			return nil, choices.Rejected, database.ErrNotFound
 		}).AnyTimes()
-	h.mockedFullState.EXPECT().GetLastAccepted().Return(postForkParentBlk.ID()).AnyTimes()
+	h.mockedFullState.EXPECT().GetLastAccepted().Return(blueberryParentBlk.ID()).AnyTimes()
 
 	// currentStaker is set just so UpdateStakerSet goes through doing nothing
 	currentStaker := state.NewMockCurrentStakers(ctrl)
@@ -178,103 +178,103 @@ func TestPostForkStandardBlockTimeVerification(t *testing.T) {
 
 	// wrong version
 	childTimestamp := uint64(parentTime.Add(time.Second).Unix())
-	postForkChildBlk, err := NewStandardBlock(
-		stateless.PreForkVersion,
+	blueberryChildBlk, err := NewStandardBlock(
+		stateless.ApricotVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height()+1,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.Error(postForkChildBlk.Verify())
+	assert.Error(blueberryChildBlk.Verify())
 
 	// wrong height
-	postForkChildBlk, err = NewStandardBlock(
-		stateless.PostForkVersion,
+	blueberryChildBlk, err = NewStandardBlock(
+		stateless.BlueberryVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height(),
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height(),
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.Error(postForkChildBlk.Verify())
+	assert.Error(blueberryChildBlk.Verify())
 
 	// wrong timestamp, earlier than parent
 	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
-	postForkChildBlk, err = NewStandardBlock(
-		stateless.PostForkVersion,
+	blueberryChildBlk, err = NewStandardBlock(
+		stateless.BlueberryVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height()+1,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.Error(postForkChildBlk.Verify())
+	assert.Error(blueberryChildBlk.Verify())
 
 	// wrong timestamp, violated synchrony bound
 	childTimestamp = uint64(parentTime.Add(executor.SyncBound).Add(time.Second).Unix())
-	postForkChildBlk, err = NewStandardBlock(
-		stateless.PostForkVersion,
+	blueberryChildBlk, err = NewStandardBlock(
+		stateless.BlueberryVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height()+1,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.Error(postForkChildBlk.Verify())
+	assert.Error(blueberryChildBlk.Verify())
 
 	// wrong timestamp, skipped staker set change event
 	childTimestamp = uint64(nextStakerTime.Add(time.Second).Unix())
-	postForkChildBlk, err = NewStandardBlock(
-		stateless.PostForkVersion,
+	blueberryChildBlk, err = NewStandardBlock(
+		stateless.BlueberryVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height()+1,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.Error(postForkChildBlk.Verify())
+	assert.Error(blueberryChildBlk.Verify())
 
 	// valid block, same timestamp as parent block
 	childTimestamp = uint64(parentTime.Unix())
-	postForkChildBlk, err = NewStandardBlock(
-		stateless.PostForkVersion,
+	blueberryChildBlk, err = NewStandardBlock(
+		stateless.BlueberryVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height()+1,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.NoError(postForkChildBlk.Verify())
+	assert.NoError(blueberryChildBlk.Verify())
 
 	// valid
 	childTimestamp = uint64(nextStakerTime.Unix())
-	postForkChildBlk, err = NewStandardBlock(
-		stateless.PostForkVersion,
+	blueberryChildBlk, err = NewStandardBlock(
+		stateless.BlueberryVersion,
 		childTimestamp,
 		h.blkVerifier,
 		h.txExecBackend,
-		postForkParentBlk.ID(),
-		postForkParentBlk.Height()+1,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
 	)
 	assert.NoError(err)
-	assert.NoError(postForkChildBlk.Verify())
+	assert.NoError(blueberryChildBlk.Verify())
 }
 
-func TestPostForkStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
+func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	assert := assert.New(t)
 
 	h := newTestHelpersCollection(t, nil)
@@ -310,7 +310,7 @@ func TestPostForkStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
 	block, err := NewStandardBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -351,7 +351,7 @@ func TestPostForkStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 // Ensure semantic verification updates the current and pending staker sets correctly.
 // Namely, it should add pending stakers whose start time is at or before the timestamp.
 // It will not remove primary network stakers; that happens in rewardTxs.
-func TestPostForkStandardBlockUpdateStakers(t *testing.T) {
+func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 	// Chronological order: staker1 start, staker2 start, staker3 start and staker 4 start,
 	//  staker3 and staker4 end, staker2 end and staker5 start, staker1 end
 	staker1 := staker{
@@ -514,7 +514,7 @@ func TestPostForkStandardBlockUpdateStakers(t *testing.T) {
 				parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 				assert.NoError(err)
 				block, err := NewStandardBlock(
-					stateless.PostForkVersion,
+					stateless.BlueberryVersion,
 					uint64(newTime.Unix()),
 					h.blkVerifier,
 					h.txExecBackend,
@@ -564,7 +564,7 @@ func TestPostForkStandardBlockUpdateStakers(t *testing.T) {
 // that ensures it fixes a bug where subnet validators are not removed
 // when timestamp is advanced and there is a pending staker whose start time
 // is after the new timestamp
-func TestPostForkStandardBlockRemoveSubnetValidator(t *testing.T) {
+func TestBlueberryStandardBlockRemoveSubnetValidator(t *testing.T) {
 	assert := assert.New(t)
 	h := newTestHelpersCollection(t, nil)
 	defer func() {
@@ -625,7 +625,7 @@ func TestPostForkStandardBlockRemoveSubnetValidator(t *testing.T) {
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
 	block, err := NewStandardBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(subnetVdr1EndTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -653,7 +653,7 @@ func TestPostForkStandardBlockRemoveSubnetValidator(t *testing.T) {
 	assert.False(h.cfg.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 }
 
-func TestPostForkStandardBlockWhitelistedSubnet(t *testing.T) {
+func TestBlueberryStandardBlockWhitelistedSubnet(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, whitelist := range []bool{true, false} {
@@ -698,7 +698,7 @@ func TestPostForkStandardBlockWhitelistedSubnet(t *testing.T) {
 			parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 			assert.NoError(err)
 			block, err := NewStandardBlock(
-				stateless.PostForkVersion,
+				stateless.BlueberryVersion,
 				uint64(subnetVdr1StartTime.Unix()),
 				h.blkVerifier,
 				h.txExecBackend,
@@ -718,7 +718,7 @@ func TestPostForkStandardBlockWhitelistedSubnet(t *testing.T) {
 	}
 }
 
-func TestPostForkStandardBlockDelegatorStakerWeight(t *testing.T) {
+func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	assert := assert.New(t)
 	h := newTestHelpersCollection(t, nil)
 	defer func() {
@@ -751,7 +751,7 @@ func TestPostForkStandardBlockDelegatorStakerWeight(t *testing.T) {
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
 	block, err := NewStandardBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -796,7 +796,7 @@ func TestPostForkStandardBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Advance Time
 	block, err = NewStandardBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,

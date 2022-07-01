@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-func (b *blockBuilder) nextPreForkTxs(preBlkState state.Chain) ([]*txs.Tx, error) {
+func (b *blockBuilder) nextApricotTxs(preBlkState state.Chain) ([]*txs.Tx, error) {
 	// Try return standard txs. Note that
-	// PreFork standard blocks to not advance chain time
+	// apricot standard blocks do not advance chain time
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		return txs, nil
@@ -33,7 +33,7 @@ func (b *blockBuilder) nextPreForkTxs(preBlkState state.Chain) ([]*txs.Tx, error
 		return []*txs.Tx{rewardValidatorTx}, nil
 	}
 
-	// Try building a proposal block that advances the chain timestamp.
+	// try building a proposal block that advances the chain timestamp.
 	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(preBlkState)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve next chain time %s", err)
@@ -46,7 +46,7 @@ func (b *blockBuilder) nextPreForkTxs(preBlkState state.Chain) ([]*txs.Tx, error
 		return []*txs.Tx{advanceTimeTx}, nil
 	}
 
-	// Clean out the mempool's transactions with invalid timestamps.
+	// clean out the mempool's transactions with invalid timestamps.
 	b.dropTooEarlyMempoolProposalTxs()
 
 	if !b.HasProposalTx() {
@@ -54,11 +54,11 @@ func (b *blockBuilder) nextPreForkTxs(preBlkState state.Chain) ([]*txs.Tx, error
 		return nil, errNoPendingBlocks
 	}
 
-	// Get the proposal transaction that should be issued.
+	// get the proposal transaction that should be issued.
 	tx := b.PopProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
-	// If the chain timestamp is too far in the past to issue this transaction
+	// if the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
 	maxChainStartTime := preBlkState.GetTimestamp().Add(executor.MaxFutureStartTime)

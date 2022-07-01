@@ -639,7 +639,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _, _ := defaultVM()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -676,7 +676,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredHeight := preferred.Height()
 	blk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -1731,7 +1731,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1774,7 +1774,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		firstVM.blkVerifier,
 		firstVM.txExecutorBackend,
 		preferredID,
@@ -1868,7 +1868,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 
 	db := manager.NewMemDB(version.Semantic1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1907,7 +1907,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		firstVM.blkVerifier,
 		firstVM.txExecutorBackend,
 		preferredID,
@@ -1999,7 +1999,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
@@ -2047,7 +2047,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	advanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2295,7 +2295,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Factory: Factory{
@@ -2339,7 +2339,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2368,7 +2368,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 	secondAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		firstOption.ID(),
@@ -2468,7 +2468,7 @@ func TestMaxStakeAmount(t *testing.T) {
 // Test that calling Verify on a block with an unverified parent doesn't cause a panic.
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
@@ -2549,7 +2549,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 
 	addSubnetBlk0, err := stateful.NewStandardBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2561,7 +2561,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}
 	addSubnetBlk1, err := stateful.NewStandardBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2573,7 +2573,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}
 	addSubnetBlk2, err := stateful.NewStandardBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		addSubnetBlk1.ID(),
@@ -2608,7 +2608,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, baseDB, mutableSharedMemory := defaultVM()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -2647,7 +2647,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	addValidatorProposalBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2723,7 +2723,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	importBlk, err := stateful.NewStandardBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2790,7 +2790,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	advanceTimeProposalBlk, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2865,7 +2865,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, baseDB, mutableSharedMemory := defaultVM()
-	blkVersion := uint16(stateless.PreForkVersion)
+	blkVersion := uint16(stateless.ApricotVersion)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -2903,7 +2903,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorProposalBlk0, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -2948,7 +2948,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	advanceTimeProposalBlk0, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -3032,7 +3032,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	importBlk, err := stateful.NewStandardBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -3110,7 +3110,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorProposalBlk1, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,
@@ -3155,7 +3155,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	advanceTimeProposalBlk1, err := stateful.NewProposalBlock(
 		blkVersion,
-		0, // preFork timestamp is not serialized
+		0, // apricot timestamp is not serialized
 		vm.blkVerifier,
 		vm.txExecutorBackend,
 		preferredID,

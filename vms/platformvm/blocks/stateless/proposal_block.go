@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	_ ProposalBlockIntf = &ProposalBlock{}
-	_ ProposalBlockIntf = &PostForkProposalBlock{}
+	_ ProposalBlockIntf = &ApricotProposalBlock{}
+	_ ProposalBlockIntf = &BlueberryProposalBlock{}
 )
 
 type ProposalBlockIntf interface {
@@ -37,8 +37,8 @@ func NewProposalBlock(
 	}
 
 	switch version {
-	case PreForkVersion:
-		res := &ProposalBlock{
+	case ApricotVersion:
+		res := &ApricotProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
@@ -56,8 +56,8 @@ func NewProposalBlock(
 		}
 		return res, res.Initialize(version, bytes)
 
-	case PostForkVersion:
-		res := &PostForkProposalBlock{
+	case BlueberryVersion:
+		res := &BlueberryProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
@@ -82,13 +82,13 @@ func NewProposalBlock(
 }
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now
-type ProposalBlock struct {
+type ApricotProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
+func (pb *ApricotProposalBlock) Initialize(version uint16, bytes []byte) error {
 	if err := pb.CommonBlock.Initialize(version, bytes); err != nil {
 		return err
 	}
@@ -105,17 +105,17 @@ func (pb *ProposalBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (pb *ProposalBlock) ProposalTx() *txs.Tx { return pb.Tx }
+func (pb *ApricotProposalBlock) ProposalTx() *txs.Tx { return pb.Tx }
 
-type PostForkProposalBlock struct {
+type BlueberryProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	TxBytes []byte `serialize:"false" postFork:"true" json:"txs"`
+	TxBytes []byte `serialize:"false" blueberry:"true" json:"txs"`
 
 	Tx *txs.Tx
 }
 
-func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error {
+func (ppb *BlueberryProposalBlock) Initialize(version uint16, bytes []byte) error {
 	if err := ppb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
@@ -133,4 +133,4 @@ func (ppb *PostForkProposalBlock) Initialize(version uint16, bytes []byte) error
 	return nil
 }
 
-func (ppb *PostForkProposalBlock) ProposalTx() *txs.Tx { return ppb.Tx }
+func (ppb *BlueberryProposalBlock) ProposalTx() *txs.Tx { return ppb.Tx }

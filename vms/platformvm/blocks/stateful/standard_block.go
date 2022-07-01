@@ -121,14 +121,14 @@ func (sb *StandardBlock) Verify() error {
 	parentState := parent.OnAccept()
 	blkVersion := sb.Version()
 	switch blkVersion {
-	case stateless.PreForkVersion:
+	case stateless.ApricotVersion:
 		sb.onAcceptState = state.NewDiff(
 			parentState,
 			parentState.CurrentStakers(),
 			parentState.PendingStakers(),
 		)
 
-	case stateless.PostForkVersion:
+	case stateless.BlueberryVersion:
 		// We update staker set before processing block transactions
 		nextChainTime := sb.Timestamp()
 		currentStakers := parentState.CurrentStakers()

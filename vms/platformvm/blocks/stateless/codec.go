@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	// PreForkVersion is the current default codec version
-	PreForkVersion  = 0
-	PostForkVersion = 1
+	// ApricotVersion is the current default codec version
+	ApricotVersion   = 0
+	BlueberryVersion = 1
 
-	postForkTag = "postFork"
+	blueberryTag = "blueberry"
 )
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
@@ -31,60 +31,60 @@ var (
 )
 
 func init() {
-	postForkTags := []string{reflectcodec.DefaultTagName, postForkTag}
+	blueberryTags := []string{reflectcodec.DefaultTagName, blueberryTag}
 
-	preCdc := linearcodec.NewDefault()
-	postCdc := linearcodec.NewWithTags(postForkTags)
+	apricotCdc := linearcodec.NewDefault()
+	blueberryCdc := linearcodec.NewWithTags(blueberryTags)
 	Codec = codec.NewDefaultManager()
 
 	preGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	postGc := linearcodec.New(postForkTags, math.MaxInt32)
+	postGc := linearcodec.New(blueberryTags, math.MaxInt32)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{preCdc, postCdc, preGc, postGc} {
+	for _, c := range []codec.Registry{apricotCdc, blueberryCdc, preGc, postGc} {
 		errs.Add(
-			RegisterPreForkBlockTypes(c),
+			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
 		)
 	}
-	for _, c := range []codec.Registry{postCdc, postGc} {
-		errs.Add(RegisterPostForkBlockTypes(c))
+	for _, c := range []codec.Registry{blueberryCdc, postGc} {
+		errs.Add(RegisterBlueberryBlockTypes(c))
 	}
 
 	errs.Add(
-		Codec.RegisterCodec(PreForkVersion, preCdc),
-		Codec.RegisterCodec(PostForkVersion, postCdc),
-		GenesisCodec.RegisterCodec(PreForkVersion, preGc),
-		GenesisCodec.RegisterCodec(PostForkVersion, postGc),
+		Codec.RegisterCodec(ApricotVersion, apricotCdc),
+		Codec.RegisterCodec(BlueberryVersion, blueberryCdc),
+		GenesisCodec.RegisterCodec(ApricotVersion, preGc),
+		GenesisCodec.RegisterCodec(BlueberryVersion, postGc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
 }
 
-// RegisterPreForkBlockTypes allows registering relevant type of blocks package
+// RegisterApricotBlockTypes allows registering relevant type of blocks package
 // in the right sequence. Following repackaging of platformvm package, a few
 // subpackage-level codecs were introduced, each handling serialization of specific types.
 // RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
 // are coherent with components one.
-func RegisterPreForkBlockTypes(targetCodec codec.Registry) error {
+func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		targetCodec.RegisterType(&ProposalBlock{}),
+		targetCodec.RegisterType(&ApricotProposalBlock{}),
 		targetCodec.RegisterType(&AbortBlock{}),
 		targetCodec.RegisterType(&CommitBlock{}),
-		targetCodec.RegisterType(&StandardBlock{}),
+		targetCodec.RegisterType(&ApricotStandardBlock{}),
 		targetCodec.RegisterType(&AtomicBlock{}),
 	)
 	return errs.Err
 }
 
-func RegisterPostForkBlockTypes(targetCodec codec.Registry) error {
+func RegisterBlueberryBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		targetCodec.RegisterType(&PostForkProposalBlock{}),
-		targetCodec.RegisterType(&PostForkStandardBlock{}),
+		targetCodec.RegisterType(&BlueberryProposalBlock{}),
+		targetCodec.RegisterType(&BlueberryStandardBlock{}),
 	)
 	return errs.Err
 }

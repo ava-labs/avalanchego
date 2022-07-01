@@ -190,12 +190,12 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	blkVersion := preferred.ExpectedChildVersion()
 	switch blkVersion {
-	case stateless.PreForkVersion:
-		b.txExecutorBackend.Ctx.Log.Info("about to build pre fork blocks")
-		txes, err = b.nextPreForkTxs(preferredState)
-	case stateless.PostForkVersion:
-		b.txExecutorBackend.Ctx.Log.Info("about to build post fork blocks")
-		txes, blkTime, err = b.nextPostForkTxs(preferredState)
+	case stateless.ApricotVersion:
+		b.txExecutorBackend.Ctx.Log.Info("about to build apricot blocks")
+		txes, err = b.nextApricotTxs(preferredState)
+	case stateless.BlueberryVersion:
+		b.txExecutorBackend.Ctx.Log.Info("about to build blueberry blocks")
+		txes, blkTime, err = b.nextBlueberryTxs(preferredState)
 	default:
 		err = fmt.Errorf("unsupported block version %d", blkVersion)
 	}

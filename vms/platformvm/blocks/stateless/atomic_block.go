@@ -32,7 +32,7 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (AtomicBlockIntf
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := CommonBlockIntf(res)
-	bytes, err := Codec.Marshal(PreForkVersion, &blk)
+	bytes, err := Codec.Marshal(ApricotVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
@@ -41,7 +41,7 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (AtomicBlockIntf
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
-	return res, res.Initialize(PreForkVersion, bytes)
+	return res, res.Initialize(ApricotVersion, bytes)
 }
 
 // AtomicBlock being accepted results in the atomic transaction contained in the

@@ -795,7 +795,7 @@ func (s *state) SyncGenesis(genesisBytes []byte) error {
 	}
 
 	genesisBlock, err := stateless.NewCommitBlock(
-		stateless.PreForkVersion,
+		stateless.ApricotVersion,
 		0, // timestamp
 		genesisID,
 		0, // height
@@ -1199,8 +1199,8 @@ func (s *state) writeBlocks() error {
 		)
 
 		// Note that here we are marshalling stateBlks, not stateless.Blocks.
-		// We keep stateless.PreForkVersion for backward compatibility
-		btxBytes, err := stateless.GenesisCodec.Marshal(stateless.PreForkVersion, &sblk)
+		// We keep stateless.ApricotVersion for backward compatibility
+		btxBytes, err := stateless.GenesisCodec.Marshal(stateless.ApricotVersion, &sblk)
 		if err != nil {
 			return fmt.Errorf("failed to write blocks with: %w", err)
 		}

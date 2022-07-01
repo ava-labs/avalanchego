@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPreForkProposalBlockTimeVerification(t *testing.T) {
+func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -39,11 +39,11 @@ func TestPreForkProposalBlockTimeVerification(t *testing.T) {
 
 	// setup and store parent block
 	// it's a standard block for simplicity
-	blksVersion := uint16(stateless.PreForkVersion)
+	blksVersion := uint16(stateless.ApricotVersion)
 	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
-	preForkParentBlk, err := stateless.NewStandardBlock(
+	apricotParentBlk, err := stateless.NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
@@ -56,12 +56,12 @@ func TestPreForkProposalBlockTimeVerification(t *testing.T) {
 	currentSupply := uint64(1000)
 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
 		func(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
-			if blockID == preForkParentBlk.ID() {
-				return preForkParentBlk, choices.Accepted, nil
+			if blockID == apricotParentBlk.ID() {
+				return apricotParentBlk, choices.Accepted, nil
 			}
 			return nil, choices.Rejected, database.ErrNotFound
 		}).AnyTimes()
-	h.mockedFullState.EXPECT().GetLastAccepted().Return(preForkParentBlk.ID()).AnyTimes()
+	h.mockedFullState.EXPECT().GetLastAccepted().Return(apricotParentBlk.ID()).AnyTimes()
 
 	// create a proposal transaction to be included into proposal block
 	utx := &txs.AddValidatorTx{
@@ -98,8 +98,8 @@ func TestPreForkProposalBlockTimeVerification(t *testing.T) {
 		uint64(parentTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
-		preForkParentBlk.ID(),
-		preForkParentBlk.Height(),
+		apricotParentBlk.ID(),
+		apricotParentBlk.Height(),
 		blkTx,
 	)
 	assert.NoError(err)
@@ -112,15 +112,15 @@ func TestPreForkProposalBlockTimeVerification(t *testing.T) {
 		uint64(parentTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
-		preForkParentBlk.ID(),
-		preForkParentBlk.Height()+1,
+		apricotParentBlk.ID(),
+		apricotParentBlk.Height()+1,
 		blkTx,
 	)
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 }
 
-func TestPostForkProposalBlockTimeVerification(t *testing.T) {
+func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -141,7 +141,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	parentHeight := uint64(2022)
 
 	parentBlk, err := stateless.NewStandardBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
 		parentHeight,
@@ -211,7 +211,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 
 	// wrong version
 	block, err := NewProposalBlock(
-		stateless.PreForkVersion,
+		stateless.ApricotVersion,
 		uint64(parentTime.Add(time.Second).Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -224,7 +224,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 
 	// wrong height
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(parentTime.Add(time.Second).Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -243,7 +243,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	}
 	assert.NoError(invalidTx.Sign(txs.Codec, nil))
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(parentTime.Add(time.Second).Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -256,7 +256,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 
 	// wrong timestamp, non increasing wrt parent
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(parentTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -270,7 +270,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	// wrong timestamp, violated synchrony bound
 	beyondSyncBoundTimeStamp := h.clk.Time().Add(executor.SyncBound).Add(time.Second)
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(beyondSyncBoundTimeStamp.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -284,7 +284,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	// wrong timestamp, skipped staker set change event
 	skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(skippedStakerEventTimeStamp.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -296,7 +296,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(validatorEndTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -321,7 +321,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(nextStakerTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -333,7 +333,7 @@ func TestPostForkProposalBlockTimeVerification(t *testing.T) {
 	assert.NoError(block.Verify())
 }
 
-func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
+func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 	// Chronological order (not in scale):
 	// Staker0:    |--- ??? // Staker0 end time depends on the test
 	// Staker1:        |------------------------------------------------------------------------|
@@ -606,7 +606,7 @@ func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
 					parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 					assert.NoError(err)
 					block, err := NewProposalBlock(
-						stateless.PostForkVersion,
+						stateless.BlueberryVersion,
 						uint64(newTime.Unix()),
 						h.blkVerifier,
 						h.txExecBackend,
@@ -658,7 +658,7 @@ func TestPostForkProposalBlockUpdateStakers(t *testing.T) {
 	}
 }
 
-func TestPostForkProposalBlockRemoveSubnetValidator(t *testing.T) {
+func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	assert := assert.New(t)
 	h := newTestHelpersCollection(t, nil)
 	defer func() {
@@ -747,7 +747,7 @@ func TestPostForkProposalBlockRemoveSubnetValidator(t *testing.T) {
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
 	block, err := NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(subnetVdr1EndTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -769,14 +769,14 @@ func TestPostForkProposalBlockRemoveSubnetValidator(t *testing.T) {
 	assert.False(exists, "should have been removed from validator set")
 
 	// Check VM Validators are removed successfully
-	block.onPostForkBaseOptionsState.Apply(h.fullState)
+	block.onBlueberryBaseOptionsState.Apply(h.fullState)
 	block.onCommitState.Apply(h.fullState)
 	assert.NoError(h.fullState.Commit())
 	assert.False(h.cfg.Validators.Contains(testSubnet1.ID(), subnetVdr2NodeID))
 	assert.False(h.cfg.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 }
 
-func TestPostForkProposalBlockWhitelistedSubnet(t *testing.T) {
+func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, whitelist := range []bool{true, false} {
@@ -849,7 +849,7 @@ func TestPostForkProposalBlockWhitelistedSubnet(t *testing.T) {
 			parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 			assert.NoError(err)
 			block, err := NewProposalBlock(
-				stateless.PostForkVersion,
+				stateless.BlueberryVersion,
 				uint64(subnetVdr1StartTime.Unix()),
 				h.blkVerifier,
 				h.txExecBackend,
@@ -861,7 +861,7 @@ func TestPostForkProposalBlockWhitelistedSubnet(t *testing.T) {
 
 			// update staker set
 			assert.NoError(block.Verify())
-			block.onPostForkBaseOptionsState.Apply(h.fullState)
+			block.onBlueberryBaseOptionsState.Apply(h.fullState)
 			block.onCommitState.Apply(h.fullState)
 
 			assert.NoError(h.fullState.Commit())
@@ -870,7 +870,7 @@ func TestPostForkProposalBlockWhitelistedSubnet(t *testing.T) {
 	}
 }
 
-func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
+func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert := assert.New(t)
 	h := newTestHelpersCollection(t, nil)
 	defer func() {
@@ -932,7 +932,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
 	block, err := NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -943,7 +943,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 
-	block.onPostForkBaseOptionsState.Apply(h.fullState)
+	block.onBlueberryBaseOptionsState.Apply(h.fullState)
 	block.onCommitState.Apply(h.fullState)
 	assert.NoError(h.fullState.Commit())
 
@@ -1005,7 +1005,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Advance Time
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -1016,7 +1016,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 
-	block.onPostForkBaseOptionsState.Apply(h.fullState)
+	block.onBlueberryBaseOptionsState.Apply(h.fullState)
 	block.onCommitState.Apply(h.fullState)
 	assert.NoError(h.fullState.Commit())
 
@@ -1025,7 +1025,7 @@ func TestPostForkProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.Equal(h.cfg.MinDelegatorStake+h.cfg.MinValidatorStake, vdrWeight)
 }
 
-func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
+func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	assert := assert.New(t)
 	h := newTestHelpersCollection(t, nil)
 	defer func() {
@@ -1087,7 +1087,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
 	block, err := NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -1098,7 +1098,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 
-	block.onPostForkBaseOptionsState.Apply(h.fullState)
+	block.onBlueberryBaseOptionsState.Apply(h.fullState)
 	block.onCommitState.Apply(h.fullState)
 	assert.NoError(h.fullState.Commit())
 
@@ -1159,7 +1159,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 
 	// Advance Time
 	block, err = NewProposalBlock(
-		stateless.PostForkVersion,
+		stateless.BlueberryVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
 		h.blkVerifier,
 		h.txExecBackend,
@@ -1170,7 +1170,7 @@ func TestPostForkProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 
-	block.onPostForkBaseOptionsState.Apply(h.fullState)
+	block.onBlueberryBaseOptionsState.Apply(h.fullState)
 	block.onCommitState.Apply(h.fullState)
 	assert.NoError(h.fullState.Commit())
 

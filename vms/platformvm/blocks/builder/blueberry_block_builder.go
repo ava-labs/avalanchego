@@ -13,13 +13,13 @@ import (
 
 // nextTx returns the next transactions to be included in a block, along with
 // its timestamp.
-func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Chain) ([]*txs.Tx, time.Time, error) {
-	// Before selecting txs to be included in block, we need to clean mempool
+func (b *blockBuilder) nextBlueberryTxs(prefBlkState state.Chain) ([]*txs.Tx, time.Time, error) {
+	// before selecting txs to be included in block, we need to clean mempool
 	// from transactions with invalid timestamps.
 	b.dropTooEarlyMempoolProposalTxs()
 
 	// check if timing is right for a standard block and issue it if so
-	nextStdBlkTime, couldBuildStdBlk, err := b.nextStandardPostForkBlkTimestamp(prefBlkState)
+	nextStdBlkTime, couldBuildStdBlk, err := b.nextBlueberryStandardBlkTimestamp(prefBlkState)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("could not evaluate what block should be built %s", err)
 	}
@@ -43,7 +43,7 @@ func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Chain) ([]*txs.Tx, tim
 		return []*txs.Tx{rewardValidatorTx}, nextPropBlkTime, nil
 	}
 
-	// Try advance chain time or issue a mempool proposal tx;
+	// try advance chain time or issue a mempool proposal tx;
 	// whatever is earlier.
 	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(prefBlkState)
 	if err != nil {
@@ -70,10 +70,10 @@ func (b *blockBuilder) nextPostForkTxs(prefBlkState state.Chain) ([]*txs.Tx, tim
 	return nil, time.Time{}, errNoPendingBlocks
 }
 
-// nextStandardPostForkBlkTimestamp attempts to calculate timestamp of next Standard Block
+// nextBlueberryStandardBlkTimestamp attempts to calculate timestamp of next Standard Block
 // to be issued. Returns the calculated time, true/false if a standard block could be issued,
 // finally error.
-func (b *blockBuilder) nextStandardPostForkBlkTimestamp(preBlkState state.Chain) (time.Time, bool, error) {
+func (b *blockBuilder) nextBlueberryStandardBlkTimestamp(preBlkState state.Chain) (time.Time, bool, error) {
 	nextBlkTime := b.txExecutorBackend.Clk.Time()
 
 	minNextTimestamp := preBlkState.GetTimestamp()
