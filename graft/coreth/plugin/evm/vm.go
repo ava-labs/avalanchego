@@ -231,7 +231,8 @@ type VM struct {
 
 	builder *blockBuilder
 
-	gossiper Gossiper
+	gossiper    Gossiper
+	gossipStats GossipStats
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -551,6 +552,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 	//
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will
 	// not work.
+	vm.gossipStats = NewGossipStats()
 	vm.gossiper = vm.createGossiper()
 	vm.builder = vm.NewBlockBuilder(vm.toEngine)
 	vm.builder.awaitSubmittedTxs()
