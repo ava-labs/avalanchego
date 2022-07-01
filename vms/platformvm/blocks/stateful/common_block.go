@@ -45,7 +45,7 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.acceptor.GetLastAccepted() {
+	if c.baseBlk.ID() == c.acceptor.getLastAccepted() {
 		return c.Timestamp()
 	}
 	return c.timestamp

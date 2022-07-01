@@ -173,9 +173,6 @@ func (a *acceptor) acceptAbortBlock(b *AbortBlock) error {
 	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
 }
 
-// TODO
-func (a *acceptor) GetLastAccepted() ids.ID { return ids.Empty }
-
 func (a *acceptor) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) error {
 	parentIntf, err := a.parent(b.baseBlk)
 	if err != nil {

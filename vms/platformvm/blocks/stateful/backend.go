@@ -14,11 +14,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// todo rename to something to do with state?
-type backend struct{}
+type backend struct {
+	state state.State
+}
 
 func (b *backend) setLastAccepted(blkID ids.ID) {
 	// TODO implement
+}
+
+func (b *backend) getLastAccepted() ids.ID {
+	return b.state.GetLastAccepted()
 }
 
 func (b *backend) addStatelessBlock(block stateless.Block, status choices.Status) {
