@@ -229,6 +229,7 @@ func (a *acceptorImpl) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) e
 	return nil
 }
 
+// TODO document acceptable input types
 func (a *acceptorImpl) setBaseState(b Block) {
 	switch b := b.(type) {
 	case *AbortBlock:

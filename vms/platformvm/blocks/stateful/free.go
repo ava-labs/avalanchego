@@ -3,8 +3,6 @@
 
 package stateful
 
-import "github.com/ava-labs/avalanchego/ids"
-
 var _ freer = &freerImpl{}
 
 type freer interface {
@@ -39,6 +37,3 @@ func (f *freerImpl) freeCommonBlock(b *commonBlock) {
 	f.dropVerifiedBlock(b.baseBlk.ID())
 	b.children = nil
 }
-
-// TODO
-func (f *freerImpl) dropVerifiedBlock(id ids.ID) {}

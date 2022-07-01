@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 type lastAccepteder interface {
@@ -26,6 +27,7 @@ type statelessBlockState interface {
 }
 
 type backend struct {
+	mempool mempool.Mempool
 	lastAccepteder
 	statelessBlockState
 	txExecutorBackend executor.Backend
@@ -66,17 +68,25 @@ func (b *backend) markRejectedOptionVote() {
 	// TODO
 }
 
-// TODO
-func (b *backend) removeDecisionTxs(txs []*txs.Tx) {}
+func (b *backend) removeDecisionTxs(txs []*txs.Tx) {
+	b.mempool.RemoveDecisionTxs(txs)
+}
 
-// TODO
-func (b *backend) markDropped(txID ids.ID, err string) {}
+func (b *backend) markDropped(txID ids.ID, err string) {
+	b.mempool.MarkDropped(txID, err)
+}
 
-// TODO
-func (b *backend) removeProposalTx(tx *txs.Tx) {}
+func (b *backend) removeProposalTx(tx *txs.Tx) {
+	b.mempool.RemoveProposalTx(tx)
+}
 
-// TODO
-func (b *backend) cacheVerifiedBlock(blk Block) {}
+func (b *backend) cacheVerifiedBlock(blk Block) {
+	b.verifiedBlksCache[blk.ID()] = blk
+}
+
+func (b *backend) dropVerifiedBlock(id ids.ID) {
+	delete(b.verifiedBlksCache, id)
+}
 
 // TODO
 // TODO do we even need this or can we just pass parent ID into getStatefulBlock?
@@ -100,14 +110,6 @@ func (b *backend) getStatefulBlock(blkID ids.ID) (Block, error) {
 	*/
 	return nil, errors.New("TODO")
 }
-
-// TODO
-func (b *backend) children() []Block {
-	return nil
-}
-
-// TODO
-func (b *backend) addChild(parent Block, child Block) {}
 
 // TODO implement
 // TODO specify what type block should be

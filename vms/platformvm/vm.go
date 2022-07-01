@@ -388,6 +388,9 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return stateful.MakeStateful(
 		statelessBlk,
 		nil, // TODO remove vm.blkVerifier
+		nil, // TODO acceptor
+		nil, // TODO rejector
+		nil, // TODO freer
 		vm.txExecutorBackend,
 		choices.Processing,
 	)

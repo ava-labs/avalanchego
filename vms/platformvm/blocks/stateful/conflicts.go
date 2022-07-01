@@ -21,7 +21,8 @@ type conflictChecker interface {
 
 type conflictCheckerImpl struct{}
 
-func newConflictChecker() conflictChecker {
+// TODO
+func NewConflictChecker() conflictChecker {
 	return &conflictCheckerImpl{}
 }
 
