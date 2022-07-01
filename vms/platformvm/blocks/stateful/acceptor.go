@@ -58,7 +58,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.AtomicBlock, b.Status())
-	if err := a.markAccepted(b.AtomicBlock); err != nil {
+	if err := a.MarkAccepted(b.AtomicBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 
@@ -101,7 +101,7 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.StandardBlock, b.Status())
-	if err := a.markAccepted(b.StandardBlock); err != nil {
+	if err := a.MarkAccepted(b.StandardBlock); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
 
@@ -147,7 +147,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	}
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.CommitBlock, b.Status())
-	if err := a.markAccepted(b.CommitBlock); err != nil {
+	if err := a.MarkAccepted(b.CommitBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
 	}
 
@@ -169,7 +169,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	}
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.AbortBlock, b.Status())
-	if err := a.markAccepted(b.AbortBlock); err != nil {
+	if err := a.MarkAccepted(b.AbortBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
 	}
 

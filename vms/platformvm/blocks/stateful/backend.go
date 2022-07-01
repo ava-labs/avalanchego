@@ -4,8 +4,6 @@
 package stateful
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -36,11 +34,6 @@ type backend struct {
 	lastAccepteder
 	blockState
 	heightSetter
-}
-
-func (b *backend) markAccepted(blk stateless.Block) error {
-	// TODO implement
-	return errors.New("TODO")
 }
 
 func (b *backend) getState() state.State {
