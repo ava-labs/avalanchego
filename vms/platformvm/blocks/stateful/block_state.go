@@ -4,8 +4,6 @@
 package stateful
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -14,15 +12,24 @@ import (
 
 var _ blockState = &blockStateImpl{}
 
-type blockState interface {
-	AddStatelessBlock(block stateless.Block, status choices.Status)
+type statelessBlockState interface {
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
+	AddStatelessBlock(block stateless.Block, status choices.Status)
+}
+
+type statefulBlockState interface {
 	GetStatefulBlock(blkID ids.ID) (Block, error)
 	pinVerifiedBlock(blk Block)
 	unpinVerifiedBlock(id ids.ID)
 }
 
+type blockState interface {
+	statefulBlockState
+	statelessBlockState
+}
+
 type blockStateImpl struct {
+	statelessBlockState
 	// TODO is there a way to avoid having [manager] in here?
 	// [blockStateImpl] is embedded in manager.
 	manager           Manager
@@ -36,7 +43,7 @@ func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 		return blk, nil
 	}
 
-	statelessBlk, blkStatus, err := b.GetStatelessBlock(blkID)
+	statelessBlk, blkStatus, err := b.statelessBlockState.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
@@ -47,14 +54,6 @@ func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 		b.txExecutorBackend,
 		blkStatus,
 	)
-}
-
-// TODO
-func (b *blockStateImpl) AddStatelessBlock(block stateless.Block, status choices.Status) {}
-
-// TODO
-func (b *blockStateImpl) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
-	return nil, choices.Unknown, errors.New("TODO")
 }
 
 func (b *blockStateImpl) pinVerifiedBlock(blk Block) {

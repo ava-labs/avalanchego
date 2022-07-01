@@ -44,12 +44,14 @@ func NewManager(
 	heightSetter heightSetter,
 	versionDB versionDB,
 	timestampGetter timestampGetter,
+	statelessBlockState statelessBlockState,
 	txExecutorBackend executor.Backend,
 ) Manager {
 	blockState := &blockStateImpl{
-		manager:           nil, // Set below
-		verifiedBlks:      map[ids.ID]Block{},
-		txExecutorBackend: txExecutorBackend,
+		manager:             nil, // Set below
+		statelessBlockState: statelessBlockState,
+		verifiedBlks:        map[ids.ID]Block{},
+		txExecutorBackend:   txExecutorBackend,
 	}
 
 	backend := backend{
