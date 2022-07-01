@@ -67,6 +67,7 @@ func NewManager(
 	freer := &freerImpl{backend: backend}
 
 	manager := &manager{
+		backend:  backend,
 		verifier: &verifierImpl{backend: backend},
 		acceptor: &acceptorImpl{backend: backend},
 		rejector: &rejectorImpl{
