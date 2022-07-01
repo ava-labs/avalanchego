@@ -15,11 +15,6 @@ type rejector interface {
 	rejectAbortBlock(b *AbortBlock) error
 }
 
-func NewRejector() rejector {
-	// TODO implement
-	return &rejectorImpl{}
-}
-
 type rejectorImpl struct {
 	backend
 	freer

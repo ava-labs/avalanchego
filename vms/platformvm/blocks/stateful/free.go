@@ -16,11 +16,6 @@ type freer interface {
 	freeStandardBlock(b *StandardBlock)
 }
 
-func NewFreer() freer {
-	// TODO implement
-	return &freerImpl{}
-}
-
 type freerImpl struct {
 	backend
 }

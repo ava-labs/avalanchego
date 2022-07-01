@@ -23,11 +23,6 @@ type conflictCheckerImpl struct {
 	backend
 }
 
-// TODO
-func NewConflictChecker() conflictChecker {
-	return &conflictCheckerImpl{}
-}
-
 func (c *conflictCheckerImpl) conflictsAtomicBlock(b *AtomicBlock, s ids.Set) (bool, error) {
 	if b.Status() == choices.Accepted {
 		return false, nil

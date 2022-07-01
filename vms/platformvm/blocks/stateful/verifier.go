@@ -25,11 +25,6 @@ type verifier interface {
 	verifyCommonBlock(b *commonBlock) error
 }
 
-func NewVerifier() verifier {
-	// TODO implement
-	return &verifierImpl{}
-}
-
 type verifierImpl struct {
 	backend
 }
@@ -43,14 +38,6 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	if parentErr != nil {
 		return parentErr
 	}
-
-	/* TODO remove
-	// The parent of a proposal block (ie this block) must be a decision block
-	parent, ok := parentIntf.(Decision)
-	if !ok {
-		return fmt.Errorf("expected Decision block but got %T", parentIntf)
-	}
-	*/
 
 	// parentState is the state if this block's parent is accepted
 	parentState := v.onAccept(parentIntf)

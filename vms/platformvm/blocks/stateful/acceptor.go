@@ -21,11 +21,6 @@ type acceptor interface {
 	GetLastAccepted() ids.ID
 }
 
-func NewAcceptor() acceptor {
-	// TODO implement
-	return &acceptorImpl{}
-}
-
 type acceptorImpl struct {
 	backend
 }
