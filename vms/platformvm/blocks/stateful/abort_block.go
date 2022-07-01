@@ -98,9 +98,9 @@ func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
 }
 
 func (a *AbortBlock) free() {
-	a.Manager.freeAbortBlock(a)
+	a.freeAbortBlock(a)
 }
 
 func (a *AbortBlock) setBaseState() {
-	a.Manager.setBaseStateAbortBlock(a)
+	a.setBaseStateAbortBlock(a)
 }

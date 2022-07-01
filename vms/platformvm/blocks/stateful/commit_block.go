@@ -96,6 +96,6 @@ func (c *CommitBlock) free() {
 	c.freeCommitBlock(c)
 }
 
-func (a *CommitBlock) setBaseState() {
-	a.Manager.setBaseStateCommitBlock(a)
+func (c *CommitBlock) setBaseState() {
+	c.setBaseStateCommitBlock(c)
 }

@@ -143,7 +143,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		return stateful.NewStandardBlock(
-			nil, // TODO remove b.vm.blkVerifier,
+			b.vm.manager,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -162,7 +162,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			nil, // TODO remove b.vm.blkVerifier,
+			b.vm.manager,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -181,7 +181,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			nil, // TODO remove b.vm.blkVerifier,
+			b.vm.manager,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -211,7 +211,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			nil, // TODO remove b.vm.blkVerifier,
+			b.vm.manager,
 			b.vm.txExecutorBackend,
 			preferredID,
 			nextHeight,
@@ -220,7 +220,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	return stateful.NewProposalBlock(
-		nil, // TODO remove b.vm.blkVerifier,
+		b.vm.manager,
 		b.vm.txExecutorBackend,
 		preferredID,
 		nextHeight,

@@ -119,6 +119,6 @@ func (sb *StandardBlock) free() {
 	sb.freeStandardBlock(sb)
 }
 
-func (a *StandardBlock) setBaseState() {
-	a.Manager.setBaseStateStandardBlock(a)
+func (sb *StandardBlock) setBaseState() {
+	sb.Manager.setBaseStateStandardBlock(sb)
 }

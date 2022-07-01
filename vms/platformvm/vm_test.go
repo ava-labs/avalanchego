@@ -669,7 +669,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 	blk, err := stateful.NewProposalBlock(
-		nil, // TODO remove b.vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -1680,7 +1680,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	blk, err := stateful.NewAtomicBlock(
-		nil, // TODO remove b.vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -1763,7 +1763,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove firstVM.blkVerifier,
+		firstVM.manager,
 		firstVM.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -1891,7 +1891,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove firstVM.blkVerifier,
+		firstVM.manager,
 		firstVM.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2026,7 +2026,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 	advanceTimeBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2315,7 +2315,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2342,7 +2342,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		firstOption.ID(),
 		firstOption.(stateful.Block).Height()+1,
@@ -2520,7 +2520,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	addSubnetBlk0, err := stateful.NewStandardBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2530,7 +2530,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	addSubnetBlk1, err := stateful.NewStandardBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2540,7 +2540,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	addSubnetBlk2, err := stateful.NewStandardBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
@@ -2611,7 +2611,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	addValidatorProposalBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2685,7 +2685,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight = addValidatorProposalCommit.Height()
 
 	importBlk, err := stateful.NewStandardBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2750,7 +2750,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight = importBlk.Height()
 
 	advanceTimeProposalBlk, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2855,7 +2855,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	addValidatorProposalBlk0, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2898,7 +2898,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = addValidatorProposalCommit0.Height()
 
 	advanceTimeProposalBlk0, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -2980,7 +2980,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
 	importBlk, err := stateful.NewStandardBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -3056,7 +3056,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = importBlk.Height()
 
 	addValidatorProposalBlk1, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
@@ -3099,7 +3099,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = addValidatorProposalCommit1.Height()
 
 	advanceTimeProposalBlk1, err := stateful.NewProposalBlock(
-		nil, // TODO remove vm.blkVerifier,
+		vm.manager,
 		vm.txExecutorBackend,
 		preferredID,
 		preferredHeight+1,
