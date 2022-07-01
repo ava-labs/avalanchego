@@ -26,8 +26,15 @@ type statelessBlockState interface {
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
 }
 
+type versionDB interface {
+	abort()
+	commitBatch() (database.Batch, error)
+	commit() error
+}
+
 type backend struct {
-	mempool mempool.Mempool
+	mempool.Mempool
+	versionDB
 	lastAccepteder
 	statelessBlockState
 	txExecutorBackend executor.Backend
@@ -44,18 +51,6 @@ func (b *backend) getState() state.State {
 	return nil
 }
 
-func (b *backend) abort() {
-	// TODO
-}
-
-func (b *backend) commitBatch() (database.Batch, error) {
-	return nil, errors.New("TODO")
-}
-
-func (b *backend) commit() error {
-	return errors.New("TODO")
-}
-
 func (b *backend) add(*txs.Tx) error {
 	return errors.New("TODO")
 }
@@ -68,18 +63,6 @@ func (b *backend) markRejectedOptionVote() {
 	// TODO
 }
 
-func (b *backend) removeDecisionTxs(txs []*txs.Tx) {
-	b.mempool.RemoveDecisionTxs(txs)
-}
-
-func (b *backend) markDropped(txID ids.ID, err string) {
-	b.mempool.MarkDropped(txID, err)
-}
-
-func (b *backend) removeProposalTx(tx *txs.Tx) {
-	b.mempool.RemoveProposalTx(tx)
-}
-
 func (b *backend) cacheVerifiedBlock(blk Block) {
 	b.verifiedBlksCache[blk.ID()] = blk
 }
@@ -88,7 +71,6 @@ func (b *backend) dropVerifiedBlock(id ids.ID) {
 	delete(b.verifiedBlksCache, id)
 }
 
-// TODO
 // TODO do we even need this or can we just pass parent ID into getStatefulBlock?
 func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
 	parentBlkID := blk.Parent()
@@ -96,7 +78,6 @@ func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
 }
 
 func (b *backend) getStatefulBlock(blkID ids.ID) (Block, error) {
-	/* TODO
 	// If block is in memory, return it.
 	if blk, exists := b.verifiedBlksCache[blkID]; exists {
 		return blk, nil
@@ -106,9 +87,15 @@ func (b *backend) getStatefulBlock(blkID ids.ID) (Block, error) {
 	if err != nil {
 		return nil, err
 	}
-		return MakeStateful(statelessBlk, b, b.txExecutorBackend, blkStatus)
-	*/
-	return nil, errors.New("TODO")
+	return MakeStateful(
+		statelessBlk,
+		nil, // TODO verifier
+		nil, // TODO acceptor
+		nil, // TODO rejector
+		nil, // TODO freer
+		b.txExecutorBackend,
+		blkStatus,
+	)
 }
 
 // TODO implement

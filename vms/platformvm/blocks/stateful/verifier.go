@@ -63,7 +63,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	err := b.Tx.Unsigned.Visit(&txExecutor)
 	if err != nil {
 		txID := b.Tx.ID()
-		v.markDropped(txID, err.Error()) // cache tx as dropped
+		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
 
@@ -76,7 +76,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 
 	b.timestamp = parentState.GetTimestamp()
 
-	v.removeProposalTx(b.Tx)
+	v.RemoveProposalTx(b.Tx)
 	v.cacheVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
@@ -123,7 +123,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 	err = b.Tx.Unsigned.Visit(&atomicExecutor)
 	if err != nil {
 		txID := b.Tx.ID()
-		v.markDropped(txID, err.Error()) // cache tx as dropped
+		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 
@@ -142,7 +142,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 		return ErrConflictingParentTxs
 	}
 
-	v.removeDecisionTxs([]*txs.Tx{b.Tx})
+	v.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	v.cacheVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
@@ -188,7 +188,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		err := tx.Unsigned.Visit(&txExecutor)
 		if err != nil {
 			txID := tx.ID()
-			v.markDropped(txID, err.Error()) // cache tx as dropped
+			v.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
 		}
 		// ensure it doesn't overlap with current input batch
@@ -239,7 +239,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 
 	b.timestamp = b.onAcceptState.GetTimestamp()
 
-	v.removeDecisionTxs(b.Txs)
+	v.RemoveDecisionTxs(b.Txs)
 	v.cacheVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
