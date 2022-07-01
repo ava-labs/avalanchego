@@ -102,7 +102,7 @@ func (c *commonBlock) ExpectedChildVersion() uint16 {
 }
 
 func (c *commonBlock) validateBlockTimestamp(enforceStrictness bool) error {
-	// verify timestamp only for blueberry blocks
+	// verify timestamp only for post apricot blocks
 	// Note: atomic blocks have been deprecated before blueberry fork activation,
 	// therefore validateBlockTimestamp for atomic blocks should return
 	// immediately as they should all have ApricotVersion.
@@ -120,7 +120,8 @@ func (c *commonBlock) validateBlockTimestamp(enforceStrictness bool) error {
 	currentChainTime := parentBlk.Timestamp()
 
 	switch c.commonStatelessBlk.(type) {
-	case *stateless.AbortBlock, *stateless.CommitBlock:
+	case *stateless.AbortBlock,
+		*stateless.CommitBlock:
 		if !blkTime.Equal(currentChainTime) {
 			return fmt.Errorf(
 				"%w parent block timestamp (%s) option block timestamp (%s)",
@@ -131,7 +132,10 @@ func (c *commonBlock) validateBlockTimestamp(enforceStrictness bool) error {
 		}
 		return nil
 
-	default:
+	case *stateless.ApricotStandardBlock,
+		*stateless.ApricotProposalBlock,
+		*stateless.BlueberryStandardBlock,
+		*stateless.BlueberryProposalBlock:
 		parentDecision, ok := parentBlk.(Decision)
 		if !ok {
 			// The preferred block should always be a decision block
@@ -150,6 +154,12 @@ func (c *commonBlock) validateBlockTimestamp(enforceStrictness bool) error {
 			nextStakerChangeTime,
 			localTime,
 			enforceStrictness,
+		)
+
+	default:
+		return fmt.Errorf(
+			"cannot not validate block timestamp for block type %T",
+			c.commonStatelessBlk,
 		)
 	}
 }
