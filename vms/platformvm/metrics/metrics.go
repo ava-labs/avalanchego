@@ -1,20 +1,33 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package metrics
 
-/* TODO remove
+import (
+	"errors"
+	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+)
+
 var (
-	_ stateless.Metrics = &metrics{}
+	_ stateless.Metrics = &Metrics{}
 
 	errUnknownBlockType = errors.New("unknown block type")
 )
 
-type metrics struct {
-	percentConnected       prometheus.Gauge
-	subnetPercentConnected *prometheus.GaugeVec
-	localStake             prometheus.Gauge
-	totalStake             prometheus.Gauge
+type Metrics struct {
+	PercentConnected       prometheus.Gauge
+	SubnetPercentConnected *prometheus.GaugeVec
+	LocalStake             prometheus.Gauge
+	TotalStake             prometheus.Gauge
 
 	numAbortBlocks,
 	numAtomicBlocks,
@@ -34,12 +47,12 @@ type metrics struct {
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
 
-	validatorSetsCached     prometheus.Counter
-	validatorSetsCreated    prometheus.Counter
-	validatorSetsHeightDiff prometheus.Gauge
-	validatorSetsDuration   prometheus.Gauge
+	ValidatorSetsCached     prometheus.Counter
+	ValidatorSetsCreated    prometheus.Counter
+	ValidatorSetsHeightDiff prometheus.Gauge
+	ValidatorSetsDuration   prometheus.Gauge
 
-	apiRequestMetrics metric.APIInterceptor
+	APIRequestMetrics metric.APIInterceptor
 }
 
 func newBlockMetrics(namespace string, name string) prometheus.Counter {
@@ -59,17 +72,17 @@ func newTxMetrics(namespace string, name string) prometheus.Counter {
 }
 
 // Initialize platformvm metrics
-func (m *metrics) Initialize(
+func (m *Metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
 ) error {
-	m.percentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.PercentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "percent_connected",
 		Help:      "Percent of connected stake",
 	})
-	m.subnetPercentConnected = prometheus.NewGaugeVec(
+	m.SubnetPercentConnected = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "percent_connected_subnet",
@@ -77,12 +90,12 @@ func (m *metrics) Initialize(
 		},
 		[]string{"subnetID"},
 	)
-	m.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.LocalStake = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "local_staked",
 		Help:      "Total amount of AVAX on this node staked",
 	})
-	m.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.TotalStake = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "total_staked",
 		Help:      "Total amount of AVAX staked",
@@ -115,37 +128,37 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
-	m.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
+	m.ValidatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_cached",
 		Help:      "Total number of validator sets cached",
 	})
-	m.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
+	m.ValidatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_created",
 		Help:      "Total number of validator sets created from applying difflayers",
 	})
-	m.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.ValidatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_height_diff_sum",
 		Help:      "Total number of validator sets diffs applied for generating validator sets",
 	})
-	m.validatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
+	m.ValidatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_duration_sum",
 		Help:      "Total amount of time generating validator sets in nanoseconds",
 	})
 
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
-	m.apiRequestMetrics = apiRequestMetrics
+	m.APIRequestMetrics = apiRequestMetrics
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
 
-		registerer.Register(m.percentConnected),
-		registerer.Register(m.subnetPercentConnected),
-		registerer.Register(m.localStake),
-		registerer.Register(m.totalStake),
+		registerer.Register(m.PercentConnected),
+		registerer.Register(m.SubnetPercentConnected),
+		registerer.Register(m.LocalStake),
+		registerer.Register(m.TotalStake),
 
 		registerer.Register(m.numAbortBlocks),
 		registerer.Register(m.numAtomicBlocks),
@@ -166,24 +179,24 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
 
-		registerer.Register(m.validatorSetsCreated),
-		registerer.Register(m.validatorSetsCached),
-		registerer.Register(m.validatorSetsHeightDiff),
-		registerer.Register(m.validatorSetsDuration),
+		registerer.Register(m.ValidatorSetsCreated),
+		registerer.Register(m.ValidatorSetsCached),
+		registerer.Register(m.ValidatorSetsHeightDiff),
+		registerer.Register(m.ValidatorSetsDuration),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets
 	for subnetID := range whitelistedSubnets {
 		// initialize to 0
-		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
+		m.SubnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
 	}
 	return errs.Err
 }
 
-func (m *metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
-func (m *metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
+func (m *Metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
+func (m *Metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
 
-func (m *metrics) MarkAccepted(b stateless.Block) error {
+func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
 	case *stateless.AbortBlock:
 		m.numAbortBlocks.Inc()
@@ -208,7 +221,7 @@ func (m *metrics) MarkAccepted(b stateless.Block) error {
 	return nil
 }
 
-func (m *metrics) acceptTx(tx *txs.Tx) error {
+func (m *Metrics) acceptTx(tx *txs.Tx) error {
 	switch tx.Unsigned.(type) {
 	case *txs.AddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()
@@ -233,4 +246,3 @@ func (m *metrics) acceptTx(tx *txs.Tx) error {
 	}
 	return nil
 }
-*/

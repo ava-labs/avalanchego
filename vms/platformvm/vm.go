@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -67,7 +68,7 @@ type VM struct {
 	Factory
 	blockBuilder
 
-	metrics
+	metrics.Metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
 	*network
@@ -143,7 +144,7 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize metrics as soon as possible
-	if err := vm.metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
+	if err := vm.Metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
 		return err
 	}
 
@@ -205,7 +206,7 @@ func (vm *VM) Initialize(
 		mempool,
 		vm.internalState,
 		vm.txExecutorBackend,
-		&vm.metrics,
+		&vm.Metrics,
 		vm.recentlyAccepted,
 	)
 	*/
@@ -434,8 +435,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptRequest)
-	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterRequest)
+	server.RegisterInterceptFunc(vm.Metrics.APIRequestMetrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.Metrics.APIRequestMetrics.AfterRequest)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}
@@ -494,7 +495,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 		if !ok {
 			return nil, errWrongCacheType
 		}
-		vm.metrics.validatorSetsCached.Inc()
+		vm.Metrics.ValidatorSetsCached.Inc()
 		return validatorSet, nil
 	}
 
@@ -554,9 +555,9 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 	validatorSetsCache.Put(height, vdrSet)
 
 	endTime := vm.Clock().Time()
-	vm.metrics.validatorSetsCreated.Inc()
-	vm.metrics.validatorSetsDuration.Add(float64(endTime.Sub(startTime)))
-	vm.metrics.validatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
+	vm.Metrics.ValidatorSetsCreated.Inc()
+	vm.Metrics.ValidatorSetsDuration.Add(float64(endTime.Sub(startTime)))
+	vm.Metrics.ValidatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
 	return vdrSet, nil
 }
 
@@ -607,8 +608,8 @@ func (vm *VM) updateValidators() error {
 	}
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.localStake.Set(float64(weight))
-	vm.totalStake.Set(float64(primaryValidators.Weight()))
+	vm.LocalStake.Set(float64(weight))
+	vm.LocalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)

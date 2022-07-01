@@ -25,11 +25,16 @@ type versionDB interface {
 	commit() error
 }
 
+type heightSetter interface {
+	SetHeight(height uint64)
+}
+
 type backend struct {
 	mempool.Mempool
 	versionDB
 	lastAccepteder
 	blockState
+	heightSetter
 }
 
 func (b *backend) markAccepted(blk stateless.Block) error {

@@ -247,12 +247,11 @@ func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
 	a.SetLastAccepted(blkID)
-	a.setHeight(b.baseBlk.Height())
-	a.addToRecentlyAcceptedWindows(blkID)
+	a.SetHeight(b.baseBlk.Height())
+	// TODO do we need the line below?
+	// a.addToRecentlyAcceptedWindows(blkID)
 }
 
-// TODO
-func (a *acceptorImpl) setHeight(height uint64) {}
-
-// TODO
+/* TODO
 func (a *acceptorImpl) addToRecentlyAcceptedWindows(blkID ids.ID) {}
+*/

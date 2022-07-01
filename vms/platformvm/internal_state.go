@@ -130,8 +130,8 @@ func NewState(vm *VM, db database.Database, genesis []byte, metrics prometheus.R
 		metrics,
 		&vm.Config,
 		vm.ctx,
-		vm.localStake,
-		vm.totalStake,
+		vm.LocalStake,
+		vm.LocalStake,
 		vm.rewards,
 	)
 	if err != nil {
