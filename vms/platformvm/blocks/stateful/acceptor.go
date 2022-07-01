@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
 var _ Acceptor = &acceptor{}
@@ -54,7 +53,7 @@ func (a *acceptor) acceptAtomicBlock(b *AtomicBlock) error {
 		b.Parent(),
 	)
 
-	a.commonAccept(b.baseBlk)
+	a.commonAccept(b.commonBlock)
 	a.addStatelessBlock(b.AtomicBlock, b.Status())
 	if err := a.markAccepted(b.AtomicBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
@@ -97,7 +96,7 @@ func (a *acceptor) acceptStandardBlock(b *StandardBlock) error {
 	blkID := b.ID()
 	b.txExecutorBackend.Ctx.Log.Verbo("accepting block with ID %s", blkID)
 
-	a.commonAccept(b.baseBlk)
+	a.commonAccept(b.commonBlock)
 	a.addStatelessBlock(b.StandardBlock, b.Status())
 	if err := a.markAccepted(b.StandardBlock); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
@@ -143,7 +142,7 @@ func (a *acceptor) acceptCommitBlock(b *CommitBlock) error {
 	if err := a.acceptParentDoubleDecisionBlock(b.doubleDecisionBlock); err != nil {
 		return err
 	}
-	a.commonAccept(b.baseBlk)
+	a.commonAccept(b.commonBlock)
 	a.addStatelessBlock(b.CommitBlock, b.Status())
 	if err := a.markAccepted(b.CommitBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
@@ -164,7 +163,7 @@ func (a *acceptor) acceptAbortBlock(b *AbortBlock) error {
 	if err := a.acceptParentDoubleDecisionBlock(b.doubleDecisionBlock); err != nil {
 		return err
 	}
-	a.commonAccept(b.baseBlk)
+	a.commonAccept(b.commonBlock)
 	a.addStatelessBlock(b.AbortBlock, b.Status())
 	if err := a.markAccepted(b.AbortBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
@@ -239,12 +238,11 @@ func (a *acceptor) setBaseState(b Block) {
 	}
 }
 
-func (a *acceptor) commonAccept(b *stateless.CommonBlock) {
-	blkID := b.ID()
-
-	//b.status = choices.Accepted
+func (a *acceptor) commonAccept(b *commonBlock) {
+	blkID := b.baseBlk.ID()
+	b.status = choices.Accepted
 	a.setLastAccepted(blkID)
-	a.setHeight(b.Height())
+	a.setHeight(b.baseBlk.Height())
 	a.addToRecentlyAcceptedWindows(blkID)
 }
 
