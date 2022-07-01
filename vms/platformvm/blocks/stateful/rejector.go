@@ -114,5 +114,8 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 
 func (r *rejectorImpl) commonReject(b *commonBlock) {
 	b.status = choices.Rejected
+	// We do the following rather than implementing free()
+	// on *commonBlock so that in the future, we don't accidentally
+	// forget to implement free() on a block type that embeds *commonBlock.
 	r.freeCommonBlock(b)
 }

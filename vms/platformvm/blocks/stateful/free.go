@@ -6,8 +6,6 @@ package stateful
 var _ freer = &freerImpl{}
 
 type freer interface {
-	// TODO is this interface right?
-	// What about other block types?
 	freeProposalBlock(b *ProposalBlock)
 	freeCommonBlock(b *commonBlock)
 	freeAtomicBlock(b *AtomicBlock)

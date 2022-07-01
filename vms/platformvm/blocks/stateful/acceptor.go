@@ -6,7 +6,6 @@ package stateful
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
@@ -18,7 +17,6 @@ type acceptor interface {
 	acceptStandardBlock(b *StandardBlock) error
 	acceptCommitBlock(b *CommitBlock) error
 	acceptAbortBlock(b *AbortBlock) error
-	GetLastAccepted() ids.ID
 }
 
 type acceptorImpl struct {

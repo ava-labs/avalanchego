@@ -62,6 +62,8 @@ func toStatefulAbortBlock(
 			decisionBlock: decisionBlock{
 				chainState: manager,
 				commonBlock: &commonBlock{
+					timestampGetter:   manager,
+					lastAccepteder:    manager,
 					baseBlk:           &statelessBlk.CommonBlock,
 					status:            status,
 					txExecutorBackend: txExecutorBackend,

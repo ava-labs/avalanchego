@@ -28,7 +28,6 @@ var _ Block = &ProposalBlock{}
 // The proposal will be enacted (change the chain's state) if the proposal block
 // is accepted and followed by an accepted Commit block
 type ProposalBlock struct {
-	// TODO set this field
 	Manager
 	*stateless.ProposalBlock
 	*commonBlock
@@ -68,6 +67,8 @@ func toStatefulProposalBlock(
 		ProposalBlock: statelessBlk,
 		Manager:       manager,
 		commonBlock: &commonBlock{
+			timestampGetter:   manager,
+			lastAccepteder:    manager,
 			baseBlk:           &statelessBlk.CommonBlock,
 			status:            status,
 			txExecutorBackend: txExecutorBackend,

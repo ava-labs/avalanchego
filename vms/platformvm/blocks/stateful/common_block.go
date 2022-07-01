@@ -13,13 +13,12 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	timestamper    // TODO set this field
-	lastAccepteder // TODO set this field
-	baseBlk        *stateless.CommonBlock
-	timestamp      time.Time // Time this block was proposed at
-	status         choices.Status
-	children       []Block
-
+	timestampGetter
+	lastAccepteder
+	baseBlk           *stateless.CommonBlock
+	timestamp         time.Time // Time this block was proposed at
+	status            choices.Status
+	children          []Block
 	txExecutorBackend executor.Backend
 }
 
@@ -42,7 +41,7 @@ func (c *commonBlock) Timestamp() time.Time {
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
 	if c.baseBlk.ID() == c.GetLastAccepted() {
-		return c.Timestamp()
+		return c.GetTimestamp()
 	}
 	return c.timestamp
 }

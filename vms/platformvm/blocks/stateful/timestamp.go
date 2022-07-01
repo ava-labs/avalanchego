@@ -5,15 +5,15 @@ package stateful
 
 import "time"
 
-var _ Timestamper = &timestamper{}
+var _ timestampGetter = &timestampGetterImpl{}
 
-type Timestamper interface {
-	Timestamp() time.Time
+type timestampGetter interface {
+	GetTimestamp() time.Time
 }
 
-type timestamper struct{}
+type timestampGetterImpl struct{}
 
 // TODO
-func (t *timestamper) Timestamp() time.Time {
+func (t *timestampGetterImpl) GetTimestamp() time.Time {
 	return time.Time{}
 }

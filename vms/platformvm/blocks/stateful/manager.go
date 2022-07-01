@@ -22,10 +22,12 @@ type Manager interface {
 	verifier
 	acceptor
 	rejector
-	baseStateSetter // TODO set this
+	baseStateSetter
 	conflictChecker
 	freer
 	chainState
+	timestampGetter
+	lastAccepteder
 }
 
 func NewManager(
@@ -35,6 +37,7 @@ func NewManager(
 	lastAccepteder lastAccepteder,
 	heightSetter heightSetter,
 	versionDB versionDB,
+	timestampGetter timestampGetter,
 	txExecutorBackend executor.Backend,
 ) Manager {
 	blockState := &blockStateImpl{
@@ -53,15 +56,19 @@ func NewManager(
 		state:          state,
 	}
 
+	freer := &freerImpl{backend: backend}
+
 	manager := &manager{
-		blockState:      blockState,
-		state:           state,
-		verifier:        &verifierImpl{backend: backend},
-		acceptor:        &acceptorImpl{backend: backend},
-		rejector:        &rejectorImpl{backend: backend},
+		verifier: &verifierImpl{backend: backend},
+		acceptor: &acceptorImpl{backend: backend},
+		rejector: &rejectorImpl{
+			backend: backend,
+			freer:   freer,
+		},
 		baseStateSetter: &baseStateSetterImpl{State: state},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
-		freer:           &freerImpl{backend: backend},
+		freer:           freer,
+		timestampGetter: timestampGetter,
 	}
 	// TODO is there a way to avoid having a Manager
 	// in [blockState] so we don't have to do this?
@@ -70,16 +77,22 @@ func NewManager(
 }
 
 type manager struct {
-	blockState
+	backend
 	verifier
 	acceptor
 	rejector
 	baseStateSetter
 	conflictChecker
 	freer
-	state state.State
+	timestampGetter
 }
 
 func (m *manager) GetState() state.State {
 	return m.state
 }
+
+/* TODO fix
+func (m *manager) LastAccepted() time.Time {
+	return m.state.LastAccepted()
+}
+*/
