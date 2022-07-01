@@ -29,7 +29,7 @@ var _ Block = &ProposalBlock{}
 // is accepted and followed by an accepted Commit block
 type ProposalBlock struct {
 	// TODO set this field
-	verifier2 Verifier2
+	verifier2 verifier
 	// TODO set this field
 	acceptor Acceptor
 	// TODO set this field
@@ -49,7 +49,7 @@ type ProposalBlock struct {
 // The parent of this block has ID [parentID].
 // The parent must be a decision block.
 func NewProposalBlock(
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -65,7 +65,7 @@ func NewProposalBlock(
 
 func toStatefulProposalBlock(
 	statelessBlk *stateless.ProposalBlock,
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*ProposalBlock, error) {

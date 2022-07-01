@@ -41,7 +41,7 @@ type AtomicBlock struct {
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewAtomicBlock(
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -56,7 +56,7 @@ func NewAtomicBlock(
 
 func toStatefulAtomicBlock(
 	statelessBlk *stateless.AtomicBlock,
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*AtomicBlock, error) {

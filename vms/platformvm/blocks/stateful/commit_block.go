@@ -19,7 +19,7 @@ var (
 // be a proposal block) being enacted.
 type CommitBlock struct {
 	// TODO set this field
-	verifier2 Verifier2
+	verifier2 verifier
 	// TODO set this field
 	acceptor Acceptor
 	// TODO set this field
@@ -34,7 +34,7 @@ type CommitBlock struct {
 // proposal block, has ID [parentID]. Additionally the block will track if it
 // was originally preferred or not for metrics.
 func NewCommitBlock(
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -50,7 +50,7 @@ func NewCommitBlock(
 
 func toStatefulCommitBlock(
 	statelessBlk *stateless.CommitBlock,
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,

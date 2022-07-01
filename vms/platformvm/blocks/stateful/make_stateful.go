@@ -13,7 +13,7 @@ import (
 
 func MakeStateful(
 	statelessBlk stateless.Block,
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (Block, error) {

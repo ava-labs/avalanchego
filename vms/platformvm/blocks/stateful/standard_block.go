@@ -25,7 +25,7 @@ var (
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
 	// TODO set this field
-	verifier2 Verifier2
+	verifier2 verifier
 	// TODO set this field
 	acceptor Acceptor
 	// TODO set this field
@@ -43,7 +43,7 @@ type StandardBlock struct {
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewStandardBlock(
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -58,7 +58,7 @@ func NewStandardBlock(
 
 func toStatefulStandardBlock(
 	statelessBlk *stateless.StandardBlock,
-	verifier Verifier2,
+	verifier verifier,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (*StandardBlock, error) {

@@ -14,11 +14,11 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	conflictChecker           // TODO set this field
-	verifier        Verifier2 // TODO embed? And make sure this is set
-	acceptor                  // TODO set this field
-	timestamper               // TODO set this field
-	freer                     // TODO set this field
+	conflictChecker          // TODO set this field
+	verifier        verifier // TODO embed? And make sure this is set
+	acceptor                 // TODO set this field
+	timestamper              // TODO set this field
+	freer                    // TODO set this field
 	baseBlk         *stateless.CommonBlock
 	timestamp       time.Time // Time this block was proposed at
 	status          choices.Status

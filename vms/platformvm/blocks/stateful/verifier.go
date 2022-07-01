@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var _ Verifier2 = &verifier2{}
+var _ verifier = &verifierImpl{}
 
-type Verifier2 interface {
+type verifier interface {
 	verifyProposalBlock(b *ProposalBlock) error
 	verifyAtomicBlock(b *AtomicBlock) error
 	verifyStandardBlock(b *StandardBlock) error
@@ -25,16 +25,16 @@ type Verifier2 interface {
 	verifyCommonBlock(b *commonBlock) error
 }
 
-func NewVerifier() Verifier2 {
+func NewVerifier() verifier {
 	// TODO implement
-	return &verifier2{}
+	return &verifierImpl{}
 }
 
-type verifier2 struct {
+type verifierImpl struct {
 	backend
 }
 
-func (v *verifier2) verifyProposalBlock(b *ProposalBlock) error {
+func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	if err := b.verify(); err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (v *verifier2) verifyProposalBlock(b *ProposalBlock) error {
 	return nil
 }
 
-func (v *verifier2) verifyAtomicBlock(b *AtomicBlock) error {
+func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 	if err := b.verify(); err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (v *verifier2) verifyAtomicBlock(b *AtomicBlock) error {
 	return nil
 }
 
-func (v *verifier2) verifyStandardBlock(b *StandardBlock) error {
+func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 	if err := b.verify(); err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (v *verifier2) verifyStandardBlock(b *StandardBlock) error {
 	return nil
 }
 
-func (v *verifier2) verifyCommitBlock(b *CommitBlock) error {
+func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 	if err := b.verify(); err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (v *verifier2) verifyCommitBlock(b *CommitBlock) error {
 	return nil
 }
 
-func (v *verifier2) verifyAbortBlock(b *AbortBlock) error {
+func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
 	if err := b.verify(); err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func (v *verifier2) verifyAbortBlock(b *AbortBlock) error {
 }
 
 // Assumes [b] isn't nil
-func (v *verifier2) verifyCommonBlock(b *commonBlock) error {
+func (v *verifierImpl) verifyCommonBlock(b *commonBlock) error {
 	parent, err := v.parent(b.baseBlk)
 	if err != nil {
 		return err
