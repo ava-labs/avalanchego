@@ -10,26 +10,27 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
-var _ Acceptor = &acceptor{}
+var _ acceptor = &acceptorImpl{}
 
-type Acceptor interface {
+type acceptor interface {
 	acceptProposalBlock(b *ProposalBlock) error
 	acceptAtomicBlock(b *AtomicBlock) error
 	acceptStandardBlock(b *StandardBlock) error
 	acceptCommitBlock(b *CommitBlock) error
 	acceptAbortBlock(b *AbortBlock) error
+	GetLastAccepted() ids.ID
 }
 
-func NewAcceptor() Acceptor {
+func NewAcceptor() acceptor {
 	// TODO implement
-	return &acceptor{}
+	return &acceptorImpl{}
 }
 
-type acceptor struct {
+type acceptorImpl struct {
 	backend
 }
 
-func (a *acceptor) acceptProposalBlock(b *ProposalBlock) error {
+func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 	blkID := b.ID()
 	b.txExecutorBackend.Ctx.Log.Verbo(
 		"Accepting Proposal Block %s at height %d with parent %s",
@@ -38,12 +39,14 @@ func (a *acceptor) acceptProposalBlock(b *ProposalBlock) error {
 		b.Parent(),
 	)
 
+	// TODO should the line below be here?
+	a.commonAccept(b.commonBlock)
 	b.status = choices.Accepted
-	a.setLastAccepted(blkID)
+	a.SetLastAccepted(blkID)
 	return nil
 }
 
-func (a *acceptor) acceptAtomicBlock(b *AtomicBlock) error {
+func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	blkID := b.ID()
 
 	b.txExecutorBackend.Ctx.Log.Verbo(
@@ -54,7 +57,7 @@ func (a *acceptor) acceptAtomicBlock(b *AtomicBlock) error {
 	)
 
 	a.commonAccept(b.commonBlock)
-	a.addStatelessBlock(b.AtomicBlock, b.Status())
+	a.AddStatelessBlock(b.AtomicBlock, b.Status())
 	if err := a.markAccepted(b.AtomicBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -92,12 +95,12 @@ func (a *acceptor) acceptAtomicBlock(b *AtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) acceptStandardBlock(b *StandardBlock) error {
+func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	blkID := b.ID()
 	b.txExecutorBackend.Ctx.Log.Verbo("accepting block with ID %s", blkID)
 
 	a.commonAccept(b.commonBlock)
-	a.addStatelessBlock(b.StandardBlock, b.Status())
+	a.AddStatelessBlock(b.StandardBlock, b.Status())
 	if err := a.markAccepted(b.StandardBlock); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
@@ -130,7 +133,7 @@ func (a *acceptor) acceptStandardBlock(b *StandardBlock) error {
 	return nil
 }
 
-func (a *acceptor) acceptCommitBlock(b *CommitBlock) error {
+func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	if b.txExecutorBackend.Bootstrapped.GetValue() {
 		if b.wasPreferred {
 			a.markAcceptedOptionVote()
@@ -143,7 +146,7 @@ func (a *acceptor) acceptCommitBlock(b *CommitBlock) error {
 		return err
 	}
 	a.commonAccept(b.commonBlock)
-	a.addStatelessBlock(b.CommitBlock, b.Status())
+	a.AddStatelessBlock(b.CommitBlock, b.Status())
 	if err := a.markAccepted(b.CommitBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
 	}
@@ -151,7 +154,7 @@ func (a *acceptor) acceptCommitBlock(b *CommitBlock) error {
 	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
 }
 
-func (a *acceptor) acceptAbortBlock(b *AbortBlock) error {
+func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	if b.txExecutorBackend.Bootstrapped.GetValue() {
 		if b.wasPreferred {
 			a.markAcceptedOptionVote()
@@ -164,7 +167,7 @@ func (a *acceptor) acceptAbortBlock(b *AbortBlock) error {
 		return err
 	}
 	a.commonAccept(b.commonBlock)
-	a.addStatelessBlock(b.AbortBlock, b.Status())
+	a.AddStatelessBlock(b.AbortBlock, b.Status())
 	if err := a.markAccepted(b.AbortBlock); err != nil {
 		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
 	}
@@ -172,7 +175,7 @@ func (a *acceptor) acceptAbortBlock(b *AbortBlock) error {
 	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
 }
 
-func (a *acceptor) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) error {
+func (a *acceptorImpl) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) error {
 	parentIntf, err := a.parent(b.baseBlk)
 	if err != nil {
 		return err
@@ -203,7 +206,7 @@ func (a *acceptor) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) error 
 	return nil
 }
 
-func (a *acceptor) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) error {
+func (a *acceptorImpl) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) error {
 	blkID := b.baseBlk.ID()
 	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
@@ -221,12 +224,12 @@ func (a *acceptor) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) error
 	if err := parent.Accept(); err != nil {
 		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
 	}
-	a.addStatelessBlock(parent, parent.Status())
+	a.AddStatelessBlock(parent, parent.Status())
 
 	return nil
 }
 
-func (a *acceptor) setBaseState(b Block) {
+func (a *acceptorImpl) setBaseState(b Block) {
 	switch b := b.(type) {
 	case *AbortBlock:
 		b.onAcceptState.SetBase(a.getState())
@@ -238,16 +241,16 @@ func (a *acceptor) setBaseState(b Block) {
 	}
 }
 
-func (a *acceptor) commonAccept(b *commonBlock) {
+func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
-	a.setLastAccepted(blkID)
+	a.SetLastAccepted(blkID)
 	a.setHeight(b.baseBlk.Height())
 	a.addToRecentlyAcceptedWindows(blkID)
 }
 
 // TODO
-func (a *acceptor) setHeight(height uint64) {}
+func (a *acceptorImpl) setHeight(height uint64) {}
 
 // TODO
-func (a *acceptor) addToRecentlyAcceptedWindows(blkID ids.ID) {}
+func (a *acceptorImpl) addToRecentlyAcceptedWindows(blkID ids.ID) {}

@@ -31,9 +31,9 @@ type ProposalBlock struct {
 	// TODO set this field
 	verifier2 verifier
 	// TODO set this field
-	acceptor Acceptor
+	acceptor acceptor
 	// TODO set this field
-	rejector Rejector
+	rejector rejector
 	// TODO set this field
 	*stateless.ProposalBlock
 	*commonBlock
@@ -128,7 +128,16 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 			err,
 		)
 	}
-	abort, err := NewAbortBlock(pb.verifier, pb.txExecutorBackend, blkID, nextHeight, !pb.prefersCommit)
+	abort, err := NewAbortBlock(
+		pb.verifier,
+		nil,
+		nil,
+		nil,
+		pb.txExecutorBackend,
+		blkID,
+		nextHeight,
+		!pb.prefersCommit,
+	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",

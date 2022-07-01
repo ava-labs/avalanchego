@@ -18,12 +18,7 @@ var (
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.
 type AbortBlock struct {
-	// TODO set this field
-	verifier2 verifier
-	// TODO set this field
-	acceptor Acceptor
-	// TODO set this field
-	rejector Rejector
+	rejector rejector
 	*stateless.AbortBlock
 	*doubleDecisionBlock
 
@@ -35,6 +30,9 @@ type AbortBlock struct {
 // originally preferred or not for metrics.
 func NewAbortBlock(
 	verifier verifier,
+	acceptor acceptor,
+	rejector rejector,
+	freer freer,
 	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
@@ -44,24 +42,39 @@ func NewAbortBlock(
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulAbortBlock(statelessBlk, verifier, txExecutorBackend, wasPreferred, choices.Processing)
+	return toStatefulAbortBlock(
+		statelessBlk,
+		verifier,
+		acceptor,
+		rejector,
+		freer,
+		txExecutorBackend,
+		wasPreferred,
+		choices.Processing,
+	)
 }
 
 func toStatefulAbortBlock(
 	statelessBlk *stateless.AbortBlock,
 	verifier verifier,
+	acceptor acceptor,
+	rejector rejector,
+	freer freer,
 	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
 ) (*AbortBlock, error) {
 	abort := &AbortBlock{
 		AbortBlock: statelessBlk,
+		rejector:   rejector,
 		doubleDecisionBlock: &doubleDecisionBlock{
 			decisionBlock: decisionBlock{
 				commonBlock: &commonBlock{
 					baseBlk:           &statelessBlk.CommonBlock,
 					status:            status,
 					verifier:          verifier,
+					acceptor:          acceptor,
+					freer:             freer,
 					txExecutorBackend: txExecutorBackend,
 				},
 			},
@@ -86,5 +99,5 @@ func (a *AbortBlock) Reject() error {
 //
 // This function also sets onAcceptState if the verification passes.
 func (a *AbortBlock) Verify() error {
-	return a.verifier2.verifyAbortBlock(a)
+	return a.verifier.verifyAbortBlock(a)
 }

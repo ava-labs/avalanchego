@@ -3,9 +3,11 @@
 
 package stateful
 
-var _ Rejector = &rejector{}
+import "github.com/ava-labs/avalanchego/snow/choices"
 
-type Rejector interface {
+var _ rejector = &rejectorImpl{}
+
+type rejector interface {
 	rejectProposalBlock(b *ProposalBlock) error
 	rejectAtomicBlock(b *AtomicBlock) error
 	rejectStandardBlock(b *StandardBlock) error
@@ -13,16 +15,17 @@ type Rejector interface {
 	rejectAbortBlock(b *AbortBlock) error
 }
 
-func NewRejector() Rejector {
+func NewRejector() rejector {
 	// TODO implement
-	return &rejector{}
+	return &rejectorImpl{}
 }
 
-type rejector struct {
+type rejectorImpl struct {
 	backend
+	freer
 }
 
-func (r *rejector) rejectProposalBlock(b *ProposalBlock) error {
+func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 	b.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Proposal Block %s at height %d with parent %s",
 		b.ID(),
@@ -41,12 +44,12 @@ func (r *rejector) rejectProposalBlock(b *ProposalBlock) error {
 		)
 	}
 
-	defer b.reject()
-	r.addStatelessBlock(b.ProposalBlock, b.Status())
+	defer r.commonReject(b.commonBlock)
+	r.AddStatelessBlock(b.ProposalBlock, b.Status())
 	return r.commit()
 }
 
-func (r *rejector) rejectAtomicBlock(b *AtomicBlock) error {
+func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 	b.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Atomic Block %s at height %d with parent %s",
 		b.ID(),
@@ -62,12 +65,12 @@ func (r *rejector) rejectAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	defer b.reject()
-	r.addStatelessBlock(b.AtomicBlock, b.Status())
+	defer r.commonReject(b.commonBlock)
+	r.AddStatelessBlock(b.AtomicBlock, b.Status())
 	return r.commit()
 }
 
-func (r *rejector) rejectStandardBlock(b *StandardBlock) error {
+func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 	b.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Standard Block %s at height %d with parent %s",
 		b.ID(),
@@ -85,23 +88,23 @@ func (r *rejector) rejectStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	defer b.reject()
-	r.addStatelessBlock(b.StandardBlock, b.Status())
+	defer r.commonReject(b.commonBlock)
+	r.AddStatelessBlock(b.StandardBlock, b.Status())
 	return r.commit()
 }
 
-func (r *rejector) rejectCommitBlock(b *CommitBlock) error {
+func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 	b.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting CommitBlock Block %s at height %d with parent %s",
 		b.ID(), b.Height(), b.Parent(),
 	)
 
-	defer b.reject()
-	r.addStatelessBlock(b.CommitBlock, b.Status())
+	defer r.commonReject(b.commonBlock)
+	r.AddStatelessBlock(b.CommitBlock, b.Status())
 	return r.commit()
 }
 
-func (r *rejector) rejectAbortBlock(b *AbortBlock) error {
+func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 	b.txExecutorBackend.Ctx.Log.Verbo(
 		"Rejecting Abort Block %s at height %d with parent %s",
 		b.ID(),
@@ -109,7 +112,12 @@ func (r *rejector) rejectAbortBlock(b *AbortBlock) error {
 		b.Parent(),
 	)
 
-	defer b.reject()
-	r.addStatelessBlock(b.AbortBlock, b.Status())
+	defer r.commonReject(b.commonBlock)
+	r.AddStatelessBlock(b.AbortBlock, b.Status())
 	return r.commit()
+}
+
+func (r *rejectorImpl) commonReject(b *commonBlock) {
+	b.status = choices.Rejected
+	r.freeCommonBlock(b)
 }

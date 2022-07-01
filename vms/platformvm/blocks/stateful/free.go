@@ -5,38 +5,40 @@ package stateful
 
 import "github.com/ava-labs/avalanchego/ids"
 
-var _ Freer = &freer{}
+var _ freer = &freerImpl{}
 
-type Freer interface {
+type freer interface {
+	// TODO is this interface right?
+	// What about other block types?
 	freeProposalBlock(b *ProposalBlock)
 	freeDecisionBlock(b *decisionBlock)
 	freeCommonBlock(b *commonBlock)
 }
 
-func NewFreer() Freer {
+func NewFreer() freer {
 	// TODO implement
-	return &freer{}
+	return &freerImpl{}
 }
 
-type freer struct {
+type freerImpl struct {
 	backend
 }
 
-func (f *freer) freeProposalBlock(b *ProposalBlock) {
-	b.commonBlock.free()
+func (f *freerImpl) freeProposalBlock(b *ProposalBlock) {
+	f.freeCommonBlock(b.commonBlock)
 	b.onCommitState = nil
 	b.onAbortState = nil
 }
 
-func (f *freer) freeDecisionBlock(b *decisionBlock) {
-	b.commonBlock.free()
+func (f *freerImpl) freeDecisionBlock(b *decisionBlock) {
+	f.freeCommonBlock(b.commonBlock)
 	b.onAcceptState = nil
 }
 
-func (f *freer) freeCommonBlock(b *commonBlock) {
+func (f *freerImpl) freeCommonBlock(b *commonBlock) {
 	f.dropVerifiedBlock(b.baseBlk.ID())
 	b.children = nil
 }
 
 // TODO
-func (f *freer) dropVerifiedBlock(id ids.ID) {}
+func (f *freerImpl) dropVerifiedBlock(id ids.ID) {}

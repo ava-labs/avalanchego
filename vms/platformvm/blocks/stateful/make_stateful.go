@@ -14,12 +14,24 @@ import (
 func MakeStateful(
 	statelessBlk stateless.Block,
 	verifier verifier,
+	acceptor acceptor,
+	rejector rejector,
+	freer freer,
 	txExecutorBackend executor.Backend,
 	status choices.Status,
 ) (Block, error) {
 	switch sb := statelessBlk.(type) {
 	case *stateless.AbortBlock:
-		return toStatefulAbortBlock(sb, verifier, txExecutorBackend, false /*wasPreferred*/, status)
+		return toStatefulAbortBlock(
+			sb,
+			verifier,
+			acceptor,
+			rejector,
+			freer,
+			txExecutorBackend,
+			false, /*wasPreferred*/
+			status,
+		)
 
 	case *stateless.AtomicBlock:
 		return toStatefulAtomicBlock(sb, verifier, txExecutorBackend, status)

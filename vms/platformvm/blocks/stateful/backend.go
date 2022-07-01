@@ -12,22 +12,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+type lastAccepteder interface {
+	SetLastAccepted(blkID ids.ID)
+	GetLastAccepted() ids.ID
+}
+
+type statelessBlockState interface {
+	AddStatelessBlock(block stateless.Block, status choices.Status)
+	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
+}
+
 type backend struct {
-	state state.State
-}
-
-func (b *backend) setLastAccepted(blkID ids.ID) {
-	// TODO implement
-}
-
-func (b *backend) getLastAccepted() ids.ID {
-	return b.state.GetLastAccepted()
-}
-
-func (b *backend) addStatelessBlock(block stateless.Block, status choices.Status) {
-	// TODO implement
+	lastAccepteder
+	statelessBlockState
+	txExecutorBackend executor.Backend
+	verifiedBlksCache map[ids.ID]Block
 }
 
 func (b *backend) markAccepted(blk stateless.Block) error {
@@ -84,6 +86,18 @@ func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
 }
 
 func (b *backend) getStatefulBlock(blkID ids.ID) (Block, error) {
+	/* TODO
+	// If block is in memory, return it.
+	if blk, exists := b.verifiedBlksCache[blkID]; exists {
+		return blk, nil
+	}
+
+	statelessBlk, blkStatus, err := b.GetStatelessBlock(blkID)
+	if err != nil {
+		return nil, err
+	}
+		return MakeStateful(statelessBlk, b, b.txExecutorBackend, blkStatus)
+	*/
 	return nil, errors.New("TODO")
 }
 

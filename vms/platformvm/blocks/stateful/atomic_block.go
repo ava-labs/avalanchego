@@ -25,9 +25,9 @@ var (
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	// TODO set this field
-	acceptor Acceptor
+	acceptor acceptor
 	// TODO set this field
-	rejector Rejector
+	rejector rejector
 	*stateless.AtomicBlock
 	*decisionBlock
 

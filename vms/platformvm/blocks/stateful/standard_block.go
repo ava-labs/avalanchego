@@ -27,9 +27,9 @@ type StandardBlock struct {
 	// TODO set this field
 	verifier2 verifier
 	// TODO set this field
-	acceptor Acceptor
+	acceptor acceptor
 	// TODO set this field
-	rejector Rejector
+	rejector rejector
 	*stateless.StandardBlock
 	*decisionBlock
 

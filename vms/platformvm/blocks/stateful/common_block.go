@@ -14,11 +14,11 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	conflictChecker          // TODO set this field
-	verifier        verifier // TODO embed? And make sure this is set
-	acceptor                 // TODO set this field
-	timestamper              // TODO set this field
-	freer                    // TODO set this field
+	conflictChecker // TODO set this field
+	verifier        // TODO set this field
+	acceptor        // TODO set this field
+	timestamper     // TODO set this field
+	freer           // TODO set this field
 	baseBlk         *stateless.CommonBlock
 	timestamp       time.Time // Time this block was proposed at
 	status          choices.Status
@@ -45,7 +45,7 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.acceptor.getLastAccepted() {
+	if c.baseBlk.ID() == c.acceptor.GetLastAccepted() {
 		return c.Timestamp()
 	}
 	return c.timestamp
@@ -71,29 +71,29 @@ func (c *commonBlock) verify() error {
 	}
 	return c.verifier.verifyCommonBlock(c)
 
-	/*
-		parent, err := c.parentBlock()
-		if err != nil {
-			return err
-		}
-		if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
-			return fmt.Errorf(
-				"expected block to have height %d, but found %d",
-				expectedHeight,
-				c.baseBlk.Height(),
-			)
-		}
-		return nil
+	/* TODO remove
+	parent, err := c.parentBlock()
+	if err != nil {
+		return err
+	}
+	if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
+		return fmt.Errorf(
+			"expected block to have height %d, but found %d",
+			expectedHeight,
+			c.baseBlk.Height(),
+		)
+	}
+	return nil
 	*/
 }
 
+/*TODO remove
 func (c *commonBlock) free() {
 	c.freer.freeCommonBlock(c)
-	/* TODO remove
 	c.verifier.DropVerifiedBlock(c.baseBlk.ID())
 	c.children = nil
-	*/
 }
+*/
 
 /* TODO remove
 func (c *commonBlock) accept() {
@@ -106,7 +106,9 @@ func (c *commonBlock) accept() {
 }
 */
 
+/* TODO remove
 func (c *commonBlock) reject() {
 	defer c.free()
 	c.status = choices.Rejected
 }
+*/
