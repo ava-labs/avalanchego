@@ -553,7 +553,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
-		peerVersion := msg.Get(message.VersionStruct).(version.Application)
+		peerVersion := msg.Get(message.VersionStruct).(*version.Application)
 		return engine.Connected(nodeID, peerVersion)
 
 	case message.Disconnected:

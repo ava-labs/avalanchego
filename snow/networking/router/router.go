@@ -30,6 +30,7 @@ type Router interface {
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
+		whiteListedSubnets ids.Set,
 		onFatal func(exitCode int),
 		healthConfig HealthConfig,
 		metricsNamespace string,

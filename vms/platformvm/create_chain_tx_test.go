@@ -21,7 +21,7 @@ import (
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -135,7 +135,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tx, err := vm.newCreateChainTx(
+		tx, err := vm.txBuilder.NewCreateChainTx(
 			test.subnetID,
 			test.genesisData,
 			test.vmID,
@@ -161,7 +161,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -170,7 +170,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -203,7 +203,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -212,7 +212,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx( // create a tx
+	tx, err := vm.txBuilder.NewCreateChainTx( // create a tx
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -257,7 +257,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // Ensure Execute fails when the Subnet the blockchain specifies as
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -266,7 +266,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -298,7 +298,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -308,7 +308,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	}()
 
 	// create a valid tx
-	tx, err := vm.newCreateChainTx(
+	tx, err := vm.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -367,7 +367,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -377,10 +377,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			ins, outs, _, signers, err := vm.stake(keys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := vm.utxoHandler.Spend(keys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
-			subnetAuth, subnetSigners, err := vm.authorize(vm.internalState, testSubnet1.ID(), keys)
+			subnetAuth, subnetSigners, err := vm.utxoHandler.Authorize(vm.internalState, testSubnet1.ID(), keys)
 			assert.NoError(err)
 
 			signers = append(signers, subnetSigners)

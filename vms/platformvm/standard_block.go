@@ -100,7 +100,7 @@ func (sb *StandardBlock) Verify() error {
 	sb.inputs.Clear()
 	sb.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
-	funcs := make([]func() error, 0, len(sb.Txs))
+	funcs := make([]func(), 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
 		executor := standardTxExecutor{
 			vm:    sb.vm,
@@ -151,13 +151,10 @@ func (sb *StandardBlock) Verify() error {
 	if numFuncs := len(funcs); numFuncs == 1 {
 		sb.onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		sb.onAcceptFunc = func() error {
+		sb.onAcceptFunc = func() {
 			for _, f := range funcs {
-				if err := f(); err != nil {
-					return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
-				}
+				f()
 			}
-			return nil
 		}
 	}
 
@@ -198,9 +195,7 @@ func (sb *StandardBlock) Accept() error {
 		child.setBaseState()
 	}
 	if sb.onAcceptFunc != nil {
-		if err := sb.onAcceptFunc(); err != nil {
-			return fmt.Errorf("failed to execute onAcceptFunc: %w", err)
-		}
+		sb.onAcceptFunc()
 	}
 
 	sb.free()

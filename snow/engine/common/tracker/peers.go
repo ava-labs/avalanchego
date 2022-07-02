@@ -77,7 +77,7 @@ func (p *peers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight
 	}
 }
 
-func (p *peers) Connected(nodeID ids.NodeID, _ version.Application) error {
+func (p *peers) Connected(nodeID ids.NodeID, _ *version.Application) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

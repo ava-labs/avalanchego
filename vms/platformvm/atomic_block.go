@@ -167,13 +167,7 @@ func (ab *AtomicBlock) Accept() error {
 		child.setBaseState()
 	}
 	if ab.onAcceptFunc != nil {
-		if err := ab.onAcceptFunc(); err != nil {
-			return fmt.Errorf(
-				"failed to execute onAcceptFunc of %s: %w",
-				blkID,
-				err,
-			)
-		}
+		ab.onAcceptFunc()
 	}
 
 	ab.free()

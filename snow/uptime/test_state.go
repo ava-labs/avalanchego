@@ -31,9 +31,10 @@ func NewTestState() *TestState {
 }
 
 func (s *TestState) AddNode(nodeID ids.NodeID, startTime time.Time) {
+	st := time.Unix(startTime.Unix(), 0)
 	s.nodes[nodeID] = &uptime{
-		lastUpdated: startTime,
-		startTime:   startTime,
+		lastUpdated: st,
+		startTime:   st,
 	}
 }
 
@@ -51,7 +52,7 @@ func (s *TestState) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastU
 		return database.ErrNotFound
 	}
 	up.upDuration = upDuration
-	up.lastUpdated = lastUpdated
+	up.lastUpdated = time.Unix(lastUpdated.Unix(), 0)
 	return s.dbWriteError
 }
 

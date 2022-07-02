@@ -214,7 +214,6 @@ func NewNetwork(
 		Network:              nil, // This is set below.
 		Router:               router,
 		VersionCompatibility: version.GetCompatibility(config.NetworkID),
-		VersionParser:        version.DefaultApplicationParser,
 		MySubnets:            config.WhitelistedSubnets,
 		Beacons:              config.Beacons,
 		NetworkID:            config.NetworkID,
@@ -365,7 +364,10 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
-	n.router.Connected(nodeID, peerVersion)
+	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
+	for subnetID := range peer.TrackedSubnets() {
+		n.router.Connected(nodeID, peerVersion, subnetID)
+	}
 }
 
 // AllowConnection returns true if this node should have a connection to the

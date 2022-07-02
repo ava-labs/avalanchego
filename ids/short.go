@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -27,7 +27,7 @@ func ToShortID(bytes []byte) (ShortID, error) {
 
 // ShortFromString is the inverse of ShortID.String()
 func ShortFromString(idStr string) (ShortID, error) {
-	bytes, err := formatting.Decode(defaultEncoding, idStr)
+	bytes, err := cb58.Decode(idStr)
 	if err != nil {
 		return ShortID{}, err
 	}
@@ -44,7 +44,7 @@ func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 }
 
 func (id ShortID) MarshalJSON() ([]byte, error) {
-	str, err := formatting.EncodeWithChecksum(defaultEncoding, id[:])
+	str, err := cb58.Encode(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	}
 
 	// Parse CB58 formatted string to bytes
-	bytes, err := formatting.Decode(defaultEncoding, str[1:lastIndex])
+	bytes, err := cb58.Decode(str[1:lastIndex])
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
@@ -87,7 +87,7 @@ func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	str, _ := formatting.EncodeWithChecksum(defaultEncoding, id.Bytes())
+	str, _ := cb58.Encode(id.Bytes())
 	return str
 }
 
