@@ -51,7 +51,7 @@ type Consensus interface {
 	// critical error has occurred.
 	Add(Vertex) error
 
-	// VertexIssued returns true iff Vertex has been added
+	// VertexIssued returns true if Vertex has been added
 	VertexIssued(Vertex) bool
 
 	// TxIssued returns true if a vertex containing this transanction has been added

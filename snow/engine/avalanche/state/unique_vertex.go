@@ -381,7 +381,7 @@ func (vtx *uniqueVertex) HasWhitelist() bool {
 	return vtx.v.vtx.StopVertex()
 }
 
-// "uniqueVertex" itself implements "Whitelist" traversal iff its underlying
+// "uniqueVertex" itself implements "Whitelist" traversal if its underlying
 // "vertex.StatelessVertex" is marked as a stop vertex.
 func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
 	if !vtx.v.vtx.StopVertex() {

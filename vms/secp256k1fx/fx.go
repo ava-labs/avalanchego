@@ -89,7 +89,7 @@ func (fx *Fx) Bootstrapping() error { return nil }
 
 func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
-// VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
+// VerifyPermission returns nil if [credIntf] proves that [controlGroup] assents to [txIntf]
 func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {

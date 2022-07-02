@@ -62,5 +62,5 @@ func (arr innerSortBytes) Swap(i, j int) { arr[j], arr[i] = arr[i], arr[j] }
 // Each byte array is not sorted internally; the byte arrays are sorted relative to another.
 func Sort2DBytes(arr [][]byte) { sort.Sort(innerSortBytes(arr)) }
 
-// IsSorted2DBytes returns true iff [arr] is sorted
+// IsSorted2DBytes returns true if [arr] is sorted
 func IsSorted2DBytes(arr [][]byte) bool { return sort.IsSorted(innerSortBytes(arr)) }

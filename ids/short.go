@@ -127,7 +127,7 @@ func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
 	return true
 }
 
-// IsUniqueShortIDs returns true iff [ids] are unique
+// IsUniqueShortIDs returns true if [ids] are unique
 func IsUniqueShortIDs(ids []ShortID) bool {
 	set := ShortSet{}
 	set.Add(ids...)

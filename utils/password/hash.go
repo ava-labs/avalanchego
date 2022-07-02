@@ -27,7 +27,7 @@ func (h *Hash) Set(password string) error {
 	return nil
 }
 
-// Check returns true iff the provided password was the same as the last
+// Check returns true if the provided password was the same as the last
 // password set.
 func (h *Hash) Check(password string) bool {
 	pw := argon2.IDKey([]byte(password), h.Salt[:], 1, 64*1024, 4, 32)

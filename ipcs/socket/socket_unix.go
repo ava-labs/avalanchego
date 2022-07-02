@@ -66,7 +66,7 @@ func Dial(addr string) (*Client, error) {
 	return &Client{Conn: c, maxMessageSize: int64(constants.DefaultMaxMessageSize)}, nil
 }
 
-// removeIfStaleUnixSocket takes in a path and removes it iff it is a socket
+// removeIfStaleUnixSocket takes in a path and removes it if it is a socket
 // that is refusing connections
 func removeIfStaleUnixSocket(socketPath string) error {
 	// Ensure it's a socket; if not return without an error

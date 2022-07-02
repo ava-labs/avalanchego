@@ -47,7 +47,7 @@ type Consensus interface {
 	// assumed that the provided transaction ID is currently processing.
 	Remove(ids.ID) error
 
-	// Returns true iff transaction <Tx> has been added
+	// Returns true if transaction <Tx> has been added
 	Issued(Tx) bool
 
 	// Returns the set of virtuous transactions
@@ -68,12 +68,12 @@ type Consensus interface {
 	// changed. Returns if a critical error has occurred.
 	RecordPoll(ids.Bag) (bool, error)
 
-	// Returns true iff all remaining transactions are rogue. Note, it is
+	// Returns true if all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such
 	// that this instance should no longer quiesce.
 	Quiesce() bool
 
-	// Returns true iff all added transactions have been finalized. Note, it is
+	// Returns true if all added transactions have been finalized. Note, it is
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
