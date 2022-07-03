@@ -17,6 +17,17 @@ type continuousAverager struct {
 	lastUpdated time.Time
 }
 
+// NewUninitializedAverager creates a new averager with the given halflife. If
+// [Read] is called before [Observe], the zero value will be returned. When
+// [Observe] is called the first time, the averager will be initialized with
+// [value] at that time.
+func NewUninitializedAverager(halfLife time.Duration) Averager {
+	// Use 0 as the initialPrediction and 0 as the currentTime, so that when the
+	// first observation occurs (at a non-zero time) the initial prediction's
+	// weight will become negligible.
+	return NewAverager(0, halfLife, time.Time{})
+}
+
 func NewAverager(
 	initialPrediction float64,
 	halflife time.Duration,
