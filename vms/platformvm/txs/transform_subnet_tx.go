@@ -5,11 +5,13 @@ package txs
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -18,6 +20,9 @@ var (
 	_ secp256k1fx.UnsignedTx = &TransformSubnetTx{}
 
 	errCantTransformPrimaryNetwork = errors.New("cannot transform primary network")
+	errEmptyAssetID                = errors.New("empty asset ID is not valid")
+	errAssetIDCantBeAVAX           = errors.New("asset ID can't be AVAX")
+	errMaxConsumptionRateTooLarge  = fmt.Errorf("max consumption rate must be less than or equal to %d", reward.PercentDenominator)
 )
 
 // TransformSubnetTx is an unsigned transformSubnetTx
@@ -26,9 +31,16 @@ type TransformSubnetTx struct {
 	BaseTx `serialize:"true"`
 	// ID of the Subnet to transform
 	SubnetID ids.ID `serialize:"true" json:"subnetID"`
-
-	// TODO: provide staking information
-
+	// Asset to use when staking on the Subnet
+	AssetID ids.ID `serialize:"true" json:"assetID"`
+	// Amount to allocate to the subnet's reward pool
+	InitialRemainingSupply uint64 `serialize:"true" json:"initialRemainingSupply"`
+	// MaxConsumptionRate is the rate to allocate funds if the validator's stake
+	// duration is equal to the minting period
+	MaxConsumptionRate uint64 `serialize:"true" json:"maxConsumptionRate"`
+	// MinConsumptionRate is the rate to allocate funds if the validator's stake
+	// duration is 0
+	MinConsumptionRate uint64 `serialize:"true" json:"minConsumptionRate"`
 	// Authorizes this transformation
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
@@ -41,6 +53,12 @@ func (tx *TransformSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.SubnetID == constants.PrimaryNetworkID:
 		return errCantTransformPrimaryNetwork
+	case tx.AssetID == ids.Empty:
+		return errEmptyAssetID
+	case tx.AssetID == ctx.AVAXAssetID:
+		return errAssetIDCantBeAVAX
+	case tx.MaxConsumptionRate > reward.PercentDenominator:
+		return errMaxConsumptionRateTooLarge
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
