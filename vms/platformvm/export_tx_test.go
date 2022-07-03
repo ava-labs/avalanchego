@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -58,7 +58,7 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
-			tx, err := vm.newExportTx(defaultBalance-defaultTxFee, tt.destinationChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			tx, err := vm.txBuilder.NewExportTx(defaultBalance-defaultTxFee, tt.destinationChainID, to, tt.sourceKeys, ids.ShortEmpty)
 			if tt.shouldErr {
 				assert.Error(err)
 				return

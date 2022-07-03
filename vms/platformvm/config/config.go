@@ -11,7 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Struct collecting all foundational parameters of PlatformVM
@@ -81,4 +83,39 @@ type Config struct {
 
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
+}
+
+func (c *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {
+	if t.Before(c.ApricotPhase3Time) {
+		return c.CreateAssetTxFee
+	}
+	return c.CreateBlockchainTxFee
+}
+
+func (c *Config) GetCreateSubnetTxFee(t time.Time) uint64 {
+	if t.Before(c.ApricotPhase3Time) {
+		return c.CreateAssetTxFee
+	}
+	return c.CreateSubnetTxFee
+}
+
+// Create the blockchain described in [tx], but only if this node is a member of
+// the subnet that validates the chain
+func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
+	if c.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
+		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
+		!c.WhitelistedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
+		return
+	}
+
+	chainParams := chains.ChainParameters{
+		ID:          chainID,
+		SubnetID:    tx.SubnetID,
+		GenesisData: tx.GenesisData,
+		VMAlias:     tx.VMID.String(),
+	}
+	for _, fxID := range tx.FxIDs {
+		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+	}
+	c.Chains.CreateChain(chainParams)
 }

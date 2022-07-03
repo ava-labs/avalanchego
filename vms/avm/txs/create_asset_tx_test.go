@@ -419,7 +419,7 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 		},
 	}
 	tx := &Tx{Unsigned: unsignedTx}
-	for _, key := range keys {
+	for _, key := range keys[:3] {
 		addr := key.PublicKey().Address()
 
 		unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{

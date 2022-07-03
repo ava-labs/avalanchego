@@ -44,7 +44,12 @@ func TestBuildVersion(t *testing.T) {
 		IP: net.IPv4(1, 2, 3, 4),
 	}
 
-	myVersion := version.NewDefaultVersion(1, 2, 3).String()
+	myVersion := &version.Semantic{
+		Major: 1,
+		Minor: 2,
+		Patch: 3,
+	}
+	myVersionStr := myVersion.String()
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
@@ -53,7 +58,7 @@ func TestBuildVersion(t *testing.T) {
 		networkID,
 		myTime,
 		ip,
-		myVersion,
+		myVersionStr,
 		myVersionTime,
 		sig,
 		[]ids.ID{subnetID},
@@ -70,7 +75,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
 	assert.EqualValues(t, ip, parsedMsg.Get(IP))
-	assert.EqualValues(t, myVersion, parsedMsg.Get(VersionStr))
+	assert.EqualValues(t, myVersionStr, parsedMsg.Get(VersionStr))
 	assert.EqualValues(t, myVersionTime, parsedMsg.Get(VersionTime))
 	assert.EqualValues(t, sig, parsedMsg.Get(SigBytes))
 	assert.EqualValues(t, subnetIDs, parsedMsg.Get(TrackedSubnets))
