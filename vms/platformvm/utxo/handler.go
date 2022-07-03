@@ -499,22 +499,29 @@ func (h *handler) SemanticVerifySpendUTXOs(
 	now := uint64(h.clk.Time().Unix())
 
 	// Track the amount of unlocked transfers
-	unlockedProduced := feeAmount
-	unlockedConsumed := uint64(0)
+	// assetID -> amount
+	unlockedProduced := map[ids.ID]uint64{
+		feeAssetID: feeAmount,
+	}
+	unlockedConsumed := make(map[ids.ID]uint64)
 
 	// Track the amount of locked transfers and their owners
-	// locktime -> ownerID -> amount
-	lockedProduced := make(map[uint64]map[ids.ID]uint64)
-	lockedConsumed := make(map[uint64]map[ids.ID]uint64)
+	// assetID -> locktime -> ownerID -> amount
+	lockedProduced := make(map[ids.ID]map[uint64]map[ids.ID]uint64)
+	lockedConsumed := make(map[ids.ID]map[uint64]map[ids.ID]uint64)
 
 	for index, input := range ins {
 		utxo := utxos[index] // The UTXO consumed by [input]
 
-		if assetID := utxo.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("utxo asset ID %s doesn't match the fee asset ID %s", assetID, feeAssetID)
-		}
-		if assetID := input.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("input asset ID %s doesn't match the fee asset ID %s", assetID, feeAssetID)
+		realAssetID := utxo.AssetID()
+		claimedAssetID := input.AssetID()
+		if realAssetID != claimedAssetID {
+			return fmt.Errorf(
+				"input %d has asset ID %s but UTXO has asset ID %s",
+				index,
+				claimedAssetID,
+				realAssetID,
+			)
 		}
 
 		out := utxo.Out
@@ -547,11 +554,11 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		amount := in.Amount()
 
 		if now >= locktime {
-			newUnlockedConsumed, err := math.Add64(unlockedConsumed, amount)
+			newUnlockedConsumed, err := math.Add64(unlockedConsumed[realAssetID], amount)
 			if err != nil {
 				return err
 			}
-			unlockedConsumed = newUnlockedConsumed
+			unlockedConsumed[realAssetID] = newUnlockedConsumed
 			continue
 		}
 
@@ -564,11 +571,16 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
+		lockedConsumedAsset, ok := lockedConsumed[realAssetID]
+		if !ok {
+			lockedConsumedAsset = make(map[uint64]map[ids.ID]uint64)
+			lockedConsumed[realAssetID] = lockedConsumedAsset
+		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := lockedConsumed[locktime]
+		owners, ok := lockedConsumedAsset[locktime]
 		if !ok {
 			owners = make(map[ids.ID]uint64)
-			lockedConsumed[locktime] = owners
+			lockedConsumedAsset[locktime] = owners
 		}
 		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
@@ -578,9 +590,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 	}
 
 	for _, out := range outs {
-		if assetID := out.AssetID(); assetID != feeAssetID {
-			return fmt.Errorf("output asset ID %s don't match the fee asset ID %s", assetID, feeAssetID)
-		}
+		assetID := out.AssetID()
 
 		output := out.Output()
 		locktime := uint64(0)
@@ -593,11 +603,11 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		amount := output.Amount()
 
 		if locktime == 0 {
-			newUnlockedProduced, err := math.Add64(unlockedProduced, amount)
+			newUnlockedProduced, err := math.Add64(unlockedProduced[assetID], amount)
 			if err != nil {
 				return err
 			}
-			unlockedProduced = newUnlockedProduced
+			unlockedProduced[assetID] = newUnlockedProduced
 			continue
 		}
 
@@ -610,11 +620,16 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
+		lockedProducedAsset, ok := lockedProduced[assetID]
+		if !ok {
+			lockedProducedAsset = make(map[uint64]map[ids.ID]uint64)
+			lockedProduced[assetID] = lockedProducedAsset
+		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := lockedProduced[locktime]
+		owners, ok := lockedProducedAsset[locktime]
 		if !ok {
 			owners = make(map[ids.ID]uint64)
-			lockedProduced[locktime] = owners
+			lockedProducedAsset[locktime] = owners
 		}
 		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
@@ -623,35 +638,43 @@ func (h *handler) SemanticVerifySpendUTXOs(
 		owners[ownerID] = newAmount
 	}
 
-	// Make sure that for each locktime, tokens produced <= tokens consumed
-	for locktime, producedAmounts := range lockedProduced {
-		consumedAmounts := lockedConsumed[locktime]
-		for ownerID, producedAmount := range producedAmounts {
-			consumedAmount := consumedAmounts[ownerID]
+	// Make sure that for each assetID and locktime, tokens produced <= tokens consumed
+	for assetID, producedAssetAmounts := range lockedProduced {
+		lockedConsumedAsset := lockedConsumed[assetID]
+		for locktime, producedAmounts := range producedAssetAmounts {
+			consumedAmounts := lockedConsumedAsset[locktime]
+			for ownerID, producedAmount := range producedAmounts {
+				consumedAmount := consumedAmounts[ownerID]
 
-			if producedAmount > consumedAmount {
-				increase := producedAmount - consumedAmount
-				if increase > unlockedConsumed {
-					return fmt.Errorf(
-						"address %s produces %d unlocked and consumes %d unlocked for locktime %d",
-						ownerID,
-						increase,
-						unlockedConsumed,
-						locktime,
-					)
+				if producedAmount > consumedAmount {
+					increase := producedAmount - consumedAmount
+					unlockedConsumedAsset := unlockedConsumed[assetID]
+					if increase > unlockedConsumedAsset {
+						return fmt.Errorf(
+							"address %s produces %d unlocked and consumes %d unlocked for locktime %d",
+							ownerID,
+							increase,
+							unlockedConsumedAsset,
+							locktime,
+						)
+					}
+					unlockedConsumed[assetID] = unlockedConsumedAsset - increase
 				}
-				unlockedConsumed -= increase
 			}
 		}
 	}
 
-	// More unlocked tokens produced than consumed. Invalid.
-	if unlockedProduced > unlockedConsumed {
-		return fmt.Errorf(
-			"tx produces more unlocked (%d) than it consumes (%d)",
-			unlockedProduced,
-			unlockedConsumed,
-		)
+	for assetID, unlockedProducedAsset := range unlockedProduced {
+		unlockedConsumedAsset := unlockedConsumed[assetID]
+		// More unlocked tokens produced than consumed. Invalid.
+		if unlockedProducedAsset > unlockedConsumedAsset {
+			return fmt.Errorf(
+				"tx produces more unlocked %q (%d) than it consumes (%d)",
+				assetID,
+				unlockedProducedAsset,
+				unlockedConsumedAsset,
+			)
+		}
 	}
 	return nil
 }
