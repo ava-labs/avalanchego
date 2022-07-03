@@ -20,7 +20,8 @@ import (
 var (
 	_ txs.Visitor = &standardTxExecutor{}
 
-	errCustomAssetBeforeBlueberry = errors.New("custom assets can only be imported after the blueberry upgrade")
+	errCustomAssetBeforeBlueberry     = errors.New("custom assets can only be imported after the blueberry upgrade")
+	errTransformSubnetBeforeBlueberry = errors.New("subnets can only be transformed after the blueberry upgrade")
 )
 
 type standardTxExecutor struct {
@@ -294,7 +295,20 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	return nil
 }
 
-// TODO: implement
-func (*standardTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (e *standardTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	// TODO: Remove this check once the Blueberry network upgrade is complete.
+	//
+	// Blueberry network upgrade allows transforming a permissioned subnet into
+	// a permissionless subnet.
+	currentTime := e.state.GetTimestamp()
+	if currentTime.Before(e.vm.BlueberryTime) {
+		return errTransformSubnetBeforeBlueberry
+	}
+
+	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+		return err
+	}
+
+	// TODO: implement
 	return errWrongTxType
 }
