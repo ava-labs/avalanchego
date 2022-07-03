@@ -41,7 +41,6 @@ func Consume(utxoDB state.UTXODeleter, ins []*avax.TransferableInput) {
 func Produce(
 	utxoDB state.UTXOAdder,
 	txID ids.ID,
-	assetID ids.ID,
 	outs []*avax.TransferableOutput,
 ) {
 	for index, out := range outs {
@@ -50,7 +49,7 @@ func Produce(
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
-			Asset: avax.Asset{ID: assetID},
+			Asset: out.Asset,
 			Out:   out.Output(),
 		})
 	}

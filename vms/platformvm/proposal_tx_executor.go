@@ -167,14 +167,14 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.onCommit, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.onCommit, txID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxo.Consume(e.onAbort, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
+	utxo.Produce(e.onAbort, txID, outs)
 
 	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
 	return nil
@@ -330,14 +330,14 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// Consume the UTXOS
 	utxo.Consume(e.onCommit, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.onCommit, txID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxo.Consume(e.onAbort, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.onAbort, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.onAbort, txID, tx.Outs)
 
 	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
 	return nil
@@ -490,14 +490,14 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.onCommit, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.onCommit, txID, tx.Outs)
 
 	// Set up the state if this tx is aborted
 	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
 	utxo.Consume(e.onAbort, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.onAbort, txID, e.vm.ctx.AVAXAssetID, outs)
+	utxo.Produce(e.onAbort, txID, outs)
 
 	e.prefersCommit = tx.StartTime().After(e.vm.clock.Time())
 	return nil
@@ -730,7 +730,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: out.Asset,
 				Out:   out.Output(),
 			}
 			e.onCommit.AddUTXO(utxo)
@@ -747,7 +747,6 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			if !ok {
 				return errInvalidState
 			}
-
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
@@ -772,7 +771,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: e.vm.ctx.AVAXAssetID},
+				Asset: out.Asset,
 				Out:   out.Output(),
 			}
 			e.onCommit.AddUTXO(utxo)

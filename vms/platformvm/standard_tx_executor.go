@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -16,7 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
-var _ txs.Visitor = &standardTxExecutor{}
+var (
+	_ txs.Visitor = &standardTxExecutor{}
+
+	errCustomAssetBeforeBlueberry = errors.New("custom assets can only be imported after the blueberry upgrade")
+)
 
 type standardTxExecutor struct {
 	// inputs
@@ -92,7 +97,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, tx.Outs)
 	// Add the new chain to the database
 	e.state.AddChain(e.tx)
 
@@ -128,7 +133,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, tx.Outs)
 	// Add the new subnet to the database
 	e.state.AddSubnet(e.tx)
 	return nil
@@ -139,6 +144,8 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
+	currentTime := e.state.GetTimestamp()
+
 	e.inputs = ids.NewSet(len(tx.ImportedInputs))
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
@@ -146,6 +153,18 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 		e.inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
+
+		if currentTime.Before(e.vm.BlueberryTime) {
+			// TODO: Remove this check once the Blueberry network upgrade is
+			//       complete.
+			//
+			// Blueberry network upgrade allows exporting of all assets to the
+			// P-chain.
+			assetID := in.AssetID()
+			if assetID != e.vm.ctx.AVAXAssetID {
+				return errCustomAssetBeforeBlueberry
+			}
+		}
 	}
 
 	if e.vm.bootstrapped.GetValue() {
@@ -196,7 +215,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, tx.Outs)
 
 	e.atomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
@@ -239,7 +258,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.state, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.state, txID, tx.Outs)
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
