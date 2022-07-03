@@ -49,10 +49,11 @@ type proposalTxExecutor struct {
 	prefersCommit bool
 }
 
-func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error   { return errWrongTxType }
-func (*proposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return errWrongTxType }
-func (*proposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
-func (*proposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
+func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error         { return errWrongTxType }
+func (*proposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error       { return errWrongTxType }
+func (*proposalTxExecutor) ImportTx(*txs.ImportTx) error                   { return errWrongTxType }
+func (*proposalTxExecutor) ExportTx(*txs.ExportTx) error                   { return errWrongTxType }
+func (*proposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error { return errWrongTxType }
 
 func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Verify the tx is well-formed

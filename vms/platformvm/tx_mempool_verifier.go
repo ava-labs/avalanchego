@@ -49,6 +49,10 @@ func (v *mempoolTxVerifier) ExportTx(tx *txs.ExportTx) error {
 	return v.standardTx(tx)
 }
 
+func (v *mempoolTxVerifier) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	return v.standardTx(tx)
+}
+
 func (v *mempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	startTime := tx.StartTime()
 	maxLocalStartTime := v.vm.clock.Time().Add(maxFutureStartTime)

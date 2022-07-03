@@ -293,3 +293,8 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 	return nil
 }
+
+// TODO: implement
+func (*standardTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	return errWrongTxType
+}

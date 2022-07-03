@@ -14,4 +14,5 @@ type Visitor interface {
 	ExportTx(*ExportTx) error
 	AdvanceTimeTx(*AdvanceTimeTx) error
 	RewardValidatorTx(*RewardValidatorTx) error
+	TransformSubnetTx(*TransformSubnetTx) error
 }
