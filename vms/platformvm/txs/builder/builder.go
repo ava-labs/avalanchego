@@ -267,6 +267,8 @@ func (b *builder) NewImportTx(
 		})
 	}
 
+	avax.SortTransferableOutputs(outs, txs.Codec) // sort imported outputs
+
 	// Create the transaction
 	utx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
