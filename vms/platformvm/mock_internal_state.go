@@ -124,6 +124,18 @@ func (mr *MockInternalStateMockRecorder) AddSubnet(createSubnetTx interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddSubnet", reflect.TypeOf((*MockInternalState)(nil).AddSubnet), createSubnetTx)
 }
 
+// AddSubnetTransformation mocks base method.
+func (m *MockInternalState) AddSubnetTransformation(transformSubnetTx *txs.Tx) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddSubnetTransformation", transformSubnetTx)
+}
+
+// AddSubnetTransformation indicates an expected call of AddSubnetTransformation.
+func (mr *MockInternalStateMockRecorder) AddSubnetTransformation(transformSubnetTx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddSubnetTransformation", reflect.TypeOf((*MockInternalState)(nil).AddSubnetTransformation), transformSubnetTx)
+}
+
 // AddTx mocks base method.
 func (m *MockInternalState) AddTx(tx *txs.Tx, status status.Status) {
 	m.ctrl.T.Helper()
@@ -356,6 +368,21 @@ func (m *MockInternalState) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 func (mr *MockInternalStateMockRecorder) GetStartTime(nodeID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartTime", reflect.TypeOf((*MockInternalState)(nil).GetStartTime), nodeID)
+}
+
+// GetSubnetTransformation mocks base method.
+func (m *MockInternalState) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetTransformation", subnetID)
+	ret0, _ := ret[0].(*txs.Tx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetTransformation indicates an expected call of GetSubnetTransformation.
+func (mr *MockInternalStateMockRecorder) GetSubnetTransformation(subnetID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetTransformation", reflect.TypeOf((*MockInternalState)(nil).GetSubnetTransformation), subnetID)
 }
 
 // GetSubnets mocks base method.

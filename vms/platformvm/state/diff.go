@@ -31,8 +31,9 @@ type diff struct {
 
 	currentSupply uint64
 
-	addedSubnets  []*txs.Tx
-	cachedSubnets []*txs.Tx
+	addedSubnets       []*txs.Tx
+	transformedSubnets map[ids.ID]*txs.Tx
+	cachedSubnets      []*txs.Tx
 
 	addedChains  map[ids.ID][]*txs.Tx
 	cachedChains map[ids.ID][]*txs.Tx
@@ -105,6 +106,25 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	d.addedSubnets = append(d.addedSubnets, createSubnetTx)
 	if d.cachedSubnets != nil {
 		d.cachedSubnets = append(d.cachedSubnets, createSubnetTx)
+	}
+}
+
+func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	tx, exists := d.transformedSubnets[subnetID]
+	if !exists {
+		return d.parentState.GetSubnetTransformation(subnetID)
+	}
+	return tx, nil
+}
+
+func (d *diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+	if d.transformedSubnets == nil {
+		d.transformedSubnets = map[ids.ID]*txs.Tx{
+			transformSubnetTx.SubnetID: transformSubnetTxIntf,
+		}
+	} else {
+		d.transformedSubnets[transformSubnetTx.SubnetID] = transformSubnetTxIntf
 	}
 }
 
@@ -243,6 +263,9 @@ func (d *diff) Apply(baseState State) {
 	baseState.SetCurrentSupply(d.currentSupply)
 	for _, subnet := range d.addedSubnets {
 		baseState.AddSubnet(subnet)
+	}
+	for _, tx := range d.transformedSubnets {
+		baseState.AddSubnetTransformation(tx)
 	}
 	for _, chains := range d.addedChains {
 		for _, chain := range chains {
