@@ -18,12 +18,21 @@ import (
 
 // nextTx returns the next transactions to be included in a block, along with
 // its timestamp.
-func (b *blockBuilder) nextBlueberryTxs(chainTipState state.Chain) ([]*txs.Tx, time.Time, error) {
-	currentChainTime := chainTipState.GetTimestamp()
+func (b *blockBuilder) nextTxs(
+	chainTipState state.Chain,
+	blkVersion uint16,
+) ([]*txs.Tx, time.Time, error) {
+	// blkTimestamp is zeroed for Apricot blocks
+	// it is tentatively set to chainTime for Blueberry ones
+	blkTime := time.Time{}
+	if blkVersion != stateless.ApricotVersion {
+		blkTime = chainTipState.GetTimestamp()
+	}
+
 	// try including as many standard txs as possible. No need to advance chain time
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
-		return txs, currentChainTime, nil
+		return txs, blkTime, nil
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
@@ -37,25 +46,55 @@ func (b *blockBuilder) nextBlueberryTxs(chainTipState state.Chain) ([]*txs.Tx, t
 			return nil, time.Time{}, fmt.Errorf("could not build tx to reward staker %s", err)
 		}
 
-		return []*txs.Tx{rewardValidatorTx}, currentChainTime, nil
+		return []*txs.Tx{rewardValidatorTx}, blkTime, nil
 	}
 
-	// try advancing chain time. Note that is this case an empty block will be issued.
+	// try advancing chain time. It may result in empty blocks
+	txes, blkTime, shouldAdvance, err := b.tryAdvanceToNextChainTime(chainTipState, blkVersion)
+	if shouldAdvance {
+		return txes, blkTime, err
+	}
+
+	return b.trySelectMempoolProposalTx(chainTipState, blkVersion)
+}
+
+// Note: trailing boolean signals whether block content is found
+// or an error occurred. In both cases tx selection is done
+func (b *blockBuilder) tryAdvanceToNextChainTime(
+	chainTipState state.Chain,
+	blkVersion uint16,
+) ([]*txs.Tx, time.Time, bool, error) {
 	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(chainTipState)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("could not retrieve next chain time %s", err)
-	}
-	if shouldAdvanceTime {
-		return []*txs.Tx{}, nextChainTime, nil
+		return nil, time.Time{}, true, fmt.Errorf("could not retrieve next chain time %s", err)
 	}
 
+	if shouldAdvanceTime {
+		if blkVersion == stateless.ApricotVersion {
+			advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(nextChainTime)
+			if err != nil {
+				return nil, time.Time{}, true, fmt.Errorf("could not build tx to reward staker %s", err)
+			}
+			return []*txs.Tx{advanceTimeTx}, time.Time{}, true, nil
+		}
+
+		return []*txs.Tx{}, nextChainTime, true, nil
+	}
+
+	return nil, time.Time{}, false, nil
+}
+
+func (b *blockBuilder) trySelectMempoolProposalTx(
+	chainTipState state.Chain,
+	blkVersion uint16,
+) ([]*txs.Tx, time.Time, error) {
 	// clean out the mempool's transactions with invalid timestamps.
 	b.dropTooEarlyMempoolProposalTxs()
 
 	// try including a mempool proposal tx is available.
 	if !b.HasProposalTx() {
 		b.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return nil, currentChainTime, errNoPendingBlocks
+		return nil, time.Time{}, errNoPendingBlocks
 	}
 
 	tx := b.PopProposalTx()
@@ -65,11 +104,66 @@ func (b *blockBuilder) nextBlueberryTxs(chainTipState state.Chain) ([]*txs.Tx, t
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
 	maxChainStartTime := chainTipState.GetTimestamp().Add(executor.MaxFutureStartTime)
+
+	if blkVersion == stateless.ApricotVersion {
+		if !startTime.After(maxChainStartTime) {
+			return []*txs.Tx{tx}, time.Time{}, nil
+		}
+
+		b.AddProposalTx(tx)
+		now := b.txExecutorBackend.Clk.Time()
+		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(now)
+		if err != nil {
+			return nil, time.Time{}, fmt.Errorf("could not build tx to advance time %s", err)
+		}
+		return []*txs.Tx{advanceTimeTx}, time.Time{}, nil
+	}
+
+	// Blueberry blocks
 	if startTime.After(maxChainStartTime) {
 		now := b.txExecutorBackend.Clk.Time()
 		return []*txs.Tx{tx}, now, nil
 	}
 	return []*txs.Tx{tx}, maxChainStartTime, nil
+}
+
+func (b *blockBuilder) buildApricotBlock(
+	parentBlkID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (snowman.Block, error) {
+	blkVersion := uint16(stateless.ApricotVersion)
+	switch txes[0].Unsigned.(type) {
+	case txs.StakerTx,
+		*txs.RewardValidatorTx,
+		*txs.AdvanceTimeTx:
+		return stateful.NewProposalBlock(
+			blkVersion,
+			uint64(0),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes[0],
+		)
+
+	case *txs.CreateChainTx,
+		*txs.CreateSubnetTx,
+		*txs.ImportTx,
+		*txs.ExportTx:
+		return stateful.NewStandardBlock(
+			blkVersion,
+			uint64(0),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes,
+		)
+
+	default:
+		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+	}
 }
 
 func (b *blockBuilder) buildBlueberryBlock(

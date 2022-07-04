@@ -186,22 +186,17 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	blkVersion := preferred.ExpectedChildVersion()
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-
+	txes, blkTime, err := b.nextTxs(preferredState, blkVersion)
+	if err != nil {
+		return nil, err
+	}
 	switch blkVersion {
 	case stateless.ApricotVersion:
 		b.txExecutorBackend.Ctx.Log.Info("about to build apricot blocks")
-		txes, err := b.nextApricotTxs(preferredState)
-		if err != nil {
-			return nil, err
-		}
 		return b.buildApricotBlock(prefBlkID, nextHeight, txes)
 
 	case stateless.BlueberryVersion:
 		b.txExecutorBackend.Ctx.Log.Info("about to build blueberry blocks")
-		txes, blkTime, err := b.nextBlueberryTxs(preferredState)
-		if err != nil {
-			return nil, err
-		}
 		return b.buildBlueberryBlock(blkTime, prefBlkID, nextHeight, txes)
 
 	default:
