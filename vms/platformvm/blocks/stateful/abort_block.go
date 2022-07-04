@@ -80,6 +80,7 @@ func (a *AbortBlock) Accept() error {
 	if err := a.doubleDecisionBlock.acceptParent(); err != nil {
 		return err
 	}
+
 	a.accept()
 	a.verifier.AddStatelessBlock(a.AbortBlock, a.Status())
 	if err := a.verifier.MarkAccepted(a.AbortBlock); err != nil {
