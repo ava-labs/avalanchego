@@ -18,6 +18,7 @@ type Context interface {
 	AVAXAssetID() ids.ID
 	BaseTxFee() uint64
 	CreateSubnetTxFee() uint64
+	TransformSubnetTxFee() uint64
 	CreateBlockchainTxFee() uint64
 }
 
@@ -26,6 +27,7 @@ type context struct {
 	avaxAssetID           ids.ID
 	baseTxFee             uint64
 	createSubnetTxFee     uint64
+	transformSubnetTxFee  uint64
 	createBlockchainTxFee uint64
 }
 
@@ -60,6 +62,7 @@ func NewContextFromClients(
 		asset.AssetID,
 		uint64(txFees.TxFee),
 		uint64(txFees.CreateSubnetTxFee),
+		uint64(txFees.TransformSubnetTxFee),
 		uint64(txFees.CreateBlockchainTxFee),
 	), nil
 }
@@ -69,6 +72,7 @@ func NewContext(
 	avaxAssetID ids.ID,
 	baseTxFee uint64,
 	createSubnetTxFee uint64,
+	transformSubnetTxFee uint64,
 	createBlockchainTxFee uint64,
 ) Context {
 	return &context{
@@ -76,6 +80,7 @@ func NewContext(
 		avaxAssetID:           avaxAssetID,
 		baseTxFee:             baseTxFee,
 		createSubnetTxFee:     createSubnetTxFee,
+		transformSubnetTxFee:  transformSubnetTxFee,
 		createBlockchainTxFee: createBlockchainTxFee,
 	}
 }
@@ -84,4 +89,5 @@ func (c *context) NetworkID() uint32             { return c.networkID }
 func (c *context) AVAXAssetID() ids.ID           { return c.avaxAssetID }
 func (c *context) BaseTxFee() uint64             { return c.baseTxFee }
 func (c *context) CreateSubnetTxFee() uint64     { return c.createSubnetTxFee }
+func (c *context) TransformSubnetTxFee() uint64  { return c.transformSubnetTxFee }
 func (c *context) CreateBlockchainTxFee() uint64 { return c.createBlockchainTxFee }

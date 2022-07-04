@@ -40,6 +40,8 @@ type TxFeeConfig struct {
 	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
 	// Transaction fee for create subnet transactions
 	CreateSubnetTxFee uint64 `json:"createSubnetTxFee"`
+	// Transaction fee for transform subnet transactions
+	TransformSubnetTxFee uint64 `json:"transformSubnetTxFee"`
 	// Transaction fee for create blockchain transactions
 	CreateBlockchainTxFee uint64 `json:"createBlockchainTxFee"`
 }

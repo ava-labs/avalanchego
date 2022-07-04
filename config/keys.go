@@ -16,6 +16,7 @@ const (
 	TxFeeKey                                           = "tx-fee"
 	CreateAssetTxFeeKey                                = "create-asset-tx-fee"
 	CreateSubnetTxFeeKey                               = "create-subnet-tx-fee"
+	TransformSubnetTxFeeKey                            = "transform-subnet-tx-fee"
 	CreateBlockchainTxFeeKey                           = "create-blockchain-tx-fee"
 	UptimeRequirementKey                               = "uptime-requirement"
 	MinValidatorStakeKey                               = "min-validator-stake"
