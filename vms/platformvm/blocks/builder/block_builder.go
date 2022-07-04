@@ -183,6 +183,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredState := preferredDecision.OnAccept()
 
+	// select transactions to include and finally build the block
 	blkVersion := preferred.ExpectedChildVersion()
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
@@ -190,6 +191,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	switch blkVersion {
 	case stateless.ApricotVersion:
 		b.txExecutorBackend.Ctx.Log.Info("about to build apricot blocks")
@@ -201,6 +203,98 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	default:
 		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
+	}
+}
+
+func (b *blockBuilder) buildApricotBlock(
+	parentBlkID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (snowman.Block, error) {
+	blkVersion := uint16(stateless.ApricotVersion)
+	switch txes[0].Unsigned.(type) {
+	case txs.StakerTx,
+		*txs.RewardValidatorTx,
+		*txs.AdvanceTimeTx:
+		return stateful.NewProposalBlock(
+			blkVersion,
+			uint64(0),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes[0],
+		)
+
+	case *txs.CreateChainTx,
+		*txs.CreateSubnetTx,
+		*txs.ImportTx,
+		*txs.ExportTx:
+		return stateful.NewStandardBlock(
+			blkVersion,
+			uint64(0),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes,
+		)
+
+	default:
+		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+	}
+}
+
+func (b *blockBuilder) buildBlueberryBlock(
+	blkTime time.Time,
+	parentBlkID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (snowman.Block, error) {
+	blkVersion := uint16(stateless.BlueberryVersion)
+	if len(txes) == 0 {
+		// empty standard block are allowed to move chain time head
+		return stateful.NewStandardBlock(
+			blkVersion,
+			uint64(blkTime.Unix()),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			nil,
+		)
+	}
+
+	switch txes[0].Unsigned.(type) {
+	case txs.StakerTx,
+		*txs.RewardValidatorTx,
+		*txs.AdvanceTimeTx:
+		return stateful.NewProposalBlock(
+			blkVersion,
+			uint64(blkTime.Unix()),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes[0],
+		)
+
+	case *txs.CreateChainTx,
+		*txs.CreateSubnetTx,
+		*txs.ImportTx,
+		*txs.ExportTx:
+		return stateful.NewStandardBlock(
+			blkVersion,
+			uint64(blkTime.Unix()),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes,
+		)
+
+	default:
+		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
 	}
 }
 
