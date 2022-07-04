@@ -81,6 +81,7 @@ func (c *CommitBlock) Accept() error {
 	if err := c.doubleDecisionBlock.acceptParent(); err != nil {
 		return err
 	}
+
 	c.accept()
 	c.verifier.AddStatelessBlock(c.CommitBlock, c.Status())
 	if err := c.verifier.MarkAccepted(c.CommitBlock); err != nil {

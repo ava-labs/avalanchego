@@ -30,7 +30,9 @@ func (ddb *doubleDecisionBlock) acceptParent() error {
 	if err := parent.Accept(); err != nil {
 		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
 	}
-	parent.verifier.AddStatelessBlock(parent, parent.Status())
+	ddb.verifier.AddStatelessBlock(parent, parent.Status())
+	ddb.verifier.SetHeight(parent.baseBlk.Height())
+	ddb.verifier.AddToRecentlyAcceptedWindows(parent.baseBlk.ID())
 
 	return nil
 }
