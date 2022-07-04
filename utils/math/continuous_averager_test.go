@@ -6,6 +6,8 @@ package math
 import (
 	"testing"
 	"time"
+
+	"gotest.tools/assert"
 )
 
 func TestAverager(t *testing.T) {
@@ -13,15 +15,13 @@ func TestAverager(t *testing.T) {
 	currentTime := time.Now()
 
 	a := NewSyncAverager(NewAverager(0, halflife, currentTime))
-	if value := a.Read(); value != 0 {
-		t.Fatalf("wrong value returned. Expected %f ; Returned %f", 0.0, value)
-	}
+	expectedValue := float64(0)
+	assert.Equal(t, expectedValue, a.Read())
 
 	currentTime = currentTime.Add(halflife)
 	a.Observe(1, currentTime)
-	if value := a.Read(); value != 1.0/1.5 {
-		t.Fatalf("wrong value returned. Expected %f ; Returned %f", 1.0/1.5, value)
-	}
+	expectedValue = 1.0 / 1.5
+	assert.Equal(t, expectedValue, a.Read())
 }
 
 func TestAveragerTimeTravel(t *testing.T) {
@@ -29,13 +29,24 @@ func TestAveragerTimeTravel(t *testing.T) {
 	currentTime := time.Now()
 
 	a := NewSyncAverager(NewAverager(1, halflife, currentTime))
-	if value := a.Read(); value != 1 {
-		t.Fatalf("wrong value returned. Expected %f ; Returned %f", 1.0, value)
-	}
+	expectedValue := float64(1)
+	assert.Equal(t, expectedValue, a.Read())
 
 	currentTime = currentTime.Add(-halflife)
 	a.Observe(0, currentTime)
-	if value := a.Read(); value != 1.0/1.5 {
-		t.Fatalf("wrong value returned. Expected %f ; Returned %f", 1.0/1.5, value)
-	}
+	expectedValue = 1.0 / 1.5
+	assert.Equal(t, expectedValue, a.Read())
+}
+
+func TestUninitializedAverager(t *testing.T) {
+	halfLife := time.Second
+	currentTime := time.Now()
+
+	firstObservation := float64(10)
+
+	a := NewUninitializedAverager(halfLife)
+	assert.Equal(t, 0.0, a.Read())
+
+	a.Observe(firstObservation, currentTime)
+	assert.Equal(t, firstObservation, a.Read())
 }

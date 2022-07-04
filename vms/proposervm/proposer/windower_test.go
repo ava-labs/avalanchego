@@ -4,7 +4,6 @@
 package proposer
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -94,7 +93,6 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
-		fmt.Println(vdrID)
 		validatorDelay, err := w.Delay(1, 0, vdrID)
 		assert.NoError(err)
 		assert.EqualValues(expectedDelay, validatorDelay)
