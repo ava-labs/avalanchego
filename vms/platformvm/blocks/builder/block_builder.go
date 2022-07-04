@@ -326,7 +326,7 @@ func (b *blockBuilder) getStakerToReward(preferredState state.Chain) (*txs.Tx, b
 
 	staker, ok := tx.Unsigned.(txs.StakerTx)
 	if !ok {
-		return nil, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
+		return nil, false, fmt.Errorf("expected staker tx to be StakerTx but got %T", tx.Unsigned)
 	}
 	return tx, currentChainTimestamp.Equal(staker.EndTime()), nil
 }

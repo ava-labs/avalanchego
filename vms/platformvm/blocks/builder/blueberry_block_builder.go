@@ -86,10 +86,11 @@ func (b *blockBuilder) nextBlueberryStandardBlkTimestamp(preBlkState state.Chain
 	}
 
 	if !nextBlkTime.After(minNextTimestamp) {
-		nextBlkTime = minNextTimestamp.Add(time.Second)
+		nextBlkTime = minNextTimestamp.Add(time.Second) // TODO ABENEGIA: is +1 sec necessary? nice to have?
 	}
 	if !nextBlkTime.Before(maxNextTimeStamp) {
 		// a proposal block must be issued before this standard block.
+		// TODO ABENEGIA: why?? Can't we have a standard block with nextStaker timestamp??
 		return time.Time{}, false, nil
 	}
 
