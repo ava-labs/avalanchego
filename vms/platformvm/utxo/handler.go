@@ -101,8 +101,9 @@ type Verifier interface {
 	// Verify that [tx] is semantically valid.
 	// [ins] and [outs] are the inputs and outputs of [tx].
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
-	// [outs].
+	// [unlockedProduced] is the map of assets that were produced and their
+	// amounts.
+	// The [ins] must have at least [unlockedProduced] than the [outs].
 	// Precondition: [tx] has already been syntactically verified.
 	SemanticVerifySpend(
 		tx txs.UnsignedTx,
@@ -110,16 +111,16 @@ type Verifier interface {
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
-		feeAmount uint64,
-		feeAssetID ids.ID,
+		unlockedProduced map[ids.ID]uint64,
 	) error
 
 	// Verify that [tx] is semantically valid.
 	// [utxos[i]] is the UTXO being consumed by [ins[i]].
 	// [ins] and [outs] are the inputs and outputs of [tx].
 	// [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
-	// [outs].
+	// [unlockedProduced] is the map of assets that were produced and their
+	// amounts.
+	// The [ins] must have at least [unlockedProduced] more than the [outs].
 	// Precondition: [tx] has already been syntactically verified.
 	SemanticVerifySpendUTXOs(
 		tx txs.UnsignedTx,
@@ -127,8 +128,7 @@ type Verifier interface {
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
-		feeAmount uint64,
-		feeAssetID ids.ID,
+		unlockedProduced map[ids.ID]uint64,
 	) error
 }
 
@@ -446,8 +446,7 @@ func (h *handler) SemanticVerifySpend(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+	unlockedProduced map[ids.ID]uint64,
 ) error {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
@@ -462,7 +461,7 @@ func (h *handler) SemanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
 func (h *handler) SemanticVerifySpendUTXOs(
@@ -471,8 +470,7 @@ func (h *handler) SemanticVerifySpendUTXOs(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+	unlockedProduced map[ids.ID]uint64,
 ) error {
 	if len(ins) != len(creds) {
 		return fmt.Errorf(
@@ -497,11 +495,6 @@ func (h *handler) SemanticVerifySpendUTXOs(
 	// Time this transaction is being verified
 	now := uint64(h.clk.Time().Unix())
 
-	// Track the amount of unlocked transfers
-	// assetID -> amount
-	unlockedProduced := map[ids.ID]uint64{
-		feeAssetID: feeAmount,
-	}
 	unlockedConsumed := make(map[ids.ID]uint64)
 
 	// Track the amount of locked transfers and their owners

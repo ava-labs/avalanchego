@@ -144,8 +144,9 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 			tx.Ins,
 			outs,
 			e.tx.Creds,
-			e.vm.AddStakerTxFee,
-			e.vm.ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.vm.ctx.AVAXAssetID: e.vm.AddStakerTxFee,
+			},
 		); err != nil {
 			return fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}
@@ -272,6 +273,17 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
+		_, err = e.parentState.GetSubnetTransformation(tx.Validator.Subnet)
+		if err == nil {
+			return fmt.Errorf(
+				"%s is permissionless",
+				tx.Validator.Subnet,
+			)
+		}
+		if err != database.ErrNotFound {
+			return err
+		}
+
 		baseTxCredsLen := len(e.tx.Creds) - 1
 		baseTxCreds := e.tx.Creds[:baseTxCredsLen]
 		subnetCred := e.tx.Creds[baseTxCredsLen]
@@ -296,17 +308,6 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
-		_, err = e.parentState.GetSubnetTransformation(tx.Validator.Subnet)
-		if err == nil {
-			return fmt.Errorf(
-				"%s is permissionless",
-				tx.Validator.Subnet,
-			)
-		}
-		if err != database.ErrNotFound {
-			return err
-		}
-
 		if err := e.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 			return err
 		}
@@ -318,8 +319,9 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
-			e.vm.TxFee,
-			e.vm.ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.vm.ctx.AVAXAssetID: e.vm.TxFee,
+			},
 		); err != nil {
 			return err
 		}
@@ -478,8 +480,9 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			tx.Ins,
 			outs,
 			e.tx.Creds,
-			e.vm.AddStakerTxFee,
-			e.vm.ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.vm.ctx.AVAXAssetID: e.vm.AddStakerTxFee,
+			},
 		); err != nil {
 			return fmt.Errorf("failed semanticVerifySpend: %w", err)
 		}

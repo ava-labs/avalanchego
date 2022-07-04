@@ -69,9 +69,18 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
-		createBlockchainTxFee,
-		e.vm.ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.vm.ctx.AVAXAssetID: createBlockchainTxFee,
+		},
 	); err != nil {
+		return err
+	}
+
+	_, err := e.state.GetSubnetTransformation(tx.SubnetID)
+	if err == nil {
+		return fmt.Errorf("%s is immutable", tx.SubnetID)
+	}
+	if err != database.ErrNotFound {
 		return err
 	}
 
@@ -86,14 +95,6 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
 		return fmt.Errorf("%s isn't a subnet", tx.SubnetID)
-	}
-
-	_, err = e.state.GetSubnetTransformation(tx.SubnetID)
-	if err == nil {
-		return fmt.Errorf("%s is immutable", tx.SubnetID)
-	}
-	if err != database.ErrNotFound {
-		return err
 	}
 
 	// Verify that this chain is authorized by the subnet
@@ -131,8 +132,9 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Ins,
 		tx.Outs,
 		e.tx.Creds,
-		createSubnetTxFee,
-		e.vm.ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.vm.ctx.AVAXAssetID: createSubnetTxFee,
+		},
 	); err != nil {
 		return err
 	}
@@ -212,8 +214,9 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			ins,
 			tx.Outs,
 			e.tx.Creds,
-			e.vm.TxFee,
-			e.vm.ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.vm.ctx.AVAXAssetID: e.vm.TxFee,
+			},
 		); err != nil {
 			return err
 		}
@@ -256,8 +259,9 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		tx.Ins,
 		outs,
 		e.tx.Creds,
-		e.vm.TxFee,
-		e.vm.ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.vm.ctx.AVAXAssetID: e.vm.TxFee,
+		},
 	); err != nil {
 		return fmt.Errorf("failed semanticVerifySpend: %w", err)
 	}
@@ -303,7 +307,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	// TODO: Remove this check once the Blueberry network upgrade is complete.
 	//
 	// Blueberry network upgrade allows transforming a permissioned subnet into
@@ -317,6 +321,64 @@ func (e *standardTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 		return err
 	}
 
-	// TODO: implement
-	return errWrongTxType
+	// Make sure this transaction has at least one credential for the subnet
+	// authorization.
+	if len(e.tx.Creds) == 0 {
+		return errWrongNumberOfCredentials
+	}
+
+	// Select the credentials for each purpose
+	baseTxCredsLen := len(e.tx.Creds) - 1
+	baseTxCreds := e.tx.Creds[:baseTxCredsLen]
+	subnetCred := e.tx.Creds[baseTxCredsLen]
+
+	if err := e.vm.utxoHandler.SemanticVerifySpend(
+		tx,
+		e.state,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			e.vm.ctx.AVAXAssetID: e.vm.TransformSubnetTxFee,
+			tx.AssetID:           tx.InitialRemainingSupply,
+		},
+	); err != nil {
+		return err
+	}
+
+	_, err := e.state.GetSubnetTransformation(tx.SubnetID)
+	if err == nil {
+		return fmt.Errorf("%s is immutable", tx.SubnetID)
+	}
+	if err != database.ErrNotFound {
+		return err
+	}
+
+	subnetIntf, _, err := e.state.GetTx(tx.SubnetID)
+	if err == database.ErrNotFound {
+		return fmt.Errorf("%s isn't a known subnet", tx.SubnetID)
+	}
+	if err != nil {
+		return err
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return fmt.Errorf("%s isn't a subnet", tx.SubnetID)
+	}
+
+	// Verify that this chain is authorized by the subnet
+	if err := e.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+
+	// Consume the UTXOS
+	utxo.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	utxo.Produce(e.state, txID, tx.Outs)
+	// Transform the new subnet in the database
+	e.state.AddSubnetTransformation(e.tx)
+	return nil
 }

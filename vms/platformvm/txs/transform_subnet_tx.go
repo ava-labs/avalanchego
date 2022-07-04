@@ -23,6 +23,7 @@ var (
 	errEmptyAssetID                = errors.New("empty asset ID is not valid")
 	errAssetIDCantBeAVAX           = errors.New("asset ID can't be AVAX")
 	errMaxConsumptionRateTooLarge  = fmt.Errorf("max consumption rate must be less than or equal to %d", reward.PercentDenominator)
+	errMinConsumptionRateTooLarge  = errors.New("min consumption rate must be less than or equal to max consumption rate")
 )
 
 // TransformSubnetTx is an unsigned transformSubnetTx
@@ -59,6 +60,8 @@ func (tx *TransformSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return errAssetIDCantBeAVAX
 	case tx.MaxConsumptionRate > reward.PercentDenominator:
 		return errMaxConsumptionRateTooLarge
+	case tx.MaxConsumptionRate < tx.MinConsumptionRate:
+		return errMinConsumptionRateTooLarge
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
