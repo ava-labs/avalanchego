@@ -88,6 +88,14 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return fmt.Errorf("%s isn't a subnet", tx.SubnetID)
 	}
 
+	_, err = e.state.GetSubnetTransformation(tx.SubnetID)
+	if err == nil {
+		return fmt.Errorf("%s is immutable", tx.SubnetID)
+	}
+	if err != database.ErrNotFound {
+		return err
+	}
+
 	// Verify that this chain is authorized by the subnet
 	if err := e.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return err

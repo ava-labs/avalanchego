@@ -296,6 +296,17 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
+		_, err = e.parentState.GetSubnetTransformation(tx.Validator.Subnet)
+		if err == nil {
+			return fmt.Errorf(
+				"%s is permissionless",
+				tx.Validator.Subnet,
+			)
+		}
+		if err != database.ErrNotFound {
+			return err
+		}
+
 		if err := e.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 			return err
 		}
