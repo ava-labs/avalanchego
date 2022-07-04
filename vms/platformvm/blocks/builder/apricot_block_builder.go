@@ -6,20 +6,23 @@ package builder
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func (b *blockBuilder) nextApricotTxs(preBlkState state.Chain) ([]*txs.Tx, error) {
-	// Try return standard txs. Note that
-	// apricot standard blocks do not advance chain time
+	// try including as many standard txs as possible. No need to advance chain time
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		return txs, nil
 	}
 
-	// try rewarding a staker
+	// try rewarding stakers whose staking period ends at current chain time.
 	stakerTx, shouldReward, err := b.getStakerToReward(preBlkState)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next staker to reward %s", err)
@@ -33,7 +36,7 @@ func (b *blockBuilder) nextApricotTxs(preBlkState state.Chain) ([]*txs.Tx, error
 		return []*txs.Tx{rewardValidatorTx}, nil
 	}
 
-	// try building a proposal block that advances the chain timestamp.
+	// try advancing chain time
 	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(preBlkState)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve next chain time %s", err)
@@ -49,12 +52,12 @@ func (b *blockBuilder) nextApricotTxs(preBlkState state.Chain) ([]*txs.Tx, error
 	// clean out the mempool's transactions with invalid timestamps.
 	b.dropTooEarlyMempoolProposalTxs()
 
+	// try including a mempool proposal tx is available.
 	if !b.HasProposalTx() {
 		b.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, errNoPendingBlocks
 	}
 
-	// get the proposal transaction that should be issued.
 	tx := b.PopProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
@@ -73,4 +76,43 @@ func (b *blockBuilder) nextApricotTxs(preBlkState state.Chain) ([]*txs.Tx, error
 		return []*txs.Tx{advanceTimeTx}, nil
 	}
 	return []*txs.Tx{tx}, nil
+}
+
+func (b *blockBuilder) buildApricotBlock(
+	parentBlkID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (snowman.Block, error) {
+	blkVersion := uint16(stateless.ApricotVersion)
+	switch txes[0].Unsigned.(type) {
+	case txs.StakerTx,
+		*txs.RewardValidatorTx,
+		*txs.AdvanceTimeTx:
+		return stateful.NewProposalBlock(
+			blkVersion,
+			uint64(0),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes[0],
+		)
+
+	case *txs.CreateChainTx,
+		*txs.CreateSubnetTx,
+		*txs.ImportTx,
+		*txs.ExportTx:
+		return stateful.NewStandardBlock(
+			blkVersion,
+			uint64(0),
+			b.blkVerifier,
+			b.txExecutorBackend,
+			parentBlkID,
+			height,
+			txes,
+		)
+
+	default:
+		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+	}
 }

@@ -183,58 +183,29 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredState := preferredDecision.OnAccept()
 
-	var (
-		txes    []*txs.Tx
-		blkTime time.Time
-	)
-
 	blkVersion := preferred.ExpectedChildVersion()
+	prefBlkID := preferred.ID()
+	nextHeight := preferred.Height() + 1
+
 	switch blkVersion {
 	case stateless.ApricotVersion:
 		b.txExecutorBackend.Ctx.Log.Info("about to build apricot blocks")
-		txes, err = b.nextApricotTxs(preferredState)
+		txes, err := b.nextApricotTxs(preferredState)
+		if err != nil {
+			return nil, err
+		}
+		return b.buildApricotBlock(prefBlkID, nextHeight, txes)
+
 	case stateless.BlueberryVersion:
 		b.txExecutorBackend.Ctx.Log.Info("about to build blueberry blocks")
-		txes, blkTime, err = b.nextBlueberryTxs(preferredState)
-	default:
-		err = fmt.Errorf("unsupported block version %d", blkVersion)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	prefBlkID := preferred.ID()
-	nextHeight := preferred.Height() + 1
-	switch txes[0].Unsigned.(type) {
-	case txs.StakerTx,
-		*txs.RewardValidatorTx,
-		*txs.AdvanceTimeTx:
-		return stateful.NewProposalBlock(
-			blkVersion,
-			uint64(blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			prefBlkID,
-			nextHeight,
-			txes[0],
-		)
-
-	case *txs.CreateChainTx,
-		*txs.CreateSubnetTx,
-		*txs.ImportTx,
-		*txs.ExportTx:
-		return stateful.NewStandardBlock(
-			blkVersion,
-			uint64(blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			prefBlkID,
-			nextHeight,
-			txes,
-		)
+		txes, blkTime, err := b.nextBlueberryTxs(preferredState)
+		if err != nil {
+			return nil, err
+		}
+		return b.buildBlueberryBlock(blkTime, prefBlkID, nextHeight, txes)
 
 	default:
-		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
 	}
 }
 

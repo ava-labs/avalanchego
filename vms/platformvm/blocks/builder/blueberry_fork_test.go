@@ -106,7 +106,4 @@ func TestBlueberryFork(t *testing.T) {
 	assert.NoError(proposalBlk.Verify())
 	assert.NoError(proposalBlk.Accept())
 	assert.NoError(h.fullState.Commit())
-
-	// check post-Blueberry block moves ahead chain time
-	assert.True(h.fullState.GetTimestamp().After(h.cfg.BlueberryTime))
 }
