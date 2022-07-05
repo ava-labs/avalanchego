@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -170,132 +169,12 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}()
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
-
-	// Get the block to build on top of and retrieve the new block's context.
-	preferred, err := b.Preferred()
-	if err != nil {
-		return nil, err
-	}
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
-
-	// select transactions to include and finally build the block
-	blkVersion := preferred.ExpectedChildVersion()
-	prefBlkID := preferred.ID()
-	nextHeight := preferred.Height() + 1
-	txes, blkTime, err := b.nextTxs(preferredState, blkVersion)
+	blkBuildingStrategy, err := getBuildingStrategy(b)
 	if err != nil {
 		return nil, err
 	}
 
-	switch blkVersion {
-	case stateless.ApricotVersion:
-		b.txExecutorBackend.Ctx.Log.Info("about to build apricot blocks")
-		return b.buildApricotBlock(prefBlkID, nextHeight, txes)
-
-	case stateless.BlueberryVersion:
-		b.txExecutorBackend.Ctx.Log.Info("about to build blueberry blocks")
-		return b.buildBlueberryBlock(blkTime, prefBlkID, nextHeight, txes)
-
-	default:
-		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
-	}
-}
-
-func (b *blockBuilder) buildApricotBlock(
-	parentBlkID ids.ID,
-	height uint64,
-	txes []*txs.Tx,
-) (snowman.Block, error) {
-	blkVersion := uint16(stateless.ApricotVersion)
-	switch txes[0].Unsigned.(type) {
-	case txs.StakerTx,
-		*txs.RewardValidatorTx,
-		*txs.AdvanceTimeTx:
-		return stateful.NewProposalBlock(
-			blkVersion,
-			uint64(0),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			parentBlkID,
-			height,
-			txes[0],
-		)
-
-	case *txs.CreateChainTx,
-		*txs.CreateSubnetTx,
-		*txs.ImportTx,
-		*txs.ExportTx:
-		return stateful.NewStandardBlock(
-			blkVersion,
-			uint64(0),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			parentBlkID,
-			height,
-			txes,
-		)
-
-	default:
-		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
-	}
-}
-
-func (b *blockBuilder) buildBlueberryBlock(
-	blkTime time.Time,
-	parentBlkID ids.ID,
-	height uint64,
-	txes []*txs.Tx,
-) (snowman.Block, error) {
-	blkVersion := uint16(stateless.BlueberryVersion)
-	if len(txes) == 0 {
-		// empty standard block are allowed to move chain time head
-		return stateful.NewStandardBlock(
-			blkVersion,
-			uint64(blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			parentBlkID,
-			height,
-			nil,
-		)
-	}
-
-	switch txes[0].Unsigned.(type) {
-	case txs.StakerTx,
-		*txs.RewardValidatorTx,
-		*txs.AdvanceTimeTx:
-		return stateful.NewProposalBlock(
-			blkVersion,
-			uint64(blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			parentBlkID,
-			height,
-			txes[0],
-		)
-
-	case *txs.CreateChainTx,
-		*txs.CreateSubnetTx,
-		*txs.ImportTx,
-		*txs.ExportTx:
-		return stateful.NewStandardBlock(
-			blkVersion,
-			uint64(blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
-			parentBlkID,
-			height,
-			txes,
-		)
-
-	default:
-		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
-	}
+	return blkBuildingStrategy.build()
 }
 
 func (b *blockBuilder) Shutdown() {
