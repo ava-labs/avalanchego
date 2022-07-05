@@ -29,7 +29,7 @@ func (ddb *doubleDecisionBlock) acceptParent() error {
 
 	parent.commonBlock.accept()
 	parent.verifier.AddStatelessBlock(parent.ProposalBlock, parent.Status())
-	if err := parent.verifier.MarkAccepted(parent); err != nil {
+	if err := parent.verifier.MarkAccepted(parent.ProposalBlock); err != nil {
 		return fmt.Errorf("failed to accept proposal block %s: %w",
 			parent.ID(),
 			err,
