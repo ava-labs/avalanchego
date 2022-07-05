@@ -66,8 +66,6 @@ func NewManager(
 		ctx:            txExecutorBackend.Ctx,
 	}
 
-	freer := &freerImpl{backend: backend}
-
 	manager := &manager{
 		backend: backend,
 		verifier: &verifierImpl{
@@ -77,11 +75,10 @@ func NewManager(
 		acceptor: &acceptorImpl{backend: backend},
 		rejector: &rejectorImpl{
 			backend: backend,
-			freer:   freer,
 		},
 		baseStateSetter: &baseStateSetterImpl{State: state},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
-		freer:           freer,
+		freer:           &freerImpl{backend: backend},
 		timestampGetter: timestampGetter,
 	}
 	// TODO is there a way to avoid having a Manager

@@ -17,7 +17,6 @@ type rejector interface {
 
 type rejectorImpl struct {
 	backend
-	freer
 }
 
 func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
@@ -37,7 +36,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 	}
 
 	b.status = choices.Rejected
-	defer r.freeProposalBlock(b)
+	defer b.free()
 	r.AddStatelessBlock(b.ProposalBlock, choices.Rejected)
 	return r.Commit()
 }
@@ -59,7 +58,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 	}
 
 	b.status = choices.Rejected
-	defer r.freeAtomicBlock(b)
+	defer b.free()
 	r.AddStatelessBlock(b.AtomicBlock, choices.Rejected)
 	return r.Commit()
 }
@@ -83,7 +82,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 	}
 
 	b.status = choices.Rejected
-	defer r.freeStandardBlock(b)
+	defer b.free()
 	r.AddStatelessBlock(b.StandardBlock, choices.Rejected)
 	return r.Commit()
 }
@@ -97,7 +96,7 @@ func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 	)
 
 	b.status = choices.Rejected
-	defer r.freeCommitBlock(b)
+	defer b.free()
 	r.AddStatelessBlock(b.CommitBlock, choices.Rejected)
 	return r.Commit()
 }
@@ -111,7 +110,7 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 	)
 
 	b.status = choices.Rejected
-	defer r.freeAbortBlock(b)
+	defer b.free()
 	r.AddStatelessBlock(b.AbortBlock, choices.Rejected)
 	return r.Commit()
 }

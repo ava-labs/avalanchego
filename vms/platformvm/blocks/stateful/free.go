@@ -43,6 +43,7 @@ func (f *freerImpl) freeStandardBlock(b *StandardBlock) {
 func (f *freerImpl) freeDecisionBlock(b *decisionBlock) {
 	f.freeCommonBlock(b.commonBlock)
 	b.onAcceptState = nil
+	b.onAcceptFunc = nil
 }
 
 func (f *freerImpl) freeCommonBlock(b *commonBlock) {
