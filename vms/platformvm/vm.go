@@ -210,7 +210,6 @@ func (vm *VM) Initialize(
 		vm.internalState,
 		vm.internalState,
 		vm.internalState,
-		vm.internalState,
 		vm.txExecutorBackend,
 	)
 

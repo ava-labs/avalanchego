@@ -40,7 +40,6 @@ func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
 	state state.State,
-	lastAccepteder lastAccepteder,
 	heightSetter heightSetter,
 	versionDB versionDB,
 	timestampGetter timestampGetter,
@@ -57,7 +56,7 @@ func NewManager(
 	backend := backend{
 		Mempool:        mempool,
 		versionDB:      versionDB,
-		lastAccepteder: lastAccepteder,
+		lastAccepteder: state,
 		blockState:     blockState,
 		heightSetter:   heightSetter,
 		state:          state,
