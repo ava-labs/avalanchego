@@ -84,7 +84,7 @@ func (a *AbortBlock) Accept() error {
 	a.accept()
 	a.verifier.AddStatelessBlock(a.AbortBlock, a.Status())
 	if err := a.verifier.MarkAccepted(a.AbortBlock); err != nil {
-		return fmt.Errorf("failed to accept accept option block %s: %w", a.ID(), err)
+		return fmt.Errorf("failed to accept abort block %s: %w", a.ID(), err)
 	}
 
 	return a.doubleDecisionBlock.updateState()

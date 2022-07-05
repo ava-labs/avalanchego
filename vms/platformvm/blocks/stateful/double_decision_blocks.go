@@ -27,12 +27,14 @@ func (ddb *doubleDecisionBlock) acceptParent() error {
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 
-	if err := parent.Accept(); err != nil {
-		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
+	parent.commonBlock.accept()
+	parent.verifier.AddStatelessBlock(parent.ProposalBlock, parent.Status())
+	if err := parent.verifier.MarkAccepted(parent.ProposalBlock); err != nil {
+		return fmt.Errorf("failed to accept proposal block %s: %w",
+			parent.ID(),
+			err,
+		)
 	}
-	ddb.verifier.AddStatelessBlock(parent, parent.Status())
-	ddb.verifier.SetHeight(parent.baseBlk.Height())
-	ddb.verifier.AddToRecentlyAcceptedWindows(parent.baseBlk.ID())
 
 	return nil
 }

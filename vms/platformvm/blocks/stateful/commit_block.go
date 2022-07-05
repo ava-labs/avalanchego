@@ -85,7 +85,7 @@ func (c *CommitBlock) Accept() error {
 	c.accept()
 	c.verifier.AddStatelessBlock(c.CommitBlock, c.Status())
 	if err := c.verifier.MarkAccepted(c.CommitBlock); err != nil {
-		return fmt.Errorf("failed to accept accept option block %s: %w", c.ID(), err)
+		return fmt.Errorf("failed to accept commit block %s: %w", c.ID(), err)
 	}
 
 	return c.doubleDecisionBlock.updateState()
