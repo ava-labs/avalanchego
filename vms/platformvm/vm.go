@@ -211,6 +211,7 @@ func (vm *VM) Initialize(
 		vm.internalState,
 		vm.internalState,
 		vm.txExecutorBackend,
+		vm.recentlyAccepted,
 	)
 
 	if err := vm.blockBuilder.Initialize(

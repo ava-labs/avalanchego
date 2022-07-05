@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -45,6 +46,7 @@ func NewManager(
 	timestampGetter timestampGetter,
 	statelessBlockState statelessBlockState,
 	txExecutorBackend executor.Backend,
+	recentlyAccepted *window.Window,
 ) Manager {
 	blockState := &blockStateImpl{
 		manager:             nil, // Set below
@@ -71,8 +73,9 @@ func NewManager(
 			txExecutorBackend: txExecutorBackend,
 		},
 		acceptor: &acceptorImpl{
-			backend: backend,
-			metrics: metrics,
+			backend:          backend,
+			metrics:          metrics,
+			recentlyAccepted: recentlyAccepted,
 		},
 		rejector:        &rejectorImpl{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{State: state},

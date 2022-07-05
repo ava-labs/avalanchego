@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 )
 
@@ -21,7 +22,8 @@ type acceptor interface {
 }
 
 type acceptorImpl struct {
-	metrics metrics.Metrics
+	metrics          metrics.Metrics
+	recentlyAccepted *window.Window
 	backend
 }
 
@@ -34,7 +36,12 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 		b.Parent(),
 	)
 
-	a.commonAccept(b.commonBlock)
+	// Note that we do not write this block to state here.
+	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
+	// We do this so that in the event that the node shuts down, the proposal block
+	// is not written to disk unless its child is.
+	// There is an invariant that the most recently committed block is a decision block.
+	b.status = choices.Accepted
 	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -54,7 +61,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	)
 
 	a.commonAccept(b.commonBlock)
-	a.AddStatelessBlock(b.AtomicBlock, b.Status())
+	a.AddStatelessBlock(b.AtomicBlock, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b.AtomicBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -98,7 +105,7 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
 	a.commonAccept(b.commonBlock)
-	a.AddStatelessBlock(b.StandardBlock, b.Status())
+	a.AddStatelessBlock(b.StandardBlock, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b.StandardBlock); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
@@ -148,10 +155,10 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	defer parent.free()
 
 	a.commonAccept(parent.commonBlock)
-	a.AddStatelessBlock(parent.ProposalBlock, parent.Status())
+	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
 
 	a.commonAccept(b.commonBlock)
-	a.AddStatelessBlock(b.CommitBlock, b.Status())
+	a.AddStatelessBlock(b.CommitBlock, choices.Accepted)
 
 	// Update metrics
 	if a.bootstrapped.GetValue() {
@@ -160,6 +167,9 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 		} else {
 			a.metrics.MarkRejectedOptionVote()
 		}
+	}
+	if err := a.metrics.MarkAccepted(parent.ProposalBlock); err != nil {
+		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
 	}
 	if err := a.metrics.MarkAccepted(b.CommitBlock); err != nil {
 		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
@@ -186,10 +196,10 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	defer parent.free()
 
 	a.commonAccept(parent.commonBlock)
-	a.AddStatelessBlock(parent.ProposalBlock, parent.Status())
+	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
 
 	a.commonAccept(b.commonBlock)
-	a.AddStatelessBlock(b.AbortBlock, b.Status())
+	a.AddStatelessBlock(b.AbortBlock, choices.Accepted)
 
 	// Update metrics
 	if a.bootstrapped.GetValue() {
@@ -198,6 +208,9 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		} else {
 			a.metrics.MarkRejectedOptionVote()
 		}
+	}
+	if err := a.metrics.MarkAccepted(parent.ProposalBlock); err != nil {
+		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
 	}
 	if err := a.metrics.MarkAccepted(b.AbortBlock); err != nil {
 		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
@@ -223,16 +236,10 @@ func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 	return nil
 }
 
-// TODO is this right?
 func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
 	a.SetLastAccepted(blkID)
 	a.SetHeight(b.baseBlk.Height())
-	// TODO do we need the line below?
-	// a.addToRecentlyAcceptedWindows(blkID)
+	a.recentlyAccepted.Add(blkID)
 }
-
-/* TODO do we need this?
-func (a *acceptorImpl) addToRecentlyAcceptedWindows(blkID ids.ID) {}
-*/
