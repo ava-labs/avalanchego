@@ -300,9 +300,11 @@ type insecureValidatorManager struct {
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application) {
-	_ = i.vdrs.AddWeight(vdrID, i.weight)
-	i.Router.Connected(vdrID, nodeVersion)
+func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+	if constants.PrimaryNetworkID == subnetID {
+		_ = i.vdrs.AddWeight(vdrID, i.weight)
+	}
+	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
@@ -320,24 +322,26 @@ type beaconManager struct {
 	totalWeight    uint64
 }
 
-func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application) {
-	// TODO: this is always 1, beacons can be reduced to ShortSet?
-	weight, ok := b.beacons.GetWeight(vdrID)
-	if !ok {
-		b.Router.Connected(vdrID, nodeVersion)
-		return
+func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+	if constants.PrimaryNetworkID == subnetID {
+		// TODO: this is always 1, beacons can be reduced to ShortSet?
+		weight, ok := b.beacons.GetWeight(vdrID)
+		if !ok {
+			b.Router.Connected(vdrID, nodeVersion, subnetID)
+			return
+		}
+		weight, err := math.Add64(weight, b.totalWeight)
+		if err != nil {
+			b.timer.Cancel()
+			b.Router.Connected(vdrID, nodeVersion, subnetID)
+			return
+		}
+		b.totalWeight = weight
+		if b.totalWeight >= b.requiredWeight {
+			b.timer.Cancel()
+		}
 	}
-	weight, err := math.Add64(weight, b.totalWeight)
-	if err != nil {
-		b.timer.Cancel()
-		b.Router.Connected(vdrID, nodeVersion)
-		return
-	}
-	b.totalWeight = weight
-	if b.totalWeight >= b.requiredWeight {
-		b.timer.Cancel()
-	}
-	b.Router.Connected(vdrID, nodeVersion)
+	b.Router.Connected(vdrID, nodeVersion, subnetID)
 }
 
 func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
@@ -650,6 +654,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
+		n.Config.WhitelistedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
 		"requests",

@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test encoding bytes to a string and decoding back to bytes
