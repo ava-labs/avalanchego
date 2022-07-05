@@ -31,6 +31,8 @@ type diff struct {
 
 	currentSupply uint64
 
+	subnetSupplies map[ids.ID]uint64
+
 	addedSubnets       []*txs.Tx
 	transformedSubnets map[ids.ID]*txs.Tx
 	cachedSubnets      []*txs.Tx
@@ -80,6 +82,24 @@ func (d *diff) GetCurrentSupply() uint64 {
 
 func (d *diff) SetCurrentSupply(currentSupply uint64) {
 	d.currentSupply = currentSupply
+}
+
+func (d *diff) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
+	supply, ok := d.subnetSupplies[subnetID]
+	if !ok {
+		return d.parentState.GetCurrentSubnetSupply(subnetID)
+	}
+	return supply, nil
+}
+
+func (d *diff) SetCurrentSubnetSupply(subnetID ids.ID, currentSupply uint64) {
+	if d.subnetSupplies == nil {
+		d.subnetSupplies = map[ids.ID]uint64{
+			subnetID: currentSupply,
+		}
+	} else {
+		d.subnetSupplies[subnetID] = currentSupply
+	}
 }
 
 func (d *diff) GetSubnets() ([]*txs.Tx, error) {
@@ -261,6 +281,9 @@ func (d *diff) SetBase(parentState Chain) {
 func (d *diff) Apply(baseState State) {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetCurrentSupply(d.currentSupply)
+	for subnetID, supply := range d.subnetSupplies {
+		baseState.SetCurrentSubnetSupply(subnetID, supply)
+	}
 	for _, subnet := range d.addedSubnets {
 		baseState.AddSubnet(subnet)
 	}

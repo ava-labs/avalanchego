@@ -297,6 +297,21 @@ func (mr *MockInternalStateMockRecorder) GetChains(subnetID interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockInternalState)(nil).GetChains), subnetID)
 }
 
+// GetCurrentSubnetSupply mocks base method.
+func (m *MockInternalState) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentSubnetSupply", subnetID)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentSubnetSupply indicates an expected call of GetCurrentSubnetSupply.
+func (mr *MockInternalStateMockRecorder) GetCurrentSubnetSupply(subnetID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentSubnetSupply", reflect.TypeOf((*MockInternalState)(nil).GetCurrentSubnetSupply), subnetID)
+}
+
 // GetCurrentSupply mocks base method.
 func (m *MockInternalState) GetCurrentSupply() uint64 {
 	m.ctrl.T.Helper()
@@ -529,6 +544,18 @@ func (m *MockInternalState) SetCurrentStakers(cs state.CurrentStakers) {
 func (mr *MockInternalStateMockRecorder) SetCurrentStakers(cs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentStakers", reflect.TypeOf((*MockInternalState)(nil).SetCurrentStakers), cs)
+}
+
+// SetCurrentSubnetSupply mocks base method.
+func (m *MockInternalState) SetCurrentSubnetSupply(subnetID ids.ID, cs uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCurrentSubnetSupply", subnetID, cs)
+}
+
+// SetCurrentSubnetSupply indicates an expected call of SetCurrentSubnetSupply.
+func (mr *MockInternalStateMockRecorder) SetCurrentSubnetSupply(subnetID, cs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSubnetSupply", reflect.TypeOf((*MockInternalState)(nil).SetCurrentSubnetSupply), subnetID, cs)
 }
 
 // SetCurrentSupply mocks base method.
