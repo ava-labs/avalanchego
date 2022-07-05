@@ -36,15 +36,22 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 		b.Parent(),
 	)
 
+	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
+		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
+	}
+
 	// Note that we do not write this block to state here.
+	// (Namely, we don't call [a.commonAccept].)
 	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
 	// We do this so that in the event that the node shuts down, the proposal block
 	// is not written to disk unless its child is.
+	// (The VM's Shutdown method commits the database.)
 	// There is an invariant that the most recently committed block is a decision block.
 	b.status = choices.Accepted
 	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
+	a.SetLastAccepted(blkID) // TODO is this right?
 	return nil
 }
 
@@ -79,7 +86,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	if err = a.ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+	if err := a.ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			b.AtomicBlock.Tx.ID(),
@@ -168,9 +175,6 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 			a.metrics.MarkRejectedOptionVote()
 		}
 	}
-	if err := a.metrics.MarkAccepted(parent.ProposalBlock); err != nil {
-		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
-	}
 	if err := a.metrics.MarkAccepted(b.CommitBlock); err != nil {
 		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
 	}
@@ -208,9 +212,6 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		} else {
 			a.metrics.MarkRejectedOptionVote()
 		}
-	}
-	if err := a.metrics.MarkAccepted(parent.ProposalBlock); err != nil {
-		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
 	}
 	if err := a.metrics.MarkAccepted(b.AbortBlock); err != nil {
 		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
