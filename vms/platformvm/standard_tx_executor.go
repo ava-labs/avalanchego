@@ -381,5 +381,6 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	utxo.Produce(e.state, txID, tx.Outs)
 	// Transform the new subnet in the database
 	e.state.AddSubnetTransformation(e.tx)
+	e.state.SetCurrentSubnetSupply(tx.SubnetID, tx.InitialSupply)
 	return nil
 }
