@@ -127,82 +127,8 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 }
 
 func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
-	if b.txExecutorBackend.Bootstrapped.GetValue() {
-		if b.wasPreferred {
-			a.MarkAcceptedOptionVote()
-		} else {
-			a.MarkRejectedOptionVote()
-		}
-	}
-
-	if err := a.acceptParentOptionBlock(b.decisionBlock); err != nil {
-		return err
-	}
-	a.commonAccept(b.commonBlock)
-	a.AddStatelessBlock(b.CommitBlock, b.Status())
-	if err := a.MarkAccepted(b.CommitBlock); err != nil {
-		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
-	}
-
 	defer b.free()
-	return a.updateStateOptionBlock(b.decisionBlock)
-}
 
-func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
-	if b.txExecutorBackend.Bootstrapped.GetValue() {
-		if b.wasPreferred {
-			a.MarkAcceptedOptionVote()
-		} else {
-			a.MarkRejectedOptionVote()
-		}
-	}
-
-	if err := a.acceptParentOptionBlock(b.decisionBlock); err != nil {
-		return err
-	}
-	a.commonAccept(b.commonBlock)
-	a.AddStatelessBlock(b.AbortBlock, b.Status())
-	if err := a.MarkAccepted(b.AbortBlock); err != nil {
-		return fmt.Errorf("failed to accept accept option block %s: %w", b.ID(), err)
-	}
-
-	defer b.free()
-	return a.updateStateOptionBlock(b.decisionBlock)
-}
-
-// [b] must be embedded in a Commit or Abort block.
-func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
-	parentIntf, err := a.parent(b.baseBlk)
-	if err != nil {
-		return err
-	}
-
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
-	// Update the state of the chain in the database
-	b.onAcceptState.Apply(a.getState())
-	if err := a.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's state: %w", err)
-	}
-
-	for _, child := range b.children {
-		child.setBaseState()
-	}
-	if b.onAcceptFunc != nil {
-		b.onAcceptFunc()
-	}
-
-	// remove this block and its parent from memory
-	parent.free()
-	return nil
-}
-
-// [b] must be embedded in a Commit or Abort block.
-func (a *acceptorImpl) acceptParentOptionBlock(b *decisionBlock) error {
 	blkID := b.baseBlk.ID()
 	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
@@ -216,15 +142,87 @@ func (a *acceptorImpl) acceptParentOptionBlock(b *decisionBlock) error {
 		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
+	defer parent.free()
 
-	if err := parent.Accept(); err != nil {
-		return fmt.Errorf("failed to accept parent's CommonBlock: %w", err)
-	}
+	a.commonAccept(parent.commonBlock)
 	a.AddStatelessBlock(parent, parent.Status())
 
+	a.commonAccept(b.commonBlock)
+	a.AddStatelessBlock(b.CommitBlock, b.Status())
+
+	// Update metrics
+	if b.txExecutorBackend.Bootstrapped.GetValue() {
+		if b.wasPreferred {
+			a.MarkAcceptedOptionVote()
+		} else {
+			a.MarkRejectedOptionVote()
+		}
+	}
+	if err := a.MarkAccepted(b.CommitBlock); err != nil {
+		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
+	}
+
+	return a.updateStateOptionBlock(b.decisionBlock, parent)
+}
+
+func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
+	defer b.free()
+
+	blkID := b.baseBlk.ID()
+	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
+
+	parentIntf, err := a.parent(b.baseBlk)
+	if err != nil {
+		return err
+	}
+
+	parent, ok := parentIntf.(*ProposalBlock)
+	if !ok {
+		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
+		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
+	}
+	defer parent.free()
+
+	a.commonAccept(parent.commonBlock)
+	a.AddStatelessBlock(parent, parent.Status())
+
+	a.commonAccept(b.commonBlock)
+	a.AddStatelessBlock(b.AbortBlock, b.Status())
+
+	// Update metrics
+	if b.txExecutorBackend.Bootstrapped.GetValue() {
+		if b.wasPreferred {
+			a.MarkAcceptedOptionVote()
+		} else {
+			a.MarkRejectedOptionVote()
+		}
+	}
+	if err := a.MarkAccepted(b.AbortBlock); err != nil {
+		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
+	}
+
+	return a.updateStateOptionBlock(b.decisionBlock, parent)
+}
+
+// [b] must be embedded in a Commit or Abort block.
+// [parent] is the parent of the block in which [b] is embedded.
+func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock, parent *ProposalBlock) error {
+	// Update the state of the chain in the database
+	b.onAcceptState.Apply(a.getState())
+	if err := a.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
+	}
+
+	for _, child := range b.children {
+		child.setBaseState()
+	}
+	if b.onAcceptFunc != nil {
+		b.onAcceptFunc()
+	}
 	return nil
 }
 
+// TODO is this right?
 func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
