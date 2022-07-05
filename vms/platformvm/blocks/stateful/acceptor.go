@@ -32,10 +32,10 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 		b.Parent(),
 	)
 
-	// TODO should the line below be here?
 	a.commonAccept(b.commonBlock)
-	b.status = choices.Accepted
-	a.SetLastAccepted(blkID)
+	if err := a.MarkAccepted(b.ProposalBlock); err != nil {
+		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
+	}
 	return nil
 }
 

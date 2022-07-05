@@ -72,10 +72,8 @@ func NewManager(
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
 		},
-		acceptor: &acceptorImpl{backend: backend},
-		rejector: &rejectorImpl{
-			backend: backend,
-		},
+		acceptor:        &acceptorImpl{backend: backend},
+		rejector:        &rejectorImpl{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{State: state},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
 		freer:           &freerImpl{backend: backend},
