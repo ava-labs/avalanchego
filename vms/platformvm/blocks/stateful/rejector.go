@@ -28,9 +28,6 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 		b.Parent(),
 	)
 
-	b.onCommitState = nil
-	b.onAbortState = nil
-
 	if err := r.Add(b.Tx); err != nil {
 		r.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
@@ -39,8 +36,9 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 		)
 	}
 
-	defer r.commonReject(b.commonBlock)
-	r.AddStatelessBlock(b.ProposalBlock, b.Status())
+	b.status = choices.Rejected
+	defer r.freeProposalBlock(b)
+	r.AddStatelessBlock(b.ProposalBlock, choices.Rejected)
 	return r.Commit()
 }
 
@@ -60,8 +58,9 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	defer r.commonReject(b.commonBlock)
-	r.AddStatelessBlock(b.AtomicBlock, b.Status())
+	b.status = choices.Rejected
+	defer r.freeAtomicBlock(b)
+	r.AddStatelessBlock(b.AtomicBlock, choices.Rejected)
 	return r.Commit()
 }
 
@@ -83,19 +82,23 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	defer r.commonReject(b.commonBlock)
-	r.AddStatelessBlock(b.StandardBlock, b.Status())
+	b.status = choices.Rejected
+	defer r.freeStandardBlock(b)
+	r.AddStatelessBlock(b.StandardBlock, choices.Rejected)
 	return r.Commit()
 }
 
 func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 	r.ctx.Log.Verbo(
 		"Rejecting CommitBlock Block %s at height %d with parent %s",
-		b.ID(), b.Height(), b.Parent(),
+		b.ID(),
+		b.Height(),
+		b.Parent(),
 	)
 
-	defer r.commonReject(b.commonBlock)
-	r.AddStatelessBlock(b.CommitBlock, b.Status())
+	b.status = choices.Rejected
+	defer r.freeCommitBlock(b)
+	r.AddStatelessBlock(b.CommitBlock, choices.Rejected)
 	return r.Commit()
 }
 
@@ -107,15 +110,8 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 		b.Parent(),
 	)
 
-	defer r.commonReject(b.commonBlock)
-	r.AddStatelessBlock(b.AbortBlock, b.Status())
-	return r.Commit()
-}
-
-func (r *rejectorImpl) commonReject(b *commonBlock) {
 	b.status = choices.Rejected
-	// We do the following rather than implementing free()
-	// on *commonBlock so that in the future, we don't accidentally
-	// forget to implement free() on a block type that embeds *commonBlock.
-	r.freeCommonBlock(b)
+	defer r.freeAbortBlock(b)
+	r.AddStatelessBlock(b.AbortBlock, choices.Rejected)
+	return r.Commit()
 }

@@ -40,6 +40,8 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 }
 
 func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
+	defer b.free()
+
 	blkID := b.ID()
 
 	a.ctx.Log.Verbo(
@@ -84,11 +86,12 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 		b.onAcceptFunc()
 	}
 
-	b.free()
 	return nil
 }
 
 func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
+	defer b.free()
+
 	blkID := b.ID()
 	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
@@ -122,7 +125,6 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 		b.onAcceptFunc()
 	}
 
-	b.free()
 	return nil
 }
 
