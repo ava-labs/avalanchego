@@ -19,11 +19,12 @@ var (
 	_ UnsignedTx             = &TransformSubnetTx{}
 	_ secp256k1fx.UnsignedTx = &TransformSubnetTx{}
 
-	errCantTransformPrimaryNetwork = errors.New("cannot transform primary network")
-	errEmptyAssetID                = errors.New("empty asset ID is not valid")
-	errAssetIDCantBeAVAX           = errors.New("asset ID can't be AVAX")
-	errMaxConsumptionRateTooLarge  = fmt.Errorf("max consumption rate must be less than or equal to %d", reward.PercentDenominator)
-	errMinConsumptionRateTooLarge  = errors.New("min consumption rate must be less than or equal to max consumption rate")
+	errCantTransformPrimaryNetwork       = errors.New("cannot transform primary network")
+	errEmptyAssetID                      = errors.New("empty asset ID is not valid")
+	errAssetIDCantBeAVAX                 = errors.New("asset ID can't be AVAX")
+	errInitialSupplyGreaterThanMaxSupply = errors.New("initial supply can't be greater than maximum supply")
+	errMaxConsumptionRateTooLarge        = fmt.Errorf("max consumption rate must be less than or equal to %d", reward.PercentDenominator)
+	errMinConsumptionRateTooLarge        = errors.New("min consumption rate must be less than or equal to max consumption rate")
 )
 
 // TransformSubnetTx is an unsigned transformSubnetTx
@@ -34,8 +35,10 @@ type TransformSubnetTx struct {
 	SubnetID ids.ID `serialize:"true" json:"subnetID"`
 	// Asset to use when staking on the Subnet
 	AssetID ids.ID `serialize:"true" json:"assetID"`
-	// Amount to allocate to the subnet's reward pool
-	InitialRemainingSupply uint64 `serialize:"true" json:"initialRemainingSupply"`
+	// Amount to initially specify as the current supply
+	InitialSupply uint64 `serialize:"true" json:"initialSupply"`
+	// Amount to specify as the maximum token supply
+	MaximumSupply uint64 `serialize:"true" json:"maximumSupply"`
 	// MaxConsumptionRate is the rate to allocate funds if the validator's stake
 	// duration is equal to the minting period
 	MaxConsumptionRate uint64 `serialize:"true" json:"maxConsumptionRate"`
@@ -58,6 +61,8 @@ func (tx *TransformSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return errEmptyAssetID
 	case tx.AssetID == ctx.AVAXAssetID:
 		return errAssetIDCantBeAVAX
+	case tx.InitialSupply > tx.MaximumSupply:
+		return errInitialSupplyGreaterThanMaxSupply
 	case tx.MaxConsumptionRate > reward.PercentDenominator:
 		return errMaxConsumptionRateTooLarge
 	case tx.MaxConsumptionRate < tx.MinConsumptionRate:

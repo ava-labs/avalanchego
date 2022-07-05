@@ -332,6 +332,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	baseTxCreds := e.tx.Creds[:baseTxCredsLen]
 	subnetCred := e.tx.Creds[baseTxCredsLen]
 
+	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.vm.utxoHandler.SemanticVerifySpend(
 		tx,
 		e.state,
@@ -340,7 +341,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		baseTxCreds,
 		map[ids.ID]uint64{
 			e.vm.ctx.AVAXAssetID: e.vm.TransformSubnetTxFee,
-			tx.AssetID:           tx.InitialRemainingSupply,
+			tx.AssetID:           totalRewardAmount,
 		},
 	); err != nil {
 		return err
