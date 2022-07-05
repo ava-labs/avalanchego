@@ -136,7 +136,6 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	if err != nil {
 		return err
 	}
-
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
 		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
@@ -145,7 +144,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	defer parent.free()
 
 	a.commonAccept(parent.commonBlock)
-	a.AddStatelessBlock(parent, parent.Status())
+	a.AddStatelessBlock(parent.ProposalBlock, parent.Status())
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.CommitBlock, b.Status())
@@ -175,7 +174,6 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	if err != nil {
 		return err
 	}
-
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
 		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
@@ -184,7 +182,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	defer parent.free()
 
 	a.commonAccept(parent.commonBlock)
-	a.AddStatelessBlock(parent, parent.Status())
+	a.AddStatelessBlock(parent.ProposalBlock, parent.Status())
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.AbortBlock, b.Status())
