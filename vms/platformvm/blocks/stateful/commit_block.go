@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -30,7 +29,6 @@ type CommitBlock struct {
 // was originally preferred or not for metrics.
 func NewCommitBlock(
 	manager Manager,
-	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
@@ -40,13 +38,12 @@ func NewCommitBlock(
 		return nil, err
 	}
 
-	return toStatefulCommitBlock(statelessBlk, manager, txExecutorBackend, wasPreferred, choices.Processing)
+	return toStatefulCommitBlock(statelessBlk, manager, wasPreferred, choices.Processing)
 }
 
 func toStatefulCommitBlock(
 	statelessBlk *stateless.CommitBlock,
 	manager Manager,
-	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
 ) (*CommitBlock, error) {
@@ -56,11 +53,10 @@ func toStatefulCommitBlock(
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
-				timestampGetter:   manager,
-				lastAccepteder:    manager,
-				baseBlk:           &statelessBlk.CommonBlock,
-				status:            status,
-				txExecutorBackend: txExecutorBackend,
+				timestampGetter: manager,
+				lastAccepteder:  manager,
+				baseBlk:         &statelessBlk.CommonBlock,
+				status:          status,
 			},
 		},
 		wasPreferred: wasPreferred,

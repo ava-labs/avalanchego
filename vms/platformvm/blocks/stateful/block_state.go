@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ blockState = &blockStateImpl{}
@@ -17,20 +17,20 @@ var _ blockState = &blockStateImpl{}
 func MakeStateful(
 	statelessBlk stateless.Block,
 	manager Manager,
-	txExecutorBackend executor.Backend,
+	ctx *snow.Context,
 	status choices.Status,
 ) (Block, error) {
 	switch sb := statelessBlk.(type) {
 	case *stateless.AbortBlock:
-		return toStatefulAbortBlock(sb, manager, txExecutorBackend, false /*wasPreferred*/, status)
+		return toStatefulAbortBlock(sb, manager, false /*wasPreferred*/, status)
 	case *stateless.AtomicBlock:
-		return toStatefulAtomicBlock(sb, manager, txExecutorBackend, status)
+		return toStatefulAtomicBlock(sb, manager, ctx, status)
 	case *stateless.CommitBlock:
-		return toStatefulCommitBlock(sb, manager, txExecutorBackend, false /*wasPreferred*/, status)
+		return toStatefulCommitBlock(sb, manager, false /*wasPreferred*/, status)
 	case *stateless.ProposalBlock:
-		return toStatefulProposalBlock(sb, manager, txExecutorBackend, status)
+		return toStatefulProposalBlock(sb, manager, ctx, status)
 	case *stateless.StandardBlock:
-		return toStatefulStandardBlock(sb, manager, txExecutorBackend, status)
+		return toStatefulStandardBlock(sb, manager, ctx, status)
 	default:
 		return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)
 	}
@@ -56,9 +56,9 @@ type blockStateImpl struct {
 	statelessBlockState
 	// TODO is there a way to avoid having [manager] in here?
 	// [blockStateImpl] is embedded in manager.
-	manager           Manager
-	verifiedBlks      map[ids.ID]Block
-	txExecutorBackend executor.Backend
+	manager      Manager
+	verifiedBlks map[ids.ID]Block
+	ctx          *snow.Context
 }
 
 func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
@@ -75,7 +75,7 @@ func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 	return MakeStateful(
 		statelessBlk,
 		b.manager,
-		b.txExecutorBackend,
+		b.ctx,
 		blkStatus,
 	)
 }

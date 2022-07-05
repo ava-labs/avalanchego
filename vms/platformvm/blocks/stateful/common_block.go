@@ -8,18 +8,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
 	timestampGetter
 	lastAccepteder
-	baseBlk           *stateless.CommonBlock
-	timestamp         time.Time // Time this block was proposed at
-	status            choices.Status
-	children          []Block
-	txExecutorBackend executor.Backend
+	baseBlk   *stateless.CommonBlock
+	timestamp time.Time // Time this block was proposed at
+	status    choices.Status
+	children  []Block
 }
 
 func (c *commonBlock) addChild(child Block) {

@@ -21,7 +21,7 @@ type rejectorImpl struct {
 }
 
 func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	r.ctx.Log.Verbo(
 		"Rejecting Proposal Block %s at height %d with parent %s",
 		b.ID(),
 		b.Height(),
@@ -32,7 +32,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 	b.onAbortState = nil
 
 	if err := r.Add(b.Tx); err != nil {
-		b.txExecutorBackend.Ctx.Log.Verbo(
+		r.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			b.Tx.ID(),
 			err,
@@ -45,7 +45,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 }
 
 func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	r.ctx.Log.Verbo(
 		"Rejecting Atomic Block %s at height %d with parent %s",
 		b.ID(),
 		b.Height(),
@@ -53,7 +53,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 	)
 
 	if err := r.Add(b.Tx); err != nil {
-		b.txExecutorBackend.Ctx.Log.Debug(
+		r.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			b.Tx.ID(),
 			err,
@@ -66,7 +66,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 }
 
 func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	r.ctx.Log.Verbo(
 		"Rejecting Standard Block %s at height %d with parent %s",
 		b.ID(),
 		b.Height(),
@@ -75,7 +75,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 
 	for _, tx := range b.Txs {
 		if err := r.Add(tx); err != nil {
-			b.txExecutorBackend.Ctx.Log.Debug(
+			r.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),
 				err,
@@ -89,7 +89,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 }
 
 func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	r.ctx.Log.Verbo(
 		"Rejecting CommitBlock Block %s at height %d with parent %s",
 		b.ID(), b.Height(), b.Parent(),
 	)
@@ -100,7 +100,7 @@ func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 }
 
 func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	r.ctx.Log.Verbo(
 		"Rejecting Abort Block %s at height %d with parent %s",
 		b.ID(),
 		b.Height(),

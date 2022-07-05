@@ -26,6 +26,7 @@ type verifier interface {
 
 type verifierImpl struct {
 	backend
+	txExecutorBackend executor.Backend
 }
 
 func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
@@ -47,7 +48,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	parentState := parent.OnAccept()
 
 	txExecutor := executor.ProposalTxExecutor{
-		Backend:     &b.txExecutorBackend,
+		Backend:     &v.txExecutorBackend,
 		ParentState: parentState,
 		Tx:          b.Tx,
 	}
@@ -91,7 +92,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 
 	parentState := parent.OnAccept()
 
-	cfg := b.txExecutorBackend.Cfg
+	cfg := v.txExecutorBackend.Cfg
 	currentTimestamp := parentState.GetTimestamp()
 	enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time)
 
@@ -104,7 +105,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 	}
 
 	atomicExecutor := executor.AtomicTxExecutor{
-		Backend:     &b.txExecutorBackend,
+		Backend:     &v.txExecutorBackend,
 		ParentState: parentState,
 		Tx:          b.Tx,
 	}
@@ -166,7 +167,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 	funcs := make([]func(), 0, len(b.Txs))
 	for _, tx := range b.Txs {
 		txExecutor := executor.StandardTxExecutor{
-			Backend: &b.txExecutorBackend,
+			Backend: &v.txExecutorBackend,
 			State:   b.onAcceptState,
 			Tx:      tx,
 		}

@@ -51,7 +51,7 @@ func NewManager(
 		manager:             nil, // Set below
 		statelessBlockState: statelessBlockState,
 		verifiedBlks:        map[ids.ID]Block{},
-		txExecutorBackend:   txExecutorBackend,
+		ctx:                 txExecutorBackend.Ctx,
 	}
 
 	backend := backend{
@@ -62,13 +62,18 @@ func NewManager(
 		blockState:     blockState,
 		heightSetter:   heightSetter,
 		state:          state,
+		bootstrapped:   txExecutorBackend.Bootstrapped,
+		ctx:            txExecutorBackend.Ctx,
 	}
 
 	freer := &freerImpl{backend: backend}
 
 	manager := &manager{
-		backend:  backend,
-		verifier: &verifierImpl{backend: backend},
+		backend: backend,
+		verifier: &verifierImpl{
+			backend:           backend,
+			txExecutorBackend: txExecutorBackend,
+		},
 		acceptor: &acceptorImpl{backend: backend},
 		rejector: &rejectorImpl{
 			backend: backend,

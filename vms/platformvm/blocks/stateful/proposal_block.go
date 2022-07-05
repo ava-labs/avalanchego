@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ Block = &ProposalBlock{}
@@ -44,7 +44,7 @@ type ProposalBlock struct {
 // The parent must be a decision block.
 func NewProposalBlock(
 	manager Manager,
-	txExecutorBackend executor.Backend,
+	ctx *snow.Context,
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
@@ -54,28 +54,27 @@ func NewProposalBlock(
 		return nil, err
 	}
 
-	return toStatefulProposalBlock(statelessBlk, manager, txExecutorBackend, choices.Processing)
+	return toStatefulProposalBlock(statelessBlk, manager, ctx, choices.Processing)
 }
 
 func toStatefulProposalBlock(
 	statelessBlk *stateless.ProposalBlock,
 	manager Manager,
-	txExecutorBackend executor.Backend,
+	ctx *snow.Context,
 	status choices.Status,
 ) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		ProposalBlock: statelessBlk,
 		Manager:       manager,
 		commonBlock: &commonBlock{
-			timestampGetter:   manager,
-			lastAccepteder:    manager,
-			baseBlk:           &statelessBlk.CommonBlock,
-			status:            status,
-			txExecutorBackend: txExecutorBackend,
+			timestampGetter: manager,
+			lastAccepteder:  manager,
+			baseBlk:         &statelessBlk.CommonBlock,
+			status:          status,
 		},
 	}
 
-	pb.Tx.Unsigned.InitCtx(pb.txExecutorBackend.Ctx)
+	pb.Tx.Unsigned.InitCtx(ctx)
 	return pb, nil
 }
 
@@ -109,7 +108,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
 
-	commit, err := NewCommitBlock(pb.Manager, pb.txExecutorBackend, blkID, nextHeight, pb.prefersCommit)
+	commit, err := NewCommitBlock(pb.Manager, blkID, nextHeight, pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
@@ -118,7 +117,6 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	}
 	abort, err := NewAbortBlock(
 		pb.Manager,
-		pb.txExecutorBackend,
 		blkID,
 		nextHeight,
 		!pb.prefersCommit,

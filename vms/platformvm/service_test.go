@@ -768,7 +768,7 @@ func TestGetBlock(t *testing.T) {
 
 			block, err := stateful.NewStandardBlock(
 				service.vm.manager,
-				service.vm.txExecutorBackend,
+				service.vm.ctx,
 				ids.GenerateTestID(),
 				1234,
 				nil,

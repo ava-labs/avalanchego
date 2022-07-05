@@ -144,7 +144,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		return stateful.NewStandardBlock(
 			b.vm.manager,
-			b.vm.txExecutorBackend,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			txs,
@@ -163,7 +163,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		}
 		return stateful.NewProposalBlock(
 			b.vm.manager,
-			b.vm.txExecutorBackend,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			rewardValidatorTx,
@@ -182,7 +182,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		}
 		return stateful.NewProposalBlock(
 			b.vm.manager,
-			b.vm.txExecutorBackend,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
@@ -212,7 +212,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		}
 		return stateful.NewProposalBlock(
 			b.vm.manager,
-			b.vm.txExecutorBackend,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
@@ -221,7 +221,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	return stateful.NewProposalBlock(
 		b.vm.manager,
-		b.vm.txExecutorBackend,
+		b.vm.ctx,
 		preferredID,
 		nextHeight,
 		tx,

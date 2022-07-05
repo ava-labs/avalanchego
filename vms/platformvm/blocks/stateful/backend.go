@@ -6,6 +6,8 @@ package stateful
 import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -36,7 +38,9 @@ type backend struct {
 	lastAccepteder
 	blockState
 	heightSetter
-	state state.State
+	state        state.State
+	ctx          *snow.Context
+	bootstrapped *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {

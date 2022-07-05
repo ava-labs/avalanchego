@@ -25,7 +25,7 @@ type acceptorImpl struct {
 
 func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 	blkID := b.ID()
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	a.ctx.Log.Verbo(
 		"Accepting Proposal Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
@@ -42,7 +42,7 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	blkID := b.ID()
 
-	b.txExecutorBackend.Ctx.Log.Verbo(
+	a.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
@@ -68,7 +68,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	if err = b.txExecutorBackend.Ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+	if err = a.ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			b.AtomicBlock.Tx.ID(),
@@ -90,7 +90,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 
 func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	blkID := b.ID()
-	b.txExecutorBackend.Ctx.Log.Verbo("accepting block with ID %s", blkID)
+	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.StandardBlock, b.Status())
@@ -111,7 +111,7 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 		)
 	}
 
-	if err := b.txExecutorBackend.Ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+	if err := a.ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
@@ -130,7 +130,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	defer b.free()
 
 	blkID := b.baseBlk.ID()
-	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
+	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
 	parentIntf, err := a.parent(b.baseBlk)
 	if err != nil {
@@ -138,7 +138,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	}
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
-		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
+		a.ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 	defer parent.free()
@@ -150,7 +150,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	a.AddStatelessBlock(b.CommitBlock, b.Status())
 
 	// Update metrics
-	if b.txExecutorBackend.Bootstrapped.GetValue() {
+	if a.bootstrapped.GetValue() {
 		if b.wasPreferred {
 			a.MarkAcceptedOptionVote()
 		} else {
@@ -168,7 +168,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	defer b.free()
 
 	blkID := b.baseBlk.ID()
-	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
+	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
 	parentIntf, err := a.parent(b.baseBlk)
 	if err != nil {
@@ -176,7 +176,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	}
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
-		b.txExecutorBackend.Ctx.Log.Error("double decision block should only follow a proposal block")
+		a.ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 	defer parent.free()
@@ -188,7 +188,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	a.AddStatelessBlock(b.AbortBlock, b.Status())
 
 	// Update metrics
-	if b.txExecutorBackend.Bootstrapped.GetValue() {
+	if a.bootstrapped.GetValue() {
 		if b.wasPreferred {
 			a.MarkAcceptedOptionVote()
 		} else {

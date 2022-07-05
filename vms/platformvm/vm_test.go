@@ -670,7 +670,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredHeight := preferred.Height()
 	blk, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1681,7 +1681,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 
 	blk, err := stateful.NewAtomicBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1764,7 +1764,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		firstVM.manager,
-		firstVM.txExecutorBackend,
+		firstVM.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1892,7 +1892,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		firstVM.manager,
-		firstVM.txExecutorBackend,
+		firstVM.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2027,7 +2027,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	advanceTimeBlk, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2316,7 +2316,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2343,7 +2343,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 	secondAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		firstOption.ID(),
 		firstOption.(stateful.Block).Height()+1,
 		secondAdvanceTimeTx,
@@ -2521,7 +2521,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 
 	addSubnetBlk0, err := stateful.NewStandardBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -2531,7 +2531,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}
 	addSubnetBlk1, err := stateful.NewStandardBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -2541,7 +2541,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}
 	addSubnetBlk2, err := stateful.NewStandardBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -2612,7 +2612,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	addValidatorProposalBlk, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -2686,7 +2686,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	importBlk, err := stateful.NewStandardBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -2751,7 +2751,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	advanceTimeProposalBlk, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2856,7 +2856,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorProposalBlk0, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -2899,7 +2899,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	advanceTimeProposalBlk0, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -2981,7 +2981,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	importBlk, err := stateful.NewStandardBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -3057,7 +3057,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorProposalBlk1, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -3100,7 +3100,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	advanceTimeProposalBlk1, err := stateful.NewProposalBlock(
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,

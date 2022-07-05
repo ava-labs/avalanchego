@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -30,7 +29,6 @@ type AbortBlock struct {
 // originally preferred or not for metrics.
 func NewAbortBlock(
 	manager Manager,
-	txExecutorBackend executor.Backend,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
@@ -42,7 +40,6 @@ func NewAbortBlock(
 	return toStatefulAbortBlock(
 		statelessBlk,
 		manager,
-		txExecutorBackend,
 		wasPreferred,
 		choices.Processing,
 	)
@@ -51,7 +48,6 @@ func NewAbortBlock(
 func toStatefulAbortBlock(
 	statelessBlk *stateless.AbortBlock,
 	manager Manager,
-	txExecutorBackend executor.Backend,
 	wasPreferred bool,
 	status choices.Status,
 ) (*AbortBlock, error) {
@@ -61,11 +57,10 @@ func toStatefulAbortBlock(
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
-				timestampGetter:   manager,
-				lastAccepteder:    manager,
-				baseBlk:           &statelessBlk.CommonBlock,
-				status:            status,
-				txExecutorBackend: txExecutorBackend,
+				timestampGetter: manager,
+				lastAccepteder:  manager,
+				baseBlk:         &statelessBlk.CommonBlock,
+				status:          status,
 			},
 		},
 		wasPreferred: wasPreferred,

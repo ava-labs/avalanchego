@@ -8,10 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -39,7 +39,7 @@ type StandardBlock struct {
 // decision block, has ID [parentID].
 func NewStandardBlock(
 	manager Manager,
-	txExecutorBackend executor.Backend,
+	ctx *snow.Context,
 	parentID ids.ID,
 	height uint64,
 	txs []*txs.Tx,
@@ -48,13 +48,13 @@ func NewStandardBlock(
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulStandardBlock(statelessBlk, manager, txExecutorBackend, choices.Processing)
+	return toStatefulStandardBlock(statelessBlk, manager, ctx, choices.Processing)
 }
 
 func toStatefulStandardBlock(
 	statelessBlk *stateless.StandardBlock,
 	manager Manager,
-	txExecutorBackend executor.Backend,
+	ctx *snow.Context,
 	status choices.Status,
 ) (*StandardBlock, error) {
 	sb := &StandardBlock{
@@ -63,17 +63,16 @@ func toStatefulStandardBlock(
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
-				timestampGetter:   manager,
-				lastAccepteder:    manager,
-				baseBlk:           &statelessBlk.CommonBlock,
-				status:            status,
-				txExecutorBackend: txExecutorBackend,
+				timestampGetter: manager,
+				lastAccepteder:  manager,
+				baseBlk:         &statelessBlk.CommonBlock,
+				status:          status,
 			},
 		},
 	}
 
 	for _, tx := range sb.Txs {
-		tx.Unsigned.InitCtx(sb.txExecutorBackend.Ctx)
+		tx.Unsigned.InitCtx(ctx)
 	}
 
 	return sb, nil

@@ -392,7 +392,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return stateful.MakeStateful(
 		statelessBlk,
 		vm.manager,
-		vm.txExecutorBackend,
+		vm.ctx,
 		choices.Processing,
 	)
 }
