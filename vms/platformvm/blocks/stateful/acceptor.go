@@ -135,7 +135,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 		}
 	}
 
-	if err := a.acceptParentDoubleDecisionBlock(b.doubleDecisionBlock); err != nil {
+	if err := a.acceptParentOptionBlock(b.decisionBlock); err != nil {
 		return err
 	}
 	a.commonAccept(b.commonBlock)
@@ -145,7 +145,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	}
 
 	defer b.free()
-	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
+	return a.updateStateOptionBlock(b.decisionBlock)
 }
 
 func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
@@ -157,7 +157,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		}
 	}
 
-	if err := a.acceptParentDoubleDecisionBlock(b.doubleDecisionBlock); err != nil {
+	if err := a.acceptParentOptionBlock(b.decisionBlock); err != nil {
 		return err
 	}
 	a.commonAccept(b.commonBlock)
@@ -167,10 +167,11 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	}
 
 	defer b.free()
-	return a.updateStateDoubleDecisionBlock(b.doubleDecisionBlock)
+	return a.updateStateOptionBlock(b.decisionBlock)
 }
 
-func (a *acceptorImpl) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) error {
+// [b] must be embedded in a Commit or Abort block.
+func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 	parentIntf, err := a.parent(b.baseBlk)
 	if err != nil {
 		return err
@@ -200,7 +201,8 @@ func (a *acceptorImpl) updateStateDoubleDecisionBlock(b *doubleDecisionBlock) er
 	return nil
 }
 
-func (a *acceptorImpl) acceptParentDoubleDecisionBlock(b *doubleDecisionBlock) error {
+// [b] must be embedded in a Commit or Abort block.
+func (a *acceptorImpl) acceptParentOptionBlock(b *decisionBlock) error {
 	blkID := b.baseBlk.ID()
 	b.txExecutorBackend.Ctx.Log.Verbo("Accepting block with ID %s", blkID)
 

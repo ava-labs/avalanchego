@@ -20,7 +20,7 @@ var (
 type CommitBlock struct {
 	Manager
 	*stateless.CommitBlock
-	*doubleDecisionBlock
+	*decisionBlock
 
 	wasPreferred bool
 }
@@ -53,16 +53,14 @@ func toStatefulCommitBlock(
 	commit := &CommitBlock{
 		CommitBlock: statelessBlk,
 		Manager:     manager,
-		doubleDecisionBlock: &doubleDecisionBlock{
-			decisionBlock: decisionBlock{
-				chainState: manager,
-				commonBlock: &commonBlock{
-					timestampGetter:   manager,
-					lastAccepteder:    manager,
-					baseBlk:           &statelessBlk.CommonBlock,
-					status:            status,
-					txExecutorBackend: txExecutorBackend,
-				},
+		decisionBlock: &decisionBlock{
+			chainState: manager,
+			commonBlock: &commonBlock{
+				timestampGetter:   manager,
+				lastAccepteder:    manager,
+				baseBlk:           &statelessBlk.CommonBlock,
+				status:            status,
+				txExecutorBackend: txExecutorBackend,
 			},
 		},
 		wasPreferred: wasPreferred,

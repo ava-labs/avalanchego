@@ -20,7 +20,7 @@ var (
 type AbortBlock struct {
 	Manager
 	*stateless.AbortBlock
-	*doubleDecisionBlock
+	*decisionBlock
 
 	wasPreferred bool
 }
@@ -58,16 +58,14 @@ func toStatefulAbortBlock(
 	abort := &AbortBlock{
 		AbortBlock: statelessBlk,
 		Manager:    manager,
-		doubleDecisionBlock: &doubleDecisionBlock{
-			decisionBlock: decisionBlock{
-				chainState: manager,
-				commonBlock: &commonBlock{
-					timestampGetter:   manager,
-					lastAccepteder:    manager,
-					baseBlk:           &statelessBlk.CommonBlock,
-					status:            status,
-					txExecutorBackend: txExecutorBackend,
-				},
+		decisionBlock: &decisionBlock{
+			chainState: manager,
+			commonBlock: &commonBlock{
+				timestampGetter:   manager,
+				lastAccepteder:    manager,
+				baseBlk:           &statelessBlk.CommonBlock,
+				status:            status,
+				txExecutorBackend: txExecutorBackend,
 			},
 		},
 		wasPreferred: wasPreferred,

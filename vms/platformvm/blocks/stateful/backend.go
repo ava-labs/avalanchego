@@ -27,6 +27,7 @@ type heightSetter interface {
 	SetHeight(height uint64)
 }
 
+// Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
 	metrics.Metrics

@@ -22,7 +22,6 @@ type verifier interface {
 	verifyStandardBlock(b *StandardBlock) error
 	verifyCommitBlock(b *CommitBlock) error
 	verifyAbortBlock(b *AbortBlock) error
-	verifyCommonBlock(b *commonBlock) error
 }
 
 type verifierImpl struct {
@@ -52,8 +51,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 		ParentState: parentState,
 		Tx:          b.Tx,
 	}
-	err := b.Tx.Unsigned.Visit(&txExecutor)
-	if err != nil {
+	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
@@ -110,8 +108,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 		ParentState: parentState,
 		Tx:          b.Tx,
 	}
-	err = b.Tx.Unsigned.Visit(&atomicExecutor)
-	if err != nil {
+	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
@@ -173,8 +170,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 			State:   b.onAcceptState,
 			Tx:      tx,
 		}
-		err := tx.Unsigned.Visit(&txExecutor)
-		if err != nil {
+		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
@@ -296,29 +292,3 @@ func (v *verifierImpl) verifyCommonBlock(b *commonBlock) error {
 	}
 	return nil
 }
-
-/*
-type Verifier interface {
-	mempool.Mempool
-	stateless.Metrics
-
-	state.State
-	SetHeight(height uint64)
-
-	AddStatelessBlock(block stateless.Block, status choices.Status)
-	GetState() state.State
-	GetChainState() state.Chain
-	Abort()
-	Commit() error
-	CommitBatch() (database.Batch, error)
-
-	GetStatefulBlock(blkID ids.ID) (Block, error)
-	CacheVerifiedBlock(Block)
-	DropVerifiedBlock(blkID ids.ID)
-
-	// register recently accepted blocks, needed
-	// to calculate the minimum height of the block still in the
-	// Snowman++ proposal window.
-	AddToRecentlyAcceptedWindows(blkID ids.ID)
-}
-*/

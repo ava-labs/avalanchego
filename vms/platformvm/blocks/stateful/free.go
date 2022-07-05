@@ -29,11 +29,11 @@ func (f *freerImpl) freeAtomicBlock(b *AtomicBlock) {
 }
 
 func (f *freerImpl) freeAbortBlock(b *AbortBlock) {
-	f.freeDecisionBlock(&b.decisionBlock)
+	f.freeDecisionBlock(b.decisionBlock)
 }
 
 func (f *freerImpl) freeCommitBlock(b *CommitBlock) {
-	f.freeDecisionBlock(&b.decisionBlock)
+	f.freeDecisionBlock(b.decisionBlock)
 }
 
 func (f *freerImpl) freeStandardBlock(b *StandardBlock) {
