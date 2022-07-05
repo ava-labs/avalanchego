@@ -214,8 +214,10 @@ func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
-
-	b.fetchFrom.Add(nodeID)
+	// Ensure fetchFrom reflects proper validator list
+	if b.Beacons.Contains(nodeID) {
+		b.fetchFrom.Add(nodeID)
+	}
 
 	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil

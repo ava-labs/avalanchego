@@ -15,7 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 )
 
-var _ VMGetter = &vmGetter{}
+var (
+	_ VMGetter = &vmGetter{}
+
+	errInvalidVMID = errors.New("invalid vmID")
+)
 
 // VMGetter defines functionality to get the plugins on the node.
 type VMGetter interface {
@@ -75,7 +79,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			// there is no alias with plugin name, try to use full vmID.
 			vmID, err = ids.FromString(name)
 			if err != nil {
-				return nil, nil, fmt.Errorf("invalid vmID %s", name)
+				return nil, nil, fmt.Errorf("%w: %q", errInvalidVMID, name)
 			}
 		}
 

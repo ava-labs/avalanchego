@@ -4,7 +4,6 @@
 package poll
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -205,12 +204,6 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	assert.Len(t, results, 0)
 	results = s.Vote(1, vdr3, []ids.ID{vtx1})
 	assert.Len(t, results, 3)
-	fmt.Println("vtx1", vtx1.String())
-	fmt.Println("vtx2", vtx2.String())
-	fmt.Println("vtx3", vtx3.String())
-	for i, result := range results {
-		fmt.Println("result[", i, "]=", result.List()[0].String())
-	}
 	assert.Equal(t, vtx1.String(), results[0].List()[0].String())
 	assert.Equal(t, vtx2.String(), results[1].List()[0].String())
 	assert.Equal(t, vtx3.String(), results[2].List()[0].String())
