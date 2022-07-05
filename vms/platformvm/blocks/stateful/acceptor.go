@@ -162,7 +162,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
 	}
 
-	return a.updateStateOptionBlock(b.decisionBlock, parent)
+	return a.updateStateOptionBlock(b.decisionBlock)
 }
 
 func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
@@ -201,12 +201,11 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
 	}
 
-	return a.updateStateOptionBlock(b.decisionBlock, parent)
+	return a.updateStateOptionBlock(b.decisionBlock)
 }
 
 // [b] must be embedded in a Commit or Abort block.
-// [parent] is the parent of the block in which [b] is embedded.
-func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock, parent *ProposalBlock) error {
+func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
 	if err := a.Commit(); err != nil {
