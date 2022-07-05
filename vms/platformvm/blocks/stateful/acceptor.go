@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 )
 
 var _ acceptor = &acceptorImpl{}
@@ -20,6 +21,7 @@ type acceptor interface {
 }
 
 type acceptorImpl struct {
+	metrics metrics.Metrics
 	backend
 }
 
@@ -33,7 +35,7 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 	)
 
 	a.commonAccept(b.commonBlock)
-	if err := a.MarkAccepted(b.ProposalBlock); err != nil {
+	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 	return nil
@@ -53,7 +55,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.AtomicBlock, b.Status())
-	if err := a.MarkAccepted(b.AtomicBlock); err != nil {
+	if err := a.metrics.MarkAccepted(b.AtomicBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 
@@ -97,7 +99,7 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.StandardBlock, b.Status())
-	if err := a.MarkAccepted(b.StandardBlock); err != nil {
+	if err := a.metrics.MarkAccepted(b.StandardBlock); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
 
@@ -154,12 +156,12 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		if b.wasPreferred {
-			a.MarkAcceptedOptionVote()
+			a.metrics.MarkAcceptedOptionVote()
 		} else {
-			a.MarkRejectedOptionVote()
+			a.metrics.MarkRejectedOptionVote()
 		}
 	}
-	if err := a.MarkAccepted(b.CommitBlock); err != nil {
+	if err := a.metrics.MarkAccepted(b.CommitBlock); err != nil {
 		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
 	}
 
@@ -192,12 +194,12 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		if b.wasPreferred {
-			a.MarkAcceptedOptionVote()
+			a.metrics.MarkAcceptedOptionVote()
 		} else {
-			a.MarkRejectedOptionVote()
+			a.metrics.MarkRejectedOptionVote()
 		}
 	}
-	if err := a.MarkAccepted(b.AbortBlock); err != nil {
+	if err := a.metrics.MarkAccepted(b.AbortBlock); err != nil {
 		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
 	}
 

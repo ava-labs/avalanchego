@@ -56,7 +56,6 @@ func NewManager(
 
 	backend := backend{
 		Mempool:        mempool,
-		Metrics:        metrics,
 		versionDB:      versionDB,
 		lastAccepteder: lastAccepteder,
 		blockState:     blockState,
@@ -72,7 +71,10 @@ func NewManager(
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
 		},
-		acceptor:        &acceptorImpl{backend: backend},
+		acceptor: &acceptorImpl{
+			backend: backend,
+			metrics: metrics,
+		},
 		rejector:        &rejectorImpl{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{State: state},
 		conflictChecker: &conflictCheckerImpl{backend: backend},

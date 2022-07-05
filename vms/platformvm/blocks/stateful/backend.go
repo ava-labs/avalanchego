@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -32,7 +31,6 @@ type heightSetter interface {
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
-	metrics.Metrics
 	// TODO consolidate state fields below?
 	versionDB
 	lastAccepteder
