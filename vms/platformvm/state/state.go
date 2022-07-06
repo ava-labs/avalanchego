@@ -109,9 +109,17 @@ type LastAccepteder interface {
 	SetLastAccepted(blkID ids.ID, persist bool)
 }
 
+type BlockState interface {
+	// TODO rename to GetBlock?
+	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
+	// TODO rename to AddBlock?
+	AddStatelessBlock(block stateless.Block, status choices.Status)
+}
+
 type State interface {
 	LastAccepteder
 	Chain
+	BlockState
 	uptime.State
 	avax.UTXOReader
 
@@ -144,9 +152,6 @@ type State interface {
 
 	// TODO can this be removed and the height set in SetLastAccepted?
 	SetHeight(height uint64)
-
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	AddStatelessBlock(block stateless.Block, status choices.Status)
 
 	// Discard uncommitted changes to the database.
 	Abort()
