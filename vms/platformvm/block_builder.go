@@ -90,12 +90,15 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
+	/*
+		preferredDecision, ok := preferred.(stateful.Decision)
+		if !ok {
+			// The preferred block should always be a decision block
+			return fmt.Errorf("expected Decision block but got %T", preferred)
+		}
+		preferredState := preferredDecision.OnAccept()
+	*/
+	preferredState := b.vm.manager.OnAccept(preferred.ID())
 
 	verifier := executor.MempoolTxVerifier{
 		Backend:     &b.vm.txExecutorBackend,
@@ -132,12 +135,15 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
+	/* TODO remove
 	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
 	}
 	preferredState := preferredDecision.OnAccept()
+	*/
+	preferredState := b.vm.manager.OnAccept(preferredID)
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
@@ -241,6 +247,8 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
+
+	/* TODO remove
 	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
@@ -248,6 +256,8 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 	preferredState := preferredDecision.OnAccept()
+	*/
+	preferredState := b.vm.manager.OnAccept(preferred.ID())
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {

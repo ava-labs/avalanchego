@@ -6,7 +6,6 @@ package stateful
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 type Block interface {
@@ -29,16 +28,12 @@ type Block interface {
 	setBaseState()
 }
 
+// TODO remove
 // A Decision block (either Commit, Abort, or DecisionBlock) represents a
 // Decision to either commit or abort the changes specified in its parent,
 // if its parent is a proposal. Otherwise, the changes are committed
 // immediately.
-type Decision interface {
-	// This function should only be called after Verify is called.
-	// OnAccept returns:
-	// 1) The current state of the chain, if this block is decided or hasn't
-	//    been verified.
-	// 2) The state of the chain after this block is accepted, if this block was
-	//    verified successfully.
-	OnAccept() state.Chain
-}
+// type Decision interface {
+// TODO move spec and remove function
+// OnAccept() state.Chain
+// }

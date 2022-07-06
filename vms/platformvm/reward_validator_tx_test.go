@@ -133,7 +133,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onAbortState := abort.OnAccept()
+	onAbortState := secondVM.manager.OnAccept(abort.ID())
 	_, txStatus, err := onAbortState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState := commit.OnAccept()
+	onCommitState := secondVM.manager.OnAccept(commit.ID())
 	_, txStatus, err = onCommitState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)

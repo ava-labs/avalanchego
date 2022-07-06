@@ -9,10 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
-var (
-	_ Block    = &AbortBlock{}
-	_ Decision = &AbortBlock{}
-)
+var _ Block = &AbortBlock{}
+
+// TODO remove
+// _ Decision = &AbortBlock{}
 
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.

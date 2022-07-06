@@ -41,9 +41,13 @@ func (f *freerImpl) freeStandardBlock(b *StandardBlock) {
 }
 
 func (f *freerImpl) freeDecisionBlock(b *decisionBlock) {
+	blkID := b.baseBlk.ID()
 	f.freeCommonBlock(b.commonBlock)
-	b.onAcceptState = nil
-	b.onAcceptFunc = nil
+	delete(f.blkIDToOnAcceptFunc, blkID)
+	delete(f.blkIDToOnAcceptState, blkID)
+	// TODO remove
+	// b.onAcceptState = nil
+	// b.onAcceptFunc = nil
 }
 
 func (f *freerImpl) freeCommonBlock(b *commonBlock) {

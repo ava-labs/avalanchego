@@ -3,8 +3,6 @@
 
 package stateful
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/state"
-
 var _ baseStateSetter = &baseStateSetterImpl{}
 
 type baseStateSetter interface {
@@ -16,26 +14,34 @@ type baseStateSetter interface {
 }
 
 type baseStateSetterImpl struct {
-	state.State
+	backend
 }
 
 func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *ProposalBlock) {
-	b.onCommitState.SetBase(s.State)
-	b.onAbortState.SetBase(s.State)
+	b.onCommitState.SetBase(s.state)
+	b.onAbortState.SetBase(s.state)
 }
 
 func (s *baseStateSetterImpl) setBaseStateAtomicBlock(b *AtomicBlock) {
-	b.onAcceptState.SetBase(s.State)
+	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
+		onAcceptState.Apply(s.state)
+	}
 }
 
 func (s *baseStateSetterImpl) setBaseStateStandardBlock(b *StandardBlock) {
-	b.onAcceptState.SetBase(s.State)
+	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
+		onAcceptState.Apply(s.state)
+	}
 }
 
 func (s *baseStateSetterImpl) setBaseStateCommitBlock(b *CommitBlock) {
-	b.onAcceptState.SetBase(s.State)
+	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
+		onAcceptState.Apply(s.state)
+	}
 }
 
 func (s *baseStateSetterImpl) setBaseStateAbortBlock(b *AbortBlock) {
-	b.onAcceptState.SetBase(s.State)
+	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
+		onAcceptState.Apply(s.state)
+	}
 }

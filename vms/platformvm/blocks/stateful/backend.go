@@ -24,9 +24,11 @@ type backend struct {
 	heightSetter
 	// Block ID --> Function to be executed if the block is accepted.
 	blkIDToOnAcceptFunc map[ids.ID]func()
-	state               state.State
-	ctx                 *snow.Context
-	bootstrapped        *utils.AtomicBool
+	// Block ID --> State if the block is accepted.
+	blkIDToOnAcceptState map[ids.ID]state.Diff
+	state                state.State
+	ctx                  *snow.Context
+	bootstrapped         *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {
@@ -37,4 +39,14 @@ func (b *backend) getState() state.State {
 func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
 	parentBlkID := blk.Parent()
 	return b.GetStatefulBlock(parentBlkID)
+}
+
+func (b *backend) OnAccept(blkID ids.ID) state.Chain {
+	onAcceptState := b.blkIDToOnAcceptState[blkID]
+	// TODO is the below correct?
+	// TODO remove or fix commented code below.
+	if /*blk.Status().Decided() ||*/ onAcceptState == nil {
+		return b.state
+	}
+	return onAcceptState
 }

@@ -58,13 +58,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 		return parentErr
 	}
 
-	// parentState is the state if this block's parent is accepted
-	parent, ok := parentIntf.(Decision)
-	if !ok {
-		return fmt.Errorf("expected *DecisionBlock but got %T", parentIntf)
-	}
-
-	parentState := parent.OnAccept()
+	parentState := v.OnAccept(b.Parent())
 
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &v.txExecutorBackend,
@@ -102,14 +96,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 		return err
 	}
 
-	// AtomicBlock is not a modifier on a proposal block, so its parent must be
-	// a decision.
-	parent, ok := parentIntf.(Decision)
-	if !ok {
-		return fmt.Errorf("expected Decision block but got %T", parentIntf)
-	}
-
-	parentState := parent.OnAccept()
+	parentState := v.OnAccept(b.Parent())
 
 	cfg := v.txExecutorBackend.Cfg
 	currentTimestamp := parentState.GetTimestamp()
@@ -136,7 +123,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	b.onAcceptState = atomicExecutor.OnAccept
+	v.blkIDToOnAcceptState[b.baseBlk.ID()] = atomicExecutor.OnAccept
 	b.inputs = atomicExecutor.Inputs
 	b.atomicRequests = atomicExecutor.AtomicRequests
 	b.timestamp = atomicExecutor.OnAccept.GetTimestamp()
@@ -156,6 +143,8 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 }
 
 func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
+	blkID := b.ID()
+
 	if err := v.verifyCommonBlock(b.commonBlock); err != nil {
 		return err
 	}
@@ -165,13 +154,9 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		return err
 	}
 
-	parent, ok := parentIntf.(Decision)
-	if !ok {
-		return fmt.Errorf("expected Decision block but got %T", parentIntf)
-	}
-	parentState := parent.OnAccept()
+	parentState := v.OnAccept(b.Parent())
 
-	b.onAcceptState = state.NewDiff(
+	onAcceptState := state.NewDiff(
 		parentState,
 		parentState.CurrentStakers(),
 		parentState.PendingStakers(),
@@ -185,7 +170,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 	for _, tx := range b.Txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
-			State:   b.onAcceptState,
+			State:   onAcceptState,
 			Tx:      tx,
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
@@ -200,7 +185,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		// Add UTXOs to batch
 		b.Inputs.Union(txExecutor.Inputs)
 
-		b.onAcceptState.AddTx(tx, status.Committed)
+		onAcceptState.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
 			funcs = append(funcs, txExecutor.OnAccept)
 		}
@@ -230,17 +215,17 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
-		b.onAcceptFunc = funcs[0]
+		v.blkIDToOnAcceptFunc[blkID] = funcs[0]
 	} else if numFuncs > 1 {
-		b.onAcceptFunc = func() {
+		v.blkIDToOnAcceptFunc[blkID] = func() {
 			for _, f := range funcs {
 				f()
 			}
 		}
 	}
 
-	b.timestamp = b.onAcceptState.GetTimestamp()
-
+	b.timestamp = onAcceptState.GetTimestamp()
+	v.blkIDToOnAcceptState[blkID] = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
@@ -263,8 +248,9 @@ func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 
-	b.onAcceptState = parent.onCommitState
-	b.timestamp = b.onAcceptState.GetTimestamp()
+	onAcceptState := parent.onCommitState
+	b.timestamp = onAcceptState.GetTimestamp()
+	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
 
 	v.pinVerifiedBlock(b)
 	parent.addChild(b)
@@ -287,8 +273,9 @@ func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 
-	b.onAcceptState = parent.onAbortState
-	b.timestamp = b.onAcceptState.GetTimestamp()
+	onAcceptState := parent.onAbortState
+	b.timestamp = onAcceptState.GetTimestamp()
+	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
 
 	v.pinVerifiedBlock(b)
 	parent.addChild(b)

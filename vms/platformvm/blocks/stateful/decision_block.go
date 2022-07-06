@@ -3,22 +3,26 @@
 
 package stateful
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/state"
-
 type decisionBlock struct {
 	chainState
 	*commonBlock
 
+	// TODO remove
 	// state of the chain if this block is accepted
-	onAcceptState state.Diff
+	// onAcceptState state.Diff
 
+	// TODO remove
 	// to be executed if this block is accepted
-	onAcceptFunc func()
+	// onAcceptFunc func()
 }
 
-func (d *decisionBlock) OnAccept() state.Chain {
-	if d.Status().Decided() || d.onAcceptState == nil {
-		return d.GetState()
-	}
-	return d.onAcceptState
-}
+// TODO remove
+// func (d *decisionBlock) OnAccept() state.Chain {
+// 	return nil
+// 	/*
+// 		if d.Status().Decided() || d.onAcceptState == nil {
+// 			return d.GetState()
+// 		}
+// 		return d.onAcceptState
+// 	*/
+// }

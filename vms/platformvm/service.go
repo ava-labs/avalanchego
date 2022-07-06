@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -1655,24 +1654,29 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
+	/* TODO remove
 	blockIntf, err := service.vm.manager.GetStatefulBlock(blockID)
 	if err != nil {
 		return false, err
 	}
 
-	block, ok := blockIntf.(stateful.Decision)
-	if !ok {
-		parentBlkID := blockIntf.Parent()
-		parentBlockIntf, err := service.vm.GetBlock(parentBlkID)
-		if err != nil {
-			return false, err
-		}
-		block, ok = parentBlockIntf.(stateful.Decision)
+		block, ok := blockIntf.(stateful.Decision)
 		if !ok {
-			return false, fmt.Errorf("expected stateful.Decision but got %T", parentBlockIntf)
+			parentBlkID := blockIntf.Parent()
+			parentBlockIntf, err := service.vm.GetBlock(parentBlkID)
+			if err != nil {
+				return false, err
+			}
+			block, ok = parentBlockIntf.(stateful.Decision)
+			if !ok {
+				return false, fmt.Errorf("expected stateful.Decision but got %T", parentBlockIntf)
+			}
 		}
-	}
-	state := block.OnAccept()
+		state := block.OnAccept()
+	*/
+
+	// TODO make sure this is right
+	state := service.vm.manager.OnAccept(blockID)
 
 	tx, _, err := state.GetTx(chainID)
 	if err == database.ErrNotFound {
@@ -1681,7 +1685,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	if err != nil {
 		return false, err
 	}
-	_, ok = tx.Unsigned.(*txs.CreateChainTx)
+	_, ok := tx.Unsigned.(*txs.CreateChainTx)
 	return ok, nil
 }
 
@@ -1922,11 +1926,14 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	block, ok := preferred.(stateful.Decision)
-	if !ok {
-		return fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	onAccept := block.OnAccept()
+	/*
+		block, ok := preferred.(stateful.Decision)
+		if !ok {
+			return fmt.Errorf("expected Decision block but got %T", preferred)
+		}
+		onAccept := block.OnAccept()
+	*/
+	onAccept := service.vm.manager.OnAccept(preferred.ID())
 
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {

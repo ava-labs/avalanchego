@@ -17,8 +17,9 @@ import (
 var (
 	errConflictingBatchTxs = errors.New("block contains conflicting transactions")
 
-	_ Block    = &StandardBlock{}
-	_ Decision = &StandardBlock{}
+	_ Block = &StandardBlock{}
+	// TODO remove
+	// _ Decision = &StandardBlock{}
 )
 
 // StandardBlock being accepted results in the transactions contained in the

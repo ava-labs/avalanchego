@@ -23,7 +23,6 @@ type acceptor interface {
 
 type acceptorImpl struct {
 	backend
-
 	metrics          metrics.Metrics
 	recentlyAccepted *window.Window
 }
@@ -75,7 +74,9 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	}
 
 	// Update the state of the chain in the database
-	b.onAcceptState.Apply(a.getState())
+	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+		onAcceptState.Apply(a.getState())
+	}
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -99,8 +100,8 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	for _, child := range b.children {
 		child.setBaseState()
 	}
-	if b.onAcceptFunc != nil {
-		b.onAcceptFunc()
+	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+		onAcceptFunc()
 	}
 
 	return nil
@@ -119,7 +120,9 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	}
 
 	// Update the state of the chain in the database
-	b.onAcceptState.Apply(a.getState())
+	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+		onAcceptState.Apply(a.getState())
+	}
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -138,8 +141,8 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	for _, child := range b.children {
 		child.setBaseState()
 	}
-	if b.onAcceptFunc != nil {
-		b.onAcceptFunc()
+	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+		onAcceptFunc()
 	}
 
 	return nil
@@ -223,8 +226,11 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 
 // [b] must be embedded in a Commit or Abort block.
 func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
+	blkID := b.baseBlk.ID()
 	// Update the state of the chain in the database
-	b.onAcceptState.Apply(a.getState())
+	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+		onAcceptState.Apply(a.getState())
+	}
 	if err := a.state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
@@ -232,8 +238,8 @@ func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 	for _, child := range b.children {
 		child.setBaseState()
 	}
-	if b.onAcceptFunc != nil {
-		b.onAcceptFunc()
+	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+		onAcceptFunc()
 	}
 	return nil
 }

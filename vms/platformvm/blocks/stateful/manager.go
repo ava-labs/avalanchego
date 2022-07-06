@@ -24,6 +24,16 @@ type timestampGetter interface {
 	GetTimestamp() time.Time
 }
 
+type OnAcceptor interface {
+	// This function should only be called after Verify is called on [blkID].
+	// OnAccept returns:
+	// 1) The current state of the chain, if this block is decided or hasn't
+	//    been verified.
+	// 2) The state of the chain after this block is accepted, if this block was
+	//    verified successfully.
+	OnAccept(blkID ids.ID) state.Chain
+}
+
 type Manager interface {
 	blockState
 	verifier
@@ -34,31 +44,33 @@ type Manager interface {
 	freer
 	chainState
 	timestampGetter
+	OnAcceptor
 	state.LastAccepteder
 }
 
 func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
-	state state.State,
+	s state.State,
 	txExecutorBackend executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
 	blockState := &blockStateImpl{
 		manager:             nil, // Set below
-		statelessBlockState: state,
+		statelessBlockState: s,
 		verifiedBlks:        map[ids.ID]Block{},
 		ctx:                 txExecutorBackend.Ctx,
 	}
 
 	backend := backend{
-		Mempool:             mempool,
-		blockState:          blockState,
-		heightSetter:        state,
-		state:               state,
-		bootstrapped:        txExecutorBackend.Bootstrapped,
-		ctx:                 txExecutorBackend.Ctx,
-		blkIDToOnAcceptFunc: make(map[ids.ID]func()),
+		Mempool:              mempool,
+		blockState:           blockState,
+		heightSetter:         s,
+		state:                s,
+		bootstrapped:         txExecutorBackend.Bootstrapped,
+		ctx:                  txExecutorBackend.Ctx,
+		blkIDToOnAcceptFunc:  make(map[ids.ID]func()),
+		blkIDToOnAcceptState: make(map[ids.ID]state.Diff),
 	}
 
 	manager := &manager{
@@ -73,10 +85,10 @@ func NewManager(
 			recentlyAccepted: recentlyAccepted,
 		},
 		rejector:        &rejectorImpl{backend: backend},
-		baseStateSetter: &baseStateSetterImpl{State: state},
+		baseStateSetter: &baseStateSetterImpl{backend: backend},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
 		freer:           &freerImpl{backend: backend},
-		timestampGetter: state,
+		timestampGetter: s,
 	}
 	// TODO is there a way to avoid having a Manager
 	// in [blockState] so we don't have to do this?

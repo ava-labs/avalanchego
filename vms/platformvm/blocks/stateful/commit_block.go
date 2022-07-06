@@ -9,10 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
-var (
-	_ Block    = &CommitBlock{}
-	_ Decision = &CommitBlock{}
-)
+var _ Block = &CommitBlock{}
+
+// TODO remove
+// 	_ Decision = &CommitBlock{}
 
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
