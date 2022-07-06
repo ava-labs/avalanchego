@@ -109,21 +109,11 @@ type LastAccepteder interface {
 	SetLastAccepted(blkID ids.ID, persist bool)
 }
 
-type stateBlk struct {
-	Blk    stateless.Block
-	Bytes  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
-}
-
 type State interface {
 	LastAccepteder
 	Chain
 	uptime.State
 	avax.UTXOReader
-
-	// TODO: remove ShouldInit and DoneInit and perform them in New
-	ShouldInit() (bool, error)
-	DoneInit() error
 
 	AddCurrentStaker(tx *txs.Tx, potentialReward uint64)
 	DeleteCurrentStaker(tx *txs.Tx)
@@ -152,6 +142,7 @@ type State interface {
 	// memory.
 	Load() error
 
+	// TODO can this be removed and the height set in SetLastAccepted?
 	SetHeight(height uint64)
 
 	// Write uncommitted data to the base database but don't commit it.
@@ -165,10 +156,18 @@ type State interface {
 
 	// Commit changes to the base database.
 	Commit() error
+
 	// Returns a batch of unwritten changes that,
 	// when written, will be commit to the base database.
 	CommitBatch() (database.Batch, error)
+
 	Close() error
+}
+
+type stateBlk struct {
+	Blk    stateless.Block
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
 }
 
 type state struct {
@@ -420,12 +419,12 @@ func New(
 	return s, nil
 }
 
-func (s *state) ShouldInit() (bool, error) {
+func (s *state) shouldInit() (bool, error) {
 	has, err := s.singletonDB.Has(initializedKey)
 	return !has, err
 }
 
-func (s *state) DoneInit() error {
+func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
 }
 
@@ -736,7 +735,7 @@ func (s *state) MaxStakeAmount(
 	return s.maxSubnetStakeAmount(subnetID, nodeID, startTime, endTime)
 }
 
-func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
 	s.SetLastAccepted(genesisBlkID, true)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(genesis.InitialSupply)
@@ -1132,7 +1131,7 @@ func (s *state) Close() error {
 }
 
 func (s *state) sync(genesis []byte) error {
-	shouldInit, err := s.ShouldInit()
+	shouldInit, err := s.shouldInit()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to check if the database is initialized: %w",
@@ -1175,11 +1174,11 @@ func (s *state) init(genesisBytes []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := s.SyncGenesis(genesisBlock.ID(), genesisState); err != nil {
+	if err := s.syncGenesis(genesisBlock.ID(), genesisState); err != nil {
 		return err
 	}
 
-	if err := s.DoneInit(); err != nil {
+	if err := s.doneInit(); err != nil {
 		return err
 	}
 
@@ -1267,15 +1266,13 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Stat
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	statelessBlk, err := stateless.Parse(blkState.Bytes, stateless.GenesisCodec)
+	blkState.Blk, err = stateless.Parse(blkState.Bytes, stateless.GenesisCodec)
 	if err != nil {
 		return nil, choices.Processing, err
 	}
 
-	blkState.Blk = statelessBlk
-
 	s.blockCache.Put(blockID, blkState)
-	return statelessBlk, blkState.Status, nil
+	return blkState.Blk, blkState.Status, nil
 }
 
 type currentValidatorState struct {
