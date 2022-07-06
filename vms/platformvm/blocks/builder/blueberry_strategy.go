@@ -71,33 +71,31 @@ func (b *blueberryStrategy) selectBlockContent() error {
 		return nil
 	}
 
-	b.txes, b.blkTime, err = b.trySelectMempoolProposalTx()
-	return err
-}
-
-func (b *blueberryStrategy) trySelectMempoolProposalTx() ([]*txs.Tx, time.Time, error) {
 	// clean out the mempool's transactions with invalid timestamps.
 	b.dropTooEarlyMempoolProposalTxs()
 
 	// try including a mempool proposal tx is available.
 	if !b.HasProposalTx() {
 		b.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return nil, time.Time{}, errNoPendingBlocks
+		return errNoPendingBlocks
 	}
 
 	tx := b.PopProposalTx()
-	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// if the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
+	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 	maxChainStartTime := b.parentState.GetTimestamp().Add(executor.MaxFutureStartTime)
 
+	b.txes = []*txs.Tx{tx}
 	if startTime.After(maxChainStartTime) {
 		now := b.txExecutorBackend.Clk.Time()
-		return []*txs.Tx{tx}, now, nil
+		b.blkTime = now
+	} else {
+		b.blkTime = blkTime // do not change chain time
 	}
-	return []*txs.Tx{tx}, maxChainStartTime, nil
+	return err
 }
 
 func (b *blueberryStrategy) build() (snowman.Block, error) {
