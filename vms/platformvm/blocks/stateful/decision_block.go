@@ -3,6 +3,7 @@
 
 package stateful
 
+/* TODO remove
 type decisionBlock struct {
 	chainState
 	*commonBlock
@@ -15,6 +16,7 @@ type decisionBlock struct {
 	// to be executed if this block is accepted
 	// onAcceptFunc func()
 }
+*/
 
 // TODO remove
 // func (d *decisionBlock) OnAccept() state.Chain {

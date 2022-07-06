@@ -26,7 +26,7 @@ var (
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
 	*stateless.StandardBlock
-	*decisionBlock
+	*commonBlock
 
 	// Inputs are the atomic Inputs that are consumed by this block's atomic
 	// transactions
@@ -60,14 +60,11 @@ func toStatefulStandardBlock(
 ) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		StandardBlock: statelessBlk,
-		decisionBlock: &decisionBlock{
-			chainState: manager,
-			commonBlock: &commonBlock{
-				timestampGetter: manager,
-				LastAccepteder:  manager,
-				baseBlk:         &statelessBlk.CommonBlock,
-				status:          status,
-			},
+		commonBlock: &commonBlock{
+			timestampGetter: manager,
+			LastAccepteder:  manager,
+			baseBlk:         &statelessBlk.CommonBlock,
+			status:          status,
 		},
 		manager: manager,
 	}

@@ -18,7 +18,7 @@ var _ Block = &CommitBlock{}
 // be a proposal block) being enacted.
 type CommitBlock struct {
 	*stateless.CommitBlock
-	*decisionBlock
+	*commonBlock
 
 	wasPreferred bool
 	manager      Manager
@@ -49,14 +49,11 @@ func toStatefulCommitBlock(
 ) (*CommitBlock, error) {
 	commit := &CommitBlock{
 		CommitBlock: statelessBlk,
-		decisionBlock: &decisionBlock{
-			chainState: manager,
-			commonBlock: &commonBlock{
-				timestampGetter: manager,
-				LastAccepteder:  manager,
-				baseBlk:         &statelessBlk.CommonBlock,
-				status:          status,
-			},
+		commonBlock: &commonBlock{
+			timestampGetter: manager,
+			LastAccepteder:  manager,
+			baseBlk:         &statelessBlk.CommonBlock,
+			status:          status,
 		},
 		wasPreferred: wasPreferred,
 		manager:      manager,

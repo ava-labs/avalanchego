@@ -183,7 +183,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
 	}
 
-	return a.updateStateOptionBlock(b.decisionBlock)
+	return a.updateStateOptionBlock(b.commonBlock)
 }
 
 func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
@@ -221,11 +221,11 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
 	}
 
-	return a.updateStateOptionBlock(b.decisionBlock)
+	return a.updateStateOptionBlock(b.commonBlock)
 }
 
 // [b] must be embedded in a Commit or Abort block.
-func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
+func (a *acceptorImpl) updateStateOptionBlock(b *commonBlock) error {
 	blkID := b.baseBlk.ID()
 	// Update the state of the chain in the database
 	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {

@@ -18,7 +18,7 @@ var _ Block = &AbortBlock{}
 // be a proposal block) being rejected.
 type AbortBlock struct {
 	*stateless.AbortBlock
-	*decisionBlock
+	*commonBlock
 
 	wasPreferred bool
 
@@ -54,14 +54,11 @@ func toStatefulAbortBlock(
 ) (*AbortBlock, error) {
 	abort := &AbortBlock{
 		AbortBlock: statelessBlk,
-		decisionBlock: &decisionBlock{
-			chainState: manager,
-			commonBlock: &commonBlock{
-				timestampGetter: manager,
-				LastAccepteder:  manager,
-				baseBlk:         &statelessBlk.CommonBlock,
-				status:          status,
-			},
+		commonBlock: &commonBlock{
+			timestampGetter: manager,
+			LastAccepteder:  manager,
+			baseBlk:         &statelessBlk.CommonBlock,
+			status:          status,
 		},
 		wasPreferred: wasPreferred,
 		manager:      manager,
