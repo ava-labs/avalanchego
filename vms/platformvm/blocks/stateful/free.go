@@ -18,10 +18,12 @@ type freerImpl struct {
 	backend
 }
 
+// TODO should we just have one free function?
 func (f *freerImpl) freeProposalBlock(b *ProposalBlock) {
+	blkID := b.baseBlk.ID()
 	f.freeCommonBlock(b.commonBlock)
-	b.onCommitState = nil
-	b.onAbortState = nil
+	delete(f.blkIDToOnAcceptState, blkID)
+	delete(f.blkIDToOnAbortState, blkID)
 }
 
 func (f *freerImpl) freeAtomicBlock(b *AtomicBlock) {

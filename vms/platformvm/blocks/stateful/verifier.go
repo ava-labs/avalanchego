@@ -71,12 +71,16 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 		return err
 	}
 
-	b.onCommitState = txExecutor.OnCommit
-	b.onAbortState = txExecutor.OnAbort
+	blkID := b.ID()
 	b.prefersCommit = txExecutor.PrefersCommit
 
-	b.onCommitState.AddTx(b.Tx, status.Committed)
-	b.onAbortState.AddTx(b.Tx, status.Aborted)
+	onCommitState := txExecutor.OnCommit
+	onCommitState.AddTx(b.Tx, status.Committed)
+	v.blkIDToOnCommitState[blkID] = onCommitState
+
+	onAbortState := txExecutor.OnAbort
+	onAbortState.AddTx(b.Tx, status.Aborted)
+	v.blkIDToOnAbortState[blkID] = onAbortState
 
 	b.timestamp = parentState.GetTimestamp()
 
@@ -248,7 +252,7 @@ func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 
-	onAcceptState := parent.onCommitState
+	onAcceptState := v.blkIDToOnCommitState[b.Parent()]
 	b.timestamp = onAcceptState.GetTimestamp()
 	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
 
@@ -273,7 +277,7 @@ func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
 
-	onAcceptState := parent.onAbortState
+	onAcceptState := v.blkIDToOnAbortState[b.Parent()]
 	b.timestamp = onAcceptState.GetTimestamp()
 	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
 

@@ -18,8 +18,12 @@ type baseStateSetterImpl struct {
 }
 
 func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *ProposalBlock) {
-	b.onCommitState.SetBase(s.state)
-	b.onAbortState.SetBase(s.state)
+	if onCommitState := s.blkIDToOnCommitState[b.ID()]; onCommitState != nil {
+		onCommitState.SetBase(s.state)
+	}
+	if onAbortState := s.blkIDToOnAbortState[b.ID()]; onAbortState != nil {
+		onAbortState.SetBase(s.state)
+	}
 }
 
 func (s *baseStateSetterImpl) setBaseStateAtomicBlock(b *AtomicBlock) {

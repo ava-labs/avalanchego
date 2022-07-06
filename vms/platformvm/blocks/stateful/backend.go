@@ -26,9 +26,13 @@ type backend struct {
 	blkIDToOnAcceptFunc map[ids.ID]func()
 	// Block ID --> State if the block is accepted.
 	blkIDToOnAcceptState map[ids.ID]state.Diff
-	state                state.State
-	ctx                  *snow.Context
-	bootstrapped         *utils.AtomicBool
+	// Block ID --> State if this block's proposal is committed.
+	blkIDToOnCommitState map[ids.ID]state.Diff
+	// Block ID --> State if this block's proposal is aborted.
+	blkIDToOnAbortState map[ids.ID]state.Diff
+	state               state.State
+	ctx                 *snow.Context
+	bootstrapped        *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {

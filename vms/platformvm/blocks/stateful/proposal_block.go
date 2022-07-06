@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -31,10 +30,13 @@ type ProposalBlock struct {
 	*stateless.ProposalBlock
 	*commonBlock
 
+	// TODO remove
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState state.Diff
+	// onCommitState state.Diff
+
+	// TODO remove
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState  state.Diff
+	//onAbortState  state.Diff
 	prefersCommit bool
 
 	manager Manager

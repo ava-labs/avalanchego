@@ -71,6 +71,8 @@ func NewManager(
 		ctx:                  txExecutorBackend.Ctx,
 		blkIDToOnAcceptFunc:  make(map[ids.ID]func()),
 		blkIDToOnAcceptState: make(map[ids.ID]state.Diff),
+		blkIDToOnCommitState: make(map[ids.ID]state.Diff),
+		blkIDToOnAbortState:  make(map[ids.ID]state.Diff),
 	}
 
 	manager := &manager{
