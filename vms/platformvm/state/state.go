@@ -148,6 +148,7 @@ type State interface {
 
 	// Load pulls data previously stored on disk that is expected to be in
 	// memory.
+	// TODO remove Load from this interface.
 	Load() error
 
 	// TODO can this be removed and the height set in SetLastAccepted?
