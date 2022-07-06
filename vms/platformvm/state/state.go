@@ -738,10 +738,12 @@ func (s *state) MaxStakeAmount(
 	return s.maxSubnetStakeAmount(subnetID, nodeID, startTime, endTime)
 }
 
-func (s *state) syncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk *stateless.CommitBlock, genesis *genesis.State) error {
+	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID, true)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(genesis.InitialSupply)
+	s.AddStatelessBlock(genesisBlk, choices.Accepted)
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
@@ -1171,13 +1173,12 @@ func (s *state) init(genesisBytes []byte) error {
 	if err != nil {
 		return err
 	}
-	s.AddStatelessBlock(genesisBlock, choices.Accepted)
 
 	genesisState, err := genesis.ParseState(genesisBytes)
 	if err != nil {
 		return err
 	}
-	if err := s.syncGenesis(genesisBlock.ID(), genesisState); err != nil {
+	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
 		return err
 	}
 
