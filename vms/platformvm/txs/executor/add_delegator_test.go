@@ -108,7 +108,8 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.tState.AddCurrentStaker(tx, 0)
 		target.tState.AddTx(tx, status.Committed)
-		if err := target.tState.Write(dummyHeight); err != nil {
+		target.tState.SetHeight(dummyHeight)
+		if err := target.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := target.tState.Load(); err != nil {
@@ -135,7 +136,8 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.tState.AddCurrentStaker(tx, 0)
 		target.tState.AddTx(tx, status.Committed)
-		if err := target.tState.Write(dummyHeight); err != nil {
+		target.tState.SetHeight(dummyHeight)
+		if err := target.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
 		if err := target.tState.Load(); err != nil {
@@ -275,7 +277,8 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				for _, utxoID := range utxoIDs {
 					target.tState.DeleteUTXO(utxoID)
 				}
-				if err := target.tState.Write(dummyHeight); err != nil {
+				target.tState.SetHeight(dummyHeight)
+				if err := target.tState.Commit(); err != nil {
 					t.Fatal(err)
 				}
 			},

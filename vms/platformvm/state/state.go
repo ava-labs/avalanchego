@@ -145,9 +145,6 @@ type State interface {
 	// TODO can this be removed and the height set in SetLastAccepted?
 	SetHeight(height uint64)
 
-	// Write uncommitted data to the base database but don't commit it.
-	Write(height uint64) error
-
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
 	AddStatelessBlock(block stateless.Block, status choices.Status)
 
@@ -786,7 +783,7 @@ func (s *state) syncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
 		s.AddChain(chain)
 		s.AddTx(chain, status.Committed)
 	}
-	return s.Write(0)
+	return s.write(0)
 }
 
 func (s *state) Load() error {
@@ -1091,7 +1088,7 @@ func (s *state) loadPendingValidators() error {
 	return nil
 }
 
-func (s *state) Write(height uint64) error {
+func (s *state) write(height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.writeBlocks(),
@@ -1211,7 +1208,7 @@ func (s *state) Abort() {
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
-	if err := s.Write(s.currentHeight); err != nil {
+	if err := s.write(s.currentHeight); err != nil {
 		return nil, err
 	}
 	return s.baseDB.CommitBatch()

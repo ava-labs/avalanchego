@@ -242,7 +242,12 @@ func defaultState(
 	// initializeState(tState, ctx)
 
 	// persist and reload to init a bunch of in-memory stuff
-	if err := tState.Write( /*height*/ 0); err != nil {
+	tState.SetHeight(0)
+	if err := tState.Commit(); err != nil {
+		panic(err)
+	}
+	tState.SetHeight( /*height*/ 0)
+	if err := tState.Commit(); err != nil {
 		panic(err)
 	}
 	if err := tState.Load(); err != nil {
@@ -420,7 +425,8 @@ func internalStateShutdown(t *testHelpersCollection) error {
 		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := t.tState.Write( /*height*/ math.MaxUint64); err != nil {
+		t.tState.SetHeight( /*height*/ math.MaxUint64)
+		if err := t.tState.Commit(); err != nil {
 			return err
 		}
 	}
