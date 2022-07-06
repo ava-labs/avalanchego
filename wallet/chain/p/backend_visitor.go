@@ -14,6 +14,7 @@ import (
 
 var _ txs.Visitor = &backendVisitor{}
 
+// backendVisitor handles accepting of transactions for the backend
 type backendVisitor struct {
 	b    *backend
 	ctx  stdcontext.Context

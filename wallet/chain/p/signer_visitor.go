@@ -34,6 +34,7 @@ var (
 	emptySig [crypto.SECP256K1RSigLen]byte
 )
 
+// signerVisitor handles signing transactions for the signer
 type signerVisitor struct {
 	kc      *secp256k1fx.Keychain
 	backend SignerBackend
