@@ -169,7 +169,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}()
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
-	blkBuildingStrategy, err := getBuildingStrategy(b)
+	blkBuildingStrategy, err := b.getBuildingStrategy()
 	if err != nil {
 		return nil, err
 	}

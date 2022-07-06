@@ -12,13 +12,17 @@ import (
 // Blocks have different specifications/building instructions as defined by the
 // fork that the block exists in.
 type buildingStrategy interface {
+	// select transactions to be included in block,
+	// along with its timestamp.
+	selectBlockContent() error
+
 	// builds a versioned snowman.Block
 	build() (snowman.Block, error)
 }
 
 // Factory method that returns the correct building strategy for the
 // current fork.
-func getBuildingStrategy(b *blockBuilder) (buildingStrategy, error) {
+func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 	preferred, err := b.Preferred()
 	if err != nil {
 		return nil, err
@@ -34,23 +38,21 @@ func getBuildingStrategy(b *blockBuilder) (buildingStrategy, error) {
 	blkVersion := preferred.ExpectedChildVersion()
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	txes, blkTime, err := b.nextTxs(preferredState, blkVersion)
 
 	switch blkVersion {
 	case stateless.ApricotVersion:
 		return &apricotStrategy{
-			b:           b,
-			parentBlkID: prefBlkID,
-			height:      nextHeight,
-			txes:        txes,
+			blockBuilder: b,
+			parentBlkID:  prefBlkID,
+			parentState:  preferredState,
+			height:       nextHeight,
 		}, nil
 	case stateless.BlueberryVersion:
 		return &blueberryStrategy{
-			b:           b,
-			blkTime:     blkTime,
-			parentBlkID: prefBlkID,
-			height:      nextHeight,
-			txes:        txes,
+			blockBuilder: b,
+			parentBlkID:  prefBlkID,
+			parentState:  preferredState,
+			height:       nextHeight,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupporrted block version %d", blkVersion)
