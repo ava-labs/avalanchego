@@ -20,10 +20,6 @@ type Block interface {
 	// direct child
 	ExpectedChildVersion() uint16
 
-	// parent returns the parent block, similarly to Parent. However, it
-	// provides the more specific Block interface.
-	parentBlock() (Block, error)
-
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.
 	conflicts(ids.Set) (bool, error)

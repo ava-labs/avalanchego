@@ -234,6 +234,7 @@ func (m *Metrics) MarkAccepted(b stateless.CommonBlockIntf) error {
 	}
 }
 
+// TODO should we just log an error instead of returning one?
 func (m *Metrics) acceptTx(tx *txs.Tx) error {
 	switch tx.Unsigned.(type) {
 	case *txs.AddDelegatorTx:

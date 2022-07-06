@@ -67,8 +67,8 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			blueberryParentBlk, err := NewProposalBlock(
 				parentVersion,
 				uint64(test.parentTime.Unix()),
-				h.blkVerifier,
-				h.txExecBackend,
+				h.blkManager,
+				h.ctx,
 				ids.Empty, // does not matter
 				parentHeight,
 				parentTx,
@@ -83,8 +83,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			blk, err := NewCommitBlock(
 				childVersion,
 				uint64(test.childTime.Unix()),
-				h.blkVerifier,
-				h.txExecBackend,
+				h.blkManager,
 				blueberryParentBlk.ID(),
 				childHeight,
 				true, // wasPreferred
@@ -92,7 +91,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			assert.NoError(err)
 
 			// call verify on it
-			err = blk.commonBlock.verify(false /*enforceStrictness*/)
+			err = h.blkManager.(*manager).verifier.(*verifierImpl).verifyCommonBlock(blk.decisionBlock.commonBlock, false /*enforceStrictness*/)
 			assert.ErrorIs(err, test.result)
 		})
 	}

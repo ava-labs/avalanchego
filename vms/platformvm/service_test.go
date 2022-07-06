@@ -774,8 +774,8 @@ func TestGetBlock(t *testing.T) {
 			block, err := stateful.NewStandardBlock(
 				blkVersion,
 				0, // apricot timestamp is not serialized
-				service.vm.blkVerifier,
-				service.vm.txExecutorBackend,
+				service.vm.manager,
+				service.vm.ctx,
 				ids.GenerateTestID(),
 				1234,
 				nil,
@@ -785,7 +785,7 @@ func TestGetBlock(t *testing.T) {
 			}
 
 			statelessBlk := block.StandardBlockIntf
-			service.vm.blkVerifier.AddStatelessBlock(statelessBlk, block.Status())
+			service.vm.manager.AddStatelessBlock(statelessBlk, block.Status())
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),

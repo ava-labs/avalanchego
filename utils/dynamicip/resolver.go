@@ -6,21 +6,21 @@ package dynamicip
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 const (
 	ifConfigCoURL = "http://ifconfig.co"
 	ifConfigMeURL = "http://ifconfig.me"
-
+	// Note: All of the names below must be lowercase
+	// because we lowercase the user's input in NewResolver.
 	// TODO remove either ifConfig or ifConfigCo.
 	// They do the same thing.
-	OpenDNS    ResolverName = "opendns"
-	IFConfig   ResolverName = "ifconfig"
-	IFConfigCo ResolverName = "ifconfigCo"
-	IFConfigMe ResolverName = "ifconfigMe"
+	OpenDNSName    = "opendns"
+	IFConfigName   = "ifconfig"
+	IFConfigCoName = "ifconfigco"
+	IFConfigMeName = "ifconfigme"
 )
-
-type ResolverName string
 
 // Resolver resolves our public IP
 type Resolver interface {
@@ -30,15 +30,16 @@ type Resolver interface {
 
 // Returns a new Resolver that uses the given service
 // to resolve our public IP.
-// If [resolverService] isn't one of the above,
-// returns an error
-func NewResolver(resolverName ResolverName) (Resolver, error) {
-	switch resolverName {
-	case OpenDNS:
+// [resolverName] must be one of:
+// [OpenDNSName], [IFConfigName], [IFConfigCoName], [IFConfigMeName].
+// If [resolverService] isn't one of the above, returns an error
+func NewResolver(resolverName string) (Resolver, error) {
+	switch strings.ToLower(resolverName) {
+	case OpenDNSName:
 		return newOpenDNSResolver(), nil
-	case IFConfig, IFConfigCo:
+	case IFConfigName, IFConfigCoName:
 		return &ifConfigResolver{url: ifConfigCoURL}, nil
-	case IFConfigMe:
+	case IFConfigMeName:
 		return &ifConfigResolver{url: ifConfigMeURL}, nil
 	default:
 		return nil, fmt.Errorf("got unknown resolver: %s", resolverName)

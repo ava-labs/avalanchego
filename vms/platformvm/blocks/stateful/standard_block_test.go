@@ -92,8 +92,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	apricotChildBlk, err := NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height(),
 		nil, // txs nulled to simplify test
@@ -105,8 +105,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	apricotChildBlk, err = NewStandardBlock(
 		stateless.ApricotVersion,
 		uint64(parentTime.Unix()),
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -181,8 +181,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err := NewStandardBlock(
 		stateless.ApricotVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -194,8 +194,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height(),
 		nil, // txs nulled to simplify test
@@ -208,8 +208,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -222,8 +222,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -236,8 +236,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -250,8 +250,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -264,8 +264,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	blueberryChildBlk, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		childTimestamp,
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -312,8 +312,8 @@ func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	block, err := NewStandardBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -516,8 +516,8 @@ func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 				block, err := NewStandardBlock(
 					stateless.BlueberryVersion,
 					uint64(newTime.Unix()),
-					h.blkVerifier,
-					h.txExecBackend,
+					h.blkManager,
+					h.ctx,
 					parentBlk.ID(),
 					parentBlk.Height()+1,
 					nil, // txs nulled to simplify test
@@ -627,8 +627,8 @@ func TestBlueberryStandardBlockRemoveSubnetValidator(t *testing.T) {
 	block, err := NewStandardBlock(
 		stateless.BlueberryVersion,
 		uint64(subnetVdr1EndTime.Unix()),
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -700,8 +700,8 @@ func TestBlueberryStandardBlockWhitelistedSubnet(t *testing.T) {
 			block, err := NewStandardBlock(
 				stateless.BlueberryVersion,
 				uint64(subnetVdr1StartTime.Unix()),
-				h.blkVerifier,
-				h.txExecBackend,
+				h.blkManager,
+				h.ctx,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
 				nil, // txs nulled to simplify test
@@ -753,8 +753,8 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	block, err := NewStandardBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -798,8 +798,8 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	block, err = NewStandardBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
-		h.blkVerifier,
-		h.txExecBackend,
+		h.blkManager,
+		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test

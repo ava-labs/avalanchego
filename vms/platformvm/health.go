@@ -37,20 +37,20 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 	}
 
 	for subnetID := range vm.WhitelistedSubnets {
-		PercentConnected, err := vm.getPercentConnected(subnetID)
+		percentConnected, err := vm.getPercentConnected(subnetID)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get percent connected for %q: %w", subnetID, err)
 		}
 
 		subnetIDStr := subnetID.String()
-		vm.metrics.SubnetPercentConnected.WithLabelValues(subnetIDStr).Set(PercentConnected)
-		key := fmt.Sprintf("%s-PercentConnected", subnetID)
-		details[key] = PercentConnected
+		vm.metrics.SubnetPercentConnected.WithLabelValues(subnetIDStr).Set(percentConnected)
+		key := fmt.Sprintf("%s-percentConnected", subnetID)
+		details[key] = percentConnected
 
-		if PercentConnected < MinConnectedStake {
+		if percentConnected < MinConnectedStake {
 			errorReasons = append(errorReasons,
 				fmt.Sprintf("connected to %f%% of %q weight; should be connected to at least %f%%",
-					PercentConnected*100,
+					percentConnected*100,
 					subnetIDStr,
 					MinConnectedStake*100,
 				),

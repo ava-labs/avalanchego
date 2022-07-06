@@ -4,12 +4,9 @@
 package stateful
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -21,9 +18,18 @@ var (
 // be a proposal block) being enacted.
 type CommitBlock struct {
 	stateless.OptionBlock
-	*doubleDecisionBlock
+	*decisionBlock
 
 	wasPreferred bool
+	manager      Manager
+}
+
+func (c *CommitBlock) ExpectedChildVersion() uint16 {
+	forkTime := c.manager.GetConfig().BlueberryTime
+	if c.Timestamp().Before(forkTime) {
+		return stateless.ApricotVersion
+	}
+	return stateless.BlueberryVersion
 }
 
 // NewCommitBlock returns a new *Commit block where the block's parent, a
@@ -32,8 +38,7 @@ type CommitBlock struct {
 func NewCommitBlock(
 	version uint16,
 	timestamp uint64,
-	verifier Verifier,
-	txExecutorBackend executor.Backend,
+	manager Manager,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
@@ -43,92 +48,53 @@ func NewCommitBlock(
 		return nil, err
 	}
 
-	return toStatefulCommitBlock(statelessBlk, verifier, txExecutorBackend, wasPreferred, choices.Processing)
+	return toStatefulCommitBlock(statelessBlk, manager, wasPreferred, choices.Processing)
 }
 
 func toStatefulCommitBlock(
 	statelessBlk stateless.OptionBlock,
-	verifier Verifier,
-	txExecutorBackend executor.Backend,
+	manager Manager,
 	wasPreferred bool,
 	status choices.Status,
 ) (*CommitBlock, error) {
 	commit := &CommitBlock{
 		OptionBlock: statelessBlk,
-		doubleDecisionBlock: &doubleDecisionBlock{
-			decisionBlock: decisionBlock{
-				commonBlock: &commonBlock{
-					commonStatelessBlk: statelessBlk,
-					status:             status,
-					verifier:           verifier,
-					txExecutorBackend:  txExecutorBackend,
-				},
+		decisionBlock: &decisionBlock{
+			chainState: manager,
+			commonBlock: &commonBlock{
+				baseBlk:         statelessBlk,
+				status:          status,
+				timestampGetter: manager,
+				lastAccepteder:  manager,
 			},
 		},
 		wasPreferred: wasPreferred,
+		manager:      manager,
 	}
 
 	return commit, nil
 }
 
+func (c *CommitBlock) Verify() error {
+	return c.manager.verifyCommitBlock(c)
+}
+
 func (c *CommitBlock) Accept() error {
-	if c.txExecutorBackend.Bootstrapped.GetValue() {
-		if c.wasPreferred {
-			c.verifier.MarkAcceptedOptionVote()
-		} else {
-			c.verifier.MarkRejectedOptionVote()
-		}
-	}
-
-	if err := c.doubleDecisionBlock.acceptParent(); err != nil {
-		return err
-	}
-
-	c.accept()
-	c.verifier.AddStatelessBlock(c.OptionBlock, c.Status())
-	if err := c.verifier.MarkAccepted(c.OptionBlock); err != nil {
-		return fmt.Errorf("failed to accept commit block %s: %w", c.ID(), err)
-	}
-
-	return c.doubleDecisionBlock.updateState()
+	return c.manager.acceptCommitBlock(c)
 }
 
 func (c *CommitBlock) Reject() error {
-	c.txExecutorBackend.Ctx.Log.Verbo(
-		"Rejecting CommitBlock Block %s at height %d with parent %s",
-		c.ID(), c.Height(), c.Parent(),
-	)
-
-	defer c.reject()
-	c.verifier.AddStatelessBlock(c.OptionBlock, c.Status())
-	return c.verifier.Commit()
+	return c.manager.rejectCommitBlock(c)
 }
 
-// Verify this block performs a valid state transition.
-//
-// The parent block must be a proposal
-//
-// This function also sets onAcceptState if the verification passes.
-func (c *CommitBlock) Verify() error {
-	if err := c.verify(false /*enforceStrictness*/); err != nil {
-		return err
-	}
+func (c *CommitBlock) conflicts(s ids.Set) (bool, error) {
+	return c.manager.conflictsCommitBlock(c, s)
+}
 
-	parentIntf, err := c.parentBlock()
-	if err != nil {
-		return err
-	}
+func (c *CommitBlock) free() {
+	c.manager.freeCommitBlock(c)
+}
 
-	// The parent of a Commit block should always be a proposal
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
-	c.onAcceptState = parent.onCommitState
-	c.SetTimestamp(c.onAcceptState.GetTimestamp())
-
-	c.verifier.CacheVerifiedBlock(c)
-	parent.addChild(c)
-	return nil
+func (c *CommitBlock) setBaseState() {
+	c.manager.setBaseStateCommitBlock(c)
 }

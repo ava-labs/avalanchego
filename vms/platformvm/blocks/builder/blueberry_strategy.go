@@ -104,13 +104,14 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		return nil, err
 	}
 
+	ctx := b.blockBuilder.txExecutorBackend.Ctx
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
 		return stateful.NewStandardBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
+			b.blkManager,
+			ctx,
 			b.parentBlkID,
 			b.height,
 			nil,
@@ -124,8 +125,8 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		return stateful.NewProposalBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
+			b.blkManager,
+			ctx,
 			b.parentBlkID,
 			b.height,
 			b.txes[0],
@@ -138,8 +139,8 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		return stateful.NewStandardBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
-			b.blkVerifier,
-			b.txExecutorBackend,
+			b.blkManager,
+			ctx,
 			b.parentBlkID,
 			b.height,
 			b.txes,

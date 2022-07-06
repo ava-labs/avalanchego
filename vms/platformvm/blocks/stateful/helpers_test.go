@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -48,6 +47,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 
+	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
@@ -79,9 +79,9 @@ const (
 )
 
 type testHelpersCollection struct {
-	blkVerifier Verifier
-	mpool       mempool.Mempool
-	sender      *common.SenderTest
+	blkManager Manager
+	mpool      mempool.Mempool
+	sender     *common.SenderTest
 
 	isBootstrapped  *utils.AtomicBool
 	cfg             *config.Config
@@ -132,7 +132,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	res.cfg = defaultCfg()
 	res.clk = defaultClock()
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
 	res.ctx = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
@@ -200,20 +200,26 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	}
 
 	if ctrl == nil {
-		res.blkVerifier = NewBlockVerifier(
+		res.blkManager = NewManager(
 			res.mpool,
+			metrics,
+			res.fullState,
+			res.fullState,
+			res.fullState,
 			res.fullState,
 			res.txExecBackend,
-			metrics,
 			window,
 		)
 		addSubnet(res.fullState, res.txBuilder, res.txExecBackend)
 	} else {
-		res.blkVerifier = NewBlockVerifier(
+		res.blkManager = NewManager(
 			res.mpool,
+			metrics,
+			res.mockedFullState,
+			res.mockedFullState,
+			res.mockedFullState,
 			res.mockedFullState,
 			res.txExecBackend,
-			metrics,
 			window,
 		)
 		// we do not add any subnet to state, since we can mock

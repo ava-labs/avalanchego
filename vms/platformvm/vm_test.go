@@ -487,7 +487,7 @@ func TestGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if genesisBlock, err := vm.blkVerifier.GetStatefulBlock(genesisBlockID); err != nil {
+	if genesisBlock, err := vm.manager.GetStatefulBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
 	} else if genesisBlock.Status() != choices.Accepted {
 		t.Fatal("genesis block should be accepted")
@@ -677,8 +677,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	blk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1688,8 +1688,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	blk, err := stateful.NewAtomicBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1775,8 +1775,8 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		firstVM.blkVerifier,
-		firstVM.txExecutorBackend,
+		firstVM.manager,
+		firstVM.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1908,8 +1908,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		firstVM.blkVerifier,
-		firstVM.txExecutorBackend,
+		firstVM.manager,
+		firstVM.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2048,8 +2048,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2340,8 +2340,8 @@ func TestUnverifiedParent(t *testing.T) {
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2369,8 +2369,8 @@ func TestUnverifiedParent(t *testing.T) {
 	secondAdvanceTimeBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		firstOption.ID(),
 		firstOption.(stateful.Block).Height()+1,
 		secondAdvanceTimeTx,
@@ -2550,8 +2550,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	addSubnetBlk0, err := stateful.NewStandardBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -2562,8 +2562,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	addSubnetBlk1, err := stateful.NewStandardBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -2574,8 +2574,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	addSubnetBlk2, err := stateful.NewStandardBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -2648,8 +2648,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	addValidatorProposalBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -2724,8 +2724,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	importBlk, err := stateful.NewStandardBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -2791,8 +2791,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	advanceTimeProposalBlk, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2904,8 +2904,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalBlk0, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -2949,8 +2949,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalBlk0, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -3033,8 +3033,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlk, err := stateful.NewStandardBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -3111,8 +3111,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalBlk1, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -3156,8 +3156,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalBlk1, err := stateful.NewProposalBlock(
 		blkVersion,
 		0, // apricot timestamp is not serialized
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,

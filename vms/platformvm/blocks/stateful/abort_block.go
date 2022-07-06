@@ -4,12 +4,9 @@
 package stateful
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -21,9 +18,19 @@ var (
 // be a proposal block) being rejected.
 type AbortBlock struct {
 	stateless.OptionBlock
-	*doubleDecisionBlock
+	*decisionBlock
 
 	wasPreferred bool
+
+	manager Manager
+}
+
+func (a *AbortBlock) ExpectedChildVersion() uint16 {
+	forkTime := a.manager.GetConfig().BlueberryTime
+	if a.Timestamp().Before(forkTime) {
+		return stateless.ApricotVersion
+	}
+	return stateless.BlueberryVersion
 }
 
 // NewAbortBlock returns a new *AbortBlock where the block's parent, a proposal
@@ -32,8 +39,7 @@ type AbortBlock struct {
 func NewAbortBlock(
 	version uint16,
 	timestamp uint64,
-	verifier Verifier,
-	txExecutorBackend executor.Backend,
+	manager Manager,
 	parentID ids.ID,
 	height uint64,
 	wasPreferred bool,
@@ -42,94 +48,58 @@ func NewAbortBlock(
 	if err != nil {
 		return nil, err
 	}
-	return toStatefulAbortBlock(statelessBlk, verifier, txExecutorBackend, wasPreferred, choices.Processing)
+	return toStatefulAbortBlock(
+		statelessBlk,
+		manager,
+		wasPreferred,
+		choices.Processing,
+	)
 }
 
 func toStatefulAbortBlock(
 	statelessBlk stateless.OptionBlock,
-	verifier Verifier,
-	txExecutorBackend executor.Backend,
+	manager Manager,
 	wasPreferred bool,
 	status choices.Status,
 ) (*AbortBlock, error) {
 	abort := &AbortBlock{
 		OptionBlock: statelessBlk,
-		doubleDecisionBlock: &doubleDecisionBlock{
-			decisionBlock: decisionBlock{
-				commonBlock: &commonBlock{
-					commonStatelessBlk: statelessBlk,
-					status:             status,
-					verifier:           verifier,
-					txExecutorBackend:  txExecutorBackend,
-				},
+		decisionBlock: &decisionBlock{
+			chainState: manager,
+			commonBlock: &commonBlock{
+				baseBlk:         statelessBlk,
+				status:          status,
+				timestampGetter: manager,
+				lastAccepteder:  manager,
 			},
 		},
 		wasPreferred: wasPreferred,
+		manager:      manager,
 	}
 
 	return abort, nil
 }
 
+func (a *AbortBlock) Verify() error {
+	return a.manager.verifyAbortBlock(a)
+}
+
 func (a *AbortBlock) Accept() error {
-	if a.txExecutorBackend.Bootstrapped.GetValue() {
-		if a.wasPreferred {
-			a.verifier.MarkAcceptedOptionVote()
-		} else {
-			a.verifier.MarkRejectedOptionVote()
-		}
-	}
-
-	if err := a.doubleDecisionBlock.acceptParent(); err != nil {
-		return err
-	}
-
-	a.accept()
-	a.verifier.AddStatelessBlock(a.OptionBlock, a.Status())
-	if err := a.verifier.MarkAccepted(a.OptionBlock); err != nil {
-		return fmt.Errorf("failed to accept abort block %s: %w", a.ID(), err)
-	}
-
-	return a.doubleDecisionBlock.updateState()
+	return a.manager.acceptAbortBlock(a)
 }
 
 func (a *AbortBlock) Reject() error {
-	a.txExecutorBackend.Ctx.Log.Verbo(
-		"Rejecting Abort Block %s at height %d with parent %s",
-		a.ID(),
-		a.Height(),
-		a.Parent(),
-	)
-
-	defer a.reject()
-	a.verifier.AddStatelessBlock(a.OptionBlock, a.Status())
-	return a.verifier.Commit()
+	return a.manager.rejectAbortBlock(a)
 }
 
-// Verify this block performs a valid state transition.
-//
-// The parent block must be a proposal
-//
-// This function also sets onAcceptState if the verification passes.
-func (a *AbortBlock) Verify() error {
-	if err := a.verify(false /*enforceStrictness*/); err != nil {
-		return err
-	}
+func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
+	return a.manager.conflictsAbortBlock(a, s)
+}
 
-	parentIntf, err := a.parentBlock()
-	if err != nil {
-		return err
-	}
+func (a *AbortBlock) free() {
+	a.manager.freeAbortBlock(a)
+}
 
-	// The parent of an Abort block should always be a proposal
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
-	a.onAcceptState = parent.onAbortState
-	a.SetTimestamp(a.onAcceptState.GetTimestamp())
-
-	a.verifier.CacheVerifiedBlock(a)
-	parent.addChild(a)
-	return nil
+func (a *AbortBlock) setBaseState() {
+	a.manager.setBaseStateAbortBlock(a)
 }

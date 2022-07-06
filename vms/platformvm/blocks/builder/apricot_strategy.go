@@ -106,6 +106,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		return nil, err
 	}
 
+	ctx := a.blockBuilder.txExecutorBackend.Ctx
 	switch a.txes[0].Unsigned.(type) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
@@ -113,8 +114,8 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		return stateful.NewProposalBlock(
 			blkVersion,
 			uint64(0),
-			a.blkVerifier,
-			a.txExecutorBackend,
+			a.blkManager,
+			ctx,
 			a.parentBlkID,
 			a.height,
 			a.txes[0],
@@ -126,8 +127,8 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		return stateful.NewStandardBlock(
 			blkVersion,
 			uint64(0),
-			a.blkVerifier,
-			a.txExecutorBackend,
+			a.blkManager,
+			ctx,
 			a.parentBlkID,
 			a.height,
 			a.txes,

@@ -98,9 +98,9 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	blkVerifier       stateful.Verifier
 	txBuilder         p_tx_builder.Builder
 	txExecutorBackend executor.Backend
+	manager           stateful.Manager
 }
 
 // Initialize this blockchain.
@@ -194,18 +194,22 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
-	vm.blkVerifier = stateful.NewBlockVerifier(
+
+	vm.manager = stateful.NewManager(
 		mempool,
+		vm.metrics,
+		vm.internalState,
+		vm.internalState,
+		vm.internalState,
 		vm.internalState,
 		vm.txExecutorBackend,
-		vm.metrics,
 		vm.recentlyAccepted,
 	)
 	vm.BlockBuilder = p_blk_builder.NewBlockBuilder(
 		mempool,
 		vm.txBuilder,
 		vm.txExecutorBackend,
-		vm.blkVerifier,
+		vm.manager,
 		toEngine,
 		appSender,
 	)
@@ -371,14 +375,14 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 
 	return stateful.MakeStateful(
 		statelessBlk,
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		choices.Processing,
 	)
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return vm.blkVerifier.GetStatefulBlock(blkID)
+	return vm.manager.GetStatefulBlock(blkID)
 }
 
 // LastAccepted returns the block most recently accepted
@@ -565,7 +569,7 @@ func (vm *VM) GetMinimumHeight() (uint64, error) {
 // GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
 	lastAcceptedID := vm.internalState.GetLastAccepted()
-	lastAccepted, err := vm.blkVerifier.GetStatefulBlock(lastAcceptedID)
+	lastAccepted, err := vm.manager.GetStatefulBlock(lastAcceptedID)
 	if err != nil {
 		return 0, err
 	}
@@ -584,7 +588,7 @@ func (vm *VM) updateValidators() error {
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
 	vm.metrics.LocalStake.Set(float64(weight))
-	vm.metrics.TotalStake.Set(float64(primaryValidators.Weight()))
+	vm.metrics.LocalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)
