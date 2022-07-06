@@ -84,7 +84,7 @@ type VM struct {
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	internalState InternalState
+	internalState stateful.InternalState
 	utxoHandler   utxo.Handler
 
 	// ID of the preferred block
@@ -158,11 +158,15 @@ func (vm *VM) Initialize(
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 	vm.currentBlocks = make(map[ids.ID]stateful.Block)
-	if vm.internalState, err = NewState(
-		vm,
+	if vm.internalState, err = stateful.NewState(
 		vm.dbManager.Current().Database,
 		genesisBytes,
 		registerer,
+		vm.ctx,
+		&vm.Config,
+		vm.LocalStake,
+		vm.TotalStake,
+		vm.rewards,
 	); err != nil {
 		return err
 	}

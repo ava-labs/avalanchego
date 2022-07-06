@@ -2791,11 +2791,15 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := NewState(
-		vm,
+	is, err := stateful.NewState(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
+		vm.ctx,
+		&vm.Config,
+		vm.LocalStake,
+		vm.TotalStake,
+		vm.rewards,
 	)
 	assert.NoError(err)
 	vm.internalState = is
@@ -3159,11 +3163,15 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := NewState(
-		vm,
+	is, err := stateful.NewState(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
+		vm.ctx,
+		&vm.Config,
+		vm.LocalStake,
+		vm.TotalStake,
+		vm.rewards,
 	)
 	assert.NoError(err)
 	vm.internalState = is

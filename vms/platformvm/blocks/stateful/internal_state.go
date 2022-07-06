@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package stateful
 
 import (
 	"fmt"
@@ -14,11 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -97,7 +100,6 @@ type InternalState interface {
 type internalStateImpl struct {
 	state.State
 
-	vm     *VM
 	baseDB *versiondb.Database
 
 	currentHeight uint64
@@ -113,7 +115,16 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func NewState(vm *VM, db database.Database, genesis []byte, metrics prometheus.Registerer) (InternalState, error) {
+func NewState(
+	db database.Database,
+	genesis []byte,
+	metrics prometheus.Registerer,
+	ctx *snow.Context,
+	config *config.Config,
+	localStake prometheus.Gauge,
+	totalStake prometheus.Gauge,
+	rewards reward.Calculator,
+) (InternalState, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metrics,
@@ -128,11 +139,11 @@ func NewState(vm *VM, db database.Database, genesis []byte, metrics prometheus.R
 	state, err := state.New(
 		baseDB,
 		metrics,
-		&vm.Config,
-		vm.ctx,
-		vm.LocalStake,
-		vm.LocalStake,
-		vm.rewards,
+		config,
+		ctx,
+		localStake,
+		localStake,
+		rewards,
 	)
 	if err != nil {
 		return nil, err
@@ -140,7 +151,6 @@ func NewState(vm *VM, db database.Database, genesis []byte, metrics prometheus.R
 
 	is := &internalStateImpl{
 		State:       state,
-		vm:          vm,
 		baseDB:      baseDB,
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
