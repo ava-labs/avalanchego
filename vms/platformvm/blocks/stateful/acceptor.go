@@ -133,7 +133,7 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 		)
 	}
 
-	if err := a.ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+	if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 

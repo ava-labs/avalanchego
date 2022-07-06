@@ -42,7 +42,8 @@ func (c *conflictCheckerImpl) conflictsStandardBlock(b *StandardBlock, s ids.Set
 	if b.status == choices.Accepted {
 		return false, nil
 	}
-	if b.Inputs.Overlaps(s) {
+	inputs := c.blkIDToInputs[b.ID()]
+	if inputs.Overlaps(s) {
 		return true, nil
 	}
 	parent, err := c.parent(b.baseBlk)

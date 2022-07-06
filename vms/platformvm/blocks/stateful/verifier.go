@@ -164,11 +164,22 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		parentState.PendingStakers(),
 	)
 
+	// TODO do we still need to do something similar to the below?
 	// clear inputs so that multiple [Verify] calls can be made
-	b.Inputs.Clear()
-	b.atomicRequests = make(map[ids.ID]*atomic.Requests)
+	// b.Inputs.Clear()
+	// b.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
 	funcs := make([]func(), 0, len(b.Txs))
+	blockInputs, ok := v.blkIDToInputs[blkID]
+	if !ok {
+		blockInputs = ids.Set{}
+		v.blkIDToInputs[blkID] = blockInputs
+	}
+	atomicRequests := v.blkIDToAtomicRequests[blkID]
+	if !ok {
+		atomicRequests = make(map[ids.ID]*atomic.Requests)
+		v.blkIDToAtomicRequests[blkID] = atomicRequests
+	}
 	for _, tx := range b.Txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
@@ -181,11 +192,11 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 			return err
 		}
 		// ensure it doesn't overlap with current input batch
-		if b.Inputs.Overlaps(txExecutor.Inputs) {
+		if blockInputs.Overlaps(txExecutor.Inputs) {
 			return errConflictingBatchTxs
 		}
 		// Add UTXOs to batch
-		b.Inputs.Union(txExecutor.Inputs)
+		blockInputs.Union(txExecutor.Inputs)
 
 		onAcceptState.AddTx(tx, status.Committed)
 		if txExecutor.OnAccept != nil {
@@ -194,9 +205,9 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 
 		for chainID, txRequests := range txExecutor.AtomicRequests {
 			// Add/merge in the atomic requests represented by [tx]
-			chainRequests, exists := b.atomicRequests[chainID]
+			chainRequests, exists := atomicRequests[chainID]
 			if !exists {
-				b.atomicRequests[chainID] = txRequests
+				atomicRequests[chainID] = txRequests
 				continue
 			}
 
@@ -205,9 +216,9 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	if b.Inputs.Len() > 0 {
+	if blockInputs.Len() > 0 {
 		// ensure it doesnt conflict with the parent block
-		conflicts, err := parentIntf.conflicts(b.Inputs)
+		conflicts, err := parentIntf.conflicts(blockInputs)
 		if err != nil {
 			return err
 		}
