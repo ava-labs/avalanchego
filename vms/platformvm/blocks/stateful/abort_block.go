@@ -17,11 +17,12 @@ var (
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.
 type AbortBlock struct {
-	Manager
 	*stateless.AbortBlock
 	*decisionBlock
 
 	wasPreferred bool
+
+	manager Manager
 }
 
 // NewAbortBlock returns a new *AbortBlock where the block's parent, a proposal
@@ -53,7 +54,6 @@ func toStatefulAbortBlock(
 ) (*AbortBlock, error) {
 	abort := &AbortBlock{
 		AbortBlock: statelessBlk,
-		Manager:    manager,
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
@@ -64,36 +64,32 @@ func toStatefulAbortBlock(
 			},
 		},
 		wasPreferred: wasPreferred,
+		manager:      manager,
 	}
 
 	return abort, nil
 }
 
-// Verify this block performs a valid state transition.
-//
-// The parent block must be a proposal
-//
-// This function also sets onAcceptState if the verification passes.
 func (a *AbortBlock) Verify() error {
-	return a.verifyAbortBlock(a)
+	return a.manager.verifyAbortBlock(a)
 }
 
 func (a *AbortBlock) Accept() error {
-	return a.acceptAbortBlock(a)
+	return a.manager.acceptAbortBlock(a)
 }
 
 func (a *AbortBlock) Reject() error {
-	return a.rejectAbortBlock(a)
+	return a.manager.rejectAbortBlock(a)
 }
 
 func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
-	return a.conflictsAbortBlock(a, s)
+	return a.manager.conflictsAbortBlock(a, s)
 }
 
 func (a *AbortBlock) free() {
-	a.freeAbortBlock(a)
+	a.manager.freeAbortBlock(a)
 }
 
 func (a *AbortBlock) setBaseState() {
-	a.setBaseStateAbortBlock(a)
+	a.manager.setBaseStateAbortBlock(a)
 }

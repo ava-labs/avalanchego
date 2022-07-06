@@ -27,7 +27,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 		b.Parent(),
 	)
 
-	if err := r.Add(b.Tx); err != nil {
+	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			b.Tx.ID(),
@@ -37,7 +37,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 
 	b.status = choices.Rejected
 	defer b.free()
-	r.AddStatelessBlock(b.ProposalBlock, choices.Rejected)
+	r.AddStatelessBlock(b.ProposalBlock, b.status)
 	return r.Commit()
 }
 
@@ -49,7 +49,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 		b.Parent(),
 	)
 
-	if err := r.Add(b.Tx); err != nil {
+	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			b.Tx.ID(),
@@ -59,7 +59,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 
 	b.status = choices.Rejected
 	defer b.free()
-	r.AddStatelessBlock(b.AtomicBlock, choices.Rejected)
+	r.AddStatelessBlock(b.AtomicBlock, b.status)
 	return r.Commit()
 }
 
@@ -72,7 +72,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 	)
 
 	for _, tx := range b.Txs {
-		if err := r.Add(tx); err != nil {
+		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),
@@ -83,7 +83,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 
 	b.status = choices.Rejected
 	defer b.free()
-	r.AddStatelessBlock(b.StandardBlock, choices.Rejected)
+	r.AddStatelessBlock(b.StandardBlock, b.status)
 	return r.Commit()
 }
 
@@ -97,7 +97,7 @@ func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 
 	b.status = choices.Rejected
 	defer b.free()
-	r.AddStatelessBlock(b.CommitBlock, choices.Rejected)
+	r.AddStatelessBlock(b.CommitBlock, b.status)
 	return r.Commit()
 }
 
@@ -111,6 +111,6 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 
 	b.status = choices.Rejected
 	defer b.free()
-	r.AddStatelessBlock(b.AbortBlock, choices.Rejected)
+	r.AddStatelessBlock(b.AbortBlock, b.status)
 	return r.Commit()
 }

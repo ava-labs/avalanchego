@@ -24,15 +24,15 @@ var (
 // AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	Manager
 	*stateless.AtomicBlock
 	*decisionBlock
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
-	inputs ids.Set
-
+	inputs         ids.Set
 	atomicRequests map[ids.ID]*atomic.Requests
+
+	manager Manager
 }
 
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
@@ -59,7 +59,6 @@ func toStatefulAtomicBlock(
 ) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		AtomicBlock: statelessBlk,
-		Manager:     manager,
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
@@ -69,6 +68,7 @@ func toStatefulAtomicBlock(
 				status:          status,
 			},
 		},
+		manager: manager,
 	}
 
 	ab.Tx.Unsigned.InitCtx(ctx)
@@ -78,30 +78,25 @@ func toStatefulAtomicBlock(
 // conflicts checks to see if the provided input set contains any conflicts with
 // any of this block's non-accepted ancestors or itself.
 func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
-	return ab.conflictsAtomicBlock(ab, s)
+	return ab.manager.conflictsAtomicBlock(ab, s)
 }
 
-// Verify this block performs a valid state transition.
-//
-// The parent block must be a decision block
-//
-// This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
-	return ab.verifyAtomicBlock(ab)
+	return ab.manager.verifyAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) Accept() error {
-	return ab.acceptAtomicBlock(ab)
+	return ab.manager.acceptAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) Reject() error {
-	return ab.rejectAtomicBlock(ab)
+	return ab.manager.rejectAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) free() {
-	ab.freeAtomicBlock(ab)
+	ab.manager.freeAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) setBaseState() {
-	ab.setBaseStateAtomicBlock(ab)
+	ab.manager.setBaseStateAtomicBlock(ab)
 }

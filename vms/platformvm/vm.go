@@ -201,7 +201,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
-	// TODO should we just try to put InternalState into package stateful?
 	vm.manager = stateful.NewManager(
 		mempool,
 		vm.Metrics,

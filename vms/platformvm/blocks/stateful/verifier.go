@@ -17,10 +17,29 @@ import (
 var _ verifier = &verifierImpl{}
 
 type verifier interface {
+	// Verify this block is valid.
+	// The parent block must either be a Commit or an Abort block.
+	// If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 	verifyProposalBlock(b *ProposalBlock) error
+
+	// Verify this block performs a valid state transition.
+	// The parent block must be a decision block
+	// This function also sets onAcceptDB database if the verification passes.
 	verifyAtomicBlock(b *AtomicBlock) error
+
+	// Verify this block performs a valid state transition.
+	// The parent block must be a proposal
+	// This function also sets onAcceptDB database if the verification passes.
 	verifyStandardBlock(b *StandardBlock) error
+
+	// Verify this block performs a valid state transition.
+	// The parent block must be a proposal
+	// This function also sets onAcceptState if the verification passes.
 	verifyCommitBlock(b *CommitBlock) error
+
+	// Verify this block performs a valid state transition.
+	// The parent block must be a proposal
+	// This function also sets onAcceptState if the verification passes.
 	verifyAbortBlock(b *AbortBlock) error
 }
 
@@ -67,7 +86,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 
 	b.timestamp = parentState.GetTimestamp()
 
-	v.RemoveProposalTx(b.Tx)
+	v.Mempool.RemoveProposalTx(b.Tx)
 	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
@@ -130,7 +149,7 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 		return ErrConflictingParentTxs
 	}
 
-	v.RemoveDecisionTxs([]*txs.Tx{b.Tx})
+	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil
@@ -146,8 +165,6 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		return err
 	}
 
-	// StandardBlock is not a modifier on a proposal block, so its parent must
-	// be a decision.
 	parent, ok := parentIntf.(Decision)
 	if !ok {
 		return fmt.Errorf("expected Decision block but got %T", parentIntf)
@@ -224,7 +241,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 
 	b.timestamp = b.onAcceptState.GetTimestamp()
 
-	v.RemoveDecisionTxs(b.Txs)
+	v.Mempool.RemoveDecisionTxs(b.Txs)
 	v.pinVerifiedBlock(b)
 	parentIntf.addChild(b)
 	return nil

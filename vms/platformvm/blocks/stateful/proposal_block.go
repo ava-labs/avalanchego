@@ -28,7 +28,6 @@ var _ Block = &ProposalBlock{}
 // The proposal will be enacted (change the chain's state) if the proposal block
 // is accepted and followed by an accepted Commit block
 type ProposalBlock struct {
-	Manager
 	*stateless.ProposalBlock
 	*commonBlock
 
@@ -37,6 +36,8 @@ type ProposalBlock struct {
 	// The state that the chain will have if this block's proposal is aborted
 	onAbortState  state.Diff
 	prefersCommit bool
+
+	manager Manager
 }
 
 // NewProposalBlock creates a new block that proposes to issue a transaction.
@@ -65,13 +66,13 @@ func toStatefulProposalBlock(
 ) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		ProposalBlock: statelessBlk,
-		Manager:       manager,
 		commonBlock: &commonBlock{
 			timestampGetter: manager,
 			lastAccepteder:  manager,
 			baseBlk:         &statelessBlk.CommonBlock,
 			status:          status,
 		},
+		manager: manager,
 	}
 
 	pb.Tx.Unsigned.InitCtx(ctx)
@@ -79,28 +80,23 @@ func toStatefulProposalBlock(
 }
 
 func (pb *ProposalBlock) free() {
-	pb.freeProposalBlock(pb)
+	pb.manager.freeProposalBlock(pb)
 }
 
-// Verify this block is valid.
-//
-// The parent block must either be a Commit or an Abort block.
-//
-// If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	return pb.verifyProposalBlock(pb)
+	return pb.manager.verifyProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Accept() error {
-	return pb.acceptProposalBlock(pb)
+	return pb.manager.acceptProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Reject() error {
-	return pb.rejectProposalBlock(pb)
+	return pb.manager.rejectProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
-	return pb.conflictsProposalBlock(pb, s)
+	return pb.manager.conflictsProposalBlock(pb, s)
 }
 
 // Options returns the possible children of this block in preferential order.
@@ -108,7 +104,12 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
 
-	commit, err := NewCommitBlock(pb.Manager, blkID, nextHeight, pb.prefersCommit)
+	commit, err := NewCommitBlock(
+		pb.manager,
+		blkID,
+		nextHeight,
+		pb.prefersCommit,
+	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
@@ -116,7 +117,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 	abort, err := NewAbortBlock(
-		pb.Manager,
+		pb.manager,
 		blkID,
 		nextHeight,
 		!pb.prefersCommit,
@@ -135,5 +136,5 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 }
 
 func (pb *ProposalBlock) setBaseState() {
-	pb.setBaseStateProposalBlock(pb)
+	pb.manager.setBaseStateProposalBlock(pb)
 }

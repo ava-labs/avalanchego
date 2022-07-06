@@ -24,15 +24,15 @@ var (
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
-	Manager
 	*stateless.StandardBlock
 	*decisionBlock
 
 	// Inputs are the atomic Inputs that are consumed by this block's atomic
 	// transactions
-	Inputs ids.Set
-
+	Inputs         ids.Set
 	atomicRequests map[ids.ID]*atomic.Requests
+
+	manager Manager
 }
 
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
@@ -59,7 +59,6 @@ func toStatefulStandardBlock(
 ) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		StandardBlock: statelessBlk,
-		Manager:       manager,
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
@@ -69,6 +68,7 @@ func toStatefulStandardBlock(
 				status:          status,
 			},
 		},
+		manager: manager,
 	}
 
 	for _, tx := range sb.Txs {
@@ -81,30 +81,25 @@ func toStatefulStandardBlock(
 // conflicts checks to see if the provided input set contains any conflicts with
 // any of this block's non-accepted ancestors or itself.
 func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
-	return sb.conflictsStandardBlock(sb, s)
+	return sb.manager.conflictsStandardBlock(sb, s)
 }
 
-// Verify this block performs a valid state transition.
-//
-// The parent block must be a proposal
-//
-// This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
-	return sb.verifyStandardBlock(sb)
+	return sb.manager.verifyStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Accept() error {
-	return sb.acceptStandardBlock(sb)
+	return sb.manager.acceptStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Reject() error {
-	return sb.rejectStandardBlock(sb)
+	return sb.manager.rejectStandardBlock(sb)
 }
 
 func (sb *StandardBlock) free() {
-	sb.freeStandardBlock(sb)
+	sb.manager.freeStandardBlock(sb)
 }
 
 func (sb *StandardBlock) setBaseState() {
-	sb.Manager.setBaseStateStandardBlock(sb)
+	sb.manager.setBaseStateStandardBlock(sb)
 }

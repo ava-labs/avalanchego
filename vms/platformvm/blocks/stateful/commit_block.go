@@ -17,11 +17,11 @@ var (
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
 type CommitBlock struct {
-	Manager
 	*stateless.CommitBlock
 	*decisionBlock
 
 	wasPreferred bool
+	manager      Manager
 }
 
 // NewCommitBlock returns a new *Commit block where the block's parent, a
@@ -49,7 +49,6 @@ func toStatefulCommitBlock(
 ) (*CommitBlock, error) {
 	commit := &CommitBlock{
 		CommitBlock: statelessBlk,
-		Manager:     manager,
 		decisionBlock: &decisionBlock{
 			chainState: manager,
 			commonBlock: &commonBlock{
@@ -60,36 +59,32 @@ func toStatefulCommitBlock(
 			},
 		},
 		wasPreferred: wasPreferred,
+		manager:      manager,
 	}
 
 	return commit, nil
 }
 
-// Verify this block performs a valid state transition.
-//
-// The parent block must be a proposal
-//
-// This function also sets onAcceptState if the verification passes.
 func (c *CommitBlock) Verify() error {
-	return c.verifyCommitBlock(c)
+	return c.manager.verifyCommitBlock(c)
 }
 
 func (c *CommitBlock) Accept() error {
-	return c.acceptCommitBlock(c)
+	return c.manager.acceptCommitBlock(c)
 }
 
 func (c *CommitBlock) Reject() error {
-	return c.rejectCommitBlock(c)
+	return c.manager.rejectCommitBlock(c)
 }
 
 func (c *CommitBlock) conflicts(s ids.Set) (bool, error) {
-	return c.conflictsCommitBlock(c, s)
+	return c.manager.conflictsCommitBlock(c, s)
 }
 
 func (c *CommitBlock) free() {
-	c.freeCommitBlock(c)
+	c.manager.freeCommitBlock(c)
 }
 
 func (c *CommitBlock) setBaseState() {
-	c.setBaseStateCommitBlock(c)
+	c.manager.setBaseStateCommitBlock(c)
 }
