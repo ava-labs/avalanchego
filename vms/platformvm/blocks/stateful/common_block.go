@@ -4,29 +4,20 @@
 package stateful
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
+	timestampGetter
+	lastAccepteder
 	baseBlk   *stateless.CommonBlock
 	timestamp time.Time // Time this block was proposed at
 	status    choices.Status
 	children  []Block
-
-	verifier          Verifier
-	txExecutorBackend executor.Backend
-}
-
-func (c *commonBlock) parentBlock() (Block, error) {
-	parentBlkID := c.baseBlk.Parent()
-	return c.verifier.GetStatefulBlock(parentBlkID)
 }
 
 func (c *commonBlock) addChild(child Block) {
@@ -40,57 +31,8 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.verifier.GetLastAccepted() {
-		return c.verifier.GetTimestamp()
+	if c.baseBlk.ID() == c.GetLastAccepted() {
+		return c.GetTimestamp()
 	}
 	return c.timestamp
-}
-
-func (c *commonBlock) conflicts(s ids.Set) (bool, error) {
-	if c.Status() == choices.Accepted {
-		return false, nil
-	}
-	parent, err := c.parentBlock()
-	if err != nil {
-		return false, err
-	}
-	return parent.conflicts(s)
-}
-
-func (c *commonBlock) verify() error {
-	if c == nil {
-		return ErrBlockNil
-	}
-
-	parent, err := c.parentBlock()
-	if err != nil {
-		return err
-	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != c.baseBlk.Height() {
-		return fmt.Errorf(
-			"expected block to have height %d, but found %d",
-			expectedHeight,
-			c.baseBlk.Height(),
-		)
-	}
-	return nil
-}
-
-func (c *commonBlock) free() {
-	c.verifier.DropVerifiedBlock(c.baseBlk.ID())
-	c.children = nil
-}
-
-func (c *commonBlock) accept() {
-	blkID := c.baseBlk.ID()
-
-	c.status = choices.Accepted
-	c.verifier.SetLastAccepted(blkID)
-	c.verifier.SetHeight(c.baseBlk.Height())
-	c.verifier.AddToRecentlyAcceptedWindows(blkID)
-}
-
-func (c *commonBlock) reject() {
-	defer c.free()
-	c.status = choices.Rejected
 }

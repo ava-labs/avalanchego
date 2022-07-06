@@ -670,8 +670,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 	blk, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1681,8 +1681,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	blk, err := stateful.NewAtomicBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1764,8 +1764,8 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		firstVM.blkVerifier,
-		firstVM.txExecutorBackend,
+		firstVM.manager,
+		firstVM.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1892,8 +1892,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		firstVM.blkVerifier,
-		firstVM.txExecutorBackend,
+		firstVM.manager,
+		firstVM.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2027,8 +2027,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 	advanceTimeBlk, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2316,8 +2316,8 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	firstAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2343,8 +2343,8 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondAdvanceTimeBlk, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		firstOption.ID(),
 		firstOption.(stateful.Block).Height()+1,
 		secondAdvanceTimeTx,
@@ -2521,8 +2521,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	addSubnetBlk0, err := stateful.NewStandardBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -2531,8 +2531,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	addSubnetBlk1, err := stateful.NewStandardBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -2541,8 +2541,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	addSubnetBlk2, err := stateful.NewStandardBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -2612,8 +2612,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	addValidatorProposalBlk, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -2686,8 +2686,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight = addValidatorProposalCommit.Height()
 
 	importBlk, err := stateful.NewStandardBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -2751,8 +2751,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight = importBlk.Height()
 
 	advanceTimeProposalBlk, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2798,8 +2798,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		vm.metrics.localStake,
-		vm.metrics.totalStake,
+		vm.Metrics.LocalStake,
+		vm.Metrics.TotalStake,
 		rewards,
 		nil, // test does not need syncing genesis
 	)
@@ -2861,8 +2861,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	addValidatorProposalBlk0, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -2904,8 +2904,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = addValidatorProposalCommit0.Height()
 
 	advanceTimeProposalBlk0, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -2986,8 +2986,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
 	importBlk, err := stateful.NewStandardBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -3062,8 +3062,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = importBlk.Height()
 
 	addValidatorProposalBlk1, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -3105,8 +3105,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = addValidatorProposalCommit1.Height()
 
 	advanceTimeProposalBlk1, err := stateful.NewProposalBlock(
-		vm.blkVerifier,
-		vm.txExecutorBackend,
+		vm.manager,
+		vm.ctx,
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,
@@ -3171,8 +3171,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		vm.metrics.localStake,
-		vm.metrics.totalStake,
+		vm.Metrics.LocalStake,
+		vm.Metrics.TotalStake,
 		rewards,
 		nil, // test does not need syncing genesis
 	)

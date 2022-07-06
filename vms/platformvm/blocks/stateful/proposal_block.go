@@ -7,13 +7,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ Block = &ProposalBlock{}
@@ -37,14 +36,16 @@ type ProposalBlock struct {
 	// The state that the chain will have if this block's proposal is aborted
 	onAbortState  state.Diff
 	prefersCommit bool
+
+	manager Manager
 }
 
 // NewProposalBlock creates a new block that proposes to issue a transaction.
 // The parent of this block has ID [parentID].
 // The parent must be a decision block.
 func NewProposalBlock(
-	verifier Verifier,
-	txExecutorBackend executor.Backend,
+	manager Manager,
+	ctx *snow.Context,
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
@@ -54,127 +55,48 @@ func NewProposalBlock(
 		return nil, err
 	}
 
-	return toStatefulProposalBlock(statelessBlk, verifier, txExecutorBackend, choices.Processing)
+	return toStatefulProposalBlock(statelessBlk, manager, ctx, choices.Processing)
 }
 
 func toStatefulProposalBlock(
 	statelessBlk *stateless.ProposalBlock,
-	verifier Verifier,
-	txExecutorBackend executor.Backend,
+	manager Manager,
+	ctx *snow.Context,
 	status choices.Status,
 ) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		ProposalBlock: statelessBlk,
 		commonBlock: &commonBlock{
-			baseBlk:           &statelessBlk.CommonBlock,
-			status:            status,
-			verifier:          verifier,
-			txExecutorBackend: txExecutorBackend,
+			timestampGetter: manager,
+			lastAccepteder:  manager,
+			baseBlk:         &statelessBlk.CommonBlock,
+			status:          status,
 		},
+		manager: manager,
 	}
 
-	pb.Tx.Unsigned.InitCtx(pb.txExecutorBackend.Ctx)
+	pb.Tx.Unsigned.InitCtx(ctx)
 	return pb, nil
 }
 
 func (pb *ProposalBlock) free() {
-	pb.commonBlock.free()
-	pb.onCommitState = nil
-	pb.onAbortState = nil
+	pb.manager.freeProposalBlock(pb)
+}
+
+func (pb *ProposalBlock) Verify() error {
+	return pb.manager.verifyProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Accept() error {
-	blkID := pb.ID()
-	pb.txExecutorBackend.Ctx.Log.Verbo(
-		"Accepting Proposal Block %s at height %d with parent %s",
-		blkID,
-		pb.Height(),
-		pb.Parent(),
-	)
-
-	pb.status = choices.Accepted
-	pb.verifier.SetLastAccepted(blkID)
-	return nil
+	return pb.manager.acceptProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Reject() error {
-	pb.txExecutorBackend.Ctx.Log.Verbo(
-		"Rejecting Proposal Block %s at height %d with parent %s",
-		pb.ID(),
-		pb.Height(),
-		pb.Parent(),
-	)
-
-	pb.onCommitState = nil
-	pb.onAbortState = nil
-
-	if err := pb.verifier.Add(pb.Tx); err != nil {
-		pb.txExecutorBackend.Ctx.Log.Verbo(
-			"failed to reissue tx %q due to: %s",
-			pb.Tx.ID(),
-			err,
-		)
-	}
-
-	defer pb.reject()
-	pb.verifier.AddStatelessBlock(pb.ProposalBlock, pb.Status())
-	return pb.verifier.Commit()
+	return pb.manager.rejectProposalBlock(pb)
 }
 
-func (pb *ProposalBlock) setBaseState() {
-	pb.onCommitState.SetBase(pb.verifier)
-	pb.onAbortState.SetBase(pb.verifier)
-}
-
-// Verify this block is valid.
-//
-// The parent block must either be a Commit or an Abort block.
-//
-// If this block is valid, this function also sets pas.onCommit and pas.onAbort.
-func (pb *ProposalBlock) Verify() error {
-	if err := pb.verify(); err != nil {
-		return err
-	}
-
-	parentIntf, parentErr := pb.parentBlock()
-	if parentErr != nil {
-		return parentErr
-	}
-
-	// The parent of a proposal block (ie this block) must be a decision block
-	parent, ok := parentIntf.(Decision)
-	if !ok {
-		return fmt.Errorf("expected Decision block but got %T", parentIntf)
-	}
-
-	// parentState is the state if this block's parent is accepted
-	parentState := parent.OnAccept()
-
-	txExecutor := executor.ProposalTxExecutor{
-		Backend:     &pb.txExecutorBackend,
-		ParentState: parentState,
-		Tx:          pb.Tx,
-	}
-	err := pb.Tx.Unsigned.Visit(&txExecutor)
-	if err != nil {
-		txID := pb.Tx.ID()
-		pb.verifier.MarkDropped(txID, err.Error()) // cache tx as dropped
-		return err
-	}
-
-	pb.onCommitState = txExecutor.OnCommit
-	pb.onAbortState = txExecutor.OnAbort
-	pb.prefersCommit = txExecutor.PrefersCommit
-
-	pb.onCommitState.AddTx(pb.Tx, status.Committed)
-	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
-
-	pb.timestamp = parentState.GetTimestamp()
-
-	pb.verifier.RemoveProposalTx(pb.Tx)
-	pb.verifier.CacheVerifiedBlock(pb)
-	parentIntf.addChild(pb)
-	return nil
+func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
+	return pb.manager.conflictsProposalBlock(pb, s)
 }
 
 // Options returns the possible children of this block in preferential order.
@@ -182,14 +104,24 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
 
-	commit, err := NewCommitBlock(pb.verifier, pb.txExecutorBackend, blkID, nextHeight, pb.prefersCommit)
+	commit, err := NewCommitBlock(
+		pb.manager,
+		blkID,
+		nextHeight,
+		pb.prefersCommit,
+	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err := NewAbortBlock(pb.verifier, pb.txExecutorBackend, blkID, nextHeight, !pb.prefersCommit)
+	abort, err := NewAbortBlock(
+		pb.manager,
+		blkID,
+		nextHeight,
+		!pb.prefersCommit,
+	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",
@@ -201,4 +133,8 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil
+}
+
+func (pb *ProposalBlock) setBaseState() {
+	pb.manager.setBaseStateProposalBlock(pb)
 }
