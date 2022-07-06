@@ -27,12 +27,13 @@ const (
 )
 
 var (
+	_ Mempool     = &mempool{}
+	_ txs.Visitor = &mempoolIssuer{}
+
 	errUnknownTxType = errors.New("unknown transaction type")
 	errDuplicatedTx  = errors.New("duplicated transaction")
 	errConflictingTx = errors.New("conflicting transaction")
 	errMempoolFull   = errors.New("mempool is full")
-
-	_ Mempool = &mempool{}
 )
 
 type Mempool interface {
