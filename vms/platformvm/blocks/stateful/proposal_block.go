@@ -70,7 +70,6 @@ func toStatefulProposalBlock(
 		ProposalBlock: statelessBlk,
 		commonBlock: &commonBlock{
 			timestampGetter: manager,
-			LastAccepteder:  manager,
 			baseBlk:         &statelessBlk.CommonBlock,
 			status:          status,
 		},

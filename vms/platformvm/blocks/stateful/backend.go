@@ -4,6 +4,8 @@
 package stateful
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -30,11 +32,13 @@ type backend struct {
 	blkIDToOnCommitState map[ids.ID]state.Diff
 	// Block ID --> State if this block's proposal is aborted.
 	blkIDToOnAbortState map[ids.ID]state.Diff
-	// Block ID --> Children of that block
+	// Block ID --> Children of that block.
 	blkIDToChildren map[ids.ID][]Block
-	state           state.State
-	ctx             *snow.Context
-	bootstrapped    *utils.AtomicBool
+	// Block ID --> Time the block was proposed.
+	blkIDToTimestamp map[ids.ID]time.Time
+	state            state.State
+	ctx              *snow.Context
+	bootstrapped     *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {
@@ -63,5 +67,6 @@ func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToOnAcceptState, blkID)
 	delete(b.blkIDToOnAbortState, blkID)
 	delete(b.blkIDToChildren, blkID)
+	delete(b.blkIDToTimestamp, blkID)
 	b.unpinVerifiedBlock(blkID)
 }

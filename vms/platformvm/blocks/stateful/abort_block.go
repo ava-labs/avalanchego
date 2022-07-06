@@ -56,7 +56,6 @@ func toStatefulAbortBlock(
 		AbortBlock: statelessBlk,
 		commonBlock: &commonBlock{
 			timestampGetter: manager,
-			LastAccepteder:  manager,
 			baseBlk:         &statelessBlk.CommonBlock,
 			status:          status,
 		},

@@ -77,7 +77,7 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	onAbortState.AddTx(b.Tx, status.Aborted)
 	v.blkIDToOnAbortState[blkID] = onAbortState
 
-	b.timestamp = parentState.GetTimestamp()
+	v.blkIDToTimestamp[blkID] = parentState.GetTimestamp()
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	v.pinVerifiedBlock(b)
@@ -123,10 +123,11 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	v.blkIDToOnAcceptState[b.baseBlk.ID()] = atomicExecutor.OnAccept
+	blkID := b.ID()
+	v.blkIDToOnAcceptState[blkID] = atomicExecutor.OnAccept
 	b.inputs = atomicExecutor.Inputs
 	b.atomicRequests = atomicExecutor.AtomicRequests
-	b.timestamp = atomicExecutor.OnAccept.GetTimestamp()
+	v.blkIDToTimestamp[blkID] = atomicExecutor.OnAccept.GetTimestamp()
 
 	conflicts, err := parentIntf.conflicts(b.inputs)
 	if err != nil {
@@ -225,7 +226,7 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	b.timestamp = onAcceptState.GetTimestamp()
+	v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	v.blkIDToOnAcceptState[blkID] = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	v.pinVerifiedBlock(b)
@@ -240,8 +241,9 @@ func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 	}
 
 	onAcceptState := v.blkIDToOnCommitState[b.Parent()]
-	b.timestamp = onAcceptState.GetTimestamp()
-	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
+	blkID := b.ID()
+	v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
+	v.blkIDToOnAcceptState[blkID] = onAcceptState
 
 	v.pinVerifiedBlock(b)
 	parentID := b.Parent()
@@ -255,8 +257,9 @@ func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
 	}
 
 	onAcceptState := v.blkIDToOnAbortState[b.Parent()]
-	b.timestamp = onAcceptState.GetTimestamp()
-	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
+	blkID := b.ID()
+	v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
+	v.blkIDToOnAcceptState[blkID] = onAcceptState
 
 	v.pinVerifiedBlock(b)
 	parentID := b.Parent()

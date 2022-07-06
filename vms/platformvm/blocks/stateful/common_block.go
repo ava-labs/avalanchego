@@ -8,16 +8,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
 	timestampGetter
-	state.LastAccepteder
-	baseBlk   *stateless.CommonBlock
-	timestamp time.Time // Time this block was proposed at
-	status    choices.Status
+	// TODO remove
+	// state.LastAccepteder
+	baseBlk *stateless.CommonBlock
+	// TODO remove
+	// timestamp time.Time // Time this block was proposed at
+	status choices.Status
 	// TODO remove
 	// children  []Block
 }
@@ -35,8 +36,10 @@ func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
-	if c.baseBlk.ID() == c.GetLastAccepted() {
+	/* TODO is this right?
+	if c.baseBlk.ID() == c.backend.GetLastAccepted() {
 		return c.GetTimestamp()
 	}
-	return c.timestamp
+	*/
+	return c.timestampGetter.GetTimestamp(c.baseBlk.ID())
 }

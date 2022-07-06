@@ -20,10 +20,6 @@ type chainState interface {
 	GetState() state.State
 }
 
-type timestampGetter interface {
-	GetTimestamp() time.Time
-}
-
 type OnAcceptor interface {
 	// This function should only be called after Verify is called on [blkID].
 	// OnAccept returns:
@@ -73,6 +69,7 @@ func NewManager(
 		blkIDToOnCommitState: make(map[ids.ID]state.Diff),
 		blkIDToOnAbortState:  make(map[ids.ID]state.Diff),
 		blkIDToChildren:      make(map[ids.ID][]Block),
+		blkIDToTimestamp:     make(map[ids.ID]time.Time),
 	}
 
 	manager := &manager{
@@ -89,7 +86,7 @@ func NewManager(
 		rejector:        &rejectorImpl{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{backend: backend},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
-		timestampGetter: s,
+		timestampGetter: &timestampGetterImpl{backend: backend},
 	}
 	// TODO is there a way to avoid having a Manager
 	// in [blockState] so we don't have to do this?
