@@ -22,9 +22,10 @@ type acceptor interface {
 }
 
 type acceptorImpl struct {
+	backend
+
 	metrics          metrics.Metrics
 	recentlyAccepted *window.Window
-	backend
 }
 
 func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
@@ -51,7 +52,7 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
-	a.SetLastAccepted(blkID, false /*persist*/)
+	a.state.SetLastAccepted(blkID, false /*persist*/)
 	return nil
 }
 
@@ -76,8 +77,8 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
 
-	defer a.Abort()
-	batch, err := a.CommitBatch()
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to commit VM's database for block %s: %w",
@@ -120,8 +121,8 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
 
-	defer a.Abort()
-	batch, err := a.CommitBatch()
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to commit VM's database for block %s: %w",
@@ -224,7 +225,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 	// Update the state of the chain in the database
 	b.onAcceptState.Apply(a.getState())
-	if err := a.Commit(); err != nil {
+	if err := a.state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 
@@ -240,7 +241,7 @@ func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
-	a.SetLastAccepted(blkID, true /*persist*/)
+	a.state.SetLastAccepted(blkID, true /*persist*/)
 	a.SetHeight(b.baseBlk.Height())
 	a.recentlyAccepted.Add(blkID)
 }

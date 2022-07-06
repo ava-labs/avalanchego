@@ -4,14 +4,10 @@
 package stateful
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
-
-var ErrBlockNil = errors.New("block is nil")
 
 type Block interface {
 	snowman.Block

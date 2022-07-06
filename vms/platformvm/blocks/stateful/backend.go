@@ -4,19 +4,13 @@
 package stateful
 
 import (
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
-
-type versionDB interface {
-	Abort()
-	CommitBatch() (database.Batch, error)
-	Commit() error
-}
 
 type heightSetter interface {
 	SetHeight(height uint64)
@@ -26,13 +20,13 @@ type heightSetter interface {
 type backend struct {
 	mempool.Mempool
 	// TODO consolidate state fields below?
-	versionDB
-	state.LastAccepteder
 	blockState
 	heightSetter
-	state        state.State
-	ctx          *snow.Context
-	bootstrapped *utils.AtomicBool
+	// Block ID --> Function to be executed if the block is accepted.
+	blkIDToOnAcceptFunc map[ids.ID]func()
+	state               state.State
+	ctx                 *snow.Context
+	bootstrapped        *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {

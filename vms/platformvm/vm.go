@@ -209,10 +209,6 @@ func (vm *VM) Initialize(
 		mempool,
 		vm.Metrics,
 		vm.state,
-		vm.state,
-		vm.state,
-		vm.state,
-		vm.state,
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
 	)

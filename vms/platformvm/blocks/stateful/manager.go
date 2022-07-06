@@ -41,29 +41,24 @@ func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
 	state state.State,
-	heightSetter heightSetter,
-	versionDB versionDB,
-	timestampGetter timestampGetter,
-	statelessBlockState statelessBlockState,
 	txExecutorBackend executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
 	blockState := &blockStateImpl{
 		manager:             nil, // Set below
-		statelessBlockState: statelessBlockState,
+		statelessBlockState: state,
 		verifiedBlks:        map[ids.ID]Block{},
 		ctx:                 txExecutorBackend.Ctx,
 	}
 
 	backend := backend{
-		Mempool:        mempool,
-		versionDB:      versionDB,
-		LastAccepteder: state,
-		blockState:     blockState,
-		heightSetter:   heightSetter,
-		state:          state,
-		bootstrapped:   txExecutorBackend.Bootstrapped,
-		ctx:            txExecutorBackend.Ctx,
+		Mempool:             mempool,
+		blockState:          blockState,
+		heightSetter:        state,
+		state:               state,
+		bootstrapped:        txExecutorBackend.Bootstrapped,
+		ctx:                 txExecutorBackend.Ctx,
+		blkIDToOnAcceptFunc: make(map[ids.ID]func()),
 	}
 
 	manager := &manager{
@@ -81,7 +76,7 @@ func NewManager(
 		baseStateSetter: &baseStateSetterImpl{State: state},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
 		freer:           &freerImpl{backend: backend},
-		timestampGetter: timestampGetter,
+		timestampGetter: state,
 	}
 	// TODO is there a way to avoid having a Manager
 	// in [blockState] so we don't have to do this?
@@ -102,4 +97,12 @@ type manager struct {
 
 func (m *manager) GetState() state.State {
 	return m.state
+}
+
+func (m *manager) GetLastAccepted() ids.ID {
+	return m.state.GetLastAccepted()
+}
+
+func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
+	m.state.SetLastAccepted(blkID, persist)
 }
