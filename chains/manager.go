@@ -109,7 +109,7 @@ type Manager interface {
 	// Returns the ID of the subnet that is validating the provided chain
 	SubnetID(chainID ids.ID) (ids.ID, error)
 
-	// Returns true iff the chain with the given ID exists and is finished bootstrapping
+	// Returns true if the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
 
 	Shutdown()
@@ -142,7 +142,7 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled              bool            // True iff the network has staking enabled
+	StakingEnabled              bool            // True if the network has staking enabled
 	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
@@ -1001,7 +1001,7 @@ func (m *manager) notifyRegistrants(name string, engine common.Engine) {
 
 // Returns:
 // 1) the alias that already exists, or the empty string if there is none
-// 2) true iff there exists a chain such that the chain has an alias in [aliases]
+// 2) true if there exists a chain such that the chain has an alias in [aliases]
 func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 	for _, alias := range aliases {
 		if _, err := m.Lookup(alias); err == nil {

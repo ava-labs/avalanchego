@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-// Renames the file "a" to "b" iff "a" exists.
+// Renames the file "a" to "b" if "a" exists.
 // It returns "true" and no error, if rename were successful.
 // It returns "false" and no error, if the file "a" does not exist.
 // It returns "false" and an error, if rename failed.

@@ -79,7 +79,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	// Ignore any vertex that has already received alpha votes. To safely skip
 	// DAG traversal, assume that all votes for vertices with less than alpha
 	// votes will be applied to a single shared ancestor. In this case, the poll
-	// can terminate early, iff there are not enough pending votes for this
+	// can terminate early, if there are not enough pending votes for this
 	// ancestor to receive alpha votes.
 	partialVotes := ids.BitSet(0)
 	for _, vote := range p.votes.List() {

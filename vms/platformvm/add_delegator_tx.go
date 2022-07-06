@@ -79,7 +79,7 @@ func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// SyntacticVerify returns nil iff [tx] is valid
+// SyntacticVerify returns nil if [tx] is valid
 func (tx *UnsignedAddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:

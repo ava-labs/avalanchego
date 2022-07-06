@@ -20,7 +20,7 @@ import (
 
 // Subnet describes the standard interface of a subnet description
 type Subnet interface {
-	// Returns true iff the subnet is done bootstrapping
+	// Returns true if the subnet is done bootstrapping
 	IsBootstrapped() bool
 
 	// Bootstrapped marks the named chain as being bootstrapped

@@ -36,7 +36,7 @@ func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
 	}
 
 	// no checkpoint. Either index is complete or repair was never attempted.
-	// index is complete iff lastAcceptedBlock is indexed
+	// index is complete if lastAcceptedBlock is indexed
 	latestProBlkID, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
 		return false, nil

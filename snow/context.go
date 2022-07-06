@@ -85,10 +85,10 @@ type ConsensusContext struct {
 	DecisionDispatcher  EventDispatcher
 	ConsensusDispatcher EventDispatcher
 
-	// Non-zero iff this chain bootstrapped.
+	// Non-zero if this chain bootstrapped.
 	state utils.AtomicInterface
 
-	// Non-zero iff this chain is executing transactions.
+	// Non-zero if this chain is executing transactions.
 	executing utils.AtomicBool
 
 	// Indicates this chain is available to only validators.
@@ -104,7 +104,7 @@ func (ctx *ConsensusContext) GetState() State {
 	return stateInf.(State)
 }
 
-// IsExecuting returns true iff this chain is still executing transactions.
+// IsExecuting returns true if this chain is still executing transactions.
 func (ctx *ConsensusContext) IsExecuting() bool {
 	return ctx.executing.GetValue()
 }
@@ -115,7 +115,7 @@ func (ctx *ConsensusContext) Executing(b bool) {
 	ctx.executing.SetValue(b)
 }
 
-// IsValidatorOnly returns true iff this chain is available only to validators
+// IsValidatorOnly returns true if this chain is available only to validators
 func (ctx *ConsensusContext) IsValidatorOnly() bool {
 	return ctx.validatorOnly.GetValue()
 }

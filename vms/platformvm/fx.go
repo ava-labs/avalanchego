@@ -38,7 +38,7 @@ type Fx interface {
 	// should be returned.
 	VerifyTransfer(tx, in, cred, utxo interface{}) error
 
-	// VerifyPermission returns nil iff [cred] proves that [controlGroup]
+	// VerifyPermission returns nil if [cred] proves that [controlGroup]
 	// assents to [tx]
 	VerifyPermission(tx, in, cred, controlGroup interface{}) error
 

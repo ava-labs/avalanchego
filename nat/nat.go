@@ -31,7 +31,7 @@ const (
 // Router describes the functionality that a network device must support to be
 // able to open ports to an external IP.
 type Router interface {
-	// True iff this router supports NAT
+	// True if this router supports NAT
 	SupportsNAT() bool
 	// Map external port [extPort] to internal port [intPort] for [duration]
 	MapPort(protocol string, intPort, extPort uint16, desc string, duration time.Duration) error

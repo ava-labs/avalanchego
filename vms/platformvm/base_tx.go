@@ -28,7 +28,7 @@ import (
 type BaseTx struct {
 	avax.BaseTx `serialize:"true" json:"inputs"`
 
-	// true iff this transaction has already passed syntactic verification
+	// true if this transaction has already passed syntactic verification
 	syntacticallyVerified bool
 }
 
@@ -53,7 +53,7 @@ func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 	}
 }
 
-// SyntacticVerify returns nil iff this tx is well formed
+// SyntacticVerify returns nil if this tx is well formed
 func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
