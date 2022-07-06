@@ -12,9 +12,12 @@ import (
 // Blocks have different specifications/building instructions as defined by the
 // fork that the block exists in.
 type buildingStrategy interface {
+	// builds a versioned snowman.Block
 	build() (snowman.Block, error)
 }
 
+// Factory method that returns the correct building strategy for the
+// current fork.
 func getBuildingStrategy(b *blockBuilder) (buildingStrategy, error) {
 	preferred, err := b.Preferred()
 	if err != nil {
