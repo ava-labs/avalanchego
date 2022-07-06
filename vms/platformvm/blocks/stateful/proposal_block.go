@@ -36,7 +36,7 @@ type ProposalBlock struct {
 
 	// TODO remove
 	// The state that the chain will have if this block's proposal is aborted
-	//onAbortState  state.Diff
+	// onAbortState  state.Diff
 	prefersCommit bool
 
 	manager Manager
@@ -79,10 +79,6 @@ func toStatefulProposalBlock(
 
 	pb.Tx.Unsigned.InitCtx(ctx)
 	return pb, nil
-}
-
-func (pb *ProposalBlock) free() {
-	pb.manager.freeProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Verify() error {

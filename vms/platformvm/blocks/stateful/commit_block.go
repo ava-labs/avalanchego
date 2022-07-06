@@ -78,10 +78,6 @@ func (c *CommitBlock) conflicts(s ids.Set) (bool, error) {
 	return c.manager.conflictsCommitBlock(c, s)
 }
 
-func (c *CommitBlock) free() {
-	c.manager.freeCommitBlock(c)
-}
-
 func (c *CommitBlock) setBaseState() {
 	c.manager.setBaseStateCommitBlock(c)
 }

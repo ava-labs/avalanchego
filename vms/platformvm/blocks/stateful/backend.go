@@ -30,9 +30,11 @@ type backend struct {
 	blkIDToOnCommitState map[ids.ID]state.Diff
 	// Block ID --> State if this block's proposal is aborted.
 	blkIDToOnAbortState map[ids.ID]state.Diff
-	state               state.State
-	ctx                 *snow.Context
-	bootstrapped        *utils.AtomicBool
+	// Block ID --> Children of that block
+	blkIDToChildren map[ids.ID][]Block
+	state           state.State
+	ctx             *snow.Context
+	bootstrapped    *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {
@@ -53,4 +55,13 @@ func (b *backend) OnAccept(blkID ids.ID) state.Chain {
 		return b.state
 	}
 	return onAcceptState
+}
+
+func (b *backend) free(blkID ids.ID) {
+	delete(b.blkIDToOnAcceptFunc, blkID)
+	delete(b.blkIDToOnAcceptState, blkID)
+	delete(b.blkIDToOnAcceptState, blkID)
+	delete(b.blkIDToOnAbortState, blkID)
+	delete(b.blkIDToChildren, blkID)
+	b.unpinVerifiedBlock(blkID)
 }

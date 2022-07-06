@@ -83,10 +83,6 @@ func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
 	return a.manager.conflictsAbortBlock(a, s)
 }
 
-func (a *AbortBlock) free() {
-	a.manager.freeAbortBlock(a)
-}
-
 func (a *AbortBlock) setBaseState() {
 	a.manager.setBaseStateAbortBlock(a)
 }

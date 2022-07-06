@@ -94,10 +94,6 @@ func (sb *StandardBlock) Reject() error {
 	return sb.manager.rejectStandardBlock(sb)
 }
 
-func (sb *StandardBlock) free() {
-	sb.manager.freeStandardBlock(sb)
-}
-
 func (sb *StandardBlock) setBaseState() {
 	sb.manager.setBaseStateStandardBlock(sb)
 }

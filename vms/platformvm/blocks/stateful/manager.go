@@ -41,7 +41,6 @@ type Manager interface {
 	rejector
 	baseStateSetter
 	conflictChecker
-	freer
 	chainState
 	timestampGetter
 	OnAcceptor
@@ -73,6 +72,7 @@ func NewManager(
 		blkIDToOnAcceptState: make(map[ids.ID]state.Diff),
 		blkIDToOnCommitState: make(map[ids.ID]state.Diff),
 		blkIDToOnAbortState:  make(map[ids.ID]state.Diff),
+		blkIDToChildren:      make(map[ids.ID][]Block),
 	}
 
 	manager := &manager{
@@ -89,7 +89,6 @@ func NewManager(
 		rejector:        &rejectorImpl{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{backend: backend},
 		conflictChecker: &conflictCheckerImpl{backend: backend},
-		freer:           &freerImpl{backend: backend},
 		timestampGetter: s,
 	}
 	// TODO is there a way to avoid having a Manager
@@ -105,7 +104,6 @@ type manager struct {
 	rejector
 	baseStateSetter
 	conflictChecker
-	freer
 	timestampGetter
 }
 

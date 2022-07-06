@@ -91,10 +91,6 @@ func (ab *AtomicBlock) Reject() error {
 	return ab.manager.rejectAtomicBlock(ab)
 }
 
-func (ab *AtomicBlock) free() {
-	ab.manager.freeAtomicBlock(ab)
-}
-
 func (ab *AtomicBlock) setBaseState() {
 	ab.manager.setBaseStateAtomicBlock(ab)
 }

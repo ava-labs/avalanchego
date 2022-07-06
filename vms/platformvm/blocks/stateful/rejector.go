@@ -36,7 +36,7 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 	}
 
 	b.status = choices.Rejected
-	defer b.free()
+	defer r.free(b.ID())
 	r.AddStatelessBlock(b.ProposalBlock, b.status)
 	return r.state.Commit()
 }
@@ -58,7 +58,7 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 	}
 
 	b.status = choices.Rejected
-	defer b.free()
+	defer r.free(b.ID())
 	r.AddStatelessBlock(b.AtomicBlock, b.status)
 	return r.state.Commit()
 }
@@ -82,7 +82,7 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 	}
 
 	b.status = choices.Rejected
-	defer b.free()
+	defer r.free(b.ID())
 	r.AddStatelessBlock(b.StandardBlock, b.status)
 	return r.state.Commit()
 }
@@ -96,7 +96,7 @@ func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 	)
 
 	b.status = choices.Rejected
-	defer b.free()
+	defer r.free(b.ID())
 	r.AddStatelessBlock(b.CommitBlock, b.status)
 	return r.state.Commit()
 }
@@ -110,7 +110,7 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 	)
 
 	b.status = choices.Rejected
-	defer b.free()
+	defer r.free(b.ID())
 	r.AddStatelessBlock(b.AbortBlock, b.status)
 	return r.state.Commit()
 }

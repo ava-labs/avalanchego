@@ -56,9 +56,8 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 }
 
 func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
-	defer b.free()
-
 	blkID := b.ID()
+	defer a.backend.free(blkID)
 
 	a.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
@@ -97,7 +96,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	for _, child := range b.children {
+	for _, child := range a.blkIDToChildren[blkID] {
 		child.setBaseState()
 	}
 	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
@@ -108,9 +107,9 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 }
 
 func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
-	defer b.free()
-
 	blkID := b.ID()
+	defer a.free(blkID)
+
 	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
 	a.commonAccept(b.commonBlock)
@@ -138,7 +137,7 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
-	for _, child := range b.children {
+	for _, child := range a.blkIDToChildren[blkID] {
 		child.setBaseState()
 	}
 	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
@@ -149,9 +148,9 @@ func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
 }
 
 func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
-	defer b.free()
-
 	blkID := b.baseBlk.ID()
+	defer a.free(blkID)
+
 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
 	parentIntf, err := a.parent(b.baseBlk)
@@ -163,7 +162,7 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 		a.ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
-	defer parent.free()
+	defer a.free(parent.ID())
 
 	a.commonAccept(parent.commonBlock)
 	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
@@ -187,9 +186,9 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 }
 
 func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
-	defer b.free()
-
 	blkID := b.baseBlk.ID()
+	defer a.free(blkID)
+
 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
 	parentIntf, err := a.parent(b.baseBlk)
@@ -201,7 +200,7 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 		a.ctx.Log.Error("double decision block should only follow a proposal block")
 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
 	}
-	defer parent.free()
+	defer a.free(parent.ID())
 
 	a.commonAccept(parent.commonBlock)
 	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
@@ -235,7 +234,7 @@ func (a *acceptorImpl) updateStateOptionBlock(b *commonBlock) error {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 
-	for _, child := range b.children {
+	for _, child := range a.blkIDToChildren[blkID] {
 		child.setBaseState()
 	}
 	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {

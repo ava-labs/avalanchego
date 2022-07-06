@@ -18,12 +18,15 @@ type commonBlock struct {
 	baseBlk   *stateless.CommonBlock
 	timestamp time.Time // Time this block was proposed at
 	status    choices.Status
-	children  []Block
+	// TODO remove
+	// children  []Block
 }
 
+/* TODO remove
 func (c *commonBlock) addChild(child Block) {
 	c.children = append(c.children, child)
 }
+*/
 
 // Parent returns this block's parent's ID
 func (c *commonBlock) Status() choices.Status { return c.status }

@@ -53,11 +53,6 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 		return err
 	}
 
-	parentIntf, parentErr := v.parent(b.baseBlk)
-	if parentErr != nil {
-		return parentErr
-	}
-
 	parentState := v.OnAccept(b.Parent())
 
 	txExecutor := executor.ProposalTxExecutor{
@@ -86,7 +81,8 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	v.pinVerifiedBlock(b)
-	parentIntf.addChild(b)
+	parentID := b.Parent()
+	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	return nil
 }
 
@@ -142,7 +138,8 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	v.pinVerifiedBlock(b)
-	parentIntf.addChild(b)
+	parentID := b.Parent()
+	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	return nil
 }
 
@@ -232,7 +229,8 @@ func (v *verifierImpl) verifyStandardBlock(b *StandardBlock) error {
 	v.blkIDToOnAcceptState[blkID] = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	v.pinVerifiedBlock(b)
-	parentIntf.addChild(b)
+	parentID := b.Parent()
+	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	return nil
 }
 
@@ -241,23 +239,13 @@ func (v *verifierImpl) verifyCommitBlock(b *CommitBlock) error {
 		return err
 	}
 
-	parentIntf, err := v.parent(b.baseBlk)
-	if err != nil {
-		return err
-	}
-
-	// The parent of a Commit block should always be a proposal
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
 	onAcceptState := v.blkIDToOnCommitState[b.Parent()]
 	b.timestamp = onAcceptState.GetTimestamp()
 	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
 
 	v.pinVerifiedBlock(b)
-	parent.addChild(b)
+	parentID := b.Parent()
+	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	return nil
 }
 
@@ -266,23 +254,13 @@ func (v *verifierImpl) verifyAbortBlock(b *AbortBlock) error {
 		return err
 	}
 
-	parentIntf, err := v.parent(b.baseBlk)
-	if err != nil {
-		return err
-	}
-
-	// The parent of an Abort block should always be a proposal
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-
 	onAcceptState := v.blkIDToOnAbortState[b.Parent()]
 	b.timestamp = onAcceptState.GetTimestamp()
 	v.blkIDToOnAcceptState[b.ID()] = onAcceptState
 
 	v.pinVerifiedBlock(b)
-	parent.addChild(b)
+	parentID := b.Parent()
+	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	return nil
 }
 
