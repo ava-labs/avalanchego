@@ -63,7 +63,7 @@ func toStatefulAtomicBlock(
 			chainState: manager,
 			commonBlock: &commonBlock{
 				timestampGetter: manager,
-				lastAccepteder:  manager,
+				LastAccepteder:  manager,
 				baseBlk:         &statelessBlk.CommonBlock,
 				status:          status,
 			},
