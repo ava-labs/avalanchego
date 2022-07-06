@@ -6,7 +6,6 @@ package stateful
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -28,10 +27,11 @@ type AtomicBlock struct {
 	*stateless.AtomicBlock
 	*commonBlock
 
+	// TODO remove
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
-	inputs         ids.Set
-	atomicRequests map[ids.ID]*atomic.Requests
+	// inputs         ids.Set
+	// atomicRequests map[ids.ID]*atomic.Requests
 
 	manager Manager
 }

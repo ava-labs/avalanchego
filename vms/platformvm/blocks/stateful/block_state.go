@@ -22,11 +22,11 @@ func MakeStateful(
 ) (Block, error) {
 	switch sb := statelessBlk.(type) {
 	case *stateless.AbortBlock:
-		return toStatefulAbortBlock(sb, manager, false /*wasPreferred*/, status)
+		return toStatefulAbortBlock(sb, manager, status)
 	case *stateless.AtomicBlock:
 		return toStatefulAtomicBlock(sb, manager, ctx, status)
 	case *stateless.CommitBlock:
-		return toStatefulCommitBlock(sb, manager, false /*wasPreferred*/, status)
+		return toStatefulCommitBlock(sb, manager, status)
 	case *stateless.ProposalBlock:
 		return toStatefulProposalBlock(sb, manager, ctx, status)
 	case *stateless.StandardBlock:

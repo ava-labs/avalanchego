@@ -3,6 +3,8 @@
 
 package stateful
 
+import "github.com/ava-labs/avalanchego/ids"
+
 var _ baseStateSetter = &baseStateSetterImpl{}
 
 type baseStateSetter interface {
@@ -27,25 +29,23 @@ func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *ProposalBlock) {
 }
 
 func (s *baseStateSetterImpl) setBaseStateAtomicBlock(b *AtomicBlock) {
-	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
-		onAcceptState.Apply(s.state)
-	}
+	s.setBaseStateCommon(b.ID())
 }
 
 func (s *baseStateSetterImpl) setBaseStateStandardBlock(b *StandardBlock) {
-	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
-		onAcceptState.Apply(s.state)
-	}
+	s.setBaseStateCommon(b.ID())
 }
 
 func (s *baseStateSetterImpl) setBaseStateCommitBlock(b *CommitBlock) {
-	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
-		onAcceptState.Apply(s.state)
-	}
+	s.setBaseStateCommon(b.ID())
 }
 
 func (s *baseStateSetterImpl) setBaseStateAbortBlock(b *AbortBlock) {
-	if onAcceptState := s.blkIDToOnAcceptState[b.ID()]; onAcceptState != nil {
+	s.setBaseStateCommon(b.ID())
+}
+
+func (s *baseStateSetterImpl) setBaseStateCommon(blkID ids.ID) {
+	if onAcceptState := s.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
 		onAcceptState.Apply(s.state)
 	}
 }

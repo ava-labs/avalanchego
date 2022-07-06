@@ -37,7 +37,8 @@ type ProposalBlock struct {
 	// TODO remove
 	// The state that the chain will have if this block's proposal is aborted
 	// onAbortState  state.Diff
-	prefersCommit bool
+	// TODO remove
+	// prefersCommit bool
 
 	manager Manager
 }
@@ -101,11 +102,11 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
 
+	preferCommit := pb.manager.preferredCommit(blkID)
 	commit, err := NewCommitBlock(
 		pb.manager,
 		blkID,
 		nextHeight,
-		pb.prefersCommit,
 	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
@@ -117,7 +118,6 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		pb.manager,
 		blkID,
 		nextHeight,
-		!pb.prefersCommit,
 	)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
@@ -126,7 +126,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	if pb.prefersCommit {
+	if preferCommit {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil

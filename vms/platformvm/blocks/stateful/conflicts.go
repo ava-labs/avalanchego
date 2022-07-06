@@ -27,7 +27,8 @@ func (c *conflictCheckerImpl) conflictsAtomicBlock(b *AtomicBlock, s ids.Set) (b
 	if b.Status() == choices.Accepted {
 		return false, nil
 	}
-	if b.inputs.Overlaps(s) {
+	inputs := c.blkIDToInputs[b.ID()]
+	if inputs.Overlaps(s) {
 		return true, nil
 	}
 	parent, err := c.parent(b.baseBlk)

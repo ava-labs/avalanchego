@@ -6,6 +6,7 @@ package stateful
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -40,6 +41,7 @@ type Manager interface {
 	chainState
 	timestampGetter
 	OnAcceptor
+	initialPreferenceGetter
 	state.LastAccepteder
 }
 
@@ -58,18 +60,21 @@ func NewManager(
 	}
 
 	backend := backend{
-		Mempool:              mempool,
-		blockState:           blockState,
-		heightSetter:         s,
-		state:                s,
-		bootstrapped:         txExecutorBackend.Bootstrapped,
-		ctx:                  txExecutorBackend.Ctx,
-		blkIDToOnAcceptFunc:  make(map[ids.ID]func()),
-		blkIDToOnAcceptState: make(map[ids.ID]state.Diff),
-		blkIDToOnCommitState: make(map[ids.ID]state.Diff),
-		blkIDToOnAbortState:  make(map[ids.ID]state.Diff),
-		blkIDToChildren:      make(map[ids.ID][]Block),
-		blkIDToTimestamp:     make(map[ids.ID]time.Time),
+		Mempool:               mempool,
+		blockState:            blockState,
+		heightSetter:          s,
+		state:                 s,
+		bootstrapped:          txExecutorBackend.Bootstrapped,
+		ctx:                   txExecutorBackend.Ctx,
+		blkIDToOnAcceptFunc:   make(map[ids.ID]func()),
+		blkIDToOnAcceptState:  make(map[ids.ID]state.Diff),
+		blkIDToOnCommitState:  make(map[ids.ID]state.Diff),
+		blkIDToOnAbortState:   make(map[ids.ID]state.Diff),
+		blkIDToChildren:       make(map[ids.ID][]Block),
+		blkIDToTimestamp:      make(map[ids.ID]time.Time),
+		blkIDToInputs:         make(map[ids.ID]ids.Set),
+		blkIDToAtomicRequests: make(map[ids.ID]map[ids.ID]*atomic.Requests),
+		blkIDToPreferCommit:   make(map[ids.ID]bool),
 	}
 
 	manager := &manager{
@@ -83,10 +88,11 @@ func NewManager(
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
 		},
-		rejector:        &rejectorImpl{backend: backend},
-		baseStateSetter: &baseStateSetterImpl{backend: backend},
-		conflictChecker: &conflictCheckerImpl{backend: backend},
-		timestampGetter: &timestampGetterImpl{backend: backend},
+		rejector:                &rejectorImpl{backend: backend},
+		baseStateSetter:         &baseStateSetterImpl{backend: backend},
+		conflictChecker:         &conflictCheckerImpl{backend: backend},
+		timestampGetter:         &timestampGetterImpl{backend: backend},
+		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
 	}
 	// TODO is there a way to avoid having a Manager
 	// in [blockState] so we don't have to do this?
@@ -102,6 +108,7 @@ type manager struct {
 	baseStateSetter
 	conflictChecker
 	timestampGetter
+	initialPreferenceGetter
 }
 
 func (m *manager) GetState() state.State {

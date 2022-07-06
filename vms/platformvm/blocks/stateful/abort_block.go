@@ -20,7 +20,7 @@ type AbortBlock struct {
 	*stateless.AbortBlock
 	*commonBlock
 
-	wasPreferred bool
+	// wasPreferred bool
 
 	manager Manager
 }
@@ -32,7 +32,6 @@ func NewAbortBlock(
 	manager Manager,
 	parentID ids.ID,
 	height uint64,
-	wasPreferred bool,
 ) (*AbortBlock, error) {
 	statelessBlk, err := stateless.NewAbortBlock(parentID, height)
 	if err != nil {
@@ -41,7 +40,6 @@ func NewAbortBlock(
 	return toStatefulAbortBlock(
 		statelessBlk,
 		manager,
-		wasPreferred,
 		choices.Processing,
 	)
 }
@@ -49,7 +47,6 @@ func NewAbortBlock(
 func toStatefulAbortBlock(
 	statelessBlk *stateless.AbortBlock,
 	manager Manager,
-	wasPreferred bool,
 	status choices.Status,
 ) (*AbortBlock, error) {
 	abort := &AbortBlock{
@@ -59,8 +56,7 @@ func toStatefulAbortBlock(
 			baseBlk:         &statelessBlk.CommonBlock,
 			status:          status,
 		},
-		wasPreferred: wasPreferred,
-		manager:      manager,
+		manager: manager,
 	}
 
 	return abort, nil

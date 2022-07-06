@@ -6,6 +6,7 @@ package stateful
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -18,6 +19,7 @@ type heightSetter interface {
 	SetHeight(height uint64)
 }
 
+// TODO improve/add comments.
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
@@ -36,9 +38,15 @@ type backend struct {
 	blkIDToChildren map[ids.ID][]Block
 	// Block ID --> Time the block was proposed.
 	blkIDToTimestamp map[ids.ID]time.Time
-	state            state.State
-	ctx              *snow.Context
-	bootstrapped     *utils.AtomicBool
+	// Block ID --> Inputs of txs in that block.
+	blkIDToInputs map[ids.ID]ids.Set
+	// Block ID --> Atomic requests for txs in that block.
+	blkIDToAtomicRequests map[ids.ID]map[ids.ID]*atomic.Requests
+	// Block ID --> Whether we initially prefer committing this block.
+	blkIDToPreferCommit map[ids.ID]bool
+	state               state.State
+	ctx                 *snow.Context
+	bootstrapped        *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {
@@ -68,5 +76,8 @@ func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToOnAbortState, blkID)
 	delete(b.blkIDToChildren, blkID)
 	delete(b.blkIDToTimestamp, blkID)
+	delete(b.blkIDToInputs, blkID)
+	delete(b.blkIDToAtomicRequests, blkID)
+	delete(b.blkIDToPreferCommit, blkID)
 	b.unpinVerifiedBlock(blkID)
 }

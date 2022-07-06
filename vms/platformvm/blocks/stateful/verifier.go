@@ -53,7 +53,8 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 		return err
 	}
 
-	parentState := v.OnAccept(b.Parent())
+	parentID := b.Parent()
+	parentState := v.OnAccept(parentID)
 
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &v.txExecutorBackend,
@@ -67,7 +68,6 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	}
 
 	blkID := b.ID()
-	b.prefersCommit = txExecutor.PrefersCommit
 
 	onCommitState := txExecutor.OnCommit
 	onCommitState.AddTx(b.Tx, status.Committed)
@@ -78,11 +78,11 @@ func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
 	v.blkIDToOnAbortState[blkID] = onAbortState
 
 	v.blkIDToTimestamp[blkID] = parentState.GetTimestamp()
+	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+	v.blkIDToPreferCommit[blkID] = txExecutor.PrefersCommit
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	v.pinVerifiedBlock(b)
-	parentID := b.Parent()
-	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	return nil
 }
 
@@ -125,11 +125,11 @@ func (v *verifierImpl) verifyAtomicBlock(b *AtomicBlock) error {
 
 	blkID := b.ID()
 	v.blkIDToOnAcceptState[blkID] = atomicExecutor.OnAccept
-	b.inputs = atomicExecutor.Inputs
-	b.atomicRequests = atomicExecutor.AtomicRequests
+	v.blkIDToInputs[blkID] = atomicExecutor.Inputs
+	v.blkIDToAtomicRequests[blkID] = atomicExecutor.AtomicRequests
 	v.blkIDToTimestamp[blkID] = atomicExecutor.OnAccept.GetTimestamp()
 
-	conflicts, err := parentIntf.conflicts(b.inputs)
+	conflicts, err := parentIntf.conflicts(atomicExecutor.Inputs)
 	if err != nil {
 		return err
 	}

@@ -20,8 +20,9 @@ type CommitBlock struct {
 	*stateless.CommitBlock
 	*commonBlock
 
-	wasPreferred bool
-	manager      Manager
+	// TODO remove
+	// wasPreferred bool
+	manager Manager
 }
 
 // NewCommitBlock returns a new *Commit block where the block's parent, a
@@ -31,20 +32,18 @@ func NewCommitBlock(
 	manager Manager,
 	parentID ids.ID,
 	height uint64,
-	wasPreferred bool,
 ) (*CommitBlock, error) {
 	statelessBlk, err := stateless.NewCommitBlock(parentID, height)
 	if err != nil {
 		return nil, err
 	}
 
-	return toStatefulCommitBlock(statelessBlk, manager, wasPreferred, choices.Processing)
+	return toStatefulCommitBlock(statelessBlk, manager, choices.Processing)
 }
 
 func toStatefulCommitBlock(
 	statelessBlk *stateless.CommitBlock,
 	manager Manager,
-	wasPreferred bool,
 	status choices.Status,
 ) (*CommitBlock, error) {
 	commit := &CommitBlock{
@@ -54,8 +53,7 @@ func toStatefulCommitBlock(
 			baseBlk:         &statelessBlk.CommonBlock,
 			status:          status,
 		},
-		wasPreferred: wasPreferred,
-		manager:      manager,
+		manager: manager,
 	}
 
 	return commit, nil

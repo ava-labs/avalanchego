@@ -87,7 +87,7 @@ func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	if err := a.ctx.SharedMemory.Apply(b.atomicRequests, batch); err != nil {
+	if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			b.AtomicBlock.Tx.ID(),
@@ -170,9 +170,11 @@ func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
 	a.commonAccept(b.commonBlock)
 	a.AddStatelessBlock(b.CommitBlock, choices.Accepted)
 
+	wasPreferred := a.blkIDToPreferCommit[blkID]
+
 	// Update metrics
 	if a.bootstrapped.GetValue() {
-		if b.wasPreferred {
+		if wasPreferred {
 			a.metrics.MarkAcceptedOptionVote()
 		} else {
 			a.metrics.MarkRejectedOptionVote()
@@ -209,8 +211,9 @@ func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
 	a.AddStatelessBlock(b.AbortBlock, choices.Accepted)
 
 	// Update metrics
+	wasPreferred := a.blkIDToPreferCommit[blkID]
 	if a.bootstrapped.GetValue() {
-		if b.wasPreferred {
+		if wasPreferred {
 			a.metrics.MarkAcceptedOptionVote()
 		} else {
 			a.metrics.MarkRejectedOptionVote()
