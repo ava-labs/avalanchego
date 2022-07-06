@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var _ blockState = &blockStateImpl{}
@@ -36,24 +37,16 @@ func MakeStateful(
 	}
 }
 
-type statelessBlockState interface {
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
+type blockState interface {
 	AddStatelessBlock(block stateless.Block, status choices.Status)
-}
-
-type statefulBlockState interface {
 	GetStatefulBlock(blkID ids.ID) (Block, error)
 	pinVerifiedBlock(blk Block)
 	unpinVerifiedBlock(id ids.ID)
 }
 
-type blockState interface {
-	statefulBlockState
-	statelessBlockState
-}
-
 type blockStateImpl struct {
-	statelessBlockState
+	state.State
+
 	// TODO is there a way to avoid having [manager] in here?
 	// [blockStateImpl] is embedded in manager.
 	manager      Manager
@@ -67,7 +60,7 @@ func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 		return blk, nil
 	}
 
-	statelessBlk, blkStatus, err := b.statelessBlockState.GetStatelessBlock(blkID)
+	statelessBlk, blkStatus, err := b.State.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
