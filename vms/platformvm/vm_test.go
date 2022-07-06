@@ -52,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -501,7 +502,7 @@ func TestGenesis(t *testing.T) {
 		}
 		addrs := ids.ShortSet{}
 		addrs.Add(addr)
-		utxos, err := avax.GetAllUTXOs(vm.internalState, addrs)
+		utxos, err := avax.GetAllUTXOs(vm.state, addrs)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -541,12 +542,12 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure genesis timestamp is correct
-	if timestamp := vm.internalState.GetTimestamp(); timestamp.Unix() != int64(genesisState.Time) {
+	if timestamp := vm.state.GetTimestamp(); timestamp.Unix() != int64(genesisState.Time) {
 		t.Fatalf("vm's time is incorrect. Expected %v got %v", genesisState.Time, timestamp)
 	}
 
 	// Ensure the new subnet we created exists
-	if _, _, err := vm.internalState.GetTx(testSubnet1.ID()); err != nil {
+	if _, _, err := vm.state.GetTx(testSubnet1.ID()); err != nil {
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
 	}
 }
@@ -617,13 +618,13 @@ func TestAddValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	} else if err := commit.Accept(); err != nil { // commit the proposal
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status of tx should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakers()
+	pendingStakers := vm.state.PendingStakers()
 
 	// Verify that new validator now in pending validator set
 	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
@@ -754,13 +755,13 @@ func TestAddValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakers()
+	pendingStakers := vm.state.PendingStakers()
 
 	// Verify that new validator NOT in pending validator set
 	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
@@ -873,13 +874,13 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // accept the proposal
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakers()
+	pendingStakers := vm.state.PendingStakers()
 	vdr := pendingStakers.GetValidator(nodeID)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
 
@@ -956,13 +957,13 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakers()
+	pendingStakers := vm.state.PendingStakers()
 	vdr := pendingStakers.GetValidator(nodeID)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
 
@@ -1018,14 +1019,14 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
 	// Verify that chain's timestamp has advanced
-	if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
+	if timestamp := vm.state.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
 
@@ -1059,13 +1060,13 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // reward the genesis validator
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	currentStakers := vm.internalState.CurrentStakers()
+	currentStakers := vm.state.CurrentStakers()
 	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -1114,11 +1115,11 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
+	} else if timestamp := vm.state.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
 
@@ -1147,13 +1148,13 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := vm.internalState.CurrentStakers()
+	currentStakers := vm.state.CurrentStakers()
 	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -1200,11 +1201,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
+	} else if timestamp := vm.state.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
 
@@ -1233,13 +1234,13 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := vm.internalState.CurrentStakers()
+	currentStakers := vm.state.CurrentStakers()
 	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
 		t.Fatal("should have removed a genesis validator")
 	}
@@ -1290,14 +1291,14 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
 	// Verify chain was created
-	chains, err := vm.internalState.GetChains(testSubnet1.ID())
+	chains, err := vm.state.GetChains(testSubnet1.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1348,13 +1349,13 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(createSubnetTx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	subnets, err := vm.internalState.GetSubnets()
+	subnets, err := vm.state.GetSubnets()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1419,13 +1420,13 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // add the validator to pending validator set
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers := vm.internalState.PendingStakers()
+	pendingStakers := vm.state.PendingStakers()
 	vdr := pendingStakers.GetValidator(nodeID)
 	_, exists := vdr.SubnetValidators()[createSubnetTx.ID()]
 	if !exists {
@@ -1467,20 +1468,20 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // move validator addValidatorTx from pending to current
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers = vm.internalState.PendingStakers()
+	pendingStakers = vm.state.PendingStakers()
 	vdr = pendingStakers.GetValidator(nodeID)
 	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
 	if exists {
 		t.Fatal("should have removed the pending validator")
 	}
 
-	currentStakers := vm.internalState.CurrentStakers()
+	currentStakers := vm.state.CurrentStakers()
 	cVDR, err := currentStakers.GetValidator(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -1523,20 +1524,20 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	} else if err := commit.Accept(); err != nil { // remove validator from current validator set
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
-	pendingStakers = vm.internalState.PendingStakers()
+	pendingStakers = vm.state.PendingStakers()
 	vdr = pendingStakers.GetValidator(nodeID)
 	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
 	if exists {
 		t.Fatal("should have removed the pending validator")
 	}
 
-	currentStakers = vm.internalState.CurrentStakers()
+	currentStakers = vm.state.CurrentStakers()
 	cVDR, err = currentStakers.GetValidator(nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -1629,7 +1630,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1710,7 +1711,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2426,7 +2427,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			amount, err := vm.internalState.MaxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
+			amount, err := vm.state.MaxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2791,30 +2792,30 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := stateful.NewState(
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
-		vm.ctx,
 		&vm.Config,
+		vm.ctx,
 		vm.LocalStake,
 		vm.TotalStake,
 		vm.rewards,
 	)
 	assert.NoError(err)
-	vm.internalState = is
+	vm.state = is
 
 	// Verify that new validator is now in the current validator set.
 	{
-		currentStakers := vm.internalState.CurrentStakers()
+		currentStakers := vm.state.CurrentStakers()
 		_, err = currentStakers.GetValidator(nodeID)
 		assert.NoError(err)
 
-		pendingStakers := vm.internalState.PendingStakers()
+		pendingStakers := vm.state.PendingStakers()
 		_, _, err := pendingStakers.GetValidatorTx(nodeID)
 		assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.internalState.GetTimestamp()
+		currentTimestamp := vm.state.GetTimestamp()
 		assert.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
 	}
 }
@@ -2831,7 +2832,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.internalState.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
+	vm.state.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
 	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
@@ -3163,23 +3164,23 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := stateful.NewState(
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
-		vm.ctx,
 		&vm.Config,
+		vm.ctx,
 		vm.LocalStake,
 		vm.TotalStake,
 		vm.rewards,
 	)
 	assert.NoError(err)
-	vm.internalState = is
+	vm.state = is
 
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
 	{
-		currentStakers := vm.internalState.CurrentStakers()
+		currentStakers := vm.state.CurrentStakers()
 		node0, err := currentStakers.GetValidator(nodeID0)
 		assert.NoError(err)
 		potentialReward := node0.PotentialReward()
@@ -3190,13 +3191,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		potentialReward = node1.PotentialReward()
 		assert.EqualValues(uint64(59999999), potentialReward)
 
-		pendingStakers := vm.internalState.PendingStakers()
+		pendingStakers := vm.state.PendingStakers()
 		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.internalState.GetTimestamp()
+		currentTimestamp := vm.state.GetTimestamp()
 		assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
 	}
 }

@@ -82,7 +82,7 @@ func TestAtomicTxImports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.internalState.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
+	vm.state.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
 
 	vm.mempool.AddDecisionTx(tx)
 	b, err := vm.BuildBlock()
@@ -92,7 +92,7 @@ func TestAtomicTxImports(t *testing.T) {
 	assert.NoError(err)
 	err = b.Accept()
 	assert.NoError(err)
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state
 	assert.Equal(txStatus, status.Committed)

@@ -15,13 +15,17 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -31,6 +35,7 @@ import (
 
 const (
 	validatorDiffsCacheSize = 2048
+	blockCacheSize          = 2048
 	txCacheSize             = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
@@ -39,6 +44,8 @@ const (
 
 var (
 	_ State = &state{}
+
+	blockPrefix = []byte("block")
 
 	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 
@@ -102,6 +109,12 @@ type LastAccepteder interface {
 	SetLastAccepted(blkID ids.ID, persist bool)
 }
 
+type stateBlk struct {
+	Blk    stateless.Block
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
+}
+
 type State interface {
 	LastAccepteder
 	Chain
@@ -135,17 +148,26 @@ type State interface {
 		endTime time.Time,
 	) (uint64, error)
 
-	// TODO: remove SyncGenesis and Load from the interface and perform them
-	//       once upon creation
-
-	// SyncGenesis initializes the state with the genesis state.
-	SyncGenesis(genesisBlkID ids.ID, genesisState *genesis.State) error
-
 	// Load pulls data previously stored on disk that is expected to be in
 	// memory.
 	Load() error
 
+	SetHeight(height uint64)
+
+	// Write uncommitted data to the base database but don't commit it.
 	Write(height uint64) error
+
+	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
+	AddStatelessBlock(block stateless.Block, status choices.Status)
+
+	// Discard uncommitted changes to the database.
+	Abort()
+
+	// Commit changes to the base database.
+	Commit() error
+	// Returns a batch of unwritten changes that,
+	// when written, will be commit to the base database.
+	CommitBatch() (database.Batch, error)
 	Close() error
 }
 
@@ -156,9 +178,14 @@ type state struct {
 	totalStake prometheus.Gauge
 	rewards    reward.Calculator
 
-	baseDB database.Database
+	baseDB *versiondb.Database
 
 	stakers
+	currentHeight uint64
+
+	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
+	blockCache  cache.Cacher        // cache of blockID -> Block, if the entry is nil, it is not in the database
+	blockDB     database.Database
 
 	addedCurrentStakers   []*ValidatorReward
 	deletedCurrentStakers []*txs.Tx
@@ -239,7 +266,8 @@ type txBytesAndStatus struct {
 }
 
 func New(
-	baseDB database.Database,
+	db database.Database,
+	genesisBytes []byte,
 	metrics prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,
@@ -247,6 +275,17 @@ func New(
 	totalStake prometheus.Gauge,
 	rewards reward.Calculator,
 ) (State, error) {
+	blockCache, err := metercacher.New(
+		"block_cache",
+		metrics,
+		&cache.LRU{Size: blockCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	baseDB := versiondb.New(db)
+
 	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
 
 	currentValidatorsDB := prefixdb.New(currentPrefix, validatorsDB)
@@ -311,15 +350,21 @@ func New(
 		metrics,
 		&cache.LRU{Size: chainDBCacheSize},
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return &state{
+	s := &state{
 		cfg:        cfg,
 		ctx:        ctx,
 		localStake: localStake,
 		totalStake: totalStake,
 		rewards:    rewards,
+		baseDB:     baseDB,
 
-		baseDB: baseDB,
+		addedBlocks: make(map[ids.ID]stateBlk),
+		blockCache:  blockCache,
+		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
 		uptimes:        make(map[ids.NodeID]*currentValidatorState),
 		updatedUptimes: make(map[ids.NodeID]struct{}),
@@ -363,7 +408,16 @@ func New(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}, err
+	}
+
+	if err := s.sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = s.Close()
+
+		return nil, err
+	}
+
+	return s, nil
 }
 
 func (s *state) ShouldInit() (bool, error) {
@@ -1041,6 +1095,7 @@ func (s *state) loadPendingValidators() error {
 func (s *state) Write(height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
+		s.writeBlocks(),
 		s.writeCurrentStakers(height),
 		s.writePendingStakers(),
 		s.writeUptimes(),
@@ -1074,6 +1129,153 @@ func (s *state) Close() error {
 		s.singletonDB.Close(),
 	)
 	return errs.Err
+}
+
+func (s *state) sync(genesis []byte) error {
+	shouldInit, err := s.ShouldInit()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database is initialized: %w",
+			err,
+		)
+	}
+
+	// If the database is empty, create the platform chain anew using the
+	// provided genesis state
+	if shouldInit {
+		if err := s.init(genesis); err != nil {
+			return fmt.Errorf(
+				"failed to initialize the database: %w",
+				err,
+			)
+		}
+	}
+
+	if err := s.Load(); err != nil {
+		return fmt.Errorf(
+			"failed to load the database state: %w",
+			err,
+		)
+	}
+	return nil
+}
+
+func (s *state) init(genesisBytes []byte) error {
+	// Create the genesis block and save it as being accepted (We don't do
+	// genesisBlock.Accept() because then it'd look for genesisBlock's
+	// non-existent parent)
+	genesisID := hashing.ComputeHash256Array(genesisBytes)
+	genesisBlock, err := stateless.NewCommitBlock(genesisID, 0)
+	if err != nil {
+		return err
+	}
+	s.AddStatelessBlock(genesisBlock, choices.Accepted)
+
+	genesisState, err := genesis.ParseState(genesisBytes)
+	if err != nil {
+		return err
+	}
+	if err := s.SyncGenesis(genesisBlock.ID(), genesisState); err != nil {
+		return err
+	}
+
+	if err := s.DoneInit(); err != nil {
+		return err
+	}
+
+	return s.Commit()
+}
+
+func (s *state) AddStatelessBlock(block stateless.Block, status choices.Status) {
+	s.addedBlocks[block.ID()] = stateBlk{
+		Blk:    block,
+		Bytes:  block.Bytes(),
+		Status: status,
+	}
+}
+
+func (s *state) SetHeight(height uint64) {
+	s.currentHeight = height
+}
+
+func (s *state) Commit() error {
+	defer s.Abort()
+	batch, err := s.CommitBatch()
+	if err != nil {
+		return err
+	}
+	return batch.Write()
+}
+
+func (s *state) Abort() {
+	s.baseDB.Abort()
+}
+
+func (s *state) CommitBatch() (database.Batch, error) {
+	if err := s.Write(s.currentHeight); err != nil {
+		return nil, err
+	}
+	return s.baseDB.CommitBatch()
+}
+
+func (s *state) writeBlocks() error {
+	for blkID, stateBlk := range s.addedBlocks {
+		var (
+			blkID = blkID
+			stBlk = stateBlk
+		)
+
+		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
+		blockBytes, err := stateless.GenesisCodec.Marshal(stateless.Version, &stBlk)
+		if err != nil {
+			return fmt.Errorf("failed to marshal block %s: %w", blkID, err)
+		}
+
+		delete(s.addedBlocks, blkID)
+		s.blockCache.Put(blkID, stateBlk)
+		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
+			return fmt.Errorf("failed to write block %s: %w", blkID, err)
+		}
+	}
+	return nil
+}
+
+func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk.Blk, blk.Status, nil
+	}
+	if blkIntf, cached := s.blockCache.Get(blockID); cached {
+		if blkIntf == nil {
+			return nil, choices.Processing, database.ErrNotFound // status does not matter here
+		}
+
+		blkState := blkIntf.(stateBlk)
+		return blkState.Blk, blkState.Status, nil
+	}
+
+	blkBytes, err := s.blockDB.Get(blockID[:])
+	if err == database.ErrNotFound {
+		s.blockCache.Put(blockID, nil)
+		return nil, choices.Processing, database.ErrNotFound // status does not matter here
+	} else if err != nil {
+		return nil, choices.Processing, err // status does not matter here
+	}
+
+	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+	blkState := stateBlk{}
+	if _, err := stateless.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, err // status does not matter here
+	}
+
+	statelessBlk, err := stateless.Parse(blkState.Bytes, stateless.GenesisCodec)
+	if err != nil {
+		return nil, choices.Processing, err
+	}
+
+	blkState.Blk = statelessBlk
+
+	s.blockCache.Put(blockID, blkState)
+	return statelessBlk, blkState.Status, nil
 }
 
 type currentValidatorState struct {

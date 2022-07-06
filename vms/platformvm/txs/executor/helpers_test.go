@@ -43,8 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
-
-	p_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var (
@@ -225,8 +223,10 @@ func defaultState(
 		Help:      "Total amount of AVAX staked",
 	})
 
+	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
 		baseDB,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
@@ -239,7 +239,7 @@ func defaultState(
 	}
 
 	// setup initial data as if we are storing genesis
-	initializeState(tState, ctx)
+	// initializeState(tState, ctx)
 
 	// persist and reload to init a bunch of in-memory stuff
 	if err := tState.Write( /*height*/ 0); err != nil {
@@ -337,21 +337,6 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 		}
 	}
 	return res
-}
-
-func initializeState(tState state.State, ctx *snow.Context) {
-	genesisBytes := buildGenesisTest(ctx)
-	genesisState, err := p_genesis.ParseState(genesisBytes)
-	if err != nil {
-		panic(err)
-	}
-	dummyGenID := ids.ID{'g', 'e', 'n', 'I', 'D'}
-	if err := tState.SyncGenesis(
-		dummyGenID,
-		genesisState,
-	); err != nil {
-		panic(err)
-	}
 }
 
 func buildGenesisTest(ctx *snow.Context) []byte {
