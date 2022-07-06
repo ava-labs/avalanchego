@@ -46,7 +46,6 @@ const (
 )
 
 var (
-	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
 	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
 	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
 	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
@@ -86,7 +85,7 @@ func (service *Service) GetHeight(r *http.Request, args *struct{}, response *Get
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	lastAccepted, err := service.vm.blkVerifier.GetStatefulBlock(lastAcceptedID)
+	lastAccepted, err := service.vm.manager.GetStatefulBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -1669,7 +1668,7 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	blockIntf, err := service.vm.blkVerifier.GetStatefulBlock(blockID)
+	blockIntf, err := service.vm.manager.GetStatefulBlock(blockID)
 	if err != nil {
 		return false, err
 	}
@@ -1683,7 +1682,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 		}
 		block, ok = parentBlockIntf.(stateful.Decision)
 		if !ok {
-			return false, errMissingDecisionBlock
+			return false, fmt.Errorf("expected stateful.Decision but got %T", parentBlockIntf)
 		}
 	}
 	state := block.OnAccept()
@@ -1940,9 +1939,9 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	if !ok {
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
+	onAccept := block.OnAccept()
 
-	OnAccept := block.OnAccept()
-	_, _, err = OnAccept.GetTx(args.TxID)
+	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.
 		response.Status = status.Processing

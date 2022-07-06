@@ -85,9 +85,9 @@ type mutableSharedMemory struct {
 
 type testHelpersCollection struct {
 	BlockBuilder
-	blkVerifier stateful.Verifier
-	mpool       mempool.Mempool
-	sender      *common.SenderTest
+	blkManager stateful.Manager
+	mpool      mempool.Mempool
+	sender     *common.SenderTest
 
 	isBootstrapped *utils.AtomicBool
 	cfg            *config.Config
@@ -186,18 +186,22 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
-	res.blkVerifier = stateful.NewBlockVerifier(
+	res.blkManager = stateful.NewManager(
 		res.mpool,
+		metrics,
+		res.fullState,
+		res.fullState,
+		res.fullState,
 		res.fullState,
 		res.txExecBackend,
-		metrics,
 		window,
 	)
+
 	res.BlockBuilder = NewBlockBuilder(
 		res.mpool,
 		res.txBuilder,
 		res.txExecBackend,
-		res.blkVerifier,
+		res.blkManager,
 		nil, // toEngine,
 		res.sender,
 	)
