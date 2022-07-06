@@ -6,6 +6,7 @@ package stateful
 import "github.com/ava-labs/avalanchego/vms/platformvm/state"
 
 type decisionBlock struct {
+	chainState
 	*commonBlock
 
 	// state of the chain if this block is accepted
@@ -15,19 +16,9 @@ type decisionBlock struct {
 	onAcceptFunc func()
 }
 
-// From CommonDecisionBlock
-func (d *decisionBlock) free() {
-	d.commonBlock.free()
-	d.onAcceptState = nil
-}
-
-func (d *decisionBlock) setBaseState() {
-	d.onAcceptState.SetBase(d.verifier.GetChainState())
-}
-
 func (d *decisionBlock) OnAccept() state.Chain {
 	if d.Status().Decided() || d.onAcceptState == nil {
-		return d.verifier.GetChainState()
+		return d.GetState()
 	}
 	return d.onAcceptState
 }

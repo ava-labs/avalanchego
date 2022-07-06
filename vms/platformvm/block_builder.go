@@ -85,7 +85,6 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	// Get the preferred block (which we want to build off)
 	preferred, err := b.vm.Preferred()
 	if err != nil {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
@@ -97,6 +96,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("expected Decision block but got %T", preferred)
 	}
 	preferredState := preferredDecision.OnAccept()
+
 	verifier := executor.MempoolTxVerifier{
 		Backend:     &b.vm.txExecutorBackend,
 		ParentState: preferredState,
@@ -131,6 +131,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
+
 	preferredDecision, ok := preferred.(stateful.Decision)
 	if !ok {
 		// The preferred block should always be a decision block
@@ -142,8 +143,8 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		return stateful.NewStandardBlock(
-			b.vm.blkVerifier,
-			b.vm.txExecutorBackend,
+			b.vm.manager,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			txs,
@@ -161,8 +162,8 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			b.vm.blkVerifier,
-			b.vm.txExecutorBackend,
+			b.vm.manager,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			rewardValidatorTx,
@@ -180,8 +181,8 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			b.vm.blkVerifier,
-			b.vm.txExecutorBackend,
+			b.vm.manager,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
@@ -210,8 +211,8 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return stateful.NewProposalBlock(
-			b.vm.blkVerifier,
-			b.vm.txExecutorBackend,
+			b.vm.manager,
+			b.vm.ctx,
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
@@ -219,8 +220,8 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	return stateful.NewProposalBlock(
-		b.vm.blkVerifier,
-		b.vm.txExecutorBackend,
+		b.vm.manager,
+		b.vm.ctx,
 		preferredID,
 		nextHeight,
 		tx,
