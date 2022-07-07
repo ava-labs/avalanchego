@@ -53,7 +53,7 @@ func TestBlueberryFork(t *testing.T) {
 			ids.ShortEmpty,
 		)
 		assert.NoError(err)
-		h.mpool.AddProposalTx(addPendingValidatorTx)
+		assert.NoError(h.mpool.Add(addPendingValidatorTx))
 
 		proposalBlk, err := h.BlockBuilder.BuildBlock()
 		assert.NoError(err)
@@ -99,7 +99,7 @@ func TestBlueberryFork(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	assert.NoError(err)
-	h.mpool.AddDecisionTx(createChainTx)
+	assert.NoError(h.mpool.Add(createChainTx))
 
 	proposalBlk, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err)

@@ -6,13 +6,11 @@ package mempool
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
@@ -55,14 +53,6 @@ type Mempool interface {
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
 
-	AddDecisionTx(tx *txs.Tx)
-	AddProposalTx(tx *txs.Tx)
-
-	// Return timestamp of earliest proposal tx in mempool.
-	// Note: if no proposal txs are available, MaxTime is returned,
-	// which comes handy in subsequent comparisons
-	EarliestProposalTxTime() time.Time
-
 	HasDecisionTxs() bool
 	HasProposalTx() bool
 
@@ -71,6 +61,16 @@ type Mempool interface {
 
 	PopDecisionTxs(maxTxsBytes int) []*txs.Tx
 	PopProposalTx() *txs.Tx
+
+	// PeekDecisionTxs returns the next decisionTxs
+	// up to maxTxsBytes without removing it from mempool.
+	// It returns nil if !HasDecisionTxs()
+	PeekDecisionTxs(maxTxsBytes int) []*txs.Tx
+
+	// PeekProposalTx returns next proposalTx
+	// without removing it from mempool.
+	// It returns nil if !HasProposalTx()
+	PeekProposalTx() *txs.Tx
 
 	// Note: dropped txs are added to droppedTxIDs but not
 	// not evicted from unissued decision/proposal txs.
@@ -191,9 +191,9 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	switch tx.Unsigned.(type) {
 	case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-		m.AddProposalTx(tx)
+		m.addProposalTx(tx)
 	case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-		m.AddDecisionTx(tx)
+		m.addDecisionTx(tx)
 	default:
 		m.unknownTxs.Inc()
 		return fmt.Errorf("%w: %T", ErrUnknownTxType, tx.Unsigned)
@@ -220,12 +220,12 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 	return m.unissuedProposalTxs.Get(txID)
 }
 
-func (m *mempool) AddDecisionTx(tx *txs.Tx) {
+func (m *mempool) addDecisionTx(tx *txs.Tx) {
 	m.unissuedDecisionTxs.Add(tx)
 	m.register(tx)
 }
 
-func (m *mempool) AddProposalTx(tx *txs.Tx) {
+func (m *mempool) addProposalTx(tx *txs.Tx) {
 	m.unissuedProposalTxs.Add(tx)
 	m.register(tx)
 }
@@ -267,18 +267,32 @@ func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*txs.Tx {
 	return txs
 }
 
+func (m *mempool) PeekDecisionTxs(maxTxsBytes int) []*txs.Tx {
+	fullList := m.unissuedDecisionTxs.List()
+	res := make([]*txs.Tx, 0, cap(fullList))
+	totalBytes := 0
+	for _, tx := range fullList {
+		totalBytes += len(tx.Bytes())
+		if totalBytes > maxTxsBytes {
+			return res
+		}
+		res = append(res, tx)
+	}
+	return res
+}
+
+func (m *mempool) PeekProposalTx() *txs.Tx {
+	if m.unissuedProposalTxs.Len() == 0 {
+		return nil
+	}
+
+	return m.unissuedProposalTxs.Peek()
+}
+
 func (m *mempool) PopProposalTx() *txs.Tx {
 	tx := m.unissuedProposalTxs.RemoveTop()
 	m.deregister(tx)
 	return tx
-}
-
-func (m *mempool) EarliestProposalTxTime() time.Time {
-	if m.unissuedProposalTxs.Len() == 0 {
-		return mockable.MaxTime
-	}
-
-	return m.unissuedProposalTxs.Peek().Unsigned.(txs.StakerTx).StartTime()
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason string) {

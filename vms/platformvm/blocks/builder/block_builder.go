@@ -279,10 +279,9 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() {
 	now := b.txExecutorBackend.Clk.Time()
 	syncTime := now.Add(executor.SyncBound)
 	for b.Mempool.HasProposalTx() {
-		tx := b.Mempool.PopProposalTx()
+		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
-			b.Mempool.AddProposalTx(tx)
 			return
 		}
 

@@ -87,7 +87,7 @@ func TestAtomicTxImports(t *testing.T) {
 	}
 	h.fullState.SetTimestamp(h.cfg.ApricotPhase5Time.Add(100 * time.Second))
 
-	h.BlockBuilder.AddDecisionTx(tx)
+	assert.NoError(h.BlockBuilder.Add(tx))
 	b, err := h.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work

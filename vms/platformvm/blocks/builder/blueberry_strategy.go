@@ -42,24 +42,12 @@ func (b *blueberryStrategy) hasContent() (bool, error) {
 		return !b.blkTime.IsZero(), nil
 	}
 
-	// reinsert txes in mempool before returning
-	for _, tx := range b.txes {
-		switch tx.Unsigned.(type) {
-		case *txs.RewardValidatorTx:
-			// nothing to do, these tx is generated
-			// just in time, not picked from mempool
-		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-			b.Mempool.AddProposalTx(tx)
-		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-			b.Mempool.AddDecisionTx(tx)
-		default:
-			return false, fmt.Errorf("unhandled tx type %T, could not reinsert in mempool", b.txes[0].Unsigned)
-		}
-	}
-
 	return true, nil
 }
 
+// Note: selectBlockContent will only peek into mempool and must not
+// remove any transactions. It's up to the caller to cleanup the mempool
+// if it must
 func (b *blueberryStrategy) selectBlockContent() error {
 	// blkTimestamp is zeroed for Apricot blocks
 	// it is tentatively set to chainTime for Blueberry ones
@@ -67,7 +55,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 
 	// try including as many standard txs as possible. No need to advance chain time
 	if b.HasDecisionTxs() {
-		txs := b.PopDecisionTxs(TargetBlockSize)
+		txs := b.PeekDecisionTxs(TargetBlockSize)
 		b.txes = txs
 		b.blkTime = blkTime
 		return nil
@@ -109,7 +97,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 		return errNoPendingBlocks
 	}
 
-	tx := b.PopProposalTx()
+	tx := b.PeekProposalTx()
 
 	// if the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
@@ -131,6 +119,21 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	blkVersion := uint16(stateless.BlueberryVersion)
 	if err := b.selectBlockContent(); err != nil {
 		return nil, err
+	}
+
+	// remove selected transactions from mempool
+	for _, tx := range b.txes {
+		switch tx.Unsigned.(type) {
+		case *txs.RewardValidatorTx:
+			// nothing to do, these tx is generated
+			// just in time, not picked from mempool
+		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
+			b.Mempool.RemoveProposalTx(tx)
+		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
+			b.Mempool.RemoveDecisionTxs([]*txs.Tx{tx})
+		default:
+			return nil, fmt.Errorf("unhandled tx type %T, could not remove from mempool", tx.Unsigned)
+		}
 	}
 
 	ctx := b.blockBuilder.txExecutorBackend.Ctx
