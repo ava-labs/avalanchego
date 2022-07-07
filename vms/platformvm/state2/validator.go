@@ -4,10 +4,8 @@
 package state
 
 import (
-	"github.com/google/btree"
+	"github.com/ava-labs/avalanchego/ids"
 )
-
-var _ Validator = &baseValidator{}
 
 type Validator interface {
 	// CurrentStaker returns the current staker associated with this validator.
@@ -36,20 +34,26 @@ type Validator interface {
 	NewPendingDelegatorIterator() StakerIterator
 }
 
-type baseValidator struct {
-	currentStaker          *Staker
-	pendingStaker          *Staker
-	currentDelegatorWeight uint64
-	currentDelegators      *btree.BTree
-	pendingDelegators      *btree.BTree
-}
+type Validators interface {
+	// GetValidator returns the staker state associated with this validator.
+	GetValidator(subnetID ids.ID, nodeID ids.NodeID) Validator
 
-func (v *baseValidator) CurrentStaker() *Staker         { return v.currentStaker }
-func (v *baseValidator) PendingStaker() *Staker         { return v.pendingStaker }
-func (v *baseValidator) CurrentDelegatorWeight() uint64 { return v.currentDelegatorWeight }
-func (v *baseValidator) NewCurrentDelegatorIterator() StakerIterator {
-	return NewTreeIterator(v.currentDelegators)
-}
-func (v *baseValidator) NewPendingDelegatorIterator() StakerIterator {
-	return NewTreeIterator(v.pendingDelegators)
+	// GetNextRewardedStaker returns the next staker that has a non-zero
+	// PotentialReward.
+	GetNextRewardedStaker() *Staker
+
+	// NewCurrentStakerIterator returns the current stakers in the validator set
+	// sorted in order of their future removal.
+	NewCurrentStakerIterator() StakerIterator
+
+	// NewPendingStakerIterator returns the pending stakers in the validator set
+	// sorted in order of their future addition.
+	NewPendingStakerIterator() StakerIterator
+
+	// Update(
+	// 	currentStakersToAdd []*Staker,
+	// 	currentStakersToRemove []*Staker,
+	// 	pendingStakersToAdd []*Staker,
+	// 	pendingStakersToRemove []*Staker,
+	// )
 }
