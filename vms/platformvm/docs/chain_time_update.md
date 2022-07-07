@@ -18,7 +18,7 @@ Before Blueberry fork activation, `ChainTime` was incremented by an `AdvanceTime
 
 1. *Strict Monotonicity*: proposed time must be *strictly* greater than current `ChainTime`
 2. *Synchronicity*: proposed time must not be later than node’s current time plus a synchronicity bound (currently set to 10 seconds).
-3. *No Skipping*: proposed time must be smaller or equal to the next staking event, that is start/end of any staker.
+3. *No Skipping*: proposed time must be less than or equal to the next staking event, that is start/end of any staker.
 
 Note that *Synchronicity* makes sure that `ChainTime` approximate “real” time flow. If we dropped synchronicity requirement, a staker could declare any staking time and immediately push `ChainTime` to the end, so as to pocket a reward without having actually carried out any activity in the “real” time.
 
