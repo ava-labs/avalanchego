@@ -72,15 +72,15 @@ func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
 }
 
 func (sb *StandardBlock) Verify() error {
-	return sb.verifyStandardBlock(sb)
+	return sb.VerifyStandardBlock(sb.StandardBlock)
 }
 
 func (sb *StandardBlock) Accept() error {
-	return sb.acceptStandardBlock(sb)
+	return sb.AcceptStandardBlock(sb.StandardBlock)
 }
 
 func (sb *StandardBlock) Reject() error {
-	return sb.rejectStandardBlock(sb)
+	return sb.RejectStandardBlock(sb.StandardBlock)
 }
 
 func (sb *StandardBlock) setBaseState() {

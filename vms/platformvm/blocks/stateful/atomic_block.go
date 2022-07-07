@@ -69,15 +69,15 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 }
 
 func (ab *AtomicBlock) Verify() error {
-	return ab.verifyAtomicBlock(ab)
+	return ab.VerifyAtomicBlock(ab.AtomicBlock)
 }
 
 func (ab *AtomicBlock) Accept() error {
-	return ab.acceptAtomicBlock(ab)
+	return ab.AcceptAtomicBlock(ab.AtomicBlock)
 }
 
 func (ab *AtomicBlock) Reject() error {
-	return ab.rejectAtomicBlock(ab)
+	return ab.RejectAtomicBlock(ab.AtomicBlock)
 }
 
 func (ab *AtomicBlock) setBaseState() {

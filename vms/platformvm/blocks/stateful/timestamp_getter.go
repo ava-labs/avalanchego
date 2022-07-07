@@ -19,9 +19,14 @@ type timestampGetterImpl struct {
 
 // TODO add comment
 func (t *timestampGetterImpl) GetTimestamp(blkID ids.ID) time.Time {
-	timestamp := t.blkIDToTimestamp[blkID]
-	if timestamp.IsZero() {
+	// timestamp := t.blkIDToTimestamp[blkID]
+	// if timestamp.IsZero() {
+	// 	return t.state.GetTimestamp()
+	// }
+	// return timestamp
+	blockState, ok := t.blkIDToState[blkID]
+	if !ok {
 		return t.state.GetTimestamp()
 	}
-	return timestamp
+	return blockState.timestamp
 }

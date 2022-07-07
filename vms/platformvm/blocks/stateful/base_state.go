@@ -20,12 +20,18 @@ type baseStateSetterImpl struct {
 }
 
 func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *ProposalBlock) {
-	if onCommitState := s.blkIDToOnCommitState[b.ID()]; onCommitState != nil {
-		onCommitState.SetBase(s.state)
+	blockState, ok := s.blkIDToState[b.ID()]
+	if !ok {
+		return
 	}
-	if onAbortState := s.blkIDToOnAbortState[b.ID()]; onAbortState != nil {
-		onAbortState.SetBase(s.state)
-	}
+	blockState.onCommitState.SetBase(s.state)
+	blockState.onAbortState.SetBase(s.state)
+	// if onCommitState := s.blkIDToOnCommitState[b.ID()]; onCommitState != nil {
+	// 	onCommitState.SetBase(s.state)
+	// }
+	// if onAbortState := s.blkIDToOnAbortState[b.ID()]; onAbortState != nil {
+	// 	onAbortState.SetBase(s.state)
+	// }
 }
 
 func (s *baseStateSetterImpl) setBaseStateAtomicBlock(b *AtomicBlock) {
@@ -45,7 +51,12 @@ func (s *baseStateSetterImpl) setBaseStateAbortBlock(b *AbortBlock) {
 }
 
 func (s *baseStateSetterImpl) setBaseStateCommon(blkID ids.ID) {
-	if onAcceptState := s.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-		onAcceptState.Apply(s.state)
+	blockState, ok := s.blkIDToState[blkID]
+	if !ok {
+		return
 	}
+	blockState.onAcceptState.Apply(s.state)
+	// if onAcceptState := s.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+	// 	onAcceptState.Apply(s.state)
+	// }
 }

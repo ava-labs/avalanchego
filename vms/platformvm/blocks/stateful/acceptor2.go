@@ -95,7 +95,15 @@ func (a *acceptor2) AcceptAtomicBlock(b *stateless.AtomicBlock) error {
 		)
 	}
 
-	if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
+	// if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
+	// 	return fmt.Errorf(
+	// 		"failed to atomically accept tx %s in block %s: %w",
+	// 		b.Tx.ID(),
+	// 		blkID,
+	// 		err,
+	// 	)
+	// }
+	if err := a.ctx.SharedMemory.Apply(blockState.atomicRequests, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
 			b.Tx.ID(),
@@ -317,7 +325,10 @@ func (a *acceptor2) updateStateOptionBlock(b stateless.CommonBlock) error {
 		// TODO
 		// childID.setBaseState()
 	}
-	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+	// if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+	// 	onAcceptFunc()
+	// }
+	if onAcceptFunc := blockState.onAcceptFunc; onAcceptFunc != nil {
 		onAcceptFunc()
 	}
 	return nil

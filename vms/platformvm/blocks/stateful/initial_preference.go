@@ -16,5 +16,6 @@ type initialPreferenceGetterImpl struct {
 }
 
 func (i *initialPreferenceGetterImpl) preferredCommit(blkID ids.ID) bool {
-	return i.blkIDToPreferCommit[blkID]
+	// return i.blkIDToPreferCommit[blkID]
+	return i.blkIDToState[blkID].inititallyPreferCommit
 }

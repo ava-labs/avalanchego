@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
+// TODO can we remove this?
 type statusGetter interface {
 	status(blkID ids.ID) choices.Status
 }
@@ -17,10 +18,5 @@ type statusGetterImpl struct {
 }
 
 func (s *statusGetterImpl) status(blkID ids.ID) choices.Status {
-	status := s.blkIDToStatus[blkID]
-	// TODO fix this
-	//if status == choices.Unknown {
-	//	return s.state.Status(blkID)
-	//}
-	return status
+	return s.blkIDToState[blkID].status
 }

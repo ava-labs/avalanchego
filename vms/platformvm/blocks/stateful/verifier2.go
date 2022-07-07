@@ -44,23 +44,23 @@ func (v *verifier2) VerifyProposalBlock(b *stateless.ProposalBlock) error {
 		return err
 	}
 
-	blkID := b.ID()
+	// blkID := b.ID()
 
 	onCommitState := txExecutor.OnCommit
 	onCommitState.AddTx(b.Tx, status.Committed)
-	v.blkIDToOnCommitState[blkID] = onCommitState
+	// v.blkIDToOnCommitState[blkID] = onCommitState
 	blockState.onCommitState = onCommitState
 
 	onAbortState := txExecutor.OnAbort
 	onAbortState.AddTx(b.Tx, status.Aborted)
-	v.blkIDToOnAbortState[blkID] = onAbortState
+	// v.blkIDToOnAbortState[blkID] = onAbortState
 	blockState.onAbortState = onAbortState
 
-	v.blkIDToTimestamp[blkID] = parentState.GetTimestamp()
+	// v.blkIDToTimestamp[blkID] = parentState.GetTimestamp()
 	blockState.timestamp = parentState.GetTimestamp()
 	// TODO
 	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
-	v.blkIDToPreferCommit[blkID] = txExecutor.PrefersCommit
+	// v.blkIDToPreferCommit[blkID] = txExecutor.PrefersCommit
 	blockState.inititallyPreferCommit = txExecutor.PrefersCommit
 
 	v.Mempool.RemoveProposalTx(b.Tx)
@@ -116,13 +116,13 @@ func (v *verifier2) VerifyAtomicBlock(b *stateless.AtomicBlock) error {
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
 	blkID := b.ID()
-	v.blkIDToOnAcceptState[blkID] = atomicExecutor.OnAccept
+	// v.blkIDToOnAcceptState[blkID] = atomicExecutor.OnAccept
 	blockState.onAcceptState = atomicExecutor.OnAccept
-	v.blkIDToInputs[blkID] = atomicExecutor.Inputs
+	// v.blkIDToInputs[blkID] = atomicExecutor.Inputs
 	blockState.inputs = atomicExecutor.Inputs
-	v.blkIDToAtomicRequests[blkID] = atomicExecutor.AtomicRequests
+	// v.blkIDToAtomicRequests[blkID] = atomicExecutor.AtomicRequests
 	blockState.atomicRequests = atomicExecutor.AtomicRequests
-	v.blkIDToTimestamp[blkID] = atomicExecutor.OnAccept.GetTimestamp()
+	// v.blkIDToTimestamp[blkID] = atomicExecutor.OnAccept.GetTimestamp()
 	blockState.timestamp = atomicExecutor.OnAccept.GetTimestamp()
 
 	conflicts, err := parentIntf.conflicts(atomicExecutor.Inputs)
@@ -235,14 +235,14 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
-		v.blkIDToOnAcceptFunc[blkID] = funcs[0]
+		// v.blkIDToOnAcceptFunc[blkID] = funcs[0]
 		blockState.onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		v.blkIDToOnAcceptFunc[blkID] = func() {
-			for _, f := range funcs {
-				f()
-			}
-		}
+		// v.blkIDToOnAcceptFunc[blkID] = func() {
+		// 	for _, f := range funcs {
+		// 		f()
+		// 	}
+		// }
 		blockState.onAcceptFunc = func() {
 			for _, f := range funcs {
 				f()
@@ -250,9 +250,9 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 		}
 	}
 
-	v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
+	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	blockState.timestamp = onAcceptState.GetTimestamp()
-	v.blkIDToOnAcceptState[blkID] = onAcceptState
+	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blockState.onAcceptState = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	// TODO
@@ -275,11 +275,13 @@ func (v *verifier2) VerifyCommitBlock(b *stateless.CommitBlock) error {
 		return err
 	}
 
-	parentID := b.Parent()
-	onAcceptState := v.blkIDToOnCommitState[parentID]
-	v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
+	// TODO
+	// parentID := b.Parent()
+	// onAcceptState := v.blkIDToOnCommitState[parentID]
+	onAcceptState := state.Diff(nil) // TODO get parent state
+	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	blockState.timestamp = onAcceptState.GetTimestamp()
-	v.blkIDToOnAcceptState[blkID] = onAcceptState
+	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blockState.onAcceptState = onAcceptState
 
 	// v.pinVerifiedBlock(b)
@@ -301,12 +303,12 @@ func (v *verifier2) VerifyAbortBlock(b *stateless.AbortBlock) error {
 		return err
 	}
 
-	parentID := b.Parent()
-
-	onAcceptState := v.blkIDToOnAbortState[parentID]
-	v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
+	// parentID := b.Parent()
+	// onAcceptState := v.blkIDToOnAbortState[parentID]
+	onAcceptState := state.Diff(nil)
+	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	blockState.timestamp = onAcceptState.GetTimestamp()
-	v.blkIDToOnAcceptState[blkID] = onAcceptState
+	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blockState.onAcceptState = onAcceptState
 
 	// v.pinVerifiedBlock(b)

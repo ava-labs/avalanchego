@@ -68,15 +68,15 @@ func toStatefulProposalBlock(
 }
 
 func (pb *ProposalBlock) Verify() error {
-	return pb.verifyProposalBlock(pb)
+	return pb.VerifyProposalBlock(pb.ProposalBlock)
 }
 
 func (pb *ProposalBlock) Accept() error {
-	return pb.acceptProposalBlock(pb)
+	return pb.AcceptProposalBlock(pb.ProposalBlock)
 }
 
 func (pb *ProposalBlock) Reject() error {
-	return pb.rejectProposalBlock(pb)
+	return pb.RejectProposalBlock(pb.ProposalBlock)
 }
 
 func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {

@@ -4,6 +4,8 @@
 package stateful
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
@@ -27,7 +29,13 @@ func (c *conflictCheckerImpl) conflictsAtomicBlock(b *AtomicBlock, s ids.Set) (b
 	if b.Status() == choices.Accepted {
 		return false, nil
 	}
-	inputs := c.blkIDToInputs[b.ID()]
+	// inputs := c.blkIDToInputs[b.ID()]
+	blockState, ok := c.blkIDToState[b.ID()]
+	if !ok {
+		// TODO do we need this check?
+		return false, fmt.Errorf("couldn't find state for block %s", b.ID())
+	}
+	inputs := blockState.inputs
 	if inputs.Overlaps(s) {
 		return true, nil
 	}
@@ -40,14 +48,20 @@ func (c *conflictCheckerImpl) conflictsAtomicBlock(b *AtomicBlock, s ids.Set) (b
 
 func (c *conflictCheckerImpl) conflictsStandardBlock(b *StandardBlock, s ids.Set) (bool, error) {
 	// TODO remove
-	//if b.status == choices.Accepted {
-	//	return false, nil
-	//}
+	// if b.status == choices.Accepted {
+	// 	return false, nil
+	// }
 	blkID := b.ID()
-	if status := c.blkIDToStatus[blkID]; status == choices.Accepted {
-		return false, nil
+	// if status := c.blkIDToStatus[blkID]; status == choices.Accepted {
+	// 	return false, nil
+	// }
+	// inputs := c.blkIDToInputs[b.ID()]
+	blockState, ok := c.blkIDToState[blkID]
+	if !ok {
+		// TODO do we need this check?
+		return false, fmt.Errorf("couldn't find state for block %s", blkID)
 	}
-	inputs := c.blkIDToInputs[b.ID()]
+	inputs := blockState.inputs
 	if inputs.Overlaps(s) {
 		return true, nil
 	}

@@ -4,12 +4,9 @@
 package stateful
 
 import (
-	"time"
-
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/window"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -34,9 +31,12 @@ type OnAcceptor interface {
 
 type Manager interface {
 	blockState
-	verifier
-	acceptor
-	rejector
+	// verifier
+	// acceptor
+	// rejector
+	stateless.BlockVerifier
+	stateless.BlockAcceptor
+	stateless.BlockRejector
 	baseStateSetter
 	conflictChecker
 	chainState
@@ -62,36 +62,46 @@ func NewManager(
 	}
 
 	backend := backend{
-		Mempool:               mempool,
-		blockState:            blockState,
-		heightSetter:          s,
-		state:                 s,
-		bootstrapped:          txExecutorBackend.Bootstrapped,
-		ctx:                   txExecutorBackend.Ctx,
-		blkIDToStatus:         make(map[ids.ID]choices.Status),
-		blkIDToOnAcceptFunc:   make(map[ids.ID]func()),
-		blkIDToOnAcceptState:  make(map[ids.ID]state.Diff),
-		blkIDToOnCommitState:  make(map[ids.ID]state.Diff),
-		blkIDToOnAbortState:   make(map[ids.ID]state.Diff),
-		blkIDToChildren:       make(map[ids.ID][]Block),
-		blkIDToTimestamp:      make(map[ids.ID]time.Time),
-		blkIDToInputs:         make(map[ids.ID]ids.Set),
-		blkIDToAtomicRequests: make(map[ids.ID]map[ids.ID]*atomic.Requests),
-		blkIDToPreferCommit:   make(map[ids.ID]bool),
+		Mempool:      mempool,
+		blockState:   blockState,
+		heightSetter: s,
+		state:        s,
+		bootstrapped: txExecutorBackend.Bootstrapped,
+		ctx:          txExecutorBackend.Ctx,
+		// blkIDToStatus:         make(map[ids.ID]choices.Status),
+		// blkIDToOnAcceptFunc:   make(map[ids.ID]func()),
+		// blkIDToOnAcceptState:  make(map[ids.ID]state.Diff),
+		// blkIDToOnCommitState:  make(map[ids.ID]state.Diff),
+		// blkIDToOnAbortState:   make(map[ids.ID]state.Diff),
+		// blkIDToChildren:       make(map[ids.ID][]Block),
+		// blkIDToTimestamp:      make(map[ids.ID]time.Time),
+		// blkIDToInputs:         make(map[ids.ID]ids.Set),
+		// blkIDToAtomicRequests: make(map[ids.ID]map[ids.ID]*atomic.Requests),
+		// blkIDToPreferCommit:   make(map[ids.ID]bool),
 	}
 
 	manager := &manager{
 		backend: backend,
-		verifier: &verifierImpl{
+		// verifier: &verifierImpl{
+		// 	backend:           backend,
+		// 	txExecutorBackend: txExecutorBackend,
+		// },
+		BlockVerifier: &verifier2{
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
 		},
-		acceptor: &acceptorImpl{
+		//acceptor: &acceptorImpl{
+		//	backend:          backend,
+		//	metrics:          metrics,
+		//	recentlyAccepted: recentlyAccepted,
+		//},
+		BlockAcceptor: &acceptor2{
 			backend:          backend,
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
 		},
-		rejector:                &rejectorImpl{backend: backend},
+		// rejector:                &rejectorImpl{backend: backend},
+		BlockRejector:           &rejector2{backend: backend},
 		baseStateSetter:         &baseStateSetterImpl{backend: backend},
 		conflictChecker:         &conflictCheckerImpl{backend: backend},
 		timestampGetter:         &timestampGetterImpl{backend: backend},
@@ -106,9 +116,12 @@ func NewManager(
 
 type manager struct {
 	backend
-	verifier
-	acceptor
-	rejector
+	// verifier
+	// acceptor
+	// rejector
+	stateless.BlockVerifier
+	stateless.BlockAcceptor
+	stateless.BlockRejector
 	baseStateSetter
 	conflictChecker
 	timestampGetter

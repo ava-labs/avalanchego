@@ -54,15 +54,15 @@ func toStatefulCommitBlock(
 }
 
 func (c *CommitBlock) Verify() error {
-	return c.verifyCommitBlock(c)
+	return c.VerifyCommitBlock(c.CommitBlock)
 }
 
 func (c *CommitBlock) Accept() error {
-	return c.acceptCommitBlock(c)
+	return c.AcceptCommitBlock(c.CommitBlock)
 }
 
 func (c *CommitBlock) Reject() error {
-	return c.rejectCommitBlock(c)
+	return c.RejectCommitBlock(c.CommitBlock)
 }
 
 func (c *CommitBlock) conflicts(s ids.Set) (bool, error) {

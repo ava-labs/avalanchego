@@ -57,15 +57,15 @@ func toStatefulAbortBlock(
 }
 
 func (a *AbortBlock) Verify() error {
-	return a.verifyAbortBlock(a)
+	return a.VerifyAbortBlock(a.AbortBlock)
 }
 
 func (a *AbortBlock) Accept() error {
-	return a.acceptAbortBlock(a)
+	return a.AcceptAbortBlock(a.AbortBlock)
 }
 
 func (a *AbortBlock) Reject() error {
-	return a.rejectAbortBlock(a)
+	return a.RejectAbortBlock(a.AbortBlock)
 }
 
 func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
