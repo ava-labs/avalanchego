@@ -4,10 +4,20 @@
 package state
 
 import (
+	"bytes"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/google/btree"
 )
+
+var _ btree.Item = &Staker{}
+
+type StakerIterator interface {
+	Next() bool
+	Value() *Staker
+	Release()
+}
 
 type Staker struct {
 	TxID            ids.ID
@@ -17,10 +27,28 @@ type Staker struct {
 	StartTime       time.Time
 	EndTime         time.Time
 	PotentialReward uint64
-	Priority        Priority
+
+	// The following fields are only used for the staker tree.
+	NextTime time.Time
+	Priority byte
 }
 
-type Priority struct {
-	Current byte
-	Pending byte
+func (s *Staker) Less(thanIntf btree.Item) bool {
+	than := thanIntf.(*Staker)
+
+	if s.NextTime.Before(than.NextTime) {
+		return true
+	}
+	if than.NextTime.Before(s.NextTime) {
+		return false
+	}
+
+	if s.Priority > than.Priority {
+		return true
+	}
+	if than.Priority > s.Priority {
+		return false
+	}
+
+	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
