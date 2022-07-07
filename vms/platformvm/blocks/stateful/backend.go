@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -20,32 +21,13 @@ type heightSetter interface {
 type backend struct {
 	mempool.Mempool
 	// TODO consolidate state fields below?
-	blockState
+	statelessBlockState
 	heightSetter
-	blkIDToState map[ids.ID]*stat // TODO set this
-	/*
-		// Block ID --> Function to be executed if the block is accepted.
-		blkIDToOnAcceptFunc map[ids.ID]func()
-		// Block ID --> State if the block is accepted.
-		blkIDToOnAcceptState map[ids.ID]state.Diff
-		// Block ID --> State if this block's proposal is committed.
-		blkIDToOnCommitState map[ids.ID]state.Diff
-		// Block ID --> State if this block's proposal is aborted.
-		blkIDToOnAbortState map[ids.ID]state.Diff
-		// Block ID --> Children of that block.
-		blkIDToChildren map[ids.ID][]Block
-		// Block ID --> Time the block was proposed.
-		blkIDToTimestamp map[ids.ID]time.Time
-		// Block ID --> Inputs of txs in that block.
-		blkIDToInputs map[ids.ID]ids.Set
-		// Block ID --> Atomic requests for txs in that block.
-		blkIDToAtomicRequests map[ids.ID]map[ids.ID]*atomic.Requests
-		// Block ID --> Whether we initially prefer committing this block.
-		blkIDToPreferCommit map[ids.ID]bool
-	*/
-	state        state.State
-	ctx          *snow.Context
-	bootstrapped *utils.AtomicBool
+	verifiedBlocks map[ids.ID]stateless.Block // TODO can we just put the blocks with their state?
+	blkIDToState   map[ids.ID]*stat           // TODO set this
+	state          state.State
+	ctx            *snow.Context
+	bootstrapped   *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {
@@ -72,5 +54,4 @@ func (b *backend) free(blkID ids.ID) {
 	// delete(b.blkIDToAtomicRequests, blkID)
 	// delete(b.blkIDToPreferCommit, blkID)
 	delete(b.blkIDToState, blkID)
-	b.unpinVerifiedBlock(blkID)
 }

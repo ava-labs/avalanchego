@@ -7,18 +7,17 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
-type timestampGetter interface {
-	GetTimestamp(blkID ids.ID) time.Time
-}
+var _ stateless.Timestamper = &timestampGetterImpl{}
 
 type timestampGetterImpl struct {
 	backend
 }
 
 // TODO add comment
-func (t *timestampGetterImpl) GetTimestamp(blkID ids.ID) time.Time {
+func (t *timestampGetterImpl) Timestamp(blkID ids.ID) time.Time {
 	// timestamp := t.blkIDToTimestamp[blkID]
 	// if timestamp.IsZero() {
 	// 	return t.state.GetTimestamp()

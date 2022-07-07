@@ -16,11 +16,7 @@ var (
 )
 
 type AbortBlock struct {
-	BlockVerifier // TODO set this field
-	BlockAcceptor // TODO set this field
-	BlockRejector // TODO set this field
-	Statuser      // TODO set
-	CommonBlock   `serialize:"true"`
+	CommonBlock `serialize:"true"`
 }
 
 func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }

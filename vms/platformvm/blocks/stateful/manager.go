@@ -5,6 +5,7 @@ package stateful
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -30,21 +31,22 @@ type OnAcceptor interface {
 }
 
 type Manager interface {
-	blockState
+	statelessBlockState
 	// verifier
 	// acceptor
 	// rejector
 	stateless.BlockVerifier
 	stateless.BlockAcceptor
 	stateless.BlockRejector
+	stateless.Statuser
+	stateless.Timestamper
 	baseStateSetter
 	// conflictChecker
 	chainState
-	timestampGetter
 	OnAcceptor
 	initialPreferenceGetter
-	statusGetter
 	state.LastAccepteder
+	GetBlock(id ids.ID) (snowman.Block, error)
 }
 
 func NewManager(
@@ -54,30 +56,15 @@ func NewManager(
 	txExecutorBackend executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
-	blockState := &blockStateImpl{
-		manager:             nil, // Set below
-		statelessBlockState: s,
-		verifiedBlks:        map[ids.ID]Block{},
-		ctx:                 txExecutorBackend.Ctx,
-	}
-
 	backend := backend{
-		Mempool:      mempool,
-		blockState:   blockState,
-		heightSetter: s,
-		state:        s,
-		bootstrapped: txExecutorBackend.Bootstrapped,
-		ctx:          txExecutorBackend.Ctx,
-		// blkIDToStatus:         make(map[ids.ID]choices.Status),
-		// blkIDToOnAcceptFunc:   make(map[ids.ID]func()),
-		// blkIDToOnAcceptState:  make(map[ids.ID]state.Diff),
-		// blkIDToOnCommitState:  make(map[ids.ID]state.Diff),
-		// blkIDToOnAbortState:   make(map[ids.ID]state.Diff),
-		// blkIDToChildren:       make(map[ids.ID][]Block),
-		// blkIDToTimestamp:      make(map[ids.ID]time.Time),
-		// blkIDToInputs:         make(map[ids.ID]ids.Set),
-		// blkIDToAtomicRequests: make(map[ids.ID]map[ids.ID]*atomic.Requests),
-		// blkIDToPreferCommit:   make(map[ids.ID]bool),
+		Mempool:             mempool,
+		statelessBlockState: s,
+		heightSetter:        s,
+		state:               s,
+		bootstrapped:        txExecutorBackend.Bootstrapped,
+		ctx:                 txExecutorBackend.Ctx,
+		verifiedBlocks:      make(map[ids.ID]stateless.Block),
+		blkIDToState:        map[ids.ID]*stat{},
 	}
 
 	manager := &manager{
@@ -104,29 +91,22 @@ func NewManager(
 		BlockRejector:   &rejector2{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{backend: backend},
 		// conflictChecker:         &conflictCheckerImpl{backend: backend},
-		timestampGetter:         &timestampGetterImpl{backend: backend},
+		Timestamper:             &timestampGetterImpl{backend: backend},
 		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
-		statusGetter:            &statusGetterImpl{backend: backend},
+		Statuser:                &statusGetterImpl{backend: backend},
 	}
-	// TODO is there a way to avoid having a Manager
-	// in [blockState] so we don't have to do this?
-	blockState.manager = manager
 	return manager
 }
 
 type manager struct {
 	backend
-	// verifier
-	// acceptor
-	// rejector
 	stateless.BlockVerifier
 	stateless.BlockAcceptor
 	stateless.BlockRejector
+	stateless.Statuser
+	stateless.Timestamper
 	baseStateSetter
-	// conflictChecker
-	timestampGetter
 	initialPreferenceGetter
-	statusGetter
 }
 
 func (m *manager) GetState() state.State {
@@ -139,4 +119,13 @@ func (m *manager) GetLastAccepted() ids.ID {
 
 func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
 	m.state.SetLastAccepted(blkID, persist)
+}
+
+func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	if blk, ok := m.verifiedBlocks[blkID]; ok {
+		return blk, nil
+	}
+	blk, _, err := m.statelessBlockState.GetStatelessBlock(blkID)
+	blk.Sync(m.BlockVerifier, m.BlockAcceptor, m.BlockRejector, m.Statuser, m.Timestamper)
+	return blk, err
 }

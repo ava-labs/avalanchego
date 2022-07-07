@@ -8,22 +8,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 type Statuser interface {
-	Status() choices.Status
+	Status(blkID ids.ID) choices.Status
 }
 
 type Timestamper interface {
-	Timestamp() time.Time
+	Timestamp(ids.ID) time.Time
 }
 
 // Interface introduced for marshalling/unmarshalling
 type Block interface {
-	Statuser
+	snowman.Block
 	Initialize(bytes []byte) error
-
 	ID() ids.ID
 	Bytes() []byte
 	Parent() ids.ID
@@ -32,4 +32,12 @@ type Block interface {
 	// BlockTxs returns list of transactions
 	// contained in the block
 	BlockTxs() []*txs.Tx
+
+	Sync(
+		BlockVerifier,
+		BlockAcceptor,
+		BlockRejector,
+		Statuser,
+		Timestamper,
+	)
 }

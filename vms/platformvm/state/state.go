@@ -1251,6 +1251,7 @@ func (s *state) writeBlocks() error {
 	return nil
 }
 
+// TODO remove status return value
 func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk.Blk, blk.Status, nil

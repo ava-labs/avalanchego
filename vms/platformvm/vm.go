@@ -399,7 +399,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return vm.manager.GetStatefulBlock(blkID)
+	return vm.manager.GetBlock(blkID)
 }
 
 // LastAccepted returns the block most recently accepted
@@ -419,7 +419,7 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 }
 
 func (vm *VM) Preferred() (stateful.Block, error) {
-	return vm.manager.GetStatefulBlock(vm.preferred)
+	return vm.manager.GetBlock(vm.preferred)
 }
 
 func (vm *VM) Version() (string, error) {

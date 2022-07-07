@@ -6,17 +6,15 @@ package stateful
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
-// TODO can we remove this?
-type statusGetter interface {
-	status(blkID ids.ID) choices.Status
-}
+var _ stateless.Statuser = &statusGetterImpl{}
 
 type statusGetterImpl struct {
 	backend
 }
 
-func (s *statusGetterImpl) status(blkID ids.ID) choices.Status {
+func (s *statusGetterImpl) Status(blkID ids.ID) choices.Status {
 	return s.blkIDToState[blkID].status
 }

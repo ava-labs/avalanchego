@@ -165,6 +165,7 @@ func (v *verifier2) VerifyAtomicBlock(b *stateless.AtomicBlock) error {
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blockState
+	v.verifiedBlocks[blkID] = b
 	return nil
 }
 
@@ -304,6 +305,7 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blockState
+	v.verifiedBlocks[blkID] = b
 	return nil
 }
 
@@ -329,6 +331,7 @@ func (v *verifier2) VerifyCommitBlock(b *stateless.CommitBlock) error {
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blockState
+	v.verifiedBlocks[blkID] = b
 
 	// TODO
 	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
@@ -359,6 +362,7 @@ func (v *verifier2) VerifyAbortBlock(b *stateless.AbortBlock) error {
 
 	// TODO
 	// 	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+	v.verifiedBlocks[blkID] = b
 	return nil
 }
 
