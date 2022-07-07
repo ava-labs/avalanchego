@@ -31,7 +31,7 @@ Validation rules for block timestamps varies slightly depending on block types:
 * `CommitBlock`s and `AbortBlock`s timestamp must be equal to the timestamp of the `ProposalBlock` they depend upon
 * `StandardBlock`s and `ProposalBlock`s share `AdvanceTimeTx`s validation rules with the exception of the *strict monotonicity*:
   1. *Monotonicity*: block timestamp must be *greater or equal* to current `ChainTime` (which is also its parent timestamp if parent was accepted)
-  2. *Synchronicity*: block timestamp must not be later than node’s current time plus a synchronicity bound (currently set to 10 seconds).
+  2. *Synchronicity*: block timestamp must not be greater than node’s current time plus a synchronicity bound (currently set to 10 seconds).
   3. *No Skipping*: proposed time must be less than or equal to the next staking event, that is start/end of any staker.
 
 ## Serialization changes
