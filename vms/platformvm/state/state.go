@@ -96,13 +96,25 @@ type Chain interface {
 	AddTx(tx *txs.Tx, status status.Status)
 }
 
+type LastAccepteder interface {
+	// On startup, returns the block from the most
+	// recent call to SetLastAccepted([blkID], true).
+	// After that, returns the block from the most recent
+	// call to SetLastAccepted([blkID], [persist]), regardless
+	// of whether [persist] is true or false.
+	GetLastAccepted() ids.ID
+	// Set [blkID] as the last accepted block.
+	// If [persist], [blkID] will be written to the database
+	// as the last accepted block next time it's committed.
+	SetLastAccepted(blkID ids.ID, persist bool)
+}
+
 type State interface {
+	LastAccepteder
 	Chain
 	uptime.State
 	avax.UTXOReader
 
-	GetLastAccepted() ids.ID
-	SetLastAccepted(ids.ID)
 	SetHeight(height uint64)
 
 	GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error)
@@ -204,8 +216,18 @@ type state struct {
 
 	originalTimestamp, timestamp         time.Time
 	originalCurrentSupply, currentSupply uint64
-	originalLastAccepted, lastAccepted   ids.ID
-	singletonDB                          database.Database
+
+	// [lastAccepted] is the most recently accepted block.
+	// Returned by GetLastAccepted().
+	lastAccepted ids.ID
+	// [persistedLastAccepted] is the most recently accepted block
+	// that was written to the database.
+	persistedLastAccepted ids.ID
+	// [toPersistLastAccepted] will be written to the database
+	// on its next commit and replace [persistedLastAccepted]
+	// as the most recently accepted block written to the database.
+	toPersistLastAccepted ids.ID
+	singletonDB           database.Database
 
 	currentHeight uint64
 	addedBlocks   map[ids.ID]stateBlk // map of blockID -> stateBlk
@@ -644,13 +666,19 @@ func (s *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdat
 	return nil
 }
 
-func (s *state) GetTimestamp() time.Time             { return s.timestamp }
-func (s *state) SetTimestamp(tm time.Time)           { s.timestamp = tm }
-func (s *state) GetCurrentSupply() uint64            { return s.currentSupply }
-func (s *state) SetCurrentSupply(cs uint64)          { s.currentSupply = cs }
-func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
-func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
-func (s *state) SetHeight(height uint64)             { s.currentHeight = height }
+func (s *state) GetTimestamp() time.Time    { return s.timestamp }
+func (s *state) SetTimestamp(tm time.Time)  { s.timestamp = tm }
+func (s *state) GetCurrentSupply() uint64   { return s.currentSupply }
+func (s *state) SetCurrentSupply(cs uint64) { s.currentSupply = cs }
+func (s *state) GetLastAccepted() ids.ID    { return s.lastAccepted }
+func (s *state) SetLastAccepted(lastAccepted ids.ID, persist bool) {
+	s.lastAccepted = lastAccepted
+	if persist {
+		s.toPersistLastAccepted = lastAccepted
+	}
+}
+
+func (s *state) SetHeight(height uint64) { s.currentHeight = height }
 
 func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
@@ -804,7 +832,7 @@ func (s *state) SyncGenesis(genesisBytes []byte) error {
 		return err
 	}
 	s.AddStatelessBlock(genesisBlock, choices.Accepted)
-	s.SetLastAccepted(genesisBlock.ID())
+	s.SetLastAccepted(genesisBlock.ID(), true)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(genesis.InitialSupply)
 
@@ -886,8 +914,9 @@ func (s *state) loadMetadata() error {
 	if err != nil {
 		return err
 	}
-	s.originalLastAccepted = lastAccepted
+	s.persistedLastAccepted = lastAccepted
 	s.lastAccepted = lastAccepted
+	s.toPersistLastAccepted = lastAccepted
 	return nil
 }
 
@@ -1571,11 +1600,11 @@ func (s *state) writeMetadata() error {
 		}
 		s.originalCurrentSupply = s.currentSupply
 	}
-	if s.originalLastAccepted != s.lastAccepted {
-		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {
+	if s.persistedLastAccepted != s.toPersistLastAccepted {
+		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.toPersistLastAccepted); err != nil {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
-		s.originalLastAccepted = s.lastAccepted
+		s.persistedLastAccepted = s.toPersistLastAccepted
 	}
 	return nil
 }

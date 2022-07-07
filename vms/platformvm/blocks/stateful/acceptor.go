@@ -54,7 +54,7 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 	if err := a.metrics.MarkAccepted(b.ProposalBlockIntf); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
-	a.SetLastAccepted(blkID) // TODO is this right?
+	a.SetLastAccepted(blkID, false /*persist*/)
 	return nil
 }
 
@@ -243,7 +243,7 @@ func (a *acceptorImpl) updateStateOptionBlock(b *decisionBlock) error {
 func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
 	b.status = choices.Accepted
-	a.SetLastAccepted(blkID)
+	a.SetLastAccepted(blkID, true /*persist*/)
 	a.SetHeight(b.baseBlk.Height())
 	a.recentlyAccepted.Add(blkID)
 }

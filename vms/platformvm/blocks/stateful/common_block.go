@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var ErrOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
@@ -20,7 +21,7 @@ type commonBlock struct {
 	children []Block
 
 	timestampGetter
-	lastAccepteder
+	state.LastAccepteder
 }
 
 func (c *commonBlock) addChild(child Block) {

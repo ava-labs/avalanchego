@@ -81,7 +81,7 @@ func toStatefulProposalBlock(
 			baseBlk:         statelessBlk,
 			status:          status,
 			timestampGetter: manager,
-			lastAccepteder:  manager,
+			LastAccepteder:  manager,
 		},
 		manager: manager,
 	}

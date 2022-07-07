@@ -5,18 +5,12 @@ package stateful
 
 import (
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
-
-type lastAccepteder interface {
-	SetLastAccepted(blkID ids.ID)
-	GetLastAccepted() ids.ID
-}
 
 type versionDB interface {
 	Abort()
@@ -33,7 +27,7 @@ type backend struct {
 	mempool.Mempool
 	// TODO consolidate state fields below?
 	versionDB
-	lastAccepteder
+	state.LastAccepteder
 	blockState
 	heightSetter
 	state        state.State

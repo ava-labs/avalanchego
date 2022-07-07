@@ -308,6 +308,55 @@ func (mr *MockChainMockRecorder) SetTimestamp(tm interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), tm)
 }
 
+// MockLastAccepteder is a mock of LastAccepteder interface.
+type MockLastAccepteder struct {
+	ctrl     *gomock.Controller
+	recorder *MockLastAcceptederMockRecorder
+}
+
+// MockLastAcceptederMockRecorder is the mock recorder for MockLastAccepteder.
+type MockLastAcceptederMockRecorder struct {
+	mock *MockLastAccepteder
+}
+
+// NewMockLastAccepteder creates a new mock instance.
+func NewMockLastAccepteder(ctrl *gomock.Controller) *MockLastAccepteder {
+	mock := &MockLastAccepteder{ctrl: ctrl}
+	mock.recorder = &MockLastAcceptederMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockLastAccepteder) EXPECT() *MockLastAcceptederMockRecorder {
+	return m.recorder
+}
+
+// GetLastAccepted mocks base method.
+func (m *MockLastAccepteder) GetLastAccepted() ids.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastAccepted")
+	ret0, _ := ret[0].(ids.ID)
+	return ret0
+}
+
+// GetLastAccepted indicates an expected call of GetLastAccepted.
+func (mr *MockLastAcceptederMockRecorder) GetLastAccepted() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockLastAccepteder)(nil).GetLastAccepted))
+}
+
+// SetLastAccepted mocks base method.
+func (m *MockLastAccepteder) SetLastAccepted(blkID ids.ID, persist bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastAccepted", blkID, persist)
+}
+
+// SetLastAccepted indicates an expected call of SetLastAccepted.
+func (mr *MockLastAcceptederMockRecorder) SetLastAccepted(blkID, persist interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockLastAccepteder)(nil).SetLastAccepted), blkID, persist)
+}
+
 // MockState is a mock of State interface.
 type MockState struct {
 	ctrl     *gomock.Controller
@@ -807,15 +856,15 @@ func (mr *MockStateMockRecorder) SetHeight(height interface{}) *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *MockState) SetLastAccepted(arg0 ids.ID) {
+func (m *MockState) SetLastAccepted(blkID ids.ID, persist bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", arg0)
+	m.ctrl.Call(m, "SetLastAccepted", blkID, persist)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *MockStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) SetLastAccepted(blkID, persist interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID, persist)
 }
 
 // SetPendingStakers mocks base method.
