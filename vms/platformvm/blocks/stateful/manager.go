@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -42,6 +43,7 @@ type Manager interface {
 	timestampGetter
 	OnAcceptor
 	initialPreferenceGetter
+	statusGetter
 	state.LastAccepteder
 }
 
@@ -66,6 +68,7 @@ func NewManager(
 		state:                 s,
 		bootstrapped:          txExecutorBackend.Bootstrapped,
 		ctx:                   txExecutorBackend.Ctx,
+		blkIDToStatus:         make(map[ids.ID]choices.Status),
 		blkIDToOnAcceptFunc:   make(map[ids.ID]func()),
 		blkIDToOnAcceptState:  make(map[ids.ID]state.Diff),
 		blkIDToOnCommitState:  make(map[ids.ID]state.Diff),
@@ -93,6 +96,7 @@ func NewManager(
 		conflictChecker:         &conflictCheckerImpl{backend: backend},
 		timestampGetter:         &timestampGetterImpl{backend: backend},
 		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
+		statusGetter:            &statusGetterImpl{backend: backend},
 	}
 	// TODO is there a way to avoid having a Manager
 	// in [blockState] so we don't have to do this?
@@ -109,6 +113,7 @@ type manager struct {
 	conflictChecker
 	timestampGetter
 	initialPreferenceGetter
+	statusGetter
 }
 
 func (m *manager) GetState() state.State {

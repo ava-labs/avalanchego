@@ -26,14 +26,6 @@ var (
 type AtomicBlock struct {
 	*stateless.AtomicBlock
 	*commonBlock
-
-	// TODO remove
-	// inputs are the atomic inputs that are consumed by this block's atomic
-	// transaction
-	// inputs         ids.Set
-	// atomicRequests map[ids.ID]*atomic.Requests
-
-	manager Manager
 }
 
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
@@ -61,11 +53,9 @@ func toStatefulAtomicBlock(
 	ab := &AtomicBlock{
 		AtomicBlock: statelessBlk,
 		commonBlock: &commonBlock{
-			timestampGetter: manager,
-			baseBlk:         &statelessBlk.CommonBlock,
-			status:          status,
+			Manager: manager,
+			baseBlk: &statelessBlk.CommonBlock,
 		},
-		manager: manager,
 	}
 
 	ab.Tx.Unsigned.InitCtx(ctx)
@@ -75,21 +65,21 @@ func toStatefulAtomicBlock(
 // conflicts checks to see if the provided input set contains any conflicts with
 // any of this block's non-accepted ancestors or itself.
 func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
-	return ab.manager.conflictsAtomicBlock(ab, s)
+	return ab.conflictsAtomicBlock(ab, s)
 }
 
 func (ab *AtomicBlock) Verify() error {
-	return ab.manager.verifyAtomicBlock(ab)
+	return ab.verifyAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) Accept() error {
-	return ab.manager.acceptAtomicBlock(ab)
+	return ab.acceptAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) Reject() error {
-	return ab.manager.rejectAtomicBlock(ab)
+	return ab.rejectAtomicBlock(ab)
 }
 
 func (ab *AtomicBlock) setBaseState() {
-	ab.manager.setBaseStateAtomicBlock(ab)
+	ab.setBaseStateAtomicBlock(ab)
 }

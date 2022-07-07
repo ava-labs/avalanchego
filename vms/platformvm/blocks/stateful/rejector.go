@@ -35,9 +35,12 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 		)
 	}
 
-	b.status = choices.Rejected
-	defer r.free(b.ID())
-	r.AddStatelessBlock(b.ProposalBlock, b.status)
+	// TODO remove
+	// b.status = choices.Rejected
+	blkID := b.ID()
+	r.blkIDToStatus[blkID] = choices.Rejected
+	defer r.free(blkID)
+	r.AddStatelessBlock(b.ProposalBlock, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -57,9 +60,12 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	b.status = choices.Rejected
-	defer r.free(b.ID())
-	r.AddStatelessBlock(b.AtomicBlock, b.status)
+	// TODO remove
+	// b.status = choices.Rejected
+	blkID := b.ID()
+	r.blkIDToStatus[blkID] = choices.Rejected
+	defer r.free(blkID)
+	r.AddStatelessBlock(b.AtomicBlock, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -81,9 +87,12 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	b.status = choices.Rejected
+	// TODO remove
+	// b.status = choices.Rejected
+	blkID := b.ID()
+	r.blkIDToStatus[blkID] = choices.Rejected
 	defer r.free(b.ID())
-	r.AddStatelessBlock(b.StandardBlock, b.status)
+	r.AddStatelessBlock(b.StandardBlock, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -95,9 +104,11 @@ func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
 		b.Parent(),
 	)
 
-	b.status = choices.Rejected
+	// b.status = choices.Rejected
+	blkID := b.ID()
+	r.blkIDToStatus[blkID] = choices.Rejected
 	defer r.free(b.ID())
-	r.AddStatelessBlock(b.CommitBlock, b.status)
+	r.AddStatelessBlock(b.CommitBlock, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -109,8 +120,10 @@ func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
 		b.Parent(),
 	)
 
-	b.status = choices.Rejected
+	// b.status = choices.Rejected
+	blkID := b.ID()
+	r.blkIDToStatus[blkID] = choices.Rejected
 	defer r.free(b.ID())
-	r.AddStatelessBlock(b.AbortBlock, b.status)
+	r.AddStatelessBlock(b.AbortBlock, choices.Rejected)
 	return r.state.Commit()
 }

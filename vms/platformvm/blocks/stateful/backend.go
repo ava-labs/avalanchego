@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -26,6 +27,8 @@ type backend struct {
 	// TODO consolidate state fields below?
 	blockState
 	heightSetter
+	// Block ID --> Status of the block.
+	blkIDToStatus map[ids.ID]choices.Status
 	// Block ID --> Function to be executed if the block is accepted.
 	blkIDToOnAcceptFunc map[ids.ID]func()
 	// Block ID --> State if the block is accepted.

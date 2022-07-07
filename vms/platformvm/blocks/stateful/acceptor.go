@@ -47,7 +47,11 @@ func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
 	// is not written to disk unless its child is.
 	// (The VM's Shutdown method commits the database.)
 	// There is an invariant that the most recently committed block is a decision block.
-	b.status = choices.Accepted
+
+	// TODO remove
+	// b.status = choices.Accepted
+
+	a.blkIDToStatus[blkID] = choices.Accepted
 	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -248,7 +252,7 @@ func (a *acceptorImpl) updateStateOptionBlock(b *commonBlock) error {
 
 func (a *acceptorImpl) commonAccept(b *commonBlock) {
 	blkID := b.baseBlk.ID()
-	b.status = choices.Accepted
+	a.blkIDToStatus[blkID] = choices.Accepted
 	a.state.SetLastAccepted(blkID, true /*persist*/)
 	a.SetHeight(b.baseBlk.Height())
 	a.recentlyAccepted.Add(blkID)

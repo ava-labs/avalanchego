@@ -12,13 +12,13 @@ import (
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
-	timestampGetter
+	Manager
 	// TODO remove
 	// state.LastAccepteder
 	baseBlk *stateless.CommonBlock
 	// TODO remove
 	// timestamp time.Time // Time this block was proposed at
-	status choices.Status
+	// status choices.Status
 	// TODO remove
 	// children  []Block
 }
@@ -30,7 +30,7 @@ func (c *commonBlock) addChild(child Block) {
 */
 
 // Parent returns this block's parent's ID
-func (c *commonBlock) Status() choices.Status { return c.status }
+func (c *commonBlock) Status() choices.Status { return c.status(c.baseBlk.ID()) }
 
 func (c *commonBlock) Timestamp() time.Time {
 	// If this is the last accepted block and the block was loaded from disk
@@ -41,5 +41,5 @@ func (c *commonBlock) Timestamp() time.Time {
 		return c.GetTimestamp()
 	}
 	*/
-	return c.timestampGetter.GetTimestamp(c.baseBlk.ID())
+	return c.GetTimestamp(c.baseBlk.ID())
 }

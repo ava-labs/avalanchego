@@ -29,18 +29,6 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	*stateless.ProposalBlock
 	*commonBlock
-
-	// TODO remove
-	// The state that the chain will have if this block's proposal is committed
-	// onCommitState state.Diff
-
-	// TODO remove
-	// The state that the chain will have if this block's proposal is aborted
-	// onAbortState  state.Diff
-	// TODO remove
-	// prefersCommit bool
-
-	manager Manager
 }
 
 // NewProposalBlock creates a new block that proposes to issue a transaction.
@@ -70,11 +58,9 @@ func toStatefulProposalBlock(
 	pb := &ProposalBlock{
 		ProposalBlock: statelessBlk,
 		commonBlock: &commonBlock{
-			timestampGetter: manager,
-			baseBlk:         &statelessBlk.CommonBlock,
-			status:          status,
+			Manager: manager,
+			baseBlk: &statelessBlk.CommonBlock,
 		},
-		manager: manager,
 	}
 
 	pb.Tx.Unsigned.InitCtx(ctx)
@@ -82,19 +68,19 @@ func toStatefulProposalBlock(
 }
 
 func (pb *ProposalBlock) Verify() error {
-	return pb.manager.verifyProposalBlock(pb)
+	return pb.verifyProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Accept() error {
-	return pb.manager.acceptProposalBlock(pb)
+	return pb.acceptProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) Reject() error {
-	return pb.manager.rejectProposalBlock(pb)
+	return pb.rejectProposalBlock(pb)
 }
 
 func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
-	return pb.manager.conflictsProposalBlock(pb, s)
+	return pb.conflictsProposalBlock(pb, s)
 }
 
 // Options returns the possible children of this block in preferential order.
@@ -102,9 +88,9 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
 
-	preferCommit := pb.manager.preferredCommit(blkID)
+	preferCommit := pb.preferredCommit(blkID)
 	commit, err := NewCommitBlock(
-		pb.manager,
+		pb.Manager,
 		blkID,
 		nextHeight,
 	)
@@ -115,7 +101,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 	abort, err := NewAbortBlock(
-		pb.manager,
+		pb.Manager,
 		blkID,
 		nextHeight,
 	)
@@ -133,5 +119,5 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 }
 
 func (pb *ProposalBlock) setBaseState() {
-	pb.manager.setBaseStateProposalBlock(pb)
+	pb.setBaseStateProposalBlock(pb)
 }

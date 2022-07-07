@@ -39,7 +39,12 @@ func (c *conflictCheckerImpl) conflictsAtomicBlock(b *AtomicBlock, s ids.Set) (b
 }
 
 func (c *conflictCheckerImpl) conflictsStandardBlock(b *StandardBlock, s ids.Set) (bool, error) {
-	if b.status == choices.Accepted {
+	// TODO remove
+	//if b.status == choices.Accepted {
+	//	return false, nil
+	//}
+	blkID := b.ID()
+	if status := c.blkIDToStatus[blkID]; status == choices.Accepted {
 		return false, nil
 	}
 	inputs := c.blkIDToInputs[b.ID()]

@@ -19,10 +19,6 @@ var _ Block = &AbortBlock{}
 type AbortBlock struct {
 	*stateless.AbortBlock
 	*commonBlock
-
-	// wasPreferred bool
-
-	manager Manager
 }
 
 // NewAbortBlock returns a new *AbortBlock where the block's parent, a proposal
@@ -52,32 +48,30 @@ func toStatefulAbortBlock(
 	abort := &AbortBlock{
 		AbortBlock: statelessBlk,
 		commonBlock: &commonBlock{
-			timestampGetter: manager,
-			baseBlk:         &statelessBlk.CommonBlock,
-			status:          status,
+			Manager: manager,
+			baseBlk: &statelessBlk.CommonBlock,
 		},
-		manager: manager,
 	}
 
 	return abort, nil
 }
 
 func (a *AbortBlock) Verify() error {
-	return a.manager.verifyAbortBlock(a)
+	return a.verifyAbortBlock(a)
 }
 
 func (a *AbortBlock) Accept() error {
-	return a.manager.acceptAbortBlock(a)
+	return a.acceptAbortBlock(a)
 }
 
 func (a *AbortBlock) Reject() error {
-	return a.manager.rejectAbortBlock(a)
+	return a.rejectAbortBlock(a)
 }
 
 func (a *AbortBlock) conflicts(s ids.Set) (bool, error) {
-	return a.manager.conflictsAbortBlock(a, s)
+	return a.conflictsAbortBlock(a, s)
 }
 
 func (a *AbortBlock) setBaseState() {
-	a.manager.setBaseStateAbortBlock(a)
+	a.setBaseStateAbortBlock(a)
 }

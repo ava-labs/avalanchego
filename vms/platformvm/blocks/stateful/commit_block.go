@@ -19,10 +19,6 @@ var _ Block = &CommitBlock{}
 type CommitBlock struct {
 	*stateless.CommitBlock
 	*commonBlock
-
-	// TODO remove
-	// wasPreferred bool
-	manager Manager
 }
 
 // NewCommitBlock returns a new *Commit block where the block's parent, a
@@ -49,32 +45,30 @@ func toStatefulCommitBlock(
 	commit := &CommitBlock{
 		CommitBlock: statelessBlk,
 		commonBlock: &commonBlock{
-			timestampGetter: manager,
-			baseBlk:         &statelessBlk.CommonBlock,
-			status:          status,
+			Manager: manager,
+			baseBlk: &statelessBlk.CommonBlock,
 		},
-		manager: manager,
 	}
 
 	return commit, nil
 }
 
 func (c *CommitBlock) Verify() error {
-	return c.manager.verifyCommitBlock(c)
+	return c.verifyCommitBlock(c)
 }
 
 func (c *CommitBlock) Accept() error {
-	return c.manager.acceptCommitBlock(c)
+	return c.acceptCommitBlock(c)
 }
 
 func (c *CommitBlock) Reject() error {
-	return c.manager.rejectCommitBlock(c)
+	return c.rejectCommitBlock(c)
 }
 
 func (c *CommitBlock) conflicts(s ids.Set) (bool, error) {
-	return c.manager.conflictsCommitBlock(c, s)
+	return c.conflictsCommitBlock(c, s)
 }
 
 func (c *CommitBlock) setBaseState() {
-	c.manager.setBaseStateCommitBlock(c)
+	c.setBaseStateCommitBlock(c)
 }

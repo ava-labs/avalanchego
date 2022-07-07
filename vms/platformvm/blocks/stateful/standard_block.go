@@ -26,14 +26,6 @@ var (
 type StandardBlock struct {
 	*stateless.StandardBlock
 	*commonBlock
-
-	// TODO remove
-	// Inputs are the atomic Inputs that are consumed by this block's atomic
-	// transactions
-	// Inputs         ids.Set
-	// atomicRequests map[ids.ID]*atomic.Requests
-
-	manager Manager
 }
 
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
@@ -61,11 +53,9 @@ func toStatefulStandardBlock(
 	sb := &StandardBlock{
 		StandardBlock: statelessBlk,
 		commonBlock: &commonBlock{
-			timestampGetter: manager,
-			baseBlk:         &statelessBlk.CommonBlock,
-			status:          status,
+			Manager: manager,
+			baseBlk: &statelessBlk.CommonBlock,
 		},
-		manager: manager,
 	}
 
 	for _, tx := range sb.Txs {
@@ -78,21 +68,21 @@ func toStatefulStandardBlock(
 // conflicts checks to see if the provided input set contains any conflicts with
 // any of this block's non-accepted ancestors or itself.
 func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
-	return sb.manager.conflictsStandardBlock(sb, s)
+	return sb.conflictsStandardBlock(sb, s)
 }
 
 func (sb *StandardBlock) Verify() error {
-	return sb.manager.verifyStandardBlock(sb)
+	return sb.verifyStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Accept() error {
-	return sb.manager.acceptStandardBlock(sb)
+	return sb.acceptStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Reject() error {
-	return sb.manager.rejectStandardBlock(sb)
+	return sb.rejectStandardBlock(sb)
 }
 
 func (sb *StandardBlock) setBaseState() {
-	sb.manager.setBaseStateStandardBlock(sb)
+	sb.setBaseStateStandardBlock(sb)
 }
