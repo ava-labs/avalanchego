@@ -34,7 +34,7 @@ type Manager interface {
 	freer
 	chainState
 	timestampGetter
-	lastAccepteder
+	state.LastAccepteder
 }
 
 func NewManager(
@@ -57,7 +57,7 @@ func NewManager(
 	backend := backend{
 		Mempool:        mempool,
 		versionDB:      versionDB,
-		lastAccepteder: state,
+		LastAccepteder: state,
 		blockState:     blockState,
 		heightSetter:   heightSetter,
 		state:          state,

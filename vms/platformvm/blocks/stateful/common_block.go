@@ -8,12 +8,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 // commonBlock contains fields and methods common to all full blocks in this VM.
 type commonBlock struct {
 	timestampGetter
-	lastAccepteder
+	state.LastAccepteder
 	baseBlk   *stateless.CommonBlock
 	timestamp time.Time // Time this block was proposed at
 	status    choices.Status
