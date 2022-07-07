@@ -31,6 +31,35 @@ type blueberryStrategy struct {
 	blkTime time.Time
 }
 
+func (b *blueberryStrategy) hasContent() (bool, error) {
+	if err := b.selectBlockContent(); err != nil {
+		return false, err
+	}
+
+	if len(b.txes) == 0 {
+		// blueberry allows empty blocks with non-zero timestamp
+		// to move ahead chain time
+		return !b.blkTime.IsZero(), nil
+	}
+
+	// reinsert txes in mempool before returning
+	for _, tx := range b.txes {
+		switch tx.Unsigned.(type) {
+		case *txs.RewardValidatorTx:
+			// nothing to do, these tx is generated
+			// just in time, not picked from mempool
+		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
+			b.Mempool.AddProposalTx(tx)
+		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
+			b.Mempool.AddDecisionTx(tx)
+		default:
+			return false, fmt.Errorf("unhandled tx type %T, could not reinsert in mempool", b.txes[0].Unsigned)
+		}
+	}
+
+	return true, nil
+}
+
 func (b *blueberryStrategy) selectBlockContent() error {
 	// blkTimestamp is zeroed for Apricot blocks
 	// it is tentatively set to chainTime for Blueberry ones

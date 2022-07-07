@@ -15,9 +15,8 @@ import (
 // Blocks have different specifications/building instructions as defined by the
 // fork that the block exists in.
 type buildingStrategy interface {
-	// select transactions to be included in block,
-	// along with its timestamp.
-	selectBlockContent() error
+	// only check whether next block could be built
+	hasContent() (bool, error)
 
 	// builds a versioned snowman.Block
 	build() (snowman.Block, error)

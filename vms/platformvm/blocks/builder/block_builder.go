@@ -195,13 +195,25 @@ func (b *blockBuilder) Shutdown() {
 // resetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
 func (b *blockBuilder) resetTimer() {
-	// If there is a pending transaction trigger building of a block with that transaction
-	if b.Mempool.HasDecisionTxs() {
+	blkBuildStrategy, err := b.getBuildingStrategy()
+	if err != nil {
+		return
+	}
+
+	// check if there are txs to be included in the block
+	// or if chain time can be moved ahead via block timestamp
+	hasContent, err := blkBuildStrategy.hasContent()
+	if err != nil {
+		return
+	}
+	if hasContent {
 		b.notifyBlockReady()
 		return
 	}
 
+	// Wake up when it's time to add/remove the next validator
 	ctx := b.txExecutorBackend.Ctx
+	now := b.txExecutorBackend.Clk.Time()
 	preferred, err := b.Preferred()
 	if err != nil {
 		return
@@ -213,34 +225,6 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 	preferredState := preferredDecision.OnAccept()
-
-	_, shouldReward, err := b.getStakerToReward(preferredState)
-	if err != nil {
-		ctx.Log.Error("failed to fetch next staker to reward with %s", err)
-		return
-	}
-	if shouldReward {
-		b.notifyBlockReady()
-		return
-	}
-
-	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
-	if err != nil {
-		ctx.Log.Error("failed to fetch next chain time with %s", err)
-		return
-	}
-	if shouldAdvanceTime {
-		// time is at or after the time for the next validator to join/leave
-		b.notifyBlockReady() // Should issue a proposal to advance timestamp
-		return
-	}
-
-	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); hasProposalTxs {
-		b.notifyBlockReady() // Should issue a ProposeAddValidator
-		return
-	}
-
-	now := b.txExecutorBackend.Clk.Time()
 	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time: %s", err)
@@ -248,8 +232,6 @@ func (b *blockBuilder) resetTimer() {
 	}
 	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
-
-	// Wake up when it's time to add/remove the next validator
 	b.timer.SetTimeoutIn(waitTime)
 }
 

@@ -29,6 +29,33 @@ type apricotStrategy struct {
 	txes []*txs.Tx
 }
 
+func (a *apricotStrategy) hasContent() (bool, error) {
+	if err := a.selectBlockContent(); err != nil {
+		return false, err
+	}
+
+	if len(a.txes) == 0 {
+		return false, nil
+	}
+
+	// reinsert txes in mempool before returning
+	for _, tx := range a.txes {
+		switch tx.Unsigned.(type) {
+		case *txs.RewardValidatorTx, *txs.AdvanceTimeTx:
+			// nothing to do, these txes are generated
+			// just in time, not picked from mempool
+		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
+			a.Mempool.AddProposalTx(tx)
+		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
+			a.Mempool.AddDecisionTx(tx)
+		default:
+			return false, fmt.Errorf("unhandled tx type %T, could not reinsert in mempool", a.txes[0].Unsigned)
+		}
+	}
+
+	return true, nil
+}
+
 func (a *apricotStrategy) selectBlockContent() error {
 	// try including as many standard txs as possible. No need to advance chain time
 	if a.HasDecisionTxs() {
