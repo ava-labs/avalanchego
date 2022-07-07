@@ -4,14 +4,18 @@
 package stateful
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
+
+var _ snowman.Block = &block{}
 
 type Block interface {
 	snowman.Block
@@ -35,8 +39,43 @@ type Block interface {
 	// 	setBaseState()
 }
 
+func NewBlock(blk stateless.Block, manager Manager) snowman.Block {
+	return &block{
+		manager: manager,
+		Block:   blk,
+	}
+}
+
+type block struct {
+	stateless.Block
+	manager Manager
+}
+
+func (b *block) Verify() error {
+	return b.Visit(b.manager.verifyVisitor)
+}
+
+func (b *block) Accept() error {
+	return errors.New("TODO")
+}
+
+func (b *block) Reject() error {
+	return errors.New("TODO")
+}
+
+// TODO
+func (b *block) Status() choices.Status {
+	return choices.Unknown
+}
+
+// TODO
+func (b *block) Timestamp() time.Time {
+	return time.Time{}
+}
+
 // TODO rename
-type stat struct {
+type blockState struct {
+	// TODO add stateless block to this struct
 	status                 choices.Status
 	onAcceptFunc           func()
 	onAcceptState          state.Diff

@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -22,7 +21,6 @@ type Timestamper interface {
 
 // Interface introduced for marshalling/unmarshalling
 type Block interface {
-	snowman.Block
 	Initialize(bytes []byte) error
 	ID() ids.ID
 	Bytes() []byte
@@ -33,11 +31,5 @@ type Block interface {
 	// contained in the block
 	BlockTxs() []*txs.Tx
 
-	Sync(
-		BlockVerifier,
-		BlockAcceptor,
-		BlockRejector,
-		Statuser,
-		Timestamper,
-	)
+	Visit(visitor Visitor) error
 }

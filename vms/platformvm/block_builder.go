@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	stateless "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -133,7 +132,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 	preferredID := preferred.ID()
-	nextHeight := preferred.Height() + 1
+	// nextHeight := preferred.Height() + 1
 
 	/* TODO remove
 	preferredDecision, ok := preferred.(stateful.Decision)
@@ -147,7 +146,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
-		txs := b.PopDecisionTxs(TargetBlockSize)
+		// txs := b.PopDecisionTxs(TargetBlockSize)
 		// return stateful.NewStandardBlock(
 		// 	b.vm.manager,
 		// 	b.vm.ctx,
@@ -155,28 +154,19 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	txs,
 		// )
-		return stateless.NewStandardBlock(
-			preferredID,
-			nextHeight,
-			txs,
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-		)
+		return nil, errors.New("TODO")
 	}
 
 	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := b.getStakerToReward(preferredState)
+	_ /*stakerTxID*/, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {
 		return nil, err
 	}
 	if shouldReward {
-		rewardValidatorTx, err := b.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
-		if err != nil {
-			return nil, err
-		}
+		// rewardValidatorTx, err := b.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
+		// if err != nil {
+		// 	return nil, err
+		// }
 		// return stateful.NewProposalBlock(
 		// 	b.vm.manager,
 		// 	b.vm.ctx,
@@ -184,16 +174,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	rewardValidatorTx,
 		// )
-		return stateless.NewProposalBlock(
-			preferredID,
-			nextHeight,
-			rewardValidatorTx,
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-		)
+		return nil, errors.New("TODO")
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -202,7 +183,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldAdvanceTime {
-		advanceTimeTx, err := b.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
+		_ /*advanceTimeTx*/, err := b.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
 		if err != nil {
 			return nil, err
 		}
@@ -213,16 +194,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	advanceTimeTx,
 		// )
-		return stateless.NewProposalBlock(
-			preferredID,
-			nextHeight,
-			advanceTimeTx,
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-		)
+		return nil, errors.New("TODO")
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -242,7 +214,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if startTime.After(maxChainStartTime) {
 		b.AddProposalTx(tx)
 
-		advanceTimeTx, err := b.vm.txBuilder.NewAdvanceTimeTx(b.vm.clock.Time())
+		_ /*advanceTimeTx*/, err := b.vm.txBuilder.NewAdvanceTimeTx(b.vm.clock.Time())
 		if err != nil {
 			return nil, err
 		}
@@ -253,16 +225,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	advanceTimeTx,
 		// )
-		return stateless.NewProposalBlock(
-			preferredID,
-			nextHeight,
-			advanceTimeTx,
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-			nil, // TODO
-		)
+		return nil, errors.New("TODO")
 	}
 
 	// return stateful.NewProposalBlock(
@@ -272,16 +235,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// 	nextHeight,
 	// 	tx,
 	// )
-	return stateless.NewProposalBlock(
-		preferredID,
-		nextHeight,
-		tx,
-		nil, // TODO
-		nil, // TODO
-		nil, // TODO
-		nil, // TODO
-		nil, // TODO
-	)
+	return nil, errors.New("TODO")
 }
 
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the

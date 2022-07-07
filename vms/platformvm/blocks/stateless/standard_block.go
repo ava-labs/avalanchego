@@ -33,16 +33,8 @@ func (sb *StandardBlock) Initialize(bytes []byte) error {
 
 func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
 
-func (sb *StandardBlock) Verify() error {
-	return sb.VerifyStandardBlock(sb)
-}
-
-func (sb *StandardBlock) Accept() error {
-	return sb.AcceptStandardBlock(sb)
-}
-
-func (sb *StandardBlock) Reject() error {
-	return sb.RejectStandardBlock(sb)
+func (sb *StandardBlock) Visit(v Visitor) error {
+	return v.VisitStandardBlock(sb)
 }
 
 func (sb *StandardBlock) Timestamp() time.Time {

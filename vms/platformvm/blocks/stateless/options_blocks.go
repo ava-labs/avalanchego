@@ -21,16 +21,8 @@ type AbortBlock struct {
 
 func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
 
-func (ab *AbortBlock) Verify() error {
-	return ab.VerifyAbortBlock(ab)
-}
-
-func (ab *AbortBlock) Accept() error {
-	return ab.AcceptAbortBlock(ab)
-}
-
-func (ab *AbortBlock) Reject() error {
-	return ab.RejectAbortBlock(ab)
+func (ab *AbortBlock) Visit(v Visitor) error {
+	return v.VisitAbortBlock(ab)
 }
 
 func NewAbortBlock(
@@ -71,16 +63,8 @@ type CommitBlock struct {
 
 func (cb *CommitBlock) BlockTxs() []*txs.Tx { return nil }
 
-func (cb *CommitBlock) Verify() error {
-	return cb.VerifyCommitBlock(cb)
-}
-
-func (cb *CommitBlock) Accept() error {
-	return cb.AcceptCommitBlock(cb)
-}
-
-func (cb *CommitBlock) Reject() error {
-	return cb.RejectCommitBlock(cb)
+func (cb *CommitBlock) Visit(v Visitor) error {
+	return v.VisitCommitBlock(cb)
 }
 
 func NewCommitBlock(

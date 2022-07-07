@@ -4,6 +4,8 @@
 package stateful
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
@@ -35,11 +37,11 @@ type Manager interface {
 	// verifier
 	// acceptor
 	// rejector
-	stateless.BlockVerifier
-	stateless.BlockAcceptor
-	stateless.BlockRejector
-	stateless.Statuser
-	stateless.Timestamper
+	// stateless.BlockVerifier
+	// stateless.BlockAcceptor
+	// stateless.BlockRejector
+	// stateless.Statuser
+	// stateless.Timestamper
 	baseStateSetter
 	// conflictChecker
 	chainState
@@ -64,47 +66,39 @@ func NewManager(
 		bootstrapped:        txExecutorBackend.Bootstrapped,
 		ctx:                 txExecutorBackend.Ctx,
 		verifiedBlocks:      make(map[ids.ID]stateless.Block),
-		blkIDToState:        map[ids.ID]*stat{},
+		blkIDToState:        map[ids.ID]*blockState{},
 	}
 
 	manager := &manager{
 		backend: backend,
-		// verifier: &verifierImpl{
-		// 	backend:           backend,
-		// 	txExecutorBackend: txExecutorBackend,
-		// },
-		BlockVerifier: &verifier2{
+		verifier: &verifier{
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
 		},
-		// acceptor: &acceptorImpl{
-		// 	backend:          backend,
-		// 	metrics:          metrics,
-		// 	recentlyAccepted: recentlyAccepted,
-		// },
-		BlockAcceptor: &acceptor2{
+		acceptor: &acceptor{
 			backend:          backend,
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
 		},
-		// rejector:                &rejectorImpl{backend: backend},
-		BlockRejector:   &rejector2{backend: backend},
+		rejector:        &rejector{backend: backend},
 		baseStateSetter: &baseStateSetterImpl{backend: backend},
-		// conflictChecker:         &conflictCheckerImpl{backend: backend},
-		Timestamper:             &timestampGetterImpl{backend: backend},
+		// Timestamper:             &timestampGetterImpl{backend: backend},
 		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
-		Statuser:                &statusGetterImpl{backend: backend},
+		// Statuser:                &statusGetterImpl{backend: backend},
 	}
 	return manager
 }
 
 type manager struct {
 	backend
-	stateless.BlockVerifier
-	stateless.BlockAcceptor
-	stateless.BlockRejector
-	stateless.Statuser
-	stateless.Timestamper
+	verifier stateless.Visitor
+	acceptor stateless.Visitor
+	rejector stateless.Visitor
+	// stateless.BlockVerifier
+	// stateless.BlockAcceptor
+	// stateless.BlockRejector
+	// stateless.Statuser
+	// stateless.Timestamper
 	baseStateSetter
 	initialPreferenceGetter
 }
@@ -121,11 +115,12 @@ func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
 	m.state.SetLastAccepted(blkID, persist)
 }
 
+// TODO fix
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	if blk, ok := m.verifiedBlocks[blkID]; ok {
-		return blk, nil
-	}
-	blk, _, err := m.statelessBlockState.GetStatelessBlock(blkID)
-	blk.Sync(m.BlockVerifier, m.BlockAcceptor, m.BlockRejector, m.Statuser, m.Timestamper)
-	return blk, err
+	// if blk, ok := m.verifiedBlocks[blkID]; ok {
+	// 	return blk, nil
+	// }
+	// blk, _, err := m.statelessBlockState.GetStatelessBlock(blkID)
+	// return blk, err
+	return nil, errors.New("TODO")
 }

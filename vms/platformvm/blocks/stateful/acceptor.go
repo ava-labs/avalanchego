@@ -3,249 +3,332 @@
 
 package stateful
 
-// var _ acceptor = &acceptorImpl{}
+import (
+	"fmt"
 
-// type acceptor interface {
-// 	acceptProposalBlock(b *ProposalBlock) error
-// 	acceptAtomicBlock(b *AtomicBlock) error
-// 	acceptStandardBlock(b *StandardBlock) error
-// 	acceptCommitBlock(b *CommitBlock) error
-// 	acceptAbortBlock(b *AbortBlock) error
-// }
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/window"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+)
 
-// type acceptorImpl struct {
-// 	backend
-// 	metrics          metrics.Metrics
-// 	recentlyAccepted *window.Window
-// }
+var _ stateless.Visitor = &acceptor{}
 
-// func (a *acceptorImpl) acceptProposalBlock(b *ProposalBlock) error {
-// 	blkID := b.ID()
-// 	a.ctx.Log.Verbo(
-// 		"Accepting Proposal Block %s at height %d with parent %s",
-// 		blkID,
-// 		b.Height(),
-// 		b.Parent(),
-// 	)
+type acceptor struct {
+	backend
+	metrics          metrics.Metrics
+	recentlyAccepted *window.Window
+}
 
-// 	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
-// 		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
-// 	}
+func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	a.ctx.Log.Verbo(
+		"Accepting Proposal Block %s at height %d with parent %s",
+		blkID,
+		b.Height(),
+		b.Parent(),
+	)
 
-// 	// Note that we do not write this block to state here.
-// 	// (Namely, we don't call [a.commonAccept].)
-// 	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-// 	// We do this so that in the event that the node shuts down, the proposal block
-// 	// is not written to disk unless its child is.
-// 	// (The VM's Shutdown method commits the database.)
-// 	// There is an invariant that the most recently committed block is a decision block.
+	if err := a.metrics.MarkAccepted(b); err != nil {
+		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
+	}
 
-// 	// TODO remove
-// 	// b.status = choices.Accepted
+	// Note that we do not write this block to state here.
+	// (Namely, we don't call [a.commonAccept].)
+	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
+	// We do this so that in the event that the node shuts down, the proposal block
+	// is not written to disk unless its child is.
+	// (The VM's Shutdown method commits the database.)
+	// There is an invariant that the most recently committed block is a decision block.
 
-// 	a.blkIDToStatus[blkID] = choices.Accepted
-// 	if err := a.metrics.MarkAccepted(b.ProposalBlock); err != nil {
-// 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
-// 	}
-// 	a.state.SetLastAccepted(blkID, false /*persist*/)
-// 	return nil
-// }
+	// TODO remove
+	// b.status = choices.Accepted
 
-// func (a *acceptorImpl) acceptAtomicBlock(b *AtomicBlock) error {
-// 	blkID := b.ID()
-// 	defer a.backend.free(blkID)
+	// a.blkIDToStatus[blkID] = choices.Accepted
+	blkState.status = choices.Accepted
+	if err := a.metrics.MarkAccepted(b); err != nil {
+		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
+	}
+	a.state.SetLastAccepted(blkID, false /*persist*/)
+	return nil
+}
 
-// 	a.ctx.Log.Verbo(
-// 		"Accepting Atomic Block %s at height %d with parent %s",
-// 		blkID,
-// 		b.Height(),
-// 		b.Parent(),
-// 	)
+func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
 
-// 	a.commonAccept(b.commonBlock)
-// 	a.AddStatelessBlock(b.AtomicBlock, choices.Accepted)
-// 	if err := a.metrics.MarkAccepted(b.AtomicBlock); err != nil {
-// 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
-// 	}
+	defer a.backend.free(blkID)
 
-// 	// Update the state of the chain in the database
-// 	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-// 		onAcceptState.Apply(a.getState())
-// 	}
+	a.ctx.Log.Verbo(
+		"Accepting Atomic Block %s at height %d with parent %s",
+		blkID,
+		b.Height(),
+		b.Parent(),
+	)
 
-// 	defer a.state.Abort()
-// 	batch, err := a.state.CommitBatch()
-// 	if err != nil {
-// 		return fmt.Errorf(
-// 			"failed to commit VM's database for block %s: %w",
-// 			blkID,
-// 			err,
-// 		)
-// 	}
+	a.commonAccept(blkState, b)
+	a.AddStatelessBlock(b, choices.Accepted)
+	if err := a.metrics.MarkAccepted(b); err != nil {
+		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
+	}
 
-// 	if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
-// 		return fmt.Errorf(
-// 			"failed to atomically accept tx %s in block %s: %w",
-// 			b.AtomicBlock.Tx.ID(),
-// 			blkID,
-// 			err,
-// 		)
-// 	}
+	// Update the state of the chain in the database
+	// if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+	// 	onAcceptState.Apply(a.getState())
+	// }
+	blkState.onAcceptState.Apply(a.getState())
 
-// 	for _, child := range a.blkIDToChildren[blkID] {
-// 		child.setBaseState()
-// 	}
-// 	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
-// 		onAcceptFunc()
-// 	}
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
+	}
 
-// 	return nil
-// }
+	// if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
+	// 	return fmt.Errorf(
+	// 		"failed to atomically accept tx %s in block %s: %w",
+	// 		b.Tx.ID(),
+	// 		blkID,
+	// 		err,
+	// 	)
+	// }
+	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+		return fmt.Errorf(
+			"failed to atomically accept tx %s in block %s: %w",
+			b.Tx.ID(),
+			blkID,
+			err,
+		)
+	}
 
-// func (a *acceptorImpl) acceptStandardBlock(b *StandardBlock) error {
-// 	blkID := b.ID()
-// 	defer a.free(blkID)
+	// for _, child := range a.blkIDToChildren[blkID] {
+	// 	child.setBaseState()
+	// }
+	for _, childID := range blkState.children {
+		childState, ok := a.blkIDToState[childID]
+		if !ok {
+			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkID)
+		}
+		_ = childState
+		// TODO
+		// childState.setBaseState()
+	}
 
-// 	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
+	// if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+	// 	onAcceptFunc()
+	// }
+	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+		onAcceptFunc()
+	}
 
-// 	a.commonAccept(b.commonBlock)
-// 	a.AddStatelessBlock(b.StandardBlock, choices.Accepted)
-// 	if err := a.metrics.MarkAccepted(b.StandardBlock); err != nil {
-// 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
-// 	}
+	return nil
+}
 
-// 	// Update the state of the chain in the database
-// 	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-// 		onAcceptState.Apply(a.getState())
-// 	}
+func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	defer a.free(blkID)
 
-// 	defer a.state.Abort()
-// 	batch, err := a.state.CommitBatch()
-// 	if err != nil {
-// 		return fmt.Errorf(
-// 			"failed to commit VM's database for block %s: %w",
-// 			blkID,
-// 			err,
-// 		)
-// 	}
+	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
-// 	if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
-// 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
-// 	}
+	a.commonAccept(blkState, b)
+	a.AddStatelessBlock(b, choices.Accepted)
+	if err := a.metrics.MarkAccepted(b); err != nil {
+		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
+	}
 
-// 	for _, child := range a.blkIDToChildren[blkID] {
-// 		child.setBaseState()
-// 	}
-// 	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
-// 		onAcceptFunc()
-// 	}
+	// Update the state of the chain in the database
+	// if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+	// 	onAcceptState.Apply(a.getState())
+	// }
+	blkState.onAcceptState.Apply(a.getState())
 
-// 	return nil
-// }
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
+	}
 
-// func (a *acceptorImpl) acceptCommitBlock(b *CommitBlock) error {
-// 	blkID := b.baseBlk.ID()
-// 	defer a.free(blkID)
+	// if err := a.ctx.SharedMemory.Apply(a.blkIDToAtomicRequests[blkID], batch); err != nil {
+	// 	return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+	// }
+	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+	}
 
-// 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
+	// for _, child := range a.blkIDToChildren[blkID] {
+	// 	child.setBaseState()
+	// }
+	// if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+	// 	onAcceptFunc()
+	// }
+	for _, childID := range blkState.children {
+		childState, ok := a.blkIDToState[childID]
+		if !ok {
+			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkID)
+		}
+		_ = childState
+		// TODO
+		// child.setBaseState()
+	}
+	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+		onAcceptFunc()
+	}
+	return nil
+}
 
-// 	parentIntf, err := a.parent(b.baseBlk)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	parent, ok := parentIntf.(*ProposalBlock)
-// 	if !ok {
-// 		a.ctx.Log.Error("double decision block should only follow a proposal block")
-// 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-// 	}
-// 	defer a.free(parent.ID())
+func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	defer a.free(blkID)
 
-// 	a.commonAccept(parent.commonBlock)
-// 	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
+	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
-// 	a.commonAccept(b.commonBlock)
-// 	a.AddStatelessBlock(b.CommitBlock, choices.Accepted)
+	// parentIntf, err := a.parent(b.baseBlk)
+	// if err != nil {
+	// 	return err
+	// }
+	// parent, ok := parentIntf.(*ProposalBlock)
+	// if !ok {
+	// 	a.ctx.Log.Error("double decision block should only follow a proposal block")
+	// 	return fmt.Errorf("expected Proposal block but got %T", parentIntf)
+	// }
+	parentID := b.Parent()
+	parentState := a.blkIDToState[parentID]
+	parent, _, err := a.GetStatelessBlock(parentID)
+	if err != nil {
+		return err
+	}
+	defer a.free(parent.ID())
 
-// 	wasPreferred := a.blkIDToPreferCommit[blkID]
+	a.commonAccept(parentState, parent)
+	a.AddStatelessBlock(parent, choices.Accepted)
 
-// 	// Update metrics
-// 	if a.bootstrapped.GetValue() {
-// 		if wasPreferred {
-// 			a.metrics.MarkAcceptedOptionVote()
-// 		} else {
-// 			a.metrics.MarkRejectedOptionVote()
-// 		}
-// 	}
-// 	if err := a.metrics.MarkAccepted(b.CommitBlock); err != nil {
-// 		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
-// 	}
+	a.commonAccept(blkState, b)
+	a.AddStatelessBlock(b, choices.Accepted)
 
-// 	return a.updateStateOptionBlock(b.commonBlock)
-// }
+	// wasPreferred := a.blkIDToPreferCommit[blkID]
+	wasPreferred := blkState.inititallyPreferCommit
 
-// func (a *acceptorImpl) acceptAbortBlock(b *AbortBlock) error {
-// 	blkID := b.baseBlk.ID()
-// 	defer a.free(blkID)
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		if wasPreferred {
+			a.metrics.MarkAcceptedOptionVote()
+		} else {
+			a.metrics.MarkRejectedOptionVote()
+		}
+	}
+	if err := a.metrics.MarkAccepted(b); err != nil {
+		return fmt.Errorf("failed to accept commit option block %s: %w", b.ID(), err)
+	}
 
-// 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
+	return a.updateStateOptionBlock(b.CommonBlock)
+}
 
-// 	parentIntf, err := a.parent(b.baseBlk)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	parent, ok := parentIntf.(*ProposalBlock)
-// 	if !ok {
-// 		a.ctx.Log.Error("double decision block should only follow a proposal block")
-// 		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-// 	}
-// 	defer a.free(parent.ID())
+func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	defer a.free(blkID)
 
-// 	a.commonAccept(parent.commonBlock)
-// 	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
+	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
-// 	a.commonAccept(b.commonBlock)
-// 	a.AddStatelessBlock(b.AbortBlock, choices.Accepted)
+	parentID := b.Parent()
+	parentState := a.blkIDToState[parentID]
+	parent, _, err := a.GetStatelessBlock(parentID)
+	if err != nil {
+		return err
+	}
+	defer a.free(parentID)
 
-// 	// Update metrics
-// 	wasPreferred := a.blkIDToPreferCommit[blkID]
-// 	if a.bootstrapped.GetValue() {
-// 		if wasPreferred {
-// 			a.metrics.MarkAcceptedOptionVote()
-// 		} else {
-// 			a.metrics.MarkRejectedOptionVote()
-// 		}
-// 	}
-// 	if err := a.metrics.MarkAccepted(b.AbortBlock); err != nil {
-// 		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
-// 	}
+	a.commonAccept(parentState, parent) // TODO pass in parent state
+	a.AddStatelessBlock(parent, choices.Accepted)
 
-// 	return a.updateStateOptionBlock(b.commonBlock)
-// }
+	a.commonAccept(blkState, b)
+	a.AddStatelessBlock(b, choices.Accepted)
 
-// // [b] must be embedded in a Commit or Abort block.
-// func (a *acceptorImpl) updateStateOptionBlock(b *commonBlock) error {
-// 	blkID := b.baseBlk.ID()
-// 	// Update the state of the chain in the database
-// 	if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-// 		onAcceptState.Apply(a.getState())
-// 	}
-// 	if err := a.state.Commit(); err != nil {
-// 		return fmt.Errorf("failed to commit vm's state: %w", err)
-// 	}
+	// Update metrics
+	// wasPreferred := a.blkIDToPreferCommit[blkID]
 
-// 	for _, child := range a.blkIDToChildren[blkID] {
-// 		child.setBaseState()
-// 	}
-// 	if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
-// 		onAcceptFunc()
-// 	}
-// 	return nil
-// }
+	// TODO should this be the parent's state?
+	wasPreferred := blkState.inititallyPreferCommit
+	if a.bootstrapped.GetValue() {
+		if wasPreferred {
+			a.metrics.MarkAcceptedOptionVote()
+		} else {
+			a.metrics.MarkRejectedOptionVote()
+		}
+	}
+	if err := a.metrics.MarkAccepted(b); err != nil {
+		return fmt.Errorf("failed to accept abort option block %s: %w", b.ID(), err)
+	}
 
-// func (a *acceptorImpl) commonAccept(b *commonBlock) {
-// 	blkID := b.baseBlk.ID()
-// 	a.blkIDToStatus[blkID] = choices.Accepted
-// 	a.state.SetLastAccepted(blkID, true /*persist*/)
-// 	a.SetHeight(b.baseBlk.Height())
-// 	a.recentlyAccepted.Add(blkID)
-// }
+	return a.updateStateOptionBlock(b.CommonBlock)
+}
+
+// [b] must be embedded in a Commit or Abort block.
+func (a *acceptor) updateStateOptionBlock(b stateless.CommonBlock) error {
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+
+	// Update the state of the chain in the database
+	// if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+	// 	onAcceptState.Apply(a.getState())
+	// }
+	blkState.onAcceptState.Apply(a.getState())
+	if err := a.state.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
+	}
+
+	for _, childID := range blkState.children {
+		childState, ok := a.blkIDToState[childID]
+		if !ok {
+			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkID)
+		}
+		_ = childState
+		// TODO
+		// childID.setBaseState()
+	}
+	// if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
+	// 	onAcceptFunc()
+	// }
+	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+		onAcceptFunc()
+	}
+	return nil
+}
+
+func (a *acceptor) commonAccept(blkState *blockState, b stateless.Block) {
+	blkID := b.ID()
+	// a.blkIDToStatus[blkID] = choices.Accepted
+	blkState.status = choices.Accepted
+	a.state.SetLastAccepted(blkID, true /*persist*/)
+	a.SetHeight(b.Height())
+	a.recentlyAccepted.Add(blkID)
+}

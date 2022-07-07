@@ -37,16 +37,8 @@ func (ab *AtomicBlock) Initialize(bytes []byte) error {
 
 func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
-func (ab *AtomicBlock) Verify() error {
-	return ab.VerifyAtomicBlock(ab)
-}
-
-func (ab *AtomicBlock) Accept() error {
-	return ab.AcceptAtomicBlock(ab)
-}
-
-func (ab *AtomicBlock) Reject() error {
-	return ab.RejectAtomicBlock(ab)
+func (ab *AtomicBlock) Visit(v Visitor) error {
+	return v.VisitAtomicBlock(ab)
 }
 
 func NewAtomicBlock(

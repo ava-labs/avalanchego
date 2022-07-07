@@ -24,7 +24,7 @@ type backend struct {
 	statelessBlockState
 	heightSetter
 	verifiedBlocks map[ids.ID]stateless.Block // TODO can we just put the blocks with their state?
-	blkIDToState   map[ids.ID]*stat           // TODO set this
+	blkIDToState   map[ids.ID]*blockState     // TODO set this
 	state          state.State
 	ctx            *snow.Context
 	bootstrapped   *utils.AtomicBool
@@ -44,14 +44,6 @@ func (b *backend) OnAccept(blkID ids.ID) state.Chain {
 }
 
 func (b *backend) free(blkID ids.ID) {
-	// delete(b.blkIDToOnAcceptFunc, blkID)
-	// delete(b.blkIDToOnAcceptState, blkID)
-	// delete(b.blkIDToOnAcceptState, blkID)
-	// delete(b.blkIDToOnAbortState, blkID)
-	// delete(b.blkIDToChildren, blkID)
-	// delete(b.blkIDToTimestamp, blkID)
-	// delete(b.blkIDToInputs, blkID)
-	// delete(b.blkIDToAtomicRequests, blkID)
-	// delete(b.blkIDToPreferCommit, blkID)
 	delete(b.blkIDToState, blkID)
+	delete(b.verifiedBlocks, blkID)
 }

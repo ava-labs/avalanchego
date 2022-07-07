@@ -38,16 +38,8 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 
 func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
 
-func (pb *ProposalBlock) Verify() error {
-	return pb.VerifyProposalBlock(pb)
-}
-
-func (pb *ProposalBlock) Accept() error {
-	return pb.AcceptProposalBlock(pb)
-}
-
-func (pb *ProposalBlock) Reject() error {
-	return pb.RejectProposalBlock(pb)
+func (pb *ProposalBlock) Visit(v Visitor) error {
+	return v.VisitProposalBlock(pb)
 }
 
 func NewProposalBlock(
