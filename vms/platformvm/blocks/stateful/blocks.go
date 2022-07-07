@@ -4,8 +4,13 @@
 package stateful
 
 import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 type Block interface {
@@ -30,12 +35,16 @@ type Block interface {
 	setBaseState()
 }
 
-// TODO remove
-// A Decision block (either Commit, Abort, or DecisionBlock) represents a
-// Decision to either commit or abort the changes specified in its parent,
-// if its parent is a proposal. Otherwise, the changes are committed
-// immediately.
-// type Decision interface {
-// TODO move spec and remove function
-// OnAccept() state.Chain
-// }
+// TODO rename
+type stat struct {
+	status                 choices.Status
+	onAcceptFunc           func()
+	onAcceptState          state.Diff
+	onCommitState          state.Diff
+	onAbortState           state.Diff
+	children               []ids.ID
+	timestamp              time.Time
+	inputs                 ids.Set
+	atomicRequests         map[ids.ID]*atomic.Requests
+	inititallyPreferCommit bool
+}

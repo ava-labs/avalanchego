@@ -27,6 +27,7 @@ type backend struct {
 	// TODO consolidate state fields below?
 	blockState
 	heightSetter
+	blkIDToState map[ids.ID]*stat // TODO set this
 	// Block ID --> Status of the block.
 	blkIDToStatus map[ids.ID]choices.Status
 	// Block ID --> Function to be executed if the block is accepted.
