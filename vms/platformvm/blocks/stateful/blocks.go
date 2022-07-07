@@ -18,7 +18,7 @@ type Block interface {
 
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.
-	conflicts(ids.Set) (bool, error)
+	// conflicts(ids.Set) (bool, error)
 
 	// TODO remove
 	// addChild notifies this block that it has a child block building on it.
@@ -32,7 +32,7 @@ type Block interface {
 	// free()
 
 	// Set the block's underlying state to the chain's internal state
-	setBaseState()
+	// 	setBaseState()
 }
 
 // TODO rename

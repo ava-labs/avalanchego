@@ -38,7 +38,7 @@ type Manager interface {
 	stateless.BlockAcceptor
 	stateless.BlockRejector
 	baseStateSetter
-	conflictChecker
+	// conflictChecker
 	chainState
 	timestampGetter
 	OnAcceptor
@@ -101,9 +101,9 @@ func NewManager(
 			recentlyAccepted: recentlyAccepted,
 		},
 		// rejector:                &rejectorImpl{backend: backend},
-		BlockRejector:           &rejector2{backend: backend},
-		baseStateSetter:         &baseStateSetterImpl{backend: backend},
-		conflictChecker:         &conflictCheckerImpl{backend: backend},
+		BlockRejector:   &rejector2{backend: backend},
+		baseStateSetter: &baseStateSetterImpl{backend: backend},
+		// conflictChecker:         &conflictCheckerImpl{backend: backend},
 		timestampGetter:         &timestampGetterImpl{backend: backend},
 		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
 		statusGetter:            &statusGetterImpl{backend: backend},
@@ -123,7 +123,7 @@ type manager struct {
 	stateless.BlockAcceptor
 	stateless.BlockRejector
 	baseStateSetter
-	conflictChecker
+	// conflictChecker
 	timestampGetter
 	initialPreferenceGetter
 	statusGetter

@@ -88,10 +88,10 @@ func (v *verifier2) VerifyAtomicBlock(b *stateless.AtomicBlock) error {
 	// if err != nil {
 	// 	return err
 	// }
-	parentIntf, err := v.GetStatefulBlock(b.Parent())
-	if err != nil {
-		return err
-	}
+	// parentIntf, err := v.GetStatefulBlock(b.Parent())
+	// if err != nil {
+	// 	return err
+	// }
 
 	parentState := v.OnAccept(b.Parent())
 
@@ -130,13 +130,33 @@ func (v *verifier2) VerifyAtomicBlock(b *stateless.AtomicBlock) error {
 	// v.blkIDToTimestamp[blkID] = atomicExecutor.OnAccept.GetTimestamp()
 	blockState.timestamp = atomicExecutor.OnAccept.GetTimestamp()
 
-	conflicts, err := parentIntf.conflicts(atomicExecutor.Inputs)
-	if err != nil {
-		return err
+	// Check for conflicts in atomic inputs
+	var nextBlock stateless.Block = b
+	for {
+		parentID := nextBlock.Parent()
+		parentState := v.blkIDToState[parentID]
+		if parentState == nil {
+			// The parent state isn't pinned in memory.
+			// This means the parent must be accepted already.
+			break
+		}
+		if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
+			return ErrConflictingParentTxs
+		}
+		parent, _, err := v.GetStatelessBlock(parentID)
+		if err != nil {
+			return err
+		}
+		nextBlock = parent
 	}
-	if conflicts {
-		return ErrConflictingParentTxs
-	}
+
+	// conflicts, err := parentIntf.conflicts(atomicExecutor.Inputs)
+	// if err != nil {
+	// 	return err
+	// }
+	// if conflicts {
+	// 	return ErrConflictingParentTxs
+	// }
 
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	// TODO
@@ -163,10 +183,10 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 	// if err != nil {
 	// 	return err
 	// }
-	parentIntf, err := v.GetStatefulBlock(b.Parent())
-	if err != nil {
-		return err
-	}
+	// parentIntf, err := v.GetStatefulBlock(b.Parent())
+	// if err != nil {
+	// 	return err
+	// }
 
 	parentState := v.OnAccept(b.Parent())
 
@@ -230,13 +250,31 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 
 	if blockState.inputs.Len() > 0 {
 		// ensure it doesnt conflict with the parent block
-		conflicts, err := parentIntf.conflicts(blockState.inputs)
-		if err != nil {
-			return err
+		var nextBlock stateless.Block = b
+		for {
+			parentID := nextBlock.Parent()
+			parentState := v.blkIDToState[parentID]
+			if parentState == nil {
+				// The parent state isn't pinned in memory.
+				// This means the parent must be accepted already.
+				break
+			}
+			if parentState.inputs.Overlaps(blockState.inputs) {
+				return ErrConflictingParentTxs
+			}
+			parent, _, err := v.GetStatelessBlock(parentID)
+			if err != nil {
+				return err
+			}
+			nextBlock = parent
 		}
-		if conflicts {
-			return ErrConflictingParentTxs
-		}
+		// conflicts, err := parentIntf.conflicts(blockState.inputs)
+		// if err != nil {
+		// 	return err
+		// }
+		// if conflicts {
+		// 	return ErrConflictingParentTxs
+		// }
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
