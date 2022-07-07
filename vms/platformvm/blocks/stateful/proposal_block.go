@@ -49,14 +49,6 @@ type ProposalBlock struct {
 	manager Manager
 }
 
-func (pb *ProposalBlock) ExpectedChildVersion() uint16 {
-	forkTime := pb.manager.GetConfig().BlueberryTime
-	if pb.Timestamp().Before(forkTime) {
-		return stateless.ApricotVersion
-	}
-	return stateless.BlueberryVersion
-}
-
 // NewProposalBlock creates a new block that proposes to issue a transaction.
 // The parent of this block has ID [parentID].
 // The parent must be a decision block.

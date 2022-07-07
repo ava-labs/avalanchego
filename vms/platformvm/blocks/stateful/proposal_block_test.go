@@ -522,7 +522,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 			h.cfg.BlueberryTime = time.Time{} // activate Blueberry
 			h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 
-			addedStakerTxsByEndTime := make(map[time.Time]*txs.Tx, 0)
+			addedStakerTxsByEndTime := make(map[time.Time]*txs.Tx)
 			for _, staker := range test.stakers {
 				addPendingValidatorTx, err := h.txBuilder.NewAddValidatorTx(
 					h.cfg.MinValidatorStake,

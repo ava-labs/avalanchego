@@ -36,8 +36,6 @@ type Manager interface {
 	chainState
 	timestampGetter
 	lastAccepteder
-
-	GetConfig() *config.Config
 }
 
 func NewManager(
@@ -108,8 +106,4 @@ type manager struct {
 
 func (m *manager) GetState() state.State {
 	return m.state
-}
-
-func (m *manager) GetConfig() *config.Config {
-	return m.Config
 }

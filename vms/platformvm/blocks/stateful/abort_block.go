@@ -25,14 +25,6 @@ type AbortBlock struct {
 	manager Manager
 }
 
-func (a *AbortBlock) ExpectedChildVersion() uint16 {
-	forkTime := a.manager.GetConfig().BlueberryTime
-	if a.Timestamp().Before(forkTime) {
-		return stateless.ApricotVersion
-	}
-	return stateless.BlueberryVersion
-}
-
 // NewAbortBlock returns a new *AbortBlock where the block's parent, a proposal
 // block, has ID [parentID]. Additionally the block will track if it was
 // originally preferred or not for metrics.

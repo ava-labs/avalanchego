@@ -35,14 +35,6 @@ type AtomicBlock struct {
 	manager Manager
 }
 
-func (ab *AtomicBlock) ExpectedChildVersion() uint16 {
-	forkTime := ab.manager.GetConfig().BlueberryTime
-	if ab.Timestamp().Before(forkTime) {
-		return stateless.ApricotVersion
-	}
-	return stateless.BlueberryVersion
-}
-
 // NewAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewAtomicBlock(

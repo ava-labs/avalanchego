@@ -35,14 +35,6 @@ type StandardBlock struct {
 	manager Manager
 }
 
-func (sb *StandardBlock) ExpectedChildVersion() uint16 {
-	forkTime := sb.manager.GetConfig().BlueberryTime
-	if sb.Timestamp().Before(forkTime) {
-		return stateless.ApricotVersion
-	}
-	return stateless.BlueberryVersion
-}
-
 // NewStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
 func NewStandardBlock(

@@ -15,9 +15,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var _ verifier = &verifierImpl{}
+var (
+	_ verifier       = &verifierImpl{}
+	_ blockVersioner = &verifierImpl{}
+)
+
+type blockVersioner interface {
+	// ExpectedChildVersion returns the expected version
+	// of this block's direct child
+	ExpectedChildVersion(blk Block) uint16
+}
 
 type verifier interface {
+	blockVersioner
+
 	// Verify this block is valid.
 	// The parent block must either be a Commit or an Abort block.
 	// If this block is valid, this function also sets pas.onCommit and pas.onAbort.
@@ -47,6 +58,15 @@ type verifier interface {
 type verifierImpl struct {
 	backend
 	txExecutorBackend executor.Backend
+}
+
+func (v *verifierImpl) ExpectedChildVersion(blk Block) uint16 {
+	cfg := v.txExecutorBackend.Cfg
+	forkTime := cfg.BlueberryTime
+	if blk.Timestamp().Before(forkTime) {
+		return stateless.ApricotVersion
+	}
+	return stateless.BlueberryVersion
 }
 
 func (v *verifierImpl) verifyProposalBlock(b *ProposalBlock) error {
@@ -411,7 +431,7 @@ func (v *verifierImpl) verifyCommonBlock(cb *commonBlock, enforceStrictness bool
 
 	// verify block version
 	blkVersion := cb.baseBlk.Version()
-	expectedVersion := parent.ExpectedChildVersion()
+	expectedVersion := v.ExpectedChildVersion(parent)
 	if expectedVersion != blkVersion {
 		return fmt.Errorf(
 			"expected block to have version %d, but found %d",

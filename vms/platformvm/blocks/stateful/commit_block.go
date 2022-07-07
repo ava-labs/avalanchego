@@ -24,14 +24,6 @@ type CommitBlock struct {
 	manager      Manager
 }
 
-func (c *CommitBlock) ExpectedChildVersion() uint16 {
-	forkTime := c.manager.GetConfig().BlueberryTime
-	if c.Timestamp().Before(forkTime) {
-		return stateless.ApricotVersion
-	}
-	return stateless.BlueberryVersion
-}
-
 // NewCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID]. Additionally the block will track if it
 // was originally preferred or not for metrics.

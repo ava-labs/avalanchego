@@ -16,10 +16,6 @@ var ErrBlockNil = errors.New("block is nil")
 type Block interface {
 	snowman.Block
 
-	// ExpectedChildVersion returns the expected version of this block's
-	// direct child
-	ExpectedChildVersion() uint16
-
 	// returns true if this block or any processing ancestors consume any of the
 	// named atomic imports.
 	conflicts(ids.Set) (bool, error)

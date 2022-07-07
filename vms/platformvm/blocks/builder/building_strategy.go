@@ -38,7 +38,7 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 	preferredState := preferredDecision.OnAccept()
 
 	// select transactions to include and finally build the block
-	blkVersion := preferred.ExpectedChildVersion()
+	blkVersion := b.blkManager.ExpectedChildVersion(preferred)
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
@@ -58,6 +58,6 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 			height:       nextHeight,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupporrted block version %d", blkVersion)
+		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
 	}
 }
