@@ -23,6 +23,10 @@ type baseValidator struct {
 	pendingDelegators      *btree.BTree
 
 	// Representation of pending changes
+	currentStakerModified     bool
+	newCurrentStaker          *Staker
+	pendingStakerModified     bool
+	newPendingStaker          *Staker
 	currentDelegatorsToAdd    []*Staker
 	currentDelegatorsToRemove []*Staker
 	pendingDelegatorsToAdd    []*Staker
@@ -30,10 +34,16 @@ type baseValidator struct {
 }
 
 func (v *baseValidator) CurrentStaker() *Staker {
+	if v.currentStakerModified {
+		return v.newCurrentStaker
+	}
 	return v.currentStaker
 }
 
 func (v *baseValidator) PendingStaker() *Staker {
+	if v.pendingStakerModified {
+		return v.newPendingStaker
+	}
 	return v.pendingStaker
 }
 
@@ -121,4 +131,31 @@ func (v *baseValidators) NewPendingStakerIterator() StakerIterator {
 		treeIterator,
 		NewSliceIterator(v.pendingStakersToAdd),
 	)
+}
+
+func (v *baseValidators) Update(
+	currentStakersToAdd []*Staker,
+	currentStakersToRemove []*Staker,
+	pendingStakersToAdd []*Staker,
+	pendingStakersToRemove []*Staker,
+) {
+	v.currentStakersToAdd = currentStakersToAdd
+	v.currentStakersToRemove = currentStakersToRemove
+	v.pendingStakersToAdd = pendingStakersToAdd
+	v.pendingStakersToRemove = pendingStakersToRemove
+
+	for _, staker := range currentStakersToAdd {
+		subnetValidators, ok := v.validators[staker.SubnetID]
+		if !ok {
+			subnetValidators = make(map[ids.NodeID]*baseValidator)
+			v.validators[staker.SubnetID] = subnetValidators
+		}
+
+		validator, ok := subnetValidators[staker.NodeID]
+		if !ok {
+			validator = &baseValidator{}
+			subnetValidators[staker.NodeID] = validator
+			continue
+		}
+	}
 }

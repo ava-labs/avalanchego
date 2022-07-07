@@ -50,10 +50,10 @@ type Validators interface {
 	// sorted in order of their future addition.
 	NewPendingStakerIterator() StakerIterator
 
-	// Update(
-	// 	currentStakersToAdd []*Staker,
-	// 	currentStakersToRemove []*Staker,
-	// 	pendingStakersToAdd []*Staker,
-	// 	pendingStakersToRemove []*Staker,
-	// )
+	Update(
+		currentStakersToAdd []*Staker,
+		currentStakersToRemove []*Staker,
+		pendingStakersToAdd []*Staker,
+		pendingStakersToRemove []*Staker,
+	)
 }
