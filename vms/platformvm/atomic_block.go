@@ -126,6 +126,7 @@ func (ab *AtomicBlock) Verify() error {
 
 	ab.vm.blockBuilder.RemoveDecisionTxs([]*txs.Tx{ab.Tx})
 	ab.vm.currentBlocks[blkID] = ab
+	ab.vm.stateVersions.SetState(blkID, ab.onAcceptState)
 	return nil
 }
 
