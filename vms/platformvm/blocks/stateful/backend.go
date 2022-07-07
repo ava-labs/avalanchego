@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -51,12 +50,6 @@ type backend struct {
 
 func (b *backend) getState() state.State {
 	return b.state
-}
-
-// TODO do we even need this or can we just pass parent ID into getStatefulBlock?
-func (b *backend) parent(blk *stateless.CommonBlock) (Block, error) {
-	parentBlkID := blk.Parent()
-	return b.GetStatefulBlock(parentBlkID)
 }
 
 // TODO is this right?

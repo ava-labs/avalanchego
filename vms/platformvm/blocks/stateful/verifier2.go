@@ -4,6 +4,7 @@
 package stateful
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -13,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var _ stateless.BlockVerifier = &verifier2{}
+var (
+	_                       stateless.BlockVerifier = &verifier2{}
+	errConflictingBatchTxs                          = errors.New("block contains conflicting transactions")
+	ErrConflictingParentTxs                         = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+)
 
 type verifier2 struct {
 	backend
@@ -64,7 +69,7 @@ func (v *verifier2) VerifyProposalBlock(b *stateless.ProposalBlock) error {
 	blockState.inititallyPreferCommit = txExecutor.PrefersCommit
 
 	v.Mempool.RemoveProposalTx(b.Tx)
-	//v.pinVerifiedBlock(b)
+	// v.pinVerifiedBlock(b)
 	v.blkIDToState[b.ID()] = blockState
 	return nil
 }
@@ -79,10 +84,10 @@ func (v *verifier2) VerifyAtomicBlock(b *stateless.AtomicBlock) error {
 		return err
 	}
 
-	//parentIntf, err := v.parent(b.baseBlk)
-	//if err != nil {
-	//	return err
-	//}
+	// parentIntf, err := v.parent(b.baseBlk)
+	// if err != nil {
+	// 	return err
+	// }
 	parentIntf, err := v.GetStatefulBlock(b.Parent())
 	if err != nil {
 		return err
@@ -154,10 +159,10 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 		return err
 	}
 
-	//parentIntf, err := v.parent(b.baseBlk)
-	//if err != nil {
-	//	return err
-	//}
+	// parentIntf, err := v.parent(b.baseBlk)
+	// if err != nil {
+	// 	return err
+	// }
 	parentIntf, err := v.GetStatefulBlock(b.Parent())
 	if err != nil {
 		return err
@@ -177,16 +182,16 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 	// b.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
 	funcs := make([]func(), 0, len(b.Txs))
-	//blockInputs, ok := v.blkIDToInputs[blkID]
-	//if !ok {
-	//	blockInputs = ids.Set{}
-	//	v.blkIDToInputs[blkID] = blockInputs
-	//}
-	//atomicRequests := v.blkIDToAtomicRequests[blkID]
-	//if !ok {
-	//	atomicRequests = make(map[ids.ID]*atomic.Requests)
-	//	v.blkIDToAtomicRequests[blkID] = atomicRequests
-	//}
+	// blockInputs, ok := v.blkIDToInputs[blkID]
+	// if !ok {
+	// 	blockInputs = ids.Set{}
+	// 	v.blkIDToInputs[blkID] = blockInputs
+	// }
+	// atomicRequests := v.blkIDToAtomicRequests[blkID]
+	// if !ok {
+	// 	atomicRequests = make(map[ids.ID]*atomic.Requests)
+	// 	v.blkIDToAtomicRequests[blkID] = atomicRequests
+	// }
 	for _, tx := range b.Txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
@@ -256,10 +261,10 @@ func (v *verifier2) VerifyStandardBlock(b *stateless.StandardBlock) error {
 	blockState.onAcceptState = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	// TODO
-	//parentID := b.Parent()
-	//v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+	// parentID := b.Parent()
+	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 
-	//v.pinVerifiedBlock(b)
+	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blockState
 	return nil
 }

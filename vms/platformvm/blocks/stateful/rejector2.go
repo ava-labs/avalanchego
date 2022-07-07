@@ -41,7 +41,7 @@ func (r *rejector2) RejectProposalBlock(b *stateless.ProposalBlock) error {
 	// TODO remove
 	// b.status = choices.Rejected
 	blockState.status = choices.Rejected
-	//r.blkIDToStatus[blkID] = choices.Rejected
+	// r.blkIDToStatus[blkID] = choices.Rejected
 	defer r.free(blkID)
 	r.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()

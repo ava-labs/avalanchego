@@ -4,12 +4,24 @@
 package stateless
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+type Statuser interface {
+	Status() choices.Status
+}
+
+type Timestamper interface {
+	Timestamp() time.Time
+}
+
 // Interface introduced for marshalling/unmarshalling
 type Block interface {
+	Statuser
 	Initialize(bytes []byte) error
 
 	ID() ids.ID

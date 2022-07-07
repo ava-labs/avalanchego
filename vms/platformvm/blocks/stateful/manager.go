@@ -90,11 +90,11 @@ func NewManager(
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
 		},
-		//acceptor: &acceptorImpl{
-		//	backend:          backend,
-		//	metrics:          metrics,
-		//	recentlyAccepted: recentlyAccepted,
-		//},
+		// acceptor: &acceptorImpl{
+		// 	backend:          backend,
+		// 	metrics:          metrics,
+		// 	recentlyAccepted: recentlyAccepted,
+		// },
 		BlockAcceptor: &acceptor2{
 			backend:          backend,
 			metrics:          metrics,

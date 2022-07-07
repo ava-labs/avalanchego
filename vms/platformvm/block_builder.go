@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	stateless "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -148,12 +148,22 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
-		return stateful.NewStandardBlock(
-			b.vm.manager,
-			b.vm.ctx,
+		// return stateful.NewStandardBlock(
+		// 	b.vm.manager,
+		// 	b.vm.ctx,
+		// 	preferredID,
+		// 	nextHeight,
+		// 	txs,
+		// )
+		return stateless.NewStandardBlock(
 			preferredID,
 			nextHeight,
 			txs,
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
 		)
 	}
 
@@ -167,12 +177,22 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
-			b.vm.manager,
-			b.vm.ctx,
+		// return stateful.NewProposalBlock(
+		// 	b.vm.manager,
+		// 	b.vm.ctx,
+		// 	preferredID,
+		// 	nextHeight,
+		// 	rewardValidatorTx,
+		// )
+		return stateless.NewProposalBlock(
 			preferredID,
 			nextHeight,
 			rewardValidatorTx,
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
 		)
 	}
 
@@ -186,12 +206,22 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
-			b.vm.manager,
-			b.vm.ctx,
+		// return stateful.NewProposalBlock(
+		// 	b.vm.manager,
+		// 	b.vm.ctx,
+		// 	preferredID,
+		// 	nextHeight,
+		// 	advanceTimeTx,
+		// )
+		return stateless.NewProposalBlock(
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
 		)
 	}
 
@@ -216,21 +246,41 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
-			b.vm.manager,
-			b.vm.ctx,
+		// return stateful.NewProposalBlock(
+		// 	b.vm.manager,
+		// 	b.vm.ctx,
+		// 	preferredID,
+		// 	nextHeight,
+		// 	advanceTimeTx,
+		// )
+		return stateless.NewProposalBlock(
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
+			nil, // TODO
 		)
 	}
 
-	return stateful.NewProposalBlock(
-		b.vm.manager,
-		b.vm.ctx,
+	// return stateful.NewProposalBlock(
+	// 	b.vm.manager,
+	// 	b.vm.ctx,
+	// 	preferredID,
+	// 	nextHeight,
+	// 	tx,
+	// )
+	return stateless.NewProposalBlock(
 		preferredID,
 		nextHeight,
 		tx,
+		nil, // TODO
+		nil, // TODO
+		nil, // TODO
+		nil, // TODO
+		nil, // TODO
 	)
 }
 

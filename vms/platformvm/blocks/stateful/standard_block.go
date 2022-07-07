@@ -3,86 +3,74 @@
 
 package stateful
 
-import (
-	"errors"
+// var (
+// 	errConflictingBatchTxs = errors.New("block contains conflicting transactions")
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-)
+// 	_ Block = &StandardBlock{}
+// )
 
-var (
-	errConflictingBatchTxs = errors.New("block contains conflicting transactions")
+// // StandardBlock being accepted results in the transactions contained in the
+// // block to be accepted and committed to the chain.
+// type StandardBlock struct {
+// 	*stateless.StandardBlock
+// 	*commonBlock
+// }
 
-	_ Block = &StandardBlock{}
-	// TODO remove
-	// _ Decision = &StandardBlock{}
-)
+// // NewStandardBlock returns a new *StandardBlock where the block's parent, a
+// // decision block, has ID [parentID].
+// func NewStandardBlock(
+// 	manager Manager,
+// 	ctx *snow.Context,
+// 	parentID ids.ID,
+// 	height uint64,
+// 	txs []*txs.Tx,
+// ) (*StandardBlock, error) {
+// 	statelessBlk, err := stateless.NewStandardBlock(parentID, height, txs)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return toStatefulStandardBlock(statelessBlk, manager, ctx, choices.Processing)
+// }
 
-// StandardBlock being accepted results in the transactions contained in the
-// block to be accepted and committed to the chain.
-type StandardBlock struct {
-	*stateless.StandardBlock
-	*commonBlock
-}
+// func toStatefulStandardBlock(
+// 	statelessBlk *stateless.StandardBlock,
+// 	manager Manager,
+// 	ctx *snow.Context,
+// 	status choices.Status,
+// ) (*StandardBlock, error) {
+// 	sb := &StandardBlock{
+// 		StandardBlock: statelessBlk,
+// 		commonBlock: &commonBlock{
+// 			Manager: manager,
+// 			baseBlk: &statelessBlk.CommonBlock,
+// 		},
+// 	}
 
-// NewStandardBlock returns a new *StandardBlock where the block's parent, a
-// decision block, has ID [parentID].
-func NewStandardBlock(
-	manager Manager,
-	ctx *snow.Context,
-	parentID ids.ID,
-	height uint64,
-	txs []*txs.Tx,
-) (*StandardBlock, error) {
-	statelessBlk, err := stateless.NewStandardBlock(parentID, height, txs)
-	if err != nil {
-		return nil, err
-	}
-	return toStatefulStandardBlock(statelessBlk, manager, ctx, choices.Processing)
-}
+// 	for _, tx := range sb.Txs {
+// 		tx.Unsigned.InitCtx(ctx)
+// 	}
 
-func toStatefulStandardBlock(
-	statelessBlk *stateless.StandardBlock,
-	manager Manager,
-	ctx *snow.Context,
-	status choices.Status,
-) (*StandardBlock, error) {
-	sb := &StandardBlock{
-		StandardBlock: statelessBlk,
-		commonBlock: &commonBlock{
-			Manager: manager,
-			baseBlk: &statelessBlk.CommonBlock,
-		},
-	}
+// 	return sb, nil
+// }
 
-	for _, tx := range sb.Txs {
-		tx.Unsigned.InitCtx(ctx)
-	}
+// // conflicts checks to see if the provided input set contains any conflicts with
+// // any of this block's non-accepted ancestors or itself.
+// func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
+// 	return sb.conflictsStandardBlock(sb, s)
+// }
 
-	return sb, nil
-}
+// func (sb *StandardBlock) Verify() error {
+// 	return sb.VerifyStandardBlock(sb.StandardBlock)
+// }
 
-// conflicts checks to see if the provided input set contains any conflicts with
-// any of this block's non-accepted ancestors or itself.
-func (sb *StandardBlock) conflicts(s ids.Set) (bool, error) {
-	return sb.conflictsStandardBlock(sb, s)
-}
+// func (sb *StandardBlock) Accept() error {
+// 	return sb.AcceptStandardBlock(sb.StandardBlock)
+// }
 
-func (sb *StandardBlock) Verify() error {
-	return sb.VerifyStandardBlock(sb.StandardBlock)
-}
+// func (sb *StandardBlock) Reject() error {
+// 	return sb.RejectStandardBlock(sb.StandardBlock)
+// }
 
-func (sb *StandardBlock) Accept() error {
-	return sb.AcceptStandardBlock(sb.StandardBlock)
-}
-
-func (sb *StandardBlock) Reject() error {
-	return sb.RejectStandardBlock(sb.StandardBlock)
-}
-
-func (sb *StandardBlock) setBaseState() {
-	sb.setBaseStateStandardBlock(sb)
-}
+// func (sb *StandardBlock) setBaseState() {
+// 	sb.setBaseStateStandardBlock(sb)
+// }

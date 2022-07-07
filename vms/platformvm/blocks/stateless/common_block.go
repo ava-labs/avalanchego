@@ -13,8 +13,13 @@ type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
 
-	id    ids.ID
-	bytes []byte
+	id            ids.ID
+	bytes         []byte
+	BlockVerifier // TODO set this field
+	BlockAcceptor // TODO set this field
+	BlockRejector // TODO set this field
+	Statuser      // TODO set this field
+	Timestamper   // TODO set this field
 }
 
 func (b *CommonBlock) Initialize(bytes []byte) error {

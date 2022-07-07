@@ -38,11 +38,37 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 
 func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
 
-func NewProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*ProposalBlock, error) {
+func (pb *ProposalBlock) Verify() error {
+	return pb.VerifyProposalBlock(pb)
+}
+
+func (pb *ProposalBlock) Accept() error {
+	return pb.AcceptProposalBlock(pb)
+}
+
+func (pb *ProposalBlock) Reject() error {
+	return pb.RejectProposalBlock(pb)
+}
+
+func NewProposalBlock(
+	parentID ids.ID,
+	height uint64,
+	tx *txs.Tx,
+	verifier BlockVerifier,
+	acceptor BlockAcceptor,
+	rejector BlockRejector,
+	statuser Statuser,
+	timestamper Timestamper,
+) (*ProposalBlock, error) {
 	res := &ProposalBlock{
 		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
+			BlockVerifier: verifier,
+			BlockAcceptor: acceptor,
+			BlockRejector: rejector,
+			Statuser:      statuser,
+			Timestamper:   timestamper,
+			PrntID:        parentID,
+			Hght:          height,
 		},
 		Tx: tx,
 	}

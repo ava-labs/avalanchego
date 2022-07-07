@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -388,12 +387,15 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
+	/* TODO fix
 	return stateful.MakeStateful(
 		statelessBlk,
 		vm.manager,
 		vm.ctx,
 		choices.Processing,
 	)
+	*/
+	return nil, errors.New("TODO")
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {

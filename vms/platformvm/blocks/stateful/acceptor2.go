@@ -73,16 +73,16 @@ func (a *acceptor2) AcceptAtomicBlock(b *stateless.AtomicBlock) error {
 		b.Parent(),
 	)
 
-	a.commonAccept(blockState, b.CommonBlock)
+	a.commonAccept(blockState, b)
 	a.AddStatelessBlock(b, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 
 	// Update the state of the chain in the database
-	//if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-	//	onAcceptState.Apply(a.getState())
-	//}
+	// if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+	// 	onAcceptState.Apply(a.getState())
+	// }
 	blockState.onAcceptState.Apply(a.getState())
 
 	defer a.state.Abort()
@@ -145,7 +145,7 @@ func (a *acceptor2) AcceptStandardBlock(b *stateless.StandardBlock) error {
 
 	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
-	a.commonAccept(blockState, b.CommonBlock)
+	a.commonAccept(blockState, b)
 	a.AddStatelessBlock(b, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
@@ -205,30 +205,27 @@ func (a *acceptor2) AcceptCommitBlock(b *stateless.CommitBlock) error {
 
 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
-	//parentIntf, err := a.parent(b.baseBlk)
-	//if err != nil {
-	//	return err
-	//}
-	//parent, ok := parentIntf.(*ProposalBlock)
-	//if !ok {
-	//	a.ctx.Log.Error("double decision block should only follow a proposal block")
-	//	return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	//}
-	parentIntf, err := a.GetStatefulBlock(b.Parent())
+	// parentIntf, err := a.parent(b.baseBlk)
+	// if err != nil {
+	// 	return err
+	// }
+	// parent, ok := parentIntf.(*ProposalBlock)
+	// if !ok {
+	// 	a.ctx.Log.Error("double decision block should only follow a proposal block")
+	// 	return fmt.Errorf("expected Proposal block but got %T", parentIntf)
+	// }
+	parentID := b.Parent()
+	parentState := a.blkIDToState[parentID]
+	parent, _, err := a.GetStatelessBlock(parentID)
 	if err != nil {
 		return err
 	}
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		a.ctx.Log.Error("double decision block should only follow a proposal block")
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
 	defer a.free(parent.ID())
 
-	a.commonAccept(nil, parent.CommonBlock) // TODO pass in parent state
-	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
+	a.commonAccept(parentState, parent)
+	a.AddStatelessBlock(parent, choices.Accepted)
 
-	a.commonAccept(blockState, b.CommonBlock)
+	a.commonAccept(blockState, b)
 	a.AddStatelessBlock(b, choices.Accepted)
 
 	// wasPreferred := a.blkIDToPreferCommit[blkID]
@@ -259,25 +256,18 @@ func (a *acceptor2) AcceptAbortBlock(b *stateless.AbortBlock) error {
 
 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
 
-	//parentIntf, err := a.parent(b.baseBlk)
-	//if err != nil {
-	//	return err
-	//}
-	parentIntf, err := a.GetStatefulBlock(b.Parent())
+	parentID := b.Parent()
+	parentState := a.blkIDToState[parentID]
+	parent, _, err := a.GetStatelessBlock(parentID)
 	if err != nil {
 		return err
 	}
-	parent, ok := parentIntf.(*ProposalBlock)
-	if !ok {
-		a.ctx.Log.Error("double decision block should only follow a proposal block")
-		return fmt.Errorf("expected Proposal block but got %T", parentIntf)
-	}
-	defer a.free(parent.ID())
+	defer a.free(parentID)
 
-	a.commonAccept(nil, parent.CommonBlock) // TODO pass in parent state
-	a.AddStatelessBlock(parent.ProposalBlock, choices.Accepted)
+	a.commonAccept(parentState, parent) // TODO pass in parent state
+	a.AddStatelessBlock(parent, choices.Accepted)
 
-	a.commonAccept(blockState, b.CommonBlock)
+	a.commonAccept(blockState, b)
 	a.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
@@ -308,9 +298,9 @@ func (a *acceptor2) updateStateOptionBlock(b stateless.CommonBlock) error {
 	}
 
 	// Update the state of the chain in the database
-	//if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-	//	onAcceptState.Apply(a.getState())
-	//}
+	// if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
+	// 	onAcceptState.Apply(a.getState())
+	// }
 	blockState.onAcceptState.Apply(a.getState())
 	if err := a.state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
@@ -334,7 +324,7 @@ func (a *acceptor2) updateStateOptionBlock(b stateless.CommonBlock) error {
 	return nil
 }
 
-func (a *acceptor2) commonAccept(blockState *stat, b stateless.CommonBlock) {
+func (a *acceptor2) commonAccept(blockState *stat, b stateless.Block) {
 	blkID := b.ID()
 	// a.blkIDToStatus[blkID] = choices.Accepted
 	blockState.status = choices.Accepted

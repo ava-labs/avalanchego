@@ -3,23 +3,26 @@
 
 package stateful
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+)
 
 var _ baseStateSetter = &baseStateSetterImpl{}
 
 type baseStateSetter interface {
-	setBaseStateProposalBlock(b *ProposalBlock)
-	setBaseStateAtomicBlock(b *AtomicBlock)
-	setBaseStateStandardBlock(b *StandardBlock)
-	setBaseStateCommitBlock(b *CommitBlock)
-	setBaseStateAbortBlock(b *AbortBlock)
+	setBaseStateProposalBlock(b *stateless.ProposalBlock)
+	setBaseStateAtomicBlock(b *stateless.AtomicBlock)
+	setBaseStateStandardBlock(b *stateless.StandardBlock)
+	setBaseStateCommitBlock(b *stateless.CommitBlock)
+	setBaseStateAbortBlock(b *stateless.AbortBlock)
 }
 
 type baseStateSetterImpl struct {
 	backend
 }
 
-func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *ProposalBlock) {
+func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *stateless.ProposalBlock) {
 	blockState, ok := s.blkIDToState[b.ID()]
 	if !ok {
 		return
@@ -34,19 +37,19 @@ func (s *baseStateSetterImpl) setBaseStateProposalBlock(b *ProposalBlock) {
 	// }
 }
 
-func (s *baseStateSetterImpl) setBaseStateAtomicBlock(b *AtomicBlock) {
+func (s *baseStateSetterImpl) setBaseStateAtomicBlock(b *stateless.AtomicBlock) {
 	s.setBaseStateCommon(b.ID())
 }
 
-func (s *baseStateSetterImpl) setBaseStateStandardBlock(b *StandardBlock) {
+func (s *baseStateSetterImpl) setBaseStateStandardBlock(b *stateless.StandardBlock) {
 	s.setBaseStateCommon(b.ID())
 }
 
-func (s *baseStateSetterImpl) setBaseStateCommitBlock(b *CommitBlock) {
+func (s *baseStateSetterImpl) setBaseStateCommitBlock(b *stateless.CommitBlock) {
 	s.setBaseStateCommon(b.ID())
 }
 
-func (s *baseStateSetterImpl) setBaseStateAbortBlock(b *AbortBlock) {
+func (s *baseStateSetterImpl) setBaseStateAbortBlock(b *stateless.AbortBlock) {
 	s.setBaseStateCommon(b.ID())
 }
 

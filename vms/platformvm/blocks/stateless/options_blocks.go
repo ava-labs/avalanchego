@@ -16,16 +16,45 @@ var (
 )
 
 type AbortBlock struct {
-	CommonBlock `serialize:"true"`
+	BlockVerifier // TODO set this field
+	BlockAcceptor // TODO set this field
+	BlockRejector // TODO set this field
+	Statuser      // TODO set
+	CommonBlock   `serialize:"true"`
 }
 
 func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
 
-func NewAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
+func (ab *AbortBlock) Verify() error {
+	return ab.VerifyAbortBlock(ab)
+}
+
+func (ab *AbortBlock) Accept() error {
+	return ab.AcceptAbortBlock(ab)
+}
+
+func (ab *AbortBlock) Reject() error {
+	return ab.RejectAbortBlock(ab)
+}
+
+func NewAbortBlock(
+	parentID ids.ID,
+	height uint64,
+	verifier BlockVerifier,
+	acceptor BlockAcceptor,
+	rejector BlockRejector,
+	statuser Statuser,
+	timestamper Timestamper,
+) (*AbortBlock, error) {
 	res := &AbortBlock{
 		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
+			BlockVerifier: verifier,
+			BlockAcceptor: acceptor,
+			BlockRejector: rejector,
+			Statuser:      statuser,
+			Timestamper:   timestamper,
+			PrntID:        parentID,
+			Hght:          height,
 		},
 	}
 
@@ -46,11 +75,36 @@ type CommitBlock struct {
 
 func (cb *CommitBlock) BlockTxs() []*txs.Tx { return nil }
 
-func NewCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
+func (cb *CommitBlock) Verify() error {
+	return cb.VerifyCommitBlock(cb)
+}
+
+func (cb *CommitBlock) Accept() error {
+	return cb.AcceptCommitBlock(cb)
+}
+
+func (cb *CommitBlock) Reject() error {
+	return cb.RejectCommitBlock(cb)
+}
+
+func NewCommitBlock(
+	parentID ids.ID,
+	height uint64,
+	verifier BlockVerifier,
+	acceptor BlockAcceptor,
+	rejector BlockRejector,
+	statuser Statuser,
+	timestamper Timestamper,
+) (*CommitBlock, error) {
 	res := &CommitBlock{
 		CommonBlock: CommonBlock{
-			PrntID: parentID,
-			Hght:   height,
+			BlockVerifier: verifier,
+			BlockAcceptor: acceptor,
+			BlockRejector: rejector,
+			Statuser:      statuser,
+			Timestamper:   timestamper,
+			PrntID:        parentID,
+			Hght:          height,
 		},
 	}
 

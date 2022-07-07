@@ -4,7 +4,7 @@
 package stateful
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -14,27 +14,28 @@ import (
 
 var _ blockState = &blockStateImpl{}
 
-func MakeStateful(
-	statelessBlk stateless.Block,
-	manager Manager,
-	ctx *snow.Context,
-	status choices.Status,
-) (Block, error) {
-	switch sb := statelessBlk.(type) {
-	case *stateless.AbortBlock:
-		return toStatefulAbortBlock(sb, manager, status)
-	case *stateless.AtomicBlock:
-		return toStatefulAtomicBlock(sb, manager, ctx, status)
-	case *stateless.CommitBlock:
-		return toStatefulCommitBlock(sb, manager, status)
-	case *stateless.ProposalBlock:
-		return toStatefulProposalBlock(sb, manager, ctx, status)
-	case *stateless.StandardBlock:
-		return toStatefulStandardBlock(sb, manager, ctx, status)
-	default:
-		return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)
-	}
-}
+// TODO remove
+// func MakeStateful(
+// 	statelessBlk stateless.Block,
+// 	manager Manager,
+// 	ctx *snow.Context,
+// 	status choices.Status,
+// ) (Block, error) {
+// 	switch sb := statelessBlk.(type) {
+// 	// case *stateless.AbortBlock:
+// 	// 	return toStatefulAbortBlock(sb, manager, status)
+// 	case *stateless.AtomicBlock:
+// 		return toStatefulAtomicBlock(sb, manager, ctx, status)
+// 	case *stateless.CommitBlock:
+// 		return toStatefulCommitBlock(sb, manager, status)
+// 	case *stateless.ProposalBlock:
+// 		return toStatefulProposalBlock(sb, manager, ctx, status)
+// 	case *stateless.StandardBlock:
+// 		return toStatefulStandardBlock(sb, manager, ctx, status)
+// 	default:
+// 		return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)
+// 	}
+// }
 
 type statelessBlockState interface {
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
@@ -71,13 +72,15 @@ func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, _ = statelessBlk, blkStatus
 
-	return MakeStateful(
-		statelessBlk,
-		b.manager,
-		b.ctx,
-		blkStatus,
-	)
+	// return MakeStateful(
+	// 	statelessBlk,
+	// 	b.manager,
+	// 	b.ctx,
+	// 	blkStatus,
+	// )
+	return nil, errors.New("TODO")
 }
 
 func (b *blockStateImpl) pinVerifiedBlock(blk Block) {

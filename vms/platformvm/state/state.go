@@ -1169,7 +1169,15 @@ func (s *state) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := stateless.NewCommitBlock(genesisID, 0)
+	genesisBlock, err := stateless.NewCommitBlock(
+		genesisID,
+		0,
+		nil, // TODO is it OK to pass in nil?
+		nil, // TODO is it OK to pass in nil?
+		nil, // TODO is it OK to pass in nil?
+		nil, // TODO is it OK to pass in nil?
+		nil, // TODO is it OK to pass in nil?
+	)
 	if err != nil {
 		return err
 	}
