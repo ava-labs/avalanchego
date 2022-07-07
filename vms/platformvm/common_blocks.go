@@ -249,8 +249,7 @@ type DoubleDecisionBlock struct {
 }
 
 func (ddb *DoubleDecisionBlock) Accept() error {
-	blkID := ddb.ID()
-	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", blkID)
+	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 
 	parentIntf, err := ddb.parentBlock()
 	if err != nil {
