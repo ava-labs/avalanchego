@@ -100,31 +100,8 @@ type Block interface {
 	// provides the more specific Block interface.
 	parentBlock() (Block, error)
 
-	// addChild notifies this block that it has a child block building on it.
-	// When this block commits its changes, it should set the child's base state
-	// to the internal state. This ensures that the state versions do not
-	// recurse the length of the chain.
-	addChild(Block)
-
 	// free all the references of this block from the vm's memory
 	free()
-
-	// Set the block's underlying state to the chain's internal state
-	setBaseState()
-}
-
-// A decision block (either Commit, Abort, or DecisionBlock.) represents a
-// decision to either commit (accept) or abort (reject) the changes specified in
-// its parent, if its parent is a proposal. Otherwise, the changes are committed
-// immediately.
-type decision interface {
-	// This function should only be called after Verify is called.
-	// onAccept returns:
-	// 1) The current state of the chain, if this block is decided or hasn't
-	//    been verified.
-	// 2) The state of the chain after this block is accepted, if this block was
-	//    verified successfully.
-	onAccept() state.Chain
 }
 
 // CommonBlock contains fields and methods common to all blocks in this VM.
@@ -138,9 +115,6 @@ type CommonBlock struct {
 	timestamp time.Time // Time this block was proposed at
 	status    choices.Status
 	vm        *VM
-
-	// This block's children
-	children []Block
 }
 
 func (b *CommonBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
@@ -183,13 +157,8 @@ func (b *CommonBlock) parentBlock() (Block, error) {
 	return b.vm.getBlock(b.Parent())
 }
 
-func (b *CommonBlock) addChild(child Block) {
-	b.children = append(b.children, child)
-}
-
 func (b *CommonBlock) free() {
 	delete(b.vm.currentBlocks, b.ID())
-	b.children = nil
 }
 
 func (b *CommonBlock) conflicts(s ids.Set) (bool, error) {
@@ -238,6 +207,10 @@ func (b *CommonBlock) Accept() error {
 	b.vm.internalState.AddBlock(b.self)
 	b.vm.internalState.SetLastAccepted(blkID)
 	b.vm.internalState.SetHeight(b.Hght)
+
+	b.vm.stateVersions.DeleteState(b.Parent())
+	b.vm.stateVersions.SetState(blkID, b.vm.internalState)
+
 	b.vm.lastAcceptedID = blkID
 	b.vm.recentlyAccepted.Add(blkID)
 	return b.vm.metrics.AcceptBlock(b.self)
@@ -259,19 +232,10 @@ func (cdb *CommonDecisionBlock) free() {
 	cdb.onAcceptState = nil
 }
 
-func (cdb *CommonDecisionBlock) setBaseState() {
-	cdb.onAcceptState.SetBase(cdb.vm.internalState)
-}
-
-func (cdb *CommonDecisionBlock) onAccept() state.Chain {
-	if cdb.Status().Decided() || cdb.onAcceptState == nil {
-		return cdb.vm.internalState
-	}
-	return cdb.onAcceptState
-}
-
 func (cdb *CommonDecisionBlock) Reject() error {
 	defer cdb.free()
+
+	cdb.vm.stateVersions.DeleteState(cdb.ID())
 
 	cdb.status = choices.Rejected
 	// TODO: don't write rejected blocks to disk
@@ -312,9 +276,6 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 
-	for _, child := range ddb.children {
-		child.setBaseState()
-	}
 	if ddb.onAcceptFunc != nil {
 		ddb.onAcceptFunc()
 	}

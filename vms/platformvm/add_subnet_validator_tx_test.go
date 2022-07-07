@@ -176,9 +176,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -205,9 +206,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -257,9 +259,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -295,9 +298,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -322,9 +326,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -349,9 +354,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -379,9 +385,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -432,9 +439,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          duplicateSubnetTx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -466,9 +474,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -499,9 +508,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -531,9 +541,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -567,9 +578,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

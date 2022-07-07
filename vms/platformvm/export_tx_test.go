@@ -65,25 +65,23 @@ func TestNewExportTx(t *testing.T) {
 			}
 			assert.NoError(err)
 
-			// Get the preferred block (which we want to build off)
-			preferred, err := vm.Preferred()
-			assert.NoError(err)
-
-			preferredDecision, ok := preferred.(decision)
-			assert.True(ok)
-
-			preferredState := preferredDecision.onAccept()
-			fakedState := state.NewDiff(
-				preferredState,
-				preferredState.CurrentStakers(),
-				preferredState.PendingStakers(),
+			fakeState, err := state.NewDiff(
+				vm.preferred,
+				vm.stateVersions,
 			)
-			fakedState.SetTimestamp(tt.timestamp)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fakeState.SetTimestamp(tt.timestamp)
+
+			fakeBlockID := ids.GenerateTestID()
+			vm.stateVersions.SetState(fakeBlockID, fakeState)
 
 			verifier := mempoolTxVerifier{
-				vm:          vm,
-				parentState: fakedState,
-				tx:          tx,
+				vm:            vm,
+				parentID:      fakeBlockID,
+				stateVersions: vm.stateVersions,
+				tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

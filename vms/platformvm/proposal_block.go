@@ -90,11 +90,6 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	return nil
 }
 
-func (pb *ProposalBlock) setBaseState() {
-	pb.onCommitState.SetBase(pb.vm.internalState)
-	pb.onAbortState.SetBase(pb.vm.internalState)
-}
-
 // Verify this block is valid.
 //
 // The parent block must either be a Commit or an Abort block.
@@ -107,24 +102,11 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, parentErr := pb.parentBlock()
-	if parentErr != nil {
-		return parentErr
-	}
-
-	// The parent of a proposal block (ie this block) must be a decision block
-	parent, ok := parentIntf.(decision)
-	if !ok {
-		return errInvalidBlockType
-	}
-
-	// parentState is the state if this block's parent is accepted
-	parentState := parent.onAccept()
-
 	executor := proposalTxExecutor{
-		vm:          pb.vm,
-		parentState: parentState,
-		tx:          pb.Tx,
+		vm:            pb.vm,
+		parentID:      pb.PrntID,
+		stateVersions: pb.vm.stateVersions,
+		tx:            pb.Tx,
 	}
 	err := pb.Tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -140,11 +122,12 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onCommitState.AddTx(pb.Tx, status.Committed)
 	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
 
-	pb.timestamp = parentState.GetTimestamp()
+	// It is safe to use [pb.onAbortState] here because the timestamp will never
+	// be modified by an Abort block.
+	pb.timestamp = pb.onAbortState.GetTimestamp()
 
 	pb.vm.blockBuilder.RemoveProposalTx(pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
-	parentIntf.addChild(pb)
 	return nil
 }
 

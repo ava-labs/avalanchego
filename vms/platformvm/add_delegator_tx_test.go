@@ -340,9 +340,10 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			}
 
 			executor := proposalTxExecutor{
-				vm:          vm,
-				parentState: vm.internalState,
-				tx:          tx,
+				vm:            vm,
+				parentID:      vm.preferred,
+				stateVersions: vm.stateVersions,
+				tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
@@ -396,12 +397,18 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
 
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
 	vm.clock.Set(validatorStartTime)
 
 	firstAdvanceTimeBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, firstAdvanceTimeBlock)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
 
 	firstDelegatorStartTime := validatorStartTime.Add(syncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -427,12 +434,18 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
 
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
 	vm.clock.Set(firstDelegatorStartTime)
 
 	secondAdvanceTimeBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, secondAdvanceTimeBlock)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -459,6 +472,9 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -562,6 +578,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
 
+			err = vm.SetPreference(vm.lastAcceptedID)
+			assert.NoError(err)
+
 			// create valid tx
 			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 				delegator1Stake,
@@ -583,6 +602,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
+
+			err = vm.SetPreference(vm.lastAcceptedID)
+			assert.NoError(err)
 
 			// create valid tx
 			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -606,6 +628,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
 
+			err = vm.SetPreference(vm.lastAcceptedID)
+			assert.NoError(err)
+
 			// create valid tx
 			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
 				delegator3Stake,
@@ -627,6 +652,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addThirdDelegatorBlock)
+
+			err = vm.SetPreference(vm.lastAcceptedID)
+			assert.NoError(err)
 
 			// create valid tx
 			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -655,6 +683,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, addFourthDelegatorBlock)
+
+			err = vm.SetPreference(vm.lastAcceptedID)
+			assert.NoError(err)
 		})
 	}
 }

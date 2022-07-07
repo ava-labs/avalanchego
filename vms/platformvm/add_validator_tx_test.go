@@ -208,9 +208,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -235,9 +236,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -262,9 +264,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -303,9 +306,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -339,9 +343,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

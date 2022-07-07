@@ -186,14 +186,17 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
+	state, err := state.NewDiff(
+		vm.preferred,
+		vm.stateVersions,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewDiff(
-			vm.internalState,
-			vm.internalState.CurrentStakers(),
-			vm.internalState.PendingStakers(),
-		),
-		tx: tx,
+		vm:    vm,
+		state: state,
+		tx:    tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -239,14 +242,17 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
+	state, err := state.NewDiff(
+		vm.preferred,
+		vm.stateVersions,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewDiff(
-			vm.internalState,
-			vm.internalState.CurrentStakers(),
-			vm.internalState.PendingStakers(),
-		),
-		tx: tx,
+		vm:    vm,
+		state: state,
+		tx:    tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -281,14 +287,17 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
+	state, err := state.NewDiff(
+		vm.preferred,
+		vm.stateVersions,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewDiff(
-			vm.internalState,
-			vm.internalState.CurrentStakers(),
-			vm.internalState.PendingStakers(),
-		),
-		tx: tx,
+		vm:    vm,
+		state: state,
+		tx:    tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -321,14 +330,17 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	state, err := state.NewDiff(
+		vm.preferred,
+		vm.stateVersions,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	executor := standardTxExecutor{
-		vm: vm,
-		state: state.NewDiff(
-			vm.internalState,
-			vm.internalState.CurrentStakers(),
-			vm.internalState.PendingStakers(),
-		),
-		tx: tx,
+		vm:    vm,
+		state: state,
+		tx:    tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -402,11 +414,13 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			state := state.NewDiff(
-				vm.internalState,
-				vm.internalState.CurrentStakers(),
-				vm.internalState.PendingStakers(),
+			state, err := state.NewDiff(
+				vm.preferred,
+				vm.stateVersions,
 			)
+			if err != nil {
+				t.Fatal(err)
+			}
 			state.SetTimestamp(test.time)
 
 			executor := standardTxExecutor{
