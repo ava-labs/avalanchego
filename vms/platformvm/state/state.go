@@ -1369,7 +1369,7 @@ func (s *state) writeUTXOs() error {
 			}
 			continue
 		}
-		if err := s.utxoState.PutUTXO(utxoID, utxo); err != nil {
+		if err := s.utxoState.PutUTXO(utxo); err != nil {
 			return fmt.Errorf("failed to add UTXO: %w", err)
 		}
 	}

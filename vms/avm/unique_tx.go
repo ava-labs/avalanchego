@@ -160,9 +160,8 @@ func (tx *UniqueTx) Accept() error {
 	}
 	// Add new utxos
 	for _, utxo := range outputUTXOs {
-		utxoID := utxo.InputID()
-		if err := tx.vm.state.PutUTXO(utxoID, utxo); err != nil {
-			return fmt.Errorf("couldn't put UTXO %s: %w", utxoID, err)
+		if err := tx.vm.state.PutUTXO(utxo); err != nil {
+			return fmt.Errorf("couldn't put UTXO %s: %w", utxo.InputID(), err)
 		}
 	}
 
