@@ -52,6 +52,7 @@ type Mempool interface {
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
+	Remove(txs []*txs.Tx)
 
 	HasDecisionTxs() bool
 	HasProposalTx() bool
@@ -220,6 +221,19 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 	return m.unissuedProposalTxs.Get(txID)
 }
 
+func (m *mempool) Remove(txes []*txs.Tx) {
+	for _, tx := range txes {
+		switch tx.Unsigned.(type) {
+		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
+			m.RemoveProposalTx(tx)
+		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
+			m.RemoveDecisionTxs([]*txs.Tx{tx})
+		default:
+			// nothing to remove here
+		}
+	}
+}
+
 func (m *mempool) addDecisionTx(tx *txs.Tx) {
 	m.unissuedDecisionTxs.Add(tx)
 	m.register(tx)
@@ -268,17 +282,19 @@ func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*txs.Tx {
 }
 
 func (m *mempool) PeekDecisionTxs(maxTxsBytes int) []*txs.Tx {
-	fullList := m.unissuedDecisionTxs.List()
-	res := make([]*txs.Tx, 0, cap(fullList))
-	totalBytes := 0
-	for _, tx := range fullList {
+	list := m.unissuedDecisionTxs.List()
+
+	totalBytes, txsToKeep := 0, 0
+	for _, tx := range list {
 		totalBytes += len(tx.Bytes())
 		if totalBytes > maxTxsBytes {
-			return res
+			break
 		}
-		res = append(res, tx)
+		txsToKeep++
 	}
-	return res
+
+	list = list[:txsToKeep]
+	return list
 }
 
 func (m *mempool) PeekProposalTx() *txs.Tx {

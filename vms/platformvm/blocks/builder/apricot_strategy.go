@@ -37,11 +37,13 @@ func (a *apricotStrategy) hasContent() (bool, error) {
 	return len(a.txes) == 0, nil
 }
 
+// Note: selectBlockContent will only peek into mempool and must not
+// remove any transactions. It's up to the caller to cleanup the mempool
+// if it must
 func (a *apricotStrategy) selectBlockContent() error {
 	// try including as many standard txs as possible. No need to advance chain time
 	if a.HasDecisionTxs() {
-		txs := a.PeekDecisionTxs(TargetBlockSize)
-		a.txes = txs
+		a.txes = a.PeekDecisionTxs(TargetBlockSize)
 		return nil
 	}
 
@@ -87,7 +89,6 @@ func (a *apricotStrategy) trySelectMempoolProposalTx() ([]*txs.Tx, error) {
 		a.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return []*txs.Tx{}, errNoPendingBlocks
 	}
-
 	tx := a.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
@@ -113,20 +114,8 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		return nil, err
 	}
 
-	// remove selected transactions from mempool
-	for _, tx := range a.txes {
-		switch tx.Unsigned.(type) {
-		case *txs.RewardValidatorTx, *txs.AdvanceTimeTx:
-			// nothing to do, these tx is generated
-			// just in time, not picked from mempool
-		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-			a.Mempool.RemoveProposalTx(tx)
-		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-			a.Mempool.RemoveDecisionTxs([]*txs.Tx{tx})
-		default:
-			return nil, fmt.Errorf("unhandled tx type %T, could not remove from mempool", tx.Unsigned)
-		}
-	}
+	// remove selected txs from mempool
+	a.Mempool.Remove(a.txes)
 
 	ctx := a.blockBuilder.txExecutorBackend.Ctx
 	switch a.txes[0].Unsigned.(type) {

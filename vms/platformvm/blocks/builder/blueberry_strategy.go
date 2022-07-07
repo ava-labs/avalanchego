@@ -55,8 +55,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 
 	// try including as many standard txs as possible. No need to advance chain time
 	if b.HasDecisionTxs() {
-		txs := b.PeekDecisionTxs(TargetBlockSize)
-		b.txes = txs
+		b.txes = b.PeekDecisionTxs(TargetBlockSize)
 		b.blkTime = blkTime
 		return nil
 	}
@@ -96,7 +95,6 @@ func (b *blueberryStrategy) selectBlockContent() error {
 		b.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return errNoPendingBlocks
 	}
-
 	tx := b.PeekProposalTx()
 
 	// if the chain timestamp is too far in the past to issue this transaction
@@ -121,20 +119,8 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		return nil, err
 	}
 
-	// remove selected transactions from mempool
-	for _, tx := range b.txes {
-		switch tx.Unsigned.(type) {
-		case *txs.RewardValidatorTx:
-			// nothing to do, these tx is generated
-			// just in time, not picked from mempool
-		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-			b.Mempool.RemoveProposalTx(tx)
-		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-			b.Mempool.RemoveDecisionTxs([]*txs.Tx{tx})
-		default:
-			return nil, fmt.Errorf("unhandled tx type %T, could not remove from mempool", tx.Unsigned)
-		}
-	}
+	// remove selected txs from mempool
+	b.Mempool.Remove(b.txes)
 
 	ctx := b.blockBuilder.txExecutorBackend.Ctx
 	if len(b.txes) == 0 {
