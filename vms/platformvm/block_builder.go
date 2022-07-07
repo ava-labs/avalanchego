@@ -94,26 +94,13 @@ func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	// Get the preferred block (which we want to build off)
-	preferred, err := m.vm.Preferred()
-	if err != nil {
-		return fmt.Errorf("couldn't get preferred block: %w", err)
-	}
-
-	preferredDecision, ok := preferred.(decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return errInvalidBlockType
-	}
-
-	preferredState := preferredDecision.onAccept()
 	verifier := mempoolTxVerifier{
-		vm:          m.vm,
-		parentState: preferredState,
-		tx:          tx,
+		vm:            m.vm,
+		parentID:      m.vm.preferred, // We want to build off of the preferred block
+		stateVersions: m.vm.stateVersions,
+		tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&verifier)
-	if err != nil {
+	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		m.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -159,12 +146,12 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	preferredDecision, ok := preferred.(decision)
+
+	preferredState, ok := m.vm.stateVersions.GetState(preferredID)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, errInvalidBlockType
 	}
-	preferredState := preferredDecision.onAccept()
 
 	// Try building a standard block.
 	if m.HasDecisionTxs() {
@@ -234,17 +221,12 @@ func (m *blockBuilder) ResetTimer() {
 		return
 	}
 
-	preferred, err := m.vm.Preferred()
-	if err != nil {
-		return
-	}
-	preferredDecision, ok := preferred.(decision)
+	preferredState, ok := m.vm.stateVersions.GetState(m.vm.preferred)
 	if !ok {
 		// The preferred block should always be a decision block
-		m.vm.ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
+		m.vm.ctx.Log.Error("the preferred block %q should be a decision block", m.vm.preferred)
 		return
 	}
-	preferredState := preferredDecision.onAccept()
 
 	_, shouldReward, err := m.getStakerToReward(preferredState)
 	if err != nil {

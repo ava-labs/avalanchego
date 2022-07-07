@@ -39,9 +39,10 @@ var (
 
 type proposalTxExecutor struct {
 	// inputs
-	vm          *VM
-	parentState state.Chain
-	tx          *txs.Tx
+	vm            *VM
+	parentID      ids.ID
+	stateVersions state.Versions
+	tx            *txs.Tx
 
 	// outputs
 	onCommit      state.Diff
@@ -85,15 +86,20 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return errStakeTooLong
 	}
 
-	currentStakers := e.parentState.CurrentStakers()
-	pendingStakers := e.parentState.PendingStakers()
+	parentState, ok := e.stateVersions.GetState(e.parentID)
+	if !ok {
+		return errInvalidBlockType
+	}
+
+	currentStakers := parentState.CurrentStakers()
+	pendingStakers := parentState.PendingStakers()
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	if e.vm.bootstrapped.GetValue() {
-		currentTimestamp := e.parentState.GetTimestamp()
+		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()
 		if !currentTimestamp.Before(startTime) {
@@ -139,7 +145,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		// Verify the flowcheck
 		if err := e.vm.utxoHandler.SemanticVerifySpend(
 			tx,
-			e.parentState,
+			parentState,
 			tx.Ins,
 			outs,
 			e.tx.Creds,
@@ -162,7 +168,16 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewDiff(e.parentState, currentStakers, newlyPendingStakers)
+	onCommit, err := state.NewDiffWithValidators(
+		e.parentID,
+		e.vm.stateVersions,
+		currentStakers,
+		newlyPendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+	e.onCommit = onCommit
 
 	// Consume the UTXOS
 	utxo.Consume(e.onCommit, tx.Ins)
@@ -170,7 +185,17 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
+	onAbort, err := state.NewDiffWithValidators(
+		e.parentID,
+		e.vm.stateVersions,
+		currentStakers,
+		pendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+	e.onAbort = onAbort
+
 	// Consume the UTXOS
 	utxo.Consume(e.onAbort, tx.Ins)
 	// Produce the UTXOS
@@ -201,11 +226,16 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakers := e.parentState.CurrentStakers()
-	pendingStakers := e.parentState.PendingStakers()
+	parentState, ok := e.stateVersions.GetState(e.parentID)
+	if !ok {
+		return errInvalidBlockType
+	}
+
+	currentStakers := parentState.CurrentStakers()
+	pendingStakers := parentState.PendingStakers()
 
 	if e.vm.bootstrapped.GetValue() {
-		currentTimestamp := e.parentState.GetTimestamp()
+		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
@@ -275,7 +305,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		baseTxCreds := e.tx.Creds[:baseTxCredsLen]
 		subnetCred := e.tx.Creds[baseTxCredsLen]
 
-		subnetIntf, _, err := e.parentState.GetTx(tx.Validator.Subnet)
+		subnetIntf, _, err := parentState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			if err == database.ErrNotFound {
 				return errValidatorSubset
@@ -302,7 +332,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		// Verify the flowcheck
 		if err := e.vm.utxoHandler.SemanticVerifySpend(
 			tx,
-			e.parentState,
+			parentState,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
@@ -325,7 +355,16 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewDiff(e.parentState, currentStakers, newlyPendingStakers)
+	onCommit, err := state.NewDiffWithValidators(
+		e.parentID,
+		e.stateVersions,
+		currentStakers,
+		newlyPendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+	e.onCommit = onCommit
 
 	// Consume the UTXOS
 	utxo.Consume(e.onCommit, tx.Ins)
@@ -333,7 +372,17 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
+	onAbort, err := state.NewDiffWithValidators(
+		e.parentID,
+		e.stateVersions,
+		currentStakers,
+		pendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+	e.onAbort = onAbort
+
 	// Consume the UTXOS
 	utxo.Consume(e.onAbort, tx.Ins)
 	// Produce the UTXOS
@@ -368,11 +417,16 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	currentStakers := e.parentState.CurrentStakers()
-	pendingStakers := e.parentState.PendingStakers()
+	parentState, ok := e.stateVersions.GetState(e.parentID)
+	if !ok {
+		return errInvalidBlockType
+	}
+
+	currentStakers := parentState.CurrentStakers()
+	pendingStakers := parentState.PendingStakers()
 
 	if e.vm.bootstrapped.GetValue() {
-		currentTimestamp := e.parentState.GetTimestamp()
+		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
@@ -462,7 +516,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		// Verify the flowcheck
 		if err := e.vm.utxoHandler.SemanticVerifySpend(
 			tx,
-			e.parentState,
+			parentState,
 			tx.Ins,
 			outs,
 			e.tx.Creds,
@@ -485,7 +539,16 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	// Set up the state if this tx is committed
 	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	e.onCommit = state.NewDiff(e.parentState, currentStakers, newlyPendingStakers)
+	onCommit, err := state.NewDiffWithValidators(
+		e.parentID,
+		e.stateVersions,
+		currentStakers,
+		newlyPendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+	e.onCommit = onCommit
 
 	// Consume the UTXOS
 	utxo.Consume(e.onCommit, tx.Ins)
@@ -493,7 +556,17 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
 	// Set up the state if this tx is aborted
-	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
+	onAbort, err := state.NewDiffWithValidators(
+		e.parentID,
+		e.stateVersions,
+		currentStakers,
+		pendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+	e.onAbort = onAbort
+
 	// Consume the UTXOS
 	utxo.Consume(e.onAbort, tx.Ins)
 	// Produce the UTXOS
@@ -522,7 +595,12 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	if chainTimestamp := e.parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
+	parentState, ok := e.stateVersions.GetState(e.parentID)
+	if !ok {
+		return errInvalidBlockType
+	}
+
+	if chainTimestamp := parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
 		return fmt.Errorf(
 			"proposed timestamp (%s), not after current timestamp (%s)",
 			txTimestamp,
@@ -532,7 +610,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := e.parentState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := parentState.GetNextStakerChangeTime()
 	if err != nil {
 		return err
 	}
@@ -545,9 +623,9 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	currentSupply := e.parentState.GetCurrentSupply()
+	currentSupply := parentState.GetCurrentSupply()
 
-	pendingStakers := e.parentState.PendingStakers()
+	pendingStakers := parentState.PendingStakers()
 	toAddValidatorsWithRewardToCurrent := []*state.ValidatorReward(nil)
 	toAddDelegatorsWithRewardToCurrent := []*state.ValidatorReward(nil)
 	toAddWithoutRewardToCurrent := []*txs.Tx(nil)
@@ -616,7 +694,7 @@ pendingStakerLoop:
 	}
 	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
 
-	currentStakers := e.parentState.CurrentStakers()
+	currentStakers := parentState.CurrentStakers()
 	numToRemoveFromCurrent := 0
 
 	// Remove from the staker set any subnet validators whose endTime is at or
@@ -647,12 +725,29 @@ currentStakerLoop:
 		return err
 	}
 
-	e.onCommit = state.NewDiff(e.parentState, newlyCurrentStakers, newlyPendingStakers)
+	e.onCommit, err = state.NewDiffWithValidators(
+		e.parentID,
+		e.stateVersions,
+		newlyCurrentStakers,
+		newlyPendingStakers,
+	)
+	if err != nil {
+		return err
+	}
+
 	e.onCommit.SetTimestamp(txTimestamp)
 	e.onCommit.SetCurrentSupply(currentSupply)
 
 	// State doesn't change if this proposal is aborted
-	e.onAbort = state.NewDiff(e.parentState, currentStakers, pendingStakers)
+	e.onAbort, err = state.NewDiffWithValidators(
+		e.parentID,
+		e.stateVersions,
+		currentStakers,
+		pendingStakers,
+	)
+	if err != nil {
+		return err
+	}
 
 	e.prefersCommit = !txTimestamp.After(localTimestampPlusSync)
 	return nil
@@ -668,7 +763,12 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakers := e.parentState.CurrentStakers()
+	parentState, ok := e.stateVersions.GetState(e.parentID)
+	if !ok {
+		return errInvalidBlockType
+	}
+
+	currentStakers := parentState.CurrentStakers()
 	stakerTx, stakerReward, err := currentStakers.GetNextStaker()
 	if err == database.ErrNotFound {
 		return fmt.Errorf("failed to get next staker stop time: %w", err)
@@ -687,7 +787,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
-	currentTime := e.parentState.GetTimestamp()
+	currentTime := parentState.GetTimestamp()
 	staker, ok := stakerTx.Unsigned.(txs.StakerTx)
 	if !ok {
 		return errWrongTxType
@@ -705,9 +805,16 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	pendingStakers := e.parentState.PendingStakers()
-	e.onCommit = state.NewDiff(e.parentState, newlyCurrentStakers, pendingStakers)
-	e.onAbort = state.NewDiff(e.parentState, newlyCurrentStakers, pendingStakers)
+	pendingStakers := parentState.PendingStakers()
+	e.onCommit, err = state.NewDiffWithValidators(e.parentID, e.vm.stateVersions, newlyCurrentStakers, pendingStakers)
+	if err != nil {
+		return err
+	}
+
+	e.onAbort, err = state.NewDiffWithValidators(e.parentID, e.vm.stateVersions, newlyCurrentStakers, pendingStakers)
+	if err != nil {
+		return err
+	}
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := e.onAbort.GetCurrentSupply()

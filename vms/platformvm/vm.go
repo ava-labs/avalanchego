@@ -90,6 +90,7 @@ type VM struct {
 
 	internalState InternalState
 	utxoHandler   utxo.Handler
+	stateVersions state.Versions
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -177,6 +178,11 @@ func (vm *VM) Initialize(
 	vm.internalState = is
 	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 
+	vm.lastAcceptedID = is.GetLastAccepted()
+	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
+
+	vm.stateVersions = state.NewVersions(vm.lastAcceptedID, is)
+
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
@@ -213,9 +219,6 @@ func (vm *VM) Initialize(
 		vm.AtomicUTXOManager,
 		vm.utxoHandler,
 	)
-
-	vm.lastAcceptedID = is.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
 
 	// Build off the most recently accepted block
 	return vm.SetPreference(vm.lastAcceptedID)

@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -13,9 +14,10 @@ import (
 var _ txs.Visitor = &mempoolTxVerifier{}
 
 type mempoolTxVerifier struct {
-	vm          *VM
-	parentState state.Chain
-	tx          *txs.Tx
+	vm            *VM
+	parentID      ids.ID
+	stateVersions state.Versions
+	tx            *txs.Tx
 }
 
 func (*mempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
@@ -57,9 +59,10 @@ func (v *mempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	}
 
 	executor := proposalTxExecutor{
-		vm:          v.vm,
-		parentState: v.parentState,
-		tx:          v.tx,
+		vm:            v.vm,
+		parentID:      v.parentID,
+		stateVersions: v.stateVersions,
+		tx:            v.tx,
 	}
 	err := tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
@@ -71,14 +74,18 @@ func (v *mempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 }
 
 func (v *mempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
+	state, err := state.NewDiff(
+		v.parentID,
+		v.stateVersions,
+	)
+	if err != nil {
+		return err
+	}
+
 	executor := standardTxExecutor{
-		vm: v.vm,
-		state: state.NewDiff(
-			v.parentState,
-			v.parentState.CurrentStakers(),
-			v.parentState.PendingStakers(),
-		),
-		tx: v.tx,
+		vm:    v.vm,
+		state: state,
+		tx:    v.tx,
 	}
 	return tx.Visit(&executor)
 }

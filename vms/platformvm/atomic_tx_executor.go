@@ -16,9 +16,10 @@ var _ txs.Visitor = &atomicTxExecutor{}
 // the execution was moved to be performed inside of the standardTxExecutor.
 type atomicTxExecutor struct {
 	// inputs
-	vm          *VM
-	parentState state.Chain
-	tx          *txs.Tx
+	vm            *VM
+	parentID      ids.ID
+	stateVersions state.Versions
+	tx            *txs.Tx
 
 	// outputs
 	onAccept       state.Diff
@@ -43,17 +44,21 @@ func (e *atomicTxExecutor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (e *atomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
-	e.onAccept = state.NewDiff(
-		e.parentState,
-		e.parentState.CurrentStakers(),
-		e.parentState.PendingStakers(),
+	onAccept, err := state.NewDiff(
+		e.parentID,
+		e.stateVersions,
 	)
+	if err != nil {
+		return err
+	}
+	e.onAccept = onAccept
+
 	executor := standardTxExecutor{
 		vm:    e.vm,
 		state: e.onAccept,
 		tx:    e.tx,
 	}
-	err := tx.Visit(&executor)
+	err = tx.Visit(&executor)
 	e.inputs = executor.inputs
 	e.atomicRequests = executor.atomicRequests
 	return err

@@ -75,11 +75,13 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
-			state := state.NewDiff(
-				vm.internalState,
-				vm.internalState.CurrentStakers(),
-				vm.internalState.PendingStakers(),
+			state, err := state.NewDiff(
+				vm.preferred,
+				vm.stateVersions,
 			)
+			if err != nil {
+				t.Fatal(err)
+			}
 			state.SetTimestamp(test.time)
 
 			executor := standardTxExecutor{

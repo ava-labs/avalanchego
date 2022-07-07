@@ -377,13 +377,22 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	)
 	if err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	}
+	if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	}
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
 		panic(err)
-	} else if err := blk.Verify(); err != nil {
+	}
+	if err := blk.Verify(); err != nil {
 		panic(err)
-	} else if err := blk.Accept(); err != nil {
+	}
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		panic(err)
+	}
+	if err := blk.Accept(); err != nil {
 		panic(err)
 	}
 
@@ -860,7 +869,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -941,7 +950,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAccept().GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := commit.onAcceptState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1005,7 +1014,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1015,6 +1024,9 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
 	}
 
 	// Verify that chain's timestamp has advanced
@@ -1046,7 +1058,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1101,7 +1113,7 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1113,6 +1125,9 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
 	}
 
 	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
@@ -1132,7 +1147,7 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := commit.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1187,7 +1202,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1199,6 +1214,9 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
 	}
 
 	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
@@ -1218,7 +1236,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := commit.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1346,6 +1364,9 @@ func TestCreateSubnet(t *testing.T) {
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
+	}
 
 	subnets, err := vm.internalState.GetSubnets()
 	if err != nil {
@@ -1406,7 +1427,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1416,6 +1437,9 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
 	}
 
 	pendingStakers := vm.internalState.PendingStakers()
@@ -1454,7 +1478,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1464,6 +1488,9 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
 	}
 
 	pendingStakers = vm.internalState.PendingStakers()
@@ -1510,7 +1537,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
+	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Aborted {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
@@ -1520,6 +1547,9 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+		t.Fatal(err)
 	}
 
 	pendingStakers = vm.internalState.PendingStakers()
@@ -2551,7 +2581,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that the new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit.onAccept()
+		onAccept := addValidatorProposalCommit.onAcceptState
 		pendingStakers := onAccept.PendingStakers()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID)
@@ -2778,7 +2808,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that first new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit0.onAccept()
+		onAccept := addValidatorProposalCommit0.onAcceptState
 		pendingStakers := onAccept.PendingStakers()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
@@ -2817,7 +2847,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the first new validator is now in the current validator set.
 	{
-		onAccept := advanceTimeProposalCommit0.onAccept()
+		onAccept := advanceTimeProposalCommit0.onAcceptState
 		currentStakers := onAccept.CurrentStakers()
 		_, err = currentStakers.GetValidator(nodeID0)
 		assert.NoError(err)
@@ -2962,7 +2992,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit1.onAccept()
+		onAccept := addValidatorProposalCommit1.onAcceptState
 		pendingStakers := onAccept.PendingStakers()
 
 		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
@@ -3001,7 +3031,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator is now in the current validator set.
 	{
-		onAccept := advanceTimeProposalCommit1.onAccept()
+		onAccept := advanceTimeProposalCommit1.onAcceptState
 		currentStakers := onAccept.CurrentStakers()
 		_, err := currentStakers.GetValidator(nodeID1)
 		assert.NoError(err)

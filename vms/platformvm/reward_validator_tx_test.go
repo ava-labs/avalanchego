@@ -54,9 +54,10 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -75,9 +76,10 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -92,9 +94,10 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	}
 
 	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: vm.internalState,
-		tx:          tx,
+		vm:            vm,
+		parentID:      vm.preferred,
+		stateVersions: vm.stateVersions,
+		tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -161,9 +164,10 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -182,9 +186,10 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -200,9 +205,10 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		}
 
 		executor := proposalTxExecutor{
-			vm:          vm,
-			parentState: vm.internalState,
-			tx:          tx,
+			vm:            vm,
+			parentID:      vm.preferred,
+			stateVersions: vm.stateVersions,
+			tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -307,9 +313,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: vm.internalState,
-		tx:          tx,
+		vm:            vm,
+		parentID:      vm.preferred,
+		stateVersions: vm.stateVersions,
+		tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(err)
@@ -411,9 +418,10 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	executor := proposalTxExecutor{
-		vm:          vm,
-		parentState: vm.internalState,
-		tx:          tx,
+		vm:            vm,
+		parentID:      vm.preferred,
+		stateVersions: vm.stateVersions,
+		tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(err)
@@ -565,8 +573,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onAbortState := abort.onAccept()
-	_, txStatus, err := onAbortState.GetTx(block.Tx.ID())
+	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -575,6 +582,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	}
+	if err := secondVM.SetPreference(secondVM.lastAcceptedID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -623,8 +633,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState := commit.onAccept()
-	_, txStatus, err = onCommitState.GetTx(block.Tx.ID())
+	_, txStatus, err = commit.onAcceptState.GetTx(block.Tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -733,6 +742,9 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	// advance the timestamp
 	if err := commit.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
 		t.Fatal(err)
 	}
 

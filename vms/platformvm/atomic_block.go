@@ -17,8 +17,7 @@ import (
 var (
 	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
-	_ Block    = &AtomicBlock{}
-	_ decision = &AtomicBlock{}
+	_ Block = &AtomicBlock{}
 )
 
 // AtomicBlock being accepted results in the atomic transaction contained in the
@@ -74,19 +73,15 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := ab.parentBlock()
+	parent, err := ab.parentBlock()
 	if err != nil {
 		return err
 	}
 
-	// AtomicBlock is not a modifier on a proposal block, so its parent must be
-	// a decision.
-	parent, ok := parentIntf.(decision)
+	parentState, ok := ab.vm.stateVersions.GetState(ab.PrntID)
 	if !ok {
 		return errInvalidBlockType
 	}
-
-	parentState := parent.onAccept()
 
 	currentTimestamp := parentState.GetTimestamp()
 	enabledAP5 := !currentTimestamp.Before(ab.vm.ApricotPhase5Time)
@@ -100,9 +95,10 @@ func (ab *AtomicBlock) Verify() error {
 	}
 
 	executor := atomicTxExecutor{
-		vm:          ab.vm,
-		parentState: parentState,
-		tx:          ab.Tx,
+		vm:            ab.vm,
+		parentID:      ab.PrntID,
+		stateVersions: ab.vm.stateVersions,
+		tx:            ab.Tx,
 	}
 	err = ab.Tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -118,7 +114,7 @@ func (ab *AtomicBlock) Verify() error {
 	ab.atomicRequests = executor.atomicRequests
 	ab.timestamp = executor.onAccept.GetTimestamp()
 
-	conflicts, err := parentIntf.conflicts(ab.inputs)
+	conflicts, err := parent.conflicts(ab.inputs)
 	if err != nil {
 		return err
 	}
@@ -128,7 +124,6 @@ func (ab *AtomicBlock) Verify() error {
 
 	ab.vm.blockBuilder.RemoveDecisionTxs([]*txs.Tx{ab.Tx})
 	ab.vm.currentBlocks[blkID] = ab
-	parentIntf.addChild(ab)
 	return nil
 }
 
@@ -163,9 +158,6 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
-	for _, child := range ab.children {
-		child.setBaseState()
-	}
 	if ab.onAcceptFunc != nil {
 		ab.onAcceptFunc()
 	}

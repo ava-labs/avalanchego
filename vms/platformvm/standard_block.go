@@ -18,8 +18,7 @@ import (
 var (
 	errConflictingBatchTxs = errors.New("block contains conflicting transactions")
 
-	_ Block    = &StandardBlock{}
-	_ decision = &StandardBlock{}
+	_ Block = &StandardBlock{}
 )
 
 // StandardBlock being accepted results in the transactions contained in the
@@ -77,24 +76,13 @@ func (sb *StandardBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := sb.parentBlock()
+	onAcceptState, err := state.NewDiff(
+		sb.PrntID,
+		sb.vm.stateVersions,
+	)
 	if err != nil {
 		return err
 	}
-
-	// StandardBlock is not a modifier on a proposal block, so its parent must
-	// be a decision.
-	parent, ok := parentIntf.(decision)
-	if !ok {
-		return errInvalidBlockType
-	}
-
-	parentState := parent.onAccept()
-	sb.onAcceptState = state.NewDiff(
-		parentState,
-		parentState.CurrentStakers(),
-		parentState.PendingStakers(),
-	)
 
 	// clear inputs so that multiple [Verify] calls can be made
 	sb.inputs.Clear()
@@ -104,7 +92,7 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		executor := standardTxExecutor{
 			vm:    sb.vm,
-			state: sb.onAcceptState,
+			state: onAcceptState,
 			tx:    tx,
 		}
 		err := tx.Unsigned.Visit(&executor)
@@ -119,7 +107,7 @@ func (sb *StandardBlock) Verify() error {
 		}
 		sb.inputs.Union(executor.inputs)
 
-		sb.onAcceptState.AddTx(tx, status.Committed)
+		onAcceptState.AddTx(tx, status.Committed)
 		if executor.onAccept != nil {
 			funcs = append(funcs, executor.onAccept)
 		}
@@ -138,8 +126,13 @@ func (sb *StandardBlock) Verify() error {
 	}
 
 	if sb.inputs.Len() > 0 {
+		parent, err := sb.parentBlock()
+		if err != nil {
+			return err
+		}
+
 		// ensure it doesn't conflict with the parent block
-		conflicts, err := parentIntf.conflicts(sb.inputs)
+		conflicts, err := parent.conflicts(sb.inputs)
 		if err != nil {
 			return err
 		}
@@ -158,11 +151,12 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
-	sb.timestamp = sb.onAcceptState.GetTimestamp()
+	sb.onAcceptState = onAcceptState
+	sb.timestamp = onAcceptState.GetTimestamp()
 
 	sb.vm.blockBuilder.RemoveDecisionTxs(sb.Txs)
 	sb.vm.currentBlocks[blkID] = sb
-	parentIntf.addChild(sb)
+	sb.vm.stateVersions.SetState(blkID, onAcceptState)
 	return nil
 }
 
@@ -191,9 +185,6 @@ func (sb *StandardBlock) Accept() error {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
-	for _, child := range sb.children {
-		child.setBaseState()
-	}
 	if sb.onAcceptFunc != nil {
 		sb.onAcceptFunc()
 	}
