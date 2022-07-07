@@ -73,11 +73,6 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	parent, err := ab.parentBlock()
-	if err != nil {
-		return err
-	}
-
 	parentState, ok := ab.vm.stateVersions.GetState(ab.PrntID)
 	if !ok {
 		return errInvalidBlockType
@@ -100,7 +95,7 @@ func (ab *AtomicBlock) Verify() error {
 		stateVersions: ab.vm.stateVersions,
 		tx:            ab.Tx,
 	}
-	err = ab.Tx.Unsigned.Visit(&executor)
+	err := ab.Tx.Unsigned.Visit(&executor)
 	if err != nil {
 		txID := ab.Tx.ID()
 		ab.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
@@ -114,12 +109,19 @@ func (ab *AtomicBlock) Verify() error {
 	ab.atomicRequests = executor.atomicRequests
 	ab.timestamp = executor.onAccept.GetTimestamp()
 
-	conflicts, err := parent.conflicts(ab.inputs)
-	if err != nil {
-		return err
-	}
-	if conflicts {
-		return errConflictingParentTxs
+	if ab.inputs.Len() > 0 {
+		parent, err := ab.parentBlock()
+		if err != nil {
+			return err
+		}
+
+		conflicts, err := parent.conflicts(ab.inputs)
+		if err != nil {
+			return err
+		}
+		if conflicts {
+			return errConflictingParentTxs
+		}
 	}
 
 	ab.vm.blockBuilder.RemoveDecisionTxs([]*txs.Tx{ab.Tx})
