@@ -274,7 +274,7 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 // a valid starting time but does not necessarily remove all txs since
 // popped txs are not necessarily ordered by start time.
 // Returns true/false if mempool is non-empty/empty following cleanup.
-func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
+func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() {
 	ctx := b.txExecutorBackend.Ctx
 	now := b.txExecutorBackend.Clk.Time()
 	syncTime := now.Add(executor.SyncBound)
@@ -283,7 +283,7 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
 			b.Mempool.AddProposalTx(tx)
-			return true
+			return
 		}
 
 		txID := tx.ID()
@@ -296,7 +296,6 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
 		ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
 	}
-	return false
 }
 
 // notifyBlockReady tells the consensus engine that a new block is ready to be
