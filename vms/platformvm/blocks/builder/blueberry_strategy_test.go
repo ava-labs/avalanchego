@@ -8,14 +8,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestApricotPickingOrder(t *testing.T) {
+func TestBlueberryPickingOrder(t *testing.T) {
 	assert := assert.New(t)
 
 	// mock ResetBlockTimer to control timing of block formation
@@ -25,7 +24,7 @@ func TestApricotPickingOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.BlueberryTime = mockable.MaxTime // Blueberry not active yet
+	h.cfg.BlueberryTime = time.Time{} // Blueberry already active
 
 	chainTime := h.fullState.GetTimestamp()
 	now := chainTime.Add(time.Second)
@@ -79,7 +78,11 @@ func TestApricotPickingOrder(t *testing.T) {
 	assert.NoError(err)
 	stdBlk, ok := blk.(*stateful.StandardBlock)
 	assert.True(ok)
-	assert.Equal(decisionTxs, stdBlk.DecisionTxs())
+	assert.True(len(decisionTxs) == len(stdBlk.DecisionTxs()))
+	for i, tx := range stdBlk.DecisionTxs() {
+		assert.Equal(decisionTxs[i].ID(), tx.ID())
+	}
+
 	assert.False(h.mempool.HasDecisionTxs())
 
 	// test: reward validator blocks must follow, one per endingValidator
@@ -105,5 +108,5 @@ func TestApricotPickingOrder(t *testing.T) {
 	assert.NoError(err)
 	propBlk, ok := blk.(*stateful.ProposalBlock)
 	assert.True(ok)
-	assert.Equal(stakerTx, propBlk.ProposalTx())
+	assert.Equal(stakerTx.ID(), propBlk.ProposalTx().ID())
 }

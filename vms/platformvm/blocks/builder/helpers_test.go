@@ -483,3 +483,62 @@ func internalStateShutdown(t *testHelpersCollection) error {
 	)
 	return errs.Err
 }
+
+func createTestDecisionTxes(count int) ([]*txs.Tx, error) {
+	res := make([]*txs.Tx, 0, count)
+	for i := uint32(0); i < uint32(count); i++ {
+		utx := &txs.CreateChainTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    10,
+				BlockchainID: ids.Empty.Prefix(uint64(i)),
+				Ins: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID:        ids.ID{'t', 'x', 'I', 'D'},
+						OutputIndex: i,
+					},
+					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+					In: &secp256k1fx.TransferInput{
+						Amt:   uint64(5678),
+						Input: secp256k1fx.Input{SigIndices: []uint32{i}},
+					},
+				}},
+				Outs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: uint64(1234),
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+						},
+					},
+				}},
+			}},
+			SubnetID:    ids.GenerateTestID(),
+			ChainName:   "chainName",
+			VMID:        ids.GenerateTestID(),
+			FxIDs:       []ids.ID{ids.GenerateTestID()},
+			GenesisData: []byte{'g', 'e', 'n', 'D', 'a', 't', 'a'},
+			SubnetAuth:  &secp256k1fx.Input{SigIndices: []uint32{1}},
+		}
+
+		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, tx)
+	}
+	return res, nil
+}
+
+func createTestValidatorTx(h *testHelpersCollection, startTime, endTime time.Time) (*txs.Tx, error) {
+	return h.txBuilder.NewAddValidatorTx(
+		h.cfg.MinValidatorStake,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		h.ctx.NodeID,  // node ID
+		ids.ShortID{}, // reward address
+		reward.PercentDenominator,
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(), // change addr
+	)
+}
