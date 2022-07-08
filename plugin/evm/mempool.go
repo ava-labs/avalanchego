@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -18,6 +19,30 @@ const (
 )
 
 var errNoGasUsed = errors.New("no gas used")
+
+// mempoolMetrics defines the metrics for the atomic mempool
+type mempoolMetrics struct {
+	pendingTxs metrics.Gauge // Gauge of currently pending transactions in the txHeap
+	currentTxs metrics.Gauge // Gauge of current transactions to be issued into a block
+	issuedTxs  metrics.Gauge // Gauge of transactions that have been issued into a block
+
+	addedTxs     metrics.Counter // Count of all transactions added to the mempool
+	discardedTxs metrics.Counter // Count of all discarded transactions
+
+	newTxsReturned metrics.Counter // Count of transactions returned from GetNewTxs
+}
+
+// newMempoolMetrics constructs metrics for the atomic mempool
+func newMempoolMetrics() *mempoolMetrics {
+	return &mempoolMetrics{
+		pendingTxs:     metrics.GetOrRegisterGauge("atomic_mempool_pending_txs", nil),
+		currentTxs:     metrics.GetOrRegisterGauge("atomic_mempool_current_txs", nil),
+		issuedTxs:      metrics.GetOrRegisterGauge("atomic_mempool_issued_txs", nil),
+		addedTxs:       metrics.GetOrRegisterCounter("atomic_mempool_added_txs", nil),
+		discardedTxs:   metrics.GetOrRegisterCounter("atomic_mempool_discarded_txs", nil),
+		newTxsReturned: metrics.GetOrRegisterCounter("atomic_mempool_new_txs_returned", nil),
+	}
+}
 
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
@@ -44,6 +69,8 @@ type Mempool struct {
 	txHeap *txHeap
 	// utxoSpenders maps utxoIDs to the transaction consuming them in the mempool
 	utxoSpenders map[ids.ID]*Tx
+
+	metrics *mempoolMetrics
 }
 
 // NewMempool returns a Mempool with [maxSize]
@@ -57,6 +84,7 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
 		utxoSpenders: make(map[ids.ID]*Tx),
+		metrics:      newMempoolMetrics(),
 	}
 }
 
@@ -184,8 +212,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 		}
 		// Remove any conflicting transactions from the mempool
 		for _, conflictTx := range conflictingTxs {
-			m.removeTx(conflictTx)
-			m.discardedTxs.Put(conflictTx.ID(), conflictTx)
+			m.removeTx(conflictTx, true)
 		}
 	}
 	// If adding this transaction would exceed the mempool's size, check if there is a lower priced
@@ -206,8 +233,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 				)
 			}
 
-			m.removeTx(minTx)
-			m.discardedTxs.Put(minTx.ID(), minTx)
+			m.removeTx(minTx, true)
 		} else {
 			// This could occur if we have used our entire size allowance on
 			// transactions that are currently processing.
@@ -228,6 +254,8 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	// on how their [gasPrice] compares and add to [utxoSet] to make sure we can
 	// reject conflicting transactions.
 	m.txHeap.Push(tx, gasPrice)
+	m.metrics.addedTxs.Inc(1)
+	m.metrics.pendingTxs.Update(int64(m.txHeap.Len()))
 	for utxoID := range utxoSet {
 		m.utxoSpenders[utxoID] = tx
 	}
@@ -251,6 +279,8 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 	if m.txHeap.Len() > 0 {
 		tx := m.txHeap.PopMax()
 		m.currentTxs[tx.ID()] = tx
+		m.metrics.pendingTxs.Update(int64(m.txHeap.Len()))
+		m.metrics.currentTxs.Update(int64(len(m.currentTxs)))
 		return tx, true
 	}
 
@@ -299,6 +329,8 @@ func (m *Mempool) IssueCurrentTxs() {
 		m.issuedTxs[txID] = m.currentTxs[txID]
 		delete(m.currentTxs, txID)
 	}
+	m.metrics.issuedTxs.Update(int64(len(m.issuedTxs)))
+	m.metrics.currentTxs.Update(int64(len(m.currentTxs)))
 
 	// If there are more transactions to be issued, add an item
 	// to Pending.
@@ -350,15 +382,18 @@ func (m *Mempool) cancelTx(tx *Tx) {
 	gasPrice, err := m.atomicTxGasPrice(tx)
 	if err == nil {
 		m.txHeap.Push(tx, gasPrice)
+		m.metrics.pendingTxs.Update(int64(m.txHeap.Len()))
 	} else {
 		// If the err is not nil, we simply discard the transaction because it is
 		// invalid. This should never happen but we guard against the case it does.
 		log.Error("failed to calculate atomic tx gas price while canceling current tx", "err", err)
 		m.removeSpenders(tx)
 		m.discardedTxs.Put(tx.ID(), tx)
+		m.metrics.discardedTxs.Inc(1)
 	}
 
 	delete(m.currentTxs, tx.ID())
+	m.metrics.currentTxs.Update(int64(len(m.currentTxs)))
 }
 
 // DiscardCurrentTx marks a [tx] in the [currentTxs] map as invalid and aborts the attempt
@@ -388,6 +423,8 @@ func (m *Mempool) discardCurrentTx(tx *Tx) {
 	m.removeSpenders(tx)
 	m.discardedTxs.Put(tx.ID(), tx)
 	delete(m.currentTxs, tx.ID())
+	m.metrics.currentTxs.Update(int64(len(m.currentTxs)))
+	m.metrics.discardedTxs.Inc(1)
 }
 
 // removeTx removes [txID] from the mempool.
@@ -396,13 +433,23 @@ func (m *Mempool) discardCurrentTx(tx *Tx) {
 // removeTx must be called for all conflicts before overwriting the utxoSpenders
 // map.
 // Assumes lock is held.
-func (m *Mempool) removeTx(tx *Tx) {
+func (m *Mempool) removeTx(tx *Tx, discard bool) {
 	txID := tx.ID()
 
 	// Remove from [currentTxs], [txHeap], and [issuedTxs].
 	delete(m.currentTxs, txID)
 	m.txHeap.Remove(txID)
 	delete(m.issuedTxs, txID)
+
+	if discard {
+		m.discardedTxs.Put(txID, tx)
+		m.metrics.discardedTxs.Inc(1)
+	} else {
+		m.discardedTxs.Evict(txID)
+	}
+	m.metrics.pendingTxs.Update(int64(m.txHeap.Len()))
+	m.metrics.currentTxs.Update(int64(len(m.currentTxs)))
+	m.metrics.issuedTxs.Update(int64(len(m.issuedTxs)))
 
 	// Remove all entries from [utxoSpenders].
 	m.removeSpenders(tx)
@@ -423,8 +470,7 @@ func (m *Mempool) RemoveTx(tx *Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.removeTx(tx)
-	m.discardedTxs.Evict(tx.ID())
+	m.removeTx(tx, false)
 }
 
 // addPending makes sure that an item is in the Pending channel.
@@ -435,12 +481,13 @@ func (m *Mempool) addPending() {
 	}
 }
 
-// GetNewTxs returns the array of [newTxs] and replaces it with a new array.
+// GetNewTxs returns the array of [newTxs] and replaces it with an empty array.
 func (m *Mempool) GetNewTxs() []*Tx {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	cpy := m.newTxs
 	m.newTxs = nil
+	m.metrics.newTxsReturned.Inc(int64(len(cpy))) // Increment the number of newTxs
 	return cpy
 }
