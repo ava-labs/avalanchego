@@ -165,15 +165,15 @@ func (s *stateSyncer) Start(ctx context.Context) {
 		})
 	}
 
-	// Start the syncer and code syncer.
+	// Start the code syncer and leaf syncer.
 	eg, ctx := errgroup.WithContext(ctx)
+	s.codeSyncer.start(ctx) // start the code syncer first since the leaf syncer may add code tasks
+	s.syncer.Start(ctx, s.numThreads, rootTask, storageTasks...)
 	eg.Go(func() error {
-		s.syncer.Start(ctx, s.numThreads, rootTask, storageTasks...)
 		err := <-s.syncer.Done()
 		return err
 	})
 	eg.Go(func() error {
-		s.codeSyncer.start(ctx)
 		err := <-s.codeSyncer.Done()
 		return err
 	})
