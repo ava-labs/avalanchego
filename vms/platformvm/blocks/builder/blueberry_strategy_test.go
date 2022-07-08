@@ -68,7 +68,8 @@ func TestBlueberryPickingOrder(t *testing.T) {
 		assert.NoError(h.mempool.Add(dt))
 	}
 
-	starkerTxStartTime := nextChainTime.Add(executor.SyncBound).Add(time.Second)
+	// start time is beyond maximal distance from chain time
+	starkerTxStartTime := nextChainTime.Add(executor.MaxFutureStartTime).Add(time.Second)
 	stakerTx, err := createTestValidatorTx(h, starkerTxStartTime, starkerTxStartTime.Add(time.Hour))
 	assert.NoError(err)
 	assert.NoError(h.mempool.Add(stakerTx))
@@ -76,6 +77,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	// test: decisionTxs must be picked first
 	blk, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
+	assert.True(blk.Timestamp().Equal(nextChainTime))
 	stdBlk, ok := blk.(*stateful.StandardBlock)
 	assert.True(ok)
 	assert.True(len(decisionTxs) == len(stdBlk.DecisionTxs()))
@@ -88,6 +90,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	// test: reward validator blocks must follow, one per endingValidator
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
+	assert.True(blk.Timestamp().Equal(nextChainTime))
 	rewardBlk, ok := blk.(*stateful.ProposalBlock)
 	assert.True(ok)
 	rewardTx, ok := rewardBlk.ProposalTx().Unsigned.(*txs.RewardValidatorTx)
@@ -103,10 +106,28 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	assert.NoError(commitBlk.Verify())
 	assert.NoError(commitBlk.Accept())
 
-	// finally mempool addValidatorTx must be picked
+	// mempool proposal tx is too far in the future. A
+	// proposal block including mempool proposalTx
+	// will be issued to advance time and
+	now = nextChainTime.Add(executor.MaxFutureStartTime / 2)
+	h.clk.Set(now)
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
-	propBlk, ok := blk.(*stateful.ProposalBlock)
+	assert.True(blk.Timestamp().Equal(now))
+	proposalBlk, ok := blk.(*stateful.ProposalBlock)
 	assert.True(ok)
-	assert.Equal(stakerTx.ID(), propBlk.ProposalTx().ID())
+	assert.Equal(stakerTx.ID(), proposalBlk.ProposalTx().ID())
+
+	// Finally an empty standard block can be issued to advance time
+	// if no mempool txs are available
+	now, err = h.fullState.GetNextStakerChangeTime()
+	assert.NoError(err)
+	h.clk.Set(now)
+
+	blk, err = h.BlockBuilder.BuildBlock()
+	assert.NoError(err)
+	assert.True(blk.Timestamp().Equal(now))
+	emptyStdBlk, ok := blk.(*stateful.StandardBlock)
+	assert.True(ok)
+	assert.True(len(emptyStdBlk.DecisionTxs()) == 0)
 }

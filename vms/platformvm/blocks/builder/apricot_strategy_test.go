@@ -69,7 +69,8 @@ func TestApricotPickingOrder(t *testing.T) {
 		assert.NoError(h.mempool.Add(dt))
 	}
 
-	starkerTxStartTime := nextChainTime.Add(executor.SyncBound).Add(time.Second)
+	// start time is beyond maximal distance from chain time
+	starkerTxStartTime := nextChainTime.Add(executor.MaxFutureStartTime).Add(time.Second)
 	stakerTx, err := createTestValidatorTx(h, starkerTxStartTime, starkerTxStartTime.Add(time.Hour))
 	assert.NoError(err)
 	assert.NoError(h.mempool.Add(stakerTx))
@@ -97,6 +98,27 @@ func TestApricotPickingOrder(t *testing.T) {
 	options, err := blk.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 	commitBlk := options[0]
+	assert.NoError(commitBlk.Verify())
+	assert.NoError(commitBlk.Accept())
+
+	// mempool proposal tx is too far in the future. An advance time tx
+	// will be issued first
+	now = nextChainTime.Add(executor.MaxFutureStartTime / 2)
+	h.clk.Set(now)
+	blk, err = h.BlockBuilder.BuildBlock()
+	assert.NoError(err)
+	advanceTimeBlk, ok := blk.(*stateful.ProposalBlock)
+	assert.True(ok)
+	advanceTimeTx, ok := advanceTimeBlk.ProposalTx().Unsigned.(*txs.AdvanceTimeTx)
+	assert.True(ok)
+	assert.True(advanceTimeTx.Timestamp().Equal(now))
+
+	// accept advance time tx so that we can issue mempool proposal tx
+	assert.NoError(blk.Verify())
+	assert.NoError(blk.Accept())
+	options, err = blk.(snowman.OracleBlock).Options()
+	assert.NoError(err)
+	commitBlk = options[0]
 	assert.NoError(commitBlk.Verify())
 	assert.NoError(commitBlk.Accept())
 
