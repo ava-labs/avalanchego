@@ -4,10 +4,10 @@ The activation of Blueberry fork changes only slightly the way P-chain selects t
 
 ## Apricot block formation logic
 
-Transactions to be included into an Apricot blocks can originate from mempool or can be created just in time to duly update the stakers set. Block formation logic upon Apricot fork can be broken up into two high-level logical steps:
+Transactions to be included into an Apricot block can originate from the mempool or can be created just in time to duly update the stakers set. Block formation logic in the Apricot fork can be broken up into two high-level logical steps:
 
-* First we try and select standard or proposal transactions which can be included in a block *without advancing current chain time*;
-* If no such transactions exist, we try and select transactions which *may require advancing chain time*. If chain time change is required a proposal block with an advance time tx is build first; selected transactions may be included in a subsequent block.
+* First, we try selecting any candidate standard or proposal transactions which could be included in a block *without advancing the current chain time*;
+* If no such transactions are found, we evaluate candidate transactions which *may require advancing chain time*. If a chain time advancement is required to include these transactions in a block, a proposal block with an advance time transaction is built first; selected transactions may be included in a subsequent block.
 
 In more details, blocks which do not change chain time are build as follows:
 
@@ -19,7 +19,7 @@ While steps above could be execute in any order, we picked decisions transaction
 Once all possibilities of create a block not advancing chain time are exhausted, we attempt to build a block which *may* advance chain time as follows:
 
 1. If the local clock's time is greater than or equal to the earliest stakers' set change event timestamp, an advance time transaction is issued into a Proposal Block to move current chain time to the earliest stakers' set change timestamp. Upon this Proposal block's acceptance, chain time will be move ahead and all scheduled changes (e.g. promoting a staker from pending to current) will be carried out.
-2. If the mempool contains any proposal transactions, the one with earlier start time is selected and included into a Proposal Block[^1]. A proposal transactions as is won't cause any change in the current chain time. However there is an edge case to consider: on low activity chains (e.g. Fuji P-chain) chain time may get pretty far behind local clock. If a proposal transaction is finally issued, it is better not to readily included into a Proposal Block. In fact a proposal transactions is deemed invalid if its start time it too far in the future with respect to current chain time. To prevent generating an invalid Proposal block, in this case *an advance time transactions is issued first*, moving chain time to local time.
+2. If the mempool contains any proposal transactions, the mempool proposal transaction with the earliest start time is selected and included into a Proposal Block[^1]. A mempool proposal transaction as is won't cause any change in the current chain time[^2]. However there is an edge case to consider: on low activity chains (e.g. Fuji P-chain) chain time may fall significantly behind the local clock. If a proposal transaction is finally issued, its start time it likely to be quite far in the future with respect to the current chain time. This would cause the proposal transaction to be considered invalid and rejected, since proposal transactions start time must be at most 366 hours (or two weeks) after current chain time. So instead to readily issuing the mempool proposal transaction, an advance time transaction is issued first, moving chain time to local clock's time. As soon as chain time is advanced the mempool proposal transaction will be issued and accepted.
 
 Note that the order in which these steps are executed matters. A block updating chain time would be deemed invalid if it would advance time beyond next stakers' set change event, skipping the associated changes. The order above ensures this never happens because if checks first if chain time should be moved to next stakers' set change event. It can also be verified by inspection that timestamp selected for the advance time transactions always respect the synchrony bound.
 
@@ -27,7 +27,7 @@ Block formation terminates as soon as any of the steps executed manage to select
 
 ## Blueberry block formation logic
 
-Blueberry modifies the flow above just to avoid issuing advance time transactions, which are replaced by a block timestamp duly set. This requirement bring us to occasionally be allowed to issue empty standard blocks just to set the new chain time.
+The activation of the Blueberry fork only makes minor changes to the way the P-chain selects transactions to be included in next block, such as block timestamp calculation. In this brief document we detail the process and the changes.
 
 We carry out operations in the following order:
 
@@ -37,3 +37,4 @@ We carry out operations in the following order:
 * We try and build a Proposal block with one mempool proposal transaction, if any. No changes to chain time are proposed here.
 
 [^1]: Proposal transactions whose start time is too close to local time are dropped first and won't be included in any block. TODO: I am not sure why is this, but it's coherent with P-chain API dropping any AddValidator/Delegator/SubnetValidator request whose start time is too close.
+[^2]: Of course advance time transactions are proposal ones and they do change chain time. But advance time transactions are generated just in time and never stored in a mempool. Here I refer to mempool proposal transactions which are AddValidator, AddDelegator and AddSubnetValidator. Reward delegator transaction is a proposal transaction which does not change chain time but which is never in mempool (it's generated just in time).
