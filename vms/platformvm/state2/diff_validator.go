@@ -4,50 +4,50 @@
 package state
 
 import (
-	"github.com/google/btree"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
-	_ Validator  = &baseValidator{}
-	_ Validators = &baseValidators{}
+	_ Validators = &diffValidators{}
+	_ Validator  = &diffValidator{}
 )
 
-type baseValidator struct {
+type diffValidator struct {
+	diff     *diff
+	subnetID ids.ID
+	nodeID   ids.NodeID
+
 	currentStaker          *Staker
 	pendingStaker          *Staker
 	currentDelegatorWeight uint64
-	currentDelegators      *btree.BTree
-	pendingDelegators      *btree.BTree
 }
 
-func (v *baseValidator) CurrentStaker() *Staker {
+func (v *diffValidator) CurrentStaker() *Staker {
 	return v.currentStaker
 }
 
-func (v *baseValidator) PendingStaker() *Staker {
+func (v *diffValidator) PendingStaker() *Staker {
 	return v.pendingStaker
 }
 
-func (v *baseValidator) CurrentDelegatorWeight() uint64 {
+func (v *diffValidator) CurrentDelegatorWeight() uint64 {
 	return v.currentDelegatorWeight
 }
 
-func (v *baseValidator) NewCurrentDelegatorIterator() StakerIterator {
+func (v *diffValidator) NewCurrentDelegatorIterator() StakerIterator {
 	return NewTreeIterator(v.currentDelegators)
 }
 
-func (v *baseValidator) NewPendingDelegatorIterator() StakerIterator {
+func (v *diffValidator) NewPendingDelegatorIterator() StakerIterator {
 	return NewTreeIterator(v.pendingDelegators)
 }
 
-type baseValidators struct {
+type diffValidators struct {
+	diff *diff
+
 	// Representation of DB state
-	validators         map[ids.ID]map[ids.NodeID]*baseValidator
+	validators         map[ids.ID]map[ids.NodeID]*diffValidator
 	nextRewardedStaker *Staker
-	currentStakers     *btree.BTree
-	pendingStakers     *btree.BTree
 
 	// Representation of pending changes
 	currentStakersToAdd    []*Staker
@@ -56,31 +56,35 @@ type baseValidators struct {
 	pendingStakersToRemove []*Staker
 }
 
-func (v *baseValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) Validator {
+func (v *diffValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) Validator {
 	subnetValidators, ok := v.validators[subnetID]
-	if !ok {
-		return &baseValidator{}
+	if ok {
+		validator, ok := subnetValidators[nodeID]
+		if ok {
+			return validator
+		}
 	}
-	validator, ok := subnetValidators[nodeID]
+
+	parent, ok := v.diff.stateVersions.GetState(v.diff.parentID)
 	if !ok {
-		return &baseValidator{}
+		panic("TODO handle this error")
 	}
-	return validator
+	return parent.GetValidator(subnetID, nodeID)
 }
 
-func (v *baseValidators) GetNextRewardedStaker() *Staker {
+func (v *diffValidators) GetNextRewardedStaker() *Staker {
 	return v.nextRewardedStaker
 }
 
-func (v *baseValidators) NewCurrentStakerIterator() StakerIterator {
+func (v *diffValidators) NewCurrentStakerIterator() StakerIterator {
 	return NewTreeIterator(v.currentStakers)
 }
 
-func (v *baseValidators) NewPendingStakerIterator() StakerIterator {
+func (v *diffValidators) NewPendingStakerIterator() StakerIterator {
 	return NewTreeIterator(v.pendingStakers)
 }
 
-func (v *baseValidators) Update(
+func (v *diffValidators) Update(
 	currentStakersToAdd []*Staker,
 	currentStakersToRemove []*Staker,
 	pendingStakersToAdd []*Staker,

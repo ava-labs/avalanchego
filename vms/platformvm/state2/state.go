@@ -55,6 +55,7 @@ var (
 // Chain collects all methods to manage the state of the chain for block
 // execution.
 type Chain interface {
+	Validators
 	UTXOAdder
 	UTXOGetter
 	UTXODeleter
