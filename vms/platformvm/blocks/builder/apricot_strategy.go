@@ -34,7 +34,7 @@ func (a *apricotStrategy) hasContent() (bool, error) {
 		return false, err
 	}
 
-	return len(a.txes) == 0, nil
+	return len(a.txes) != 0, nil
 }
 
 // Note: selectBlockContent will only peek into mempool and must not
