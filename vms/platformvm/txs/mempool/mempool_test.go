@@ -5,6 +5,7 @@ package mempool
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -63,51 +64,72 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	txes, err := createTestDecisionTxes(2)
 	assert.NoError(err)
 
+	// txes must not already there before we start
+	assert.False(mpool.HasDecisionTxs())
+
 	for _, tx := range txes {
 		// tx not already there
-		assert.False(mpool.HasDecisionTxs())
 		assert.False(mpool.Has(tx.ID()))
 
 		// we can insert
 		assert.NoError(mpool.Add(tx))
 
 		// we can get it
-		assert.True(mpool.HasDecisionTxs())
 		assert.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
 		assert.True(retrieved != nil)
 		assert.Equal(tx, retrieved)
 
-		// // we can peek it
-		txSize := len(tx.Bytes())
-		peeked := mpool.PeekDecisionTxs(txSize)
-		assert.True(peeked != nil)
-		assert.Equal(tx, peeked[0])
+		// we can peek it
+		peeked := mpool.PeekDecisionTxs(math.MaxInt)
+
+		// tx will be among those peeked,
+		// in NO PARTICULAR ORDER
+		found := false
+		for _, pk := range peeked {
+			if pk.ID() == tx.ID() {
+				found = true
+				break
+			}
+		}
+		assert.True(found)
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
 
-		assert.False(mpool.HasDecisionTxs())
 		assert.False(mpool.Has(tx.ID()))
 		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
-		assert.Equal([]*txs.Tx{}, mpool.PeekDecisionTxs(txSize))
 
 		// we can reinsert it
 		assert.NoError(mpool.Add(tx))
 
+		// we can mark it as dropped, but it'll still be in mempool
+		mpool.MarkDropped(tx.ID(), "dropped for test")
+		assert.True(mpool.Has(tx.ID()))
+		assert.Equal(tx, mpool.Get(tx.ID()))
+		_, dropped := mpool.GetDropReason(tx.ID())
+		assert.True(dropped)
+
 		// we can pop it
-		popped := mpool.PopDecisionTxs(txSize)
-		assert.True(len(popped) == 1)
-		assert.Equal(tx, popped[0])
+		txSize := len(tx.Bytes())
+		popped := mpool.PopDecisionTxs(math.MaxInt)
+		found = false
+		for _, pk := range popped {
+			if pk.ID() == tx.ID() {
+				found = true
+				break
+			}
+		}
+		assert.True(found)
 
 		// once popped it cannot be there
 		assert.False(mpool.Has(tx.ID()))
 		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 		assert.Equal([]*txs.Tx{}, mpool.PeekDecisionTxs(txSize))
 
-		// // we can reinsert it again to grow mempool
-		// assert.NoError(mpool.Add(tx))
+		// we can reinsert it again to grow the mempool
+		assert.NoError(mpool.Add(tx))
 	}
 }
 
@@ -118,12 +140,15 @@ func TestProposalTxsInMempool(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &dummyBlkTimer{})
 	assert.NoError(err)
 
+	// it's key to this test that proposal txs
+	// are ordered by decreasing start time
 	txes, err := createTestProposalTxes(2)
 	assert.NoError(err)
 
+	// txes should not be already there
+	assert.False(mpool.HasProposalTx())
+
 	for _, tx := range txes {
-		// tx not already there
-		assert.False(mpool.HasProposalTx())
 		assert.False(mpool.Has(tx.ID()))
 
 		// we can insert
@@ -137,7 +162,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		assert.True(retrieved != nil)
 		assert.Equal(tx, retrieved)
 
-		// // we can peek it
+		// we can peek it
 		peeked := mpool.PeekProposalTx()
 		assert.True(peeked != nil)
 		assert.Equal(tx, peeked)
@@ -145,10 +170,8 @@ func TestProposalTxsInMempool(t *testing.T) {
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
 
-		assert.False(mpool.HasProposalTx())
 		assert.False(mpool.Has(tx.ID()))
 		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
-		assert.Equal((*txs.Tx)(nil), mpool.PeekProposalTx())
 
 		// we can reinsert it
 		assert.NoError(mpool.Add(tx))
@@ -160,10 +183,9 @@ func TestProposalTxsInMempool(t *testing.T) {
 		// once popped it cannot be there
 		assert.False(mpool.Has(tx.ID()))
 		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
-		assert.Equal((*txs.Tx)(nil), mpool.PeekProposalTx())
 
-		// // we can reinsert it again to grow mempool
-		// assert.NoError(mpool.Add(tx))
+		// we can reinsert it again to grow the mempool
+		assert.NoError(mpool.Add(tx))
 	}
 }
 
@@ -213,6 +235,7 @@ func createTestDecisionTxes(count int) ([]*txs.Tx, error) {
 	return res, nil
 }
 
+// Proposal Txes are sorted by decreasing start time
 func createTestProposalTxes(count int) ([]*txs.Tx, error) {
 	var clk mockable.Clock
 	res := make([]*txs.Tx, 0, count)
@@ -220,7 +243,7 @@ func createTestProposalTxes(count int) ([]*txs.Tx, error) {
 		utx := &txs.AddValidatorTx{
 			BaseTx: txs.BaseTx{},
 			Validator: validator.Validator{
-				End: uint64(clk.Time().Add(time.Duration(i) * time.Second).Unix()),
+				Start: uint64(clk.Time().Add(time.Duration(count-i) * time.Second).Unix()),
 			},
 			Stake:        nil,
 			RewardsOwner: &secp256k1fx.OutputOwners{},
