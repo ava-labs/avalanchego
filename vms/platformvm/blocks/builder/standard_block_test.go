@@ -24,7 +24,7 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
 	h.ctx.Lock.Lock()
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {

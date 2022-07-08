@@ -18,7 +18,7 @@ import (
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -34,7 +34,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	err := h.BlockBuilder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
-	has := h.mpool.Has(txID)
+	has := h.mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
@@ -46,14 +46,14 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert.Len(blk.DecisionTxs(), 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.DecisionTxs()[0].ID(), "standard block does not include expected transaction")
 
-	has = h.mpool.Has(txID)
+	has = h.mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -66,33 +66,33 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
-	assert.NoError(h.mpool.Add(tx))
-	assert.True(h.mpool.Has(txID))
-	_, isDropped := h.mpool.GetDropReason(txID)
+	assert.NoError(h.mempool.Add(tx))
+	assert.True(h.mempool.Has(txID))
+	_, isDropped := h.mempool.GetDropReason(txID)
 	assert.False(isDropped)
 
 	// When a tx is marked as dropped, it is still available to allow re-issuance
-	h.mpool.MarkDropped(txID, "dropped for testing")
-	assert.True(h.mpool.Has(txID)) // still available
-	_, isDropped = h.mpool.GetDropReason(txID)
+	h.mempool.MarkDropped(txID, "dropped for testing")
+	assert.True(h.mempool.Has(txID)) // still available
+	_, isDropped = h.mempool.GetDropReason(txID)
 	assert.True(isDropped)
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	switch tx.Unsigned.(type) {
 	case txs.StakerTx:
-		h.mpool.PopProposalTx()
+		h.mempool.PopProposalTx()
 	case *txs.CreateChainTx,
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		h.mpool.PopDecisionTxs(math.MaxInt64)
+		h.mempool.PopDecisionTxs(math.MaxInt64)
 	default:
 		t.Fatal("unknown tx type")
 	}
-	assert.NoError(h.mpool.Add(tx))
+	assert.NoError(h.mempool.Add(tx))
 
-	assert.True(h.mpool.Has(txID))
-	_, isDropped = h.mpool.GetDropReason(txID)
+	assert.True(h.mempool.Has(txID))
+	_, isDropped = h.mempool.GetDropReason(txID)
 	assert.False(isDropped)
 }

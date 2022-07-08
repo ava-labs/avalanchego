@@ -19,7 +19,7 @@ import (
 func TestBlueberryFork(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
 	defer func() {
 		if err := internalStateShutdown(h); err != nil {
 			t.Fatal(err)
@@ -53,7 +53,7 @@ func TestBlueberryFork(t *testing.T) {
 			ids.ShortEmpty,
 		)
 		assert.NoError(err)
-		assert.NoError(h.mpool.Add(addPendingValidatorTx))
+		assert.NoError(h.mempool.Add(addPendingValidatorTx))
 
 		proposalBlk, err := h.BlockBuilder.BuildBlock()
 		assert.NoError(err)
@@ -99,7 +99,7 @@ func TestBlueberryFork(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	assert.NoError(err)
-	assert.NoError(h.mpool.Add(createChainTx))
+	assert.NoError(h.mempool.Add(createChainTx))
 
 	proposalBlk, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err)

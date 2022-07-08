@@ -83,10 +83,14 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
+type dummyBlkTimer struct{}
+
+func (*dummyBlkTimer) ResetBlockTimer() {}
+
 type testHelpersCollection struct {
 	BlockBuilder
 	blkManager stateful.Manager
-	mpool      mempool.Mempool
+	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.AtomicBool
@@ -122,7 +126,7 @@ func init() {
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 }
 
-func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
+func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpersCollection {
 	var (
 		res = &testHelpersCollection{}
 		err error
@@ -182,12 +186,18 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
 
-	res.mpool, err = mempool.NewMempool("mempool", registerer, res)
+	if mockResetBlockTimer {
+		dummy := &dummyBlkTimer{}
+		res.mempool, err = mempool.NewMempool("mempool", registerer, dummy)
+	} else {
+		res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	}
+
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
 	res.blkManager = stateful.NewManager(
-		res.mpool,
+		res.mempool,
 		metrics,
 		res.fullState,
 		res.fullState,
@@ -198,7 +208,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	)
 
 	res.BlockBuilder = NewBlockBuilder(
-		res.mpool,
+		res.mempool,
 		res.txBuilder,
 		res.txExecBackend,
 		res.blkManager,
