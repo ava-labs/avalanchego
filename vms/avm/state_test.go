@@ -49,6 +49,7 @@ func TestSetsAndGets(t *testing.T) {
 		Asset: avax.Asset{ID: ids.Empty},
 		Out:   &avax.TestVerifiable{},
 	}
+	utxoID := utxo.InputID()
 
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
@@ -73,7 +74,7 @@ func TestSetsAndGets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := state.PutUTXO(ids.Empty, utxo); err != nil {
+	if err := state.PutUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.PutTx(ids.Empty, tx); err != nil {
@@ -83,7 +84,7 @@ func TestSetsAndGets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resultUTXO, err := state.GetUTXO(ids.Empty)
+	resultUTXO, err := state.GetUTXO(utxoID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +141,7 @@ func TestFundingNoAddresses(t *testing.T) {
 		Out:   &avax.TestVerifiable{},
 	}
 
-	if err := state.PutUTXO(utxo.InputID(), utxo); err != nil {
+	if err := state.PutUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.DeleteUTXO(utxo.InputID()); err != nil {
@@ -183,7 +184,7 @@ func TestFundingAddresses(t *testing.T) {
 		},
 	}
 
-	if err := state.PutUTXO(utxo.InputID(), utxo); err != nil {
+	if err := state.PutUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
