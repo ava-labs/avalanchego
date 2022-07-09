@@ -55,7 +55,7 @@ func TestStandardBlocks(t *testing.T) {
 
 		parsedApricotStandardBlk, ok := parsed.(*ApricotStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedApricotStandardBlk.Txs)
+		assert.Equal(txs, parsedApricotStandardBlk.DecisionTxs())
 
 		// check that blueberry standard block can be built and parsed
 		blueberryStandardBlk, err := NewStandardBlock(
@@ -80,10 +80,10 @@ func TestStandardBlocks(t *testing.T) {
 		assert.Equal(blueberryStandardBlk.UnixTimestamp(), parsed.UnixTimestamp())
 		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedBlueberryStandardBlk.Txs)
+		assert.Equal(txs, parsedBlueberryStandardBlk.DecisionTxs())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotStandardBlk.Txs, parsedBlueberryStandardBlk.Txs)
+		assert.Equal(parsedApricotStandardBlk.DecisionTxs(), parsedBlueberryStandardBlk.DecisionTxs())
 	}
 }
 
@@ -124,7 +124,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		assert.True(ok)
-		assert.Equal(tx, parsedApricotProposalBlk.Tx)
+		assert.Equal(tx, parsedApricotProposalBlk.ProposalTx())
 
 		// check that blueberry proposal block can be built and parsed
 		blueberryProposalBlk, err := NewProposalBlock(
@@ -149,10 +149,10 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal(blueberryProposalBlk.UnixTimestamp(), parsed.UnixTimestamp())
 		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
 		assert.True(ok)
-		assert.Equal(tx, parsedBlueberryProposalBlk.Tx)
+		assert.Equal(tx, parsedBlueberryProposalBlk.ProposalTx())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotProposalBlk.Tx, parsedBlueberryProposalBlk.Tx)
+		assert.Equal(parsedApricotProposalBlk.ProposalTx(), parsedBlueberryProposalBlk.ProposalTx())
 	}
 }
 
@@ -264,6 +264,86 @@ func TestAbortBlock(t *testing.T) {
 		assert.Equal(blueberryAbortBlk.Version(), parsed.Version())
 		assert.Equal(blueberryAbortBlk.UnixTimestamp(), parsed.UnixTimestamp())
 	}
+}
+
+func TestAtomicBlocks(t *testing.T) {
+	// check atomic block can be built and parsed
+	assert := assert.New(t)
+	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
+	height := uint64(2022)
+	tx, err := testAtomicTx()
+	assert.NoError(err)
+
+	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
+		// build block
+		atomicBlk, err := NewAtomicBlock(
+			parentID,
+			height,
+			tx,
+		)
+		assert.NoError(err)
+
+		// parse block
+		parsed, err := Parse(atomicBlk.Bytes(), cdc)
+		assert.NoError(err)
+
+		// compare content
+		assert.Equal(atomicBlk.ID(), parsed.ID())
+		assert.Equal(atomicBlk.Bytes(), parsed.Bytes())
+		assert.Equal(atomicBlk.Parent(), parsed.Parent())
+		assert.Equal(atomicBlk.Height(), parsed.Height())
+		assert.Equal(atomicBlk.Version(), parsed.Version())
+		assert.Equal(int64(0), parsed.UnixTimestamp())
+
+		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
+		assert.True(ok)
+		assert.Equal(tx, parsedAtomicBlk.AtomicTx())
+	}
+}
+
+func testAtomicTx() (*txs.Tx, error) {
+	utx := &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    10,
+			BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: uint64(1234),
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					},
+				},
+			}},
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.ID{'t', 'x', 'I', 'D'},
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+				In: &secp256k1fx.TransferInput{
+					Amt:   uint64(5678),
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}},
+			Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+		}},
+		SourceChain: ids.ID{'c', 'h', 'a', 'i', 'n'},
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(1),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+			In: &secp256k1fx.TransferInput{
+				Amt:   50000,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+	}
+	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
+	return txs.NewSigned(utx, txs.Codec, signers)
 }
 
 func testDecisionTxs() ([]*txs.Tx, error) {
