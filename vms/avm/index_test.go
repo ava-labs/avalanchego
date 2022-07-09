@@ -75,8 +75,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
-		inputID := utxo.InputID()
-		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			t.Fatal("Error saving utxo", err)
 		}
 
@@ -168,8 +167,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
-		inputID := utxo.InputID()
-		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			t.Fatal("Error saving utxo", err)
 		}
 
@@ -265,8 +263,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 	// save utxo to state
-	inputID := utxo.InputID()
-	if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+	if err := vm.state.PutUTXO(utxo); err != nil {
 		t.Fatal("Error saving utxo", err)
 	}
 
@@ -327,8 +324,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
-		inputID := utxo.InputID()
-		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			t.Fatal("Error saving utxo", err)
 		}
 
