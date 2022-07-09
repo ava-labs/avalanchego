@@ -24,7 +24,6 @@ func TestFetchUTXOs(t *testing.T) {
 	addr := ids.GenerateTestShortID()
 	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxoID := ids.GenerateTestID()
 	utxo := &UTXO{
 		UTXOID: UTXOID{
 			TxID:        txID,
@@ -54,7 +53,7 @@ func TestFetchUTXOs(t *testing.T) {
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
 
-	err := s.PutUTXO(utxoID, utxo)
+	err := s.PutUTXO(utxo)
 	assert.NoError(err)
 
 	utxos, err := GetAllUTXOs(s, addrs)
@@ -111,7 +110,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err := s.PutUTXO(utxo0.InputID(), utxo0)
+		err := s.PutUTXO(utxo0)
 		assert.NoError(err)
 
 		utxo1 := &UTXO{
@@ -129,7 +128,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err = s.PutUTXO(utxo1.InputID(), utxo1)
+		err = s.PutUTXO(utxo1)
 		assert.NoError(err)
 
 		utxo2 := &UTXO{
@@ -147,7 +146,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err = s.PutUTXO(utxo2.InputID(), utxo2)
+		err = s.PutUTXO(utxo2)
 		assert.NoError(err)
 	}
 
