@@ -9,6 +9,8 @@ import (
 	"github.com/google/btree"
 )
 
+const defaultTreeDegree = 2
+
 var _ StakerIterator = &treeIterator{}
 
 type treeIterator struct {

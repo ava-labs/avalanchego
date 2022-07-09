@@ -7,6 +7,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/btree"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -34,6 +36,10 @@ type diff struct {
 
 	currentSupply uint64
 
+	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
+	addedStakers   *btree.BTree
+	deletedStakers map[ids.ID]*Staker
+
 	addedSubnets  []*txs.Tx
 	cachedSubnets []*txs.Tx
 
@@ -53,6 +59,15 @@ type diff struct {
 type utxoModification struct {
 	utxoID ids.ID
 	utxo   *avax.UTXO
+}
+
+type diffValidator struct {
+	stakerModified bool
+	stakerDeleted  bool
+	staker         *Staker
+
+	addedDelegators   *btree.BTree
+	deletedDelegators map[ids.ID]*Staker
 }
 
 func NewDiff(
@@ -85,6 +100,130 @@ func (d *diff) GetCurrentSupply() uint64 {
 
 func (d *diff) SetCurrentSupply(currentSupply uint64) {
 	d.currentSupply = currentSupply
+}
+
+func (d *diff) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+	subnetValidatorDiffs, ok := d.validatorDiffs[subnetID]
+	if !ok {
+		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
+		d.validatorDiffs[subnetID] = subnetValidatorDiffs
+	}
+	validatorDiff, ok := subnetValidatorDiffs[nodeID]
+	if !ok {
+		validatorDiff = &diffValidator{}
+		subnetValidatorDiffs[nodeID] = validatorDiff
+	}
+	return validatorDiff
+}
+
+func (d *diff) GetStaker(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	if subnetValidatorDiffs, ok := d.validatorDiffs[subnetID]; ok {
+		if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
+			if validatorDiff.stakerModified {
+				if validatorDiff.stakerDeleted {
+					return nil, database.ErrNotFound
+				}
+				return validatorDiff.staker, nil
+			}
+		}
+	}
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, errMissingParentState
+	}
+	return parentState.GetStaker(subnetID, nodeID)
+}
+
+func (d *diff) PutStaker(staker *Staker) {
+	validatorDiff := d.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.stakerModified = true
+	validatorDiff.stakerDeleted = false
+	validatorDiff.staker = staker
+
+	if d.addedStakers == nil {
+		d.addedStakers = btree.New(defaultTreeDegree)
+	}
+	d.addedStakers.ReplaceOrInsert(staker)
+}
+
+func (d *diff) DeleteStaker(staker *Staker) {
+	validatorDiff := d.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.stakerModified = true
+	validatorDiff.stakerDeleted = true
+	validatorDiff.staker = staker
+
+	if d.deletedStakers == nil {
+		d.deletedStakers = make(map[ids.ID]*Staker)
+	}
+	d.deletedStakers[staker.TxID] = staker
+}
+
+func (d *diff) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
+	return nil
+
+	// parentState, ok := d.stateVersions.GetState(d.parentID)
+	// if !ok {
+	// 	// TODO: handle this
+	// 	return EmptyIterator
+	// }
+
+	// if subnetValidatorDiffs, ok := d.validatorDiffs[subnetID]; ok {
+	// 	if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
+	// 		if validatorDiff.stakerModified {
+	// 			if validatorDiff.stakerDeleted {
+	// 				return nil, database.ErrNotFound
+	// 			}
+	// 			return validatorDiff.staker, nil
+	// 		}
+	// 	}
+	// }
+
+	// subnetValidators, ok := v.validators[subnetID]
+	// if !ok {
+	// 	return EmptyIterator
+	// }
+	// validator, ok := subnetValidators[nodeID]
+	// if !ok {
+	// 	return EmptyIterator
+	// }
+	// return NewTreeIterator(validator.delegators)
+}
+
+func (d *diff) PutDelegator(staker *Staker) {
+	validatorDiff := d.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.addedDelegators == nil {
+		validatorDiff.addedDelegators = btree.New(defaultTreeDegree)
+	}
+	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
+
+	if d.addedStakers == nil {
+		d.addedStakers = btree.New(defaultTreeDegree)
+	}
+	d.addedStakers.ReplaceOrInsert(staker)
+}
+
+func (d *diff) DeleteDelegator(staker *Staker) {
+	validatorDiff := d.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.deletedDelegators == nil {
+		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
+	}
+	validatorDiff.deletedDelegators[staker.TxID] = staker
+
+	if d.deletedStakers == nil {
+		d.deletedStakers = make(map[ids.ID]*Staker)
+	}
+	d.deletedStakers[staker.TxID] = staker
+}
+
+func (d *diff) GetStakerIterator() StakerIterator {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		// TODO: handle this
+		return EmptyIterator
+	}
+	parentStakerIterator := parentState.GetStakerIterator()
+	addedStakerIterator := NewTreeIterator(d.addedStakers)
+	return NewTreeIterator(v.stakers)
 }
 
 func (d *diff) GetSubnets() ([]*txs.Tx, error) {

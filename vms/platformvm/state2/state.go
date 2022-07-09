@@ -7,10 +7,19 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/btree"
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -124,68 +133,68 @@ type State interface {
 	Close() error
 }
 
-// type state struct {
-// 	cfg        *config.Config
-// 	ctx        *snow.Context
-// 	localStake prometheus.Gauge
-// 	totalStake prometheus.Gauge
-// 	rewards    reward.Calculator
+type state struct {
+	cfg        *config.Config
+	ctx        *snow.Context
+	localStake prometheus.Gauge
+	totalStake prometheus.Gauge
+	rewards    reward.Calculator
 
-// 	baseDB database.Database
+	baseDB database.Database
 
-// 	addedCurrentStakers   []*ValidatorReward
-// 	deletedCurrentStakers []*txs.Tx
-// 	addedPendingStakers   []*txs.Tx
-// 	deletedPendingStakers []*txs.Tx
-// 	uptimes               map[ids.NodeID]*currentValidatorState // nodeID -> uptimes
-// 	updatedUptimes        map[ids.NodeID]struct{}               // nodeID -> nil
+	validators     map[ids.ID]map[ids.NodeID]*baseValidator
+	stakers        *btree.BTree
+	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 
-// 	validatorsDB                 database.Database
-// 	currentValidatorsDB          database.Database
-// 	currentValidatorBaseDB       database.Database
-// 	currentValidatorList         linkeddb.LinkedDB
-// 	currentDelegatorBaseDB       database.Database
-// 	currentDelegatorList         linkeddb.LinkedDB
-// 	currentSubnetValidatorBaseDB database.Database
-// 	currentSubnetValidatorList   linkeddb.LinkedDB
-// 	pendingValidatorsDB          database.Database
-// 	pendingValidatorBaseDB       database.Database
-// 	pendingValidatorList         linkeddb.LinkedDB
-// 	pendingDelegatorBaseDB       database.Database
-// 	pendingDelegatorList         linkeddb.LinkedDB
-// 	pendingSubnetValidatorBaseDB database.Database
-// 	pendingSubnetValidatorList   linkeddb.LinkedDB
+	uptimes        map[ids.NodeID]*currentValidatorState // nodeID -> uptimes
+	updatedUptimes map[ids.NodeID]struct{}               // nodeID -> nil
 
-// 	validatorDiffsCache cache.Cacher // cache of heightWithSubnet -> map[ids.ShortID]*ValidatorWeightDiff
-// 	validatorDiffsDB    database.Database
+	validatorsDB                 database.Database
+	currentValidatorsDB          database.Database
+	currentValidatorBaseDB       database.Database
+	currentValidatorList         linkeddb.LinkedDB
+	currentDelegatorBaseDB       database.Database
+	currentDelegatorList         linkeddb.LinkedDB
+	currentSubnetValidatorBaseDB database.Database
+	currentSubnetValidatorList   linkeddb.LinkedDB
+	pendingValidatorsDB          database.Database
+	pendingValidatorBaseDB       database.Database
+	pendingValidatorList         linkeddb.LinkedDB
+	pendingDelegatorBaseDB       database.Database
+	pendingDelegatorList         linkeddb.LinkedDB
+	pendingSubnetValidatorBaseDB database.Database
+	pendingSubnetValidatorList   linkeddb.LinkedDB
 
-// 	addedTxs map[ids.ID]*txAndStatus // map of txID -> {*txs.Tx, Status}
-// 	txCache  cache.Cacher            // cache of txID -> {*txs.Tx, Status} if the entry is nil, it is not in the database
-// 	txDB     database.Database
+	validatorDiffsCache cache.Cacher // cache of heightWithSubnet -> map[ids.ShortID]*ValidatorWeightDiff
+	validatorDiffsDB    database.Database
 
-// 	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
-// 	rewardUTXOsCache cache.Cacher            // cache of txID -> []*UTXO
-// 	rewardUTXODB     database.Database
+	addedTxs map[ids.ID]*txAndStatus // map of txID -> {*txs.Tx, Status}
+	txCache  cache.Cacher            // cache of txID -> {*txs.Tx, Status} if the entry is nil, it is not in the database
+	txDB     database.Database
 
-// 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-// 	utxoDB        database.Database
-// 	utxoState     avax.UTXOState
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher            // cache of txID -> []*UTXO
+	rewardUTXODB     database.Database
 
-// 	cachedSubnets []*txs.Tx // nil if the subnets haven't been loaded
-// 	addedSubnets  []*txs.Tx
-// 	subnetBaseDB  database.Database
-// 	subnetDB      linkeddb.LinkedDB
+	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
+	utxoDB        database.Database
+	utxoState     avax.UTXOState
 
-// 	addedChains  map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
-// 	chainCache   cache.Cacher         // cache of subnetID -> the chains after all local modifications []*txs.Tx
-// 	chainDBCache cache.Cacher         // cache of subnetID -> linkedDB
-// 	chainDB      database.Database
+	cachedSubnets []*txs.Tx // nil if the subnets haven't been loaded
+	addedSubnets  []*txs.Tx
+	subnetBaseDB  database.Database
+	subnetDB      linkeddb.LinkedDB
 
-// 	originalTimestamp, timestamp         time.Time
-// 	originalCurrentSupply, currentSupply uint64
-// 	originalLastAccepted, lastAccepted   ids.ID
-// 	singletonDB                          database.Database
-// }
+	addedChains  map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher         // cache of subnetID -> the chains after all local modifications []*txs.Tx
+	chainDBCache cache.Cacher         // cache of subnetID -> linkedDB
+	chainDB      database.Database
+
+	originalTimestamp, timestamp         time.Time
+	originalCurrentSupply, currentSupply uint64
+	originalLastAccepted, lastAccepted   ids.ID
+	singletonDB                          database.Database
+}
 
 type ValidatorWeightDiff struct {
 	Decrease bool   `serialize:"true"`
@@ -200,6 +209,20 @@ type heightWithSubnet struct {
 type txBytesAndStatus struct {
 	Tx     []byte        `serialize:"true"`
 	Status status.Status `serialize:"true"`
+}
+
+type baseValidator struct {
+	staker     *Staker
+	delegators *btree.BTree
+}
+
+type currentValidatorState struct {
+	txID        ids.ID
+	lastUpdated time.Time
+
+	UpDuration      time.Duration `serialize:"true"`
+	LastUpdated     uint64        `serialize:"true"` // Unix time in seconds
+	PotentialReward uint64        `serialize:"true"`
 }
 
 // func New(
@@ -329,6 +352,143 @@ type txBytesAndStatus struct {
 // 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 // 	}, err
 // }
+
+func (s *state) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseValidator {
+	subnetValidators, ok := s.validators[subnetID]
+	if !ok {
+		subnetValidators = make(map[ids.NodeID]*baseValidator)
+		s.validators[subnetID] = subnetValidators
+	}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		validator = &baseValidator{}
+		subnetValidators[nodeID] = validator
+	}
+	return validator
+}
+
+func (s *state) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
+	subnetValidators, ok := s.validators[subnetID]
+	if !ok {
+		return
+	}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		return
+	}
+	if validator.staker != nil {
+		return
+	}
+	if validator.delegators != nil && validator.delegators.Len() > 0 {
+		return
+	}
+	delete(subnetValidators, nodeID)
+	if len(subnetValidators) == 0 {
+		delete(s.validators, subnetID)
+	}
+}
+
+func (s *state) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
+	if !ok {
+		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
+		s.validatorDiffs[subnetID] = subnetValidatorDiffs
+	}
+	validatorDiff, ok := subnetValidatorDiffs[nodeID]
+	if !ok {
+		validatorDiff = &diffValidator{}
+		subnetValidatorDiffs[nodeID] = validatorDiff
+	}
+	return validatorDiff
+}
+
+func (s *state) GetStaker(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	subnetValidators, ok := s.validators[subnetID]
+	if !ok {
+		return nil, database.ErrNotFound
+	}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		return nil, database.ErrNotFound
+	}
+	if validator.staker != nil {
+		return nil, database.ErrNotFound
+	}
+	return validator.staker, nil
+}
+
+func (s *state) PutStaker(staker *Staker) {
+	validator := s.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	validator.staker = staker
+
+	validatorDiff := s.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.stakerModified = true
+	validatorDiff.stakerDeleted = false
+	validatorDiff.staker = staker
+
+	s.stakers.ReplaceOrInsert(staker)
+}
+
+func (s *state) DeleteStaker(staker *Staker) {
+	validator := s.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	validator.staker = nil
+	s.pruneValidator(staker.SubnetID, staker.NodeID)
+
+	validatorDiff := s.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.stakerModified = true
+	validatorDiff.stakerDeleted = true
+	validatorDiff.staker = staker
+
+	s.stakers.Delete(staker)
+}
+
+func (s *state) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
+	subnetValidators, ok := s.validators[subnetID]
+	if !ok {
+		return EmptyIterator
+	}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		return EmptyIterator
+	}
+	return NewTreeIterator(validator.delegators)
+}
+
+func (s *state) PutDelegator(staker *Staker) {
+	validator := s.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	if validator.delegators == nil {
+		validator.delegators = btree.New(defaultTreeDegree)
+	}
+	validator.delegators.ReplaceOrInsert(staker)
+
+	validatorDiff := s.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.addedDelegators == nil {
+		validatorDiff.addedDelegators = btree.New(defaultTreeDegree)
+	}
+	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
+
+	s.stakers.ReplaceOrInsert(staker)
+}
+
+func (s *state) DeleteDelegator(staker *Staker) {
+	validator := s.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	if validator.delegators != nil {
+		validator.delegators.Delete(staker)
+	}
+	s.pruneValidator(staker.SubnetID, staker.NodeID)
+
+	validatorDiff := s.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.deletedDelegators == nil {
+		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
+	}
+	validatorDiff.deletedDelegators[staker.TxID] = staker
+
+	s.stakers.Delete(staker)
+}
+
+func (s *state) GetStakerIterator() StakerIterator {
+	return NewTreeIterator(s.stakers)
+}
 
 // func (s *state) ShouldInit() (bool, error) {
 // 	has, err := s.singletonDB.Has(initializedKey)
@@ -1032,15 +1192,6 @@ type txBytesAndStatus struct {
 // 		s.singletonDB.Close(),
 // 	)
 // 	return errs.Err
-// }
-
-// type currentValidatorState struct {
-// 	txID        ids.ID
-// 	lastUpdated time.Time
-
-// 	UpDuration      time.Duration `serialize:"true"`
-// 	LastUpdated     uint64        `serialize:"true"` // Unix time in seconds
-// 	PotentialReward uint64        `serialize:"true"`
 // }
 
 // func (s *state) writeCurrentStakers(height uint64) error {

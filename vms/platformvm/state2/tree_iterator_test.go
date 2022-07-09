@@ -32,7 +32,7 @@ func TestTreeIterator(t *testing.T) {
 		},
 	}
 
-	tree := btree.New(2)
+	tree := btree.New(defaultTreeDegree)
 	for _, staker := range stakers {
 		assert.Nil(tree.ReplaceOrInsert(staker))
 	}
@@ -72,7 +72,7 @@ func TestTreeIteratorEarlyRelease(t *testing.T) {
 		},
 	}
 
-	tree := btree.New(2)
+	tree := btree.New(defaultTreeDegree)
 	for _, staker := range stakers {
 		assert.Nil(tree.ReplaceOrInsert(staker))
 	}
@@ -101,7 +101,7 @@ func TestTreeIteratorAfter(t *testing.T) {
 		},
 	}
 
-	tree := btree.New(2)
+	tree := btree.New(defaultTreeDegree)
 	for _, staker := range stakers {
 		assert.Nil(tree.ReplaceOrInsert(staker))
 	}
@@ -147,7 +147,7 @@ func TestTreeIteratorAfterEarlyRelease(t *testing.T) {
 		},
 	}
 
-	tree := btree.New(2)
+	tree := btree.New(defaultTreeDegree)
 	for _, staker := range stakers {
 		assert.Nil(tree.ReplaceOrInsert(staker))
 	}
