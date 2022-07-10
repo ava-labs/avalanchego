@@ -16,126 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
-	defer func() {
-		if err := internalStateShutdown(h); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	nodeID := ids.NodeID(prefundedKeys[0].PublicKey().Address())
-
-	// Case: tx is nil
-	var unsignedTx *txs.AddSubnetValidatorTx
-	stx := txs.Tx{
-		Unsigned: unsignedTx,
-	}
-	if err := stx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have errored because tx is nil")
-	}
-
-	// Case: Wrong network ID
-	tx, err := h.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Unsigned.(*txs.AddSubnetValidatorTx).NetworkID++
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*txs.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have errored because the wrong network ID was used")
-	}
-
-	// Case: Missing Subnet ID
-	tx, err = h.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator.Subnet = ids.ID{}
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*txs.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have errored because Subnet ID is empty")
-	}
-
-	// Case: No weight
-	tx, err = h.txBuilder.NewAddSubnetValidatorTx(
-		1,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator.Wght = 0
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.Unsigned.(*txs.AddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have errored because of no weight")
-	}
-
-	// Case: Subnet auth indices not unique
-	tx, err = h.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix())-1,
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	addSubnetValidatorTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
-	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
-	input.SigIndices[0] = input.SigIndices[1]
-	// This tx was syntactically verified when it was created... pretend it
-	// wasn't so we don't use cache
-	addSubnetValidatorTx.SyntacticallyVerified = false
-	if err = tx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have erred because sig indices weren't unique")
-	}
-
-	// Case: Valid
-	if tx, err := h.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	); err != nil {
-		t.Fatal(err)
-	} else if err := tx.SyntacticVerify(h.ctx); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	h := newTestHelpersCollection()
 	h.ctx.Lock.Lock()
@@ -145,7 +25,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 	}()
 
-	nodeID := prefundedKeys[0].PublicKey().Address()
+	nodeID := preFundedKeys[0].PublicKey().Address()
 
 	{
 		// Case: Proposed validator currently validating primary network
@@ -222,7 +102,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		pendingDSValidatorID,       // node ID
 		nodeID,                     // reward address
 		reward.PercentDenominator,  // shares
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -506,14 +386,14 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], prefundedKeys[1]},
+			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Replace a valid signature with one from keys[3]
-		sig, err := prefundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
+		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -564,43 +444,5 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 		}
-	}
-}
-
-// Test that marshalling/unmarshalling works
-func TestAddSubnetValidatorMarshal(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
-	defer func() {
-		if err := internalStateShutdown(h); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// valid tx
-	tx, err := h.txBuilder.NewAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		ids.NodeID(prefundedKeys[0].PublicKey().Address()),
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	txBytes, err := txs.Codec.Marshal(txs.Version, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	parsedTx, err := txs.Parse(txs.Codec, txBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := parsedTx.SyntacticVerify(h.ctx); err != nil {
-		t.Fatal(err)
 	}
 }

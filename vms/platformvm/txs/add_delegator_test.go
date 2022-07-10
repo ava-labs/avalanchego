@@ -37,6 +37,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	err = stx.SyntacticVerify(ctx)
 	assert.True(errors.Is(err, errNilSignedTx))
 
+	// Case : unsigned tx is nil
+	err = addDelegatorTx.SyntacticVerify(ctx)
+	assert.True(errors.Is(err, ErrNilTx))
+
 	validatorWeight := uint64(2022)
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
@@ -72,7 +76,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			},
 		},
 	}}
-
 	addDelegatorTx = &AddDelegatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,

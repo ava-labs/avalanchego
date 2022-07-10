@@ -50,7 +50,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -131,7 +131,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	if err != nil {
@@ -152,7 +152,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		ids.NodeID(nodeID),
 		nodeID,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	); err != nil {
 		t.Fatal(err)
@@ -186,7 +186,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID),
 			nodeID,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
@@ -213,7 +213,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID),
 			nodeID,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
@@ -240,7 +240,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID), // node ID
 			nodeID,             // reward address
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
@@ -272,7 +272,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID),                                      // node ID
 			key2.PublicKey().Address(),                              // reward address
 			reward.PercentDenominator,                               // shares
-			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr // key
 		)
 		if err != nil {
@@ -309,7 +309,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			ids.NodeID(nodeID),
 			nodeID,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
@@ -317,7 +317,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		// Remove all UTXOs owned by preFundedKeys[0]
-		utxoIDs, err := h.tState.UTXOIDs(prefundedKeys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+		utxoIDs, err := h.tState.UTXOIDs(preFundedKeys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 		if err != nil {
 			t.Fatal(err)
 		}
