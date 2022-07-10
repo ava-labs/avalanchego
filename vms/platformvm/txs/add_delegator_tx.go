@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,6 +21,8 @@ var (
 	_ UnsignedTx             = &AddDelegatorTx{}
 	_ StakerTx               = &AddDelegatorTx{}
 	_ secp256k1fx.UnsignedTx = &AddDelegatorTx{}
+
+	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
 )
 
 // AddDelegatorTx is an unsigned addDelegatorTx
@@ -93,7 +96,11 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
-		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
+		return fmt.Errorf("%w, delegator weight %d total stake weight %d",
+			errDelegatorWeightMismatch,
+			tx.Validator.Wght,
+			totalStakeWeight,
+		)
 	}
 
 	// cache that this is valid
