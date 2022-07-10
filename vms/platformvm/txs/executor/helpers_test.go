@@ -53,7 +53,7 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	prefundedKeys             []*crypto.PrivateKeySECP256K1R
+	preFundedKeys             []*crypto.PrivateKeySECP256K1R
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
@@ -105,8 +105,8 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 }
 
 func init() {
-	prefundedKeys = crypto.BuildTestKeys()
-	testSubnet1ControlKeys = prefundedKeys[0:3]
+	preFundedKeys = crypto.BuildTestKeys()
+	testSubnet1ControlKeys = preFundedKeys[0:3]
 }
 
 func newTestHelpersCollection() *testHelpersCollection {
@@ -179,12 +179,12 @@ func addSubnet(
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
-			prefundedKeys[0].PublicKey().Address(),
-			prefundedKeys[1].PublicKey().Address(),
-			prefundedKeys[2].PublicKey().Address(),
+			preFundedKeys[0].PublicKey().Address(),
+			preFundedKeys[1].PublicKey().Address(),
+			preFundedKeys[2].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
-		prefundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
 		panic(err)
@@ -343,9 +343,9 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 }
 
 func buildGenesisTest(ctx *snow.Context) []byte {
-	genesisUTXOs := make([]api.UTXO, len(prefundedKeys))
+	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
-	for i, key := range prefundedKeys {
+	for i, key := range preFundedKeys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(hrp, id.Bytes())
 		if err != nil {
@@ -357,8 +357,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(prefundedKeys))
-	for i, key := range prefundedKeys {
+	genesisValidators := make([]api.PrimaryValidator, len(preFundedKeys))
+	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
