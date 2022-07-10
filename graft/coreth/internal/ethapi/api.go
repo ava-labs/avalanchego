@@ -129,6 +129,15 @@ func (s *PublicEthereumAPI) FeeHistory(ctx context.Context, blockCount rpc.Decim
 	return results, nil
 }
 
+// Syncing allows the caller to determine whether the chain is syncing or not.
+// In geth, the response is either a map representing an ethereum.SyncProgress
+// struct or "false" (indicating the chain is not syncing).
+// In coreth, avalanchego prevents API calls unless bootstrapping is complete,
+// so we always return false here for API compatibility.
+func (s *PublicEthereumAPI) Syncing() (interface{}, error) {
+	return false, nil
+}
+
 // PublicTxPoolAPI offers and API for the transaction pool. It only operates on data that is non confidential.
 type PublicTxPoolAPI struct {
 	b Backend
