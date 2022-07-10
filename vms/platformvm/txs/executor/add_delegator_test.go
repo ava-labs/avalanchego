@@ -13,66 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
-
-func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
-	h := newTestHelpersCollection()
-	defer func() {
-		if err := internalStateShutdown(h); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	rewardAddress := prefundedKeys[0].PublicKey().Address()
-	nodeID := ids.NodeID(rewardAddress)
-
-	// Case : tx is nil
-	var unsignedTx *txs.AddDelegatorTx
-	stx := txs.Tx{
-		Unsigned: unsignedTx,
-	}
-	if err := stx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have errored because tx is nil")
-	}
-
-	// Case: Wrong network ID
-	tx, err := h.txBuilder.NewAddDelegatorTx(
-		h.cfg.MinDelegatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	addDelegatorTx := tx.Unsigned.(*txs.AddDelegatorTx)
-	addDelegatorTx.NetworkID++
-	// This tx was syntactically verified when it was created... pretend it
-	// wasn't so we don't use cache
-	addDelegatorTx.SyntacticallyVerified = false
-	if err := tx.SyntacticVerify(h.ctx); err == nil {
-		t.Fatal("should have erred because the wrong network ID was used")
-	}
-	// Case: Valid
-	if tx, err := h.txBuilder.NewAddDelegatorTx(
-		h.cfg.MinDelegatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
-		ids.ShortEmpty,
-	); err != nil {
-		t.Fatal(err)
-	} else if err := tx.SyntacticVerify(h.ctx); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestAddDelegatorTxExecute(t *testing.T) {
 	dummyHeight := uint64(1)
