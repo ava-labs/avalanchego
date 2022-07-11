@@ -8,7 +8,32 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/google/btree"
+)
+
+const (
+	// First subnet delegators are removed from the current validator set,
+	SubnetDelegatorCurrentPriority = iota
+	// then subnet validators,
+	SubnetValidatorCurrentPriority
+	// then primary network delegators,
+	PrimaryNetworkDelegatorCurrentPriority
+	// then primary network validators.
+	PrimaryNetworkValidatorCurrentPriority
+)
+
+const (
+	// First primary network validators are moved from the pending to the
+	// current validator set,
+	PrimaryNetworkValidatorPendingPriority = iota
+	// then primary network delegators,
+	PrimaryNetworkDelegatorPendingPriority
+	// then subnet validators,
+	SubnetValidatorPendingPriority
+	// then subnet delegators.
+	SubnetDelegatorPendingPriority
 )
 
 var _ btree.Item = &Staker{}
@@ -43,12 +68,45 @@ func (s *Staker) Less(thanIntf btree.Item) bool {
 		return false
 	}
 
-	if s.Priority > than.Priority {
+	if s.Priority < than.Priority {
 		return true
 	}
-	if than.Priority > s.Priority {
+	if than.Priority < s.Priority {
 		return false
 	}
 
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
+}
+
+func NewPrimaryNetworkValidatorStaker(txID ids.ID, tx *txs.AddValidatorTx) *Staker {
+	return &Staker{
+		TxID:      txID,
+		NodeID:    tx.Validator.NodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    tx.Weight(),
+		StartTime: tx.StartTime(),
+		EndTime:   tx.EndTime(),
+	}
+}
+
+func NewPrimaryNetworkDelegatorStaker(txID ids.ID, tx *txs.AddDelegatorTx) *Staker {
+	return &Staker{
+		TxID:      txID,
+		NodeID:    tx.Validator.NodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    tx.Weight(),
+		StartTime: tx.StartTime(),
+		EndTime:   tx.EndTime(),
+	}
+}
+
+func NewSubnetValidatorStaker(txID ids.ID, tx *txs.AddSubnetValidatorTx) *Staker {
+	return &Staker{
+		TxID:      txID,
+		NodeID:    tx.Validator.NodeID,
+		SubnetID:  tx.Validator.Subnet,
+		Weight:    tx.Weight(),
+		StartTime: tx.StartTime(),
+		EndTime:   tx.EndTime(),
+	}
 }
