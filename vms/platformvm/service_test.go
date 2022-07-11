@@ -526,11 +526,11 @@ func TestGetStake(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	service.vm.internalState.AddCurrentStaker(tx, 0)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
+	service.vm.state.AddCurrentStaker(tx, 0)
+	service.vm.state.AddTx(tx, status.Committed)
+	err = service.vm.state.Commit()
 	assert.NoError(err)
-	err = service.vm.internalState.Load()
+	err = service.vm.state.Load()
 	assert.NoError(err)
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
@@ -570,11 +570,11 @@ func TestGetStake(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	service.vm.internalState.AddPendingStaker(tx)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
+	service.vm.state.AddPendingStaker(tx)
+	service.vm.state.AddTx(tx, status.Committed)
+	err = service.vm.state.Commit()
 	assert.NoError(err)
-	err = service.vm.internalState.Load()
+	err = service.vm.state.Load()
 	assert.NoError(err)
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
@@ -674,13 +674,13 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service.vm.internalState.AddCurrentStaker(tx, 0)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
+	service.vm.state.AddCurrentStaker(tx, 0)
+	service.vm.state.AddTx(tx, status.Committed)
+	err = service.vm.state.Commit()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = service.vm.internalState.Load()
+	err = service.vm.state.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -739,10 +739,10 @@ func TestGetTimestamp(t *testing.T) {
 	err := service.GetTimestamp(nil, nil, &reply)
 	assert.NoError(err)
 
-	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
+	assert.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
-	service.vm.internalState.SetTimestamp(newTimestamp)
+	service.vm.state.SetTimestamp(newTimestamp)
 
 	err = service.GetTimestamp(nil, nil, &reply)
 	assert.NoError(err)

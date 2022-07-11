@@ -196,7 +196,7 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 		return err
 	}
 
-	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
@@ -378,7 +378,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 	}
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
-			service.vm.internalState,
+			service.vm.state,
 			addrSet,
 			startAddr,
 			startUTXO,
@@ -460,7 +460,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 	getAll := len(args.IDs) == 0
 	if getAll {
-		subnets, err := service.vm.internalState.GetSubnets() // all subnets
+		subnets, err := service.vm.state.GetSubnets() // all subnets
 		if err != nil {
 			return fmt.Errorf("error getting subnets from database: %w", err)
 		}
@@ -510,7 +510,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			continue
 		}
 
-		subnetTx, _, err := service.vm.internalState.GetTx(subnetID)
+		subnetTx, _, err := service.vm.state.GetTx(subnetID)
 		if err == database.ErrNotFound {
 			continue
 		}
@@ -609,7 +609,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentValidators := service.vm.internalState.CurrentStakers()
+	currentValidators := service.vm.state.CurrentStakers()
 
 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
@@ -779,7 +779,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingValidators := service.vm.internalState.PendingStakers()
+	pendingValidators := service.vm.state.PendingStakers()
 
 	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
 		switch staker := tx.Unsigned.(type) {
@@ -861,7 +861,7 @@ type GetCurrentSupplyReply struct {
 func (service *Service) GetCurrentSupply(_ *http.Request, _ *struct{}, reply *GetCurrentSupplyReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetCurrentSupply called")
 
-	reply.Supply = json.Uint64(service.vm.internalState.GetCurrentSupply())
+	reply.Supply = json.Uint64(service.vm.state.GetCurrentSupply())
 	return nil
 }
 
@@ -1649,7 +1649,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 }
 
 func (service *Service) nodeValidates(blockchainID ids.ID) bool {
-	chainTx, _, err := service.vm.internalState.GetTx(blockchainID)
+	chainTx, _, err := service.vm.state.GetTx(blockchainID)
 	if err != nil {
 		return false
 	}
@@ -1714,7 +1714,7 @@ type ValidatedByResponse struct {
 func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	service.vm.ctx.Log.Debug("Platform: ValidatedBy called")
 
-	chainTx, _, err := service.vm.internalState.GetTx(args.BlockchainID)
+	chainTx, _, err := service.vm.state.GetTx(args.BlockchainID)
 	if err != nil {
 		return fmt.Errorf(
 			"problem retrieving blockchain %q: %w",
@@ -1745,7 +1745,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.ctx.Log.Debug("Platform: Validates called")
 
 	if args.SubnetID != constants.PrimaryNetworkID {
-		subnetTx, _, err := service.vm.internalState.GetTx(args.SubnetID)
+		subnetTx, _, err := service.vm.state.GetTx(args.SubnetID)
 		if err != nil {
 			return fmt.Errorf(
 				"problem retrieving subnet %q: %w",
@@ -1760,7 +1760,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 
 	// Get the chains that exist
-	chains, err := service.vm.internalState.GetChains(args.SubnetID)
+	chains, err := service.vm.state.GetChains(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("problem retrieving chains for subnet %q: %w", args.SubnetID, err)
 	}
@@ -1797,7 +1797,7 @@ type GetBlockchainsResponse struct {
 func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetBlockchains called")
 
-	subnets, err := service.vm.internalState.GetSubnets()
+	subnets, err := service.vm.state.GetSubnets()
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -1805,7 +1805,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	response.Blockchains = []APIBlockchain{}
 	for _, subnet := range subnets {
 		subnetID := subnet.ID()
-		chains, err := service.vm.internalState.GetChains(subnetID)
+		chains, err := service.vm.state.GetChains(subnetID)
 		if err != nil {
 			return fmt.Errorf(
 				"couldn't retrieve chains for subnet %q: %w",
@@ -1829,7 +1829,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		}
 	}
 
-	chains, err := service.vm.internalState.GetChains(constants.PrimaryNetworkID)
+	chains, err := service.vm.state.GetChains(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -1874,7 +1874,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetTxReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTx called")
 
-	tx, _, err := service.vm.internalState.GetTx(args.TxID)
+	tx, _, err := service.vm.state.GetTx(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
@@ -1919,7 +1919,7 @@ type GetTxStatusResponse struct {
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetTxStatus called with txID: %s", args.TxID)
 
-	_, txStatus, err := service.vm.internalState.GetTx(args.TxID)
+	_, txStatus, err := service.vm.state.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = txStatus
 		return nil
@@ -2073,7 +2073,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return err
 	}
 
-	currentStakers := service.vm.internalState.CurrentStakers()
+	currentStakers := service.vm.state.CurrentStakers()
 	stakers := currentStakers.Stakers()
 
 	var (
@@ -2092,7 +2092,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts = append(stakedOuts, outs...)
 	}
 
-	pendingStakers := service.vm.internalState.PendingStakers()
+	pendingStakers := service.vm.state.PendingStakers()
 	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
@@ -2184,7 +2184,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	startTime := time.Unix(int64(args.StartTime), 0)
 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
+	maxStakeAmount, err := service.vm.state.MaxStakeAmount(
 		args.SubnetID,
 		args.NodeID,
 		startTime,
@@ -2210,7 +2210,7 @@ type GetRewardUTXOsReply struct {
 func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *GetRewardUTXOsReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetRewardUTXOs called")
 
-	utxos, err := service.vm.internalState.GetRewardUTXOs(args.TxID)
+	utxos, err := service.vm.state.GetRewardUTXOs(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get reward UTXOs: %w", err)
 	}
@@ -2243,7 +2243,7 @@ type GetTimestampReply struct {
 func (service *Service) GetTimestamp(_ *http.Request, args *struct{}, reply *GetTimestampReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTimestamp called")
 
-	reply.Timestamp = service.vm.internalState.GetTimestamp()
+	reply.Timestamp = service.vm.state.GetTimestamp()
 	return nil
 }
 
