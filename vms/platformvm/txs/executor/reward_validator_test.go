@@ -26,6 +26,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	currentStakers := h.tState.CurrentStakers()
 	toRemoveTx, _, err := currentStakers.GetNextStaker()
@@ -105,6 +106,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	}
 
 	txExecutor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -127,6 +129,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	currentStakers := h.tState.CurrentStakers()
 	toRemoveTx, _, err := currentStakers.GetNextStaker()
@@ -206,6 +209,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	}
 
 	txExecutor.OnAbort.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -229,6 +233,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
@@ -268,8 +273,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	h.tState.AddCurrentStaker(delTx, 1000000)
 	h.tState.AddTx(delTx, status.Committed)
 	h.tState.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	err = h.tState.Commit()
-	assert.NoError(err)
+	h.tState.SetHeight(dummyHeight)
+	assert.NoError(h.tState.Commit())
 	err = h.tState.Load()
 	assert.NoError(err)
 	// test validator stake
@@ -303,8 +308,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor.OnCommit.Apply(h.tState)
-	err = h.tState.Commit()
-	assert.NoError(err)
+	h.tState.SetHeight(dummyHeight)
+	assert.NoError(h.tState.Commit())
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
@@ -336,6 +341,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	initialSupply := h.tState.GetCurrentSupply()
 
@@ -376,8 +382,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	h.tState.AddCurrentStaker(delTx, 1000000)
 	h.tState.AddTx(delTx, status.Committed)
 	h.tState.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	err = h.tState.Commit()
-	assert.NoError(err)
+	h.tState.SetHeight(dummyHeight)
+	assert.NoError(h.tState.Commit())
 	err = h.tState.Load()
 	assert.NoError(err)
 
@@ -405,8 +411,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor.OnAbort.Apply(h.tState)
-	err = h.tState.Commit()
-	assert.NoError(err)
+	h.tState.SetHeight(dummyHeight)
+	assert.NoError(h.tState.Commit())
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
 	newVdrBalance, err := avax.GetBalance(h.tState, vdrDestSet)

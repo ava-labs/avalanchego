@@ -84,8 +84,8 @@ type VM struct {
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	internalState state.State
-	utxoHandler   utxo.Handler
+	state       state.State
+	utxoHandler utxo.Handler
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -158,23 +158,23 @@ func (vm *VM) Initialize(
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 	vm.currentBlocks = make(map[ids.ID]stateful.Block)
-	if vm.internalState, err = state.New(
+	if vm.state, err = state.New(
 		vm.dbManager.Current().Database,
+		genesisBytes,
 		registerer,
 		&vm.Config,
 		vm.ctx,
-		vm.Metrics.LocalStake,
-		vm.Metrics.TotalStake,
+		vm.LocalStake,
+		vm.TotalStake,
 		vm.rewards,
-		genesisBytes,
 	); err != nil {
 		return err
 	}
 
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
-	vm.uptimeManager = uptime.NewManager(vm.internalState)
+	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.state, vm.fx)
+	vm.uptimeManager = uptime.NewManager(vm.state)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
 	vm.txBuilder = builder.NewTxBuilder(
@@ -182,7 +182,7 @@ func (vm *VM) Initialize(
 		vm.Config,
 		&vm.clock,
 		vm.fx,
-		vm.internalState,
+		vm.state,
 		vm.AtomicUTXOManager,
 		vm.utxoHandler,
 	)
@@ -208,10 +208,10 @@ func (vm *VM) Initialize(
 	vm.manager = stateful.NewManager(
 		mempool,
 		vm.Metrics,
-		vm.internalState,
-		vm.internalState,
-		vm.internalState,
-		vm.internalState,
+		vm.state,
+		vm.state,
+		vm.state,
+		vm.state,
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
 	)
@@ -245,7 +245,7 @@ func (vm *VM) Initialize(
 	}
 
 	// Build off the most recently accepted block
-	lastAcceptedID := vm.internalState.GetLastAccepted()
+	lastAcceptedID := vm.state.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 	return vm.SetPreference(lastAcceptedID)
 }
@@ -263,7 +263,7 @@ func (vm *VM) initBlockchains() error {
 			}
 		}
 	} else {
-		subnets, err := vm.internalState.GetSubnets()
+		subnets, err := vm.state.GetSubnets()
 		if err != nil {
 			return err
 		}
@@ -278,7 +278,7 @@ func (vm *VM) initBlockchains() error {
 
 // Create the subnet with ID [subnetID]
 func (vm *VM) createSubnet(subnetID ids.ID) error {
-	chains, err := vm.internalState.GetChains(subnetID)
+	chains, err := vm.state.GetChains(subnetID)
 	if err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
-	return vm.internalState.Commit()
+	return vm.state.Commit()
 }
 
 func (vm *VM) SetState(state snow.State) error {
@@ -360,14 +360,14 @@ func (vm *VM) Shutdown() error {
 		if err := vm.uptimeManager.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := vm.internalState.Commit(); err != nil {
+		if err := vm.state.Commit(); err != nil {
 			return err
 		}
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.internalState.Close(),
+		vm.state.Close(),
 		vm.dbManager.Close(),
 	)
 	return errs.Err
@@ -405,7 +405,7 @@ func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 // LastAccepted returns the block most recently accepted
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	return vm.internalState.GetLastAccepted(), nil
+	return vm.state.GetLastAccepted(), nil
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
@@ -474,7 +474,7 @@ func (vm *VM) Disconnected(vdrID ids.NodeID) error {
 	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
-	return vm.internalState.Commit()
+	return vm.state.Commit()
 }
 
 // GetValidatorSet returns the validator set at the specified height for the
@@ -521,7 +521,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
-		diffs, err := vm.internalState.GetValidatorWeightDiffs(i, subnetID)
+		diffs, err := vm.state.GetValidatorWeightDiffs(i, subnetID)
 		if err != nil {
 			return nil, err
 		}
@@ -589,7 +589,7 @@ func (vm *VM) GetMinimumHeight() (uint64, error) {
 
 // GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
-	lastAccepted, err := vm.GetBlock(vm.internalState.GetLastAccepted())
+	lastAccepted, err := vm.GetBlock(vm.state.GetLastAccepted())
 	if err != nil {
 		return 0, err
 	}
@@ -597,7 +597,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 }
 
 func (vm *VM) updateValidators() error {
-	currentValidators := vm.internalState.CurrentStakers()
+	currentValidators := vm.state.CurrentStakers()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {
 		return err
