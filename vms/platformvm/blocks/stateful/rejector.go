@@ -4,8 +4,6 @@
 package stateful
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
@@ -18,14 +16,10 @@ type rejector struct {
 
 func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	blkID := b.ID()
-	blockState, ok := r.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("block %s state not found", blkID)
-	}
 
 	r.ctx.Log.Verbo(
 		"Rejecting Proposal Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
@@ -38,10 +32,6 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 		)
 	}
 
-	// TODO remove
-	// b.status = choices.Rejected
-	blockState.status = choices.Rejected
-	// r.blkIDToStatus[blkID] = choices.Rejected
 	defer r.free(blkID)
 	r.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
@@ -49,14 +39,10 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 
 func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
-	blockState, ok := r.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("block %s state not found", blkID)
-	}
 
 	r.ctx.Log.Verbo(
 		"Rejecting Atomic Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
@@ -69,10 +55,6 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		)
 	}
 
-	// TODO remove
-	// b.status = choices.Rejected
-	// 	r.blkIDToStatus[blkID] = choices.Rejected
-	blockState.status = choices.Rejected
 	defer r.free(blkID)
 	r.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
@@ -80,14 +62,10 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 
 func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
-	blockState, ok := r.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("block %s state not found", blkID)
-	}
 
 	r.ctx.Log.Verbo(
 		"Rejecting Standard Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
@@ -102,56 +80,43 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 		}
 	}
 
-	// TODO remove
-	// b.status = choices.Rejected
-	// 	r.blkIDToStatus[blkID] = choices.Rejected
-	blockState.status = choices.Rejected
-	defer r.free(b.ID())
+	defer r.free(blkID)
 	r.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
 func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
 	blkID := b.ID()
-	blockState, ok := r.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("block %s state not found", blkID)
-	}
 
 	r.ctx.Log.Verbo(
 		"Rejecting CommitBlock Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	// b.status = choices.Rejected
-	// 	r.blkIDToStatus[blkID] = choices.Rejected
-	blockState.status = choices.Rejected
-
-	defer r.free(b.ID())
+	defer func() {
+		r.free(blkID)
+		r.free(b.Parent())
+	}()
 	r.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
 func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
 	blkID := b.ID()
-	blockState, ok := r.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("block %s state not found", blkID)
-	}
 
 	r.ctx.Log.Verbo(
 		"Rejecting Abort Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	// b.status = choices.Rejected
-	// r.blkIDToStatus[blkID] = choices.Rejected
-	blockState.status = choices.Rejected
-	defer r.free(b.ID())
+	defer func() {
+		r.free(blkID)
+		r.free(b.Parent())
+	}()
 	r.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }

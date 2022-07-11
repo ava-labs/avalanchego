@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -182,6 +184,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	if !ok {
 		blkState = &blockState{
 			statelessBlock: b,
+			atomicRequests: make(map[ids.ID]*atomic.Requests),
 		}
 	}
 
@@ -328,13 +331,13 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
-		return err
+		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
 	}
 
 	//
-	// parentID := b.Parent()
-	// onAcceptState := v.blkIDToOnCommitState[parentID]
-	onAcceptState := state.Diff(nil) // TODO get parent state
+	parentID := b.Parent()
+	onAcceptState := v.blkIDToState[parentID].onCommitState
+	// onAcceptState := state.Diff(nil) // TODO get parent state
 	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	blkState.timestamp = onAcceptState.GetTimestamp()
 	// v.blkIDToOnAcceptState[blkID] = onAcceptState
@@ -343,7 +346,6 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
 
-	parentID := b.Parent()
 	parentState := v.blkIDToState[parentID]
 	parentState.children = append(parentState.children, blkID)
 
@@ -363,17 +365,13 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 		return err
 	}
 
-	// parentID := b.Parent()
-	// onAcceptState := v.blkIDToOnAbortState[parentID]
-	onAcceptState := state.Diff(nil)
-	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
+	parentID := b.Parent()
+	onAcceptState := v.blkIDToState[parentID].onAbortState
 	blkState.timestamp = onAcceptState.GetTimestamp()
-	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blkState.onAcceptState = onAcceptState
 
 	v.blkIDToState[blkID] = blkState
 
-	parentID := b.Parent()
 	parentState := v.blkIDToState[parentID]
 	parentState.children = append(parentState.children, blkID)
 	return nil
@@ -381,11 +379,22 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 
 // Assumes [b] isn't nil
 func (v *verifier) verifyCommonBlock(b stateless.CommonBlock) error {
-	parent, _, err := v.GetStatelessBlock(b.Parent())
-	if err != nil {
-		return err
+	var (
+		parentID           = b.Parent()
+		parentStatelessBlk stateless.Block
+	)
+	// Check if the parent is in memory.
+	if parent, ok := v.blkIDToState[parentID]; ok {
+		parentStatelessBlk = parent.statelessBlock
+	} else {
+		// The parent isn't in memory.
+		var err error
+		parentStatelessBlk, _, err = v.GetStatelessBlock(parentID)
+		if err != nil {
+			return err
+		}
 	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != b.Height() {
+	if expectedHeight := parentStatelessBlk.Height() + 1; expectedHeight != b.Height() {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
 			expectedHeight,

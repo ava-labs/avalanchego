@@ -4,6 +4,7 @@
 package stateful
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -14,40 +15,26 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-var _ snowman.Block = &block{}
+var (
+	_ snowman.Block       = &block{}
+	_ snowman.OracleBlock = &oracleBlock{}
+)
 
-// TODO remove
-// type Block interface {
-// 	snowman.Block
-
-// TODO remove
-// returns true if this block or any processing ancestors consume any of the
-// named atomic imports.
-// conflicts(ids.Set) (bool, error)
-
-// TODO remove
-// addChild notifies this block that it has a child block building on it.
-// When this block commits its changes, it should set the child's base state
-// to the internal state. This ensures that the state versions do not
-// recurse the length of the chain.
-// addChild(Block)
-
-// TODO remove
-// free all the references of this block from the vm's memory
-// free()
-
-// Set the block's underlying state to the chain's internal state
-// 	setBaseState()
-// }
-
-func NewBlock(
+func newBlock(
 	blk stateless.Block,
 	manager *manager,
 ) snowman.Block {
-	return &block{
+	b := &block{
 		manager: manager,
 		Block:   blk,
 	}
+	// TODO should we just have a NewOracleBlock method?
+	if _, ok := blk.(*stateless.ProposalBlock); ok {
+		return &oracleBlock{
+			block: b,
+		}
+	}
+	return b
 }
 
 type block struct {
@@ -70,6 +57,9 @@ func (b *block) Reject() error {
 // TODO
 func (b *block) Status() choices.Status {
 	blkID := b.ID()
+	if b.manager.state.GetLastAccepted() == blkID {
+		return choices.Accepted
+	}
 	// Check if the block is in memory
 	if _, ok := b.manager.backend.blkIDToState[blkID]; ok {
 		return choices.Processing
@@ -89,9 +79,6 @@ func (b *block) Timestamp() time.Time {
 	// 	 If this is the last accepted block and the block was loaded from disk
 	// 	 since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// 	 we explicitly return the chain time.
-	//if c.baseBlk.ID() == c.backend.GetLastAccepted() {
-	//	return c.GetTimestamp()
-	//}
 	blkID := b.ID()
 	// Check if the block is processing.
 	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
@@ -104,11 +91,48 @@ func (b *block) Timestamp() time.Time {
 	return b.manager.state.GetTimestamp()
 }
 
-// TODO rename
+type oracleBlock struct {
+	// Invariant: The inner statless block is a *stateless.ProposalBlock.
+	*block
+}
+
+func (b *oracleBlock) Options() ([2]snowman.Block, error) {
+	blkID := b.ID()
+	nextHeight := b.Height() + 1
+
+	statelessCommitBlk, err := stateless.NewCommitBlock(
+		blkID,
+		nextHeight,
+	)
+	if err != nil {
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to create commit block: %w",
+			err,
+		)
+	}
+	commitBlock := b.manager.NewBlock(statelessCommitBlk)
+
+	statelessAbortBlk, err := stateless.NewAbortBlock(
+		blkID,
+		nextHeight,
+	)
+	if err != nil {
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to create abort block: %w",
+			err,
+		)
+	}
+	abortBlock := b.manager.NewBlock(statelessAbortBlk)
+
+	if b.manager.backend.blkIDToState[blkID].inititallyPreferCommit {
+		return [2]snowman.Block{commitBlock, abortBlock}, nil
+	}
+	return [2]snowman.Block{abortBlock, commitBlock}, nil
+}
+
 type blockState struct {
 	// TODO add stateless block to this struct
 	statelessBlock         stateless.Block
-	status                 choices.Status
 	onAcceptFunc           func()
 	onAcceptState          state.Diff
 	onCommitState          state.Diff

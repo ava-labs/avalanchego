@@ -19,10 +19,9 @@ type heightSetter interface {
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
-	// TODO consolidate state fields below?
 	statelessBlockState
 	heightSetter
-	blkIDToState map[ids.ID]*blockState // TODO set this
+	blkIDToState map[ids.ID]*blockState
 	state        state.State
 	ctx          *snow.Context
 	bootstrapped *utils.AtomicBool
@@ -32,7 +31,6 @@ func (b *backend) getState() state.State {
 	return b.state
 }
 
-// TODO is this right?
 func (b *backend) OnAccept(blkID ids.ID) state.Chain {
 	blockState, ok := b.blkIDToState[blkID]
 	if !ok {

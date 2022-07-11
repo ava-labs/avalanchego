@@ -22,10 +22,6 @@ type acceptor struct {
 
 func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	blkID := b.ID()
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
-	}
 	a.ctx.Log.Verbo(
 		"Accepting Proposal Block %s at height %d with parent %s",
 		blkID,
@@ -48,8 +44,6 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	// TODO remove
 	// b.status = choices.Accepted
 
-	// a.blkIDToStatus[blkID] = choices.Accepted
-	blkState.status = choices.Accepted
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -64,7 +58,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
 
-	defer a.backend.free(blkID)
+	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
@@ -230,14 +224,14 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	// }
 	parentID := b.Parent()
 	parentState := a.blkIDToState[parentID]
-	parent, _, err := a.GetStatelessBlock(parentID)
-	if err != nil {
-		return err
-	}
-	defer a.free(parent.ID())
+	// parent, _, err := a.GetStatelessBlock(parentID)
+	// if err != nil {
+	// 	return fmt.Errorf("couldn't get parent %s of %s: %s", parentID, blkID, err)
+	// }
+	defer a.free(parentID)
 
-	a.commonAccept(parentState, parent)
-	a.AddStatelessBlock(parent, choices.Accepted)
+	a.commonAccept(parentState, parentState.statelessBlock)
+	a.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
 
 	a.commonAccept(blkState, b)
 	a.AddStatelessBlock(b, choices.Accepted)
@@ -272,21 +266,15 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 
 	parentID := b.Parent()
 	parentState := a.blkIDToState[parentID]
-	parent, _, err := a.GetStatelessBlock(parentID)
-	if err != nil {
-		return err
-	}
 	defer a.free(parentID)
 
-	a.commonAccept(parentState, parent) // TODO pass in parent state
-	a.AddStatelessBlock(parent, choices.Accepted)
+	a.commonAccept(parentState, parentState.statelessBlock)
+	a.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
 
 	a.commonAccept(blkState, b)
 	a.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
-	// wasPreferred := a.blkIDToPreferCommit[blkID]
-
 	// TODO should this be the parent's state?
 	wasPreferred := blkState.inititallyPreferCommit
 	if a.bootstrapped.GetValue() {
@@ -312,9 +300,6 @@ func (a *acceptor) updateStateOptionBlock(b stateless.CommonBlock) error {
 	}
 
 	// Update the state of the chain in the database
-	// if onAcceptState := a.blkIDToOnAcceptState[blkID]; onAcceptState != nil {
-	// 	onAcceptState.Apply(a.getState())
-	// }
 	blkState.onAcceptState.Apply(a.getState())
 	if err := a.state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
@@ -334,11 +319,7 @@ func (a *acceptor) updateStateOptionBlock(b stateless.CommonBlock) error {
 		if childState.onAcceptState != nil {
 			childState.onAcceptState.Apply(a.state)
 		}
-		// childID.setBaseState()
 	}
-	// if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {
-	// 	onAcceptFunc()
-	// }
 	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
 		onAcceptFunc()
 	}
@@ -347,8 +328,6 @@ func (a *acceptor) updateStateOptionBlock(b stateless.CommonBlock) error {
 
 func (a *acceptor) commonAccept(blkState *blockState, b stateless.Block) {
 	blkID := b.ID()
-	// a.blkIDToStatus[blkID] = choices.Accepted
-	blkState.status = choices.Accepted
 	a.state.SetLastAccepted(blkID, true /*persist*/)
 	a.SetHeight(b.Height())
 	a.recentlyAccepted.Add(blkID)

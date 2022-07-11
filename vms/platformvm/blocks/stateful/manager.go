@@ -46,8 +46,7 @@ func NewManager(
 		state:               s,
 		bootstrapped:        txExecutorBackend.Bootstrapped,
 		ctx:                 txExecutorBackend.Ctx,
-		// verifiedBlocks:      make(map[ids.ID]stateless.Block),
-		blkIDToState: map[ids.ID]*blockState{},
+		blkIDToState:        map[ids.ID]*blockState{},
 	}
 
 	manager := &manager{
@@ -62,8 +61,6 @@ func NewManager(
 			recentlyAccepted: recentlyAccepted,
 		},
 		rejector: &rejector{backend: backend},
-		// baseStateSetter:         &baseStateSetterImpl{backend: backend},
-		// initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
 	}
 	return manager
 }
@@ -73,36 +70,19 @@ type manager struct {
 	verifier stateless.Visitor
 	acceptor stateless.Visitor
 	rejector stateless.Visitor
-	// baseStateSetter
-	// initialPreferenceGetter
 }
-
-// TODO remove
-// func (m *manager) GetState() state.State {
-// 	return m.state
-// }
-
-// TODO remove
-// func (m *manager) GetLastAccepted() ids.ID {
-// 	return m.state.GetLastAccepted()
-// }
-
-// TODO remove
-// func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
-// 	m.state.SetLastAccepted(blkID, persist)
-// }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := m.blkIDToState[blkID]; ok {
-		return NewBlock(blk.statelessBlock, m), nil
+		return newBlock(blk.statelessBlock, m), nil
 	}
 	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
-	return NewBlock(statelessBlk, m), nil
+	return newBlock(statelessBlk, m), nil
 }
 
 func (m *manager) NewBlock(blk stateless.Block) snowman.Block {
-	return NewBlock(blk, m)
+	return newBlock(blk, m)
 }
