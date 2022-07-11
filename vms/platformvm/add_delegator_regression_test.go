@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/stretchr/testify/assert"
@@ -327,15 +328,19 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Bl
 	assert.NoError(err)
 
 	// Assert preferences are correct
-	proposalBlk := blk.(*stateful.ProposalBlock)
+	proposalBlk := blk.(snowman.OracleBlock)
 	options, err := proposalBlk.Options()
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*stateful.CommitBlock)
+	commit, ok := options[0].(*stateful.Block)
+	assert.True(ok, "expected commit block to be preferred")
+	_, ok = options[0].(*stateful.Block).Block.(*stateless.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*stateful.AbortBlock)
+	abort, ok := options[1].(*stateful.Block)
+	assert.True(ok, "expected abort block to be issued")
+	_, ok = options[1].(*stateful.Block).Block.(*stateless.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	err = commit.Verify()

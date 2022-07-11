@@ -41,9 +41,6 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	// (The VM's Shutdown method commits the database.)
 	// There is an invariant that the most recently committed block is a decision block.
 
-	// TODO remove
-	// b.status = choices.Accepted
-
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -67,7 +64,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		b.Parent(),
 	)
 
-	a.commonAccept(blkState, b)
+	a.commonAccept(b)
 	a.AddStatelessBlock(b, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
@@ -146,7 +143,7 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 
 	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
 
-	a.commonAccept(blkState, b)
+	a.commonAccept(b)
 	a.AddStatelessBlock(b, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
@@ -230,10 +227,10 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	// }
 	defer a.free(parentID)
 
-	a.commonAccept(parentState, parentState.statelessBlock)
+	a.commonAccept(parentState.statelessBlock)
 	a.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
 
-	a.commonAccept(blkState, b)
+	a.commonAccept(b)
 	a.AddStatelessBlock(b, choices.Accepted)
 
 	// wasPreferred := a.blkIDToPreferCommit[blkID]
@@ -268,10 +265,10 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	parentState := a.blkIDToState[parentID]
 	defer a.free(parentID)
 
-	a.commonAccept(parentState, parentState.statelessBlock)
+	a.commonAccept(parentState.statelessBlock)
 	a.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
 
-	a.commonAccept(blkState, b)
+	a.commonAccept(b)
 	a.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
@@ -326,7 +323,7 @@ func (a *acceptor) updateStateOptionBlock(b stateless.CommonBlock) error {
 	return nil
 }
 
-func (a *acceptor) commonAccept(blkState *blockState, b stateless.Block) {
+func (a *acceptor) commonAccept(b stateless.Block) {
 	blkID := b.ID()
 	a.state.SetLastAccepted(blkID, true /*persist*/)
 	a.SetHeight(b.Height())

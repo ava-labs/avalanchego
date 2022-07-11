@@ -1654,27 +1654,6 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	/* TODO remove
-	blockIntf, err := service.vm.manager.GetStatefulBlock(blockID)
-	if err != nil {
-		return false, err
-	}
-
-		block, ok := blockIntf.(stateful.Decision)
-		if !ok {
-			parentBlkID := blockIntf.Parent()
-			parentBlockIntf, err := service.vm.GetBlock(parentBlkID)
-			if err != nil {
-				return false, err
-			}
-			block, ok = parentBlockIntf.(stateful.Decision)
-			if !ok {
-				return false, fmt.Errorf("expected stateful.Decision but got %T", parentBlockIntf)
-			}
-		}
-		state := block.OnAccept()
-	*/
-
 	// TODO make sure this is right
 	state := service.vm.manager.OnAccept(blockID)
 

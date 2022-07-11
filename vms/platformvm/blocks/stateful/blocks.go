@@ -16,46 +16,46 @@ import (
 )
 
 var (
-	_ snowman.Block       = &block{}
-	_ snowman.OracleBlock = &oracleBlock{}
+	_ snowman.Block       = &Block{}
+	_ snowman.OracleBlock = &OracleBlock{}
 )
 
 func newBlock(
 	blk stateless.Block,
 	manager *manager,
 ) snowman.Block {
-	b := &block{
+	b := &Block{
 		manager: manager,
 		Block:   blk,
 	}
 	// TODO should we just have a NewOracleBlock method?
 	if _, ok := blk.(*stateless.ProposalBlock); ok {
-		return &oracleBlock{
-			block: b,
+		return &OracleBlock{
+			Block: b,
 		}
 	}
 	return b
 }
 
-type block struct {
+type Block struct {
 	stateless.Block
 	manager *manager
 }
 
-func (b *block) Verify() error {
+func (b *Block) Verify() error {
 	return b.Visit(b.manager.verifier)
 }
 
-func (b *block) Accept() error {
+func (b *Block) Accept() error {
 	return b.Visit(b.manager.acceptor)
 }
 
-func (b *block) Reject() error {
+func (b *Block) Reject() error {
 	return b.Visit(b.manager.rejector)
 }
 
 // TODO
-func (b *block) Status() choices.Status {
+func (b *Block) Status() choices.Status {
 	blkID := b.ID()
 	if b.manager.state.GetLastAccepted() == blkID {
 		return choices.Accepted
@@ -75,7 +75,7 @@ func (b *block) Status() choices.Status {
 }
 
 // TODO
-func (b *block) Timestamp() time.Time {
+func (b *Block) Timestamp() time.Time {
 	// 	 If this is the last accepted block and the block was loaded from disk
 	// 	 since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// 	 we explicitly return the chain time.
@@ -91,12 +91,12 @@ func (b *block) Timestamp() time.Time {
 	return b.manager.state.GetTimestamp()
 }
 
-type oracleBlock struct {
+type OracleBlock struct {
 	// Invariant: The inner statless block is a *stateless.ProposalBlock.
-	*block
+	*Block
 }
 
-func (b *oracleBlock) Options() ([2]snowman.Block, error) {
+func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
@@ -124,7 +124,11 @@ func (b *oracleBlock) Options() ([2]snowman.Block, error) {
 	}
 	abortBlock := b.manager.NewBlock(statelessAbortBlk)
 
-	if b.manager.backend.blkIDToState[blkID].inititallyPreferCommit {
+	blkState, ok := b.manager.backend.blkIDToState[blkID]
+	if !ok {
+		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
+	}
+	if blkState.inititallyPreferCommit {
 		return [2]snowman.Block{commitBlock, abortBlock}, nil
 	}
 	return [2]snowman.Block{abortBlock, commitBlock}, nil

@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -263,8 +265,8 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*stateful.StandardBlock); !ok {
-		t.Fatalf("should be *StandardBlock but is %T", block)
+	} else if blk, ok := block.(*stateful.Block); !ok {
+		t.Fatalf("should be *stateful.Block but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
@@ -359,10 +361,12 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			} else if err := block.Accept(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if blk, ok := block.(*stateful.ProposalBlock); ok { // For proposal blocks, commit them
+			} else if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
 				if options, err := blk.Options(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if commit, ok := options[0].(*stateful.CommitBlock); !ok {
+				} else if commit, ok := options[0].(*stateful.Block); !ok {
+					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
+				} else if _, ok := options[0].(*stateful.Block).Block.(*stateless.CommitBlock); !ok {
 					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 				} else if err := commit.Verify(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -766,19 +770,37 @@ func TestGetBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			service, _ := defaultService(t)
 
-			block, err := stateful.NewStandardBlock(
-				service.vm.manager,
-				service.vm.ctx,
-				ids.GenerateTestID(),
-				1234,
+			// Make a block an accept it, then check we can get it.
+			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
+				testSubnet1.ID(),
 				nil,
+				constants.AVMID,
+				nil,
+				"chain name",
+				[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+				keys[0].PublicKey().Address(), // change addr
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			preferred, err := service.vm.GetBlock(service.vm.preferred)
+			if err != nil {
+				t.Fatal(err)
+			}
+			statelessBlock, err := stateless.NewStandardBlock(
+				service.vm.preferred,
+				preferred.Height()+1,
+				[]*txs.Tx{tx},
 			)
 			if err != nil {
 				t.Fatal("couldn't create block: %w", err)
 			}
-
-			statelessBlk := block.StandardBlock
-			service.vm.manager.AddStatelessBlock(statelessBlk, block.Status())
+			block := service.vm.manager.NewBlock(statelessBlock)
+			if err := block.Verify(); err != nil {
+				t.Fatal("couldn't verify block: %w", err)
+			} else if err := block.Accept(); err != nil {
+				t.Fatal("couldn't accept block: %w", err)
+			}
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),

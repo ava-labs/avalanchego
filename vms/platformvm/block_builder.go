@@ -135,14 +135,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
-	/* TODO remove
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
-	*/
 	preferredState := b.vm.manager.OnAccept(preferredID)
 
 	// Try building a standard block.
@@ -273,15 +265,6 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 
-	/* TODO remove
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		b.vm.ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
-		return
-	}
-	preferredState := preferredDecision.OnAccept()
-	*/
 	preferredState := b.vm.manager.OnAccept(preferred.ID())
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)

@@ -275,9 +275,15 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 			if parentState.inputs.Overlaps(blkState.inputs) {
 				return ErrConflictingParentTxs
 			}
-			parent, _, err := v.GetStatelessBlock(parentID)
-			if err != nil {
-				return err
+			var parent stateless.Block
+			if parentState, ok := v.blkIDToState[parentID]; ok {
+				parent = parentState.statelessBlock
+			} else {
+				var err error
+				parent, _, err = v.GetStatelessBlock(parentID)
+				if err != nil {
+					return err
+				}
 			}
 			nextBlock = parent
 		}
