@@ -72,8 +72,9 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	v.Mempool.RemoveProposalTx(b.Tx)
 	v.blkIDToState[blkID] = blkState
 
-	parentBlockState := v.blkIDToState[parentID]
-	parentBlockState.children = append(parentBlockState.children, blkID)
+	if parentBlockState, ok := v.blkIDToState[parentID]; ok {
+		parentBlockState.children = append(parentBlockState.children, blkID)
+	}
 	return nil
 }
 
@@ -167,9 +168,9 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	// parentID := b.Parent()
 	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	parentID := b.Parent()
-	parentBlockState := v.blkIDToState[parentID]
-	parentBlockState.children = append(parentBlockState.children, blkID)
-
+	if parentBlockState, ok := v.blkIDToState[parentID]; ok {
+		parentBlockState.children = append(parentBlockState.children, blkID)
+	}
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
 	return nil
@@ -308,8 +309,9 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	blkState.onAcceptState = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	parentID := b.Parent()
-	parentBlockState := v.blkIDToState[parentID]
-	parentBlockState.children = append(parentBlockState.children, blkID)
+	if parentBlockState, ok := v.blkIDToState[parentID]; ok {
+		parentBlockState.children = append(parentBlockState.children, blkID)
+	}
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState

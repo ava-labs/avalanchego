@@ -78,7 +78,8 @@ func (b *block) Status() choices.Status {
 	_, status, err := b.manager.GetStatelessBlock(blkID)
 	if err != nil {
 		// It isn't in the database.
-		return choices.Unknown
+		// TODO is this right?
+		return choices.Processing
 	}
 	return status
 }
