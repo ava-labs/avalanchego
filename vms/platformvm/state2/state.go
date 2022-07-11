@@ -711,7 +711,7 @@ func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
 			return err
 		}
 
-		staker := NewPrimaryNetworkValidatorStaker(vdrTx.ID(), tx)
+		staker := NewPrimaryNetworkStaker(vdrTx.ID(), &tx.Validator)
 		staker.PotentialReward = potentialReward
 		staker.NextTime = staker.EndTime
 		staker.Priority = PrimaryNetworkValidatorCurrentPriority
@@ -803,7 +803,7 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx.Unsigned)
 		}
 
-		staker := NewPrimaryNetworkValidatorStaker(txID, addValidatorTx)
+		staker := NewPrimaryNetworkStaker(txID, &addValidatorTx.Validator)
 		staker.PotentialReward = uptime.PotentialReward
 		staker.NextTime = staker.EndTime
 		staker.Priority = PrimaryNetworkValidatorCurrentPriority
@@ -844,7 +844,7 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx.Unsigned)
 		}
 
-		staker := NewPrimaryNetworkDelegatorStaker(txID, addDelegatorTx)
+		staker := NewPrimaryNetworkStaker(txID, &addDelegatorTx.Validator)
 		staker.PotentialReward = potentialReward
 		staker.NextTime = staker.EndTime
 		staker.Priority = PrimaryNetworkDelegatorCurrentPriority
@@ -879,7 +879,7 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
 		}
 
-		staker := NewSubnetValidatorStaker(txID, addSubnetValidatorTx)
+		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
 		staker.NextTime = staker.EndTime
 		staker.Priority = SubnetValidatorCurrentPriority
 
@@ -912,7 +912,7 @@ func (s *state) loadPendingValidators() error {
 			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx.Unsigned)
 		}
 
-		staker := NewPrimaryNetworkValidatorStaker(txID, addValidatorTx)
+		staker := NewPrimaryNetworkStaker(txID, &addValidatorTx.Validator)
 		staker.NextTime = staker.StartTime
 		staker.Priority = PrimaryNetworkValidatorPendingPriority
 
@@ -943,7 +943,7 @@ func (s *state) loadPendingValidators() error {
 			return fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx.Unsigned)
 		}
 
-		staker := NewPrimaryNetworkDelegatorStaker(txID, addDelegatorTx)
+		staker := NewPrimaryNetworkStaker(txID, &addDelegatorTx.Validator)
 		staker.NextTime = staker.StartTime
 		staker.Priority = PrimaryNetworkDelegatorPendingPriority
 
@@ -977,7 +977,7 @@ func (s *state) loadPendingValidators() error {
 			return fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
 		}
 
-		staker := NewSubnetValidatorStaker(txID, addSubnetValidatorTx)
+		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
 		staker.NextTime = staker.StartTime
 		staker.Priority = SubnetValidatorPendingPriority
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/google/btree"
 )
 
@@ -78,35 +78,24 @@ func (s *Staker) Less(thanIntf btree.Item) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func NewPrimaryNetworkValidatorStaker(txID ids.ID, tx *txs.AddValidatorTx) *Staker {
+func NewPrimaryNetworkStaker(txID ids.ID, vdr *validator.Validator) *Staker {
 	return &Staker{
 		TxID:      txID,
-		NodeID:    tx.Validator.NodeID,
+		NodeID:    vdr.ID(),
 		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    tx.Weight(),
-		StartTime: tx.StartTime(),
-		EndTime:   tx.EndTime(),
+		Weight:    vdr.Weight(),
+		StartTime: vdr.StartTime(),
+		EndTime:   vdr.EndTime(),
 	}
 }
 
-func NewPrimaryNetworkDelegatorStaker(txID ids.ID, tx *txs.AddDelegatorTx) *Staker {
+func NewSubnetStaker(txID ids.ID, vdr *validator.SubnetValidator) *Staker {
 	return &Staker{
 		TxID:      txID,
-		NodeID:    tx.Validator.NodeID,
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    tx.Weight(),
-		StartTime: tx.StartTime(),
-		EndTime:   tx.EndTime(),
-	}
-}
-
-func NewSubnetValidatorStaker(txID ids.ID, tx *txs.AddSubnetValidatorTx) *Staker {
-	return &Staker{
-		TxID:      txID,
-		NodeID:    tx.Validator.NodeID,
-		SubnetID:  tx.Validator.Subnet,
-		Weight:    tx.Weight(),
-		StartTime: tx.StartTime(),
-		EndTime:   tx.EndTime(),
+		NodeID:    vdr.ID(),
+		SubnetID:  vdr.SubnetID(),
+		Weight:    vdr.Weight(),
+		StartTime: vdr.StartTime(),
+		EndTime:   vdr.EndTime(),
 	}
 }
