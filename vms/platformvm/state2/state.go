@@ -528,16 +528,13 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		return nil, status.Unknown, err
 	}
 
-	tx := txs.Tx{}
-	if _, err := genesis.Codec.Unmarshal(stx.Tx, &tx); err != nil {
-		return nil, status.Unknown, err
-	}
-	if err := tx.Sign(genesis.Codec, nil); err != nil {
+	tx, err := txs.Parse(genesis.Codec, stx.Tx)
+	if err != nil {
 		return nil, status.Unknown, err
 	}
 
 	ptx := &txAndStatus{
-		tx:     &tx,
+		tx:     tx,
 		status: stx.Status,
 	}
 

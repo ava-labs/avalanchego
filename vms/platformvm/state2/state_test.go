@@ -27,6 +27,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var (
+	initialTxID             = ids.GenerateTestID()
+	initialNodeID           = ids.GenerateTestNodeID()
+	initialTime             = time.Now().Round(time.Second)
+	initialValidatorEndTime = initialTime.Add(28 * 24 * time.Hour)
+)
+
 func TestStateInitialization(t *testing.T) {
 	assert := assert.New(t)
 
@@ -49,10 +56,31 @@ func TestStateInitialization(t *testing.T) {
 func TestStateSyncGenesis(t *testing.T) {
 	assert := assert.New(t)
 
-	initialTxID := ids.GenerateTestID()
-	initialNodeID := ids.GenerateTestNodeID()
-	initialTime := time.Now().Round(time.Second)
-	initialValidatorEndTime := initialTime.Add(28 * 24 * time.Hour)
+	state, _ := newInitializedState(assert)
+
+	staker, err := state.GetCurrentStaker(constants.PrimaryNetworkID, initialNodeID)
+	assert.NoError(err)
+	assert.NotNil(staker)
+	assert.Equal(initialNodeID, staker.NodeID)
+
+	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
+	assert.NoError(err)
+	assertIteratorsEqual(assert, EmptyIterator, delegatorIterator)
+
+	stakerIterator, err := state.GetCurrentStakerIterator()
+	assert.NoError(err)
+	assertIteratorsEqual(assert, NewSliceIterator(staker), stakerIterator)
+
+	_, err = state.GetPendingStaker(constants.PrimaryNetworkID, initialNodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
+	assert.NoError(err)
+	assertIteratorsEqual(assert, EmptyIterator, delegatorIterator)
+}
+
+func newInitializedState(assert *assert.Assertions) (State, database.Database) {
+	state, db := newUninitializedState(assert)
 
 	initialValidator := &txs.AddValidatorTx{
 		Validator: validator.Validator{
@@ -109,30 +137,9 @@ func TestStateSyncGenesis(t *testing.T) {
 		Timestamp:     uint64(initialTime.Unix()),
 		InitialSupply: units.Schmeckle + units.Avax,
 	}
-
-	state, _ := newUninitializedState(assert)
 	assert.NoError(state.SyncGenesis(genesisBlkID, genesisState))
 
-	staker, err := state.GetCurrentStaker(constants.PrimaryNetworkID, initialNodeID)
-	assert.NoError(err)
-	assert.NotNil(staker)
-	assert.Equal(initialValidatorTx.ID(), staker.TxID)
-	assert.Equal(initialValidator.Validator.NodeID, staker.NodeID)
-
-	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
-	assert.NoError(err)
-	assertIteratorsEqual(assert, EmptyIterator, delegatorIterator)
-
-	stakerIterator, err := state.GetCurrentStakerIterator()
-	assert.NoError(err)
-	assertIteratorsEqual(assert, NewSliceIterator(staker), stakerIterator)
-
-	_, err = state.GetPendingStaker(constants.PrimaryNetworkID, initialNodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
-
-	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
-	assert.NoError(err)
-	assertIteratorsEqual(assert, EmptyIterator, delegatorIterator)
+	return state, db
 }
 
 func newUninitializedState(assert *assert.Assertions) (State, database.Database) {
@@ -164,19 +171,4 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 	assert.NoError(err)
 	assert.NotNil(state)
 	return state
-}
-
-func assertIteratorsEqual(assert *assert.Assertions, expected, actual StakerIterator) {
-	for expected.Next() {
-		assert.True(actual.Next())
-
-		expectedStaker := expected.Value()
-		actualStaker := actual.Value()
-
-		assert.Equal(expectedStaker, actualStaker)
-	}
-	assert.False(actual.Next())
-
-	expected.Release()
-	actual.Release()
 }
