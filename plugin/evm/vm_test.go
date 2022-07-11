@@ -293,7 +293,7 @@ func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON stri
 
 func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"internal-private-debug"}
+	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
@@ -303,7 +303,7 @@ func TestVMConfig(t *testing.T) {
 
 func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"internal-private-debug"}
+	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 

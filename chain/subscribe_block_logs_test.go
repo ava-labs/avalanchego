@@ -22,7 +22,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	ethBackend := chain.APIBackend()
 	ethBackend.SubscribeAcceptedLogsEvent(acceptedLogsCh)
 
-	api := filters.NewPublicFilterAPI(ethBackend, true, 5*time.Minute)
+	api := filters.NewFilterAPI(ethBackend, true, 5*time.Minute)
 
 	// *NOTE* this was pre-compiled for the test..
 	/*
