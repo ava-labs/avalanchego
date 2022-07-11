@@ -30,6 +30,7 @@ package eth
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -155,7 +156,13 @@ func New(
 	if genesisErr != nil {
 		return nil, genesisErr
 	}
-	log.Info("Initialised chain configuration", "config", chainConfig)
+	log.Info("")
+	log.Info(strings.Repeat("-", 153))
+	for _, line := range strings.Split(chainConfig.String(), "\n") {
+		log.Info(line)
+	}
+	log.Info(strings.Repeat("-", 153))
+	log.Info("")
 
 	// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
 	// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,

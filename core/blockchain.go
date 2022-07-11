@@ -1243,6 +1243,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if err := indexesBatch.Write(); err != nil {
 		log.Crit("Failed to delete useless indexes", "err", err)
 	}
+
 	// If any logs need to be fired, do it now. In theory we could avoid creating
 	// this goroutine if there are no events to fire, but realistcally that only
 	// ever happens if we're reorging empty blocks, which will only happen on idle

@@ -176,10 +176,6 @@ func (b *EthAPIBackend) BadBlocks() []*types.Block {
 	return b.eth.blockchain.BadBlocks()
 }
 
-func (b *EthAPIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
-	return nil, nil
-}
-
 func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	// Request the block by its number and retrieve its state
 	header, err := b.HeaderByNumber(ctx, number)

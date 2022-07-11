@@ -30,13 +30,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // Tests if the trie diffs are tracked correctly.
 func TestTrieTracer(t *testing.T) {
-	db := NewDatabase(rawdb.NewMemoryDatabase())
-	trie, _ := New(common.Hash{}, db)
+	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
 	trie.tracer = newTracer()
 
 	// Insert a batch of entries, all the nodes should be marked as inserted
@@ -103,8 +101,7 @@ func TestTrieTracer(t *testing.T) {
 }
 
 func TestTrieTracerNoop(t *testing.T) {
-	db := NewDatabase(rawdb.NewMemoryDatabase())
-	trie, _ := New(common.Hash{}, db)
+	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
 	trie.tracer = newTracer()
 
 	// Insert a batch of entries, all the nodes should be marked as inserted

@@ -165,25 +165,36 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Apricot Phase 1: %v, Apricot Phase 2: %v, Apricot Phase 3: %v, Apricot Phase 4: %v, Apricot Phase 5: %v, Engine: Dummy Consensus Engine}",
-		c.ChainID,
-		c.HomesteadBlock,
-		c.DAOForkBlock,
-		c.DAOForkSupport,
-		c.EIP150Block,
-		c.EIP155Block,
-		c.EIP158Block,
-		c.ByzantiumBlock,
-		c.ConstantinopleBlock,
-		c.PetersburgBlock,
-		c.IstanbulBlock,
-		c.MuirGlacierBlock,
-		c.ApricotPhase1BlockTimestamp,
-		c.ApricotPhase2BlockTimestamp,
-		c.ApricotPhase3BlockTimestamp,
-		c.ApricotPhase4BlockTimestamp,
-		c.ApricotPhase5BlockTimestamp,
-	)
+	var banner string
+
+	banner += fmt.Sprintf("Chain ID:  %v\n", c.ChainID)
+	banner += "Consensus: Dummy Consensus Engine\n\n"
+
+	// Create a list of forks with a short description of them. Forks that only
+	// makes sense for mainnet should be optional at printing to avoid bloating
+	// the output for testnets and private networks.
+	banner += "Hard Forks:\n"
+	banner += fmt.Sprintf(" - Homestead:                   %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/homestead.md)\n", c.HomesteadBlock)
+	if c.DAOForkBlock != nil {
+		banner += fmt.Sprintf(" - DAO Fork:                    %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/dao-fork.md)\n", c.DAOForkBlock)
+	}
+	banner += fmt.Sprintf(" - Tangerine Whistle (EIP 150): %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/tangerine-whistle.md)\n", c.EIP150Block)
+	banner += fmt.Sprintf(" - Spurious Dragon/1 (EIP 155): %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/spurious-dragon.md)\n", c.EIP155Block)
+	banner += fmt.Sprintf(" - Spurious Dragon/2 (EIP 158): %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/spurious-dragon.md)\n", c.EIP155Block)
+	banner += fmt.Sprintf(" - Byzantium:                   %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/byzantium.md)\n", c.ByzantiumBlock)
+	banner += fmt.Sprintf(" - Constantinople:              %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/constantinople.md)\n", c.ConstantinopleBlock)
+	banner += fmt.Sprintf(" - Petersburg:                  %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/petersburg.md)\n", c.PetersburgBlock)
+	banner += fmt.Sprintf(" - Istanbul:                    %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/istanbul.md)\n", c.IstanbulBlock)
+	if c.MuirGlacierBlock != nil {
+		banner += fmt.Sprintf(" - Muir Glacier:                %-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/muir-glacier.md)\n", c.MuirGlacierBlock)
+	}
+	banner += fmt.Sprintf(" - Apricot Phase 1 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.3.0)\n", c.ApricotPhase1BlockTimestamp)
+	banner += fmt.Sprintf(" - Apricot Phase 2 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.4.0)\n", c.ApricotPhase2BlockTimestamp)
+	banner += fmt.Sprintf(" - Apricot Phase 3 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.5.0)\n", c.ApricotPhase3BlockTimestamp)
+	banner += fmt.Sprintf(" - Apricot Phase 4 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0)\n", c.ApricotPhase4BlockTimestamp)
+	banner += fmt.Sprintf(" - Apricot Phase 5 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0)\n", c.ApricotPhase5BlockTimestamp)
+	banner += "\n"
+	return banner
 }
 
 // IsHomestead returns whether num is either equal to the homestead block or greater.

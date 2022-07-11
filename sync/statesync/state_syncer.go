@@ -309,7 +309,7 @@ func (s *stateSyncer) createStorageTrieTask(accountHash common.Hash, storageRoot
 		OnSyncFailure: s.onSyncFailure,
 		OnStart: func(common.Hash) (bool, error) {
 			// check if this storage root is on disk
-			storageTrie, err := trie.New(storageRoot, s.trieDB)
+			storageTrie, err := trie.New(accountHash, storageRoot, s.trieDB)
 			if err != nil {
 				return false, nil
 			}
