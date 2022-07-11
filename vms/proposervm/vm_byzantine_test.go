@@ -6,6 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
 
@@ -516,7 +517,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(); err != errUnexpectedBlockType {
+	if err := outerOption.Verify(); !errors.Is(err, errUnexpectedBlockType) {
 		t.Fatal(err)
 	}
 
