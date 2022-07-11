@@ -3,7 +3,9 @@
 
 package state
 
-import "container/heap"
+import (
+	"container/heap"
+)
 
 var (
 	_ StakerIterator = &multiIterator{}

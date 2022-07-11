@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/btree"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
