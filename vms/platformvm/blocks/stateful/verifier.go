@@ -28,7 +28,9 @@ type verifier struct {
 func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	blkState, ok := v.blkIDToState[b.ID()]
 	if !ok {
-		blkState = &blockState{}
+		blkState = &blockState{
+			statelessBlock: b,
+		}
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -77,7 +79,9 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	blkState, ok := v.blkIDToState[b.ID()]
 	if !ok {
-		blkState = &blockState{}
+		blkState = &blockState{
+			statelessBlock: b,
+		}
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -165,7 +169,6 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
-	v.verifiedBlocks[blkID] = b
 	return nil
 }
 
@@ -173,7 +176,9 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
 	blkState, ok := v.blkIDToState[blkID]
 	if !ok {
-		blkState = &blockState{}
+		blkState = &blockState{
+			statelessBlock: b,
+		}
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -305,7 +310,6 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
-	v.verifiedBlocks[blkID] = b
 	return nil
 }
 
@@ -313,7 +317,9 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	blkID := b.ID()
 	blkState, ok := v.blkIDToState[blkID]
 	if !ok {
-		blkState = &blockState{}
+		blkState = &blockState{
+			statelessBlock: b,
+		}
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -331,7 +337,6 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
-	v.verifiedBlocks[blkID] = b
 
 	// TODO
 	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
@@ -342,7 +347,9 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 	blkID := b.ID()
 	blkState, ok := v.blkIDToState[blkID]
 	if !ok {
-		blkState = &blockState{}
+		blkState = &blockState{
+			statelessBlock: b,
+		}
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -358,11 +365,10 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 	blkState.onAcceptState = onAcceptState
 
 	// v.pinVerifiedBlock(b)
-	v.blkIDToState[blkID] = blkState
 
 	// TODO
 	// 	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
-	v.verifiedBlocks[blkID] = b
+	v.blkIDToState[blkID] = blkState
 	return nil
 }
 

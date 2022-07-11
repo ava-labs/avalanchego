@@ -4,8 +4,6 @@
 package stateful
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
@@ -18,10 +16,6 @@ import (
 
 var _ Manager = &manager{}
 
-type chainState interface {
-	GetState() state.State
-}
-
 type OnAcceptor interface {
 	// This function should only be called after Verify is called on [blkID].
 	// OnAccept returns:
@@ -33,21 +27,12 @@ type OnAcceptor interface {
 }
 
 type Manager interface {
-	statelessBlockState
-	// verifier
-	// acceptor
-	// rejector
-	// stateless.BlockVerifier
-	// stateless.BlockAcceptor
-	// stateless.BlockRejector
-	// stateless.Statuser
-	// stateless.Timestamper
-	baseStateSetter
-	// conflictChecker
-	chainState
+	//statelessBlockState
+	//baseStateSetter
+	//chainState
 	OnAcceptor
-	initialPreferenceGetter
-	state.LastAccepteder
+	//initialPreferenceGetter
+	//state.LastAccepteder
 	GetBlock(id ids.ID) (snowman.Block, error)
 }
 
@@ -65,8 +50,8 @@ func NewManager(
 		state:               s,
 		bootstrapped:        txExecutorBackend.Bootstrapped,
 		ctx:                 txExecutorBackend.Ctx,
-		verifiedBlocks:      make(map[ids.ID]stateless.Block),
-		blkIDToState:        map[ids.ID]*blockState{},
+		// verifiedBlocks:      make(map[ids.ID]stateless.Block),
+		blkIDToState: map[ids.ID]*blockState{},
 	}
 
 	manager := &manager{
@@ -80,11 +65,9 @@ func NewManager(
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
 		},
-		rejector:        &rejector{backend: backend},
-		baseStateSetter: &baseStateSetterImpl{backend: backend},
-		// Timestamper:             &timestampGetterImpl{backend: backend},
+		rejector:                &rejector{backend: backend},
+		baseStateSetter:         &baseStateSetterImpl{backend: backend},
 		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
-		// Statuser:                &statusGetterImpl{backend: backend},
 	}
 	return manager
 }
@@ -94,11 +77,6 @@ type manager struct {
 	verifier stateless.Visitor
 	acceptor stateless.Visitor
 	rejector stateless.Visitor
-	// stateless.BlockVerifier
-	// stateless.BlockAcceptor
-	// stateless.BlockRejector
-	// stateless.Statuser
-	// stateless.Timestamper
 	baseStateSetter
 	initialPreferenceGetter
 }
@@ -115,12 +93,13 @@ func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
 	m.state.SetLastAccepted(blkID, persist)
 }
 
-// TODO fix
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	// if blk, ok := m.verifiedBlocks[blkID]; ok {
-	// 	return blk, nil
-	// }
-	// blk, _, err := m.statelessBlockState.GetStatelessBlock(blkID)
-	// return blk, err
-	return nil, errors.New("TODO")
+	if blk, ok := m.blkIDToState[blkID]; ok {
+		return NewBlock(blk.statelessBlock, m), nil
+	}
+	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
+	if err != nil {
+		return nil, err
+	}
+	return NewBlock(statelessBlk, m), nil
 }

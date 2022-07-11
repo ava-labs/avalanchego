@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -23,11 +22,10 @@ type backend struct {
 	// TODO consolidate state fields below?
 	statelessBlockState
 	heightSetter
-	verifiedBlocks map[ids.ID]stateless.Block // TODO can we just put the blocks with their state?
-	blkIDToState   map[ids.ID]*blockState     // TODO set this
-	state          state.State
-	ctx            *snow.Context
-	bootstrapped   *utils.AtomicBool
+	blkIDToState map[ids.ID]*blockState // TODO set this
+	state        state.State
+	ctx          *snow.Context
+	bootstrapped *utils.AtomicBool
 }
 
 func (b *backend) getState() state.State {
@@ -45,5 +43,4 @@ func (b *backend) OnAccept(blkID ids.ID) state.Chain {
 
 func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
-	delete(b.verifiedBlocks, blkID)
 }

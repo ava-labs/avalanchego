@@ -4,7 +4,6 @@
 package stateful
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -39,7 +38,10 @@ type Block interface {
 	// 	setBaseState()
 }
 
-func NewBlock(blk stateless.Block, manager Manager) snowman.Block {
+func NewBlock(
+	blk stateless.Block,
+	manager *manager,
+) snowman.Block {
 	return &block{
 		manager: manager,
 		Block:   blk,
@@ -48,34 +50,61 @@ func NewBlock(blk stateless.Block, manager Manager) snowman.Block {
 
 type block struct {
 	stateless.Block
-	manager Manager
+	manager *manager
 }
 
 func (b *block) Verify() error {
-	return b.Visit(b.manager.verifyVisitor)
+	return b.Visit(b.manager.verifier)
 }
 
 func (b *block) Accept() error {
-	return errors.New("TODO")
+	return b.Visit(b.manager.acceptor)
 }
 
 func (b *block) Reject() error {
-	return errors.New("TODO")
+	return b.Visit(b.manager.rejector)
 }
 
 // TODO
 func (b *block) Status() choices.Status {
-	return choices.Unknown
+	blkID := b.ID()
+	// Check if the block is in memory
+	if _, ok := b.manager.backend.blkIDToState[blkID]; ok {
+		return choices.Processing
+	}
+	// Block isn't in memory. Check in the database.
+	_, status, err := b.manager.GetStatelessBlock(blkID)
+	if err != nil {
+		// It isn't in the database.
+		return choices.Unknown
+	}
+	return status
 }
 
 // TODO
 func (b *block) Timestamp() time.Time {
-	return time.Time{}
+	// 	 If this is the last accepted block and the block was loaded from disk
+	// 	 since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// 	 we explicitly return the chain time.
+	//if c.baseBlk.ID() == c.backend.GetLastAccepted() {
+	//	return c.GetTimestamp()
+	//}
+	blkID := b.ID()
+	// Check if the block is processing.
+	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
+		return blkState.timestamp
+	}
+	// The block isn't processing.
+	// According to the snowman.Block interface, the last accepted
+	// block is the only accepted block that must return a correct timestamp,
+	// so we just return the chain time.
+	return b.manager.state.GetTimestamp()
 }
 
 // TODO rename
 type blockState struct {
 	// TODO add stateless block to this struct
+	statelessBlock         stateless.Block
 	status                 choices.Status
 	onAcceptFunc           func()
 	onAcceptState          state.Diff
