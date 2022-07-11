@@ -120,8 +120,15 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		if !ok {
 			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkID)
 		}
-		_ = childState
-		// TODO
+		if childState.onCommitState != nil {
+			childState.onCommitState.SetBase(a.state)
+		}
+		if childState.onAbortState != nil {
+			childState.onAbortState.SetBase(a.state)
+		}
+		if childState.onAcceptState != nil {
+			childState.onAcceptState.Apply(a.state)
+		}
 		// childState.setBaseState()
 	}
 
@@ -185,8 +192,15 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 		if !ok {
 			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkID)
 		}
-		_ = childState
-		// TODO
+		if childState.onCommitState != nil {
+			childState.onCommitState.SetBase(a.state)
+		}
+		if childState.onAbortState != nil {
+			childState.onAbortState.SetBase(a.state)
+		}
+		if childState.onAcceptState != nil {
+			childState.onAcceptState.Apply(a.state)
+		}
 		// child.setBaseState()
 	}
 	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
@@ -311,8 +325,15 @@ func (a *acceptor) updateStateOptionBlock(b stateless.CommonBlock) error {
 		if !ok {
 			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkID)
 		}
-		_ = childState
-		// TODO
+		if childState.onCommitState != nil {
+			childState.onCommitState.SetBase(a.state)
+		}
+		if childState.onAbortState != nil {
+			childState.onAbortState.SetBase(a.state)
+		}
+		if childState.onAcceptState != nil {
+			childState.onAcceptState.Apply(a.state)
+		}
 		// childID.setBaseState()
 	}
 	// if onAcceptFunc := a.blkIDToOnAcceptFunc[blkID]; onAcceptFunc != nil {

@@ -26,7 +26,9 @@ type verifier struct {
 }
 
 func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
-	blkState, ok := v.blkIDToState[b.ID()]
+	blkID := b.ID()
+
+	blkState, ok := v.blkIDToState[blkID]
 	if !ok {
 		blkState = &blockState{
 			statelessBlock: b,
@@ -38,7 +40,7 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState := v.OnAccept(parentID)
+	parentState := v.OnAccept(parentID) // TODO is this right?
 
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &v.txExecutorBackend,
@@ -50,8 +52,6 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
-
-	// blkID := b.ID()
 
 	onCommitState := txExecutor.OnCommit
 	onCommitState.AddTx(b.Tx, status.Committed)
@@ -65,14 +65,15 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 
 	// v.blkIDToTimestamp[blkID] = parentState.GetTimestamp()
 	blkState.timestamp = parentState.GetTimestamp()
-	// TODO
-	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+
 	// v.blkIDToPreferCommit[blkID] = txExecutor.PrefersCommit
 	blkState.inititallyPreferCommit = txExecutor.PrefersCommit
 
 	v.Mempool.RemoveProposalTx(b.Tx)
-	// v.pinVerifiedBlock(b)
-	v.blkIDToState[b.ID()] = blkState
+	v.blkIDToState[blkID] = blkState
+
+	parentBlockState := v.blkIDToState[parentID]
+	parentBlockState.children = append(parentBlockState.children, blkID)
 	return nil
 }
 
@@ -163,9 +164,11 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	// }
 
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
-	// TODO
 	// parentID := b.Parent()
 	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+	parentID := b.Parent()
+	parentBlockState := v.blkIDToState[parentID]
+	parentBlockState.children = append(parentBlockState.children, blkID)
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
@@ -304,9 +307,9 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blkState.onAcceptState = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
-	// TODO
-	// parentID := b.Parent()
-	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+	parentID := b.Parent()
+	parentBlockState := v.blkIDToState[parentID]
+	parentBlockState.children = append(parentBlockState.children, blkID)
 
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
@@ -326,7 +329,7 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 		return err
 	}
 
-	// TODO
+	//
 	// parentID := b.Parent()
 	// onAcceptState := v.blkIDToOnCommitState[parentID]
 	onAcceptState := state.Diff(nil) // TODO get parent state
@@ -338,8 +341,10 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
 
-	// TODO
-	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
+	parentID := b.Parent()
+	parentState := v.blkIDToState[parentID]
+	parentState.children = append(parentState.children, blkID)
+
 	return nil
 }
 
@@ -364,11 +369,11 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blkState.onAcceptState = onAcceptState
 
-	// v.pinVerifiedBlock(b)
-
-	// TODO
-	// 	v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	v.blkIDToState[blkID] = blkState
+
+	parentID := b.Parent()
+	parentState := v.blkIDToState[parentID]
+	parentState.children = append(parentState.children, blkID)
 	return nil
 }
 

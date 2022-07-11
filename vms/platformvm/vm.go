@@ -382,7 +382,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	/* TODO fix
+	/* TODO
 	return stateful.MakeStateful(
 		statelessBlk,
 		vm.manager,
