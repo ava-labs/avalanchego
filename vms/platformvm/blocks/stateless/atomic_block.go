@@ -45,21 +45,11 @@ func NewAtomicBlock(
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
-	verifier BlockVerifier,
-	acceptor BlockAcceptor,
-	rejector BlockRejector,
-	statuser Statuser,
-	timestamper Timestamper,
 ) (*AtomicBlock, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
-			BlockVerifier: verifier,
-			BlockAcceptor: acceptor,
-			BlockRejector: rejector,
-			Statuser:      statuser,
-			Timestamper:   timestamper,
-			PrntID:        parentID,
-			Hght:          height,
+			PrntID: parentID,
+			Hght:   height,
 		},
 		Tx: tx,
 	}

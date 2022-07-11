@@ -1172,11 +1172,6 @@ func (s *state) init(genesisBytes []byte) error {
 	genesisBlock, err := stateless.NewCommitBlock(
 		genesisID,
 		0,
-		nil, // TODO is it OK to pass in nil?
-		nil, // TODO is it OK to pass in nil?
-		nil, // TODO is it OK to pass in nil?
-		nil, // TODO is it OK to pass in nil?
-		nil, // TODO is it OK to pass in nil?
 	)
 	if err != nil {
 		return err

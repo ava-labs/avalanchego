@@ -4,10 +4,7 @@
 package stateless
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -18,13 +15,6 @@ type CommonBlock struct {
 
 	id    ids.ID
 	bytes []byte
-
-	// TODO consolidate these interfaces?
-	BlockVerifier
-	BlockAcceptor
-	BlockRejector
-	Statuser
-	Timestamper
 }
 
 func (b *CommonBlock) Initialize(bytes []byte) error {
@@ -44,25 +34,3 @@ func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *CommonBlock) Height() uint64 { return b.Hght }
-
-func (b *CommonBlock) Status() choices.Status {
-	return b.Statuser.Status(b.ID())
-}
-
-func (b *CommonBlock) Timestamp() time.Time {
-	return b.Timestamper.Timestamp(b.ID())
-}
-
-func (b *CommonBlock) Sync(
-	verifier BlockVerifier,
-	acceptor BlockAcceptor,
-	rejector BlockRejector,
-	statuser Statuser,
-	timestamper Timestamper,
-) {
-	b.BlockVerifier = verifier
-	b.BlockAcceptor = acceptor
-	b.BlockRejector = rejector
-	b.Statuser = statuser
-	b.Timestamper = timestamper
-}

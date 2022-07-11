@@ -16,27 +16,29 @@ import (
 
 var _ snowman.Block = &block{}
 
-type Block interface {
-	snowman.Block
+// TODO remove
+// type Block interface {
+// 	snowman.Block
 
-	// returns true if this block or any processing ancestors consume any of the
-	// named atomic imports.
-	// conflicts(ids.Set) (bool, error)
+// TODO remove
+// returns true if this block or any processing ancestors consume any of the
+// named atomic imports.
+// conflicts(ids.Set) (bool, error)
 
-	// TODO remove
-	// addChild notifies this block that it has a child block building on it.
-	// When this block commits its changes, it should set the child's base state
-	// to the internal state. This ensures that the state versions do not
-	// recurse the length of the chain.
-	// addChild(Block)
+// TODO remove
+// addChild notifies this block that it has a child block building on it.
+// When this block commits its changes, it should set the child's base state
+// to the internal state. This ensures that the state versions do not
+// recurse the length of the chain.
+// addChild(Block)
 
-	// TODO remove
-	// free all the references of this block from the vm's memory
-	// free()
+// TODO remove
+// free all the references of this block from the vm's memory
+// free()
 
-	// Set the block's underlying state to the chain's internal state
-	// 	setBaseState()
-}
+// Set the block's underlying state to the chain's internal state
+// 	setBaseState()
+// }
 
 func NewBlock(
 	blk stateless.Block,

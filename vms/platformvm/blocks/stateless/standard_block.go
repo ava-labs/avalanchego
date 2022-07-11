@@ -45,21 +45,11 @@ func NewStandardBlock(
 	parentID ids.ID,
 	height uint64,
 	txes []*txs.Tx,
-	verifier BlockVerifier,
-	acceptor BlockAcceptor,
-	rejector BlockRejector,
-	statuser Statuser,
-	timestamper Timestamper,
 ) (*StandardBlock, error) {
 	res := &StandardBlock{
 		CommonBlock: CommonBlock{
-			BlockVerifier: verifier,
-			BlockAcceptor: acceptor,
-			BlockRejector: rejector,
-			Statuser:      statuser,
-			Timestamper:   timestamper,
-			PrntID:        parentID,
-			Hght:          height,
+			PrntID: parentID,
+			Hght:   height,
 		},
 		Txs: txes,
 	}

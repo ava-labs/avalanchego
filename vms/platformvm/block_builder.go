@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -132,7 +133,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 	preferredID := preferred.ID()
-	// nextHeight := preferred.Height() + 1
+	nextHeight := preferred.Height() + 1
 
 	/* TODO remove
 	preferredDecision, ok := preferred.(stateful.Decision)
@@ -146,7 +147,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
-		// txs := b.PopDecisionTxs(TargetBlockSize)
 		// return stateful.NewStandardBlock(
 		// 	b.vm.manager,
 		// 	b.vm.ctx,
@@ -154,19 +154,24 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	txs,
 		// )
-		return nil, errors.New("TODO")
+		txs := b.PopDecisionTxs(TargetBlockSize)
+		statelessBlk, err := stateless.NewStandardBlock(preferredID, nextHeight, txs)
+		if err != nil {
+			return nil, err
+		}
+		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
 	// Try building a proposal block that rewards a staker.
-	_ /*stakerTxID*/, shouldReward, err := b.getStakerToReward(preferredState)
+	stakerTxID, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {
 		return nil, err
 	}
 	if shouldReward {
-		// rewardValidatorTx, err := b.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		rewardValidatorTx, err := b.vm.txBuilder.NewRewardValidatorTx(stakerTxID)
+		if err != nil {
+			return nil, err
+		}
 		// return stateful.NewProposalBlock(
 		// 	b.vm.manager,
 		// 	b.vm.ctx,
@@ -174,7 +179,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	rewardValidatorTx,
 		// )
-		return nil, errors.New("TODO")
+		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, rewardValidatorTx)
+		if err != nil {
+			return nil, err
+		}
+		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -183,7 +192,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 	if shouldAdvanceTime {
-		_ /*advanceTimeTx*/, err := b.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
+		advanceTimeTx, err := b.vm.txBuilder.NewAdvanceTimeTx(nextChainTime)
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +203,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	advanceTimeTx,
 		// )
-		return nil, errors.New("TODO")
+		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		if err != nil {
+			return nil, err
+		}
+		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -214,7 +227,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	if startTime.After(maxChainStartTime) {
 		b.AddProposalTx(tx)
 
-		_ /*advanceTimeTx*/, err := b.vm.txBuilder.NewAdvanceTimeTx(b.vm.clock.Time())
+		advanceTimeTx, err := b.vm.txBuilder.NewAdvanceTimeTx(b.vm.clock.Time())
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +238,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		// 	nextHeight,
 		// 	advanceTimeTx,
 		// )
-		return nil, errors.New("TODO")
+		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		if err != nil {
+			return nil, err
+		}
+		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
 	// return stateful.NewProposalBlock(
@@ -235,7 +252,11 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// 	nextHeight,
 	// 	tx,
 	// )
-	return nil, errors.New("TODO")
+	statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, tx)
+	if err != nil {
+		return nil, err
+	}
+	return b.vm.manager.NewBlock(statelessBlk), nil
 }
 
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the

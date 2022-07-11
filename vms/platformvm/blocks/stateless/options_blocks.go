@@ -28,21 +28,11 @@ func (ab *AbortBlock) Visit(v Visitor) error {
 func NewAbortBlock(
 	parentID ids.ID,
 	height uint64,
-	verifier BlockVerifier,
-	acceptor BlockAcceptor,
-	rejector BlockRejector,
-	statuser Statuser,
-	timestamper Timestamper,
 ) (*AbortBlock, error) {
 	res := &AbortBlock{
 		CommonBlock: CommonBlock{
-			BlockVerifier: verifier,
-			BlockAcceptor: acceptor,
-			BlockRejector: rejector,
-			Statuser:      statuser,
-			Timestamper:   timestamper,
-			PrntID:        parentID,
-			Hght:          height,
+			PrntID: parentID,
+			Hght:   height,
 		},
 	}
 
@@ -70,21 +60,11 @@ func (cb *CommitBlock) Visit(v Visitor) error {
 func NewCommitBlock(
 	parentID ids.ID,
 	height uint64,
-	verifier BlockVerifier,
-	acceptor BlockAcceptor,
-	rejector BlockRejector,
-	statuser Statuser,
-	timestamper Timestamper,
 ) (*CommitBlock, error) {
 	res := &CommitBlock{
 		CommonBlock: CommonBlock{
-			BlockVerifier: verifier,
-			BlockAcceptor: acceptor,
-			BlockRejector: rejector,
-			Statuser:      statuser,
-			Timestamper:   timestamper,
-			PrntID:        parentID,
-			Hght:          height,
+			PrntID: parentID,
+			Hght:   height,
 		},
 	}
 

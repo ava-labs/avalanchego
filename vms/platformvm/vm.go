@@ -100,10 +100,6 @@ type VM struct {
 	// Value: cache mapping height -> validator set map
 	validatorSetCaches map[ids.ID]cache.Cacher
 
-	// Key: block ID
-	// Value: the block
-	currentBlocks map[ids.ID]stateful.Block
-
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
@@ -156,7 +152,6 @@ func (vm *VM) Initialize(
 	)
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-	vm.currentBlocks = make(map[ids.ID]stateful.Block)
 	if vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
@@ -395,7 +390,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		choices.Processing,
 	)
 	*/
-	return nil, errors.New("TODO")
+	return vm.manager.NewBlock(statelessBlk), nil
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
@@ -418,7 +413,7 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return nil
 }
 
-func (vm *VM) Preferred() (stateful.Block, error) {
+func (vm *VM) Preferred() (snowman.Block, error) {
 	return vm.manager.GetBlock(vm.preferred)
 }
 

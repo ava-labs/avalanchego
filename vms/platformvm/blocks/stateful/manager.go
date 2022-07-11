@@ -27,13 +27,9 @@ type OnAcceptor interface {
 }
 
 type Manager interface {
-	//statelessBlockState
-	//baseStateSetter
-	//chainState
 	OnAcceptor
-	//initialPreferenceGetter
-	//state.LastAccepteder
 	GetBlock(id ids.ID) (snowman.Block, error)
+	NewBlock(stateless.Block) snowman.Block
 }
 
 func NewManager(
@@ -65,9 +61,9 @@ func NewManager(
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
 		},
-		rejector:                &rejector{backend: backend},
-		baseStateSetter:         &baseStateSetterImpl{backend: backend},
-		initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
+		rejector: &rejector{backend: backend},
+		// baseStateSetter:         &baseStateSetterImpl{backend: backend},
+		// initialPreferenceGetter: &initialPreferenceGetterImpl{backend: backend},
 	}
 	return manager
 }
@@ -77,21 +73,24 @@ type manager struct {
 	verifier stateless.Visitor
 	acceptor stateless.Visitor
 	rejector stateless.Visitor
-	baseStateSetter
-	initialPreferenceGetter
+	// baseStateSetter
+	// initialPreferenceGetter
 }
 
-func (m *manager) GetState() state.State {
-	return m.state
-}
+// TODO remove
+// func (m *manager) GetState() state.State {
+// 	return m.state
+// }
 
-func (m *manager) GetLastAccepted() ids.ID {
-	return m.state.GetLastAccepted()
-}
+// TODO remove
+// func (m *manager) GetLastAccepted() ids.ID {
+// 	return m.state.GetLastAccepted()
+// }
 
-func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
-	m.state.SetLastAccepted(blkID, persist)
-}
+// TODO remove
+// func (m *manager) SetLastAccepted(blkID ids.ID, persist bool) {
+// 	m.state.SetLastAccepted(blkID, persist)
+// }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := m.blkIDToState[blkID]; ok {
@@ -102,4 +101,8 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 		return nil, err
 	}
 	return NewBlock(statelessBlk, m), nil
+}
+
+func (m *manager) NewBlock(blk stateless.Block) snowman.Block {
+	return NewBlock(blk, m)
 }
