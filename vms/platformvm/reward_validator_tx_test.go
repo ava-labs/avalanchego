@@ -149,7 +149,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err = secondVM.internalState.GetTx(block.ProposalTx().ID())
+	_, txStatus, err = secondVM.state.GetTx(block.ProposalTx().ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	// Verify that chain's timestamp has advanced
-	timestamp := secondVM.internalState.GetTimestamp()
+	timestamp := secondVM.state.GetTimestamp()
 	if !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
@@ -210,7 +210,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err = secondVM.internalState.GetTx(block.ProposalTx().ID())
+	_, txStatus, err = secondVM.state.GetTx(block.ProposalTx().ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", txStatus)
 	}
 
-	currentStakers := secondVM.internalState.CurrentStakers()
+	currentStakers := secondVM.state.CurrentStakers()
 	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")
@@ -309,7 +309,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}
 
 	// Verify that chain's timestamp has advanced
-	timestamp := vm.internalState.GetTimestamp()
+	timestamp := vm.state.GetTimestamp()
 	if !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
@@ -353,7 +353,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentStakers := vm.internalState.CurrentStakers()
+	currentStakers := vm.state.CurrentStakers()
 	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
 	if err == nil {
 		t.Fatal("should have removed a genesis validator")

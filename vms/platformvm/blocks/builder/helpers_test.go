@@ -287,13 +287,13 @@ func defaultState(
 	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
 		baseDB,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
 		dummyLocalStake,
 		dummyTotalStake,
 		rewardsCalc,
-		genesisBytes,
 	)
 	if err != nil {
 		panic(err)

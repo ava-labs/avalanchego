@@ -6,15 +6,16 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -79,7 +80,7 @@ type testHelpersCollection struct {
 	isBootstrapped *utils.AtomicBool
 	cfg            *config.Config
 	clk            *mockable.Clock
-	baseDB         *versiondb.Database
+	baseDB         database.Database
 	ctx            *snow.Context
 	msm            *mutableSharedMemory
 	fx             fx.Fx
@@ -117,13 +118,13 @@ func newTestHelpersCollection() *testHelpersCollection {
 	clk := defaultClock()
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx, msm := defaultCtx(baseDB)
+	db := baseDBManager.Current().Database
+	ctx, msm := defaultCtx(db)
 
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
 	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
-	tState := defaultState(&cfg, ctx, baseDB, rewardsCalc)
+	tState := defaultState(&cfg, ctx, db, rewardsCalc)
 
 	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimeMan := uptime.NewManager(tState)
@@ -156,7 +157,7 @@ func newTestHelpersCollection() *testHelpersCollection {
 		isBootstrapped: &isBootstrapped,
 		cfg:            &cfg,
 		clk:            &clk,
-		baseDB:         baseDB,
+		baseDB:         db,
 		ctx:            ctx,
 		msm:            msm,
 		fx:             fx,
@@ -214,7 +215,7 @@ func addSubnet(
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
-	baseDB *versiondb.Database,
+	db database.Database,
 	rewardsCalc reward.Calculator,
 ) state.State {
 	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -230,20 +231,21 @@ func defaultState(
 
 	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
-		baseDB,
+		db,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
 		dummyLocalStake,
 		dummyTotalStake,
 		rewardsCalc,
-		genesisBytes,
 	)
 	if err != nil {
 		panic(err)
 	}
 
 	// persist and reload to init a bunch of in-memory stuff
+	tState.SetHeight(0)
 	if err := tState.Commit(); err != nil {
 		panic(err)
 	}
@@ -253,13 +255,13 @@ func defaultState(
 	return tState
 }
 
-func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory) {
+func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
 	ctx.AVAXAssetID = avaxAssetID
 
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, db)
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, atomicDB)
 	if err != nil {
@@ -423,6 +425,7 @@ func internalStateShutdown(t *testHelpersCollection) error {
 		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
 			return err
 		}
+		t.tState.SetHeight( /*height*/ math.MaxUint64)
 		if err := t.tState.Commit(); err != nil {
 			return err
 		}

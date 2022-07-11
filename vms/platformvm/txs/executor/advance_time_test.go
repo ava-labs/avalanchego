@@ -121,6 +121,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -187,6 +188,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// Test VM validators
 	executor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 	assert.True(t, h.cfg.Validators.Contains(constants.PrimaryNetworkID, nodeID))
 }
@@ -338,6 +340,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				}
 			}()
 			h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
+			dummyHeight := uint64(1)
 
 			for _, staker := range test.stakers {
 				_, err := addPendingValidator(
@@ -364,6 +367,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				h.tState.AddPendingStaker(tx)
 				h.tState.AddTx(tx, status.Committed)
 			}
+			h.tState.SetHeight(dummyHeight)
 			if err := h.tState.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -391,6 +395,8 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				assert.NoError(err)
 				executor.OnCommit.Apply(h.tState)
 			}
+
+			h.tState.SetHeight(dummyHeight)
 			assert.NoError(h.tState.Commit())
 
 			// Check that the validators we expect to be in the current staker set are there
@@ -435,6 +441,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		}
 	}()
 	h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
+	dummyHeight := uint64(1)
 
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := preFundedKeys[0].PublicKey().Address()
@@ -456,6 +463,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	h.tState.AddCurrentStaker(tx, 0)
 	h.tState.AddTx(tx, status.Committed)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -482,6 +490,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	h.tState.AddPendingStaker(tx)
 	h.tState.AddTx(tx, status.Committed)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -521,6 +530,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}
 	// Check VM Validators are removed successfully
 	executor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 	assert.False(t, h.cfg.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetVdr2NodeID)))
 	assert.False(t, h.cfg.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
@@ -536,10 +546,11 @@ func TestWhitelistedSubnet(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-
+			dummyHeight := uint64(1)
 			if whitelist {
 				h.cfg.WhitelistedSubnets.Add(testSubnet1.ID())
 			}
+
 			// Add a subnet validator to the staker set
 			subnetValidatorNodeID := preFundedKeys[0].PublicKey().Address()
 
@@ -560,6 +571,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 			h.tState.AddPendingStaker(tx)
 			h.tState.AddTx(tx, status.Committed)
+			h.tState.SetHeight(dummyHeight)
 			if err := h.tState.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -585,6 +597,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			}
 
 			executor.OnCommit.Apply(h.tState)
+			h.tState.SetHeight(dummyHeight)
 			assert.NoError(t, h.tState.Commit())
 			assert.Equal(t, whitelist, h.cfg.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
 		})
@@ -599,6 +612,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -622,6 +636,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 
 	// Test validator weight before delegation
@@ -646,6 +661,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 	h.tState.AddPendingStaker(addDelegatorTx)
 	h.tState.AddTx(addDelegatorTx, status.Committed)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 	assert.NoError(t, h.tState.Load())
 
@@ -662,6 +678,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 
 	// Test validator weight after delegation
@@ -677,6 +694,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -700,6 +718,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 
 	// Test validator weight before delegation
@@ -723,6 +742,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 	h.tState.AddPendingStaker(addDelegatorTx)
 	h.tState.AddTx(addDelegatorTx, status.Committed)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 	assert.NoError(t, h.tState.Load())
 
@@ -739,6 +759,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(h.tState)
+	h.tState.SetHeight(dummyHeight)
 	assert.NoError(t, h.tState.Commit())
 
 	// Test validator weight after delegation
@@ -827,6 +848,8 @@ func addPendingValidator(
 
 	h.tState.AddPendingStaker(addPendingValidatorTx)
 	h.tState.AddTx(addPendingValidatorTx, status.Committed)
+	dummyHeight := uint64(1)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		return nil, err
 	}

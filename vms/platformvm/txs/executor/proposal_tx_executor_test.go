@@ -19,6 +19,7 @@ import (
 )
 
 func TestAddDelegatorTxExecute(t *testing.T) {
+	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
@@ -51,6 +52,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.tState.AddCurrentStaker(tx, 0)
 		target.tState.AddTx(tx, status.Committed)
+		target.tState.SetHeight(dummyHeight)
 		if err := target.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -78,6 +80,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.tState.AddCurrentStaker(tx, 0)
 		target.tState.AddTx(tx, status.Committed)
+		target.tState.SetHeight(dummyHeight)
 		if err := target.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -217,6 +220,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				for _, utxoID := range utxoIDs {
 					target.tState.DeleteUTXO(utxoID)
 				}
+				target.tState.SetHeight(dummyHeight)
 				if err := target.tState.Commit(); err != nil {
 					t.Fatal(err)
 				}
@@ -413,6 +417,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	h.tState.AddCurrentStaker(addDSTx, 0)
 	h.tState.AddTx(addDSTx, status.Committed)
+	dummyHeight := uint64(1)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -553,6 +559,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	h.tState.AddCurrentStaker(subnetTx, 0)
 	h.tState.AddTx(subnetTx, status.Committed)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -587,6 +594,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	h.tState.DeleteCurrentStaker(subnetTx)
+	h.tState.SetHeight(dummyHeight)
 	if err := h.tState.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -703,6 +711,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 		h.tState.AddCurrentStaker(tx, 0)
 		h.tState.AddTx(tx, status.Committed)
+		h.tState.SetHeight(dummyHeight)
 		if err := h.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -842,6 +851,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 
 		h.tState.AddCurrentStaker(tx, 0)
 		h.tState.AddTx(tx, status.Committed)
+		dummyHeight := uint64(1)
+		h.tState.SetHeight(dummyHeight)
 		if err := h.tState.Commit(); err != nil {
 			t.Fatal(err)
 		}
