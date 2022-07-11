@@ -4,7 +4,6 @@
 package p
 
 import (
-	"fmt"
 	"sync"
 
 	stdcontext "context"
@@ -53,53 +52,12 @@ func NewBackend(ctx Context, utxos ChainUTXOs, txs map[ids.ID]*txs.Tx) Backend {
 }
 
 func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
-	var baseTx *txs.BaseTx
 	txID := tx.ID()
-	switch utx := tx.Unsigned.(type) {
-	case *txs.AddDelegatorTx:
-		baseTx = &utx.BaseTx
-	case *txs.AddSubnetValidatorTx:
-		baseTx = &utx.BaseTx
-	case *txs.AddValidatorTx:
-		baseTx = &utx.BaseTx
-	case *txs.ExportTx:
-		baseTx = &utx.BaseTx
-
-		for i, out := range utx.ExportedOutputs {
-			err := b.AddUTXO(
-				ctx,
-				utx.DestinationChain,
-				&avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs) + i),
-					},
-					Asset: avax.Asset{ID: out.AssetID()},
-					Out:   out.Out,
-				},
-			)
-			if err != nil {
-				return err
-			}
-		}
-	case *txs.ImportTx:
-		baseTx = &utx.BaseTx
-
-		consumedRemoteUTXOIDs := utx.InputUTXOs()
-		err := b.removeUTXOs(ctx, utx.SourceChain, consumedRemoteUTXOIDs)
-		if err != nil {
-			return err
-		}
-	case *txs.CreateChainTx:
-		baseTx = &utx.BaseTx
-	case *txs.CreateSubnetTx:
-		baseTx = &utx.BaseTx
-	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
-	}
-
-	consumedUTXOIDs := baseTx.InputIDs()
-	err := b.removeUTXOs(ctx, constants.PlatformChainID, consumedUTXOIDs)
+	err := tx.Unsigned.Visit(&backendVisitor{
+		b:    b,
+		ctx:  ctx,
+		txID: txID,
+	})
 	if err != nil {
 		return err
 	}

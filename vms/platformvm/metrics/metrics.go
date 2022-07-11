@@ -7,13 +7,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -23,17 +23,12 @@ var (
 )
 
 type Metrics struct {
+	txMetrics *txMetrics
+
 	PercentConnected       prometheus.Gauge
 	SubnetPercentConnected *prometheus.GaugeVec
 	LocalStake             prometheus.Gauge
 	TotalStake             prometheus.Gauge
-
-	ValidatorSetsCached     prometheus.Counter
-	ValidatorSetsCreated    prometheus.Counter
-	ValidatorSetsHeightDiff prometheus.Gauge
-	ValidatorSetsDuration   prometheus.Gauge
-
-	APIRequestMetrics metric.APIInterceptor
 
 	numAbortBlocks,
 	numAtomicBlocks,
@@ -41,17 +36,14 @@ type Metrics struct {
 	numProposalBlocks,
 	numStandardBlocks prometheus.Counter
 
-	numAddDelegatorTxs,
-	numAddSubnetValidatorTxs,
-	numAddValidatorTxs,
-	numAdvanceTimeTxs,
-	numCreateChainTxs,
-	numCreateSubnetTxs,
-	numExportTxs,
-	numImportTxs,
-	numRewardValidatorTxs prometheus.Counter
-
 	numVotesWon, numVotesLost prometheus.Counter
+
+	ValidatorSetsCached     prometheus.Counter
+	ValidatorSetsCreated    prometheus.Counter
+	ValidatorSetsHeightDiff prometheus.Gauge
+	ValidatorSetsDuration   prometheus.Gauge
+
+	APIRequestMetrics metric.APIInterceptor
 }
 
 func NewMetrics(
@@ -60,6 +52,10 @@ func NewMetrics(
 	whitelistedSubnets ids.Set,
 ) (*Metrics, error) {
 	res := &Metrics{}
+
+	txMetrics, err := newTxMetrics(namespace, registerer)
+	res.txMetrics = txMetrics
+	errs := wrappers.Errs{Err: err}
 
 	res.PercentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -85,6 +81,23 @@ func NewMetrics(
 		Help:      "Total amount of AVAX staked",
 	})
 
+	res.numAbortBlocks = newBlockMetrics(namespace, "abort")
+	res.numAtomicBlocks = newBlockMetrics(namespace, "atomic")
+	res.numCommitBlocks = newBlockMetrics(namespace, "commit")
+	res.numProposalBlocks = newBlockMetrics(namespace, "proposal")
+	res.numStandardBlocks = newBlockMetrics(namespace, "standard")
+
+	res.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "votes_won",
+		Help:      "Total number of votes this node has won",
+	})
+	res.numVotesLost = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "votes_lost",
+		Help:      "Total number of votes this node has lost",
+	})
+
 	res.ValidatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_cached",
@@ -106,37 +119,8 @@ func NewMetrics(
 		Help:      "Total amount of time generating validator sets in nanoseconds",
 	})
 
-	APIRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
-	res.APIRequestMetrics = APIRequestMetrics
-
-	res.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "votes_won",
-		Help:      "Total number of votes this node has won",
-	})
-	res.numVotesLost = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "votes_lost",
-		Help:      "Total number of votes this node has lost",
-	})
-
-	res.numAbortBlocks = newBlockMetrics(namespace, "abort")
-	res.numAtomicBlocks = newBlockMetrics(namespace, "atomic")
-	res.numCommitBlocks = newBlockMetrics(namespace, "commit")
-	res.numProposalBlocks = newBlockMetrics(namespace, "proposal")
-	res.numStandardBlocks = newBlockMetrics(namespace, "standard")
-
-	res.numAddDelegatorTxs = newTxMetrics(namespace, "add_delegator")
-	res.numAddSubnetValidatorTxs = newTxMetrics(namespace, "add_subnet_validator")
-	res.numAddValidatorTxs = newTxMetrics(namespace, "add_validator")
-	res.numAdvanceTimeTxs = newTxMetrics(namespace, "advance_time")
-	res.numCreateChainTxs = newTxMetrics(namespace, "create_chain")
-	res.numCreateSubnetTxs = newTxMetrics(namespace, "create_subnet")
-	res.numExportTxs = newTxMetrics(namespace, "export")
-	res.numImportTxs = newTxMetrics(namespace, "import")
-	res.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
-
-	errs := wrappers.Errs{}
+	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
+	res.APIRequestMetrics = apiRequestMetrics
 	errs.Add(
 		err,
 
@@ -144,11 +128,6 @@ func NewMetrics(
 		registerer.Register(res.SubnetPercentConnected),
 		registerer.Register(res.LocalStake),
 		registerer.Register(res.TotalStake),
-
-		registerer.Register(res.ValidatorSetsCreated),
-		registerer.Register(res.ValidatorSetsCached),
-		registerer.Register(res.ValidatorSetsHeightDiff),
-		registerer.Register(res.ValidatorSetsDuration),
 
 		registerer.Register(res.numAbortBlocks),
 		registerer.Register(res.numAtomicBlocks),
@@ -159,15 +138,10 @@ func NewMetrics(
 		registerer.Register(res.numVotesWon),
 		registerer.Register(res.numVotesLost),
 
-		registerer.Register(res.numAddDelegatorTxs),
-		registerer.Register(res.numAddSubnetValidatorTxs),
-		registerer.Register(res.numAddValidatorTxs),
-		registerer.Register(res.numAdvanceTimeTxs),
-		registerer.Register(res.numCreateChainTxs),
-		registerer.Register(res.numCreateSubnetTxs),
-		registerer.Register(res.numExportTxs),
-		registerer.Register(res.numImportTxs),
-		registerer.Register(res.numRewardValidatorTxs),
+		registerer.Register(res.ValidatorSetsCreated),
+		registerer.Register(res.ValidatorSetsCached),
+		registerer.Register(res.ValidatorSetsHeightDiff),
+		registerer.Register(res.ValidatorSetsDuration),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets
@@ -175,7 +149,6 @@ func NewMetrics(
 		// initialize to 0
 		res.SubnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
 	}
-
 	return res, errs.Err
 }
 
@@ -184,14 +157,6 @@ func newBlockMetrics(namespace string, name string) prometheus.Counter {
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_blks_accepted", name),
 		Help:      fmt.Sprintf("Number of %s blocks accepted", name),
-	})
-}
-
-func newTxMetrics(namespace string, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_txs_accepted", name),
-		Help:      fmt.Sprintf("Number of %s transactions accepted", name),
 	})
 }
 
@@ -204,16 +169,16 @@ func (m *Metrics) MarkAccepted(b stateless.Block) error {
 		m.numAbortBlocks.Inc()
 	case *stateless.AtomicBlock:
 		m.numAtomicBlocks.Inc()
-		return m.acceptTx(b.Tx)
+		return m.AcceptTx(b.Tx)
 	case *stateless.CommitBlock:
 		m.numCommitBlocks.Inc()
 	case *stateless.ProposalBlock:
 		m.numProposalBlocks.Inc()
-		return m.acceptTx(b.Tx)
+		return m.AcceptTx(b.Tx)
 	case *stateless.StandardBlock:
 		m.numStandardBlocks.Inc()
 		for _, tx := range b.Txs {
-			if err := m.acceptTx(tx); err != nil {
+			if err := m.AcceptTx(tx); err != nil {
 				return err
 			}
 		}
@@ -223,29 +188,6 @@ func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	return nil
 }
 
-// TODO should we just log an error instead of returning one?
-func (m *Metrics) acceptTx(tx *txs.Tx) error {
-	switch tx.Unsigned.(type) {
-	case *txs.AddDelegatorTx:
-		m.numAddDelegatorTxs.Inc()
-	case *txs.AddSubnetValidatorTx:
-		m.numAddSubnetValidatorTxs.Inc()
-	case *txs.AddValidatorTx:
-		m.numAddValidatorTxs.Inc()
-	case *txs.AdvanceTimeTx:
-		m.numAdvanceTimeTxs.Inc()
-	case *txs.CreateChainTx:
-		m.numCreateChainTxs.Inc()
-	case *txs.CreateSubnetTx:
-		m.numCreateSubnetTxs.Inc()
-	case *txs.ImportTx:
-		m.numImportTxs.Inc()
-	case *txs.ExportTx:
-		m.numExportTxs.Inc()
-	case *txs.RewardValidatorTx:
-		m.numRewardValidatorTxs.Inc()
-	default:
-		return fmt.Errorf("%w: %T", mempool.ErrUnknownTxType, tx.Unsigned)
-	}
-	return nil
+func (m *Metrics) AcceptTx(tx *txs.Tx) error {
+	return tx.Unsigned.Visit(m.txMetrics)
 }
