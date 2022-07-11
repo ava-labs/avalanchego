@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -19,6 +18,8 @@ import (
 var errUnknownBlockType = errors.New("unknown block type")
 
 type metrics struct {
+	txMetrics *txMetrics
+
 	percentConnected       prometheus.Gauge
 	subnetPercentConnected *prometheus.GaugeVec
 	localStake             prometheus.Gauge
@@ -31,16 +32,6 @@ type metrics struct {
 	numStandardBlocks prometheus.Counter
 
 	numVotesWon, numVotesLost prometheus.Counter
-
-	numAddDelegatorTxs,
-	numAddSubnetValidatorTxs,
-	numAddValidatorTxs,
-	numAdvanceTimeTxs,
-	numCreateChainTxs,
-	numCreateSubnetTxs,
-	numExportTxs,
-	numImportTxs,
-	numRewardValidatorTxs prometheus.Counter
 
 	validatorSetsCached     prometheus.Counter
 	validatorSetsCreated    prometheus.Counter
@@ -58,20 +49,14 @@ func newBlockMetrics(namespace string, name string) prometheus.Counter {
 	})
 }
 
-func newTxMetrics(namespace string, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_txs_accepted", name),
-		Help:      fmt.Sprintf("Number of %s transactions accepted", name),
-	})
-}
-
 // Initialize platformvm metrics
 func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
 ) error {
+	txMetrics, err := newTxMetrics(namespace, registerer)
+	m.txMetrics = txMetrics
 	m.percentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "percent_connected",
@@ -113,16 +98,6 @@ func (m *metrics) Initialize(
 		Help:      "Total number of votes this node has lost",
 	})
 
-	m.numAddDelegatorTxs = newTxMetrics(namespace, "add_delegator")
-	m.numAddSubnetValidatorTxs = newTxMetrics(namespace, "add_subnet_validator")
-	m.numAddValidatorTxs = newTxMetrics(namespace, "add_validator")
-	m.numAdvanceTimeTxs = newTxMetrics(namespace, "advance_time")
-	m.numCreateChainTxs = newTxMetrics(namespace, "create_chain")
-	m.numCreateSubnetTxs = newTxMetrics(namespace, "create_subnet")
-	m.numExportTxs = newTxMetrics(namespace, "export")
-	m.numImportTxs = newTxMetrics(namespace, "import")
-	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
-
 	m.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_cached",
@@ -144,9 +119,9 @@ func (m *metrics) Initialize(
 		Help:      "Total amount of time generating validator sets in nanoseconds",
 	})
 
+	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
 	m.apiRequestMetrics = apiRequestMetrics
-	errs := wrappers.Errs{}
 	errs.Add(
 		err,
 
@@ -164,16 +139,6 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numVotesWon),
 		registerer.Register(m.numVotesLost),
 
-		registerer.Register(m.numAddDelegatorTxs),
-		registerer.Register(m.numAddSubnetValidatorTxs),
-		registerer.Register(m.numAddValidatorTxs),
-		registerer.Register(m.numAdvanceTimeTxs),
-		registerer.Register(m.numCreateChainTxs),
-		registerer.Register(m.numCreateSubnetTxs),
-		registerer.Register(m.numExportTxs),
-		registerer.Register(m.numImportTxs),
-		registerer.Register(m.numRewardValidatorTxs),
-
 		registerer.Register(m.validatorSetsCreated),
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
@@ -188,7 +153,8 @@ func (m *metrics) Initialize(
 	return errs.Err
 }
 
-func (m *metrics) AcceptBlock(b snowman.Block) error {
+// TODO: use a visitor here
+func (m *metrics) AcceptBlock(b Block) error {
 	switch b := b.(type) {
 	case *AbortBlock:
 		m.numAbortBlocks.Inc()
@@ -214,27 +180,5 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 }
 
 func (m *metrics) AcceptTx(tx *txs.Tx) error {
-	switch tx.Unsigned.(type) {
-	case *txs.AddDelegatorTx:
-		m.numAddDelegatorTxs.Inc()
-	case *txs.AddSubnetValidatorTx:
-		m.numAddSubnetValidatorTxs.Inc()
-	case *txs.AddValidatorTx:
-		m.numAddValidatorTxs.Inc()
-	case *txs.AdvanceTimeTx:
-		m.numAdvanceTimeTxs.Inc()
-	case *txs.CreateChainTx:
-		m.numCreateChainTxs.Inc()
-	case *txs.CreateSubnetTx:
-		m.numCreateSubnetTxs.Inc()
-	case *txs.ImportTx:
-		m.numImportTxs.Inc()
-	case *txs.ExportTx:
-		m.numExportTxs.Inc()
-	case *txs.RewardValidatorTx:
-		m.numRewardValidatorTxs.Inc()
-	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
-	}
-	return nil
+	return tx.Unsigned.Visit(m.txMetrics)
 }

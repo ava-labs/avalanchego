@@ -27,12 +27,13 @@ const (
 )
 
 var (
+	_ Mempool     = &mempool{}
+	_ txs.Visitor = &mempoolIssuer{}
+
 	errUnknownTxType = errors.New("unknown transaction type")
 	errDuplicatedTx  = errors.New("duplicated transaction")
 	errConflictingTx = errors.New("conflicting transaction")
 	errMempoolFull   = errors.New("mempool is full")
-
-	_ Mempool = &mempool{}
 )
 
 type Mempool interface {
@@ -141,14 +142,12 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return errConflictingTx
 	}
 
-	switch tx.Unsigned.(type) {
-	case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-		m.AddProposalTx(tx)
-	case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-		m.AddDecisionTx(tx)
-	default:
-		m.unknownTxs.Inc()
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx.Unsigned)
+	err := tx.Unsigned.Visit(&mempoolIssuer{
+		m:  m,
+		tx: tx,
+	})
+	if err != nil {
+		return err
 	}
 
 	// Mark these UTXOs as consumed in the mempool
@@ -248,4 +247,47 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
+}
+
+type mempoolIssuer struct {
+	m  *mempool
+	tx *txs.Tx
+}
+
+func (i *mempoolIssuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errUnknownTxType }
+func (i *mempoolIssuer) RewardValidatorTx(*txs.RewardValidatorTx) error { return errUnknownTxType }
+
+func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
+	i.m.AddProposalTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	i.m.AddProposalTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	i.m.AddProposalTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) CreateChainTx(tx *txs.CreateChainTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) ImportTx(tx *txs.ImportTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) ExportTx(tx *txs.ExportTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
 }
