@@ -65,18 +65,18 @@ func TestStateSyncGenesis(t *testing.T) {
 
 	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
 	assert.NoError(err)
-	assertIteratorsEqual(assert, EmptyIterator, delegatorIterator)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
 	stakerIterator, err := state.GetCurrentStakerIterator()
 	assert.NoError(err)
-	assertIteratorsEqual(assert, NewSliceIterator(staker), stakerIterator)
+	assertIteratorsEqual(t, NewSliceIterator(staker), stakerIterator)
 
 	_, err = state.GetPendingStaker(constants.PrimaryNetworkID, initialNodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
 	assert.NoError(err)
-	assertIteratorsEqual(assert, EmptyIterator, delegatorIterator)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
 func newInitializedState(assert *assert.Assertions) (State, database.Database) {

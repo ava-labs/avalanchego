@@ -165,14 +165,8 @@ func (v *baseValidators) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID
 }
 
 func (v *baseValidators) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
-	subnetValidators, ok := v.validators[subnetID]
-	if !ok {
-		return
-	}
-	validator, ok := subnetValidators[nodeID]
-	if !ok {
-		return
-	}
+	subnetValidators := v.validators[subnetID]
+	validator := subnetValidators[nodeID]
 	if validator.staker != nil {
 		return
 	}
@@ -214,23 +208,7 @@ type diffValidator struct {
 	deletedDelegators map[ids.ID]*Staker
 }
 
-func (v *diffValidators) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
-	if v.validatorDiffs == nil {
-		v.validatorDiffs = make(map[ids.ID]map[ids.NodeID]*diffValidator)
-	}
-	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
-	if !ok {
-		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
-		v.validatorDiffs[subnetID] = subnetValidatorDiffs
-	}
-	validatorDiff, ok := subnetValidatorDiffs[nodeID]
-	if !ok {
-		validatorDiff = &diffValidator{}
-		subnetValidatorDiffs[nodeID] = validatorDiff
-	}
-	return validatorDiff
-}
-
+// GetStaker may return [nil, true] if the staker was deleted in this diff.
 func (v *diffValidators) GetStaker(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
 	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
 	if !ok {
@@ -276,7 +254,11 @@ func (v *diffValidators) DeleteStaker(staker *Staker) {
 	v.deletedStakers[staker.TxID] = staker
 }
 
-func (v *diffValidators) GetDelegatorIterator(parentIterator StakerIterator, subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
+func (v *diffValidators) GetDelegatorIterator(
+	parentIterator StakerIterator,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+) StakerIterator {
 	var (
 		addedDelegatorIterator = EmptyIterator
 		deletedDelegators      map[ids.ID]*Staker
@@ -331,4 +313,21 @@ func (v *diffValidators) GetStakerIterator(parentIterator StakerIterator) Staker
 		),
 		v.deletedStakers,
 	)
+}
+
+func (v *diffValidators) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+	if v.validatorDiffs == nil {
+		v.validatorDiffs = make(map[ids.ID]map[ids.NodeID]*diffValidator)
+	}
+	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
+	if !ok {
+		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
+		v.validatorDiffs[subnetID] = subnetValidatorDiffs
+	}
+	validatorDiff, ok := subnetValidatorDiffs[nodeID]
+	if !ok {
+		validatorDiff = &diffValidator{}
+		subnetValidatorDiffs[nodeID] = validatorDiff
+	}
+	return validatorDiff
 }

@@ -12,23 +12,79 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBaseValidatorsPruning(t *testing.T) {
+	assert := assert.New(t)
+
+	staker := newTestStaker()
+	delegator := newTestStaker()
+	delegator.SubnetID = staker.SubnetID
+	delegator.NodeID = staker.NodeID
+
+	v := newBaseValidators()
+
+	v.PutStaker(staker)
+
+	_, err := v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.NoError(err)
+
+	v.PutDelegator(delegator)
+
+	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.NoError(err)
+
+	v.DeleteStaker(staker)
+
+	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	v.DeleteDelegator(delegator)
+
+	assert.Empty(v.validators)
+
+	v.PutStaker(staker)
+
+	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.NoError(err)
+
+	v.PutDelegator(delegator)
+
+	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.NoError(err)
+
+	v.DeleteDelegator(delegator)
+
+	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.NoError(err)
+
+	v.DeleteStaker(staker)
+
+	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	assert.Empty(v.validators)
+}
+
 func TestBaseValidatorsStaker(t *testing.T) {
 	assert := assert.New(t)
 
 	staker := newTestStaker()
+	delegator := newTestStaker()
 
 	v := newBaseValidators()
 
-	v.PutDelegator(staker)
+	v.PutDelegator(delegator)
 
-	_, err := v.GetStaker(ids.GenerateTestID(), staker.NodeID)
+	_, err := v.GetStaker(ids.GenerateTestID(), delegator.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = v.GetStaker(staker.SubnetID, ids.GenerateTestNodeID())
+	_, err = v.GetStaker(delegator.SubnetID, ids.GenerateTestNodeID())
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetStaker(delegator.SubnetID, delegator.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
+
+	stakerIterator := v.GetStakerIterator()
+	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
 
 	v.PutStaker(staker)
 
@@ -36,8 +92,10 @@ func TestBaseValidatorsStaker(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(staker, returnedStaker)
 
-	stakerIterator := v.GetStakerIterator()
-	assertIteratorsEqual(assert, NewSliceIterator(staker), stakerIterator)
+	v.DeleteDelegator(delegator)
+
+	stakerIterator = v.GetStakerIterator()
+	assertIteratorsEqual(t, NewSliceIterator(staker), stakerIterator)
 
 	v.DeleteStaker(staker)
 
@@ -45,43 +103,98 @@ func TestBaseValidatorsStaker(t *testing.T) {
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	stakerIterator = v.GetStakerIterator()
-	assertIteratorsEqual(assert, EmptyIterator, stakerIterator)
+	assertIteratorsEqual(t, EmptyIterator, stakerIterator)
 }
 
 func TestBaseValidatorsDelegator(t *testing.T) {
-	assert := assert.New(t)
-
 	staker := newTestStaker()
+	delegator := newTestStaker()
 
 	v := newBaseValidators()
 
-	v.PutDelegator(staker)
+	delegatorIterator := v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
-	_, err := v.GetStaker(ids.GenerateTestID(), staker.NodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
+	v.PutDelegator(delegator)
 
-	_, err = v.GetStaker(staker.SubnetID, ids.GenerateTestNodeID())
-	assert.ErrorIs(err, database.ErrNotFound)
+	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, ids.GenerateTestNodeID())
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
+	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
+	assertIteratorsEqual(t, NewSliceIterator(delegator), delegatorIterator)
+
+	v.DeleteDelegator(delegator)
+
+	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
 	v.PutStaker(staker)
 
-	returnedStaker, err := v.GetStaker(staker.SubnetID, staker.NodeID)
-	assert.NoError(err)
-	assert.Equal(staker, returnedStaker)
+	v.PutDelegator(delegator)
+	v.DeleteDelegator(delegator)
 
-	stakerIterator := v.GetStakerIterator()
-	assertIteratorsEqual(assert, NewSliceIterator(staker), stakerIterator)
+	delegatorIterator = v.GetDelegatorIterator(staker.SubnetID, staker.NodeID)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
+}
+
+func TestDiffValidatorsStaker(t *testing.T) {
+	assert := assert.New(t)
+
+	staker := newTestStaker()
+	delegator := newTestStaker()
+
+	v := diffValidators{}
+
+	v.PutDelegator(delegator)
+
+	_, ok := v.GetStaker(ids.GenerateTestID(), delegator.NodeID)
+	assert.False(ok)
+
+	_, ok = v.GetStaker(delegator.SubnetID, ids.GenerateTestNodeID())
+	assert.False(ok)
+
+	_, ok = v.GetStaker(delegator.SubnetID, delegator.NodeID)
+	assert.False(ok)
+
+	stakerIterator := v.GetStakerIterator(EmptyIterator)
+	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
+
+	v.PutStaker(staker)
+
+	returnedStaker, ok := v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.True(ok)
+	assert.Equal(staker, returnedStaker)
 
 	v.DeleteStaker(staker)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
+	returnedStaker, ok = v.GetStaker(staker.SubnetID, staker.NodeID)
+	assert.True(ok)
+	assert.Nil(returnedStaker)
 
-	stakerIterator = v.GetStakerIterator()
-	assertIteratorsEqual(assert, EmptyIterator, stakerIterator)
+	stakerIterator = v.GetStakerIterator(EmptyIterator)
+	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
+}
+
+func TestDiffValidatorsDelegator(t *testing.T) {
+	staker := newTestStaker()
+	delegator := newTestStaker()
+
+	v := diffValidators{}
+
+	v.PutStaker(staker)
+
+	delegatorIterator := v.GetDelegatorIterator(EmptyIterator, ids.GenerateTestID(), delegator.NodeID)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
+
+	v.PutDelegator(delegator)
+
+	delegatorIterator = v.GetDelegatorIterator(EmptyIterator, delegator.SubnetID, delegator.NodeID)
+	assertIteratorsEqual(t, NewSliceIterator(delegator), delegatorIterator)
+
+	v.DeleteDelegator(delegator)
+
+	delegatorIterator = v.GetDelegatorIterator(EmptyIterator, ids.GenerateTestID(), delegator.NodeID)
+	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
 func newTestStaker() *Staker {
@@ -101,16 +214,18 @@ func newTestStaker() *Staker {
 	}
 }
 
-func assertIteratorsEqual(assert *assert.Assertions, expected, actual StakerIterator) {
+func assertIteratorsEqual(t *testing.T, expected, actual StakerIterator) {
+	t.Helper()
+
 	for expected.Next() {
-		assert.True(actual.Next())
+		assert.True(t, actual.Next())
 
 		expectedStaker := expected.Value()
 		actualStaker := actual.Value()
 
-		assert.Equal(expectedStaker, actualStaker)
+		assert.Equal(t, expectedStaker, actualStaker)
 	}
-	assert.False(actual.Next())
+	assert.False(t, actual.Next())
 
 	expected.Release()
 	actual.Release()
