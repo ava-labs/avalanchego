@@ -31,7 +31,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -514,7 +513,8 @@ func TestDiskMidAccountPartialMerge(t *testing.T) {
 // TestDiskSeek tests that seek-operations work on the disk layer
 func TestDiskSeek(t *testing.T) {
 	// Create some accounts in the disk layer
-	var db ethdb.Database = rawdb.NewMemoryDatabase()
+	db := rawdb.NewMemoryDatabase()
+	defer db.Close()
 
 	// Fill even keys [0,2,4...]
 	for i := 0; i < 0xff; i += 2 {

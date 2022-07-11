@@ -46,13 +46,13 @@ const (
 )
 
 var defaultEnabledAPIs = []string{
-	"public-eth",
-	"public-eth-filter",
+	"eth",
+	"eth-filter",
 	"net",
 	"web3",
-	"internal-public-eth",
-	"internal-public-blockchain",
-	"internal-public-transaction-pool",
+	"internal-eth",
+	"internal-blockchain",
+	"internal-transaction",
 }
 
 type Duration struct {
