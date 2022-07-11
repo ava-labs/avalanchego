@@ -22,43 +22,43 @@ func TestBaseValidatorsPruning(t *testing.T) {
 
 	v := newBaseValidators()
 
-	v.PutStaker(staker)
+	v.PutValidator(staker)
 
-	_, err := v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err := v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.NoError(err)
 
 	v.PutDelegator(delegator)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.NoError(err)
 
-	v.DeleteStaker(staker)
+	v.DeleteValidator(staker)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	v.DeleteDelegator(delegator)
 
 	assert.Empty(v.validators)
 
-	v.PutStaker(staker)
+	v.PutValidator(staker)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.NoError(err)
 
 	v.PutDelegator(delegator)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.NoError(err)
 
 	v.DeleteDelegator(delegator)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.NoError(err)
 
-	v.DeleteStaker(staker)
+	v.DeleteValidator(staker)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	assert.Empty(v.validators)
@@ -74,21 +74,21 @@ func TestBaseValidatorsStaker(t *testing.T) {
 
 	v.PutDelegator(delegator)
 
-	_, err := v.GetStaker(ids.GenerateTestID(), delegator.NodeID)
+	_, err := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = v.GetStaker(delegator.SubnetID, ids.GenerateTestNodeID())
+	_, err = v.GetValidator(delegator.SubnetID, ids.GenerateTestNodeID())
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = v.GetStaker(delegator.SubnetID, delegator.NodeID)
+	_, err = v.GetValidator(delegator.SubnetID, delegator.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	stakerIterator := v.GetStakerIterator()
 	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
 
-	v.PutStaker(staker)
+	v.PutValidator(staker)
 
-	returnedStaker, err := v.GetStaker(staker.SubnetID, staker.NodeID)
+	returnedStaker, err := v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.NoError(err)
 	assert.Equal(staker, returnedStaker)
 
@@ -97,9 +97,9 @@ func TestBaseValidatorsStaker(t *testing.T) {
 	stakerIterator = v.GetStakerIterator()
 	assertIteratorsEqual(t, NewSliceIterator(staker), stakerIterator)
 
-	v.DeleteStaker(staker)
+	v.DeleteValidator(staker)
 
-	_, err = v.GetStaker(staker.SubnetID, staker.NodeID)
+	_, err = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	stakerIterator = v.GetStakerIterator()
@@ -128,7 +128,7 @@ func TestBaseValidatorsDelegator(t *testing.T) {
 	delegatorIterator = v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
-	v.PutStaker(staker)
+	v.PutValidator(staker)
 
 	v.PutDelegator(delegator)
 	v.DeleteDelegator(delegator)
@@ -147,27 +147,27 @@ func TestDiffValidatorsStaker(t *testing.T) {
 
 	v.PutDelegator(delegator)
 
-	_, ok := v.GetStaker(ids.GenerateTestID(), delegator.NodeID)
+	_, ok := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
 	assert.False(ok)
 
-	_, ok = v.GetStaker(delegator.SubnetID, ids.GenerateTestNodeID())
+	_, ok = v.GetValidator(delegator.SubnetID, ids.GenerateTestNodeID())
 	assert.False(ok)
 
-	_, ok = v.GetStaker(delegator.SubnetID, delegator.NodeID)
+	_, ok = v.GetValidator(delegator.SubnetID, delegator.NodeID)
 	assert.False(ok)
 
 	stakerIterator := v.GetStakerIterator(EmptyIterator)
 	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
 
-	v.PutStaker(staker)
+	v.PutValidator(staker)
 
-	returnedStaker, ok := v.GetStaker(staker.SubnetID, staker.NodeID)
+	returnedStaker, ok := v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.True(ok)
 	assert.Equal(staker, returnedStaker)
 
-	v.DeleteStaker(staker)
+	v.DeleteValidator(staker)
 
-	returnedStaker, ok = v.GetStaker(staker.SubnetID, staker.NodeID)
+	returnedStaker, ok = v.GetValidator(staker.SubnetID, staker.NodeID)
 	assert.True(ok)
 	assert.Nil(returnedStaker)
 
@@ -181,7 +181,7 @@ func TestDiffValidatorsDelegator(t *testing.T) {
 
 	v := diffValidators{}
 
-	v.PutStaker(staker)
+	v.PutValidator(staker)
 
 	delegatorIterator := v.GetDelegatorIterator(EmptyIterator, ids.GenerateTestID(), delegator.NodeID)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)

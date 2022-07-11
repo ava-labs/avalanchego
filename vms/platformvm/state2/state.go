@@ -353,16 +353,16 @@ func New(
 	}, err
 }
 
-func (s *state) GetCurrentStaker(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	return s.currentValidators.GetStaker(subnetID, nodeID)
+func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	return s.currentValidators.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutCurrentStaker(staker *Staker) {
-	s.currentValidators.PutStaker(staker)
+func (s *state) PutCurrentValidator(staker *Staker) {
+	s.currentValidators.PutValidator(staker)
 }
 
-func (s *state) DeleteCurrentStaker(staker *Staker) {
-	s.currentValidators.DeleteStaker(staker)
+func (s *state) DeleteCurrentValidator(staker *Staker) {
+	s.currentValidators.DeleteValidator(staker)
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -381,16 +381,16 @@ func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
 	return s.currentValidators.GetStakerIterator(), nil
 }
 
-func (s *state) GetPendingStaker(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	return s.pendingValidators.GetStaker(subnetID, nodeID)
+func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	return s.pendingValidators.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutPendingStaker(staker *Staker) {
-	s.pendingValidators.PutStaker(staker)
+func (s *state) PutPendingValidator(staker *Staker) {
+	s.pendingValidators.PutValidator(staker)
 }
 
-func (s *state) DeletePendingStaker(staker *Staker) {
-	s.pendingValidators.DeleteStaker(staker)
+func (s *state) DeletePendingValidator(staker *Staker) {
+	s.pendingValidators.DeleteValidator(staker)
 }
 
 func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -624,7 +624,7 @@ func (s *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdat
 }
 
 func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
-	staker, err := s.currentValidators.GetStaker(constants.PrimaryNetworkID, nodeID)
+	staker, err := s.currentValidators.GetValidator(constants.PrimaryNetworkID, nodeID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -714,7 +714,7 @@ func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
 		staker.NextTime = staker.EndTime
 		staker.Priority = PrimaryNetworkValidatorCurrentPriority
 
-		s.PutCurrentStaker(staker)
+		s.PutCurrentValidator(staker)
 		s.AddTx(vdrTx, status.Committed)
 		s.SetCurrentSupply(newCurrentSupply)
 	}
@@ -807,7 +807,7 @@ func (s *state) loadCurrentValidators() error {
 		staker.Priority = PrimaryNetworkValidatorCurrentPriority
 
 		validator := s.currentValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.staker = staker
+		validator.validator = staker
 
 		s.currentValidators.stakers.ReplaceOrInsert(staker)
 
@@ -882,7 +882,7 @@ func (s *state) loadCurrentValidators() error {
 		staker.Priority = SubnetValidatorCurrentPriority
 
 		validator := s.currentValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.staker = staker
+		validator.validator = staker
 
 		s.currentValidators.stakers.ReplaceOrInsert(staker)
 	}
@@ -915,7 +915,7 @@ func (s *state) loadPendingValidators() error {
 		staker.Priority = PrimaryNetworkValidatorPendingPriority
 
 		validator := s.pendingValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.staker = staker
+		validator.validator = staker
 
 		s.pendingValidators.stakers.ReplaceOrInsert(staker)
 	}
@@ -980,7 +980,7 @@ func (s *state) loadPendingValidators() error {
 		staker.Priority = SubnetValidatorPendingPriority
 
 		validator := s.pendingValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.staker = staker
+		validator.validator = staker
 
 		s.pendingValidators.stakers.ReplaceOrInsert(staker)
 	}
@@ -1044,13 +1044,13 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		weightDiff := &ValidatorWeightDiff{}
 		weightDiffs[nodeID] = weightDiff
 
-		if validatorDiff.stakerModified {
-			staker := validatorDiff.staker
+		if validatorDiff.validatorModified {
+			staker := validatorDiff.validator
 
-			weightDiff.Decrease = validatorDiff.stakerDeleted
+			weightDiff.Decrease = validatorDiff.validatorDeleted
 			weightDiff.Amount = staker.Weight
 
-			if validatorDiff.stakerDeleted {
+			if validatorDiff.validatorDeleted {
 				if err := s.currentValidatorList.Delete(staker.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
@@ -1173,13 +1173,13 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 			weightDiff := &ValidatorWeightDiff{}
 			weightDiffs[nodeID] = weightDiff
 
-			if validatorDiff.stakerModified {
-				staker := validatorDiff.staker
+			if validatorDiff.validatorModified {
+				staker := validatorDiff.validator
 
-				weightDiff.Decrease = validatorDiff.stakerDeleted
+				weightDiff.Decrease = validatorDiff.validatorDeleted
 				weightDiff.Amount = staker.Weight
 
-				if validatorDiff.stakerDeleted {
+				if validatorDiff.validatorDeleted {
 					err = s.currentSubnetValidatorList.Delete(staker.TxID[:])
 				} else {
 					err = s.currentSubnetValidatorList.Put(staker.TxID[:], nil)
@@ -1226,11 +1226,11 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 
 func (s *state) writePendingPrimaryNetworkStakers() error {
 	for _, validatorDiff := range s.pendingValidators.validatorDiffs[constants.PrimaryNetworkID] {
-		if validatorDiff.stakerModified {
-			staker := validatorDiff.staker
+		if validatorDiff.validatorModified {
+			staker := validatorDiff.validator
 
 			var err error
-			if validatorDiff.stakerDeleted {
+			if validatorDiff.validatorDeleted {
 				err = s.pendingValidatorList.Delete(staker.TxID[:])
 			} else {
 				err = s.pendingValidatorList.Put(staker.TxID[:], nil)
@@ -1271,11 +1271,11 @@ func (s *state) writePendingSubnetStakers() error {
 		}
 
 		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.stakerModified {
-				staker := validatorDiff.staker
+			if validatorDiff.validatorModified {
+				staker := validatorDiff.validator
 
 				var err error
-				if validatorDiff.stakerDeleted {
+				if validatorDiff.validatorDeleted {
 					err = s.pendingSubnetValidatorList.Delete(staker.TxID[:])
 				} else {
 					err = s.pendingSubnetValidatorList.Put(staker.TxID[:], nil)
