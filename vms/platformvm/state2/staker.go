@@ -7,10 +7,11 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/google/btree"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
-	"github.com/google/btree"
 )
 
 const (
