@@ -48,6 +48,11 @@ type baseValidators struct {
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 }
 
+type baseValidator struct {
+	staker     *Staker
+	delegators *btree.BTree
+}
+
 func newBaseValidators() *baseValidators {
 	return &baseValidators{
 		validators:     make(map[ids.ID]map[ids.NodeID]*baseValidator),
@@ -199,6 +204,15 @@ type diffValidators struct {
 	deletedStakers map[ids.ID]*Staker
 }
 
+type diffValidator struct {
+	stakerModified bool
+	stakerDeleted  bool
+	staker         *Staker
+
+	addedDelegators   *btree.BTree
+	deletedDelegators map[ids.ID]*Staker
+}
+
 func (v *diffValidators) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
 	if v.validatorDiffs == nil {
 		v.validatorDiffs = make(map[ids.ID]map[ids.NodeID]*diffValidator)
@@ -316,13 +330,4 @@ func (v *diffValidators) GetStakerIterator(parentIterator StakerIterator) Staker
 		),
 		v.deletedStakers,
 	)
-}
-
-type diffValidator struct {
-	stakerModified bool
-	stakerDeleted  bool
-	staker         *Staker
-
-	addedDelegators   *btree.BTree
-	deletedDelegators map[ids.ID]*Staker
 }

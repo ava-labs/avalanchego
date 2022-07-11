@@ -207,9 +207,9 @@ type txBytesAndStatus struct {
 	Status status.Status `serialize:"true"`
 }
 
-type baseValidator struct {
-	staker     *Staker
-	delegators *btree.BTree
+type txAndStatus struct {
+	tx     *txs.Tx
+	status status.Status
 }
 
 type currentValidatorState struct {
