@@ -10,7 +10,7 @@ type sliceIterator struct {
 	stakers []*Staker
 }
 
-func NewSliceIterator(stakers []*Staker) StakerIterator {
+func NewSliceIterator(stakers ...*Staker) StakerIterator {
 	return &sliceIterator{
 		index:   -1,
 		stakers: stakers,

@@ -35,7 +35,7 @@ func TestMaskedIterator(t *testing.T) {
 	}
 
 	it := NewMaskedIterator(
-		NewSliceIterator(stakers),
+		NewSliceIterator(stakers...),
 		maskedStakers,
 	)
 	for _, staker := range stakers[1:2] {

@@ -71,7 +71,7 @@ func (v *baseValidators) GetStaker(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	if !ok {
 		return nil, database.ErrNotFound
 	}
-	if validator.staker != nil {
+	if validator.staker == nil {
 		return nil, database.ErrNotFound
 	}
 	return validator.staker, nil

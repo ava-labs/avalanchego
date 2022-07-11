@@ -46,9 +46,9 @@ func TestMultiIterator(t *testing.T) {
 
 	it := NewMultiIterator(
 		EmptyIterator,
-		NewSliceIterator(stakers0),
+		NewSliceIterator(stakers0...),
 		EmptyIterator,
-		NewSliceIterator(stakers1),
+		NewSliceIterator(stakers1...),
 		EmptyIterator,
 	)
 	for _, staker := range stakers {
@@ -87,9 +87,9 @@ func TestMultiIteratorEarlyRelease(t *testing.T) {
 
 	it := NewMultiIterator(
 		EmptyIterator,
-		NewSliceIterator(stakers0),
+		NewSliceIterator(stakers0...),
 		EmptyIterator,
-		NewSliceIterator(stakers1),
+		NewSliceIterator(stakers1...),
 		EmptyIterator,
 	)
 	assert.True(it.Next())

@@ -26,7 +26,7 @@ func TestSliceIterator(t *testing.T) {
 		},
 	}
 
-	it := NewSliceIterator(stakers)
+	it := NewSliceIterator(stakers...)
 	for _, staker := range stakers {
 		assert.True(it.Next())
 		assert.Equal(staker, it.Value())
