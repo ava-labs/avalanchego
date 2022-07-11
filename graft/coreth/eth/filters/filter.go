@@ -164,6 +164,14 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		}
 		return f.blockLogs(ctx, header)
 	}
+	// Short-cut if all we care about is pending logs
+	if f.begin == rpc.PendingBlockNumber.Int64() {
+		if f.end != rpc.PendingBlockNumber.Int64() {
+			return nil, errors.New("invalid block range")
+		}
+		// There is no pending block, if the request specifies only the pending block, then return nil.
+		return nil, nil
+	}
 	// Figure out the limits of the filter range
 	// LatestBlockNumber is transformed into the last accepted block in HeaderByNumber
 	// so it is left in place here.
@@ -174,12 +182,13 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	if header == nil {
 		return nil, nil
 	}
-	head := header.Number.Uint64()
-
+	var (
+		head = header.Number.Uint64()
+		end  = uint64(f.end)
+	)
 	if f.begin < 0 {
 		f.begin = int64(head)
 	}
-	end := uint64(f.end)
 	if f.end < 0 {
 		end = head
 	}
@@ -200,8 +209,10 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", f.begin, int64(end), maxBlocks)
 	}
 	// Gather all indexed logs, and finish with non indexed ones
-	var logs []*types.Log
-	size, sections := f.backend.BloomStatus()
+	var (
+		logs           []*types.Log
+		size, sections = f.backend.BloomStatus()
+	)
 	if indexed := sections * size; indexed > uint64(f.begin) {
 		if indexed > end {
 			logs, err = f.indexedLogs(ctx, end)

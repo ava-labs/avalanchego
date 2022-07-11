@@ -116,8 +116,8 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 		database:   database,
 		blockchain: blockchain,
 		config:     genesis.Config,
-		events:     filters.NewEventSystem(&filterBackend{database, blockchain}, false),
 	}
+	backend.events = filters.NewEventSystem(&filterBackend{database, blockchain, backend}, false)
 	backend.rollback(blockchain.CurrentBlock())
 	return backend
 }
@@ -724,7 +724,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query interfaces.Filt
 	var filter *filters.Filter
 	if query.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
-		filter = filters.NewBlockFilter(&filterBackend{b.database, b.blockchain}, *query.BlockHash, query.Addresses, query.Topics)
+		filter = filters.NewBlockFilter(&filterBackend{b.database, b.blockchain, b}, *query.BlockHash, query.Addresses, query.Topics)
 	} else {
 		// Initialize unset filter boundaries to run from genesis to chain head
 		from := int64(0)
@@ -736,7 +736,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query interfaces.Filt
 			to = query.ToBlock.Int64()
 		}
 		// Construct the range filter
-		filter, _ = filters.NewRangeFilter(&filterBackend{b.database, b.blockchain}, from, to, query.Addresses, query.Topics)
+		filter, _ = filters.NewRangeFilter(&filterBackend{b.database, b.blockchain, b}, from, to, query.Addresses, query.Topics)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -857,8 +857,9 @@ func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.
 type filterBackend struct {
-	db ethdb.Database
-	bc *core.BlockChain
+	db      ethdb.Database
+	bc      *core.BlockChain
+	backend *SimulatedBackend
 }
 
 func (fb *filterBackend) SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription {

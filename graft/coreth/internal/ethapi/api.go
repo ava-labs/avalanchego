@@ -497,7 +497,7 @@ func (s *PrivateAccountAPI) SignTransaction(ctx context.Context, args Transactio
 }
 
 // Sign calculates an Ethereum ECDSA signature for:
-// keccack256("\x19Ethereum Signed Message:\n" + len(message) + message))
+// keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))
 //
 // Note, the produced signature conforms to the secp256k1 curve R, S and V values,
 // where the V value will be 27 or 28 for legacy reasons.
@@ -893,6 +893,37 @@ func (diff *StateOverride) Apply(state *state.StateDB) error {
 	return nil
 }
 
+// BlockOverrides is a set of header fields to override.
+type BlockOverrides struct {
+	Number     *hexutil.Big
+	Difficulty *hexutil.Big
+	Time       *hexutil.Big
+	GasLimit   *hexutil.Uint64
+	Coinbase   *common.Address
+}
+
+// Apply overrides the given header fields into the given block context.
+func (diff *BlockOverrides) Apply(blockCtx *vm.BlockContext) {
+	if diff == nil {
+		return
+	}
+	if diff.Number != nil {
+		blockCtx.BlockNumber = diff.Number.ToInt()
+	}
+	if diff.Difficulty != nil {
+		blockCtx.Difficulty = diff.Difficulty.ToInt()
+	}
+	if diff.Time != nil {
+		blockCtx.Time = diff.Time.ToInt()
+	}
+	if diff.GasLimit != nil {
+		blockCtx.GasLimit = uint64(*diff.GasLimit)
+	}
+	if diff.Coinbase != nil {
+		blockCtx.Coinbase = *diff.Coinbase
+	}
+}
+
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
@@ -1267,17 +1298,8 @@ type RPCTransaction struct {
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
-	// Determine the signer. For replay-protected transactions, use the most permissive
-	// signer, because we assume that signers are backwards-compatible with old
-	// transactions. For non-protected transactions, the homestead signer signer is used
-	// because the return value of ChainId is zero for those transactions.
-	var signer types.Signer
-	if tx.Protected() {
-		signer = types.LatestSignerForChainID(tx.ChainId())
-	} else {
-		signer = types.HomesteadSigner{}
-	}
+func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, blockTimestamp uint64, index uint64, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
+	signer := types.MakeSigner(config, new(big.Int).SetUint64(blockNumber), new(big.Int).SetUint64(blockTimestamp))
 	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
 	result := &RPCTransaction{
@@ -1325,10 +1347,12 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction, current *types.Header, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
 	blockNumber := uint64(0)
+	blockTimestamp := uint64(0)
 	if current != nil {
 		blockNumber = current.Number.Uint64()
+		blockTimestamp = current.Time
 	}
-	return newRPCTransaction(tx, common.Hash{}, blockNumber, 0, baseFee, config)
+	return newRPCTransaction(tx, common.Hash{}, blockNumber, blockTimestamp, 0, baseFee, config)
 }
 
 // newRPCTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
@@ -1337,7 +1361,7 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64, config *param
 	if index >= uint64(len(txs)) {
 		return nil
 	}
-	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index, b.BaseFee(), config)
+	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time(), index, b.BaseFee(), config)
 }
 
 // newRPCRawTransactionFromBlockIndex returns the bytes of a transaction given a block and a transaction index.
@@ -1556,7 +1580,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 		if err != nil {
 			return nil, err
 		}
-		return newRPCTransaction(tx, blockHash, blockNumber, index, header.BaseFee, s.b.ChainConfig()), nil
+		return newRPCTransaction(tx, blockHash, blockNumber, header.Time, index, header.BaseFee, s.b.ChainConfig()), nil
 	}
 	// No finalized transaction, try to retrieve it from the pool
 	if tx := s.b.GetPoolTransaction(hash); tx != nil {
@@ -1755,7 +1779,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, input
 }
 
 // Sign calculates an ECDSA signature for:
-// keccack256("\x19Ethereum Signed Message:\n" + len(message) + message).
+// keccak256("\x19Ethereum Signed Message:\n" + len(message) + message).
 //
 // Note, the produced signature conforms to the secp256k1 curve R, S and V values,
 // where the V value will be 27 or 28 for legacy reasons.
