@@ -42,7 +42,6 @@ func NewManager(
 	backend := backend{
 		Mempool:             mempool,
 		statelessBlockState: s,
-		heightSetter:        s,
 		state:               s,
 		bootstrapped:        txExecutorBackend.Bootstrapped,
 		ctx:                 txExecutorBackend.Ctx,

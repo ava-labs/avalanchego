@@ -11,16 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-type heightSetter interface {
-	SetHeight(height uint64)
-}
-
 // TODO improve/add comments.
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
 	statelessBlockState
-	heightSetter
 	blkIDToState map[ids.ID]*blockState
 	state        state.State
 	ctx          *snow.Context

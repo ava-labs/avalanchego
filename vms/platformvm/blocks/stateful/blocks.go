@@ -54,7 +54,6 @@ func (b *Block) Reject() error {
 	return b.Visit(b.manager.rejector)
 }
 
-// TODO
 func (b *Block) Status() choices.Status {
 	blkID := b.ID()
 	if b.manager.state.GetLastAccepted() == blkID {
@@ -68,20 +67,17 @@ func (b *Block) Status() choices.Status {
 	_, status, err := b.manager.GetStatelessBlock(blkID)
 	if err != nil {
 		// It isn't in the database.
-		// TODO is this right?
 		return choices.Processing
 	}
 	return status
 }
 
-// TODO
 func (b *Block) Timestamp() time.Time {
 	// 	 If this is the last accepted block and the block was loaded from disk
 	// 	 since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// 	 we explicitly return the chain time.
-	blkID := b.ID()
 	// Check if the block is processing.
-	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
+	if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
 		return blkState.timestamp
 	}
 	// The block isn't processing.
@@ -135,7 +131,6 @@ func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 }
 
 type blockState struct {
-	// TODO add stateless block to this struct
 	statelessBlock         stateless.Block
 	onAcceptFunc           func()
 	onAcceptState          state.Diff
