@@ -4,7 +4,7 @@
 package stateless
 
 type Metrics interface {
-	MarkAcceptedOptionVote()
-	MarkRejectedOptionVote()
+	MarkVoteWon()
+	MarkVoteLost()
 	MarkAccepted(b Block) error
 }
