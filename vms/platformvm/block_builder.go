@@ -90,14 +90,6 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	/*
-		preferredDecision, ok := preferred.(stateful.Decision)
-		if !ok {
-			// The preferred block should always be a decision block
-			return fmt.Errorf("expected Decision block but got %T", preferred)
-		}
-		preferredState := preferredDecision.OnAccept()
-	*/
 	preferredState := b.vm.manager.OnAccept(preferred.ID())
 
 	verifier := executor.MempoolTxVerifier{
@@ -139,13 +131,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
-		// return stateful.NewStandardBlock(
-		// 	b.vm.manager,
-		// 	b.vm.ctx,
-		// 	preferredID,
-		// 	nextHeight,
-		// 	txs,
-		// )
 		txs := b.PopDecisionTxs(TargetBlockSize)
 		statelessBlk, err := stateless.NewStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
@@ -164,13 +149,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		// return stateful.NewProposalBlock(
-		// 	b.vm.manager,
-		// 	b.vm.ctx,
-		// 	preferredID,
-		// 	nextHeight,
-		// 	rewardValidatorTx,
-		// )
 		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, rewardValidatorTx)
 		if err != nil {
 			return nil, err
@@ -188,13 +166,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		// return stateful.NewProposalBlock(
-		// 	b.vm.manager,
-		// 	b.vm.ctx,
-		// 	preferredID,
-		// 	nextHeight,
-		// 	advanceTimeTx,
-		// )
 		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
@@ -223,13 +194,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		// return stateful.NewProposalBlock(
-		// 	b.vm.manager,
-		// 	b.vm.ctx,
-		// 	preferredID,
-		// 	nextHeight,
-		// 	advanceTimeTx,
-		// )
 		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
@@ -237,13 +201,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
-	// return stateful.NewProposalBlock(
-	// 	b.vm.manager,
-	// 	b.vm.ctx,
-	// 	preferredID,
-	// 	nextHeight,
-	// 	tx,
-	// )
 	statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, tx)
 	if err != nil {
 		return nil, err
