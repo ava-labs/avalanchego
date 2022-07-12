@@ -53,7 +53,7 @@ type UTXOGetter interface {
 // deletion of UTXOs.
 type UTXOWriter interface {
 	// PutUTXO saves the provided utxo to storage.
-	PutUTXO(utxoID ids.ID, utxo *UTXO) error
+	PutUTXO(utxo *UTXO) error
 
 	// DeleteUTXO deletes the provided utxo.
 	DeleteUTXO(utxoID ids.ID) error
@@ -137,12 +137,13 @@ func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
 	return utxo, nil
 }
 
-func (s *utxoState) PutUTXO(utxoID ids.ID, utxo *UTXO) error {
+func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	utxoBytes, err := s.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		return err
 	}
 
+	utxoID := utxo.InputID()
 	s.utxoCache.Put(utxoID, utxo)
 	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
 		return err

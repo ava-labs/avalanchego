@@ -303,7 +303,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -348,7 +348,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -395,7 +395,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -499,7 +499,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -541,7 +541,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -586,7 +586,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -629,7 +629,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(otherAssetUTXO.InputID(), otherAssetUTXO)
+	err = vm.state.PutUTXO(otherAssetUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -1812,7 +1812,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 				},
 			},
 		}
-		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -23,7 +23,6 @@ func TestUTXOState(t *testing.T) {
 	txID := ids.GenerateTestID()
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
-	utxoID := ids.GenerateTestID()
 	utxo := &UTXO{
 		UTXOID: UTXOID{
 			TxID:        txID,
@@ -39,6 +38,7 @@ func TestUTXOState(t *testing.T) {
 			},
 		},
 	}
+	utxoID := utxo.InputID()
 
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
@@ -66,7 +66,7 @@ func TestUTXOState(t *testing.T) {
 	err = s.DeleteUTXO(utxoID)
 	assert.Equal(database.ErrNotFound, err)
 
-	err = s.PutUTXO(utxoID, utxo)
+	err = s.PutUTXO(utxo)
 	assert.NoError(err)
 
 	utxoIDs, err := s.UTXOIDs(addr[:], ids.Empty, 5)
@@ -83,13 +83,14 @@ func TestUTXOState(t *testing.T) {
 	_, err = s.GetUTXO(utxoID)
 	assert.Equal(database.ErrNotFound, err)
 
-	err = s.PutUTXO(utxoID, utxo)
+	err = s.PutUTXO(utxo)
 	assert.NoError(err)
 
 	s = NewUTXOState(db, manager)
 
 	readUTXO, err = s.GetUTXO(utxoID)
 	assert.NoError(err)
+	assert.Equal(utxoID, readUTXO.InputID())
 	assert.Equal(utxo, readUTXO)
 
 	utxoIDs, err = s.UTXOIDs(addr[:], ids.Empty, 5)
