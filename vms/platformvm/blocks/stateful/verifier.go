@@ -43,7 +43,7 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState := v.OnAccept(parentID) // TODO is this right?
+	parentState := v.OnAccept(parentID)
 
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &v.txExecutorBackend,

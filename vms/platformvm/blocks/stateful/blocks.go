@@ -17,7 +17,7 @@ var (
 	_ snowman.OracleBlock = &OracleBlock{}
 )
 
-// TODO can we unexport this?
+// Exported for testing in platformvm package.
 type Block struct {
 	stateless.Block
 	manager *manager
@@ -69,7 +69,7 @@ func (b *Block) Timestamp() time.Time {
 	return b.manager.state.GetTimestamp()
 }
 
-// TODO can we unexport this?
+// Exported for testing in platformvm package.
 type OracleBlock struct {
 	// Invariant: The inner statless block is a *stateless.ProposalBlock.
 	*Block

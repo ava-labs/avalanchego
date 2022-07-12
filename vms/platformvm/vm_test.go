@@ -2306,7 +2306,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO is this right?
 	// Because the block needs to have been verified for it's preference to be
 	// set correctly, we manually select the correct preference here.
 	advanceTimePreference := options[0]
