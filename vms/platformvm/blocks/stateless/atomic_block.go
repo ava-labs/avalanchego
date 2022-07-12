@@ -16,8 +16,7 @@ var _ Block = &AtomicBlock{}
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	CommonBlock `serialize:"true"`
-
-	Tx *txs.Tx `serialize:"true" json:"tx"`
+	Tx          *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (ab *AtomicBlock) Initialize(bytes []byte) error {
@@ -38,7 +37,15 @@ func (ab *AtomicBlock) Initialize(bytes []byte) error {
 
 func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
-func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*AtomicBlock, error) {
+func (ab *AtomicBlock) Visit(v Visitor) error {
+	return v.VisitAtomicBlock(ab)
+}
+
+func NewAtomicBlock(
+	parentID ids.ID,
+	height uint64,
+	tx *txs.Tx,
+) (*AtomicBlock, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,

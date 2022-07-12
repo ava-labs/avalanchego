@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,11 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ stateless.Metrics = &Metrics{}
-
-	ErrUnknownBlockType = errors.New("unknown block type")
-)
+var _ stateless.Metrics = &Metrics{}
 
 type Metrics struct {
 	txMetrics *txMetrics
@@ -158,9 +153,15 @@ func (m *Metrics) Initialize(
 	return errs.Err
 }
 
-func (m *Metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
-func (m *Metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
+func (m *Metrics) MarkVoteWon() {
+	m.numVotesWon.Inc()
+}
 
+func (m *Metrics) MarkVoteLost() {
+	m.numVotesLost.Inc()
+}
+
+// TODO: use a visitor here
 func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
 	case *stateless.AbortBlock:
@@ -181,7 +182,7 @@ func (m *Metrics) MarkAccepted(b stateless.Block) error {
 			}
 		}
 	default:
-		return ErrUnknownBlockType
+		return fmt.Errorf("got unexpected block type %T", b)
 	}
 	return nil
 }

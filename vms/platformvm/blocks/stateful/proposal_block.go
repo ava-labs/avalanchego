@@ -3,138 +3,110 @@
 
 package stateful
 
-import (
-	"fmt"
+// var _ Block = &ProposalBlock{}
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-)
+// // ProposalBlock is a proposal to change the chain's state.
+// //
+// // A proposal may be to:
+// // 	1. Advance the chain's timestamp (*AdvanceTimeTx)
+// //  2. Remove a staker from the staker set (*RewardStakerTx)
+// //  3. Add a new staker to the set of pending (future) stakers
+// //     (*AddValidatorTx, *AddDelegatorTx, *AddSubnetValidatorTx)
+// //
+// // The proposal will be enacted (change the chain's state) if the proposal block
+// // is accepted and followed by an accepted Commit block
+// type ProposalBlock struct {
+// 	*stateless.ProposalBlock
+// 	*commonBlock
+// }
 
-var _ Block = &ProposalBlock{}
+// // NewProposalBlock creates a new block that proposes to issue a transaction.
+// // The parent of this block has ID [parentID].
+// // The parent must be a decision block.
+// func NewProposalBlock(
+// 	manager Manager,
+// 	ctx *snow.Context,
+// 	parentID ids.ID,
+// 	height uint64,
+// 	tx *txs.Tx,
+// ) (*ProposalBlock, error) {
+// 	statelessBlk, err := stateless.NewProposalBlock(parentID, height, tx)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-// ProposalBlock is a proposal to change the chain's state.
-//
-// A proposal may be to:
-// 	1. Advance the chain's timestamp (*AdvanceTimeTx)
-//  2. Remove a staker from the staker set (*RewardStakerTx)
-//  3. Add a new staker to the set of pending (future) stakers
-//     (*AddValidatorTx, *AddDelegatorTx, *AddSubnetValidatorTx)
-//
-// The proposal will be enacted (change the chain's state) if the proposal block
-// is accepted and followed by an accepted Commit block
-type ProposalBlock struct {
-	*stateless.ProposalBlock
-	*commonBlock
+// 	return toStatefulProposalBlock(statelessBlk, manager, ctx, choices.Processing)
+// }
 
-	// The state that the chain will have if this block's proposal is committed
-	onCommitState state.Diff
-	// The state that the chain will have if this block's proposal is aborted
-	onAbortState  state.Diff
-	prefersCommit bool
+// func toStatefulProposalBlock(
+// 	statelessBlk *stateless.ProposalBlock,
+// 	manager Manager,
+// 	ctx *snow.Context,
+// 	status choices.Status,
+// ) (*ProposalBlock, error) {
+// 	pb := &ProposalBlock{
+// 		ProposalBlock: statelessBlk,
+// 		commonBlock: &commonBlock{
+// 			Manager: manager,
+// 			baseBlk: &statelessBlk.CommonBlock,
+// 		},
+// 	}
 
-	manager Manager
-}
+// 	pb.Tx.Unsigned.InitCtx(ctx)
+// 	return pb, nil
+// }
 
-// NewProposalBlock creates a new block that proposes to issue a transaction.
-// The parent of this block has ID [parentID].
-// The parent must be a decision block.
-func NewProposalBlock(
-	manager Manager,
-	ctx *snow.Context,
-	parentID ids.ID,
-	height uint64,
-	tx *txs.Tx,
-) (*ProposalBlock, error) {
-	statelessBlk, err := stateless.NewProposalBlock(parentID, height, tx)
-	if err != nil {
-		return nil, err
-	}
+// func (pb *ProposalBlock) Verify() error {
+// 	return pb.VerifyProposalBlock(pb.ProposalBlock)
+// }
 
-	return toStatefulProposalBlock(statelessBlk, manager, ctx, choices.Processing)
-}
+// func (pb *ProposalBlock) Accept() error {
+// 	return pb.AcceptProposalBlock(pb.ProposalBlock)
+// }
 
-func toStatefulProposalBlock(
-	statelessBlk *stateless.ProposalBlock,
-	manager Manager,
-	ctx *snow.Context,
-	status choices.Status,
-) (*ProposalBlock, error) {
-	pb := &ProposalBlock{
-		ProposalBlock: statelessBlk,
-		commonBlock: &commonBlock{
-			timestampGetter: manager,
-			LastAccepteder:  manager,
-			baseBlk:         &statelessBlk.CommonBlock,
-			status:          status,
-		},
-		manager: manager,
-	}
+// func (pb *ProposalBlock) Reject() error {
+// 	return pb.RejectProposalBlock(pb.ProposalBlock)
+// }
 
-	pb.Tx.Unsigned.InitCtx(ctx)
-	return pb, nil
-}
+// func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
+// 	return pb.conflictsProposalBlock(pb, s)
+// }
 
-func (pb *ProposalBlock) free() {
-	pb.manager.freeProposalBlock(pb)
-}
+// // Options returns the possible children of this block in preferential order.
+// func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
+// 	blkID := pb.ID()
+// 	nextHeight := pb.Height() + 1
 
-func (pb *ProposalBlock) Verify() error {
-	return pb.manager.verifyProposalBlock(pb)
-}
+// 	preferCommit := pb.preferredCommit(blkID)
+// 	commit, err := NewCommitBlock(
+// 		pb.Manager,
+// 		blkID,
+// 		nextHeight,
+// 	)
+// 	if err != nil {
+// 		return [2]snowman.Block{}, fmt.Errorf(
+// 			"failed to create commit block: %w",
+// 			err,
+// 		)
+// 	}
+// 	abort, err := NewAbortBlock(
+// 		pb.Manager,
+// 		blkID,
+// 		nextHeight,
+// 	)
+// 	if err != nil {
+// 		return [2]snowman.Block{}, fmt.Errorf(
+// 			"failed to create abort block: %w",
+// 			err,
+// 		)
+// 	}
 
-func (pb *ProposalBlock) Accept() error {
-	return pb.manager.acceptProposalBlock(pb)
-}
+// 	if preferCommit {
+// 		return [2]snowman.Block{commit, abort}, nil
+// 	}
+// 	return [2]snowman.Block{abort, commit}, nil
+// }
 
-func (pb *ProposalBlock) Reject() error {
-	return pb.manager.rejectProposalBlock(pb)
-}
-
-func (pb *ProposalBlock) conflicts(s ids.Set) (bool, error) {
-	return pb.manager.conflictsProposalBlock(pb, s)
-}
-
-// Options returns the possible children of this block in preferential order.
-func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	blkID := pb.ID()
-	nextHeight := pb.Height() + 1
-
-	commit, err := NewCommitBlock(
-		pb.manager,
-		blkID,
-		nextHeight,
-		pb.prefersCommit,
-	)
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create commit block: %w",
-			err,
-		)
-	}
-	abort, err := NewAbortBlock(
-		pb.manager,
-		blkID,
-		nextHeight,
-		!pb.prefersCommit,
-	)
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create abort block: %w",
-			err,
-		)
-	}
-
-	if pb.prefersCommit {
-		return [2]snowman.Block{commit, abort}, nil
-	}
-	return [2]snowman.Block{abort, commit}, nil
-}
-
-func (pb *ProposalBlock) setBaseState() {
-	pb.manager.setBaseStateProposalBlock(pb)
-}
+// func (pb *ProposalBlock) setBaseState() {
+// 	pb.setBaseStateProposalBlock(pb)
+// }

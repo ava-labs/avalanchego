@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -101,10 +100,6 @@ type VM struct {
 	// Value: cache mapping height -> validator set map
 	validatorSetCaches map[ids.ID]cache.Cacher
 
-	// Key: block ID
-	// Value: the block
-	currentBlocks map[ids.ID]stateful.Block
-
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
@@ -157,7 +152,6 @@ func (vm *VM) Initialize(
 	)
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-	vm.currentBlocks = make(map[ids.ID]stateful.Block)
 	if vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
@@ -208,9 +202,6 @@ func (vm *VM) Initialize(
 	vm.manager = stateful.NewManager(
 		mempool,
 		vm.Metrics,
-		vm.state,
-		vm.state,
-		vm.state,
 		vm.state,
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
@@ -391,16 +382,19 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
+	/* TODO
 	return stateful.MakeStateful(
 		statelessBlk,
 		vm.manager,
 		vm.ctx,
 		choices.Processing,
 	)
+	*/
+	return vm.manager.NewBlock(statelessBlk), nil
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return vm.manager.GetStatefulBlock(blkID)
+	return vm.manager.GetBlock(blkID)
 }
 
 // LastAccepted returns the block most recently accepted
@@ -419,8 +413,8 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return nil
 }
 
-func (vm *VM) Preferred() (stateful.Block, error) {
-	return vm.manager.GetStatefulBlock(vm.preferred)
+func (vm *VM) Preferred() (snowman.Block, error) {
+	return vm.manager.GetBlock(vm.preferred)
 }
 
 func (vm *VM) Version() (string, error) {

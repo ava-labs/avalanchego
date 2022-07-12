@@ -4,10 +4,10 @@
 package stateful
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -16,89 +16,71 @@ import (
 
 var _ Manager = &manager{}
 
-type chainState interface {
-	GetState() state.State
-}
-
-type timestampGetter interface {
-	GetTimestamp() time.Time
+type OnAcceptor interface {
+	// This function should only be called after Verify is called on [blkID].
+	// OnAccept returns:
+	// 1) The current state of the chain, if this block is decided or hasn't
+	//    been verified.
+	// 2) The state of the chain after this block is accepted, if this block was
+	//    verified successfully.
+	OnAccept(blkID ids.ID) state.Chain
 }
 
 type Manager interface {
-	blockState
-	verifier
-	acceptor
-	rejector
-	baseStateSetter
-	conflictChecker
-	freer
-	chainState
-	timestampGetter
-	state.LastAccepteder
+	OnAcceptor
+	GetBlock(id ids.ID) (snowman.Block, error)
+	NewBlock(stateless.Block) snowman.Block
 }
 
 func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
-	state state.State,
-	heightSetter heightSetter,
-	versionDB versionDB,
-	timestampGetter timestampGetter,
+	s state.State,
 	txExecutorBackend executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
-	blockState := &blockStateImpl{
-		manager:      nil, // Set below
-		State:        state,
-		verifiedBlks: map[ids.ID]Block{},
-		ctx:          txExecutorBackend.Ctx,
-	}
-
 	backend := backend{
-		Mempool:        mempool,
-		versionDB:      versionDB,
-		LastAccepteder: state,
-		blockState:     blockState,
-		heightSetter:   heightSetter,
-		state:          state,
-		bootstrapped:   txExecutorBackend.Bootstrapped,
-		ctx:            txExecutorBackend.Ctx,
+		Mempool:      mempool,
+		state:        s,
+		bootstrapped: txExecutorBackend.Bootstrapped,
+		ctx:          txExecutorBackend.Ctx,
+		blkIDToState: map[ids.ID]*blockState{},
 	}
 
 	manager := &manager{
 		backend: backend,
-		verifier: &verifierImpl{
+		verifier: &verifier{
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
 		},
-		acceptor: &acceptorImpl{
+		acceptor: &acceptor{
 			backend:          backend,
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
 		},
-		rejector:        &rejectorImpl{backend: backend},
-		baseStateSetter: &baseStateSetterImpl{State: state},
-		conflictChecker: &conflictCheckerImpl{backend: backend},
-		freer:           &freerImpl{backend: backend},
-		timestampGetter: timestampGetter,
+		rejector: &rejector{backend: backend},
 	}
-	// TODO is there a way to avoid having a Manager
-	// in [blockState] so we don't have to do this?
-	blockState.manager = manager
 	return manager
 }
 
 type manager struct {
 	backend
-	verifier
-	acceptor
-	rejector
-	baseStateSetter
-	conflictChecker
-	freer
-	timestampGetter
+	verifier stateless.Visitor
+	acceptor stateless.Visitor
+	rejector stateless.Visitor
 }
 
-func (m *manager) GetState() state.State {
-	return m.state
+func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	if blk, ok := m.blkIDToState[blkID]; ok {
+		return newBlock(blk.statelessBlock, m), nil
+	}
+	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
+	if err != nil {
+		return nil, err
+	}
+	return newBlock(statelessBlk, m), nil
+}
+
+func (m *manager) NewBlock(blk stateless.Block) snowman.Block {
+	return newBlock(blk, m)
 }

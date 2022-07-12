@@ -38,7 +38,15 @@ func (pb *ProposalBlock) Initialize(bytes []byte) error {
 
 func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
 
-func NewProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*ProposalBlock, error) {
+func (pb *ProposalBlock) Visit(v Visitor) error {
+	return v.VisitProposalBlock(pb)
+}
+
+func NewProposalBlock(
+	parentID ids.ID,
+	height uint64,
+	tx *txs.Tx,
+) (*ProposalBlock, error) {
 	res := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
