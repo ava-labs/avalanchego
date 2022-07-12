@@ -1,0 +1,9 @@
+# Each line is a file pattern followed by one or more owners.
+
+# These owners will be the default code owners for everything in the repo.
+# Unless a later match takes precedence, these owners will be requested for
+# review whenever someone opens a pull request.
+* @ceyonur @darioush @patrick-ogrady @aaronbuchwald
+
+# These owners will be the owner of the contract-examples sub-directory.
+contract-examples/ @dasconnor
