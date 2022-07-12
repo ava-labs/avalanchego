@@ -174,6 +174,8 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	defer a.free(blkID)
 
 	parentID := b.Parent()
+	// Note: we assume this block's sibling, an Abort block, doesn't
+	// need the parent's state when it's rejected.
 	defer a.free(parentID)
 
 	a.ctx.Log.Verbo("accepting block %s", blkID)
@@ -209,6 +211,8 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	defer a.free(blkID)
 
 	parentID := b.Parent()
+	// Note: we assume this block's sibling, a Commit block, doesn't
+	// need the parent's state when it's rejected.
 	defer a.free(parentID)
 
 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
