@@ -97,22 +97,12 @@ type Chain interface {
 }
 
 type LastAccepteder interface {
-	// On startup, returns the block from the most
-	// recent call to SetLastAccepted([blkID], true).
-	// After that, returns the block from the most recent
-	// call to SetLastAccepted([blkID], [persist]), regardless
-	// of whether [persist] is true or false.
 	GetLastAccepted() ids.ID
-	// Set [blkID] as the last accepted block.
-	// If [persist], [blkID] will be written to the database
-	// as the last accepted block next time it's committed.
 	SetLastAccepted(blkID ids.ID)
 }
 
 type BlockState interface {
-	// TODO rename to GetBlock?
 	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	// TODO rename to AddBlock?
 	AddStatelessBlock(block stateless.Block, status choices.Status)
 }
 
