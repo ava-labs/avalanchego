@@ -48,7 +48,7 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	// We do this so that in the event that the node shuts down, the proposal block
 	// is not written to disk unless its child is.
 	// (The VM's Shutdown method commits the database.)
-	// There is an invariant that the most recently committed block is a decision block.
+	// The snowman.Engine requires that the last committed block is a decision block.
 	a.backend.lastAccepted = blkID
 	return nil
 }
@@ -111,11 +111,6 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 			childState.onAcceptState.Apply(a.state)
 		}
 	}
-
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
-		onAcceptFunc()
-	}
-
 	return nil
 }
 
@@ -268,9 +263,6 @@ func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 		if childState.onAcceptState != nil {
 			childState.onAcceptState.Apply(a.state)
 		}
-	}
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
-		onAcceptFunc()
 	}
 	return nil
 }

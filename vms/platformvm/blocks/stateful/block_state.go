@@ -12,16 +12,30 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-type blockState struct {
-	statelessBlock stateless.Block
-	onAcceptFunc   func()
-	onAcceptState  state.Diff
-	onCommitState  state.Diff
-	onAbortState   state.Diff
-	// This block's children which have passed verification.
-	children               []ids.ID
-	timestamp              time.Time
-	inputs                 ids.Set
-	atomicRequests         map[ids.ID]*atomic.Requests
+type standardBlockState struct {
+	onAcceptFunc func()
+}
+
+type atomicBlockState struct {
+	inputs ids.Set
+}
+
+type proposalBlockState struct {
 	inititallyPreferCommit bool
+	onCommitState          state.Diff
+	onAbortState           state.Diff
+}
+
+// The state of a block.
+// Note that not all fields will be set for a given block.
+type blockState struct {
+	standardBlockState
+	proposalBlockState
+	atomicBlockState
+	statelessBlock stateless.Block
+	onAcceptState  state.Diff
+	// This block's children which have passed verification.
+	children       []ids.ID
+	timestamp      time.Time
+	atomicRequests map[ids.ID]*atomic.Requests
 }
