@@ -110,7 +110,7 @@ func (d *diff) PutCurrentValidator(staker *Staker) {
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
-	d.currentValidatorDiffs.PutValidator(staker)
+	d.currentValidatorDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -169,7 +169,7 @@ func (d *diff) PutPendingValidator(staker *Staker) {
 }
 
 func (d *diff) DeletePendingValidator(staker *Staker) {
-	d.pendingValidatorDiffs.PutValidator(staker)
+	d.pendingValidatorDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
