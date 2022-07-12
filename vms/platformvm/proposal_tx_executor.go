@@ -508,13 +508,13 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	currentSupply := parentState.GetCurrentSupply()
-
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return err
 	}
+
 	var (
+		currentSupply             = parentState.GetCurrentSupply()
 		currentValidatorsToAdd    []*state.Staker
 		pendingValidatorsToRemove []*state.Staker
 		currentDelegatorsToAdd    []*state.Staker
@@ -535,120 +535,69 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 		switch stakerToRemove.Priority {
 		case state.PrimaryNetworkDelegatorPendingPriority:
-			r := e.vm.rewards.Calculate(
-				staker.Validator.Duration(),
-				staker.Validator.Wght,
+			potentialReward := e.vm.rewards.Calculate(
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
 				currentSupply,
 			)
-			currentSupply, err = math.Add64(currentSupply, r)
+			currentSupply, err = math.Add64(currentSupply, potentialReward)
 			if err != nil {
+				pendingStakerIterator.Release()
 				return err
 			}
 
-			delegatorsToAdd = append(delegatorsToAdd, &state.ValidatorReward{
-				AddStakerTx:     tx,
-				PotentialReward: r,
-			})
+			stakerToAdd.PotentialReward = potentialReward
+
+			currentDelegatorsToAdd = append(currentDelegatorsToAdd, &stakerToAdd)
+			pendingDelegatorsToRemove = append(pendingDelegatorsToRemove, stakerToRemove)
 		case state.PrimaryNetworkValidatorPendingPriority:
+			potentialReward := e.vm.rewards.Calculate(
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
+				currentSupply,
+			)
+			currentSupply, err = math.Add64(currentSupply, potentialReward)
+			if err != nil {
+				pendingStakerIterator.Release()
+				return err
+			}
+
+			stakerToAdd.PotentialReward = potentialReward
+
+			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
+			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
 		case state.SubnetValidatorPendingPriority:
+			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
+			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
 		default:
-			return fmt.Errorf("expected staker priority got %d", staker.Priority)
-		}
-		switch staker := tx.Unsigned.(type) {
-		case *txs.AddDelegatorTx:
-			if staker.StartTime().After(txTimestamp) {
-				break pendingStakerLoop
-			}
-
-			r := e.vm.rewards.Calculate(
-				staker.Validator.Duration(),
-				staker.Validator.Wght,
-				currentSupply,
-			)
-			currentSupply, err = math.Add64(currentSupply, r)
-			if err != nil {
-				return err
-			}
-
-			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &state.ValidatorReward{
-				AddStakerTx:     tx,
-				PotentialReward: r,
-			})
-			numToRemoveFromPending++
-		case *txs.AddValidatorTx:
-			if staker.StartTime().After(txTimestamp) {
-				break pendingStakerLoop
-			}
-
-			r := e.vm.rewards.Calculate(
-				staker.Validator.Duration(),
-				staker.Validator.Wght,
-				currentSupply,
-			)
-			currentSupply, err = math.Add64(currentSupply, r)
-			if err != nil {
-				return err
-			}
-
-			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &state.ValidatorReward{
-				AddStakerTx:     tx,
-				PotentialReward: r,
-			})
-			numToRemoveFromPending++
-		case *txs.AddSubnetValidatorTx:
-			if staker.StartTime().After(txTimestamp) {
-				break pendingStakerLoop
-			}
-
-			// If this staker should already be removed, then we should just
-			// never add them.
-			if staker.EndTime().After(txTimestamp) {
-				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, tx)
-			}
-			numToRemoveFromPending++
-		default:
-			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+			pendingStakerIterator.Release()
+			return fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 	}
-	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
+	pendingStakerIterator.Release()
 
-	currentStakers := parentState.CurrentStakers()
-	numToRemoveFromCurrent := 0
-
-	// Remove from the staker set any subnet validators whose endTime is at or
-	// before the new timestamp
-currentStakerLoop:
-	for _, tx := range currentStakers.Stakers() {
-		switch staker := tx.Unsigned.(type) {
-		case *txs.AddSubnetValidatorTx:
-			if staker.EndTime().After(txTimestamp) {
-				break currentStakerLoop
-			}
-
-			numToRemoveFromCurrent++
-		case *txs.AddValidatorTx, *txs.AddDelegatorTx:
-			// We shouldn't be removing any primary network validators here
-			break currentStakerLoop
-		default:
-			return errWrongTxType
-		}
-	}
-	newlyCurrentStakers, err := currentStakers.UpdateStakers(
-		toAddValidatorsWithRewardToCurrent,
-		toAddDelegatorsWithRewardToCurrent,
-		toAddWithoutRewardToCurrent,
-		numToRemoveFromCurrent,
-	)
+	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
 
-	e.onCommit, err = state.NewDiffWithValidators(
-		e.parentID,
-		e.stateVersions,
-		newlyCurrentStakers,
-		newlyPendingStakers,
-	)
+	var currentValidatorsToRemove []*state.Staker
+	for currentStakerIterator.Next() {
+		stakerToRemove := pendingStakerIterator.Value()
+		if stakerToRemove.EndTime.After(txTimestamp) {
+			break
+		}
+
+		if stakerToRemove.PotentialReward != 0 {
+			// We shouldn't be removing any permissionless stakers here
+			break
+		}
+
+		currentValidatorsToRemove = append(currentValidatorsToRemove, stakerToRemove)
+	}
+	currentStakerIterator.Release()
+
+	e.onCommit, err = state.NewDiff(e.parentID, e.stateVersions)
 	if err != nil {
 		return err
 	}
@@ -656,13 +605,24 @@ currentStakerLoop:
 	e.onCommit.SetTimestamp(txTimestamp)
 	e.onCommit.SetCurrentSupply(currentSupply)
 
+	for _, currentValidatorToAdd := range currentValidatorsToAdd {
+		e.onCommit.PutCurrentValidator(currentValidatorToAdd)
+	}
+	for _, pendingValidatorToRemove := range pendingValidatorsToRemove {
+		e.onCommit.DeletePendingValidator(pendingValidatorToRemove)
+	}
+	for _, currentDelegatorToAdd := range currentDelegatorsToAdd {
+		e.onCommit.PutCurrentDelegator(currentDelegatorToAdd)
+	}
+	for _, pendingDelegatorToRemove := range pendingDelegatorsToRemove {
+		e.onCommit.DeletePendingDelegator(pendingDelegatorToRemove)
+	}
+	for _, currentValidatorToRemove := range currentValidatorsToRemove {
+		e.onCommit.DeleteCurrentValidator(currentValidatorToRemove)
+	}
+
 	// State doesn't change if this proposal is aborted
-	e.onAbort, err = state.NewDiffWithValidators(
-		e.parentID,
-		e.stateVersions,
-		currentStakers,
-		pendingStakers,
-	)
+	e.onAbort, err = state.NewDiff(e.parentID, e.stateVersions)
 	if err != nil {
 		return err
 	}
@@ -686,8 +646,35 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errInvalidBlockType
 	}
 
-	currentStakers := parentState.CurrentStakers()
-	stakerTx, stakerReward, err := currentStakers.GetNextStaker()
+	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	if !currentStakerIterator.Next() {
+		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+	stakerToRemove := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	if stakerToRemove.TxID != tx.TxID {
+		return fmt.Errorf(
+			"attempting to remove TxID: %s. Should be removing %s",
+			tx.TxID,
+			stakerToRemove.TxID,
+		)
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	currentTime := parentState.GetTimestamp()
+	if !stakerToRemove.EndTime.Equal(currentTime) {
+		return fmt.Errorf(
+			"attempting to remove TxID: %s before their end time %s",
+			tx.TxID,
+			stakerToRemove.EndTime,
+		)
+	}
+
+	stakerTx, _, err := parentState.GetTx(stakerToRemove.TxID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf("failed to get next staker stop time: %w", err)
 	}
@@ -695,48 +682,23 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	stakerID := stakerTx.ID()
-	if stakerID != tx.TxID {
-		return fmt.Errorf(
-			"attempting to remove TxID: %s. Should be removing %s",
-			tx.TxID,
-			stakerID,
-		)
-	}
-
-	// Verify that the chain's timestamp is the validator's end time
-	currentTime := parentState.GetTimestamp()
-	staker, ok := stakerTx.Unsigned.(txs.StakerTx)
-	if !ok {
-		return errWrongTxType
-	}
-	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
-		return fmt.Errorf(
-			"attempting to remove TxID: %s before their end time %s",
-			tx.TxID,
-			endTime,
-		)
-	}
-
-	newlyCurrentStakers, err := currentStakers.DeleteNextStaker()
+	e.onCommit, err = state.NewDiff(e.parentID, e.vm.stateVersions)
 	if err != nil {
 		return err
 	}
 
-	pendingStakers := parentState.PendingStakers()
-	e.onCommit, err = state.NewDiffWithValidators(e.parentID, e.vm.stateVersions, newlyCurrentStakers, pendingStakers)
+	e.onCommit.DeleteCurrentValidator(stakerToRemove)
+
+	e.onAbort, err = state.NewDiff(e.parentID, e.vm.stateVersions)
 	if err != nil {
 		return err
 	}
 
-	e.onAbort, err = state.NewDiffWithValidators(e.parentID, e.vm.stateVersions, newlyCurrentStakers, pendingStakers)
-	if err != nil {
-		return err
-	}
+	e.onAbort.DeleteCurrentValidator(stakerToRemove)
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := e.onAbort.GetCurrentSupply()
-	newSupply, err := math.Sub64(currentSupply, stakerReward)
+	newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
 	if err != nil {
 		return err
 	}
@@ -763,8 +725,8 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// Provide the reward here
-		if stakerReward > 0 {
-			outIntf, err := e.vm.fx.CreateOutput(stakerReward, uStakerTx.RewardsOwner)
+		if stakerToRemove.PotentialReward > 0 {
+			outIntf, err := e.vm.fx.CreateOutput(stakerToRemove.PotentialReward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return fmt.Errorf("failed to create output: %w", err)
 			}
@@ -806,7 +768,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 		// We're removing a delegator, so we need to fetch the validator they
 		// are delgated to.
-		vdr, err := currentStakers.GetValidator(uStakerTx.Validator.NodeID)
+		vdrStaker, err := parentState.GetCurrentValidator(constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get whether %s is a validator: %w",
@@ -814,17 +776,30 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				err,
 			)
 		}
-		vdrTx, _ := vdr.AddValidatorTx()
+
+		vdrTxIntf, _, err := parentState.GetTx(vdrStaker.TxID)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to get whether %s is a validator: %w",
+				uStakerTx.Validator.NodeID,
+				err,
+			)
+		}
+
+		vdrTx, ok := vdrTxIntf.Unsigned.(*txs.AddValidatorTx)
+		if !ok {
+			return errWrongTxType
+		}
 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := reward.PercentDenominator - uint64(vdrTx.Shares)             // parentTx.Shares <= reward.PercentDenominator so no underflow
-		delegatorReward := delegatorShares * (stakerReward / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
+		delegatorShares := reward.PercentDenominator - uint64(vdrTx.Shares)                               // parentTx.Shares <= reward.PercentDenominator so no underflow
+		delegatorReward := delegatorShares * (stakerToRemove.PotentialReward / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
 		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := math.Mul64(delegatorShares, stakerReward); err == nil {
+		if optimisticReward, err := math.Mul64(delegatorShares, stakerToRemove.PotentialReward); err == nil {
 			delegatorReward = optimisticReward / reward.PercentDenominator
 		}
-		delegateeReward := stakerReward - delegatorReward // delegatorReward <= reward so no underflow
+		delegateeReward := stakerToRemove.PotentialReward - delegatorReward // delegatorReward <= reward so no underflow
 
 		offset := 0
 

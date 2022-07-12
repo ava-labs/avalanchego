@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -100,6 +101,9 @@ type State interface {
 	SetLastAccepted(ids.ID)
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
+
+	// Return the current validator set of [subnetID].
+	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 
 	// TODO: remove SyncGenesis and Load from the interface and perform them
 	//       once upon creation
@@ -676,6 +680,29 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 
 	s.validatorDiffsCache.Put(prefixStr, weightDiffs)
 	return weightDiffs, diffIter.Error()
+}
+
+func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
+	vdrs := validators.NewSet()
+	for nodeID, validator := range s.currentValidators.validators[subnetID] {
+		staker := validator.validator
+		if staker != nil {
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+				return nil, err
+			}
+		}
+
+		delegatorIterator := NewTreeIterator(validator.delegators)
+		for delegatorIterator.Next() {
+			staker := delegatorIterator.Value()
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+				delegatorIterator.Release()
+				return nil, err
+			}
+		}
+		delegatorIterator.Release()
+	}
+	return vdrs, nil
 }
 
 func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {

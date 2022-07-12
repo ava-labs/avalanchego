@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -590,158 +589,158 @@ type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 }
 
-// GetCurrentValidators returns current validators and delegators
-func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
-	service.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
+// // GetCurrentValidators returns current validators and delegators
+// func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
+// 	service.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
 
-	reply.Validators = []interface{}{}
+// 	reply.Validators = []interface{}{}
 
-	// Validator's node ID as string --> Delegators to them
-	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
+// 	// Validator's node ID as string --> Delegators to them
+// 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
-	// Create set of nodeIDs
-	nodeIDs := ids.NodeIDSet{}
-	nodeIDs.Add(args.NodeIDs...)
-	includeAllNodes := nodeIDs.Len() == 0
+// 	// Create set of nodeIDs
+// 	nodeIDs := ids.NodeIDSet{}
+// 	nodeIDs.Add(args.NodeIDs...)
+// 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentValidators := service.vm.internalState.CurrentStakers()
+// 	currentValidators := service.vm.internalState.CurrentStakers()
 
-	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
-	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
-		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
-		if err != nil {
-			return err
-		}
-		switch staker := tx.Unsigned.(type) {
-		case *txs.AddDelegatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
+// 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
+// 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
+// 		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
+// 		if err != nil {
+// 			return err
+// 		}
+// 		switch staker := tx.Unsigned.(type) {
+// 		case *txs.AddDelegatorTx:
+// 			if args.SubnetID != constants.PrimaryNetworkID {
+// 				continue
+// 			}
+// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+// 				continue
+// 			}
 
-			weight := json.Uint64(staker.Validator.Weight())
+// 			weight := json.Uint64(staker.Validator.Weight())
 
-			var rewardOwner *platformapi.Owner
-			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok {
-				rewardOwner = &platformapi.Owner{
-					Locktime:  json.Uint64(owner.Locktime),
-					Threshold: json.Uint32(owner.Threshold),
-				}
-				for _, addr := range owner.Addrs {
-					addrStr, err := service.vm.FormatLocalAddress(addr)
-					if err != nil {
-						return err
-					}
-					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
-				}
-			}
+// 			var rewardOwner *platformapi.Owner
+// 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+// 			if ok {
+// 				rewardOwner = &platformapi.Owner{
+// 					Locktime:  json.Uint64(owner.Locktime),
+// 					Threshold: json.Uint32(owner.Threshold),
+// 				}
+// 				for _, addr := range owner.Addrs {
+// 					addrStr, err := service.vm.FormatLocalAddress(addr)
+// 					if err != nil {
+// 						return err
+// 					}
+// 					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
+// 				}
+// 			}
 
-			potentialReward := json.Uint64(rewardAmount)
-			delegator := platformapi.PrimaryDelegator{
-				Staker: platformapi.Staker{
-					TxID:        tx.ID(),
-					StartTime:   json.Uint64(staker.StartTime().Unix()),
-					EndTime:     json.Uint64(staker.EndTime().Unix()),
-					StakeAmount: &weight,
-					NodeID:      staker.Validator.ID(),
-				},
-				RewardOwner:     rewardOwner,
-				PotentialReward: &potentialReward,
-			}
-			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
-		case *txs.AddValidatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
+// 			potentialReward := json.Uint64(rewardAmount)
+// 			delegator := platformapi.PrimaryDelegator{
+// 				Staker: platformapi.Staker{
+// 					TxID:        tx.ID(),
+// 					StartTime:   json.Uint64(staker.StartTime().Unix()),
+// 					EndTime:     json.Uint64(staker.EndTime().Unix()),
+// 					StakeAmount: &weight,
+// 					NodeID:      staker.Validator.ID(),
+// 				},
+// 				RewardOwner:     rewardOwner,
+// 				PotentialReward: &potentialReward,
+// 			}
+// 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
+// 		case *txs.AddValidatorTx:
+// 			if args.SubnetID != constants.PrimaryNetworkID {
+// 				continue
+// 			}
+// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+// 				continue
+// 			}
 
-			nodeID := staker.Validator.ID()
-			startTime := staker.StartTime()
-			weight := json.Uint64(staker.Validator.Weight())
-			potentialReward := json.Uint64(rewardAmount)
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
-			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
-			if err != nil {
-				return err
-			}
-			uptime := json.Float32(rawUptime)
+// 			nodeID := staker.Validator.ID()
+// 			startTime := staker.StartTime()
+// 			weight := json.Uint64(staker.Validator.Weight())
+// 			potentialReward := json.Uint64(rewardAmount)
+// 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
+// 			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			uptime := json.Float32(rawUptime)
 
-			connected := service.vm.uptimeManager.IsConnected(nodeID)
+// 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 
-			var rewardOwner *platformapi.Owner
-			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok {
-				rewardOwner = &platformapi.Owner{
-					Locktime:  json.Uint64(owner.Locktime),
-					Threshold: json.Uint32(owner.Threshold),
-				}
-				for _, addr := range owner.Addrs {
-					addrStr, err := service.vm.FormatLocalAddress(addr)
-					if err != nil {
-						return err
-					}
-					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
-				}
-			}
+// 			var rewardOwner *platformapi.Owner
+// 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+// 			if ok {
+// 				rewardOwner = &platformapi.Owner{
+// 					Locktime:  json.Uint64(owner.Locktime),
+// 					Threshold: json.Uint32(owner.Threshold),
+// 				}
+// 				for _, addr := range owner.Addrs {
+// 					addrStr, err := service.vm.FormatLocalAddress(addr)
+// 					if err != nil {
+// 						return err
+// 					}
+// 					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
+// 				}
+// 			}
 
-			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
-				Staker: platformapi.Staker{
-					TxID:        tx.ID(),
-					NodeID:      nodeID,
-					StartTime:   json.Uint64(startTime.Unix()),
-					EndTime:     json.Uint64(staker.EndTime().Unix()),
-					StakeAmount: &weight,
-				},
-				Uptime:          &uptime,
-				Connected:       connected,
-				PotentialReward: &potentialReward,
-				RewardOwner:     rewardOwner,
-				DelegationFee:   delegationFee,
-			})
-		case *txs.AddSubnetValidatorTx:
-			if args.SubnetID != staker.Validator.Subnet {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-			nodeID := staker.Validator.ID()
-			weight := json.Uint64(staker.Validator.Weight())
-			connected := service.vm.uptimeManager.IsConnected(nodeID)
-			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
-				Staker: platformapi.Staker{
-					NodeID:    nodeID,
-					TxID:      tx.ID(),
-					StartTime: json.Uint64(staker.StartTime().Unix()),
-					EndTime:   json.Uint64(staker.EndTime().Unix()),
-					Weight:    &weight,
-				},
-				Connected: connected && tracksSubnet,
-			})
-		default:
-			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
-		}
-	}
+// 			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
+// 				Staker: platformapi.Staker{
+// 					TxID:        tx.ID(),
+// 					NodeID:      nodeID,
+// 					StartTime:   json.Uint64(startTime.Unix()),
+// 					EndTime:     json.Uint64(staker.EndTime().Unix()),
+// 					StakeAmount: &weight,
+// 				},
+// 				Uptime:          &uptime,
+// 				Connected:       connected,
+// 				PotentialReward: &potentialReward,
+// 				RewardOwner:     rewardOwner,
+// 				DelegationFee:   delegationFee,
+// 			})
+// 		case *txs.AddSubnetValidatorTx:
+// 			if args.SubnetID != staker.Validator.Subnet {
+// 				continue
+// 			}
+// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+// 				continue
+// 			}
+// 			nodeID := staker.Validator.ID()
+// 			weight := json.Uint64(staker.Validator.Weight())
+// 			connected := service.vm.uptimeManager.IsConnected(nodeID)
+// 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+// 			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
+// 				Staker: platformapi.Staker{
+// 					NodeID:    nodeID,
+// 					TxID:      tx.ID(),
+// 					StartTime: json.Uint64(staker.StartTime().Unix()),
+// 					EndTime:   json.Uint64(staker.EndTime().Unix()),
+// 					Weight:    &weight,
+// 				},
+// 				Connected: connected && tracksSubnet,
+// 			})
+// 		default:
+// 			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+// 		}
+// 	}
 
-	for i, vdrIntf := range reply.Validators {
-		vdr, ok := vdrIntf.(platformapi.PrimaryValidator)
-		if !ok {
-			continue
-		}
-		if delegators, ok := vdrToDelegators[vdr.NodeID]; ok {
-			vdr.Delegators = delegators
-		}
-		reply.Validators[i] = vdr
-	}
+// 	for i, vdrIntf := range reply.Validators {
+// 		vdr, ok := vdrIntf.(platformapi.PrimaryValidator)
+// 		if !ok {
+// 			continue
+// 		}
+// 		if delegators, ok := vdrToDelegators[vdr.NodeID]; ok {
+// 			vdr.Delegators = delegators
+// 		}
+// 		reply.Validators[i] = vdr
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
 type GetPendingValidatorsArgs struct {
@@ -762,90 +761,90 @@ type GetPendingValidatorsReply struct {
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetPendingValidators returns the list of pending validators
-func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
-	service.vm.ctx.Log.Debug("Platform: GetPendingValidators called")
+// // GetPendingValidators returns the list of pending validators
+// func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
+// 	service.vm.ctx.Log.Debug("Platform: GetPendingValidators called")
 
-	reply.Validators = []interface{}{}
-	reply.Delegators = []interface{}{}
+// 	reply.Validators = []interface{}{}
+// 	reply.Delegators = []interface{}{}
 
-	// Create set of nodeIDs
-	nodeIDs := ids.NodeIDSet{}
-	nodeIDs.Add(args.NodeIDs...)
-	includeAllNodes := nodeIDs.Len() == 0
+// 	// Create set of nodeIDs
+// 	nodeIDs := ids.NodeIDSet{}
+// 	nodeIDs.Add(args.NodeIDs...)
+// 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingValidators := service.vm.internalState.PendingStakers()
+// 	pendingValidators := service.vm.internalState.PendingStakers()
 
-	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
-		switch staker := tx.Unsigned.(type) {
-		case *txs.AddDelegatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
+// 	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
+// 		switch staker := tx.Unsigned.(type) {
+// 		case *txs.AddDelegatorTx:
+// 			if args.SubnetID != constants.PrimaryNetworkID {
+// 				continue
+// 			}
+// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+// 				continue
+// 			}
 
-			weight := json.Uint64(staker.Validator.Weight())
-			reply.Delegators = append(reply.Delegators, platformapi.Staker{
-				TxID:        tx.ID(),
-				NodeID:      staker.Validator.ID(),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
-			})
-		case *txs.AddValidatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
+// 			weight := json.Uint64(staker.Validator.Weight())
+// 			reply.Delegators = append(reply.Delegators, platformapi.Staker{
+// 				TxID:        tx.ID(),
+// 				NodeID:      staker.Validator.ID(),
+// 				StartTime:   json.Uint64(staker.StartTime().Unix()),
+// 				EndTime:     json.Uint64(staker.EndTime().Unix()),
+// 				StakeAmount: &weight,
+// 			})
+// 		case *txs.AddValidatorTx:
+// 			if args.SubnetID != constants.PrimaryNetworkID {
+// 				continue
+// 			}
+// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+// 				continue
+// 			}
 
-			nodeID := staker.Validator.ID()
-			weight := json.Uint64(staker.Validator.Weight())
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
+// 			nodeID := staker.Validator.ID()
+// 			weight := json.Uint64(staker.Validator.Weight())
+// 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 
-			connected := service.vm.uptimeManager.IsConnected(nodeID)
-			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
-				Staker: platformapi.Staker{
-					TxID:        tx.ID(),
-					NodeID:      staker.Validator.ID(),
-					StartTime:   json.Uint64(staker.StartTime().Unix()),
-					EndTime:     json.Uint64(staker.EndTime().Unix()),
-					StakeAmount: &weight,
-				},
-				DelegationFee: delegationFee,
-				Connected:     connected,
-			})
-		case *txs.AddSubnetValidatorTx:
-			if args.SubnetID != staker.Validator.Subnet {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
+// 			connected := service.vm.uptimeManager.IsConnected(nodeID)
+// 			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
+// 				Staker: platformapi.Staker{
+// 					TxID:        tx.ID(),
+// 					NodeID:      staker.Validator.ID(),
+// 					StartTime:   json.Uint64(staker.StartTime().Unix()),
+// 					EndTime:     json.Uint64(staker.EndTime().Unix()),
+// 					StakeAmount: &weight,
+// 				},
+// 				DelegationFee: delegationFee,
+// 				Connected:     connected,
+// 			})
+// 		case *txs.AddSubnetValidatorTx:
+// 			if args.SubnetID != staker.Validator.Subnet {
+// 				continue
+// 			}
+// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
+// 				continue
+// 			}
 
-			nodeID := staker.Validator.ID()
-			weight := json.Uint64(staker.Validator.Weight())
-			connected := service.vm.uptimeManager.IsConnected(nodeID)
-			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
-				Staker: platformapi.Staker{
-					NodeID:    nodeID,
-					TxID:      tx.ID(),
-					StartTime: json.Uint64(staker.StartTime().Unix()),
-					EndTime:   json.Uint64(staker.EndTime().Unix()),
-					Weight:    &weight,
-				},
-				Connected: connected && tracksSubnet,
-			})
-		default:
-			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
-		}
-	}
-	return nil
-}
+// 			nodeID := staker.Validator.ID()
+// 			weight := json.Uint64(staker.Validator.Weight())
+// 			connected := service.vm.uptimeManager.IsConnected(nodeID)
+// 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+// 			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
+// 				Staker: platformapi.Staker{
+// 					NodeID:    nodeID,
+// 					TxID:      tx.ID(),
+// 					StartTime: json.Uint64(staker.StartTime().Unix()),
+// 					EndTime:   json.Uint64(staker.EndTime().Unix()),
+// 					Weight:    &weight,
+// 				},
+// 				Connected: connected && tracksSubnet,
+// 			})
+// 		default:
+// 			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+// 		}
+// 	}
+// 	return nil
+// }
 
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
 type GetCurrentSupplyReply struct {
@@ -2022,74 +2021,74 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 	return totalAmountStaked, stakedOuts, nil
 }
 
-// GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
-// staked on the Primary Network.
-//
-// This method assumes that each stake output has only owner
-// This method assumes only AVAX can be staked
-// This method only concerns itself with the Primary Network, not subnets
-// TODO: Improve the performance of this method by maintaining this data
-// in a data structure rather than re-calculating it by iterating over stakers
-func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetStakeReply) error {
-	service.vm.ctx.Log.Debug("Platform: GetStake called")
+// // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
+// // staked on the Primary Network.
+// //
+// // This method assumes that each stake output has only owner
+// // This method assumes only AVAX can be staked
+// // This method only concerns itself with the Primary Network, not subnets
+// // TODO: Improve the performance of this method by maintaining this data
+// // in a data structure rather than re-calculating it by iterating over stakers
+// func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetStakeReply) error {
+// 	service.vm.ctx.Log.Debug("Platform: GetStake called")
 
-	if len(args.Addresses) > maxGetStakeAddrs {
-		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
-	}
+// 	if len(args.Addresses) > maxGetStakeAddrs {
+// 		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
+// 	}
 
-	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
-	if err != nil {
-		return err
-	}
+// 	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	currentStakers := service.vm.internalState.CurrentStakers()
-	stakers := currentStakers.Stakers()
+// 	currentStakers := service.vm.internalState.CurrentStakers()
+// 	stakers := currentStakers.Stakers()
 
-	var (
-		totalStake uint64
-		stakedOuts = make([]avax.TransferableOutput, 0, len(stakers))
-	)
-	for _, tx := range stakers { // Iterates over current stakers
-		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
-		if err != nil {
-			return err
-		}
-		totalStake, err = math.Add64(totalStake, stakedAmt)
-		if err != nil {
-			return err
-		}
-		stakedOuts = append(stakedOuts, outs...)
-	}
+// 	var (
+// 		totalStake uint64
+// 		stakedOuts = make([]avax.TransferableOutput, 0, len(stakers))
+// 	)
+// 	for _, tx := range stakers { // Iterates over current stakers
+// 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		totalStake, err = math.Add64(totalStake, stakedAmt)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		stakedOuts = append(stakedOuts, outs...)
+// 	}
 
-	pendingStakers := service.vm.internalState.PendingStakers()
-	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
-		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
-		if err != nil {
-			return err
-		}
-		totalStake, err = math.Add64(totalStake, stakedAmt)
-		if err != nil {
-			return err
-		}
-		stakedOuts = append(stakedOuts, outs...)
-	}
+// 	pendingStakers := service.vm.internalState.PendingStakers()
+// 	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
+// 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		totalStake, err = math.Add64(totalStake, stakedAmt)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		stakedOuts = append(stakedOuts, outs...)
+// 	}
 
-	response.Staked = json.Uint64(totalStake)
-	response.Outputs = make([]string, len(stakedOuts))
-	for i, output := range stakedOuts {
-		bytes, err := Codec.Marshal(txs.Version, output)
-		if err != nil {
-			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
-		}
-		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
-		if err != nil {
-			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
-		}
-	}
-	response.Encoding = args.Encoding
+// 	response.Staked = json.Uint64(totalStake)
+// 	response.Outputs = make([]string, len(stakedOuts))
+// 	for i, output := range stakedOuts {
+// 		bytes, err := Codec.Marshal(txs.Version, output)
+// 		if err != nil {
+// 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
+// 		}
+// 		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
+// 		if err != nil {
+// 			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
+// 		}
+// 	}
+// 	response.Encoding = args.Encoding
 
-	return nil
-}
+// 	return nil
+// }
 
 // GetMinStakeReply is the response from calling GetMinStake.
 type GetMinStakeReply struct {
@@ -2147,22 +2146,22 @@ type GetMaxStakeAmountReply struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
-// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
-// node during the time period.
-func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-	startTime := time.Unix(int64(args.StartTime), 0)
-	endTime := time.Unix(int64(args.EndTime), 0)
+// // GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
+// // node during the time period.
+// func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
+// 	startTime := time.Unix(int64(args.StartTime), 0)
+// 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
-		args.SubnetID,
-		args.NodeID,
-		startTime,
-		endTime,
-	)
+// 	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
+// 		args.SubnetID,
+// 		args.NodeID,
+// 		startTime,
+// 		endTime,
+// 	)
 
-	reply.Amount = json.Uint64(maxStakeAmount)
-	return err
-}
+// 	reply.Amount = json.Uint64(maxStakeAmount)
+// 	return err
+// }
 
 // GetRewardUTXOsReply defines the GetRewardUTXOs replies returned from the API
 type GetRewardUTXOsReply struct {

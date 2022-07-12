@@ -64,8 +64,9 @@ var (
 	_ secp256k1fx.VM   = &VM{}
 	_ validators.State = &VM{}
 
-	errInvalidID      = errors.New("invalid ID")
-	errWrongCacheType = errors.New("unexpectedly cached type")
+	errInvalidID           = errors.New("invalid ID")
+	errWrongCacheType      = errors.New("unexpectedly cached type")
+	errMissingValidatorSet = errors.New("missing validator set")
 )
 
 type VM struct {
@@ -486,7 +487,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, state.ErrNotEnoughValidators
+		return nil, errMissingValidatorSet
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -572,8 +573,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 }
 
 func (vm *VM) updateValidators() error {
-	currentValidators := vm.internalState.CurrentStakers()
-	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
+	primaryValidators, err := vm.internalState.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {
 		return err
 	}
@@ -586,7 +586,7 @@ func (vm *VM) updateValidators() error {
 	vm.totalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
-		subnetValidators, err := currentValidators.ValidatorSet(subnetID)
+		subnetValidators, err := vm.internalState.ValidatorSet(subnetID)
 		if err != nil {
 			return err
 		}
