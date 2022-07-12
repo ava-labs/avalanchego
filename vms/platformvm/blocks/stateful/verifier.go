@@ -19,9 +19,10 @@ import (
 var (
 	_                       stateless.Visitor = &verifier{}
 	errConflictingBatchTxs                    = errors.New("block contains conflicting transactions")
-	ErrConflictingParentTxs                   = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errConflictingParentTxs                   = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 )
 
+// verifier handles the logic for verifying a block.
 type verifier struct {
 	backend
 	txExecutorBackend executor.Backend
@@ -134,7 +135,7 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 			break
 		}
 		if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
-			return ErrConflictingParentTxs
+			return errConflictingParentTxs
 		}
 		parent, _, err := v.state.GetStatelessBlock(parentID)
 		if err != nil {
@@ -227,7 +228,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 				break
 			}
 			if parentState.inputs.Overlaps(blkState.inputs) {
-				return ErrConflictingParentTxs
+				return errConflictingParentTxs
 			}
 			var parent stateless.Block
 			if parentState, ok := v.blkIDToState[parentID]; ok {

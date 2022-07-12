@@ -10,6 +10,7 @@ import (
 
 var _ stateless.Visitor = &rejector{}
 
+// rejector handles the logic for rejecting a block.
 type rejector struct {
 	backend
 }

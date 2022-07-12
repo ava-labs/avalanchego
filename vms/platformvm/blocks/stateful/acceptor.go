@@ -15,6 +15,7 @@ import (
 
 var _ stateless.Visitor = &acceptor{}
 
+// acceptor handles the logic for accepting a block.
 type acceptor struct {
 	backend
 	metrics          metrics.Metrics

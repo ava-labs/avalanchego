@@ -624,14 +624,12 @@ func (s *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdat
 	return nil
 }
 
-func (s *state) GetTimestamp() time.Time    { return s.timestamp }
-func (s *state) SetTimestamp(tm time.Time)  { s.timestamp = tm }
-func (s *state) GetCurrentSupply() uint64   { return s.currentSupply }
-func (s *state) SetCurrentSupply(cs uint64) { s.currentSupply = cs }
-func (s *state) GetLastAccepted() ids.ID    { return s.lastAccepted }
-func (s *state) SetLastAccepted(lastAccepted ids.ID) {
-	s.lastAccepted = lastAccepted
-}
+func (s *state) GetTimestamp() time.Time             { return s.timestamp }
+func (s *state) SetTimestamp(tm time.Time)           { s.timestamp = tm }
+func (s *state) GetCurrentSupply() uint64            { return s.currentSupply }
+func (s *state) SetCurrentSupply(cs uint64)          { s.currentSupply = cs }
+func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
+func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
 
 func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	currentValidator, err := s.CurrentStakers().GetValidator(nodeID)
