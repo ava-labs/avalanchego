@@ -95,10 +95,6 @@ done:
 			return "", "", err
 		}
 
-		if resp.ClusterInfo == nil {
-			continue
-		}
-
 		if !resp.ClusterInfo.Healthy {
 			continue
 		}
