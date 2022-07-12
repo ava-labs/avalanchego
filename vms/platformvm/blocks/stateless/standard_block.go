@@ -5,6 +5,7 @@ package stateless
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -32,7 +33,19 @@ func (sb *StandardBlock) Initialize(bytes []byte) error {
 
 func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
 
-func NewStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (*StandardBlock, error) {
+func (sb *StandardBlock) Visit(v Visitor) error {
+	return v.VisitStandardBlock(sb)
+}
+
+func (sb *StandardBlock) Timestamp() time.Time {
+	return time.Time{}
+}
+
+func NewStandardBlock(
+	parentID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (*StandardBlock, error) {
 	res := &StandardBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,

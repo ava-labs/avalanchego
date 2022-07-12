@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -42,7 +43,7 @@ type BlockBuilder interface {
 
 	StartTimer()
 	SetPreference(blockID ids.ID) error
-	Preferred() (stateful.Block, error)
+	Preferred() (snowman.Block, error)
 	AddUnverifiedTx(tx *txs.Tx) error
 	BuildBlock() (snowman.Block, error)
 	Shutdown()
@@ -116,8 +117,8 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) error {
 	return nil
 }
 
-func (b *blockBuilder) Preferred() (stateful.Block, error) {
-	return b.blkManager.GetStatefulBlock(b.preferredBlockID)
+func (b *blockBuilder) Preferred() (snowman.Block, error) {
+	return b.blkManager.GetBlock(b.preferredBlockID)
 }
 
 func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
@@ -137,12 +138,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
+	preferredState := b.blkManager.OnAccept(preferred.ID())
 
 	verifier := executor.MempoolTxVerifier{
 		Backend:     &b.txExecutorBackend,
@@ -180,23 +176,16 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
+	preferredState := b.blkManager.OnAccept(preferredID)
 
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
-		return stateful.NewStandardBlock(
-			b.blkManager,
-			ctx,
-			preferredID,
-			nextHeight,
-			txs,
-		)
+		statelessBlk, err := stateless.NewStandardBlock(preferredID, nextHeight, txs)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
 	// Try building a proposal block that rewards a staker.
@@ -209,13 +198,15 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
-			b.blkManager,
-			ctx,
+		statelessBlk, err := stateless.NewProposalBlock(
 			preferredID,
 			nextHeight,
 			rewardValidatorTx,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
@@ -228,13 +219,15 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
-			b.blkManager,
-			ctx,
+		statelessBlk, err := stateless.NewProposalBlock(
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
 	// Clean out the mempool's transactions with invalid timestamps.
@@ -258,22 +251,18 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		return stateful.NewProposalBlock(
-			b.blkManager,
-			ctx,
-			preferredID,
-			nextHeight,
-			advanceTimeTx,
-		)
+		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
-	return stateful.NewProposalBlock(
-		b.blkManager,
-		ctx,
-		preferredID,
-		nextHeight,
-		tx,
-	)
+	statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, tx)
+	if err != nil {
+		return nil, err
+	}
+	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
 func (b *blockBuilder) Shutdown() {
@@ -302,13 +291,8 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
-		return
-	}
-	preferredState := preferredDecision.OnAccept()
+
+	preferredState := b.blkManager.OnAccept(preferred.ID())
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {

@@ -21,7 +21,14 @@ type AbortBlock struct {
 
 func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
 
-func NewAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
+func (ab *AbortBlock) Visit(v Visitor) error {
+	return v.VisitAbortBlock(ab)
+}
+
+func NewAbortBlock(
+	parentID ids.ID,
+	height uint64,
+) (*AbortBlock, error) {
 	res := &AbortBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -46,7 +53,14 @@ type CommitBlock struct {
 
 func (cb *CommitBlock) BlockTxs() []*txs.Tx { return nil }
 
-func NewCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
+func (cb *CommitBlock) Visit(v Visitor) error {
+	return v.VisitCommitBlock(cb)
+}
+
+func NewCommitBlock(
+	parentID ids.ID,
+	height uint64,
+) (*CommitBlock, error) {
 	res := &CommitBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,

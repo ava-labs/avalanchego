@@ -188,10 +188,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	}
 	res.blkManager = stateful.NewManager(
 		res.mpool,
-		metrics,
-		res.fullState,
-		res.fullState,
-		res.fullState,
+		*metrics,
 		res.fullState,
 		res.txExecBackend,
 		window,

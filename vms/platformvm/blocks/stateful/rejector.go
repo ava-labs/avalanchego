@@ -3,26 +3,23 @@
 
 package stateful
 
-import "github.com/ava-labs/avalanchego/snow/choices"
+import (
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+)
 
-var _ rejector = &rejectorImpl{}
+var _ stateless.Visitor = &rejector{}
 
-type rejector interface {
-	rejectProposalBlock(b *ProposalBlock) error
-	rejectAtomicBlock(b *AtomicBlock) error
-	rejectStandardBlock(b *StandardBlock) error
-	rejectCommitBlock(b *CommitBlock) error
-	rejectAbortBlock(b *AbortBlock) error
-}
-
-type rejectorImpl struct {
+type rejector struct {
 	backend
 }
 
-func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
+func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
+	blkID := b.ID()
+
 	r.ctx.Log.Verbo(
 		"Rejecting Proposal Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
@@ -35,16 +32,17 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 		)
 	}
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.ProposalBlock, b.status)
-	return r.Commit()
+	defer r.free(blkID)
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
+func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+	blkID := b.ID()
+
 	r.ctx.Log.Verbo(
 		"Rejecting Atomic Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
@@ -57,16 +55,17 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.AtomicBlock, b.status)
-	return r.Commit()
+	defer r.free(blkID)
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
+func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
+	blkID := b.ID()
+
 	r.ctx.Log.Verbo(
 		"Rejecting Standard Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
@@ -81,36 +80,43 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.StandardBlock, b.status)
-	return r.Commit()
+	defer r.free(blkID)
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
+func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
+	blkID := b.ID()
+
 	r.ctx.Log.Verbo(
 		"Rejecting CommitBlock Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.CommitBlock, b.status)
-	return r.Commit()
+	defer func() {
+		r.free(blkID)
+		r.free(b.Parent())
+	}()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
+func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
+	blkID := b.ID()
+
 	r.ctx.Log.Verbo(
 		"Rejecting Abort Block %s at height %d with parent %s",
-		b.ID(),
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.AbortBlock, b.status)
-	return r.Commit()
+	defer func() {
+		r.free(blkID)
+		r.free(b.Parent())
+	}()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }

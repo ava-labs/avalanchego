@@ -10,11 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
@@ -107,18 +109,21 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}
 
 	// Assert preferences are correct
-	block := blk.(*stateful.ProposalBlock)
+	block := blk.(snowman.OracleBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
+	txID := blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
 
-	commit, ok := options[0].(*stateful.CommitBlock)
+	commit, ok := options[0].(*stateful.Block)
 	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if _, ok := commit.Block.(*stateless.CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
 
-	abort, ok := options[1].(*stateful.AbortBlock)
+	abort, ok := options[1].(*stateful.Block)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -133,8 +138,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onAbortState := abort.OnAccept()
-	_, txStatus, err := onAbortState.GetTx(block.Tx.ID())
+	onAbortState := secondVM.manager.OnAccept(abort.ID())
+	_, txStatus, err := onAbortState.GetTx(txID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +151,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err = secondVM.state.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.state.GetTx(txID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,20 +172,25 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	}
+	txID = blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
 
-	block = blk.(*stateful.ProposalBlock)
+	block = blk.(snowman.OracleBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commit, ok = options[1].(*stateful.CommitBlock)
+	commit, ok = options[1].(*stateful.Block)
 	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	} else if _, ok := commit.Block.(*stateless.CommitBlock); !ok {
 		t.Fatal(errShouldPrefAbort)
 	}
 
-	abort, ok = options[0].(*stateful.AbortBlock)
+	abort, ok = options[0].(*stateful.Block)
 	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	} else if _, ok := abort.Block.(*stateless.AbortBlock); !ok {
 		t.Fatal(errShouldPrefAbort)
 	}
 
@@ -191,8 +201,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState := commit.OnAccept()
-	_, txStatus, err = onCommitState.GetTx(block.Tx.ID())
+	onCommitState := secondVM.manager.OnAccept(commit.ID())
+	_, txStatus, err = onCommitState.GetTx(txID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +217,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err = secondVM.state.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.state.GetTx(txID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,18 +284,23 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}
 
 	// first the time will be advanced.
-	block := blk.(*stateful.ProposalBlock)
+	block := blk.(snowman.OracleBlock)
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commit, ok := options[0].(*stateful.CommitBlock)
+	commit, ok := options[0].(*stateful.Block)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
+	} else if _, ok := commit.Block.(*stateless.CommitBlock); !ok {
+		t.Fatal(errShouldPrefAbort)
 	}
-	abort, ok := options[1].(*stateful.AbortBlock)
+
+	abort, ok := options[1].(*stateful.Block)
 	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if _, ok := abort.Block.(*stateless.AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
 
@@ -319,18 +334,23 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block = blk.(*stateful.ProposalBlock)
+	block = blk.(snowman.OracleBlock)
 	options, err = block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	abort, ok = options[0].(*stateful.AbortBlock)
+	abort, ok = options[0].(*stateful.Block)
 	if !ok {
 		t.Fatal(errShouldPrefAbort)
+	} else if _, ok := abort.Block.(*stateless.AbortBlock); !ok {
+		t.Fatal(errShouldPrefAbort)
 	}
-	commit, ok = options[1].(*stateful.CommitBlock)
+
+	commit, ok = options[1].(*stateful.Block)
 	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	} else if _, ok := commit.Block.(*stateless.CommitBlock); !ok {
 		t.Fatal(errShouldPrefAbort)
 	}
 
