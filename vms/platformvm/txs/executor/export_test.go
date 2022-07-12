@@ -32,7 +32,7 @@ func TestNewExportTx(t *testing.T) {
 		shouldVerify       bool
 	}
 
-	sourceKey := prefundedKeys[0]
+	sourceKey := preFundedKeys[0]
 
 	tests := []test{
 		{

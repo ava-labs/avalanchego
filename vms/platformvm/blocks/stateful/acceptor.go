@@ -239,9 +239,9 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		if wasPreferred {
-			a.metrics.MarkAcceptedOptionVote()
+			a.metrics.MarkVoteWon()
 		} else {
-			a.metrics.MarkRejectedOptionVote()
+			a.metrics.MarkVoteLost()
 		}
 	}
 	if err := a.metrics.MarkAccepted(b); err != nil {
@@ -276,9 +276,9 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	wasPreferred := blkState.inititallyPreferCommit
 	if a.bootstrapped.GetValue() {
 		if wasPreferred {
-			a.metrics.MarkAcceptedOptionVote()
+			a.metrics.MarkVoteWon()
 		} else {
-			a.metrics.MarkRejectedOptionVote()
+			a.metrics.MarkVoteLost()
 		}
 	}
 	if err := a.metrics.MarkAccepted(b); err != nil {

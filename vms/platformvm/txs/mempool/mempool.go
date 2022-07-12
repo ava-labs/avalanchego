@@ -36,7 +36,8 @@ var (
 	ErrCorruptedReason   = errors.New("tx validity corrupted")
 	ErrMempoolReentrancy = errors.New("mempool reentrancy")
 
-	_ Mempool = &mempool{}
+	_ txs.Visitor = &mempoolIssuer{}
+	_ Mempool     = &mempool{}
 )
 
 type BlockTimer interface {
@@ -192,6 +193,13 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("%w: %T", ErrUnknownTxType, tx.Unsigned)
 	}
 
+	if err := tx.Unsigned.Visit(&mempoolIssuer{
+		m:  m,
+		tx: tx,
+	}); err != nil {
+		return err
+	}
+
 	// Mark these UTXOs as consumed in the mempool
 	m.consumedUTXOs.Union(inputs)
 
@@ -291,4 +299,47 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
+}
+
+type mempoolIssuer struct {
+	m  *mempool
+	tx *txs.Tx
+}
+
+func (i *mempoolIssuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return ErrUnknownTxType }
+func (i *mempoolIssuer) RewardValidatorTx(*txs.RewardValidatorTx) error { return ErrUnknownTxType }
+
+func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
+	i.m.AddProposalTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	i.m.AddProposalTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	i.m.AddProposalTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) CreateChainTx(tx *txs.CreateChainTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) ImportTx(tx *txs.ImportTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
+}
+
+func (i *mempoolIssuer) ExportTx(tx *txs.ExportTx) error {
+	i.m.AddDecisionTx(i.tx)
+	return nil
 }

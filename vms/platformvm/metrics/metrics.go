@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,16 +13,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var (
 	_ stateless.Metrics = &Metrics{}
-
-	errUnknownBlockType = errors.New("unknown block type")
+	_ txs.Visitor       = &txMetrics{}
 )
 
 type Metrics struct {
+	txMetrics *txMetrics
+
 	PercentConnected       prometheus.Gauge
 	SubnetPercentConnected *prometheus.GaugeVec
 	LocalStake             prometheus.Gauge
@@ -36,16 +35,6 @@ type Metrics struct {
 	numStandardBlocks prometheus.Counter
 
 	numVotesWon, numVotesLost prometheus.Counter
-
-	numAddDelegatorTxs,
-	numAddSubnetValidatorTxs,
-	numAddValidatorTxs,
-	numAdvanceTimeTxs,
-	numCreateChainTxs,
-	numCreateSubnetTxs,
-	numExportTxs,
-	numImportTxs,
-	numRewardValidatorTxs prometheus.Counter
 
 	ValidatorSetsCached     prometheus.Counter
 	ValidatorSetsCreated    prometheus.Counter
@@ -63,20 +52,14 @@ func newBlockMetrics(namespace string, name string) prometheus.Counter {
 	})
 }
 
-func newTxMetrics(namespace string, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_txs_accepted", name),
-		Help:      fmt.Sprintf("Number of %s transactions accepted", name),
-	})
-}
-
 // Initialize platformvm metrics
 func (m *Metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
 ) error {
+	txMetrics, err := newTxMetrics(namespace, registerer)
+	m.txMetrics = txMetrics
 	m.PercentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "percent_connected",
@@ -118,16 +101,6 @@ func (m *Metrics) Initialize(
 		Help:      "Total number of votes this node has lost",
 	})
 
-	m.numAddDelegatorTxs = newTxMetrics(namespace, "add_delegator")
-	m.numAddSubnetValidatorTxs = newTxMetrics(namespace, "add_subnet_validator")
-	m.numAddValidatorTxs = newTxMetrics(namespace, "add_validator")
-	m.numAdvanceTimeTxs = newTxMetrics(namespace, "advance_time")
-	m.numCreateChainTxs = newTxMetrics(namespace, "create_chain")
-	m.numCreateSubnetTxs = newTxMetrics(namespace, "create_subnet")
-	m.numExportTxs = newTxMetrics(namespace, "export")
-	m.numImportTxs = newTxMetrics(namespace, "import")
-	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
-
 	m.ValidatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "validator_sets_cached",
@@ -149,9 +122,9 @@ func (m *Metrics) Initialize(
 		Help:      "Total amount of time generating validator sets in nanoseconds",
 	})
 
+	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
 	m.APIRequestMetrics = apiRequestMetrics
-	errs := wrappers.Errs{}
 	errs.Add(
 		err,
 
@@ -169,16 +142,6 @@ func (m *Metrics) Initialize(
 		registerer.Register(m.numVotesWon),
 		registerer.Register(m.numVotesLost),
 
-		registerer.Register(m.numAddDelegatorTxs),
-		registerer.Register(m.numAddSubnetValidatorTxs),
-		registerer.Register(m.numAddValidatorTxs),
-		registerer.Register(m.numAdvanceTimeTxs),
-		registerer.Register(m.numCreateChainTxs),
-		registerer.Register(m.numCreateSubnetTxs),
-		registerer.Register(m.numExportTxs),
-		registerer.Register(m.numImportTxs),
-		registerer.Register(m.numRewardValidatorTxs),
-
 		registerer.Register(m.ValidatorSetsCreated),
 		registerer.Register(m.ValidatorSetsCached),
 		registerer.Register(m.ValidatorSetsHeightDiff),
@@ -193,57 +156,136 @@ func (m *Metrics) Initialize(
 	return errs.Err
 }
 
-func (m *Metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
-func (m *Metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
+func (m *Metrics) MarkVoteWon() {
+	m.numVotesWon.Inc()
+}
 
+func (m *Metrics) MarkVoteLost() {
+	m.numVotesLost.Inc()
+}
+
+// TODO: use a visitor here
 func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
 	case *stateless.AbortBlock:
 		m.numAbortBlocks.Inc()
 	case *stateless.AtomicBlock:
 		m.numAtomicBlocks.Inc()
-		return m.acceptTx(b.Tx)
+		return m.AcceptTx(b.Tx)
 	case *stateless.CommitBlock:
 		m.numCommitBlocks.Inc()
 	case *stateless.ProposalBlock:
 		m.numProposalBlocks.Inc()
-		return m.acceptTx(b.Tx)
+		return m.AcceptTx(b.Tx)
 	case *stateless.StandardBlock:
 		m.numStandardBlocks.Inc()
 		for _, tx := range b.Txs {
-			if err := m.acceptTx(tx); err != nil {
+			if err := m.AcceptTx(tx); err != nil {
 				return err
 			}
 		}
 	default:
-		return errUnknownBlockType
+		return fmt.Errorf("got unexpected block type %T", b)
 	}
 	return nil
 }
 
 // TODO should we just log an error instead of returning one?
-func (m *Metrics) acceptTx(tx *txs.Tx) error {
-	switch tx.Unsigned.(type) {
-	case *txs.AddDelegatorTx:
-		m.numAddDelegatorTxs.Inc()
-	case *txs.AddSubnetValidatorTx:
-		m.numAddSubnetValidatorTxs.Inc()
-	case *txs.AddValidatorTx:
-		m.numAddValidatorTxs.Inc()
-	case *txs.AdvanceTimeTx:
-		m.numAdvanceTimeTxs.Inc()
-	case *txs.CreateChainTx:
-		m.numCreateChainTxs.Inc()
-	case *txs.CreateSubnetTx:
-		m.numCreateSubnetTxs.Inc()
-	case *txs.ImportTx:
-		m.numImportTxs.Inc()
-	case *txs.ExportTx:
-		m.numExportTxs.Inc()
-	case *txs.RewardValidatorTx:
-		m.numRewardValidatorTxs.Inc()
-	default:
-		return fmt.Errorf("%w: %T", mempool.ErrUnknownTxType, tx.Unsigned)
+func (m *Metrics) AcceptTx(tx *txs.Tx) error {
+	return tx.Unsigned.Visit(m.txMetrics)
+}
+
+func newTxMetrics(
+	namespace string,
+	registerer prometheus.Registerer,
+) (*txMetrics, error) {
+	errs := wrappers.Errs{}
+	m := &txMetrics{
+		numAddDelegatorTxs:        newTxMetric(namespace, "add_delegator", registerer, &errs),
+		numAddSubnetValidatorTxs:  newTxMetric(namespace, "add_subnet_validator", registerer, &errs),
+		numAddValidatorTxs:        newTxMetric(namespace, "add_validator", registerer, &errs),
+		numAdvanceTimeTxs:         newTxMetric(namespace, "advance_time", registerer, &errs),
+		numCreateChainTxs:         newTxMetric(namespace, "create_chain", registerer, &errs),
+		numCreateSubnetTxs:        newTxMetric(namespace, "create_subnet", registerer, &errs),
+		numExportTxs:              newTxMetric(namespace, "export", registerer, &errs),
+		numImportTxs:              newTxMetric(namespace, "import", registerer, &errs),
+		numRewardValidatorTxs:     newTxMetric(namespace, "reward_validator", registerer, &errs),
+		numTransformSubnetTxs:     newTxMetric(namespace, "transform_subnet", registerer, &errs),
+		numAddGeneralValidatorTxs: newTxMetric(namespace, "add_general_validator", registerer, &errs),
 	}
+	return m, errs.Err
+}
+
+type txMetrics struct {
+	numAddDelegatorTxs,
+	numAddSubnetValidatorTxs,
+	numAddValidatorTxs,
+	numAdvanceTimeTxs,
+	numCreateChainTxs,
+	numCreateSubnetTxs,
+	numExportTxs,
+	numImportTxs,
+	numRewardValidatorTxs,
+	numTransformSubnetTxs,
+	numAddGeneralValidatorTxs prometheus.Counter
+}
+
+func newTxMetric(
+	namespace string,
+	txName string,
+	registerer prometheus.Registerer,
+	errs *wrappers.Errs,
+) prometheus.Counter {
+	txMetric := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      fmt.Sprintf("%s_txs_accepted", txName),
+		Help:      fmt.Sprintf("Number of %s transactions accepted", txName),
+	})
+	errs.Add(registerer.Register(txMetric))
+	return txMetric
+}
+
+func (m *txMetrics) AddValidatorTx(*txs.AddValidatorTx) error {
+	m.numAddValidatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+	m.numAddSubnetValidatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	m.numAddDelegatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) CreateChainTx(*txs.CreateChainTx) error {
+	m.numCreateChainTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) CreateSubnetTx(*txs.CreateSubnetTx) error {
+	m.numCreateSubnetTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) ImportTx(tx *txs.ImportTx) error {
+	m.numImportTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) ExportTx(tx *txs.ExportTx) error {
+	m.numExportTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	m.numAdvanceTimeTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	m.numRewardValidatorTxs.Inc()
 	return nil
 }
