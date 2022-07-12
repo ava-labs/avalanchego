@@ -31,13 +31,13 @@ const (
 )
 
 var (
+	_ Mempool     = &mempool{}
+	_ txs.Visitor = &mempoolIssuer{}
+
 	ErrUnknownTxType     = errors.New("unknown transaction type")
 	ErrMempoolFull       = errors.New("mempool is full")
 	ErrCorruptedReason   = errors.New("tx validity corrupted")
 	ErrMempoolReentrancy = errors.New("mempool reentrancy")
-
-	_ txs.Visitor = &mempoolIssuer{}
-	_ Mempool     = &mempool{}
 )
 
 type BlockTimer interface {
@@ -183,16 +183,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("tx %s conflicts with a transaction in the mempool", txID)
 	}
 
-	switch tx.Unsigned.(type) {
-	case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-		m.AddProposalTx(tx)
-	case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-		m.AddDecisionTx(tx)
-	default:
-		m.unknownTxs.Inc()
-		return fmt.Errorf("%w: %T", ErrUnknownTxType, tx.Unsigned)
-	}
-
 	if err := tx.Unsigned.Visit(&mempoolIssuer{
 		m:  m,
 		tx: tx,
@@ -306,8 +296,13 @@ type mempoolIssuer struct {
 	tx *txs.Tx
 }
 
-func (i *mempoolIssuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return ErrUnknownTxType }
-func (i *mempoolIssuer) RewardValidatorTx(*txs.RewardValidatorTx) error { return ErrUnknownTxType }
+func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+	return fmt.Errorf("%w: %T", ErrUnknownTxType, tx)
+}
+
+func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+	return fmt.Errorf("%w: %T", ErrUnknownTxType, tx)
+}
 
 func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
 	i.m.AddProposalTx(i.tx)
