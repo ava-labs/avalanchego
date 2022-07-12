@@ -40,12 +40,11 @@ func NewManager(
 	recentlyAccepted *window.Window,
 ) Manager {
 	backend := backend{
-		Mempool:             mempool,
-		statelessBlockState: s,
-		state:               s,
-		bootstrapped:        txExecutorBackend.Bootstrapped,
-		ctx:                 txExecutorBackend.Ctx,
-		blkIDToState:        map[ids.ID]*blockState{},
+		Mempool:      mempool,
+		state:        s,
+		bootstrapped: txExecutorBackend.Bootstrapped,
+		ctx:          txExecutorBackend.Ctx,
+		blkIDToState: map[ids.ID]*blockState{},
 	}
 
 	manager := &manager{

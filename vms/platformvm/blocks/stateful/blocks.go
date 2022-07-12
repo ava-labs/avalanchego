@@ -64,7 +64,7 @@ func (b *Block) Status() choices.Status {
 		return choices.Processing
 	}
 	// Block isn't in memory. Check in the database.
-	_, status, err := b.manager.GetStatelessBlock(blkID)
+	_, status, err := b.manager.state.GetStatelessBlock(blkID)
 	if err != nil {
 		// It isn't in the database.
 		return choices.Processing

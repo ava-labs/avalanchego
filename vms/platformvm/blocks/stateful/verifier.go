@@ -151,7 +151,7 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
 			return ErrConflictingParentTxs
 		}
-		parent, _, err := v.GetStatelessBlock(parentID)
+		parent, _, err := v.state.GetStatelessBlock(parentID)
 		if err != nil {
 			return err
 		}
@@ -280,7 +280,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 				parent = parentState.statelessBlock
 			} else {
 				var err error
-				parent, _, err = v.GetStatelessBlock(parentID)
+				parent, _, err = v.state.GetStatelessBlock(parentID)
 				if err != nil {
 					return err
 				}
@@ -395,7 +395,7 @@ func (v *verifier) verifyCommonBlock(b stateless.CommonBlock) error {
 	} else {
 		// The parent isn't in memory.
 		var err error
-		parentStatelessBlk, _, err = v.GetStatelessBlock(parentID)
+		parentStatelessBlk, _, err = v.state.GetStatelessBlock(parentID)
 		if err != nil {
 			return err
 		}

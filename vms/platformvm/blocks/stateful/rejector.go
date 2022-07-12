@@ -33,7 +33,7 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	}
 
 	defer r.free(blkID)
-	r.AddStatelessBlock(b, choices.Rejected)
+	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -56,7 +56,7 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	}
 
 	defer r.free(blkID)
-	r.AddStatelessBlock(b, choices.Rejected)
+	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -81,7 +81,7 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	}
 
 	defer r.free(blkID)
-	r.AddStatelessBlock(b, choices.Rejected)
+	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -99,7 +99,7 @@ func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
 		r.free(blkID)
 		r.free(b.Parent())
 	}()
-	r.AddStatelessBlock(b, choices.Rejected)
+	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
@@ -117,6 +117,6 @@ func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
 		r.free(blkID)
 		r.free(b.Parent())
 	}()
-	r.AddStatelessBlock(b, choices.Rejected)
+	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }

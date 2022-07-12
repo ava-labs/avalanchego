@@ -69,7 +69,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	}
 
 	a.commonAccept(b)
-	a.AddStatelessBlock(b, choices.Accepted)
+	a.state.AddStatelessBlock(b, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
@@ -130,7 +130,7 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 	}
 
 	a.commonAccept(b)
-	a.AddStatelessBlock(b, choices.Accepted)
+	a.state.AddStatelessBlock(b, choices.Accepted)
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept standard block %s: %w", blkID, err)
 	}
@@ -187,10 +187,10 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
 	}
 	a.commonAccept(parentState.statelessBlock)
-	a.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
+	a.state.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
 
 	a.commonAccept(b)
-	a.AddStatelessBlock(b, choices.Accepted)
+	a.state.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
 	wasPreferred := parentState.inititallyPreferCommit
@@ -219,10 +219,10 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 
 	parentState := a.blkIDToState[parentID]
 	a.commonAccept(parentState.statelessBlock)
-	a.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
+	a.state.AddStatelessBlock(parentState.statelessBlock, choices.Accepted)
 
 	a.commonAccept(b)
-	a.AddStatelessBlock(b, choices.Accepted)
+	a.state.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
 	wasPreferred := parentState.inititallyPreferCommit
