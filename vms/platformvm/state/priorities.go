@@ -26,7 +26,7 @@ const (
 	SubnetDelegatorPendingPriority
 )
 
-var PendingToCurrentPriorities = []int{
+var PendingToCurrentPriorities = []byte{
 	PrimaryNetworkValidatorPendingPriority: PrimaryNetworkValidatorCurrentPriority,
 	PrimaryNetworkDelegatorPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
 	SubnetValidatorPendingPriority:         SubnetValidatorCurrentPriority,

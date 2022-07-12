@@ -401,53 +401,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			maximumStake = math.Min64(maximumStake, e.vm.MaxValidatorStake)
 		}
 
-		canDelegate, err := CanDelegate2(parentState, primaryNetworkValidator, maximumStake, newStaker)
-		if err != nil {
-			return err
-		}
-		if !canDelegate {
-			return errOverDelegated
-		}
-
-		// Ensure that the period this delegator delegates is a subset of the
-		// time the validator validates.
-		if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
-			return state.ErrDelegatorSubset
-		}
-
-		currentDelegators, err := parentState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch current delegators for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		pendingDelegators, err := parentState.GetPendingDelegatorIterator(constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch current delegators for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		// Ensure that the period this delegator delegates wouldn't become over
-		// delegated.
-		vdrWeight := vdrTx.Weight()
-		currentWeight, err := math.Add64(vdrWeight, currentDelegatorWeight)
-		if err != nil {
-			return err
-		}
-
-		canDelegate, err := state.CanDelegate(
-			currentDelegators,
-			pendingDelegators,
-			tx,
-			currentWeight,
-			maximumWeight,
-		)
+		canDelegate, err := CanDelegate(parentState, primaryNetworkValidator, maximumStake, newStaker)
 		if err != nil {
 			return err
 		}
@@ -478,13 +432,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	// Set up the state if this tx is committed
-	newlyPendingStakers := pendingStakers.AddStaker(e.tx)
-	onCommit, err := state.NewDiffWithValidators(
-		e.parentID,
-		e.stateVersions,
-		currentStakers,
-		newlyPendingStakers,
-	)
+	onCommit, err := state.NewDiff(e.parentID, e.stateVersions)
 	if err != nil {
 		return err
 	}
@@ -495,13 +443,10 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Produce the UTXOS
 	utxo.Produce(e.onCommit, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
 
+	e.onCommit.PutPendingDelegator(newStaker)
+
 	// Set up the state if this tx is aborted
-	onAbort, err := state.NewDiffWithValidators(
-		e.parentID,
-		e.stateVersions,
-		currentStakers,
-		pendingStakers,
-	)
+	onAbort, err := state.NewDiff(e.parentID, e.stateVersions)
 	if err != nil {
 		return err
 	}
@@ -550,7 +495,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := parentState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := GetNextStakerChangeTime(parentState)
 	if err != nil {
 		return err
 	}
@@ -565,17 +510,50 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	currentSupply := parentState.GetCurrentSupply()
 
-	pendingStakers := parentState.PendingStakers()
-	toAddValidatorsWithRewardToCurrent := []*state.ValidatorReward(nil)
-	toAddDelegatorsWithRewardToCurrent := []*state.ValidatorReward(nil)
-	toAddWithoutRewardToCurrent := []*txs.Tx(nil)
-	numToRemoveFromPending := 0
+	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
+	if err != nil {
+		return err
+	}
+	var (
+		currentValidatorsToAdd    []*state.Staker
+		pendingValidatorsToRemove []*state.Staker
+		currentDelegatorsToAdd    []*state.Staker
+		pendingDelegatorsToRemove []*state.Staker
+	)
 
 	// Add to the staker set any pending stakers whose start time is at or
-	// before the new timestamp. [pendingStakers.Stakers()] is sorted in order
-	// of increasing startTime
-pendingStakerLoop:
-	for _, tx := range pendingStakers.Stakers() {
+	// before the new timestamp
+	for pendingStakerIterator.Next() {
+		stakerToRemove := pendingStakerIterator.Value()
+		if stakerToRemove.StartTime.After(txTimestamp) {
+			break
+		}
+
+		stakerToAdd := *stakerToRemove
+		stakerToAdd.NextTime = stakerToRemove.EndTime
+		stakerToAdd.Priority = state.PendingToCurrentPriorities[stakerToRemove.Priority]
+
+		switch stakerToRemove.Priority {
+		case state.PrimaryNetworkDelegatorPendingPriority:
+			r := e.vm.rewards.Calculate(
+				staker.Validator.Duration(),
+				staker.Validator.Wght,
+				currentSupply,
+			)
+			currentSupply, err = math.Add64(currentSupply, r)
+			if err != nil {
+				return err
+			}
+
+			delegatorsToAdd = append(delegatorsToAdd, &state.ValidatorReward{
+				AddStakerTx:     tx,
+				PotentialReward: r,
+			})
+		case state.PrimaryNetworkValidatorPendingPriority:
+		case state.SubnetValidatorPendingPriority:
+		default:
+			return fmt.Errorf("expected staker priority got %d", staker.Priority)
+		}
 		switch staker := tx.Unsigned.(type) {
 		case *txs.AddDelegatorTx:
 			if staker.StartTime().After(txTimestamp) {
@@ -973,122 +951,70 @@ func CanDelegate(
 }
 
 func getMaxWeight(
-	state state.Chain,
+	chainState state.Chain,
 	validator *state.Staker,
 	startTime time.Time,
 	endTime time.Time,
 ) (uint64, error) {
-	// Keep track of which delegators should be removed next so that we can
-	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := validator.EndTimeHeap{}
-	for _, currentDelegator := range current {
-		toRemoveHeap.Add(&currentDelegator.Tx.Validator)
+	currentDelegatorIterator, err := chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		return 0, err
 	}
 
-	var (
-		err error
-		// [maxStake] is the max stake at any point between now [starTime] and [endTime]
-		maxStake uint64
-	)
+	// TODO: We can optimize this by moving the current total weight to be
+	//       stored in the validator state.
+	currentWeight := validator.Weight
+	for currentDelegatorIterator.Next() {
+		currentDelegator := currentDelegatorIterator.Value()
 
-	// Calculate what the amount staked will be when each pending delegation
-	// starts.
-	for _, nextPending := range pending { // Iterates in order of increasing start time
-		// Calculate what the amount staked will be when this delegation starts.
-		nextPendingStartTime := nextPending.Tx.StartTime()
+		currentWeight, err = math.Add64(currentWeight, currentDelegator.Weight)
+		if err != nil {
+			currentDelegatorIterator.Release()
+			return 0, err
+		}
+	}
+	currentDelegatorIterator.Release()
 
-		if nextPendingStartTime.After(endTime) {
-			// This delegation starts after [endTime].
-			// Since we're calculating the max amount staked in
-			// [startTime, endTime], we can stop. (Recall that [pending] is
-			// sorted in order of increasing end time.)
+	currentDelegatorIterator, err = chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		return 0, err
+	}
+	pendingDelegatorIterator, err := chainState.GetPendingDelegatorIterator(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		currentDelegatorIterator.Release()
+		return 0, err
+	}
+	delegatorChangesIterator := state.NewStakerDiffIterator(currentDelegatorIterator, pendingDelegatorIterator)
+	defer delegatorChangesIterator.Release()
+
+	var currentMax uint64
+	for delegatorChangesIterator.Next() {
+		delegator, isAdded := delegatorChangesIterator.Value()
+		if delegator.NextTime.After(endTime) {
+			// This delegation change (and all following changes) occur after
+			// [endTime]. Since we're calculating the max amount staked in
+			// [startTime, endTime], we can stop.
 			break
 		}
 
-		// Subtract from [currentStake] all of the current delegations that will
-		// have ended by the time that the delegation [nextPending] starts.
-		for toRemoveHeap.Len() > 0 {
-			// Get the next current delegation that will end.
-			toRemove := toRemoveHeap.Peek()
-			toRemoveEndTime := toRemove.EndTime()
-			if toRemoveEndTime.After(nextPendingStartTime) {
-				break
-			}
-			// This current delegation [toRemove] ends before [nextPending]
-			// starts, so its stake should be subtracted from [currentStake].
-
-			// Changed in AP3:
-			// If the new delegator has started, then this current delegator
-			// should have an end time that is > [startTime].
-			newDelegatorHasStartedBeforeFinish := toRemoveEndTime.After(startTime)
-			if newDelegatorHasStartedBeforeFinish && currentStake > maxStake {
-				// Only update [maxStake] if it's after [startTime]
-				maxStake = currentStake
-			}
-
-			currentStake, err = math.Sub64(currentStake, toRemove.Wght)
-			if err != nil {
-				return 0, err
-			}
-
-			// Changed in AP3:
-			// Remove the delegator from the heap and update the heap so that
-			// the top of the heap is the next delegator to remove.
-			toRemoveHeap.Remove()
+		if !delegator.NextTime.Before(startTime) {
+			// We have advanced time to be at the inside of the delegation
+			// window. Make sure that the max weight is updated accordingly.
+			currentMax = math.Max64(currentMax, currentWeight)
 		}
 
-		// Add to [currentStake] the stake of this pending delegator to
-		// calculate what the stake will be when this pending delegation has
-		// started.
-		currentStake, err = math.Add64(currentStake, nextPending.Tx.Validator.Wght)
+		var op func(uint64, uint64) (uint64, error)
+		if isAdded {
+			op = math.Add64
+		} else {
+			op = math.Sub64
+		}
+		currentWeight, err = op(currentWeight, delegator.Weight)
 		if err != nil {
 			return 0, err
 		}
-
-		// Changed in AP3:
-		// If the new delegator has started, then this pending delegator should
-		// have a start time that is >= [startTime]. Otherwise, the delegator
-		// hasn't started yet and the [currentStake] shouldn't count towards the
-		// [maximumStake] during the delegators delegation period.
-		newDelegatorHasStarted := !nextPendingStartTime.Before(startTime)
-		if newDelegatorHasStarted && currentStake > maxStake {
-			// Only update [maxStake] if it's after [startTime]
-			maxStake = currentStake
-		}
-
-		// This pending delegator is a current delegator relative
-		// when considering later pending delegators that start late
-		toRemoveHeap.Add(&nextPending.Tx.Validator)
 	}
-
-	// [currentStake] is now the amount staked before the next pending delegator
-	// whose start time is after [endTime].
-
-	// If there aren't any delegators that will be added before the end of our
-	// delegation period, we should advance through time until our delegation
-	// period starts.
-	for toRemoveHeap.Len() > 0 {
-		toRemove := toRemoveHeap.Peek()
-		toRemoveEndTime := toRemove.EndTime()
-		if toRemoveEndTime.After(startTime) {
-			break
-		}
-
-		currentStake, err = math.Sub64(currentStake, toRemove.Wght)
-		if err != nil {
-			return 0, err
-		}
-
-		// Changed in AP3:
-		// Remove the delegator from the heap and update the heap so that the
-		// top of the heap is the next delegator to remove.
-		toRemoveHeap.Remove()
-	}
-
-	// We have advanced time to be inside the delegation window.
-	// Make sure that the max stake is updated accordingly.
-	if currentStake > maxStake {
-		maxStake = currentStake
-	}
-	return maxStake, nil
+	// We have advanced time to be at the end of the delegation window. Make
+	// sure that the max weight is updated accordingly.
+	return math.Max64(currentMax, currentWeight), nil
 }

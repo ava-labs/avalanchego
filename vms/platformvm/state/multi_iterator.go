@@ -41,30 +41,6 @@ func NewMultiIterator(stakers ...StakerIterator) StakerIterator {
 	return it
 }
 
-func (it *multiIterator) Len() int {
-	return len(it.heap)
-}
-
-func (it *multiIterator) Less(i, j int) bool {
-	return it.heap[i].Value().Less(it.heap[j].Value())
-}
-
-func (it *multiIterator) Swap(i, j int) {
-	it.heap[j], it.heap[i] = it.heap[i], it.heap[j]
-}
-
-func (it *multiIterator) Push(value interface{}) {
-	it.heap = append(it.heap, value.(StakerIterator))
-}
-
-func (it *multiIterator) Pop() interface{} {
-	newLength := len(it.heap) - 1
-	value := it.heap[newLength]
-	it.heap[newLength] = nil
-	it.heap = it.heap[:newLength]
-	return value
-}
-
 func (it *multiIterator) Next() bool {
 	if len(it.heap) == 0 {
 		return false
@@ -95,4 +71,28 @@ func (it *multiIterator) Release() {
 		it.Release()
 	}
 	it.heap = nil
+}
+
+func (it *multiIterator) Len() int {
+	return len(it.heap)
+}
+
+func (it *multiIterator) Less(i, j int) bool {
+	return it.heap[i].Value().Less(it.heap[j].Value())
+}
+
+func (it *multiIterator) Swap(i, j int) {
+	it.heap[j], it.heap[i] = it.heap[i], it.heap[j]
+}
+
+func (it *multiIterator) Push(value interface{}) {
+	it.heap = append(it.heap, value.(StakerIterator))
+}
+
+func (it *multiIterator) Pop() interface{} {
+	newLength := len(it.heap) - 1
+	value := it.heap[newLength]
+	it.heap[newLength] = nil
+	it.heap = it.heap[:newLength]
+	return value
 }
