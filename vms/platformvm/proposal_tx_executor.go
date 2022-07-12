@@ -369,7 +369,6 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
 	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
-	e.onCommit.PutPendingDelegator(newStaker)
 
 	if e.vm.bootstrapped.GetValue() {
 		currentTimestamp := parentState.GetTimestamp()
@@ -583,7 +582,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	var currentValidatorsToRemove []*state.Staker
 	for currentStakerIterator.Next() {
-		stakerToRemove := pendingStakerIterator.Value()
+		stakerToRemove := currentStakerIterator.Value()
 		if stakerToRemove.EndTime.After(txTimestamp) {
 			break
 		}
