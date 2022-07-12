@@ -16,9 +16,10 @@ type rejector struct {
 
 func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	blkID := b.ID()
+	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"Rejecting Proposal Block %s at height %d with parent %s",
+		"rejecting Proposal Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
 		b.Parent(),
@@ -32,16 +33,16 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 		)
 	}
 
-	defer r.free(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
 func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
+	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"Rejecting Atomic Block %s at height %d with parent %s",
+		"rejecting Atomic Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
 		b.Parent(),
@@ -55,16 +56,16 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		)
 	}
 
-	defer r.free(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
 func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
+	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"Rejecting Standard Block %s at height %d with parent %s",
+		"rejecting Standard Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
 		b.Parent(),
@@ -80,43 +81,52 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 		}
 	}
 
-	defer r.free(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
 func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
 	blkID := b.ID()
+	defer func() {
+		r.free(blkID)
+		// Note that it's OK to free the parent here.
+		// We're accepting a Commit block, so its sibling, an Abort block,
+		// must be accepted. (This is the only reason we'd reject this block.)
+		// So it's OK to remove the parent's state from [r.blkIDToState] --
+		// this block's sibling doesn't need it anymore.
+		r.free(b.Parent())
+	}()
 
 	r.ctx.Log.Verbo(
-		"Rejecting CommitBlock Block %s at height %d with parent %s",
+		"rejecting Commit Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	defer func() {
-		r.free(blkID)
-		r.free(b.Parent())
-	}()
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
 
 func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
 	blkID := b.ID()
+	defer func() {
+		r.free(blkID)
+		// Note that it's OK to free the parent here.
+		// We're accepting an Abort block, so its sibling, a Commit block,
+		// must be accepted. (This is the only reason we'd reject this block.)
+		// So it's OK to remove the parent's state from [r.blkIDToState] --
+		// this block's sibling doesn't need it anymore.
+		r.free(b.Parent())
+	}()
 
 	r.ctx.Log.Verbo(
-		"Rejecting Abort Block %s at height %d with parent %s",
+		"rejecting Abort Block %s at height %d with parent %s",
 		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	defer func() {
-		r.free(blkID)
-		r.free(b.Parent())
-	}()
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }

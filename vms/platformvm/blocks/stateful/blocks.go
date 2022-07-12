@@ -17,23 +17,6 @@ var (
 	_ snowman.OracleBlock = &OracleBlock{}
 )
 
-func newBlock(
-	blk stateless.Block,
-	manager *manager,
-) snowman.Block {
-	b := &Block{
-		manager: manager,
-		Block:   blk,
-	}
-	// TODO should we just have a NewOracleBlock method?
-	if _, ok := blk.(*stateless.ProposalBlock); ok {
-		return &OracleBlock{
-			Block: b,
-		}
-	}
-	return b
-}
-
 // TODO can we unexport this?
 type Block struct {
 	stateless.Block
@@ -54,7 +37,8 @@ func (b *Block) Reject() error {
 
 func (b *Block) Status() choices.Status {
 	blkID := b.ID()
-	if b.manager.state.GetLastAccepted() == blkID {
+
+	if b.manager.backend.lastAccepted == blkID {
 		return choices.Accepted
 	}
 	// Check if the block is in memory. If so, it's processing.

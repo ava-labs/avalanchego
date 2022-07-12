@@ -276,6 +276,7 @@ func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 
 func (a *acceptor) commonAccept(b stateless.Block) {
 	blkID := b.ID()
+	a.backend.lastAccepted = blkID
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.recentlyAccepted.Add(blkID)

@@ -13,11 +13,12 @@ import (
 )
 
 type blockState struct {
-	statelessBlock         stateless.Block
-	onAcceptFunc           func()
-	onAcceptState          state.Diff
-	onCommitState          state.Diff
-	onAbortState           state.Diff
+	statelessBlock stateless.Block
+	onAcceptFunc   func()
+	onAcceptState  state.Diff
+	onCommitState  state.Diff
+	onAbortState   state.Diff
+	// This block's children which have passed verification.
 	children               []ids.ID
 	timestamp              time.Time
 	inputs                 ids.Set

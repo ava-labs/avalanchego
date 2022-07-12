@@ -15,7 +15,15 @@ import (
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
+	// Keep the last accepted block in memory because when we check a
+	// proposal block's status, it may be accepted but not have an accepted
+	// child, in which case it's in [blkIDToState].
 	lastAccepted ids.ID
+	// blkIDToState is a map from a block's ID to the state of the block.
+	// Blocks are put into this map when they are verified.
+	// Proposal blocks are removed from this map when they are rejected
+	// or when a child is accepted.
+	// All other blocks are removed when they are accepted/rejected.
 	blkIDToState map[ids.ID]*blockState
 	state        state.State
 	ctx          *snow.Context

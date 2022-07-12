@@ -71,9 +71,11 @@ type manager struct {
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	// See if the block is in memory.
 	if blk, ok := m.blkIDToState[blkID]; ok {
 		return newBlock(blk.statelessBlock, m), nil
 	}
+	// The block isn't in memory. Check the database.
 	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
@@ -83,4 +85,18 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 func (m *manager) NewBlock(blk stateless.Block) snowman.Block {
 	return newBlock(blk, m)
+}
+
+func newBlock(blk stateless.Block, manager *manager) snowman.Block {
+	b := &Block{
+		manager: manager,
+		Block:   blk,
+	}
+	// TODO should we just have a NewOracleBlock method?
+	if _, ok := blk.(*stateless.ProposalBlock); ok {
+		return &OracleBlock{
+			Block: b,
+		}
+	}
+	return b
 }
