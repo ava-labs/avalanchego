@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -161,6 +163,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	}
 	blkState := &blockState{
 		statelessBlock: b,
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -174,11 +177,6 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 		parentState.CurrentStakers(),
 		parentState.PendingStakers(),
 	)
-
-	// TODO do we still need to do something similar to the below?
-	// clear inputs so that multiple [Verify] calls can be made
-	// b.Inputs.Clear()
-	// b.atomicRequests = make(map[ids.ID]*atomic.Requests)
 
 	funcs := make([]func(), 0, len(b.Txs))
 	for _, tx := range b.Txs {
