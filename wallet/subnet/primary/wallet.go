@@ -50,15 +50,38 @@ func NewWalletFromURI(ctx context.Context, uri string, kc *secp256k1fx.Keychain)
 	return NewWalletWithState(uri, pCTX, xCTX, utxos, kc), nil
 }
 
-func NewWalletWithState(
+// Creates a wallet with pre-loaded/cached P-chain transactions.
+func NewWalletWithTxs(ctx context.Context, uri string, kc *secp256k1fx.Keychain, preloadTXs ...ids.ID) (Wallet, error) {
+	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addrs)
+	if err != nil {
+		return nil, err
+	}
+	pTXs := make(map[ids.ID]*txs.Tx)
+	pClient := platformvm.NewClient(uri)
+	for _, id := range preloadTXs {
+		txBytes, err := pClient.GetTx(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		if err != nil {
+			return nil, err
+		}
+		pTXs[id] = tx
+	}
+	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs), nil
+}
+
+// Creates a wallet with pre-loaded/cached P-chain transactions and state.
+func NewWalletWithTxsAndState(
 	uri string,
 	pCTX p.Context,
 	xCTX x.Context,
 	utxos UTXOs,
 	kc *secp256k1fx.Keychain,
+	pTXs map[ids.ID]*txs.Tx,
 ) Wallet {
 	pUTXOs := NewChainUTXOs(constants.PlatformChainID, utxos)
-	pTXs := make(map[ids.ID]*txs.Tx)
 	pBackend := p.NewBackend(pCTX, pUTXOs, pTXs)
 	pBuilder := p.NewBuilder(kc.Addrs, pBackend)
 	pSigner := p.NewSigner(kc, pBackend)
@@ -77,6 +100,19 @@ func NewWalletWithState(
 	)
 }
 
+// Creates a wallet with pre-fetched state.
+func NewWalletWithState(
+	uri string,
+	pCTX p.Context,
+	xCTX x.Context,
+	utxos UTXOs,
+	kc *secp256k1fx.Keychain,
+) Wallet {
+	pTXs := make(map[ids.ID]*txs.Tx)
+	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs)
+}
+
+// Creates a Wallet with the given set of options
 func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	return NewWallet(
 		p.NewWalletWithOptions(w.P(), options...),
@@ -84,6 +120,7 @@ func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	)
 }
 
+// Creates a new default wallet
 func NewWallet(p p.Wallet, x x.Wallet) Wallet {
 	return &wallet{
 		p: p,
