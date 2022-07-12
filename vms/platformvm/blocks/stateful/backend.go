@@ -15,15 +15,10 @@ import (
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
-	statelessBlockState
 	blkIDToState map[ids.ID]*blockState
 	state        state.State
 	ctx          *snow.Context
 	bootstrapped *utils.AtomicBool
-}
-
-func (b *backend) getState() state.State {
-	return b.state
 }
 
 func (b *backend) OnAccept(blkID ids.ID) state.Chain {

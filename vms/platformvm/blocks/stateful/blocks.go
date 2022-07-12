@@ -7,12 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var (
@@ -128,17 +125,4 @@ func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{commitBlock, abortBlock}, nil
 	}
 	return [2]snowman.Block{abortBlock, commitBlock}, nil
-}
-
-type blockState struct {
-	statelessBlock         stateless.Block
-	onAcceptFunc           func()
-	onAcceptState          state.Diff
-	onCommitState          state.Diff
-	onAbortState           state.Diff
-	children               []ids.ID
-	timestamp              time.Time
-	inputs                 ids.Set
-	atomicRequests         map[ids.ID]*atomic.Requests
-	inititallyPreferCommit bool
 }

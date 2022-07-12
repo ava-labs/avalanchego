@@ -74,7 +74,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 
-	blkState.onAcceptState.Apply(a.getState())
+	blkState.onAcceptState.Apply(a.state)
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -136,7 +136,7 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 	}
 
 	// Update the state of the chain in the database
-	blkState.onAcceptState.Apply(a.getState())
+	blkState.onAcceptState.Apply(a.state)
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -248,7 +248,7 @@ func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 	}
 
 	// Update the state of the chain in the database
-	blkState.onAcceptState.Apply(a.getState())
+	blkState.onAcceptState.Apply(a.state)
 	if err := a.state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}

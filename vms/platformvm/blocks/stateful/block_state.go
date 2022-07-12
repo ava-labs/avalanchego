@@ -4,13 +4,23 @@
 package stateful
 
 import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-// TODO rename to reflect the fact that this is from/to the database?
-type statelessBlockState interface {
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	AddStatelessBlock(block stateless.Block, status choices.Status)
+type blockState struct {
+	statelessBlock         stateless.Block
+	onAcceptFunc           func()
+	onAcceptState          state.Diff
+	onCommitState          state.Diff
+	onAbortState           state.Diff
+	children               []ids.ID
+	timestamp              time.Time
+	inputs                 ids.Set
+	atomicRequests         map[ids.ID]*atomic.Requests
+	inititallyPreferCommit bool
 }
