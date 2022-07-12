@@ -15,6 +15,7 @@ import (
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
+	lastAccepted ids.ID
 	blkIDToState map[ids.ID]*blockState
 	state        state.State
 	ctx          *snow.Context

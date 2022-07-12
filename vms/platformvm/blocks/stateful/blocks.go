@@ -34,6 +34,7 @@ func newBlock(
 	return b
 }
 
+// TODO can we unexport this?
 type Block struct {
 	stateless.Block
 	manager *manager
@@ -56,7 +57,7 @@ func (b *Block) Status() choices.Status {
 	if b.manager.state.GetLastAccepted() == blkID {
 		return choices.Accepted
 	}
-	// Check if the block is in memory
+	// Check if the block is in memory. If so, it's processing.
 	if _, ok := b.manager.backend.blkIDToState[blkID]; ok {
 		return choices.Processing
 	}
@@ -70,9 +71,9 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
-	// 	 If this is the last accepted block and the block was loaded from disk
-	// 	 since it was accepted, then the timestamp wouldn't be set correctly. So,
-	// 	 we explicitly return the chain time.
+	// If this is the last accepted block and the block was loaded from disk
+	// since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// we explicitly return the chain time.
 	// Check if the block is processing.
 	if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
 		return blkState.timestamp
@@ -84,6 +85,7 @@ func (b *Block) Timestamp() time.Time {
 	return b.manager.state.GetTimestamp()
 }
 
+// TODO can we unexport this?
 type OracleBlock struct {
 	// Invariant: The inner statless block is a *stateless.ProposalBlock.
 	*Block

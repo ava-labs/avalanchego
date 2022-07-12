@@ -106,7 +106,7 @@ type LastAccepteder interface {
 	// Set [blkID] as the last accepted block.
 	// If [persist], [blkID] will be written to the database
 	// as the last accepted block next time it's committed.
-	SetLastAccepted(blkID ids.ID, persist bool)
+	SetLastAccepted(blkID ids.ID)
 }
 
 type BlockState interface {
@@ -245,10 +245,6 @@ type state struct {
 	// [persistedLastAccepted] is the most recently accepted block
 	// that was written to the database.
 	persistedLastAccepted ids.ID
-	// [toPersistLastAccepted] will be written to the database
-	// on its next commit and replace [persistedLastAccepted]
-	// as the most recently accepted block written to the database.
-	toPersistLastAccepted ids.ID
 	singletonDB           database.Database
 }
 
@@ -644,11 +640,8 @@ func (s *state) SetTimestamp(tm time.Time)  { s.timestamp = tm }
 func (s *state) GetCurrentSupply() uint64   { return s.currentSupply }
 func (s *state) SetCurrentSupply(cs uint64) { s.currentSupply = cs }
 func (s *state) GetLastAccepted() ids.ID    { return s.lastAccepted }
-func (s *state) SetLastAccepted(lastAccepted ids.ID, persist bool) {
+func (s *state) SetLastAccepted(lastAccepted ids.ID) {
 	s.lastAccepted = lastAccepted
-	if persist {
-		s.toPersistLastAccepted = lastAccepted
-	}
 }
 
 func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
@@ -740,7 +733,7 @@ func (s *state) MaxStakeAmount(
 
 func (s *state) syncGenesis(genesisBlk *stateless.CommitBlock, genesis *genesis.State) error {
 	genesisBlkID := genesisBlk.ID()
-	s.SetLastAccepted(genesisBlkID, true)
+	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(genesis.InitialSupply)
 	s.AddStatelessBlock(genesisBlk, choices.Accepted)
@@ -825,7 +818,6 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedLastAccepted = lastAccepted
 	s.lastAccepted = lastAccepted
-	s.toPersistLastAccepted = lastAccepted
 	return nil
 }
 
@@ -1648,11 +1640,11 @@ func (s *state) writeMetadata() error {
 		}
 		s.originalCurrentSupply = s.currentSupply
 	}
-	if s.persistedLastAccepted != s.toPersistLastAccepted {
-		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.toPersistLastAccepted); err != nil {
+	if s.persistedLastAccepted != s.lastAccepted {
+		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
-		s.persistedLastAccepted = s.toPersistLastAccepted
+		s.persistedLastAccepted = s.lastAccepted
 	}
 	return nil
 }

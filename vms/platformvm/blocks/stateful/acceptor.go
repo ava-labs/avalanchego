@@ -48,7 +48,7 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	// is not written to disk unless its child is.
 	// (The VM's Shutdown method commits the database.)
 	// There is an invariant that the most recently committed block is a decision block.
-	a.state.SetLastAccepted(blkID, false /*persist*/)
+	a.backend.lastAccepted = blkID
 	return nil
 }
 
@@ -276,7 +276,7 @@ func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 
 func (a *acceptor) commonAccept(b stateless.Block) {
 	blkID := b.ID()
-	a.state.SetLastAccepted(blkID, true /*persist*/)
+	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.recentlyAccepted.Add(blkID)
 }
