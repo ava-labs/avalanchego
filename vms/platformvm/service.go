@@ -1654,7 +1654,6 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	// TODO make sure this is right
 	state := service.vm.manager.OnAccept(blockID)
 
 	tx, _, err := state.GetTx(chainID)
@@ -1905,13 +1904,6 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	/*
-		block, ok := preferred.(stateful.Decision)
-		if !ok {
-			return fmt.Errorf("expected Decision block but got %T", preferred)
-		}
-		onAccept := block.OnAccept()
-	*/
 	onAccept := service.vm.manager.OnAccept(preferred.ID())
 
 	_, _, err = onAccept.GetTx(args.TxID)

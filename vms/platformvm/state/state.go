@@ -141,7 +141,6 @@ type State interface {
 	// TODO remove Load from this interface.
 	Load() error
 
-	// TODO can this be removed and the height set in SetLastAccepted?
 	SetHeight(height uint64)
 
 	// Discard uncommitted changes to the database.
