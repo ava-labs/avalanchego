@@ -12,7 +12,7 @@ var _ stateless.Visitor = &rejector{}
 
 // rejector handles the logic for rejecting a block.
 type rejector struct {
-	backend
+	*backend
 }
 
 func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {

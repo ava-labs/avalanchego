@@ -74,7 +74,7 @@ func (b *Block) Timestamp() time.Time {
 
 // Exported for testing in platformvm package.
 type OracleBlock struct {
-	// Invariant: The inner statless block is a *stateless.ProposalBlock.
+	// Invariant: The inner stateless block is a *stateless.ProposalBlock.
 	*Block
 }
 

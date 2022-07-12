@@ -24,7 +24,7 @@ var (
 
 // verifier handles the logic for verifying a block.
 type verifier struct {
-	backend
+	*backend
 	txExecutorBackend executor.Backend
 }
 

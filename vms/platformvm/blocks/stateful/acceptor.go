@@ -17,7 +17,7 @@ var _ stateless.Visitor = &acceptor{}
 
 // acceptor handles the logic for accepting a block.
 type acceptor struct {
-	backend
+	*backend
 	metrics          metrics.Metrics
 	recentlyAccepted *window.Window
 }
