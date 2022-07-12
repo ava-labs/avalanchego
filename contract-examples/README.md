@@ -32,17 +32,21 @@ Clone the repo and install the necessary packages via `yarn`.
 
 ```zsh
 $ git clone https://github.com/ava-labs/subnet-evm.git
-$ cd smart-contract-examples
+$ cd contract-examples
 $ yarn
 ```
 
 ## Write Contracts
 
+`AllowList.sol` is the base contract which provided AllowList precompile capabilities to inheriting contracts.
+
 `ERC20NativeMinter.sol` is based on [Open Zeppelin](https://openzeppelin.com) [ERC20](https://eips.ethereum.org/EIPS/eip-20) contract powered by native minting capabilities of Subnet EVM. ERC20 is a popular smart contract interface. It uses `INativeMinter` interface to interact with `NativeMinter` precompile.
 
 `ExampleDeployerList` shows how `ContractDeployerAllowList` precompile can be used in a smart contract. It uses `IAllowList` to interact with `ContractDeployerAllowList` precompile. When the precompile is activated only those allowed can deploy contracts.
 
-Both of these `NativeMinter` and `AllowList` should be enabled by a chain config in genesis or as an upgrade. See the example genesis under [Tests](#tests) section.
+`ExampleFeeManager` shows how a contract can change fee configuration with the `FeeConfigManager` precompile.
+
+All of these `NativeMinter`, `FeeManager` and `AllowList` contracts should be enabled by a chain config in genesis or as an upgrade. See the example genesis under [Tests](#tests) section.
 
 For more information about precompiles see [subnet-evm precompiles](https://github.com/ava-labs/subnet-evm#precompiles).
 
@@ -50,11 +54,17 @@ For more information about precompiles see [subnet-evm precompiles](https://gith
 
 Hardhat uses `hardhat.config.js` as the configuration file. You can define tasks, networks, compilers and more in that file. For more information see [here](https://hardhat.org/config/).
 
-In our repository we use a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/hardhat.config.ts). This file configures necessary network information to provide smooth interaction with Avalanche. There are also some pre-defined private keys for testing on a local test network. Each chain in subnets has their own RPC URL. Subnet EVM's RPC URL is in form of: `"http://{ip}:{port}/ext/bc/{chainID}/rpc`. When you create your own subnet and Subnet EVM chain `{chainID}` will be different. Do not forget to set correct URL under the `networks` in the configuration file.
+In our repository we use a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/hardhat.config.ts). This file configures necessary network information to provide smooth interaction with Avalanche. There are two networks in the hardhat config: `e2e` and `local`. `e2e` network is used for e2e tests and should not be changed. `local` network is used by tasks and for local deployments. There are also some pre-defined private keys for these networks. Each chain in subnets has their own RPC URL. Subnet EVM's RPC URL is in form of: `"http://{ip}:{port}/ext/bc/{chainID}/rpc`. When you create your own subnet and Subnet EVM chain `{chainID}` will be different. You can change `local` network RPC url with the `local_rpc.json`. There is an example file named with `local_rpc_example.json`. You can copy & rename this file to customize the url:
+
+```
+cp local_rpc.example.json local_rpc.json
+```
+
+Do not forget to set correct URL in the `local_rpc.json` file.
 
 ## Hardhat Tasks
 
-You can define custom hardhat tasks in [hardhat.config.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/hardhat.config.ts). Tasks contain helpers for precompiles `allowList` and `minter`. Precompiles have their own contract already-deployed when they're activated. So these can be called without deploying any intermediate contract. See `npx hardhat --help` for more information about available tasks.
+You can define custom hardhat tasks in [tasks.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/tasks.ts). Tasks contain helpers for precompiles `allowList` and `minter`. Precompiles have their own contract already-deployed when they're activated. So these can be called without deploying any intermediate contract. See `npx hardhat --help` for more information about available tasks.
 
 ## Tests
 

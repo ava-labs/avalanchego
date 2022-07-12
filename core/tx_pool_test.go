@@ -39,6 +39,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -116,6 +117,10 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	defer bc.lock.Unlock()
 
 	return bc.chainHeadFeed.Subscribe(ch)
+}
+
+func (bc *testBlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error) {
+	return testFeeConfig, common.Big0, nil
 }
 
 func (bc *testBlockChain) SenderCacher() *TxSenderCacher {

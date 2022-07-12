@@ -50,7 +50,7 @@ func TestBuildGenesis(t *testing.T) {
 	decodedGenesis := &core.Genesis{}
 	decodedGenesis.UnmarshalJSON(genesisBytes)
 	// test
-	assert.Equal(t, testGasLimit, decodedGenesis.Config.GetFeeConfig().GasLimit)
+	assert.Equal(t, testGasLimit, decodedGenesis.Config.FeeConfig.GasLimit)
 	assert.Equal(t, testAlloc, decodedGenesis.Alloc)
 }
 
@@ -90,6 +90,6 @@ func TestDecodeGenesis(t *testing.T) {
 	decodedGenesis := decReply.Genesis
 
 	// test
-	assert.Equal(t, testGasLimit, decodedGenesis.Config.GetFeeConfig().GasLimit)
+	assert.Equal(t, testGasLimit, decodedGenesis.Config.FeeConfig.GasLimit)
 	assert.Equal(t, testAlloc, decodedGenesis.Alloc)
 }

@@ -41,7 +41,7 @@ import (
 )
 
 func TestFeeHistory(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		pending      bool
 		maxCallBlock int
 		maxBlock     int
@@ -81,7 +81,6 @@ func TestFeeHistory(t *testing.T) {
 		}
 		tip := big.NewInt(1 * params.GWei)
 		backend := newTestBackendFakerEngine(t, params.TestChainConfig, 32, func(i int, b *core.BlockGen) {
-
 			signer := types.LatestSigner(params.TestChainConfig)
 
 			b.SetCoinbase(common.Address{1})
@@ -106,7 +105,10 @@ func TestFeeHistory(t *testing.T) {
 			}
 			b.AddTx(tx)
 		})
-		oracle := NewOracle(backend, config)
+		oracle, err := NewOracle(backend, config)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		first, reward, baseFee, ratio, err := oracle.FeeHistory(context.Background(), c.count, c.last, c.percent)
 

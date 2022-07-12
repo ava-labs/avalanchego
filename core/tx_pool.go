@@ -36,6 +36,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -161,6 +162,7 @@ type blockChain interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 	StateAt(root common.Hash) (*state.StateDB, error)
 	SenderCacher() *TxSenderCacher
+	GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error)
 
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
 }
@@ -1295,9 +1297,8 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsSubnetEVM(new(big.Int).SetUint64(reset.newHead.Time)) {
-			_, baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
-			if err == nil {
-				pool.priced.SetBaseFee(baseFeeEstimate)
+			if err := pool.updateBaseFeeAt(reset.newHead); err != nil {
+				log.Error("error at updating base fee in tx pool", "error", err)
 			}
 		}
 
@@ -1419,6 +1420,17 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.currentStateLock.Unlock()
 	pool.pendingNonces = newTxNoncer(statedb)
 	pool.currentMaxGas = newHead.GasLimit
+
+	// when we reset txPool we should explicitly check if fee struct for min base fee has changed
+	// so that we can correctly drop txs with < minBaseFee from tx pool.
+	if pool.chainconfig.IsFeeConfigManager(new(big.Int).SetUint64(newHead.Time)) {
+		feeConfig, _, err := pool.chain.GetFeeConfigAt(newHead)
+		if err != nil {
+			log.Error("Failed to get fee config state", "err", err, "root", newHead.Root)
+			return
+		}
+		pool.minimumFee = feeConfig.MinBaseFee
+	}
 
 	// Inject any transactions discarded due to reorgs
 	log.Debug("Reinjecting stale transactions", "count", len(reinject))
@@ -1738,12 +1750,24 @@ func (pool *TxPool) updateBaseFee() {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	_, baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, pool.currentHead, uint64(time.Now().Unix()))
-	if err == nil {
-		pool.priced.SetBaseFee(baseFeeEstimate)
-	} else {
+	err := pool.updateBaseFeeAt(pool.currentHead)
+	if err != nil {
 		log.Error("failed to update base fee", "currentHead", pool.currentHead.Hash(), "err", err)
 	}
+}
+
+// assumes lock is already held
+func (pool *TxPool) updateBaseFeeAt(head *types.Header) error {
+	feeConfig, _, err := pool.chain.GetFeeConfigAt(head)
+	if err != nil {
+		return err
+	}
+	_, baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, feeConfig, head, uint64(time.Now().Unix()))
+	if err != nil {
+		return err
+	}
+	pool.priced.SetBaseFee(baseFeeEstimate)
+	return nil
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.

@@ -8,12 +8,15 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
+
+var testMinBaseFee = big.NewInt(75_000_000_000)
 
 func testRollup(t *testing.T, longs []uint64, roll int) {
 	slice := make([]byte, len(longs)*8)
@@ -98,9 +101,9 @@ type blockDefinition struct {
 }
 
 type test struct {
-	baseFee        *big.Int
-	genBlocks      func() []blockDefinition
-	minFee, maxFee *big.Int
+	baseFee   *big.Int
+	genBlocks func() []blockDefinition
+	minFee    *big.Int
 }
 
 func TestDynamicFees(t *testing.T) {
@@ -110,8 +113,7 @@ func TestDynamicFees(t *testing.T) {
 		// Test minimal gas usage
 		{
 			baseFee: nil,
-			minFee:  params.TestMinBaseFee,
-			maxFee:  params.TestMaxBaseFee,
+			minFee:  testMinBaseFee,
 			genBlocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
@@ -126,8 +128,22 @@ func TestDynamicFees(t *testing.T) {
 		// Test overflow handling
 		{
 			baseFee: nil,
-			minFee:  params.TestMinBaseFee,
-			maxFee:  params.TestMaxBaseFee,
+			minFee:  testMinBaseFee,
+			genBlocks: func() []blockDefinition {
+				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
+				for _, timestamp := range spacedTimestamps {
+					blocks = append(blocks, blockDefinition{
+						timestamp: timestamp,
+						gasUsed:   math.MaxUint64,
+					})
+				}
+				return blocks
+			},
+		},
+		// Test update increase handling
+		{
+			baseFee: big.NewInt(50_000_000_000),
+			minFee:  testMinBaseFee,
 			genBlocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
@@ -141,8 +157,7 @@ func TestDynamicFees(t *testing.T) {
 		},
 		{
 			baseFee: nil,
-			minFee:  params.TestMinBaseFee,
-			maxFee:  params.TestMaxBaseFee,
+			minFee:  testMinBaseFee,
 			genBlocks: func() []blockDefinition {
 				return []blockDefinition{
 					{
@@ -198,9 +213,20 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 	}
 
 	for index, block := range blocks[1:] {
-		tc := params.TestChainConfig
-		tc.FeeConfig.MinBaseFee = params.TestMinBaseFee
-		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, header, block.timestamp)
+		testFeeConfig := commontype.FeeConfig{
+			GasLimit:        big.NewInt(8_000_000),
+			TargetBlockRate: 2, // in seconds
+
+			MinBaseFee:               test.minFee,
+			TargetGas:                big.NewInt(15_000_000),
+			BaseFeeChangeDenominator: big.NewInt(36),
+
+			MinBlockGasCost:  big.NewInt(0),
+			MaxBlockGasCost:  big.NewInt(1_000_000),
+			BlockGasCostStep: big.NewInt(200_000),
+		}
+
+		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 		}

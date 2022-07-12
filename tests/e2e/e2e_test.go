@@ -6,7 +6,6 @@ package e2e
 
 import (
 	"flag"
-	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,7 +29,6 @@ var (
 
 	execPath  string
 	pluginDir string
-	logLevel  string
 
 	vmGenesisPath string
 	outputPath    string
@@ -63,12 +61,6 @@ func init() {
 		"avalanchego-path",
 		"",
 		"avalanchego executable path",
-	)
-	flag.StringVar(
-		&logLevel,
-		"avalanchego-log-level",
-		"INFO",
-		"avalanchego log level",
 	)
 	flag.StringVar(
 		&pluginDir,
@@ -127,9 +119,10 @@ var _ = ginkgo.BeforeSuite(func() {
 var _ = ginkgo.AfterSuite(func() {
 	// if cluster is running, shut it down
 	running := runner.IsRunnerUp()
-	fmt.Println("Cluster running status:", running)
 	if running {
-		err := runner.ShutdownCluster()
+		err := runner.StopNetwork()
 		gomega.Expect(err).Should(gomega.BeNil())
 	}
+	err := runner.ShutdownClient()
+	gomega.Expect(err).Should(gomega.BeNil())
 })

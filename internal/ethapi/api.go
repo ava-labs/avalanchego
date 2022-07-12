@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/subnet-evm/accounts"
 	"github.com/ava-labs/subnet-evm/accounts/keystore"
 	"github.com/ava-labs/subnet-evm/accounts/scwallet"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -606,6 +607,32 @@ func (s *PublicBlockChainAPI) ChainId() (*hexutil.Big, error) {
 		return (*hexutil.Big)(config.ChainID), nil
 	}
 	return nil, fmt.Errorf("chain not synced beyond EIP-155 replay-protection fork block")
+}
+
+type FeeConfigResult struct {
+	FeeConfig     commontype.FeeConfig `json:"feeConfig"`
+	LastChangedAt *big.Int             `json:"lastChangedAt,omitempty"`
+}
+
+func (s *PublicBlockChainAPI) FeeConfig(ctx context.Context, blockNrOrHash *rpc.BlockNumberOrHash) (*FeeConfigResult, error) {
+	var (
+		header *types.Header
+		err    error
+	)
+	if blockNrOrHash == nil {
+		header = s.b.CurrentHeader()
+	} else {
+		header, err = s.b.HeaderByNumberOrHash(ctx, *blockNrOrHash)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	feeConfig, lastChangedAt, err := s.b.GetFeeConfigAt(header)
+	if err != nil {
+		return nil, err
+	}
+	return &FeeConfigResult{FeeConfig: feeConfig, LastChangedAt: lastChangedAt}, nil
 }
 
 // BlockNumber returns the block number of the chain head.

@@ -127,7 +127,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 
 	var gasLimit uint64
-	configuredGasLimit := w.chainConfig.GetFeeConfig().GasLimit.Uint64()
+	feeConfig, _, err := w.chain.GetFeeConfigAt(parent.Header())
+	if err != nil {
+		return nil, err
+	}
+	configuredGasLimit := feeConfig.GasLimit.Uint64()
 	if w.chainConfig.IsSubnetEVM(big.NewInt(timestamp)) {
 		gasLimit = configuredGasLimit
 	} else {
@@ -149,7 +153,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	bigTimestamp := big.NewInt(timestamp)
 	if w.chainConfig.IsSubnetEVM(bigTimestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, feeConfig, parent.Header(), uint64(timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
@@ -168,7 +172,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
 	// Configure any stateful precompiles that should go into effect during this block.
-	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time()), bigTimestamp, env.state)
+	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time()), types.NewBlockWithHeader(header), env.state)
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)

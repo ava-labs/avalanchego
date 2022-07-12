@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -45,13 +46,12 @@ var (
 	// For legacy tests
 	MinGasPrice        int64 = 225_000_000_000
 	TestInitialBaseFee int64 = 225_000_000_000
-	TestMinBaseFee           = big.NewInt(75_000_000_000)
 	TestMaxBaseFee           = big.NewInt(225_000_000_000)
 
 	ExtraDataSize        = 80
 	RollupWindow  uint64 = 10
 
-	DefaultFeeConfig = FeeConfig{
+	DefaultFeeConfig = commontype.FeeConfig{
 		GasLimit:        big.NewInt(8_000_000),
 		TargetBlockRate: 2, // in seconds
 
@@ -84,8 +84,8 @@ var (
 		AllowFeeRecipients:  false,
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}, precompile.ContractNativeMinterConfig{}, precompile.TxAllowListConfig{}}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}, precompile.ContractNativeMinterConfig{}, precompile.TxAllowListConfig{}}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}, precompile.ContractNativeMinterConfig{}, precompile.TxAllowListConfig{}, precompile.FeeConfigManagerConfig{}}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}, precompile.ContractNativeMinterConfig{}, precompile.TxAllowListConfig{}, precompile.FeeConfigManagerConfig{}}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -113,54 +113,13 @@ type ChainConfig struct {
 
 	SubnetEVMTimestamp *big.Int `json:"subnetEVMTimestamp,omitempty"` // A placeholder for the latest avalanche forks (nil = no fork, 0 = already activated)
 
-	FeeConfig          FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
-	AllowFeeRecipients bool      `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
+	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
+	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 
 	ContractDeployerAllowListConfig precompile.ContractDeployerAllowListConfig `json:"contractDeployerAllowListConfig,omitempty"` // Config for the contract deployer allow list precompile
 	ContractNativeMinterConfig      precompile.ContractNativeMinterConfig      `json:"contractNativeMinterConfig,omitempty"`      // Config for the native minter precompile
 	TxAllowListConfig               precompile.TxAllowListConfig               `json:"txAllowListConfig,omitempty"`               // Config for the tx allow list precompile
-}
-
-// FeeConfig specifies the parameters for the dynamic fee algorithm, which determines the gas limit, base fee, and block gas cost of blocks
-// on the network.
-//
-// The dynamic fee algorithm simply increases fees when the network is operating at a utilization level above the target and decreases fees
-// when the network is operating at a utilization level below the target.
-type FeeConfig struct {
-	// GasLimit sets the max amount of gas consumed per block.
-	GasLimit *big.Int `json:"gasLimit,omitempty"`
-
-	// TargetBlockRate sets the target rate of block production in seconds.
-	// A target of 2 will target producing a block every 2 seconds.
-	TargetBlockRate uint64 `json:"targetBlockRate,omitempty"`
-
-	// The minimum base fee sets a lower bound on the EIP-1559 base fee of a block.
-	// Since the block's base fee sets the minimum gas price for any transaction included in that block, this effectively sets a minimum
-	// gas price for any tranasction.
-	MinBaseFee *big.Int `json:"minBaseFee,omitempty"`
-
-	// When the dynamic fee algorithm observes that network activity is above/below the [TargetGas], it increases/decreases the base fee proportionally to
-	// how far above/below the target actual network activity is.
-
-	// TargetGas specifies the targeted amount of gas (including block gas cost) to consume within a rolling 10s window.
-	TargetGas *big.Int `json:"targetGas,omitempty"`
-	// The BaseFeeChangeDenominator divides the difference between actual and target utilization to determine how much to increase/decrease the base fee.
-	// This means that a larger denominator indicates a slower changing, stickier base fee, while a lower denominator will allow the base fee to adjust
-	// more quickly.
-	BaseFeeChangeDenominator *big.Int `json:"baseFeeChangeDenominator,omitempty"`
-
-	// MinBlockGasCost sets the minimum amount of gas to charge for the production of a block.
-	MinBlockGasCost *big.Int `json:"minBlockGasCost,omitempty"`
-	// MaxBlockGasCost sets the maximum amount of gas to charge for the production of a block.
-	MaxBlockGasCost *big.Int `json:"maxBlockGasCost,omitempty"`
-	// BlockGasCostStep determines how much to increase/decrease the block gas cost depending on the amount of time elapsed since the previous block.
-	// If the block is produced at the target rate, the block gas cost will stay the same as the block gas cost for the parent block.
-	// If it is produced faster/slower, the block gas cost will be increased/decreased by the step value for each second faster/slower than the target
-	// block rate accordingly.
-	// Note: if the BlockGasCostStep is set to a very large number, it effectively requires block production to go no faster than the TargetBlockRate.
-	//
-	// Ex: if a block is produced two seconds faster than the target block rate, the block gas cost will increase by 2 * BlockGasCostStep.
-	BlockGasCostStep *big.Int `json:"blockGasCostStep,omitempty"`
+	FeeManagerConfig                precompile.FeeConfigManagerConfig          `json:"feeManagerConfig,omitempty"`                // Config for the fee manager precompile
 }
 
 // String implements the fmt.Stringer interface.
@@ -169,7 +128,7 @@ func (c *ChainConfig) String() string {
 	if err != nil {
 		feeBytes = []byte("cannot unmarshal FeeConfig")
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, ContractDeployerAllowListConfig: %v, ContractNativeMinterConfig: %v, TxAllowListConfig: %v, Engine: Dummy Consensus Engine}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, ContractDeployerAllowListConfig: %v, ContractNativeMinterConfig: %v, TxAllowListConfig: %v, FeeManagerConfig: %v, Engine: Dummy Consensus Engine}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -186,6 +145,7 @@ func (c *ChainConfig) String() string {
 		c.ContractDeployerAllowListConfig,
 		c.ContractNativeMinterConfig,
 		c.TxAllowListConfig,
+		c.FeeManagerConfig,
 	)
 }
 
@@ -256,12 +216,9 @@ func (c *ChainConfig) IsTxAllowList(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.TxAllowListConfig.Timestamp(), blockTimestamp)
 }
 
-// GetFeeConfig returns the *FeeConfig if it exists, otherwise it returns [DefaultFeeConfig()].
-func (c *ChainConfig) GetFeeConfig() FeeConfig {
-	if c.FeeConfig == (FeeConfig{}) {
-		return DefaultFeeConfig
-	}
-	return c.FeeConfig
+// IsFeeConfigManager returns whether [blockTimestamp] is either equal to the FeeConfigManager fork block timestamp or greater.
+func (c *ChainConfig) IsFeeConfigManager(blockTimestamp *big.Int) bool {
+	return utils.IsForked(c.FeeManagerConfig.Timestamp(), blockTimestamp)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -281,6 +238,15 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, timest
 		bhead.SetUint64(err.RewindTo)
 	}
 	return lasterr
+}
+
+// Verify verifies chain config and returns error
+func (c *ChainConfig) Verify() error {
+	if err := c.FeeConfig.Verify(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
@@ -399,19 +365,24 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
 
-	// Check that the configuration of the optional stateful precompiles is compatible.
+	// Check that the configuration of the optional AllowList stateful precompile is compatible.
 	if isForkIncompatible(c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp(), headTimestamp) {
 		return newCompatError("AllowList fork block timestamp", c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp())
 	}
 
-	// Check that the configuration of the optional stateful precompiles is compatible.
+	// Check that the configuration of the optional ContractNativeMinter stateful precompile is compatible.
 	if isForkIncompatible(c.ContractNativeMinterConfig.Timestamp(), newcfg.ContractNativeMinterConfig.Timestamp(), headTimestamp) {
 		return newCompatError("ContractNativeMinter fork block timestamp", c.ContractNativeMinterConfig.Timestamp(), newcfg.ContractNativeMinterConfig.Timestamp())
 	}
 
-	// Check that the configuration of the optional stateful precompiles is compatible.
+	// Check that the configuration of the optional TxAllowList stateful precompile is compatible.
 	if isForkIncompatible(c.TxAllowListConfig.Timestamp(), newcfg.TxAllowListConfig.Timestamp(), headTimestamp) {
-		return newCompatError("AllowList fork block timestamp", c.TxAllowListConfig.Timestamp(), newcfg.TxAllowListConfig.Timestamp())
+		return newCompatError("TxAllowList fork block timestamp", c.TxAllowListConfig.Timestamp(), newcfg.TxAllowListConfig.Timestamp())
+	}
+
+	// Check that the configuration of the optional FeeManagerConfig stateful precompile is compatible.
+	if isForkIncompatible(c.FeeManagerConfig.Timestamp(), newcfg.FeeManagerConfig.Timestamp(), headTimestamp) {
+		return newCompatError("FeeManagerConfig fork block timestamp", c.FeeManagerConfig.Timestamp(), newcfg.FeeManagerConfig.Timestamp())
 	}
 
 	// TODO verify that the fee config is fully compatible between [c] and [newcfg].
@@ -483,6 +454,7 @@ type Rules struct {
 	IsContractDeployerAllowListEnabled bool
 	IsContractNativeMinterEnabled      bool
 	IsTxAllowListEnabled               bool
+	IsFeeConfigManagerEnabled          bool
 
 	// Precompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.
@@ -519,6 +491,7 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules.IsContractDeployerAllowListEnabled = c.IsContractDeployerAllowList(blockTimestamp)
 	rules.IsContractNativeMinterEnabled = c.IsContractNativeMinter(blockTimestamp)
 	rules.IsTxAllowListEnabled = c.IsTxAllowList(blockTimestamp)
+	rules.IsFeeConfigManagerEnabled = c.IsFeeConfigManager(blockTimestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
@@ -548,14 +521,23 @@ func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompi
 		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.TxAllowListConfig)
 	}
 
+	if c.FeeManagerConfig.Timestamp() != nil {
+		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.FeeManagerConfig)
+	}
+
 	return statefulPrecompileConfigs
 }
 
 // CheckConfigurePrecompiles iterates over any stateful precompile configs that go into effect at some point and configures them
 // if they are activated between [parentTimestamp] and [currentTimestamp].
-func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, currentTimestamp *big.Int, statedb precompile.StateDB) {
+func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, blockContext precompile.BlockContext, statedb precompile.StateDB) {
 	// Iterate the enabled stateful precompiles and configure them if needed
 	for _, config := range c.enabledStatefulPrecompiles() {
-		precompile.CheckConfigure(parentTimestamp, currentTimestamp, config, statedb)
+		precompile.CheckConfigure(c, parentTimestamp, blockContext, config, statedb)
 	}
+}
+
+// GetFeeConfig returns the FeeConfig
+func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
+	return c.FeeConfig
 }

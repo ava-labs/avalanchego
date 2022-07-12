@@ -25,7 +25,6 @@ var (
 	setEnabledSignature    = CalculateFunctionSelector("setEnabled(address)")
 	setNoneSignature       = CalculateFunctionSelector("setNone(address)")
 	readAllowListSignature = CalculateFunctionSelector("readAllowList(address)")
-
 	// Error returned when an invalid write is attempted
 	ErrCannotModifyAllowList = errors.New("non-admin cannot modify allow list")
 
@@ -157,13 +156,15 @@ func createAllowListRoleSetter(precompileAddr common.Address, role AllowListRole
 			return nil, remainingGas, vmerrs.ErrWriteProtection
 		}
 
+		stateDB := evm.GetStateDB()
+
 		// Verify that the caller is in the allow list and therefore has the right to modify it
-		callerStatus := getAllowListStatus(evm.GetStateDB(), precompileAddr, callerAddr)
+		callerStatus := getAllowListStatus(stateDB, precompileAddr, callerAddr)
 		if !callerStatus.IsAdmin() {
 			return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotModifyAllowList, callerAddr)
 		}
 
-		setAllowListRole(evm.GetStateDB(), precompileAddr, modifyAddress, role)
+		setAllowListRole(stateDB, precompileAddr, modifyAddress, role)
 		// Return an empty output and the remaining gas
 		return []byte{}, remainingGas, nil
 	}
@@ -191,12 +192,17 @@ func createReadAllowList(precompileAddr common.Address) RunStatefulPrecompileFun
 
 // createAllowListPrecompile returns a StatefulPrecompiledContract with R/W control of an allow list at [precompileAddr]
 func createAllowListPrecompile(precompileAddr common.Address) StatefulPrecompiledContract {
+	// Construct the contract with no fallback function.
+	allowListFuncs := createAllowListFunctions(precompileAddr)
+	contract := newStatefulPrecompileWithFunctionSelectors(nil, allowListFuncs)
+	return contract
+}
+
+func createAllowListFunctions(precompileAddr common.Address) []*statefulPrecompileFunction {
 	setAdmin := newStatefulPrecompileFunction(setAdminSignature, createAllowListRoleSetter(precompileAddr, AllowListAdmin))
 	setEnabled := newStatefulPrecompileFunction(setEnabledSignature, createAllowListRoleSetter(precompileAddr, AllowListEnabled))
 	setNone := newStatefulPrecompileFunction(setNoneSignature, createAllowListRoleSetter(precompileAddr, AllowListNoRole))
 	read := newStatefulPrecompileFunction(readAllowListSignature, createReadAllowList(precompileAddr))
 
-	// Construct the contract with no fallback function.
-	contract := newStatefulPrecompileWithFunctionSelectors(nil, []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read})
-	return contract
+	return []*statefulPrecompileFunction{setAdmin, setEnabled, setNone, read}
 }

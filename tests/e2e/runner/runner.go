@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
+	"github.com/ava-labs/avalanche-network-runner/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 	"github.com/onsi/ginkgo/v2/formatter"
@@ -17,9 +17,8 @@ import (
 
 var (
 	execPath string
-	logLevel string
 
-	cli runner_sdk.Client
+	cli client.Client
 )
 
 type clusterInfo struct {
@@ -39,7 +38,7 @@ func (ci clusterInfo) Save(p string) error {
 	return os.WriteFile(p, ob, fsModeWrite)
 }
 
-func GetClient() runner_sdk.Client {
+func GetClient() client.Client {
 	return cli
 }
 
@@ -47,7 +46,7 @@ func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel str
 	execPath = execPath_
 
 	var err error
-	cli, err = runner_sdk.New(runner_sdk.Config{
+	cli, err = client.New(client.Config{
 		LogLevel:    networkRunnerLogLevel,
 		Endpoint:    grpcEp,
 		DialTimeout: 10 * time.Second,
@@ -62,9 +61,8 @@ func startRunner(vmName string, genesisPath string, pluginDir string) error {
 	resp, err := cli.Start(
 		ctx,
 		execPath,
-		runner_sdk.WithLogLevel(logLevel),
-		runner_sdk.WithPluginDir(pluginDir),
-		runner_sdk.WithCustomVMs(map[string]string{
+		client.WithPluginDir(pluginDir),
+		client.WithCustomVMs(map[string]string{
 			vmName: genesisPath,
 		}))
 	cancel()
@@ -73,13 +71,6 @@ func startRunner(vmName string, genesisPath string, pluginDir string) error {
 	}
 	outf("{{green}}successfully started:{{/}} %+v\n", resp.ClusterInfo.NodeNames)
 	return nil
-}
-
-func checkRunnerHealth() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	_, err := cli.Health(ctx)
-	cancel()
-	return err
 }
 
 func WaitForCustomVm(vmId ids.ID) (string, string, error) {
@@ -97,20 +88,34 @@ done:
 
 		outf("{{magenta}}checking custom VM status{{/}}\n")
 		cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		resp, err := cli.Status(cctx)
+		resp, err := cli.Health(cctx)
 		ccancel()
 		if err != nil {
 			cancel()
 			return "", "", err
 		}
 
+		if resp.ClusterInfo == nil {
+			continue
+		}
+
+		if !resp.ClusterInfo.Healthy {
+			continue
+		}
+
+		if !resp.ClusterInfo.CustomVmsHealthy {
+			continue
+		}
+
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
 
-		if v, ok := resp.ClusterInfo.CustomVms[vmId.String()]; ok {
-			blockchainID = v.BlockchainId
-			outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", v)
-			break done
+		for chainID, vmInfo := range resp.ClusterInfo.CustomVms {
+			if vmInfo.VmId == vmId.String() {
+				blockchainID = chainID
+				outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", vmInfo)
+				break done
+			}
 		}
 	}
 	err := ctx.Err()
@@ -163,14 +168,6 @@ func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir stri
 	fmt.Println("Starting network")
 	startRunner(vmName, genesisPath, pluginDir)
 
-	// TODO: network runner health should imply custom VM healthiness
-	// or provide a separate API for custom VM healthiness
-	// "start" is async, so wait some time for cluster health
-	fmt.Println("About to sleep")
-	time.Sleep(2 * time.Minute)
-	checkRunnerHealth()
-
-	fmt.Println("Health checked")
 	blockchainId, logsDir, err := WaitForCustomVm(vmId)
 	if err != nil {
 		return clusterInfo{}, err
@@ -180,21 +177,17 @@ func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir stri
 	return GetClusterInfo(blockchainId, logsDir)
 }
 
-func ShutdownCluster() error {
-	outf("{{red}}shutting down cluster{{/}}\n")
+func StopNetwork() error {
+	outf("{{red}}shutting down network{{/}}\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	_, err := cli.Stop(ctx)
 	cancel()
-	if err != nil {
-		return err
-	}
+	return err
+}
 
+func ShutdownClient() error {
 	outf("{{red}}shutting down client{{/}}\n")
-	err = cli.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return cli.Close()
 }
 
 func outf(format string, args ...interface{}) {

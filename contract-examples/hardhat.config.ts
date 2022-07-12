@@ -3,12 +3,17 @@ import "./tasks.ts"
 import { existsSync } from "fs"
 
 // Import the dynamic rpc url if the file exists
-let rpcUrl = ""
+let testRpc = ""
 if (existsSync("./dynamic_rpc.json")) {
   const importedRpc = require("./dynamic_rpc.json")
-  rpcUrl = importedRpc.rpc
+  testRpc = importedRpc.rpc
 }
 
+let localRPC = ""
+if (existsSync("./local_rpc.json")) {
+  const importedRpc = require("./local_rpc.json")
+  localRPC = importedRpc.rpc
+}
 
 export default {
   solidity: {
@@ -33,7 +38,8 @@ export default {
   networks: {
     local: {
       //"http://{ip}:{port}/ext/bc/{chainID}/rpc
-      url: "http://127.0.0.1:9650/ext/bc/dRTfPJh4jEaRZoGkPc7xreeYbDGBrGWRV48WAYVyUgApsmzGo/rpc",
+      // modify this in the local_rpc.json
+      url: localRPC,
       chainId: 43214,
       accounts: [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",
@@ -48,9 +54,9 @@ export default {
         "0x750839e9dbbd2a0910efe40f50b2f3b2f2f59f5580bb4b83bd8c1201cf9a010a"
       ]
     },
-    subnet: {
+    e2e: {
       //"http://{ip}:{port}/ext/bc/{chainID}/rpc
-      url: rpcUrl,
+      url: testRpc,
       chainId: 99999,
       accounts: [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",

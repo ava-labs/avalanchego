@@ -18,7 +18,7 @@ var (
 )
 
 // TxAllowListConfig wraps [AllowListConfig] and uses it to implement the StatefulPrecompileConfig
-// interface while adding in the contract deployer specific precompile address.
+// interface while adding in the TxAllowList specific precompile address.
 type TxAllowListConfig struct {
 	AllowListConfig
 }
@@ -29,7 +29,7 @@ func (c *TxAllowListConfig) Address() common.Address {
 }
 
 // Configure configures [state] with the desired admins based on [c].
-func (c *TxAllowListConfig) Configure(state StateDB) {
+func (c *TxAllowListConfig) Configure(_ ChainConfig, state StateDB, _ BlockContext) {
 	c.AllowListConfig.Configure(state, TxAllowListAddress)
 }
 

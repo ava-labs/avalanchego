@@ -28,11 +28,13 @@ package gasprice
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sort"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -92,6 +94,7 @@ type OracleBackend interface {
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error)
 	LastAcceptedBlock() *types.Block
+	GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error)
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -124,7 +127,7 @@ type Oracle struct {
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
 // gasprice for newly created transaction.
-func NewOracle(backend OracleBackend, config Config) *Oracle {
+func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 	blocks := config.Blocks
 	if blocks < 1 {
 		blocks = 1
@@ -176,11 +179,18 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 			lastHead = ev.Block.Hash()
 		}
 	}()
-	minBaseFee := backend.ChainConfig().GetFeeConfig().MinBaseFee
+	feeConfig, _, err := backend.GetFeeConfigAt(backend.LastAcceptedBlock().Header())
+	var minBaseFee *big.Int
+	if err != nil {
+		// resort back to chain config
+		return nil, fmt.Errorf("failed getting fee config in the oracle: %w", err)
+	} else {
+		minBaseFee = feeConfig.MinBaseFee
+	}
 	return &Oracle{
 		backend:             backend,
 		lastPrice:           minPrice,
-		lastBaseFee:         minBaseFee,
+		lastBaseFee:         new(big.Int).Set(minBaseFee),
 		minPrice:            minPrice,
 		maxPrice:            maxPrice,
 		minGasUsed:          minGasUsed,
@@ -189,10 +199,10 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		maxCallBlockHistory: maxCallBlockHistory,
 		maxBlockHistory:     maxBlockHistory,
 		historyCache:        cache,
-	}
+	}, nil
 }
 
-// EstiamteBaseFee returns an estimate of what the base fee will be on a block
+// EstimateBaseFee returns an estimate of what the base fee will be on a block
 // produced at the current time. If SubnetEVM has not been activated, it may
 // return a nil value and a nil error.
 func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
@@ -229,6 +239,11 @@ func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error)
 	if err != nil {
 		return nil, err
 	}
+
+	feeConfig, _, err := oracle.backend.GetFeeConfigAt(block.Header())
+	if err != nil {
+		return nil, err
+	}
 	// If the fetched block does not have a base fee, return nil as the base fee
 	if block.BaseFee() == nil {
 		return nil, nil
@@ -237,7 +252,7 @@ func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error)
 	// If the block does have a baseFee, calculate the next base fee
 	// based on the current time and add it to the tip to estimate the
 	// total gas price estimate.
-	_, nextBaseFee, err := dummy.EstimateNextBaseFee(oracle.backend.ChainConfig(), block.Header(), oracle.clock.Unix())
+	_, nextBaseFee, err := dummy.EstimateNextBaseFee(oracle.backend.ChainConfig(), feeConfig, block.Header(), oracle.clock.Unix())
 	return nextBaseFee, err
 }
 
@@ -283,6 +298,14 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		return nil, nil, err
 	}
 
+	var feeLastChangedAt *big.Int
+	if oracle.backend.ChainConfig().IsFeeConfigManager(new(big.Int).SetUint64(head.Time)) {
+		_, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	headHash := head.Hash()
 
 	// If the latest gasprice is still available, return it.
@@ -310,7 +333,9 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		tipResults     []*big.Int
 		baseFeeResults []*big.Int
 	)
-	for sent < oracle.checkBlocks && number > 0 {
+
+	// iterates backwards until enough blocks are sent or until the block number that fee last changed at
+	for sent < oracle.checkBlocks && number > 0 && (feeLastChangedAt == nil || feeLastChangedAt.Uint64() < number) {
 		go oracle.getBlockTips(ctx, number, result, quit)
 		sent++
 		exp++

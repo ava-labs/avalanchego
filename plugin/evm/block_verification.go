@@ -16,9 +16,8 @@ import (
 )
 
 var (
-	legacyBlockValidator    = blockValidatorLegacy{}
-	legacyMinGasPrice       = big.NewInt(params.MinGasPrice)
-	subnetEVMBlockValidator = blockValidatorSubnetEVM{}
+	legacyBlockValidator = blockValidatorLegacy{}
+	legacyMinGasPrice    = big.NewInt(params.MinGasPrice)
 )
 
 type BlockValidator interface {
@@ -111,9 +110,11 @@ func (v blockValidatorLegacy) SyntacticVerify(b *Block) error {
 	return nil
 }
 
-type blockValidatorSubnetEVM struct{}
+type blockValidatorSubnetEVM struct {
+	feeConfigManagerEnabled bool
+}
 
-func (blockValidatorSubnetEVM) SyntacticVerify(b *Block) error {
+func (v blockValidatorSubnetEVM) SyntacticVerify(b *Block) error {
 	if b == nil || b.ethBlock == nil {
 		return errInvalidBlock
 	}
@@ -142,13 +143,18 @@ func (blockValidatorSubnetEVM) SyntacticVerify(b *Block) error {
 			ethHeader.Nonce.Uint64(), errInvalidNonce,
 		)
 	}
-	expectedGas := b.vm.chainConfig.GetFeeConfig().GasLimit.Uint64()
-	if ethHeader.GasLimit != expectedGas {
-		return fmt.Errorf(
-			"expected gas limit to be %d in subnetEVM but got %d",
-			expectedGas, ethHeader.GasLimit,
-		)
+
+	// if fee config manager is enabled, FeeConfig depends on state. State is not available here, so skip checking the gas limit.
+	if !v.feeConfigManagerEnabled {
+		expectedGas := b.vm.chainConfig.FeeConfig.GasLimit.Uint64()
+		if ethHeader.GasLimit != expectedGas {
+			return fmt.Errorf(
+				"expected gas limit to be %d in subnetEVM but got %d",
+				expectedGas, ethHeader.GasLimit,
+			)
+		}
 	}
+
 	if ethHeader.MixDigest != (common.Hash{}) {
 		return fmt.Errorf(
 			"expected MixDigest to be empty but got %x: %w",

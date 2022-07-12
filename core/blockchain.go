@@ -38,6 +38,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -64,12 +65,13 @@ var (
 )
 
 const (
-	bodyCacheLimit     = 256
-	blockCacheLimit    = 256
-	receiptsCacheLimit = 32
-	txLookupCacheLimit = 1024
-	badBlockLimit      = 10
-	TriesInMemory      = 128
+	bodyCacheLimit      = 256
+	blockCacheLimit     = 256
+	receiptsCacheLimit  = 32
+	txLookupCacheLimit  = 1024
+	feeConfigCacheLimit = 256
+	badBlockLimit       = 10
+	TriesInMemory       = 128
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -100,6 +102,13 @@ const (
 	// always print out progress. This avoids the user wondering what's going on.
 	statsReportLimit = 8 * time.Second
 )
+
+// cacheableFeeConfig encapsulates fee configuration itself and the block number that it has changed at,
+// in order to cache them together.
+type cacheableFeeConfig struct {
+	feeConfig     commontype.FeeConfig
+	lastChangedAt *big.Int
+}
 
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
@@ -172,12 +181,13 @@ type BlockChain struct {
 
 	currentBlock atomic.Value // Current head of the block chain
 
-	stateCache    state.Database // State database to reuse between imports (contains state cache)
-	stateManager  TrieWriter
-	bodyCache     *lru.Cache // Cache for the most recent block bodies
-	receiptsCache *lru.Cache // Cache for the most recent receipts per block
-	blockCache    *lru.Cache // Cache for the most recent entire blocks
-	txLookupCache *lru.Cache // Cache for the most recent transaction lookup data.
+	stateCache     state.Database // State database to reuse between imports (contains state cache)
+	stateManager   TrieWriter
+	bodyCache      *lru.Cache // Cache for the most recent block bodies
+	receiptsCache  *lru.Cache // Cache for the most recent receipts per block
+	blockCache     *lru.Cache // Cache for the most recent entire blocks
+	txLookupCache  *lru.Cache // Cache for the most recent transaction lookup data.
+	feeConfigCache *lru.Cache // Cache for the most recent feeConfig lookup data.
 
 	running int32 // 0 if chain is running, 1 when stopped
 
@@ -233,6 +243,7 @@ func NewBlockChain(
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
+	feeConfigCache, _ := lru.New(feeConfigCacheLimit)
 	badBlocks, _ := lru.New(badBlockLimit)
 
 	bc := &BlockChain{
@@ -243,15 +254,16 @@ func NewBlockChain(
 			Cache:     cacheConfig.TrieCleanLimit,
 			Preimages: cacheConfig.Preimages,
 		}),
-		bodyCache:     bodyCache,
-		receiptsCache: receiptsCache,
-		blockCache:    blockCache,
-		txLookupCache: txLookupCache,
-		engine:        engine,
-		vmConfig:      vmConfig,
-		badBlocks:     badBlocks,
-		senderCacher:  newTxSenderCacher(runtime.NumCPU()),
-		acceptorQueue: make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
+		bodyCache:      bodyCache,
+		receiptsCache:  receiptsCache,
+		blockCache:     blockCache,
+		txLookupCache:  txLookupCache,
+		feeConfigCache: feeConfigCache,
+		engine:         engine,
+		vmConfig:       vmConfig,
+		badBlocks:      badBlocks,
+		senderCacher:   newTxSenderCacher(runtime.NumCPU()),
+		acceptorQueue:  make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)

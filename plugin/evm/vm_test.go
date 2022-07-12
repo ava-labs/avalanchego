@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
@@ -2333,4 +2334,155 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	}
 
 	assert.Equal(t, signedTx0.Hash(), txs[0].Hash())
+}
+
+// Test that the fee manager changes fee configuration
+func TestFeeManagerChangeFee(t *testing.T) {
+	// Setup chain params
+	genesis := &core.Genesis{}
+	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
+		t.Fatal(err)
+	}
+
+	genesis.Config.FeeManagerConfig = precompile.FeeConfigManagerConfig{
+		AllowListConfig: precompile.AllowListConfig{
+			BlockTimestamp:  big.NewInt(0),
+			AllowListAdmins: testEthAddrs[0:1],
+		},
+	}
+
+	// set a lower fee config now
+	testLowFeeConfig := commontype.FeeConfig{
+		GasLimit:        big.NewInt(8_000_000),
+		TargetBlockRate: 5, // in seconds
+
+		MinBaseFee:               big.NewInt(5_000_000_000),
+		TargetGas:                big.NewInt(18_000_000),
+		BaseFeeChangeDenominator: big.NewInt(3396),
+
+		MinBlockGasCost:  big.NewInt(0),
+		MaxBlockGasCost:  big.NewInt(4_000_000),
+		BlockGasCostStep: big.NewInt(500_000),
+	}
+
+	genesis.Config.FeeConfig = testLowFeeConfig
+	genesisJSON, err := genesis.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that address 0 is whitelisted and address 1 is not
+	role := precompile.GetFeeConfigManagerStatus(genesisState, testEthAddrs[0])
+	if role != precompile.AllowListAdmin {
+		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
+	}
+	role = precompile.GetFeeConfigManagerStatus(genesisState, testEthAddrs[1])
+	if role != precompile.AllowListNoRole {
+		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
+	}
+	// Contract is initialized but no preconfig is given, reader should return genesis fee config
+	feeConfig, lastChangedAt, err := vm.chain.BlockChain().GetFeeConfigAt(vm.chain.GetGenesisBlock().Header())
+	assert.NoError(t, err)
+	assert.EqualValues(t, feeConfig, testLowFeeConfig)
+	assert.Zero(t, vm.chain.CurrentBlock().Number().Cmp(lastChangedAt))
+
+	// set a different fee config now
+	testHighFeeConfig := testLowFeeConfig
+	testHighFeeConfig.MinBaseFee = big.NewInt(28_000_000_000)
+
+	data, err := precompile.PackSetFeeConfig(testHighFeeConfig)
+	assert.NoError(t, err)
+
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   genesis.Config.ChainID,
+		Nonce:     uint64(0),
+		To:        &precompile.FeeConfigManagerAddress,
+		Gas:       testLowFeeConfig.GasLimit.Uint64(),
+		Value:     common.Big0,
+		GasFeeCap: testLowFeeConfig.MinBaseFee, // give low fee, it should work since we still haven't applied high fees
+		GasTipCap: common.Big0,
+		Data:      data,
+	})
+
+	signedTx, err := types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.chain.GetTxPool().AddRemote(signedTx)
+	if err != nil {
+		t.Fatalf("Failed to add tx at index: %s", err)
+	}
+
+	// Construct the block
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+
+	// Contract is initialized but no state is given, reader should return genesis fee config
+	feeConfig, lastChangedAt, err = vm.chain.BlockChain().GetFeeConfigAt(block.Header())
+	assert.NoError(t, err)
+	assert.EqualValues(t, testHighFeeConfig, feeConfig)
+	assert.EqualValues(t, vm.chain.CurrentBlock().Number(), lastChangedAt)
+
+	// should fail, with same params since fee is higher now
+	tx2 := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   genesis.Config.ChainID,
+		Nonce:     uint64(1),
+		To:        &precompile.FeeConfigManagerAddress,
+		Gas:       genesis.Config.FeeConfig.GasLimit.Uint64(),
+		Value:     common.Big0,
+		GasFeeCap: testLowFeeConfig.MinBaseFee, // this is too low for applied config, should fail
+		GasTipCap: common.Big0,
+		Data:      data,
+	})
+
+	signedTx2, err := types.SignTx(tx2, types.LatestSigner(genesis.Config), testKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.chain.GetTxPool().AddRemote(signedTx2)
+	assert.ErrorIs(t, err, core.ErrUnderpriced)
 }

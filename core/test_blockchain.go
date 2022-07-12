@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/assert"
 )
 
 type ChainTest struct {
@@ -1552,6 +1554,14 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 			},
 		},
 	}
+	config.FeeManagerConfig = precompile.FeeConfigManagerConfig{
+		AllowListConfig: precompile.AllowListConfig{
+			BlockTimestamp: big.NewInt(0),
+			AllowListAdmins: []common.Address{
+				addr1,
+			},
+		},
+	}
 	gspec := &Genesis{
 		Config: &config,
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
@@ -1574,6 +1584,19 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 		verifyGenesis func(sdb *state.StateDB)
 		verifyState   func(sdb *state.StateDB) error
 	}
+	testFeeConfig := commontype.FeeConfig{
+		GasLimit:        big.NewInt(11_000_000),
+		TargetBlockRate: 5, // in seconds
+
+		MinBaseFee:               big.NewInt(28_000_000_000),
+		TargetGas:                big.NewInt(18_000_000),
+		BaseFeeChangeDenominator: big.NewInt(3396),
+
+		MinBlockGasCost:  big.NewInt(0),
+		MaxBlockGasCost:  big.NewInt(4_000_000),
+		BlockGasCostStep: big.NewInt(500_000),
+	}
+	assert := assert.New(t)
 	tests := map[string]test{
 		"allow list": {
 			addTx: func(gen *BlockGen) {
@@ -1619,6 +1642,51 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 				if precompile.AllowListNoRole != res {
 					t.Fatalf("unexpected allow list status for addr2 %s, expected %s", res, precompile.AllowListNoRole)
 				}
+			},
+		},
+		"fee manager set config": {
+			addTx: func(gen *BlockGen) {
+				feeCap := new(big.Int).Add(gen.BaseFee(), tip)
+				input, err := precompile.PackSetFeeConfig(testFeeConfig)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     gen.TxNonce(addr1),
+					To:        &precompile.FeeConfigManagerAddress,
+					Gas:       3_000_000,
+					Value:     common.Big0,
+					GasFeeCap: feeCap,
+					GasTipCap: tip,
+					Data:      input,
+				})
+
+				signedTx, err := types.SignTx(tx, signer, key1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				gen.AddTx(signedTx)
+			},
+			verifyState: func(sdb *state.StateDB) error {
+				res := precompile.GetFeeConfigManagerStatus(sdb, addr1)
+				assert.Equal(precompile.AllowListAdmin, res)
+
+				storedConfig := precompile.GetStoredFeeConfig(sdb)
+				assert.EqualValues(testFeeConfig, storedConfig)
+
+				feeConfig, _, err := blockchain.GetFeeConfigAt(blockchain.CurrentHeader())
+				assert.NoError(err)
+				assert.EqualValues(testFeeConfig, feeConfig)
+				return nil
+			},
+			verifyGenesis: func(sdb *state.StateDB) {
+				res := precompile.GetFeeConfigManagerStatus(sdb, addr1)
+				assert.Equal(precompile.AllowListAdmin, res)
+
+				feeConfig, _, err := blockchain.GetFeeConfigAt(blockchain.Genesis().Header())
+				assert.NoError(err)
+				assert.EqualValues(config.FeeConfig, feeConfig)
 			},
 		},
 	}

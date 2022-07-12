@@ -1,11 +1,11 @@
 //SPDX-License-Identifier: MIT
-pragma solidity >=0.6.2;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "./AllowList.sol";
 import "./INativeMinter.sol";
 
-contract ERC20NativeMinter is ERC20, Ownable {
+contract ERC20NativeMinter is ERC20, AllowList {
   // Precompiled Native Minter Contract Address
   address constant MINTER_ADDRESS = 0x0200000000000000000000000000000000000001;
   // Designated Blackhole Address
@@ -18,7 +18,7 @@ contract ERC20NativeMinter is ERC20, Ownable {
   event Deposit(address indexed dst, uint256 wad);
   event Mintdrawal(address indexed src, uint256 wad);
 
-  constructor(uint256 initSupply) ERC20(TOKEN_NAME, TOKEN_SYMBOL) {
+  constructor(uint256 initSupply) ERC20(TOKEN_NAME, TOKEN_SYMBOL) AllowList(MINTER_ADDRESS) {
     // Mints INIT_SUPPLY to owner
     _mint(_msgSender(), initSupply);
   }

@@ -31,6 +31,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
@@ -88,6 +89,10 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 
 func (b *testBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return nil
+}
+
+func (b *testBackend) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error) {
+	return b.chain.GetFeeConfigAt(parent)
 }
 
 func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
@@ -179,7 +184,10 @@ func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
 		test.genBlock = func(i int, b *core.BlockGen) {}
 	}
 	backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.genBlock)
-	oracle := NewOracle(backend, config)
+	oracle, err := NewOracle(backend, config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := oracle.SuggestTipCap(context.Background())
 	if err != nil {
@@ -409,9 +417,12 @@ func TestSuggestGasPricePreSubnetEVM(t *testing.T) {
 			b.AddTx(tx)
 		}
 	})
-	oracle := NewOracle(backend, config)
+	oracle, err := NewOracle(backend, config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	_, err := oracle.SuggestPrice(context.Background())
+	_, err = oracle.SuggestPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,9 +457,12 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 			b.AddTx(tx)
 		}
 	})
-	oracle := NewOracle(backend, config)
+	oracle, err := NewOracle(backend, config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	_, err := oracle.SuggestPrice(context.Background())
+	_, err = oracle.SuggestPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

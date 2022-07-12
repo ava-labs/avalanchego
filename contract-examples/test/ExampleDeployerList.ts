@@ -1,3 +1,6 @@
+// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import {
@@ -30,6 +33,13 @@ describe("ExampleDeployerList", function () {
 
     const signers: SignerWithAddress[] = await ethers.getSigners()
     deployer = signers.slice(-1)[0]
+
+    // Fund deployer address
+    await owner.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther("1")
+    })
+
   });
 
   it("should add contract deployer as owner", async function () {
@@ -89,7 +99,7 @@ describe("ExampleDeployerList", function () {
     const allowList = await ethers.getContractAt("IAllowList", ALLOWLIST_ADDRESS, owner);
     let role = await allowList.readAllowList(contract.address);
     expect(role).to.be.equal(ROLES.NONE)
-    const result = await contract.isDeployer(contract.address);
+    const result = await contract.isEnabled(contract.address);
     expect(result).to.be.false
     try {
       await contract.addDeployer(deployer.address);
@@ -113,9 +123,9 @@ describe("ExampleDeployerList", function () {
   });
 
   it("should allow admin to add deployer address as deployer through contract", async function () {
-    let tx = await contract.addAdmin(deployer.address)
+    let tx = await contract.setEnabled(deployer.address)
     await tx.wait()
-    const result = await contract.isDeployer(deployer.address);
+    const result = await contract.isEnabled(deployer.address);
     expect(result).to.be.true
   });
 

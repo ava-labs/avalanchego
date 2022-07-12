@@ -13,6 +13,6 @@ func DescribeLocal(text string, body func()) bool {
 	return ginkgo.Describe("[Local] "+text, body)
 }
 
-func DescribePrecompile(text string, body func()) bool {
-	return ginkgo.Describe("[Precompile] "+text, ginkgo.Ordered, body)
+func DescribePrecompile(body func()) bool {
+	return ginkgo.Describe("[Precompiles]", ginkgo.Ordered, body)
 }

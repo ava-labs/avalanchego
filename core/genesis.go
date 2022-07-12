@@ -189,6 +189,11 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	if gasLimitConfig != genesis.GasLimit {
 		return nil, fmt.Errorf("gas limit in fee config (%d) does not match gas limit in header (%d)", gasLimitConfig, genesis.GasLimit)
 	}
+
+	// Verify config
+	if err := genesis.Config.Verify(); err != nil {
+		return nil, err
+	}
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
@@ -273,21 +278,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		)
 	}
 
-	genesisTimestamp := new(big.Int).SetUint64(g.Timestamp)
-	// Configure any stateful precompiles that should be enabled in the genesis.
-	g.Config.CheckConfigurePrecompiles(nil, genesisTimestamp, statedb)
-
-	// Do cusotm allocation after airdrop in case an address shows up in standard
-	// allocation
-	for addr, account := range g.Alloc {
-		statedb.SetBalance(addr, account.Balance)
-		statedb.SetCode(addr, account.Code)
-		statedb.SetNonce(addr, account.Nonce)
-		for key, value := range account.Storage {
-			statedb.SetState(addr, key, value)
-		}
-	}
-	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
 		Number:     new(big.Int).SetUint64(g.Number),
 		Nonce:      types.EncodeNonce(g.Nonce),
@@ -300,8 +290,24 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		Difficulty: g.Difficulty,
 		MixDigest:  g.Mixhash,
 		Coinbase:   g.Coinbase,
-		Root:       root,
 	}
+
+	// Configure any stateful precompiles that should be enabled in the genesis.
+	g.Config.CheckConfigurePrecompiles(nil, types.NewBlockWithHeader(head), statedb)
+
+	// Do custom allocation after airdrop in case an address shows up in standard
+	// allocation
+	for addr, account := range g.Alloc {
+		statedb.SetBalance(addr, account.Balance)
+		statedb.SetCode(addr, account.Code)
+		statedb.SetNonce(addr, account.Nonce)
+		for key, value := range account.Storage {
+			statedb.SetState(addr, key, value)
+		}
+	}
+	root := statedb.IntermediateRoot(false)
+	head.Root = root
+
 	if g.GasLimit == 0 {
 		head.GasLimit = params.GenesisGasLimit
 	}
@@ -312,7 +318,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
-			head.BaseFee = g.Config.GetFeeConfig().MinBaseFee
+			head.BaseFee = g.Config.FeeConfig.MinBaseFee
 		}
 	}
 	statedb.Commit(false)

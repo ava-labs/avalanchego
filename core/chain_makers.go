@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -262,14 +263,6 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		time = parent.Time() + gap
 	}
 
-	timestamp := new(big.Int).SetUint64(time)
-	var gasLimit uint64
-	if config.IsSubnetEVM(timestamp) {
-		gasLimit = config.GetFeeConfig().GasLimit.Uint64()
-	} else {
-		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
-	}
-
 	header := &types.Header{
 		Root:       state.IntermediateRoot(chain.Config().IsEIP158(parent.Number())),
 		ParentHash: parent.Hash(),
@@ -280,16 +273,24 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 			Difficulty: parent.Difficulty(),
 			UncleHash:  parent.UncleHash(),
 		}),
-		GasLimit: gasLimit,
-		Number:   new(big.Int).Add(parent.Number(), common.Big1),
-		Time:     time,
+		Number: new(big.Int).Add(parent.Number(), common.Big1),
+		Time:   time,
 	}
+
+	timestamp := new(big.Int).SetUint64(time)
 	if chain.Config().IsSubnetEVM(timestamp) {
-		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(chain.Config(), parent.Header(), time)
+		feeConfig, _, err := chain.GetFeeConfigAt(parent.Header())
 		if err != nil {
 			panic(err)
 		}
+
+		header.GasLimit = feeConfig.GasLimit.Uint64()
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(chain.Config(), feeConfig, parent.Header(), time)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		header.GasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
 	}
 	return header
 }
@@ -308,3 +309,6 @@ func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header       
 func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
+func (cr *fakeChainReader) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error) {
+	return cr.config.FeeConfig, nil, nil
+}

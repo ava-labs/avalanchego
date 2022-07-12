@@ -23,7 +23,7 @@ func (c *ContractDeployerAllowListConfig) Address() common.Address {
 }
 
 // Configure configures [state] with the desired admins based on [c].
-func (c *ContractDeployerAllowListConfig) Configure(state StateDB) {
+func (c *ContractDeployerAllowListConfig) Configure(_ ChainConfig, state StateDB, _ BlockContext) {
 	c.AllowListConfig.Configure(state, ContractDeployerAllowListAddress)
 }
 

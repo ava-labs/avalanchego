@@ -407,7 +407,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 
 	if config.IsSubnetEVM(new(big.Int).SetUint64(header.Time)) {
-		header.Extra, header.BaseFee, _ = dummy.CalcBaseFee(config, parent.Header(), header.Time)
+		header.Extra, header.BaseFee, _ = dummy.CalcBaseFee(config, config.FeeConfig, parent.Header(), header.Time)
 		header.BlockGasCost = big.NewInt(0)
 	}
 	var receipts []*types.Receipt
