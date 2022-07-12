@@ -253,6 +253,17 @@ func TestEngineQuery(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
+	chitted := new(bool)
+	sender.SendChitsF = func(inVdr ids.NodeID, _ uint32, prefs []ids.ID) {
+		if *chitted {
+			t.Fatalf("Sent multiple chits")
+		}
+		*chitted = true
+		if len(prefs) != 2 {
+			t.Fatalf("Wrong chits preferences")
+		}
+	}
+
 	asked := new(bool)
 	sender.SendGetF = func(inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
 		if *asked {
@@ -295,17 +306,6 @@ func TestEngineQuery(t *testing.T) {
 		}
 		if vtx0.ID() != vtxID {
 			t.Fatalf("Asking for wrong vertex")
-		}
-	}
-
-	chitted := new(bool)
-	sender.SendChitsF = func(inVdr ids.NodeID, _ uint32, prefs []ids.ID) {
-		if *chitted {
-			t.Fatalf("Sent multiple chits")
-		}
-		*chitted = true
-		if len(prefs) != 1 || prefs[0] != vtx0.ID() {
-			t.Fatalf("Wrong chits preferences")
 		}
 	}
 
@@ -1959,17 +1959,17 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		t.Fatalf("Unknown vertex")
 		panic("Should have errored")
 	}
+	sender.CantSendChits = false
 
 	if err := te.PushQuery(vdr, 0, blockingVtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(te.vtxBlocked) != 3 {
-		t.Fatalf("Both inserts and the query should be blocking")
+	if len(te.vtxBlocked) != 2 {
+		t.Fatalf("Both inserts should be blocking")
 	}
 
 	sender.CantSendPushQuery = false
-	sender.CantSendChits = false
 
 	missingVtx.StatusV = choices.Processing
 	if err := te.issue(missingVtx); err != nil {
@@ -2392,6 +2392,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	sender.SendGetF = func(vID ids.NodeID, reqID uint32, vtxID ids.ID) {
 		*requestID = reqID
 	}
+	sender.CantSendChits = false
 	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
 		if bytes.Equal(b, vtxBytes1) {
 			return vtx1, nil
@@ -2413,7 +2414,6 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 	sender.SendGetF = nil
 	manager.ParseVtxF = nil
-	sender.CantSendChits = false
 
 	if err := te.GetFailed(vdr, *requestID); err != nil {
 		t.Fatal(err)
@@ -2678,7 +2678,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 			t.Fatalf("Sent to the wrong validator")
 		}
 
-		expected := []ids.ID{vtxID1}
+		expected := []ids.ID{vtxID0}
 
 		if !ids.Equals(expected, chits) {
 			t.Fatalf("Returned wrong chits")
@@ -4444,6 +4444,7 @@ func TestAbandonTx(t *testing.T) {
 
 	// Cause the engine to send a Get request for vtx1, vtx0, and some other vtx that doesn't exist
 	sender.CantSendGet = false
+	sender.CantSendChits = false
 	err = te.PullQuery(vdr, 0, vtx1.ID())
 	assert.NoError(err)
 	err = te.PullQuery(vdr, 0, vtx0.ID())
@@ -4477,7 +4478,6 @@ func TestAbandonTx(t *testing.T) {
 		assert.FailNow("should have asked to parse vtx0")
 		return nil, errors.New("should have asked to parse vtx0")
 	}
-	sender.CantSendChits = false // Engine will respond to the PullQuerys since the vertices were abandoned
 	err = te.Put(vdr, 0, vtx0.Bytes())
 	assert.NoError(err)
 
