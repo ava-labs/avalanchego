@@ -27,15 +27,14 @@ type Diff interface {
 }
 
 type diff struct {
+	Stakers
+
 	parentID      ids.ID
 	stateVersions Versions
 
 	timestamp time.Time
 
 	currentSupply uint64
-
-	currentValidatorDiffs diffValidators
-	pendingValidatorDiffs diffValidators
 
 	addedSubnets  []*txs.Tx
 	cachedSubnets []*txs.Tx
@@ -67,6 +66,29 @@ func NewDiff(
 		return nil, errMissingParentState
 	}
 	return &diff{
+		Stakers: NewStakers(
+			parentState.CurrentStakers(),
+			parentState.PendingStakers(),
+		),
+		parentID:      parentID,
+		stateVersions: stateVersions,
+		timestamp:     parentState.GetTimestamp(),
+		currentSupply: parentState.GetCurrentSupply(),
+	}, nil
+}
+
+func NewDiffWithValidators(
+	parentID ids.ID,
+	stateVersions Versions,
+	current CurrentStakers,
+	pending PendingStakers,
+) (Diff, error) {
+	parentState, ok := stateVersions.GetState(parentID)
+	if !ok {
+		return nil, errMissingParentState
+	}
+	return &diff{
+		Stakers:       NewStakers(current, pending),
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
@@ -88,124 +110,6 @@ func (d *diff) GetCurrentSupply() uint64 {
 
 func (d *diff) SetCurrentSupply(currentSupply uint64) {
 	d.currentSupply = currentSupply
-}
-
-func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	newValidator, ok := d.currentValidatorDiffs.GetValidator(subnetID, nodeID)
-	if ok {
-		if newValidator == nil {
-			return nil, database.ErrNotFound
-		}
-		return newValidator, nil
-	}
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, errMissingParentState
-	}
-	return parentState.GetCurrentValidator(subnetID, nodeID)
-}
-
-func (d *diff) PutCurrentValidator(staker *Staker) {
-	d.currentValidatorDiffs.PutValidator(staker)
-}
-
-func (d *diff) DeleteCurrentValidator(staker *Staker) {
-	d.currentValidatorDiffs.PutValidator(staker)
-}
-
-func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, errMissingParentState
-	}
-
-	parentIterator, err := parentState.GetCurrentDelegatorIterator(subnetID, nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	return d.currentValidatorDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
-}
-
-func (d *diff) PutCurrentDelegator(staker *Staker) {
-	d.currentValidatorDiffs.PutDelegator(staker)
-}
-
-func (d *diff) DeleteCurrentDelegator(staker *Staker) {
-	d.currentValidatorDiffs.DeleteDelegator(staker)
-}
-
-func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, errMissingParentState
-	}
-
-	parentIterator, err := parentState.GetCurrentStakerIterator()
-	if err != nil {
-		return nil, err
-	}
-
-	return d.currentValidatorDiffs.GetStakerIterator(parentIterator), nil
-}
-
-func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	newValidator, ok := d.pendingValidatorDiffs.GetValidator(subnetID, nodeID)
-	if ok {
-		if newValidator == nil {
-			return nil, database.ErrNotFound
-		}
-		return newValidator, nil
-	}
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, errMissingParentState
-	}
-	return parentState.GetPendingValidator(subnetID, nodeID)
-}
-
-func (d *diff) PutPendingValidator(staker *Staker) {
-	d.pendingValidatorDiffs.PutValidator(staker)
-}
-
-func (d *diff) DeletePendingValidator(staker *Staker) {
-	d.pendingValidatorDiffs.PutValidator(staker)
-}
-
-func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, errMissingParentState
-	}
-
-	parentIterator, err := parentState.GetPendingDelegatorIterator(subnetID, nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	return d.pendingValidatorDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
-}
-
-func (d *diff) PutPendingDelegator(staker *Staker) {
-	d.pendingValidatorDiffs.PutDelegator(staker)
-}
-
-func (d *diff) DeletePendingDelegator(staker *Staker) {
-	d.pendingValidatorDiffs.DeleteDelegator(staker)
-}
-
-func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, errMissingParentState
-	}
-
-	parentIterator, err := parentState.GetPendingStakerIterator()
-	if err != nil {
-		return nil, err
-	}
-
-	return d.pendingValidatorDiffs.GetStakerIterator(parentIterator), nil
 }
 
 func (d *diff) GetSubnets() ([]*txs.Tx, error) {
@@ -395,48 +299,6 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState State) {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetCurrentSupply(d.currentSupply)
-	for _, subnetValidatorDiffs := range d.currentValidatorDiffs.validatorDiffs {
-		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorModified {
-				if validatorDiff.validatorDeleted {
-					baseState.DeleteCurrentValidator(validatorDiff.validator)
-				} else {
-					baseState.PutCurrentValidator(validatorDiff.validator)
-				}
-			}
-
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutCurrentDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeleteCurrentDelegator(delegator)
-			}
-		}
-	}
-	for _, subnetValidatorDiffs := range d.pendingValidatorDiffs.validatorDiffs {
-		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorModified {
-				if validatorDiff.validatorDeleted {
-					baseState.DeletePendingValidator(validatorDiff.validator)
-				} else {
-					baseState.PutPendingValidator(validatorDiff.validator)
-				}
-			}
-
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutPendingDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeletePendingDelegator(delegator)
-			}
-		}
-	}
 	for _, subnet := range d.addedSubnets {
 		baseState.AddSubnet(subnet)
 	}
@@ -460,4 +322,6 @@ func (d *diff) Apply(baseState State) {
 			baseState.DeleteUTXO(utxo.utxoID)
 		}
 	}
+	d.CurrentStakers().Apply(baseState)
+	d.PendingStakers().Apply(baseState)
 }
