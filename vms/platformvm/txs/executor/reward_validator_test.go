@@ -249,7 +249,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	assert.NoError(err)
@@ -263,7 +263,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
 	)
 	assert.NoError(err)
@@ -359,7 +359,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	assert.NoError(err)
@@ -372,7 +372,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{prefundedKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	assert.NoError(err)

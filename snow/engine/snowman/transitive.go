@@ -130,33 +130,24 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 }
 
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	// Will send chits once we've issued block [blkID] into consensus
-	c := &convincer{
-		consensus: t.Consensus,
-		sender:    t.Sender,
-		vdr:       nodeID,
-		requestID: requestID,
-		errs:      &t.errs,
-	}
+	// TODO: once everyone supports ChitsV2 - we should be sending that message
+	// type here.
+	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
-	added, err := t.issueFromByID(nodeID, blkID)
-	if err != nil {
+	if _, err := t.issueFromByID(nodeID, blkID); err != nil {
 		return err
 	}
 
-	// Wait until we've issued block [blkID] before sending chits.
-	if !added {
-		c.deps.Add(blkID)
-	}
-
-	t.blocked.Register(c)
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
-func (t *Transitive) PushQuery(vdr ids.NodeID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	// TODO: once everyone supports ChitsV2 - we should be sending that message
+	// type here.
+	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
@@ -170,16 +161,15 @@ func (t *Transitive) PushQuery(vdr ids.NodeID, requestID uint32, blkBytes []byte
 	}
 
 	// issue the block into consensus. If the block has already been issued,
-	// this will be a noop. If this block has missing dependencies, vdr will
+	// this will be a noop. If this block has missing dependencies, nodeID will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(vdr, blk); err != nil {
+	if _, err := t.issueFrom(nodeID, blk); err != nil {
 		return err
 	}
 
-	// register the chit request
-	return t.PullQuery(vdr, requestID, blk.ID())
+	return t.buildBlocks()
 }
 
 func (t *Transitive) Chits(vdr ids.NodeID, requestID uint32, votes []ids.ID) error {

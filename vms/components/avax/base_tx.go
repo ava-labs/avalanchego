@@ -17,8 +17,9 @@ const MaxMemoSize = 256
 
 var (
 	ErrWrongNetworkID = errors.New("tx has wrong network ID")
-	errNilTx          = errors.New("nil tx is not valid")
-	errWrongChainID   = errors.New("tx has wrong chain ID")
+
+	errNilTx        = errors.New("nil tx is not valid")
+	errWrongChainID = errors.New("tx has wrong chain ID")
 )
 
 // BaseTx is the basis of all standard transactions.
