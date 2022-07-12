@@ -136,34 +136,22 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 }
 
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	// Will send chits to [nodeID] once we have [vtxID] and its dependencies
-	c := &convincer{
-		consensus: t.Consensus,
-		sender:    t.Sender,
-		vdr:       nodeID,
-		requestID: requestID,
-		errs:      &t.errs,
-	}
+	// Immediately respond to the query with the current consensus preferences.
+	t.Sender.SendChits(nodeID, requestID, t.Consensus.Preferences().List())
 
-	// If we have [vtxID], put it into consensus if we haven't already.
-	// If not, fetch it.
-	inConsensus, err := t.issueFromByID(nodeID, vtxID)
-	if err != nil {
+	// If we have [vtxID], attempt to put it into consensus, if we haven't
+	// already. If we don't not have [vtxID], fetch it from [nodeID].
+	if _, err := t.issueFromByID(nodeID, vtxID); err != nil {
 		return err
 	}
 
-	// [vtxID] isn't in consensus yet because we don't have it or a dependency.
-	if !inConsensus {
-		c.deps.Add(vtxID) // Don't send chits until [vtxID] is in consensus.
-	}
-
-	// Wait until [vtxID] and its dependencies have been added to consensus before sending chits
-	t.vtxBlocked.Register(c)
-	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
 func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	// Immediately respond to the query with the current consensus preferences.
+	t.Sender.SendChits(nodeID, requestID, t.Consensus.Preferences().List())
+
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex due to: %s", err)
@@ -179,7 +167,7 @@ func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, vtxBytes []b
 		return err
 	}
 
-	return t.PullQuery(nodeID, requestID, vtx.ID())
+	return t.attemptToIssueTxs()
 }
 
 func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
