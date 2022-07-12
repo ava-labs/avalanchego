@@ -45,11 +45,6 @@ else
     exit 1
 fi
 
-# Check if SUBNET_EVM_COMMIT is set, if not retrieve the last commit from the repo.
-# This is used in the Dockerfile to allow a commit hash to be passed in without
-# including the .git/ directory within the Docker image.
-subnet_evm_commit=${SUBNET_EVM_COMMIT:-$( git rev-list -1 HEAD )}
-
 # Build Subnet EVM, which is run as a subprocess
-echo "Building Subnet EVM Version: $subnet_evm_version; GitCommit: $subnet_evm_commit at $binary_path"
+echo "Building Subnet EVM Version: $subnet_evm_version at $binary_path"
 go build -ldflags "-X github.com/ava-labs/subnet-evm/plugin/evm.GitCommit=$subnet_evm_commit -X github.com/ava-labs/subnet-evm/plugin/evm.Version=$subnet_evm_version $static_ld_flags" -o "$binary_path" "plugin/"*.go
