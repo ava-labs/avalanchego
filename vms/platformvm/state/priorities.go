@@ -15,11 +15,11 @@ const (
 )
 
 const (
-	// First primary network validators are moved from the pending to the
+	// First primary network delegators are moved from the pending to the
 	// current validator set,
-	PrimaryNetworkValidatorPendingPriority = iota
-	// then primary network delegators,
-	PrimaryNetworkDelegatorPendingPriority
+	PrimaryNetworkDelegatorPendingPriority = iota
+	// then primary network validators,
+	PrimaryNetworkValidatorPendingPriority
 	// then subnet validators,
 	SubnetValidatorPendingPriority
 	// then subnet delegators.
