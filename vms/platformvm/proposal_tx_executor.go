@@ -930,6 +930,8 @@ func CanDelegate(
 	return newMaxWeight <= weightLimit, nil
 }
 
+// GetMaxWeight assumes that:
+// [validator.StartTime] <= [startTime] < [endTime] <= [validator.EndTime]
 func GetMaxWeight(
 	chainState state.Chain,
 	validator *state.Staker,

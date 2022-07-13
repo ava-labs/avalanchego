@@ -62,6 +62,11 @@ import (
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 )
 
+const (
+	testNetworkID = 10 // To be used in tests
+	defaultWeight = 10000
+)
+
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -108,16 +113,6 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory crypto.FactorySECP256K1R
-)
-
-var (
-	errShouldPrefCommit = errors.New("should prefer to commit proposal")
-	errShouldPrefAbort  = errors.New("should prefer to abort proposal")
-)
-
-const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
 )
 
 type snLookup struct {
@@ -2313,54 +2308,32 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+
 	tests := []struct {
-		description    string
-		startTime      time.Time
-		endTime        time.Time
-		validatorID    ids.NodeID
-		expectedAmount uint64
+		description string
+		startTime   time.Time
+		endTime     time.Time
 	}{
 		{
-			description:    "startTime after validation period ends",
-			startTime:      defaultValidateEndTime.Add(time.Minute),
-			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: 0,
+			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
+			startTime:   defaultValidateStartTime,
+			endTime:     defaultValidateEndTime,
 		},
 		{
-			description:    "startTime when validation period ends",
-			startTime:      defaultValidateEndTime,
-			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
+			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
+			startTime:   defaultValidateStartTime.Add(time.Minute),
+			endTime:     defaultValidateEndTime,
 		},
 		{
-			description:    "startTime before validation period ends",
-			startTime:      defaultValidateEndTime.Add(-time.Minute),
-			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
+			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
+			startTime:   defaultValidateStartTime,
+			endTime:     defaultValidateEndTime.Add(-time.Minute),
 		},
 		{
-			description:    "endTime after validation period ends",
-			startTime:      defaultValidateStartTime,
-			endTime:        defaultValidateEndTime.Add(time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
-		},
-		{
-			description:    "endTime when validation period ends",
-			startTime:      defaultValidateStartTime,
-			endTime:        defaultValidateEndTime,
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
-		},
-		{
-			description:    "endTime before validation period ends",
-			startTime:      defaultValidateStartTime,
-			endTime:        defaultValidateEndTime.Add(-time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
+			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
+			startTime:   defaultValidateStartTime.Add(time.Minute),
+			endTime:     defaultValidateEndTime.Add(-time.Minute),
 		},
 	}
 
@@ -2368,12 +2341,12 @@ func TestMaxStakeAmount(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			staker, err := GetValidator(vm.internalState, constants.PrimaryNetworkID, test.validatorID)
+			staker, err := GetValidator(vm.internalState, constants.PrimaryNetworkID, nodeID)
 			assert.NoError(err)
 
 			amount, err := GetMaxWeight(vm.internalState, staker, test.startTime, test.endTime)
 			assert.NoError(err)
-			assert.Equal(test.expectedAmount, amount)
+			assert.EqualValues(defaultWeight, amount)
 		})
 	}
 }
