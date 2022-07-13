@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -296,7 +297,12 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		vm.internalState.AddCurrentStaker(tx, 0)
+		staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
+		staker.PotentialReward = 0
+		staker.NextTime = staker.EndTime
+		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+		vm.internalState.PutCurrentValidator(staker)
 		vm.internalState.AddTx(tx, status.Committed)
 		if err := vm.internalState.Commit(); err != nil {
 			t.Fatal(err)
