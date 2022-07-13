@@ -1,6 +1,7 @@
-![Github Actions](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)
 
 # Subnet EVM
+
+![Github Actions](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)
 
 [Avalanche](https://docs.avax.network/overview/getting-started/avalanche-platform) is a network composed of multiple blockchains.
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
@@ -22,8 +23,9 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 [v0.2.0] AvalancheGo@v1.7.7-v1.7.9
 [v0.2.1] AvalancheGo@v1.7.10
 [v0.2.2] AvalancheGo@v1.7.11-v1.7.12
-[v0.2.3] AvalancheGo@v1.7.13
-[v0.2.4] AvalancheGo@v1.7.13
+[v0.2.3] AvalancheGo@v1.7.13-v1.7.14
+[v0.2.4] AvalancheGo@v1.7.13-v1.7.14
+[v0.2.5] AvalancheGo@v1.7.13-v1.7.14
 ```
 
 ## API
