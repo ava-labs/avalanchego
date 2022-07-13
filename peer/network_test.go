@@ -24,7 +24,11 @@ import (
 )
 
 var (
-	defaultPeerVersion = version.NewDefaultApplication("subnetevmtest", 1, 0, 0)
+	defaultPeerVersion = &version.Application{
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
+	}
 
 	_ message.Request = &HelloRequest{}
 	_                 = &HelloResponse{}
@@ -43,7 +47,7 @@ var (
 func TestNetworkDoesNotConnectToItself(t *testing.T) {
 	selfNodeID := ids.GenerateTestNodeID()
 	n := NewNetwork(nil, nil, selfNodeID, 1)
-	assert.NoError(t, n.Connected(selfNodeID, version.NewDefaultApplication("avalanchego", 1, 0, 0)))
+	assert.NoError(t, n.Connected(selfNodeID, defaultPeerVersion))
 	assert.EqualValues(t, 0, n.Size())
 }
 
@@ -242,15 +246,27 @@ func TestRequestMinVersion(t *testing.T) {
 	requestMessage := TestMessage{Message: "this is a request"}
 	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 	assert.NoError(t, err)
-	assert.NoError(t, net.Connected(nodeID, version.NewDefaultApplication("subnetevmtest", 1, 7, 1)))
+	assert.NoError(t, net.Connected(nodeID, &version.Application{
+		Major: 1,
+		Minor: 7,
+		Patch: 1,
+	}))
 
 	// ensure version does not match
-	responseBytes, err := client.RequestAny(version.NewDefaultApplication("subnetevmtest", 2, 0, 0), requestBytes)
-	assert.Equal(t, err.Error(), "no peers found matching version subnetevmtest/2.0.0 out of 1 peers")
+	responseBytes, err := client.RequestAny(&version.Application{
+		Major: 2,
+		Minor: 0,
+		Patch: 0,
+	}, requestBytes)
+	assert.Equal(t, err.Error(), "no peers found matching version avalanche/2.0.0 out of 1 peers")
 	assert.Nil(t, responseBytes)
 
 	// ensure version matches and the request goes through
-	responseBytes, err = client.RequestAny(version.NewDefaultApplication("subnetevmtest", 1, 0, 0), requestBytes)
+	responseBytes, err = client.RequestAny(&version.Application{
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
+	}, requestBytes)
 	assert.NoError(t, err)
 
 	var response TestMessage

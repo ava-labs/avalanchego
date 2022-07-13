@@ -41,7 +41,7 @@ type Network interface {
 	// random order.
 	// A peer is considered a match if its version is greater than or equal to the specified minVersion
 	// Returns an error if the request could not be sent to a peer with the desired [minVersion].
-	RequestAny(minVersion version.Application, message []byte, handler message.ResponseHandler) error
+	RequestAny(minVersion *version.Application, message []byte, handler message.ResponseHandler) error
 
 	// Request sends message to given nodeID, notifying handler when there's a response or timeout
 	Request(nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
@@ -67,17 +67,17 @@ type Network interface {
 // network is an implementation of Network that processes message requests for
 // each peer in linear fashion
 type network struct {
-	lock                          sync.RWMutex                       // lock for mutating state of this Network struct
-	self                          ids.NodeID                         // NodeID of this node
-	requestIDGen                  uint32                             // requestID counter used to track outbound requests
-	outstandingResponseHandlerMap map[uint32]message.ResponseHandler // maps avalanchego requestID => response handler
-	activeRequests                *semaphore.Weighted                // controls maximum number of active outbound requests
-	appSender                     common.AppSender                   // avalanchego AppSender for sending messages
-	codec                         codec.Manager                      // Codec used for parsing messages
-	requestHandler                message.RequestHandler             // maps request type => handler
-	gossipHandler                 message.GossipHandler              // maps gossip type => handler
-	peers                         map[ids.NodeID]version.Application // maps nodeID => version.Version
-	stats                         stats.RequestHandlerStats          // Provide request handler metrics
+	lock                          sync.RWMutex                        // lock for mutating state of this Network struct
+	self                          ids.NodeID                          // NodeID of this node
+	requestIDGen                  uint32                              // requestID counter used to track outbound requests
+	outstandingResponseHandlerMap map[uint32]message.ResponseHandler  // maps avalanchego requestID => response handler
+	activeRequests                *semaphore.Weighted                 // controls maximum number of active outbound requests
+	appSender                     common.AppSender                    // avalanchego AppSender for sending messages
+	codec                         codec.Manager                       // Codec used for parsing messages
+	requestHandler                message.RequestHandler              // maps request type => handler
+	gossipHandler                 message.GossipHandler               // maps gossip type => handler
+	peers                         map[ids.NodeID]*version.Application // maps nodeID => version.Version
+	stats                         stats.RequestHandlerStats           // Provide request handler metrics
 }
 
 func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID, maxActiveRequests int64) Network {
@@ -86,7 +86,7 @@ func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID
 		codec:                         codec,
 		self:                          self,
 		outstandingResponseHandlerMap: make(map[uint32]message.ResponseHandler),
-		peers:                         make(map[ids.NodeID]version.Application),
+		peers:                         make(map[ids.NodeID]*version.Application),
 		activeRequests:                semaphore.NewWeighted(maxActiveRequests),
 		gossipHandler:                 message.NoopMempoolGossipHandler{},
 		stats:                         stats.NewRequestHandlerStats(),
@@ -98,7 +98,7 @@ func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID
 // If minVersion is nil, then the request will be sent to any peer regardless of their version
 // Returns a non-nil error if we were not able to send a request to a peer with >= [minVersion]
 // or we fail to send a request to the selected peer.
-func (n *network) RequestAny(minVersion version.Application, request []byte, handler message.ResponseHandler) error {
+func (n *network) RequestAny(minVersion *version.Application, request []byte, handler message.ResponseHandler) error {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
 	if err := n.activeRequests.Acquire(context.Background(), 1); err != nil {
 		return errAcquiringSemaphore
@@ -293,7 +293,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, gossipBytes []byte) error {
 }
 
 // Connected adds the given nodeID to the peer list so that it can receive messages
-func (n *network) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (n *network) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	log.Debug("adding new peer", "nodeID", nodeID)
 
 	n.lock.Lock()
@@ -344,7 +344,7 @@ func (n *network) Shutdown() {
 	defer n.lock.Unlock()
 
 	// reset peers map
-	n.peers = make(map[ids.NodeID]version.Application)
+	n.peers = make(map[ids.NodeID]*version.Application)
 }
 
 func (n *network) SetGossipHandler(handler message.GossipHandler) {

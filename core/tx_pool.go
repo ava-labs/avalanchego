@@ -683,7 +683,8 @@ func (pool *TxPool) checkTxState(from common.Address, tx *types.Transaction) err
 	}
 
 	// If the tx allow list is enabled, return an error if the from address is not allow listed.
-	if pool.chainconfig.IsTxAllowList(pool.currentHead.Number) {
+	headTimestamp := big.NewInt(int64(pool.currentHead.Time))
+	if pool.chainconfig.IsTxAllowList(headTimestamp) {
 		txAllowListRole := precompile.GetTxAllowListStatus(pool.currentState, from)
 		if !txAllowListRole.IsEnabled() {
 			return fmt.Errorf("%w: %s", precompile.ErrSenderAddressNotAllowListed, from)

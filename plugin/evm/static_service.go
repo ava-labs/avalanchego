@@ -59,7 +59,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	if err != nil {
 		return err
 	}
-	bytesStr, err := formatting.EncodeWithChecksum(args.Encoding, bytes)
+	bytesStr, err := formatting.Encode(args.Encoding, bytes)
 	if err != nil {
 		return err
 	}

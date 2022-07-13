@@ -26,38 +26,34 @@ func NewAdminService(vm *VM, performanceDir string) *Admin {
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (p *Admin) StartCPUProfiler(r *http.Request, args *struct{}, reply *api.SuccessResponse) error {
+func (p *Admin) StartCPUProfiler(r *http.Request, args *struct{}, reply *api.EmptyReply) error {
 	log.Info("Admin: StartCPUProfiler called")
 
 	err := p.profiler.StartCPUProfiler()
-	reply.Success = err == nil
 	return err
 }
 
 // StopCPUProfiler stops the cpu profile
-func (p *Admin) StopCPUProfiler(r *http.Request, args *struct{}, reply *api.SuccessResponse) error {
+func (p *Admin) StopCPUProfiler(r *http.Request, args *struct{}, reply *api.EmptyReply) error {
 	log.Info("Admin: StopCPUProfiler called")
 
 	err := p.profiler.StopCPUProfiler()
-	reply.Success = err == nil
 	return err
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (p *Admin) MemoryProfile(r *http.Request, args *struct{}, reply *api.SuccessResponse) error {
+func (p *Admin) MemoryProfile(r *http.Request, args *struct{}, reply *api.EmptyReply) error {
 	log.Info("Admin: MemoryProfile called")
 
 	err := p.profiler.MemoryProfile()
-	reply.Success = err == nil
 	return err
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (p *Admin) LockProfile(r *http.Request, args *struct{}, reply *api.SuccessResponse) error {
+func (p *Admin) LockProfile(r *http.Request, args *struct{}, reply *api.EmptyReply) error {
 	log.Info("Admin: LockProfile called")
 
 	err := p.profiler.LockProfile()
-	reply.Success = err == nil
 	return err
 }
 
@@ -65,14 +61,13 @@ type SetLogLevelArgs struct {
 	Level string `json:"level"`
 }
 
-func (p *Admin) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.SuccessResponse) error {
+func (p *Admin) SetLogLevel(r *http.Request, args *SetLogLevelArgs, reply *api.EmptyReply) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
 	logLevel, err := log.LvlFromString(args.Level)
 	if err != nil {
 		return fmt.Errorf("failed to parse log level: %w ", err)
 	}
 	p.vm.setLogLevel(logLevel)
-	reply.Success = true
 	return nil
 }
 

@@ -145,13 +145,21 @@ func setupGenesis(t *testing.T,
 	genesisBytes := buildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
-	baseDBManager := manager.NewMemDB(version.NewDefaultVersion(1, 4, 5))
+	baseDBManager := manager.NewMemDB(&version.Semantic{
+		Major: 1,
+		Minor: 4,
+		Patch: 5,
+	})
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
+	userKeystore := keystore.New(logging.NoLog{}, manager.NewMemDB(&version.Semantic{
+		Major: 1,
+		Minor: 4,
+		Patch: 5,
+	}))
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
