@@ -2366,14 +2366,14 @@ func TestMaxStakeAmount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			amount, err := vm.internalState.MaxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if amount != test.expectedAmount {
-				t.Fatalf("wrong max stake amount. Expected %d ; Returned %d",
-					test.expectedAmount, amount)
-			}
+			assert := assert.New(t)
+
+			staker, err := GetValidator(vm.internalState, constants.PrimaryNetworkID, test.validatorID)
+			assert.NoError(err)
+
+			amount, err := getMaxWeight(vm.internalState, staker, test.startTime, test.endTime)
+			assert.NoError(err)
+			assert.Equal(test.expectedAmount, amount)
 		})
 	}
 }
@@ -2533,13 +2533,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	// Verify that the new validator now in pending validator set
-	{
-		onAccept := addValidatorProposalCommit.onAcceptState
-		pendingStakers := onAccept.PendingStakers()
-
-		_, _, err := pendingStakers.GetValidatorTx(nodeID)
-		assert.NoError(err)
-	}
+	_, err = addValidatorProposalCommit.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.NoError(err)
 
 	// Create the UTXO that will be added to shared memory
 	utxo := &avax.UTXO{
@@ -2689,18 +2684,14 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm.internalState = is
 
 	// Verify that new validator is now in the current validator set.
-	{
-		currentStakers := vm.internalState.CurrentStakers()
-		_, err = currentStakers.GetValidator(nodeID)
-		assert.NoError(err)
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	assert.NoError(err)
 
-		pendingStakers := vm.internalState.PendingStakers()
-		_, _, err := pendingStakers.GetValidatorTx(nodeID)
-		assert.ErrorIs(err, database.ErrNotFound)
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.internalState.GetTimestamp()
-		assert.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
-	}
+	currentTimestamp := vm.internalState.GetTimestamp()
+	assert.Equal(newValidatorStartTime, currentTimestamp)
 }
 
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
@@ -2760,13 +2751,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	// Verify that first new validator now in pending validator set
-	{
-		onAccept := addValidatorProposalCommit0.onAcceptState
-		pendingStakers := onAccept.PendingStakers()
-
-		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
-		assert.NoError(err)
-	}
+	_, err = addValidatorProposalCommit0.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+	assert.NoError(err)
 
 	// Create the tx that moves the first new validator from the pending
 	// validator set into the current validator set.
@@ -2799,19 +2785,14 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	// Verify that the first new validator is now in the current validator set.
-	{
-		onAccept := advanceTimeProposalCommit0.onAcceptState
-		currentStakers := onAccept.CurrentStakers()
-		_, err = currentStakers.GetValidator(nodeID0)
-		assert.NoError(err)
+	_, err = advanceTimeProposalCommit0.onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+	assert.NoError(err)
 
-		pendingStakers := onAccept.PendingStakers()
-		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
-		assert.ErrorIs(err, database.ErrNotFound)
+	_, err = advanceTimeProposalCommit0.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+	assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := onAccept.GetTimestamp()
-		assert.Equal(newValidatorStartTime0.Unix(), currentTimestamp.Unix())
-	}
+	currentTimestamp := advanceTimeProposalCommit0.onAcceptState.GetTimestamp()
+	assert.Equal(newValidatorStartTime0.Unix(), currentTimestamp.Unix())
 
 	// Create the UTXO that will be added to shared memory
 	utxo := &avax.UTXO{
@@ -2944,13 +2925,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	// Verify that the second new validator now in pending validator set
-	{
-		onAccept := addValidatorProposalCommit1.onAcceptState
-		pendingStakers := onAccept.PendingStakers()
-
-		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
-		assert.NoError(err)
-	}
+	_, err = addValidatorProposalCommit1.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+	assert.NoError(err)
 
 	// Create the tx that moves the second new validator from the pending
 	// validator set into the current validator set.
@@ -2983,19 +2959,14 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	// Verify that the second new validator is now in the current validator set.
-	{
-		onAccept := advanceTimeProposalCommit1.onAcceptState
-		currentStakers := onAccept.CurrentStakers()
-		_, err := currentStakers.GetValidator(nodeID1)
-		assert.NoError(err)
+	_, err = advanceTimeProposalCommit1.onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+	assert.NoError(err)
 
-		pendingStakers := onAccept.PendingStakers()
-		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
-		assert.ErrorIs(err, database.ErrNotFound)
+	_, err = advanceTimeProposalCommit1.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+	assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := onAccept.GetTimestamp()
-		assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
-	}
+	currentTimestamp = advanceTimeProposalCommit1.onAcceptState.GetTimestamp()
+	assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
 
 	// Accept all the blocks
 	allBlocks := []smcon.Block{
@@ -3029,25 +3000,20 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
-	{
-		currentStakers := vm.internalState.CurrentStakers()
-		node0, err := currentStakers.GetValidator(nodeID0)
-		assert.NoError(err)
-		potentialReward := node0.PotentialReward()
-		assert.Equal(uint64(60000000), potentialReward)
+	staker0, err := vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+	assert.NoError(err)
+	assert.EqualValues(60000000, staker0.PotentialReward)
 
-		node1, err := currentStakers.GetValidator(nodeID1)
-		assert.NoError(err)
-		potentialReward = node1.PotentialReward()
-		assert.EqualValues(uint64(59999999), potentialReward)
+	staker1, err := vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+	assert.NoError(err)
+	assert.EqualValues(59999999, staker1.PotentialReward)
 
-		pendingStakers := vm.internalState.PendingStakers()
-		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
-		assert.ErrorIs(err, database.ErrNotFound)
-		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
-		assert.ErrorIs(err, database.ErrNotFound)
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+	assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.internalState.GetTimestamp()
-		assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
-	}
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	currentTimestamp = vm.internalState.GetTimestamp()
+	assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
 }
