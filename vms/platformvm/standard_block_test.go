@@ -87,10 +87,8 @@ func TestAtomicTxImports(t *testing.T) {
 	b, err := vm.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work
-	err = b.Verify()
-	assert.NoError(err)
-	err = b.Accept()
-	assert.NoError(err)
+	assert.NoError(b.Verify())
+	assert.NoError(b.Accept())
 	_, txStatus, err := vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state

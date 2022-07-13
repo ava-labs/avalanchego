@@ -35,12 +35,10 @@ func getValidTx(vm *VM, t *testing.T) *txs.Tx {
 // show that a tx learned from gossip is validated and added to mempool
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, sender, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -88,12 +86,10 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 // show that txs already marked as invalid are not re-requested on gossiping
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -119,12 +115,10 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 // show that locally generated txs are gossiped
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, sender, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 

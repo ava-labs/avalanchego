@@ -35,8 +35,7 @@ func TestUnsignedRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -137,8 +136,7 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -241,8 +239,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -310,8 +307,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		stateVersions: vm.stateVersions,
 		tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	assert.NoError(err)
+	assert.NoError(tx.Unsigned.Visit(&executor))
 
 	vdrDestSet := ids.ShortSet{}
 	vdrDestSet.Add(vdrRewardAddress)
@@ -326,8 +322,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	executor.onCommit.Apply(vm.internalState)
-	err = vm.internalState.Commit()
-	assert.NoError(err)
+	assert.NoError(vm.internalState.Commit())
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
@@ -353,13 +348,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -423,8 +415,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		stateVersions: vm.stateVersions,
 		tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	assert.NoError(err)
+	assert.NoError(tx.Unsigned.Visit(&executor))
 
 	vdrDestSet := ids.ShortSet{}
 	vdrDestSet.Add(vdrRewardAddress)
@@ -439,8 +430,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	executor.onAbort.Apply(vm.internalState)
-	err = vm.internalState.Commit()
-	assert.NoError(err)
+	assert.NoError(vm.internalState.Commit())
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
 	newVdrBalance, err := avax.GetBalance(vm.internalState, vdrDestSet)
@@ -479,23 +469,18 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil)
-	assert.NoError(err)
+	assert.NoError(firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil))
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	err = firstVM.SetState(snow.Bootstrapping)
-	assert.NoError(err)
-
-	err = firstVM.SetState(snow.NormalOp)
-	assert.NoError(err)
+	assert.NoError(firstVM.SetState(snow.Bootstrapping))
+	assert.NoError(firstVM.SetState(snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	err = firstVM.Shutdown()
-	assert.NoError(err)
+	assert.NoError(firstVM.Shutdown())
 
 	firstCtx.Lock.Unlock()
 
@@ -512,23 +497,18 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
-		err := secondVM.Shutdown()
-		assert.NoError(err)
+		assert.NoError(secondVM.Shutdown())
 		secondCtx.Lock.Unlock()
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	err = secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil)
-	assert.NoError(err)
+	assert.NoError(secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil))
 
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
-	err = secondVM.SetState(snow.Bootstrapping)
-	assert.NoError(err)
-
-	err = secondVM.SetState(snow.NormalOp)
-	assert.NoError(err)
+	assert.NoError(secondVM.SetState(snow.Bootstrapping))
+	assert.NoError(secondVM.SetState(snow.NormalOp))
 
 	secondVM.clock.Set(defaultValidateEndTime)
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
@@ -536,38 +516,26 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // advance the timestamp
-	assert.NoError(err)
-
-	err = secondVM.SetPreference(secondVM.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // advance the timestamp
+	assert.NoError(secondVM.SetPreference(secondVM.lastAcceptedID))
 
 	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -580,34 +548,24 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	blk, err = secondVM.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit, ok = options[1].(*CommitBlock)
-	assert.True(ok)
+	commit = options[1].(*CommitBlock)
+	abort = options[0].(*AbortBlock)
 
-	abort, ok = options[0].(*AbortBlock)
-	assert.True(ok)
-
-	err = blk.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Accept())
+	assert.NoError(commit.Verify())
 
 	_, txStatus, err = commit.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = abort.Verify()
-	assert.NoError(err)
-
-	err = abort.Accept() // do not reward the genesis validator
-	assert.NoError(err)
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // do not reward the genesis validator
 
 	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -637,22 +595,17 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
-	err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender)
-	assert.NoError(err)
+	assert.NoError(vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender))
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		ctx.Lock.Unlock()
 	}()
 
 	vm.clock.Set(defaultGenesisTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	err = vm.SetState(snow.Bootstrapping)
-	assert.NoError(err)
-
-	err = vm.SetState(snow.NormalOp)
-	assert.NoError(err)
+	assert.NoError(vm.SetState(snow.Bootstrapping))
+	assert.NoError(vm.SetState(snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -661,35 +614,21 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// first the time will be advanced.
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
-
-	// advance the timestamp
-	err = commit.Accept()
-	assert.NoError(err)
-
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
+	assert.NoError(commit.Accept()) // advance the timestamp
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.internalState.GetTimestamp()
@@ -699,31 +638,19 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	blk, err = vm.BuildBlock()
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	abort, ok = options[0].(*AbortBlock)
-	assert.True(ok)
+	abort = options[0].(*AbortBlock)
+	commit = options[1].(*CommitBlock)
 
-	commit, ok = options[1].(*CommitBlock)
-	assert.True(ok)
-
-	err = blk.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
-
-	// do not reward the genesis validator
-	err = abort.Accept()
-	assert.NoError(err)
+	assert.NoError(blk.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // do not reward the genesis validator
 
 	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)

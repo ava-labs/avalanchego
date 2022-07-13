@@ -378,14 +378,12 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-
 			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = ap3Time
 
 			vm.ctx.Lock.Lock()
 			defer func() {
-				err := vm.Shutdown()
-				assert.NoError(err)
+				assert.NoError(vm.Shutdown())
 				vm.ctx.Lock.Unlock()
 			}()
 
@@ -411,8 +409,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				SubnetAuth: subnetAuth,
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			err = tx.Sign(Codec, signers)
-			assert.NoError(err)
+			assert.NoError(tx.Sign(Codec, signers))
 
 			state, err := state.NewDiff(
 				vm.preferred,

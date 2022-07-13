@@ -721,28 +721,21 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	assert := assert.New(t)
-
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown()
-		assert.NoError(err)
-
+		assert.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTimestampReply{}
-	err := service.GetTimestamp(nil, nil, &reply)
-	assert.NoError(err)
-
+	assert.NoError(service.GetTimestamp(nil, nil, &reply))
 	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
 	service.vm.internalState.SetTimestamp(newTimestamp)
 
-	err = service.GetTimestamp(nil, nil, &reply)
-	assert.NoError(err)
-
+	assert.NoError(service.GetTimestamp(nil, nil, &reply))
 	assert.Equal(newTimestamp, reply.Timestamp)
 }
 

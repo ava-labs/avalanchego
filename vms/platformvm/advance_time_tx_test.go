@@ -124,8 +124,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -146,8 +145,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		stateVersions: vm.stateVersions,
 		tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	assert.NoError(err)
+	assert.NoError(tx.Unsigned.Visit(&executor))
 
 	validatorStaker, err := executor.onCommit.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	assert.NoError(err)
@@ -344,8 +342,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			vm, _, _, _ := defaultVM()
 			vm.ctx.Lock.Lock()
 			defer func() {
-				err := vm.Shutdown()
-				assert.NoError(err)
+				assert.NoError(vm.Shutdown())
 				vm.ctx.Lock.Unlock()
 			}()
 			vm.WhitelistedSubnets.Add(testSubnet1.ID())
@@ -394,8 +391,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 					stateVersions: vm.stateVersions,
 					tx:            tx,
 				}
-				err = tx.Unsigned.Visit(&executor)
-				assert.NoError(err)
+				assert.NoError(tx.Unsigned.Visit(&executor))
 
 				executor.onCommit.Apply(vm.internalState)
 			}
@@ -435,8 +431,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.WhitelistedSubnets.Add(testSubnet1.ID())
@@ -502,8 +497,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		stateVersions: vm.stateVersions,
 		tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	assert.NoError(err)
+	assert.NoError(tx.Unsigned.Visit(&executor))
 
 	_, err = executor.onCommit.GetCurrentValidator(testSubnet1.ID(), subnetValidatorNodeID)
 	assert.ErrorIs(err, database.ErrNotFound)

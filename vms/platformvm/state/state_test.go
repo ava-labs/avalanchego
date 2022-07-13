@@ -43,8 +43,7 @@ func TestStateInitialization(t *testing.T) {
 	assert.NoError(err)
 	assert.True(shouldInit)
 
-	err = state.DoneInit()
-	assert.NoError(err)
+	assert.NoError(state.DoneInit())
 
 	state = newStateFromDB(assert, db)
 
@@ -101,8 +100,7 @@ func newInitializedState(assert *assert.Assertions) (State, database.Database) {
 		Shares:       reward.PercentDenominator,
 	}
 	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
-	err := initialValidatorTx.Sign(txs.Codec, nil)
-	assert.NoError(err)
+	assert.NoError(initialValidatorTx.Sign(txs.Codec, nil))
 
 	initialChain := &txs.CreateChainTx{
 		SubnetID:   constants.PrimaryNetworkID,
@@ -111,8 +109,7 @@ func newInitializedState(assert *assert.Assertions) (State, database.Database) {
 		SubnetAuth: &secp256k1fx.Input{},
 	}
 	initialChainTx := &txs.Tx{Unsigned: initialChain}
-	err = initialChainTx.Sign(txs.Codec, nil)
-	assert.NoError(err)
+	assert.NoError(initialChainTx.Sign(txs.Codec, nil))
 
 	genesisBlkID := ids.GenerateTestID()
 	genesisState := &genesis.State{
@@ -149,8 +146,7 @@ func newUninitializedState(assert *assert.Assertions) (State, database.Database)
 
 func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
-	err := vdrs.Set(constants.PrimaryNetworkID, validators.NewSet())
-	assert.NoError(err)
+	assert.NoError(vdrs.Set(constants.PrimaryNetworkID, validators.NewSet()))
 
 	state, err := New(
 		db,

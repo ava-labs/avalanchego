@@ -560,8 +560,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -584,34 +583,23 @@ func TestAddValidatorCommit(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(tx)
-	assert.NoError(err)
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
 
-	_, ok = options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = commit.Accept() // commit the proposal
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(commit.Accept()) // commit the proposal
 
 	_, txStatus, err := vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
@@ -684,8 +672,7 @@ func TestAddValidatorReject(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -708,37 +695,25 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(tx)
-	assert.NoError(err)
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
-
-	err = abort.Accept() // reject the proposal
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // reject the proposal
 
 	_, txStatus, err := vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
@@ -792,8 +767,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -816,41 +790,30 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(tx)
-	assert.NoError(err)
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err := abort.onAcceptState.GetTx(tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // accept the proposal
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // accept the proposal
 
 	_, txStatus, err = vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
@@ -867,8 +830,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -891,41 +853,30 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(tx)
-	assert.NoError(err)
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
 
 	_, txStatus, err := commit.onAcceptState.GetTx(tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = abort.Verify()
-	assert.NoError(err)
-
-	err = abort.Accept() // reject the proposal
-	assert.NoError(err)
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // reject the proposal
 
 	_, txStatus, err = vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
@@ -942,8 +893,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -953,8 +903,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -967,28 +916,21 @@ func TestRewardValidatorAccept(t *testing.T) {
 	abort, ok := options[1].(*AbortBlock)
 	assert.True(ok)
 
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // advance the timestamp
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // advance the timestamp
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.internalState.GetTimestamp()
@@ -997,35 +939,25 @@ func TestRewardValidatorAccept(t *testing.T) {
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit, ok = options[0].(*CommitBlock)
-	assert.True(ok)
+	commit = options[0].(*CommitBlock)
+	abort = options[1].(*AbortBlock)
 
-	abort, ok = options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // reward the genesis validator
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // reward the genesis validator
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -1041,8 +973,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1052,35 +983,25 @@ func TestRewardValidatorReject(t *testing.T) {
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // advance the timestamp
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // advance the timestamp
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -1089,40 +1010,29 @@ func TestRewardValidatorReject(t *testing.T) {
 	timestamp := vm.internalState.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	block = blk.(*ProposalBlock)
 	options, err = block.Options() // Assert preferences are correct
 	assert.NoError(err)
 
-	commit, ok = options[0].(*CommitBlock)
-	assert.True(ok)
+	commit = options[0].(*CommitBlock)
+	abort = options[1].(*AbortBlock)
 
-	abort, ok = options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = blk.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Accept())
+	assert.NoError(commit.Verify())
 
 	_, txStatus, err = commit.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = abort.Verify()
-	assert.NoError(err)
-
-	err = abort.Accept() // do not reward the genesis validator
-	assert.NoError(err)
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // do not reward the genesis validator
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -1138,8 +1048,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1149,35 +1058,25 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // advance the timestamp
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // advance the timestamp
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -1186,40 +1085,29 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	timestamp := vm.internalState.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	block = blk.(*ProposalBlock)
 	options, err = block.Options() // Assert preferences are correct
 	assert.NoError(err)
 
-	commit, ok = options[0].(*CommitBlock)
-	assert.True(ok)
+	commit = options[0].(*CommitBlock)
+	abort = options[1].(*AbortBlock)
 
-	abort, ok = options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = blk.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Accept())
+	assert.NoError(commit.Verify())
 
 	_, txStatus, err = commit.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = abort.Verify()
-	assert.NoError(err)
-
-	err = abort.Accept() // do not reward the genesis validator
-	assert.NoError(err)
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // do not reward the genesis validator
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
@@ -1306,8 +1194,7 @@ func TestCreateSubnet(t *testing.T) {
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1324,24 +1211,19 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	err = vm.blockBuilder.AddUnverifiedTx(createSubnetTx)
-	assert.NoError(err)
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(createSubnetTx))
 
 	blk, err := vm.BuildBlock() // should contain proposal to create subnet
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
-
-	err = blk.Accept()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
+	assert.NoError(blk.Accept())
 
 	_, txStatus, err := vm.internalState.GetTx(createSubnetTx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	subnets, err := vm.internalState.GetSubnets()
 	assert.NoError(err)
@@ -1370,14 +1252,12 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
-	assert.NoError(err)
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(addValidatorTx))
 
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
@@ -1385,34 +1265,24 @@ func TestCreateSubnet(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit, ok := options[0].(*CommitBlock)
-	assert.True(ok)
+	commit := options[0].(*CommitBlock)
+	abort := options[1].(*AbortBlock)
 
-	abort, ok := options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept() // Accept the block
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept()) // Accept the block
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // add the validator to pending validator set
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // add the validator to pending validator set
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	assert.NoError(err)
@@ -1424,8 +1294,7 @@ func TestCreateSubnet(t *testing.T) {
 	blk, err = vm.BuildBlock() // should be advance time tx
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
@@ -1433,34 +1302,24 @@ func TestCreateSubnet(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit, ok = options[0].(*CommitBlock)
-	assert.True(ok)
+	commit = options[0].(*CommitBlock)
+	abort = options[1].(*AbortBlock)
 
-	abort, ok = options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // move validator addValidatorTx from pending to current
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // move validator addValidatorTx from pending to current
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
@@ -1473,8 +1332,7 @@ func TestCreateSubnet(t *testing.T) {
 	blk, err = vm.BuildBlock() // should be advance time tx
 	assert.NoError(err)
 
-	err = blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
@@ -1482,34 +1340,24 @@ func TestCreateSubnet(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit, ok = options[0].(*CommitBlock)
-	assert.True(ok)
+	commit = options[0].(*CommitBlock)
+	abort = options[1].(*AbortBlock)
 
-	abort, ok = options[1].(*AbortBlock)
-	assert.True(ok)
-
-	err = block.Accept()
-	assert.NoError(err)
-
-	err = commit.Verify()
-	assert.NoError(err)
-
-	err = abort.Verify()
-	assert.NoError(err)
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
 
 	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	err = commit.Accept() // remove validator from current validator set
-	assert.NoError(err)
+	assert.NoError(commit.Accept()) // remove validator from current validator set
 
 	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	err = vm.SetPreference(vm.lastAcceptedID)
-	assert.NoError(err)
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
 	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
@@ -2450,13 +2298,10 @@ func TestUnverifiedParentPanic(t *testing.T) {
 
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, baseDB, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -2491,19 +2336,16 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	addValidatorProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx)
 	assert.NoError(err)
 
-	err = addValidatorProposalBlk.Verify()
-	assert.NoError(err)
+	assert.NoError(addValidatorProposalBlk.Verify())
 
 	// Get the commit block to add the new validator
 	addValidatorProposalOptions, err := addValidatorProposalBlk.Options()
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*CommitBlock)
-	assert.True(ok)
+	addValidatorProposalCommit := addValidatorProposalCommitIntf.(*CommitBlock)
 
-	err = addValidatorProposalCommit.Verify()
-	assert.NoError(err)
+	assert.NoError(addValidatorProposalCommit.Verify())
 
 	// Verify that the new validator now in pending validator set
 	_, err = addValidatorProposalCommit.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
@@ -2541,10 +2383,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
+	assert.NoError(signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
-	})
-	assert.NoError(err)
+	}))
 
 	// Create the standard block that will fail verification, and then be
 	// re-verified.
@@ -2566,8 +2407,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Populate the shared memory UTXO.
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
+	assert.NoError(m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB)))
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
@@ -2593,8 +2433,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	err = importBlk.Verify()
-	assert.NoError(err)
+	assert.NoError(importBlk.Verify())
 
 	// The status shouldn't have been changed during a successful verification.
 	importBlkStatus = importBlk.Status()
@@ -2614,8 +2453,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	advanceTimeProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
 	assert.NoError(err)
 
-	err = advanceTimeProposalBlk.Verify()
-	assert.NoError(err)
+	assert.NoError(advanceTimeProposalBlk.Verify())
 
 	// Get the commit block that advances the timestamp to the point that the
 	// validator should be moved from the pending validator set into the current
@@ -2624,11 +2462,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*CommitBlock)
-	assert.True(ok)
+	advanceTimeProposalCommit := advanceTimeProposalCommitIntf.(*CommitBlock)
 
-	err = advanceTimeProposalCommit.Verify()
-	assert.NoError(err)
+	assert.NoError(advanceTimeProposalCommit.Verify())
 
 	// Accept all the blocks
 	allBlocks := []smcon.Block{
@@ -2639,11 +2475,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		advanceTimeProposalCommit,
 	}
 	for _, blk := range allBlocks {
-		err = blk.Accept()
-		assert.NoError(err)
-
-		status := blk.Status()
-		assert.Equal(choices.Accepted, status)
+		assert.NoError(blk.Accept())
+		assert.Equal(choices.Accepted, blk.Status())
 	}
 
 	// Force a reload of the state from the database.
@@ -2669,13 +2502,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, baseDB, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -2709,19 +2539,16 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx0)
 	assert.NoError(err)
 
-	err = addValidatorProposalBlk0.Verify()
-	assert.NoError(err)
+	assert.NoError(addValidatorProposalBlk0.Verify())
 
 	// Get the commit block to add the first new validator
 	addValidatorProposalOptions0, err := addValidatorProposalBlk0.Options()
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*CommitBlock)
-	assert.True(ok)
+	addValidatorProposalCommit0 := addValidatorProposalCommitIntf0.(*CommitBlock)
 
-	err = addValidatorProposalCommit0.Verify()
-	assert.NoError(err)
+	assert.NoError(addValidatorProposalCommit0.Verify())
 
 	// Verify that first new validator now in pending validator set
 	_, err = addValidatorProposalCommit0.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
@@ -2741,8 +2568,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx0)
 	assert.NoError(err)
 
-	err = advanceTimeProposalBlk0.Verify()
-	assert.NoError(err)
+	assert.NoError(advanceTimeProposalBlk0.Verify())
 
 	// Get the commit block that advances the timestamp to the point that the
 	// first new validator should be moved from the pending validator set into
@@ -2751,11 +2577,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*CommitBlock)
-	assert.True(ok)
+	advanceTimeProposalCommit0 := advanceTimeProposalCommitIntf0.(*CommitBlock)
 
-	err = advanceTimeProposalCommit0.Verify()
-	assert.NoError(err)
+	assert.NoError(advanceTimeProposalCommit0.Verify())
 
 	// Verify that the first new validator is now in the current validator set.
 	_, err = advanceTimeProposalCommit0.onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
@@ -2799,10 +2623,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
+	assert.NoError(signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
-	})
-	assert.NoError(err)
+	}))
 
 	// Create the standard block that will fail verification, and then be
 	// re-verified.
@@ -2824,8 +2647,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Populate the shared memory UTXO.
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
+	assert.NoError(m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB)))
 
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
@@ -2851,8 +2673,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	err = importBlk.Verify()
-	assert.NoError(err)
+	assert.NoError(importBlk.Verify())
 
 	// The status shouldn't have been changed during a successful verification.
 	importBlkStatus = importBlk.Status()
@@ -2883,19 +2704,16 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx1)
 	assert.NoError(err)
 
-	err = addValidatorProposalBlk1.Verify()
-	assert.NoError(err)
+	assert.NoError(addValidatorProposalBlk1.Verify())
 
 	// Get the commit block to add the second new validator
 	addValidatorProposalOptions1, err := addValidatorProposalBlk1.Options()
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*CommitBlock)
-	assert.True(ok)
+	addValidatorProposalCommit1 := addValidatorProposalCommitIntf1.(*CommitBlock)
 
-	err = addValidatorProposalCommit1.Verify()
-	assert.NoError(err)
+	assert.NoError(addValidatorProposalCommit1.Verify())
 
 	// Verify that the second new validator now in pending validator set
 	_, err = addValidatorProposalCommit1.onAcceptState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
@@ -2915,8 +2733,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx1)
 	assert.NoError(err)
 
-	err = advanceTimeProposalBlk1.Verify()
-	assert.NoError(err)
+	assert.NoError(advanceTimeProposalBlk1.Verify())
 
 	// Get the commit block that advances the timestamp to the point that the
 	// second new validator should be moved from the pending validator set into
@@ -2925,11 +2742,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*CommitBlock)
-	assert.True(ok)
+	advanceTimeProposalCommit1 := advanceTimeProposalCommitIntf1.(*CommitBlock)
 
-	err = advanceTimeProposalCommit1.Verify()
-	assert.NoError(err)
+	assert.NoError(advanceTimeProposalCommit1.Verify())
 
 	// Verify that the second new validator is now in the current validator set.
 	_, err = advanceTimeProposalCommit1.onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
@@ -2954,11 +2769,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		advanceTimeProposalCommit1,
 	}
 	for _, blk := range allBlocks {
-		err = blk.Accept()
-		assert.NoError(err)
-
-		status := blk.Status()
-		assert.Equal(choices.Accepted, status)
+		assert.NoError(blk.Accept())
+		assert.Equal(choices.Accepted, blk.Status())
 	}
 
 	// Force a reload of the state from the database.
