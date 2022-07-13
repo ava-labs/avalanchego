@@ -15,8 +15,9 @@ import (
 
 var _ stateless.Visitor = &acceptor{}
 
+// acceptor handles the logic for accepting a block.
 type acceptor struct {
-	backend
+	*backend
 	metrics          metrics.Metrics
 	recentlyAccepted *window.Window
 }
@@ -38,17 +39,13 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
 	}
 
-	if err := a.metrics.MarkAccepted(b); err != nil {
-		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
-	}
-
 	// Note that we do not write this block to state here.
 	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
 	// We do this so that in the event that the node shuts down, the proposal block
 	// is not written to disk unless its child is.
 	// (The VM's Shutdown method commits the database.)
-	// There is an invariant that the most recently committed block is a decision block.
-	a.state.SetLastAccepted(blkID, false /*persist*/)
+	// The snowman.Engine requires that the last committed block is a decision block.
+	a.backend.lastAccepted = blkID
 	return nil
 }
 
@@ -74,7 +71,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
 	}
 
-	blkState.onAcceptState.Apply(a.getState())
+	blkState.onAcceptState.Apply(a.state)
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -110,11 +107,6 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 			childState.onAcceptState.Apply(a.state)
 		}
 	}
-
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
-		onAcceptFunc()
-	}
-
 	return nil
 }
 
@@ -136,7 +128,7 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 	}
 
 	// Update the state of the chain in the database
-	blkState.onAcceptState.Apply(a.getState())
+	blkState.onAcceptState.Apply(a.state)
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -178,6 +170,8 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	defer a.free(blkID)
 
 	parentID := b.Parent()
+	// Note: we assume this block's sibling, an Abort block, doesn't
+	// need the parent's state when it's rejected.
 	defer a.free(parentID)
 
 	a.ctx.Log.Verbo("accepting block %s", blkID)
@@ -193,8 +187,8 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	a.state.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
-	wasPreferred := parentState.inititallyPreferCommit
 	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
 		if wasPreferred {
 			a.metrics.MarkVoteWon()
 		} else {
@@ -213,6 +207,8 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	defer a.free(blkID)
 
 	parentID := b.Parent()
+	// Note: we assume this block's sibling, a Commit block, doesn't
+	// need the parent's state when it's rejected.
 	defer a.free(parentID)
 
 	a.ctx.Log.Verbo("Accepting block with ID %s", blkID)
@@ -225,7 +221,7 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	a.state.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
-	wasPreferred := parentState.inititallyPreferCommit
+	wasPreferred := parentState.initiallyPreferCommit
 	if a.bootstrapped.GetValue() {
 		if wasPreferred {
 			a.metrics.MarkVoteWon()
@@ -240,7 +236,6 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	return a.updateStateOptionBlock(blkID)
 }
 
-// [b] must be embedded in a Commit or Abort block.
 func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
@@ -248,7 +243,7 @@ func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 	}
 
 	// Update the state of the chain in the database
-	blkState.onAcceptState.Apply(a.getState())
+	blkState.onAcceptState.Apply(a.state)
 	if err := a.state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
@@ -268,15 +263,13 @@ func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 			childState.onAcceptState.Apply(a.state)
 		}
 	}
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
-		onAcceptFunc()
-	}
 	return nil
 }
 
 func (a *acceptor) commonAccept(b stateless.Block) {
 	blkID := b.ID()
-	a.state.SetLastAccepted(blkID, true /*persist*/)
+	a.backend.lastAccepted = blkID
+	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.recentlyAccepted.Add(blkID)
 }

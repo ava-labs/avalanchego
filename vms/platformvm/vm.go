@@ -385,7 +385,7 @@ func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 // LastAccepted returns the block most recently accepted
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	return vm.state.GetLastAccepted(), nil
+	return vm.manager.LastAccepted(), nil
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]

@@ -7,12 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var (
@@ -20,23 +17,7 @@ var (
 	_ snowman.OracleBlock = &OracleBlock{}
 )
 
-func newBlock(
-	blk stateless.Block,
-	manager *manager,
-) snowman.Block {
-	b := &Block{
-		manager: manager,
-		Block:   blk,
-	}
-	// TODO should we just have a NewOracleBlock method?
-	if _, ok := blk.(*stateless.ProposalBlock); ok {
-		return &OracleBlock{
-			Block: b,
-		}
-	}
-	return b
-}
-
+// Exported for testing in platformvm package.
 type Block struct {
 	stateless.Block
 	manager *manager
@@ -54,13 +35,16 @@ func (b *Block) Reject() error {
 	return b.Visit(b.manager.rejector)
 }
 
-// TODO
 func (b *Block) Status() choices.Status {
 	blkID := b.ID()
-	if b.manager.state.GetLastAccepted() == blkID {
+	// If this block is an accepted Proposal block with
+	// no accepted children, it will be in [blkIDToState],
+	// but we should return accepted, not processing,
+	// so we do this check.
+	if b.manager.backend.lastAccepted == blkID {
 		return choices.Accepted
 	}
-	// Check if the block is in memory
+	// Check if the block is in memory. If so, it's processing.
 	if _, ok := b.manager.backend.blkIDToState[blkID]; ok {
 		return choices.Processing
 	}
@@ -68,20 +52,17 @@ func (b *Block) Status() choices.Status {
 	_, status, err := b.manager.state.GetStatelessBlock(blkID)
 	if err != nil {
 		// It isn't in the database.
-		// TODO is this right?
 		return choices.Processing
 	}
 	return status
 }
 
-// TODO
 func (b *Block) Timestamp() time.Time {
-	// 	 If this is the last accepted block and the block was loaded from disk
-	// 	 since it was accepted, then the timestamp wouldn't be set correctly. So,
-	// 	 we explicitly return the chain time.
-	blkID := b.ID()
+	// If this is the last accepted block and the block was loaded from disk
+	// since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// we explicitly return the chain time.
 	// Check if the block is processing.
-	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
+	if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
 		return blkState.timestamp
 	}
 	// The block isn't processing.
@@ -91,8 +72,9 @@ func (b *Block) Timestamp() time.Time {
 	return b.manager.state.GetTimestamp()
 }
 
+// Exported for testing in platformvm package.
 type OracleBlock struct {
-	// Invariant: The inner statless block is a *stateless.ProposalBlock.
+	// Invariant: The inner stateless block is a *stateless.ProposalBlock.
 	*Block
 }
 
@@ -128,22 +110,8 @@ func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 	if !ok {
 		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
 	}
-	if blkState.inititallyPreferCommit {
+	if blkState.initiallyPreferCommit {
 		return [2]snowman.Block{commitBlock, abortBlock}, nil
 	}
 	return [2]snowman.Block{abortBlock, commitBlock}, nil
-}
-
-type blockState struct {
-	// TODO add stateless block to this struct
-	statelessBlock         stateless.Block
-	onAcceptFunc           func()
-	onAcceptState          state.Diff
-	onCommitState          state.Diff
-	onAbortState           state.Diff
-	children               []ids.ID
-	timestamp              time.Time
-	inputs                 ids.Set
-	atomicRequests         map[ids.ID]*atomic.Requests
-	inititallyPreferCommit bool
 }
