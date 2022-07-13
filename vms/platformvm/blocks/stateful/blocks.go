@@ -49,12 +49,13 @@ func (b *Block) Status() choices.Status {
 		return choices.Processing
 	}
 	// Block isn't in memory. Check in the database.
-	_, status, err := b.manager.state.GetStatelessBlock(blkID)
-	if err != nil {
-		// It isn't in the database.
-		return choices.Processing
+	if _, status, err := b.manager.state.GetStatelessBlock(blkID); err == nil {
+		return status
 	}
-	return status
+	// choices.Unknown means we don't have the bytes of the block.
+	// In this case, we do, so we return choices.Processing.
+	return choices.Processing
+
 }
 
 func (b *Block) Timestamp() time.Time {
