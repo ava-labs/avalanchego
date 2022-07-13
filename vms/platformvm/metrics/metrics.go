@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ stateless.Metrics = &Metrics{}
-
 type Metrics struct {
 	txMetrics *txMetrics
 

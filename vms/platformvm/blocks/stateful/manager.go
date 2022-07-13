@@ -16,7 +16,7 @@ import (
 
 var _ Manager = &manager{}
 
-type OnAcceptor interface {
+type Manager interface {
 	// This function should only be called after Verify is called on [blkID].
 	// OnAccept returns:
 	// 1) The current state of the chain, if this block is decided or hasn't
@@ -24,10 +24,8 @@ type OnAcceptor interface {
 	// 2) The state of the chain after this block is accepted, if this block was
 	//    verified successfully.
 	OnAccept(blkID ids.ID) state.Chain
-}
-
-type Manager interface {
-	OnAcceptor
+	// Returns the ID of the most recently accepted block.
+	LastAccepted() ids.ID
 	GetBlock(id ids.ID) (snowman.Block, error)
 	NewBlock(stateless.Block) snowman.Block
 }
@@ -39,7 +37,7 @@ func NewManager(
 	txExecutorBackend executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
-	backend := backend{
+	backend := &backend{
 		Mempool:      mempool,
 		state:        s,
 		bootstrapped: txExecutorBackend.Bootstrapped,
@@ -64,16 +62,18 @@ func NewManager(
 }
 
 type manager struct {
-	backend
+	*backend
 	verifier stateless.Visitor
 	acceptor stateless.Visitor
 	rejector stateless.Visitor
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	// See if the block is in memory.
 	if blk, ok := m.blkIDToState[blkID]; ok {
 		return newBlock(blk.statelessBlock, m), nil
 	}
+	// The block isn't in memory. Check the database.
 	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
@@ -83,4 +83,27 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 func (m *manager) NewBlock(blk stateless.Block) snowman.Block {
 	return newBlock(blk, m)
+}
+
+func (m *manager) LastAccepted() ids.ID {
+	if m.backend.lastAccepted == ids.Empty {
+		// No blocks have been accepted since startup.
+		// Return the last accepted block from state.
+		return m.state.GetLastAccepted()
+	}
+	return m.backend.lastAccepted
+}
+
+func newBlock(blk stateless.Block, manager *manager) snowman.Block {
+	b := &Block{
+		manager: manager,
+		Block:   blk,
+	}
+	// TODO should we just have a NewOracleBlock method?
+	if _, ok := blk.(*stateless.ProposalBlock); ok {
+		return &OracleBlock{
+			Block: b,
+		}
+	}
+	return b
 }

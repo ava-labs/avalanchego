@@ -19,22 +19,24 @@ import (
 var (
 	_                       stateless.Visitor = &verifier{}
 	errConflictingBatchTxs                    = errors.New("block contains conflicting transactions")
-	ErrConflictingParentTxs                   = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errConflictingParentTxs                   = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 )
 
+// verifier handles the logic for verifying a block.
 type verifier struct {
-	backend
+	*backend
 	txExecutorBackend executor.Backend
 }
 
 func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	blkID := b.ID()
 
-	blkState, ok := v.blkIDToState[blkID]
-	if !ok {
-		blkState = &blockState{
-			statelessBlock: b,
-		}
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+	blkState := &blockState{
+		statelessBlock: b,
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
@@ -42,7 +44,7 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState := v.OnAccept(parentID) // TODO is this right?
+	parentState := v.OnAccept(parentID)
 
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:     &v.txExecutorBackend,
@@ -57,19 +59,14 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 
 	onCommitState := txExecutor.OnCommit
 	onCommitState.AddTx(b.Tx, status.Committed)
-	// v.blkIDToOnCommitState[blkID] = onCommitState
 	blkState.onCommitState = onCommitState
 
 	onAbortState := txExecutor.OnAbort
 	onAbortState.AddTx(b.Tx, status.Aborted)
-	// v.blkIDToOnAbortState[blkID] = onAbortState
 	blkState.onAbortState = onAbortState
 
-	// v.blkIDToTimestamp[blkID] = parentState.GetTimestamp()
 	blkState.timestamp = parentState.GetTimestamp()
-
-	// v.blkIDToPreferCommit[blkID] = txExecutor.PrefersCommit
-	blkState.inititallyPreferCommit = txExecutor.PrefersCommit
+	blkState.initiallyPreferCommit = txExecutor.PrefersCommit
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	v.blkIDToState[blkID] = blkState
@@ -81,25 +78,19 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 }
 
 func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
-	blkState, ok := v.blkIDToState[b.ID()]
-	if !ok {
-		blkState = &blockState{
-			statelessBlock: b,
-		}
+	blkID := b.ID()
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+	blkState := &blockState{
+		statelessBlock: b,
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
 		return err
 	}
-
-	// parentIntf, err := v.parent(b.baseBlk)
-	// if err != nil {
-	// 	return err
-	// }
-	// parentIntf, err := v.GetStatefulBlock(b.Parent())
-	// if err != nil {
-	// 	return err
-	// }
 
 	parentState := v.OnAccept(b.Parent())
 
@@ -128,17 +119,12 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	blkID := b.ID()
-	// v.blkIDToOnAcceptState[blkID] = atomicExecutor.OnAccept
 	blkState.onAcceptState = atomicExecutor.OnAccept
-	// v.blkIDToInputs[blkID] = atomicExecutor.Inputs
 	blkState.inputs = atomicExecutor.Inputs
-	// v.blkIDToAtomicRequests[blkID] = atomicExecutor.AtomicRequests
 	blkState.atomicRequests = atomicExecutor.AtomicRequests
-	// v.blkIDToTimestamp[blkID] = atomicExecutor.OnAccept.GetTimestamp()
 	blkState.timestamp = atomicExecutor.OnAccept.GetTimestamp()
 
-	// Check for conflicts in atomic inputs
+	// Check for conflicts in atomic inputs.
 	var nextBlock stateless.Block = b
 	for {
 		parentID := nextBlock.Parent()
@@ -149,57 +135,41 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 			break
 		}
 		if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
-			return ErrConflictingParentTxs
+			return errConflictingParentTxs
 		}
 		parent, _, err := v.state.GetStatelessBlock(parentID)
 		if err != nil {
+			// The parent isn't in memory, so it should be on disk,
+			// but it isn't.
 			return err
 		}
 		nextBlock = parent
 	}
 
-	// conflicts, err := parentIntf.conflicts(atomicExecutor.Inputs)
-	// if err != nil {
-	// 	return err
-	// }
-	// if conflicts {
-	// 	return ErrConflictingParentTxs
-	// }
-
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
-	// parentID := b.Parent()
-	// v.blkIDToChildren[parentID] = append(v.blkIDToChildren[parentID], b)
 	parentID := b.Parent()
 	if parentBlockState, ok := v.blkIDToState[parentID]; ok {
 		parentBlockState.children = append(parentBlockState.children, blkID)
 	}
-	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
 func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
-	blkState, ok := v.blkIDToState[blkID]
-	if !ok {
-		blkState = &blockState{
-			statelessBlock: b,
-			atomicRequests: make(map[ids.ID]*atomic.Requests),
-		}
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+	blkState := &blockState{
+		statelessBlock: b,
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
 		return err
 	}
-
-	// parentIntf, err := v.parent(b.baseBlk)
-	// if err != nil {
-	// 	return err
-	// }
-	// parentIntf, err := v.GetStatefulBlock(b.Parent())
-	// if err != nil {
-	// 	return err
-	// }
 
 	parentState := v.OnAccept(b.Parent())
 
@@ -209,22 +179,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 		parentState.PendingStakers(),
 	)
 
-	// TODO do we still need to do something similar to the below?
-	// clear inputs so that multiple [Verify] calls can be made
-	// b.Inputs.Clear()
-	// b.atomicRequests = make(map[ids.ID]*atomic.Requests)
-
 	funcs := make([]func(), 0, len(b.Txs))
-	// blockInputs, ok := v.blkIDToInputs[blkID]
-	// if !ok {
-	// 	blockInputs = ids.Set{}
-	// 	v.blkIDToInputs[blkID] = blockInputs
-	// }
-	// atomicRequests := v.blkIDToAtomicRequests[blkID]
-	// if !ok {
-	// 	atomicRequests = make(map[ids.ID]*atomic.Requests)
-	// 	v.blkIDToAtomicRequests[blkID] = atomicRequests
-	// }
 	for _, tx := range b.Txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
@@ -261,8 +216,8 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 		}
 	}
 
+	// Check for conflicts in ancestors.
 	if blkState.inputs.Len() > 0 {
-		// ensure it doesnt conflict with the parent block
 		var nextBlock stateless.Block = b
 		for {
 			parentID := nextBlock.Parent()
@@ -273,10 +228,11 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 				break
 			}
 			if parentState.inputs.Overlaps(blkState.inputs) {
-				return ErrConflictingParentTxs
+				return errConflictingParentTxs
 			}
 			var parent stateless.Block
 			if parentState, ok := v.blkIDToState[parentID]; ok {
+				// The parent is in memory.
 				parent = parentState.statelessBlock
 			} else {
 				var err error
@@ -287,24 +243,11 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 			}
 			nextBlock = parent
 		}
-		// conflicts, err := parentIntf.conflicts(blkState.inputs)
-		// if err != nil {
-		// 	return err
-		// }
-		// if conflicts {
-		// 	return ErrConflictingParentTxs
-		// }
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
-		// v.blkIDToOnAcceptFunc[blkID] = funcs[0]
 		blkState.onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		// v.blkIDToOnAcceptFunc[blkID] = func() {
-		// 	for _, f := range funcs {
-		// 		f()
-		// 	}
-		// }
 		blkState.onAcceptFunc = func() {
 			for _, f := range funcs {
 				f()
@@ -312,9 +255,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 		}
 	}
 
-	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	blkState.timestamp = onAcceptState.GetTimestamp()
-	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blkState.onAcceptState = onAcceptState
 	v.Mempool.RemoveDecisionTxs(b.Txs)
 	parentID := b.Parent()
@@ -322,34 +263,30 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 		parentBlockState.children = append(parentBlockState.children, blkID)
 	}
 
-	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
 func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	blkID := b.ID()
-	blkState, ok := v.blkIDToState[blkID]
-	if !ok {
-		blkState = &blockState{
-			statelessBlock: b,
-		}
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+	blkState := &blockState{
+		statelessBlock: b,
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
 		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
 	}
 
-	//
 	parentID := b.Parent()
 	onAcceptState := v.blkIDToState[parentID].onCommitState
-	// onAcceptState := state.Diff(nil) // TODO get parent state
-	// v.blkIDToTimestamp[blkID] = onAcceptState.GetTimestamp()
 	blkState.timestamp = onAcceptState.GetTimestamp()
-	// v.blkIDToOnAcceptState[blkID] = onAcceptState
 	blkState.onAcceptState = onAcceptState
 
-	// v.pinVerifiedBlock(b)
 	v.blkIDToState[blkID] = blkState
 
 	parentState := v.blkIDToState[parentID]
@@ -360,11 +297,13 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 
 func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 	blkID := b.ID()
-	blkState, ok := v.blkIDToState[blkID]
-	if !ok {
-		blkState = &blockState{
-			statelessBlock: b,
-		}
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+	blkState := &blockState{
+		statelessBlock: b,
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {

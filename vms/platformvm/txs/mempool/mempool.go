@@ -34,10 +34,8 @@ var (
 	_ Mempool     = &mempool{}
 	_ txs.Visitor = &mempoolIssuer{}
 
-	ErrUnknownTxType     = errors.New("unknown transaction type")
-	ErrMempoolFull       = errors.New("mempool is full")
-	ErrCorruptedReason   = errors.New("tx validity corrupted")
-	ErrMempoolReentrancy = errors.New("mempool reentrancy")
+	ErrUnknownTxType = errors.New("unknown transaction type")
+	ErrMempoolFull   = errors.New("mempool is full")
 )
 
 type BlockTimer interface {
@@ -156,7 +154,7 @@ func (m *mempool) DisableAdding() { m.dropIncoming = true }
 
 func (m *mempool) Add(tx *txs.Tx) error {
 	if m.dropIncoming {
-		return ErrMempoolReentrancy
+		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
 	}
 
 	// Note: a previously dropped tx can be re-added
