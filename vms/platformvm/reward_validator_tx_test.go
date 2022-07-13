@@ -575,7 +575,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Verify that chain's timestamp has advanced
 	timestamp := secondVM.internalState.GetTimestamp()
-	assert.Equal(defaultValidateEndTime, timestamp)
+	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	blk, err = secondVM.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
@@ -693,7 +693,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.internalState.GetTimestamp()
-	assert.Equal(defaultValidateEndTime, timestamp)
+	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
 	blk, err = vm.BuildBlock()

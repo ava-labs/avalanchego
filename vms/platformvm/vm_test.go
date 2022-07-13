@@ -856,10 +856,10 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	err = commit.Accept() // accept the proposal
 	assert.NoError(err)
-	assert.Equal(status.Committed, txStatus)
 
 	_, txStatus, err = vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in pending validator set
 	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
@@ -997,7 +997,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.internalState.GetTimestamp()
-	assert.Equal(defaultValidateEndTime, timestamp)
+	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
@@ -1092,7 +1092,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.Equal(status.Committed, txStatus)
 
 	timestamp := vm.internalState.GetTimestamp()
-	assert.Equal(defaultValidateEndTime, timestamp)
+	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	err = vm.SetPreference(vm.lastAcceptedID)
 	assert.NoError(err)
@@ -1189,7 +1189,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.Equal(status.Committed, txStatus)
 
 	timestamp := vm.internalState.GetTimestamp()
-	assert.Equal(defaultValidateEndTime, timestamp)
+	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	err = vm.SetPreference(vm.lastAcceptedID)
 	assert.NoError(err)
@@ -2691,7 +2691,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	currentTimestamp := vm.internalState.GetTimestamp()
-	assert.Equal(newValidatorStartTime, currentTimestamp)
+	assert.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
 }
 
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
