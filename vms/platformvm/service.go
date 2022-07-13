@@ -2008,74 +2008,96 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 	return totalAmountStaked, stakedOuts, nil
 }
 
-// // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
-// // staked on the Primary Network.
-// //
-// // This method assumes that each stake output has only owner
-// // This method assumes only AVAX can be staked
-// // This method only concerns itself with the Primary Network, not subnets
-// // TODO: Improve the performance of this method by maintaining this data
-// // in a data structure rather than re-calculating it by iterating over stakers
-// func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetStakeReply) error {
-// 	service.vm.ctx.Log.Debug("Platform: GetStake called")
+// GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
+// staked on the Primary Network.
+//
+// This method assumes that each stake output has only owner
+// This method assumes only AVAX can be staked
+// This method only concerns itself with the Primary Network, not subnets
+// TODO: Improve the performance of this method by maintaining this data
+// in a data structure rather than re-calculating it by iterating over stakers
+func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetStakeReply) error {
+	service.vm.ctx.Log.Debug("Platform: GetStake called")
 
-// 	if len(args.Addresses) > maxGetStakeAddrs {
-// 		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
-// 	}
+	if len(args.Addresses) > maxGetStakeAddrs {
+		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
+	}
 
-// 	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
-// 	if err != nil {
-// 		return err
-// 	}
+	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	if err != nil {
+		return err
+	}
 
-// 	currentStakers := service.vm.internalState.CurrentStakers()
-// 	stakers := currentStakers.Stakers()
+	currentStakerIterator, err := service.vm.internalState.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer currentStakerIterator.Release()
 
-// 	var (
-// 		totalStake uint64
-// 		stakedOuts = make([]avax.TransferableOutput, 0, len(stakers))
-// 	)
-// 	for _, tx := range stakers { // Iterates over current stakers
-// 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		totalStake, err = math.Add64(totalStake, stakedAmt)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		stakedOuts = append(stakedOuts, outs...)
-// 	}
+	var (
+		totalStake uint64
+		stakedOuts []avax.TransferableOutput
+	)
+	for currentStakerIterator.Next() { // Iterates over current stakers
+		staker := currentStakerIterator.Value()
 
-// 	pendingStakers := service.vm.internalState.PendingStakers()
-// 	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
-// 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		totalStake, err = math.Add64(totalStake, stakedAmt)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		stakedOuts = append(stakedOuts, outs...)
-// 	}
+		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		if err != nil {
+			return err
+		}
 
-// 	response.Staked = json.Uint64(totalStake)
-// 	response.Outputs = make([]string, len(stakedOuts))
-// 	for i, output := range stakedOuts {
-// 		bytes, err := Codec.Marshal(txs.Version, output)
-// 		if err != nil {
-// 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
-// 		}
-// 		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
-// 		if err != nil {
-// 			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
-// 		}
-// 	}
-// 	response.Encoding = args.Encoding
+		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
+		if err != nil {
+			return err
+		}
+		totalStake, err = math.Add64(totalStake, stakedAmt)
+		if err != nil {
+			return err
+		}
+		stakedOuts = append(stakedOuts, outs...)
+	}
 
-// 	return nil
-// }
+	pendingStakerIterator, err := service.vm.internalState.GetPendingStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer pendingStakerIterator.Release()
+
+	for pendingStakerIterator.Next() { // Iterates over pending stakers
+		staker := pendingStakerIterator.Value()
+
+		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		if err != nil {
+			return err
+		}
+
+		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
+		if err != nil {
+			return err
+		}
+		totalStake, err = math.Add64(totalStake, stakedAmt)
+		if err != nil {
+			return err
+		}
+		stakedOuts = append(stakedOuts, outs...)
+	}
+
+	response.Staked = json.Uint64(totalStake)
+	response.Outputs = make([]string, len(stakedOuts))
+	for i, output := range stakedOuts {
+		bytes, err := Codec.Marshal(txs.Version, output)
+		if err != nil {
+			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
+		}
+		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
+		if err != nil {
+			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
+		}
+	}
+	response.Encoding = args.Encoding
+
+	return nil
+}
 
 // GetMinStakeReply is the response from calling GetMinStake.
 type GetMinStakeReply struct {
