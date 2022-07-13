@@ -160,7 +160,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	_, err = executor.onAbort.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	validatorStaker, err = executor.onAbort.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	validatorStaker, err = executor.onAbort.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	assert.NoError(err)
 	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
 
