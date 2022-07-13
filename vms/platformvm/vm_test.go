@@ -2188,7 +2188,6 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			assert := assert.New(t)
-
 			staker, err := GetValidator(vm.internalState, constants.PrimaryNetworkID, nodeID)
 			assert.NoError(err)
 

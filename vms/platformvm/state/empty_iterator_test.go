@@ -11,12 +11,10 @@ import (
 
 func TestEmptyIterator(t *testing.T) {
 	assert := assert.New(t)
-
 	assert.False(EmptyIterator.Next())
 
 	EmptyIterator.Release()
 
 	assert.False(EmptyIterator.Next())
-
 	assert.Nil(EmptyIterator.Value())
 }

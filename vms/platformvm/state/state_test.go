@@ -36,7 +36,6 @@ var (
 
 func TestStateInitialization(t *testing.T) {
 	assert := assert.New(t)
-
 	state, db := newUninitializedState(assert)
 
 	shouldInit, err := state.ShouldInit()
@@ -54,7 +53,6 @@ func TestStateInitialization(t *testing.T) {
 
 func TestStateSyncGenesis(t *testing.T) {
 	assert := assert.New(t)
-
 	state, _ := newInitializedState(assert)
 
 	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)

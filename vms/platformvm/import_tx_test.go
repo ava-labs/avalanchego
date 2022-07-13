@@ -128,7 +128,6 @@ func TestNewImportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
-
 			mutableSharedMemory.SharedMemory = tt.sharedMemory
 			tx, err := vm.txBuilder.NewImportTx(tt.sourceChainID, to, tt.sourceKeys, ids.ShortEmpty)
 			if tt.shouldErr {

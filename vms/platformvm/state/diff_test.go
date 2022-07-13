@@ -13,7 +13,6 @@ import (
 
 func TestDiffMissingState(t *testing.T) {
 	assert := assert.New(t)
-
 	state, _ := newInitializedState(assert)
 	states := NewVersions(ids.GenerateTestID(), state)
 
@@ -23,7 +22,6 @@ func TestDiffMissingState(t *testing.T) {
 
 func TestDiffCreation(t *testing.T) {
 	assert := assert.New(t)
-
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(assert)
 	states := NewVersions(lastAcceptedID, state)
@@ -35,7 +33,6 @@ func TestDiffCreation(t *testing.T) {
 
 func TestDiffCurrentSupply(t *testing.T) {
 	assert := assert.New(t)
-
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(assert)
 	states := NewVersions(lastAcceptedID, state)

@@ -14,7 +14,6 @@ import (
 
 func TestMaskedIterator(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),

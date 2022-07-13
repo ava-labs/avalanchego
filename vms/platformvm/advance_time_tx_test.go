@@ -120,7 +120,6 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {

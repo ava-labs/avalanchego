@@ -14,7 +14,6 @@ import (
 
 func TestBaseValidatorsPruning(t *testing.T) {
 	assert := assert.New(t)
-
 	staker := newTestStaker()
 	delegator := newTestStaker()
 	delegator.SubnetID = staker.SubnetID
@@ -66,7 +65,6 @@ func TestBaseValidatorsPruning(t *testing.T) {
 
 func TestBaseValidatorsStaker(t *testing.T) {
 	assert := assert.New(t)
-
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
@@ -139,7 +137,6 @@ func TestBaseValidatorsDelegator(t *testing.T) {
 
 func TestDiffValidatorsStaker(t *testing.T) {
 	assert := assert.New(t)
-
 	staker := newTestStaker()
 	delegator := newTestStaker()
 

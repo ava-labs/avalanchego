@@ -129,7 +129,6 @@ func TestStakerLess(t *testing.T) {
 
 func TestNewPrimaryNetworkStaker(t *testing.T) {
 	assert := assert.New(t)
-
 	txID := ids.GenerateTestID()
 	vdr := &validator.Validator{
 		NodeID: ids.GenerateTestNodeID(),
@@ -153,7 +152,6 @@ func TestNewPrimaryNetworkStaker(t *testing.T) {
 
 func TestNewSubnetStaker(t *testing.T) {
 	assert := assert.New(t)
-
 	txID := ids.GenerateTestID()
 	vdr := &validator.SubnetValidator{
 		Validator: validator.Validator{

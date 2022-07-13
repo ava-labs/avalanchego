@@ -21,6 +21,7 @@ import (
 )
 
 func TestAtomicTxImports(t *testing.T) {
+	assert := assert.New(t)
 	vm, baseDB, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -29,7 +30,6 @@ func TestAtomicTxImports(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
-	assert := assert.New(t)
 
 	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),

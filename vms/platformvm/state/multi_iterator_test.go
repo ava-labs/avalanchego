@@ -14,7 +14,6 @@ import (
 
 func TestMultiIterator(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers0 := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -62,7 +61,6 @@ func TestMultiIterator(t *testing.T) {
 
 func TestMultiIteratorEarlyRelease(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers0 := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),

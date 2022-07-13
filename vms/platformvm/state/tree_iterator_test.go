@@ -16,7 +16,6 @@ import (
 
 func TestTreeIterator(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -48,7 +47,6 @@ func TestTreeIterator(t *testing.T) {
 
 func TestTreeIteratorNil(t *testing.T) {
 	assert := assert.New(t)
-
 	it := NewTreeIterator(nil)
 	assert.False(it.Next())
 	it.Release()
@@ -56,7 +54,6 @@ func TestTreeIteratorNil(t *testing.T) {
 
 func TestTreeIteratorEarlyRelease(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -85,7 +82,6 @@ func TestTreeIteratorEarlyRelease(t *testing.T) {
 
 func TestTreeIteratorAfter(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -117,7 +113,6 @@ func TestTreeIteratorAfter(t *testing.T) {
 
 func TestTreeIteratorAfterNil(t *testing.T) {
 	assert := assert.New(t)
-
 	staker := &Staker{
 		TxID:     ids.GenerateTestID(),
 		NextTime: time.Unix(0, 0),
@@ -131,7 +126,6 @@ func TestTreeIteratorAfterNil(t *testing.T) {
 
 func TestTreeIteratorAfterEarlyRelease(t *testing.T) {
 	assert := assert.New(t)
-
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),

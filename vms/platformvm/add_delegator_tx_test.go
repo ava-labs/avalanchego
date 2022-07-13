@@ -368,7 +368,6 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -538,7 +537,6 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
-
 			vm, _, _, _ := defaultVM()
 			vm.ApricotPhase3Time = test.ap3Time
 

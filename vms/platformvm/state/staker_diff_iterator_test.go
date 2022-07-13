@@ -14,7 +14,6 @@ import (
 
 func TestStakerDiffIterator(t *testing.T) {
 	assert := assert.New(t)
-
 	currentStakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -113,7 +112,6 @@ func TestStakerDiffIterator(t *testing.T) {
 
 func TestMutableStakerIterator(t *testing.T) {
 	assert := assert.New(t)
-
 	initialStakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
