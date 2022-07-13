@@ -686,14 +686,10 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	e.onCommit.DeleteCurrentValidator(stakerToRemove)
-
 	e.onAbort, err = state.NewDiff(e.parentID, e.vm.stateVersions)
 	if err != nil {
 		return err
 	}
-
-	e.onAbort.DeleteCurrentValidator(stakerToRemove)
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := e.onAbort.GetCurrentSupply()
@@ -709,6 +705,9 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	)
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case *txs.AddValidatorTx:
+		e.onCommit.DeleteCurrentValidator(stakerToRemove)
+		e.onAbort.DeleteCurrentValidator(stakerToRemove)
+
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
@@ -751,6 +750,9 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		nodeID = uStakerTx.Validator.ID()
 		startTime = uStakerTx.StartTime()
 	case *txs.AddDelegatorTx:
+		e.onCommit.DeleteCurrentDelegator(stakerToRemove)
+		e.onAbort.DeleteCurrentDelegator(stakerToRemove)
+
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
