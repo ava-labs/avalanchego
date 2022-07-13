@@ -93,7 +93,7 @@ type StateSyncClient interface {
 // and monitor progress.
 // Error returns an error if any was encountered.
 type Syncer interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context) error
 	Done() <-chan error
 }
 
@@ -275,7 +275,9 @@ func (client *stateSyncerClient) syncBlocks(ctx context.Context, fromHash common
 func (client *stateSyncerClient) syncAtomicTrie(ctx context.Context) error {
 	log.Info("atomic tx: sync starting", "root", client.syncSummary.AtomicRoot)
 	atomicSyncer := client.atomicTrie.Syncer(client.client, client.syncSummary.AtomicRoot, client.syncSummary.BlockNumber)
-	atomicSyncer.Start(ctx)
+	if err := atomicSyncer.Start(ctx); err != nil {
+		return err
+	}
 	err := <-atomicSyncer.Done()
 	log.Info("atomic tx: sync finished", "root", client.syncSummary.AtomicRoot, "err", err)
 	return err
@@ -283,18 +285,20 @@ func (client *stateSyncerClient) syncAtomicTrie(ctx context.Context) error {
 
 func (client *stateSyncerClient) syncStateTrie(ctx context.Context) error {
 	log.Info("state sync: sync starting", "root", client.syncSummary.BlockRoot)
-	evmSyncer, err := statesync.NewEVMStateSyncer(&statesync.EVMStateSyncerConfig{
+	evmSyncer, err := statesync.NewStateSyncer(&statesync.StateSyncerConfig{
 		Client:                   client.client,
 		Root:                     client.syncSummary.BlockRoot,
-		DB:                       client.chaindb,
 		BatchSize:                ethdb.IdealBatchSize,
+		DB:                       client.chaindb,
 		MaxOutstandingCodeHashes: statesync.DefaultMaxOutstandingCodeHashes,
 		NumCodeFetchingWorkers:   statesync.DefaultNumCodeFetchingWorkers,
 	})
 	if err != nil {
 		return err
 	}
-	evmSyncer.Start(ctx)
+	if err := evmSyncer.Start(ctx); err != nil {
+		return err
+	}
 	err = <-evmSyncer.Done()
 	log.Info("state sync: sync finished", "root", client.syncSummary.BlockRoot, "err", err)
 	return err

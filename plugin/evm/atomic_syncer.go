@@ -16,6 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+var (
+	_ Syncer                  = &atomicSyncer{}
+	_ syncclient.LeafSyncTask = &atomicSyncerLeafTask{}
+)
+
 // atomicSyncer is used to sync the atomic trie from the network. The CallbackLeafSyncer
 // is responsible for orchestrating the sync while atomicSyncer is responsible for maintaining
 // the state of progress and writing the actual atomic trie to the trieDB.
@@ -47,33 +52,31 @@ func addZeroes(height uint64) []byte {
 func newAtomicSyncer(client syncclient.LeafClient, atomicTrie *atomicTrie, targetRoot common.Hash, targetHeight uint64) *atomicSyncer {
 	_, lastCommit := atomicTrie.LastCommitted()
 
-	return &atomicSyncer{
+	atomicSyncer := &atomicSyncer{
 		atomicTrie:   atomicTrie,
 		targetRoot:   targetRoot,
 		targetHeight: targetHeight,
 		nextCommit:   lastCommit + atomicTrie.commitHeightInterval,
 		nextHeight:   lastCommit + 1,
-		syncer:       syncclient.NewCallbackLeafSyncer(client),
 	}
+	tasks := make(chan syncclient.LeafSyncTask, 1)
+	tasks <- &atomicSyncerLeafTask{atomicSyncer: atomicSyncer}
+	close(tasks)
+	atomicSyncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks)
+	return atomicSyncer
 }
 
 // Start begins syncing the target atomic root.
-func (s *atomicSyncer) Start(ctx context.Context) {
-	s.syncer.Start(ctx, 1, &syncclient.LeafSyncTask{
-		NodeType:      message.AtomicTrieNode,
-		Root:          s.targetRoot,
-		Start:         addZeroes(s.nextHeight),
-		OnLeafs:       s.onLeafs,
-		OnFinish:      s.onFinish,
-		OnSyncFailure: s.onSyncFailure,
-	})
+func (s *atomicSyncer) Start(ctx context.Context) error {
+	s.syncer.Start(ctx, 1, s.onSyncFailure)
+	return nil
 }
 
 // onLeafs is the callback for the leaf syncer, which will insert the key-value pairs into the trie.
-func (s *atomicSyncer) onLeafs(_ common.Hash, keys [][]byte, values [][]byte) ([]*syncclient.LeafSyncTask, error) {
+func (s *atomicSyncer) onLeafs(keys [][]byte, values [][]byte) error {
 	for i, key := range keys {
 		if len(key) != atomicKeyLength {
-			return nil, fmt.Errorf("unexpected key len (%d) in atomic trie sync", len(key))
+			return fmt.Errorf("unexpected key len (%d) in atomic trie sync", len(key))
 		}
 		// key = height + blockchainID
 		height := binary.BigEndian.Uint64(key[:wrappers.LongLen])
@@ -81,24 +84,24 @@ func (s *atomicSyncer) onLeafs(_ common.Hash, keys [][]byte, values [][]byte) ([
 		// Commit the trie and update [nextCommit] if we are crossing a commit interval
 		if height > s.nextCommit {
 			if err := s.atomicTrie.commit(s.nextCommit); err != nil {
-				return nil, err
+				return err
 			}
 			if err := s.atomicTrie.db.Commit(); err != nil {
-				return nil, err
+				return err
 			}
 			s.nextCommit += s.atomicTrie.commitHeightInterval
 		}
 
 		if err := s.atomicTrie.trie.TryUpdate(key, values[i]); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // onFinish is called when sync for this trie is complete.
 // commit the trie to disk and perform the final checks that we synced the target root correctly.
-func (s *atomicSyncer) onFinish(_ common.Hash) error {
+func (s *atomicSyncer) onFinish() error {
 	// commit the trie on finish
 	if err := s.atomicTrie.commit(s.targetHeight); err != nil {
 		return err
@@ -124,3 +127,18 @@ func (s *atomicSyncer) onSyncFailure(error) error {
 
 // Done returns a channel which produces any error that occurred during syncing or nil on success.
 func (s *atomicSyncer) Done() <-chan error { return s.syncer.Done() }
+
+type atomicSyncerLeafTask struct {
+	atomicSyncer *atomicSyncer
+}
+
+func (a *atomicSyncerLeafTask) Start() []byte              { return addZeroes(a.atomicSyncer.nextHeight) }
+func (a *atomicSyncerLeafTask) End() []byte                { return nil }
+func (a *atomicSyncerLeafTask) NodeType() message.NodeType { return message.AtomicTrieNode }
+func (a *atomicSyncerLeafTask) OnFinish() error            { return a.atomicSyncer.onFinish() }
+func (a *atomicSyncerLeafTask) OnStart() (bool, error)     { return false, nil }
+func (a *atomicSyncerLeafTask) Root() common.Hash          { return a.atomicSyncer.targetRoot }
+func (a *atomicSyncerLeafTask) Account() common.Hash       { return common.Hash{} }
+func (a *atomicSyncerLeafTask) OnLeafs(keys, vals [][]byte) error {
+	return a.atomicSyncer.onLeafs(keys, vals)
+}
