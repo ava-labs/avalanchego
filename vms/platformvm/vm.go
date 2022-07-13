@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -196,10 +195,7 @@ func (vm *VM) Initialize(
 
 	vm.manager = stateful.NewManager(
 		mempool,
-		vm.metrics,
-		vm.state,
-		vm.state,
-		vm.state,
+		*vm.metrics,
 		vm.state,
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
@@ -372,30 +368,29 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
+	/* TODO
 	return stateful.MakeStateful(
 		statelessBlk,
 		vm.manager,
 		vm.ctx,
 		choices.Processing,
 	)
+	*/
+	return vm.manager.NewBlock(statelessBlk), nil
 }
 
 func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return vm.manager.GetStatefulBlock(blkID)
+	return vm.manager.GetBlock(blkID)
 }
 
 // LastAccepted returns the block most recently accepted
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	return vm.state.GetLastAccepted(), nil
+	return vm.manager.LastAccepted(), nil
 }
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
 	return vm.BlockBuilder.SetPreference(blkID)
-}
-
-func (vm *VM) Preferred() (stateful.Block, error) {
-	return vm.BlockBuilder.Preferred()
 }
 
 func (vm *VM) Version() (string, error) {

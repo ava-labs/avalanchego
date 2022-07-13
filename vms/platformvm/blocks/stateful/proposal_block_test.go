@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -55,7 +56,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	chainTime := h.clk.Time().Truncate(time.Second)
 	currentSupply := uint64(1000)
 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-		func(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
+		func(blockID ids.ID) (stateless.Block, choices.Status, error) {
 			if blockID == apricotParentBlk.ID() {
 				return apricotParentBlk, choices.Accepted, nil
 			}
@@ -93,29 +94,27 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		Return(time.Duration(1000) /*upDuration*/, time.Time{} /*lastUpdated*/, nil /*err*/).AnyTimes()
 
 	// wrong height
-	block, err := NewProposalBlock(
+	statelessProposalBlock, err := stateless.NewProposalBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height(),
 		blkTx,
 	)
+	block := h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
 	// valid
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height()+1,
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 }
@@ -153,7 +152,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	currentSupply := uint64(1000)
 
 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-		func(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
+		func(blockID ids.ID) (stateless.Block, choices.Status, error) {
 			if blockID == parentBlk.ID() {
 				return parentBlk, choices.Accepted, nil
 			}
@@ -210,28 +209,26 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	currentStaker.EXPECT().DeleteNextStaker().AnyTimes()
 
 	// wrong version
-	block, err := NewProposalBlock(
+	statelessProposalBlock, err := stateless.NewProposalBlock(
 		stateless.ApricotVersion,
 		uint64(parentTime.Add(time.Second).Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		blkTx,
 	)
+	block := h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
 	// wrong height
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(parentTime.Add(time.Second).Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height(),
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -242,68 +239,63 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		},
 	}
 	assert.NoError(invalidTx.Sign(txs.Codec, nil))
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(parentTime.Add(time.Second).Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		invalidTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
 	// wrong timestamp, non increasing wrt parent
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(parentTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
 	// wrong timestamp, violated synchrony bound
 	beyondSyncBoundTimeStamp := h.clk.Time().Add(executor.SyncBound).Add(time.Second)
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(beyondSyncBoundTimeStamp.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
 	// wrong timestamp, skipped staker set change event
 	skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(skippedStakerEventTimeStamp.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(validatorEndTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 
@@ -320,15 +312,14 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		},
 	}
 
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(nextStakerTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		blkTx,
 	)
+	block = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 }
@@ -605,11 +596,9 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 					preferredID := h.fullState.GetLastAccepted()
 					parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 					assert.NoError(err)
-					block, err := NewProposalBlock(
+					statelessProposalBlock, err := stateless.NewProposalBlock(
 						stateless.BlueberryVersion,
 						uint64(newTime.Unix()),
-						h.blkManager,
-						h.ctx,
 						parentBlk.ID(),
 						parentBlk.Height()+1,
 						s0RewardTx,
@@ -617,8 +606,9 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 					assert.NoError(err)
 
 					// verify and accept the block
+					block := h.blkManager.NewBlock(statelessProposalBlock)
 					assert.NoError(block.Verify())
-					options, err := block.Options()
+					options, err := block.(snowman.OracleBlock).Options()
 					assert.NoError(err)
 
 					assert.NoError(options[0].Verify())
@@ -746,21 +736,24 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	preferredID := h.fullState.GetLastAccepted()
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	block, err := NewProposalBlock(
+	statelessProposalBlock, err := stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(subnetVdr1EndTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
 	)
 	assert.NoError(err)
+	propBlk := h.blkManager.NewBlock(statelessProposalBlock)
+	assert.NoError(propBlk.Verify()) // verify and update staker set
 
-	// update staker set
-	assert.NoError(block.Verify())
+	options, err := propBlk.(snowman.OracleBlock).Options()
+	assert.NoError(err)
+	commitBlk := options[0]
+	assert.NoError(commitBlk.Verify())
 
-	currentStakers := block.onCommitState.CurrentStakers()
+	blkState := h.blkManager.(*manager).blkIDToState[propBlk.ID()]
+	currentStakers := blkState.onCommitState.CurrentStakers()
 	vdr, err := currentStakers.GetValidator(subnetValidatorNodeID)
 	assert.NoError(err)
 	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
@@ -769,9 +762,8 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	assert.False(exists, "should have been removed from validator set")
 
 	// Check VM Validators are removed successfully
-	block.onBlueberryBaseOptionsState.Apply(h.fullState)
-	block.onCommitState.Apply(h.fullState)
-	assert.NoError(h.fullState.Commit())
+	assert.NoError(propBlk.Accept())
+	assert.NoError(commitBlk.Accept())
 	assert.False(h.cfg.Validators.Contains(testSubnet1.ID(), subnetVdr2NodeID))
 	assert.False(h.cfg.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 }
@@ -848,23 +840,23 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 			preferredID := h.fullState.GetLastAccepted()
 			parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 			assert.NoError(err)
-			block, err := NewProposalBlock(
+			statelessProposalBlock, err := stateless.NewProposalBlock(
 				stateless.BlueberryVersion,
 				uint64(subnetVdr1StartTime.Unix()),
-				h.blkManager,
-				h.ctx,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
 				s0RewardTx,
 			)
 			assert.NoError(err)
+			propBlk := h.blkManager.NewBlock(statelessProposalBlock)
+			assert.NoError(propBlk.Verify()) // verify update staker set
+			options, err := propBlk.(snowman.OracleBlock).Options()
+			assert.NoError(err)
+			commitBlk := options[0]
+			assert.NoError(commitBlk.Verify())
 
-			// update staker set
-			assert.NoError(block.Verify())
-			block.onBlueberryBaseOptionsState.Apply(h.fullState)
-			block.onCommitState.Apply(h.fullState)
-
-			assert.NoError(h.fullState.Commit())
+			assert.NoError(propBlk.Accept())
+			assert.NoError(commitBlk.Accept())
 			assert.Equal(whitelist, h.cfg.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 		})
 	}
@@ -931,21 +923,24 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	preferredID := h.fullState.GetLastAccepted()
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	block, err := NewProposalBlock(
+	statelessProposalBlock, err := stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
 	)
 	assert.NoError(err)
-	assert.NoError(block.Verify())
+	propBlk := h.blkManager.NewBlock(statelessProposalBlock)
+	assert.NoError(propBlk.Verify())
 
-	block.onBlueberryBaseOptionsState.Apply(h.fullState)
-	block.onCommitState.Apply(h.fullState)
-	assert.NoError(h.fullState.Commit())
+	options, err := propBlk.(snowman.OracleBlock).Options()
+	assert.NoError(err)
+	commitBlk := options[0]
+	assert.NoError(commitBlk.Verify())
+
+	assert.NoError(propBlk.Accept())
+	assert.NoError(commitBlk.Accept())
 
 	// Test validator weight before delegation
 	primarySet, ok := h.cfg.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -1004,21 +999,24 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(s0RewardTx.Sign(txs.Codec, nil))
 
 	// Advance Time
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
 	)
+	propBlk = h.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
-	assert.NoError(block.Verify())
+	assert.NoError(propBlk.Verify())
 
-	block.onBlueberryBaseOptionsState.Apply(h.fullState)
-	block.onCommitState.Apply(h.fullState)
-	assert.NoError(h.fullState.Commit())
+	options, err = propBlk.(snowman.OracleBlock).Options()
+	assert.NoError(err)
+	commitBlk = options[0]
+	assert.NoError(commitBlk.Verify())
+
+	assert.NoError(propBlk.Accept())
+	assert.NoError(commitBlk.Accept())
 
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)
@@ -1086,21 +1084,24 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	preferredID := h.fullState.GetLastAccepted()
 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	block, err := NewProposalBlock(
+	statelessProposalBlock, err := stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingValidatorStartTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
 	)
 	assert.NoError(err)
-	assert.NoError(block.Verify())
+	propBlk := h.blkManager.NewBlock(statelessProposalBlock)
+	assert.NoError(propBlk.Verify())
 
-	block.onBlueberryBaseOptionsState.Apply(h.fullState)
-	block.onCommitState.Apply(h.fullState)
-	assert.NoError(h.fullState.Commit())
+	options, err := propBlk.(snowman.OracleBlock).Options()
+	assert.NoError(err)
+	commitBlk := options[0]
+	assert.NoError(commitBlk.Verify())
+
+	assert.NoError(propBlk.Accept())
+	assert.NoError(commitBlk.Accept())
 
 	// Test validator weight before delegation
 	primarySet, ok := h.cfg.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -1158,21 +1159,24 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(s0RewardTx.Sign(txs.Codec, nil))
 
 	// Advance Time
-	block, err = NewProposalBlock(
+	statelessProposalBlock, err = stateless.NewProposalBlock(
 		stateless.BlueberryVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
-		h.blkManager,
-		h.ctx,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
 	)
 	assert.NoError(err)
-	assert.NoError(block.Verify())
+	propBlk = h.blkManager.NewBlock(statelessProposalBlock)
+	assert.NoError(propBlk.Verify())
 
-	block.onBlueberryBaseOptionsState.Apply(h.fullState)
-	block.onCommitState.Apply(h.fullState)
-	assert.NoError(h.fullState.Commit())
+	options, err = propBlk.(snowman.OracleBlock).Options()
+	assert.NoError(err)
+	commitBlk = options[0]
+	assert.NoError(commitBlk.Verify())
+
+	assert.NoError(propBlk.Accept())
+	assert.NoError(commitBlk.Accept())
 
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)

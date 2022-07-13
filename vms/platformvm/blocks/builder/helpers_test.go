@@ -198,10 +198,7 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 	}
 	res.blkManager = stateful.NewManager(
 		res.mempool,
-		metrics,
-		res.fullState,
-		res.fullState,
-		res.fullState,
+		*metrics,
 		res.fullState,
 		res.txExecBackend,
 		window,

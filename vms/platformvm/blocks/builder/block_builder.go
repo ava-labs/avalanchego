@@ -42,7 +42,7 @@ type BlockBuilder interface {
 
 	StartTimer()
 	SetPreference(blockID ids.ID) error
-	Preferred() (stateful.Block, error)
+	Preferred() (snowman.Block, error)
 	AddUnverifiedTx(tx *txs.Tx) error
 	BuildBlock() (snowman.Block, error)
 	Shutdown()
@@ -116,8 +116,8 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) error {
 	return nil
 }
 
-func (b *blockBuilder) Preferred() (stateful.Block, error) {
-	return b.blkManager.GetStatefulBlock(b.preferredBlockID)
+func (b *blockBuilder) Preferred() (snowman.Block, error) {
+	return b.blkManager.GetBlock(b.preferredBlockID)
 }
 
 func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
@@ -137,12 +137,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
+	preferredState := b.blkManager.OnAccept(preferred.ID())
 
 	verifier := executor.MempoolTxVerifier{
 		Backend:     &b.txExecutorBackend,
@@ -218,13 +213,7 @@ func (b *blockBuilder) resetTimer() {
 	if err != nil {
 		return
 	}
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
-		return
-	}
-	preferredState := preferredDecision.OnAccept()
+	preferredState := b.blkManager.OnAccept(preferred.ID())
 	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time: %s", err)

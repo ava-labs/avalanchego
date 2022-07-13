@@ -10,21 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var _ CommonBlockIntf = &CommonBlock{}
-
-type CommonBlockIntf interface {
-	Initialize(version uint16, bytes []byte) error
-
-	ID() ids.ID
-	Bytes() []byte
-	Parent() ids.ID
-	Height() uint64
-	Version() uint16
-	UnixTimestamp() int64
-
-	SetTimestamp(time.Time)
-}
-
 // CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
 	// parent's ID

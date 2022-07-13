@@ -34,10 +34,8 @@ var (
 	_ Mempool     = &mempool{}
 	_ txs.Visitor = &mempoolIssuer{}
 
-	ErrUnknownTxType     = errors.New("unknown transaction type")
-	ErrMempoolFull       = errors.New("mempool is full")
-	ErrCorruptedReason   = errors.New("tx validity corrupted")
-	ErrMempoolReentrancy = errors.New("mempool reentrancy")
+	ErrUnknownTxType = errors.New("unknown transaction type")
+	ErrMempoolFull   = errors.New("mempool is full")
 )
 
 type BlockTimer interface {
@@ -164,7 +162,7 @@ func (m *mempool) DisableAdding() { m.dropIncoming = true }
 
 func (m *mempool) Add(tx *txs.Tx) error {
 	if m.dropIncoming {
-		return ErrMempoolReentrancy
+		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
 	}
 
 	// Note: a previously dropped tx can be re-added
@@ -191,11 +189,10 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("tx %s conflicts with a transaction in the mempool", txID)
 	}
 
-	err := tx.Unsigned.Visit(&mempoolIssuer{
+	if err := tx.Unsigned.Visit(&mempoolIssuer{
 		m:  m,
 		tx: tx,
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -342,8 +339,13 @@ type mempoolIssuer struct {
 	tx *txs.Tx
 }
 
-func (i *mempoolIssuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return ErrUnknownTxType }
-func (i *mempoolIssuer) RewardValidatorTx(*txs.RewardValidatorTx) error { return ErrUnknownTxType }
+func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+	return fmt.Errorf("%w: %T", ErrUnknownTxType, tx)
+}
+
+func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+	return fmt.Errorf("%w: %T", ErrUnknownTxType, tx)
+}
 
 func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
 	i.m.addProposalTx(i.tx)

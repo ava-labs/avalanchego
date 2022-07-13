@@ -45,13 +45,13 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			description: "abort block timestamp before parent's one",
 			childTime:   now.Add(-1 * time.Second),
 			parentTime:  now,
-			result:      ErrOptionBlockTimestampNotMatchingParent,
+			result:      errOptionBlockTimestampNotMatchingParent,
 		},
 		{
 			description: "abort block timestamp after parent's one",
 			parentTime:  now,
 			childTime:   now.Add(time.Second),
-			result:      ErrOptionBlockTimestampNotMatchingParent,
+			result:      errOptionBlockTimestampNotMatchingParent,
 		},
 	}
 
@@ -66,12 +66,10 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			parentTx, err := testProposalTx()
 			assert.NoError(err)
 
-			blueberryParentBlk, err := NewProposalBlock(
+			blueberryParentBlk, err := stateless.NewProposalBlock(
 				parentVersion,
 				uint64(test.parentTime.Unix()),
-				h.blkManager,
-				h.ctx,
-				ids.Empty, // does not matter
+				ids.Empty, // parentID does not matter
 				parentHeight,
 				parentTx,
 			)
@@ -82,18 +80,17 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			// build and verify child block
 			childVersion := blkVersion
 			childHeight := parentHeight + 1
-			blk, err := NewAbortBlock(
+			statelessAbortBlk, err := stateless.NewAbortBlock(
 				childVersion,
 				uint64(test.childTime.Unix()),
-				h.blkManager,
 				blueberryParentBlk.ID(),
 				childHeight,
-				true, // wasPreferred
 			)
 			assert.NoError(err)
 
 			// call verify on it
-			err = h.blkManager.(*manager).verifier.(*verifierImpl).verifyCommonBlock(blk.decisionBlock.commonBlock, false /*enforceStrictness*/)
+			commonBlk := statelessAbortBlk.(*stateless.AbortBlock)
+			err = h.blkManager.(*manager).verifier.(*verifier).verifyCommonBlock(commonBlk)
 			assert.ErrorIs(err, test.result)
 		})
 	}

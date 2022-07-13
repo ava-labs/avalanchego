@@ -4,45 +4,122 @@
 package stateful
 
 import (
-	"errors"
+	"fmt"
+	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
-var ErrBlockNil = errors.New("block is nil")
+var (
+	_ snowman.Block       = &Block{}
+	_ snowman.OracleBlock = &OracleBlock{}
+)
 
-type Block interface {
-	snowman.Block
-
-	// returns true if this block or any processing ancestors consume any of the
-	// named atomic imports.
-	conflicts(ids.Set) (bool, error)
-
-	// addChild notifies this block that it has a child block building on it.
-	// When this block commits its changes, it should set the child's base state
-	// to the internal state. This ensures that the state versions do not
-	// recurse the length of the chain.
-	addChild(Block)
-
-	// free all the references of this block from the vm's memory
-	free()
-
-	// Set the block's underlying state to the chain's internal state
-	setBaseState()
+// Exported for testing in platformvm package.
+type Block struct {
+	stateless.Block
+	manager *manager
 }
 
-// A Decision block (either Commit, Abort, or DecisionBlock) represents a
-// Decision to either commit or abort the changes specified in its parent,
-// if its parent is a proposal. Otherwise, the changes are committed
-// immediately.
-type Decision interface {
-	// This function should only be called after Verify is called.
-	// OnAccept returns:
-	// 1) The current state of the chain, if this block is decided or hasn't
-	//    been verified.
-	// 2) The state of the chain after this block is accepted, if this block was
-	//    verified successfully.
-	OnAccept() state.Chain
+func (b *Block) Verify() error {
+	return b.Visit(b.manager.verifier)
+}
+
+func (b *Block) Accept() error {
+	return b.Visit(b.manager.acceptor)
+}
+
+func (b *Block) Reject() error {
+	return b.Visit(b.manager.rejector)
+}
+
+func (b *Block) Status() choices.Status {
+	blkID := b.ID()
+	// If this block is an accepted Proposal block with
+	// no accepted children, it will be in [blkIDToState],
+	// but we should return accepted, not processing,
+	// so we do this check.
+	if b.manager.backend.lastAccepted == blkID {
+		return choices.Accepted
+	}
+	// Check if the block is in memory. If so, it's processing.
+	if _, ok := b.manager.backend.blkIDToState[blkID]; ok {
+		return choices.Processing
+	}
+	// Block isn't in memory. Check in the database.
+	_, status, err := b.manager.state.GetStatelessBlock(blkID)
+	if err != nil {
+		// It isn't in the database.
+		return choices.Processing
+	}
+	return status
+}
+
+func (b *Block) Timestamp() time.Time {
+	// If this is the last accepted block and the block was loaded from disk
+	// since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// we explicitly return the chain time.
+	// Check if the block is processing.
+	if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
+		return blkState.timestamp
+	}
+
+	if b.Version() == stateless.ApricotVersion {
+		// The block isn't processing.
+		// According to the snowman.Block interface, the last accepted
+		// block is the only accepted block that must return a correct timestamp,
+		// so we just return the chain time.
+		return b.manager.state.GetTimestamp()
+	}
+	return time.Unix(b.UnixTimestamp(), 0)
+}
+
+// Exported for testing in platformvm package.
+type OracleBlock struct {
+	// Invariant: The inner stateless block is a *stateless.ProposalBlock.
+	*Block
+}
+
+func (b *OracleBlock) Options() ([2]snowman.Block, error) {
+	blkID := b.ID()
+	nextHeight := b.Height() + 1
+
+	statelessCommitBlk, err := stateless.NewCommitBlock(
+		b.Version(),
+		uint64(b.UnixTimestamp()),
+		blkID,
+		nextHeight,
+	)
+	if err != nil {
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to create commit block: %w",
+			err,
+		)
+	}
+	commitBlock := b.manager.NewBlock(statelessCommitBlk)
+
+	statelessAbortBlk, err := stateless.NewAbortBlock(
+		b.Version(),
+		uint64(b.UnixTimestamp()),
+		blkID,
+		nextHeight,
+	)
+	if err != nil {
+		return [2]snowman.Block{}, fmt.Errorf(
+			"failed to create abort block: %w",
+			err,
+		)
+	}
+	abortBlock := b.manager.NewBlock(statelessAbortBlk)
+
+	blkState, ok := b.manager.backend.blkIDToState[blkID]
+	if !ok {
+		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
+	}
+	if blkState.initiallyPreferCommit {
+		return [2]snowman.Block{commitBlock, abortBlock}, nil
+	}
+	return [2]snowman.Block{abortBlock, commitBlock}, nil
 }

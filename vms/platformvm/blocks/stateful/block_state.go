@@ -4,84 +4,44 @@
 package stateful
 
 import (
-	"fmt"
+	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-var _ blockState = &blockStateImpl{}
-
-func MakeStateful(
-	statelessBlk stateless.CommonBlockIntf,
-	manager Manager,
-	ctx *snow.Context,
-	status choices.Status,
-) (Block, error) {
-	switch sb := statelessBlk.(type) {
-	case stateless.AtomicBlockIntf:
-		return toStatefulAtomicBlock(sb, manager, ctx, status)
-	case stateless.ProposalBlockIntf:
-		return toStatefulProposalBlock(sb, manager, ctx, status)
-	case stateless.StandardBlockIntf:
-		return toStatefulStandardBlock(sb, manager, ctx, status)
-	case stateless.OptionBlock:
-		switch sb.(type) {
-		case *stateless.AbortBlock:
-			return toStatefulAbortBlock(sb, manager, false /*wasPreferred*/, status)
-		case *stateless.CommitBlock:
-			return toStatefulCommitBlock(sb, manager, false /*wasPreferred*/, status)
-		default:
-			return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)
-		}
-	default:
-		return nil, fmt.Errorf("couldn't make unknown block type %T stateful", statelessBlk)
-	}
+type standardBlockState struct {
+	onAcceptFunc func()
 }
 
-type blockState interface {
-	AddStatelessBlock(block stateless.CommonBlockIntf, status choices.Status)
-	GetStatefulBlock(blkID ids.ID) (Block, error)
-	pinVerifiedBlock(blk Block)
-	unpinVerifiedBlock(id ids.ID)
+type atomicBlockState struct {
+	inputs ids.Set
 }
 
-type blockStateImpl struct {
-	state.State
-
-	// TODO is there a way to avoid having [manager] in here?
-	// [blockStateImpl] is embedded in manager.
-	manager      Manager
-	verifiedBlks map[ids.ID]Block
-	ctx          *snow.Context
+type proposalBlockState struct {
+	initiallyPreferCommit bool
+	onCommitState         state.Diff
+	onAbortState          state.Diff
 }
 
-func (b *blockStateImpl) GetStatefulBlock(blkID ids.ID) (Block, error) {
-	// If block is in memory, return it.
-	if blk, exists := b.verifiedBlks[blkID]; exists {
-		return blk, nil
-	}
+// The state of a block.
+// Note that not all fields will be set for a given block.
+type blockState struct {
+	standardBlockState
+	proposalBlockState
+	atomicBlockState
+	statelessBlock stateless.Block
+	onAcceptState  state.Diff
+	// This block's children which have passed verification.
+	children       []ids.ID
+	timestamp      time.Time
+	atomicRequests map[ids.ID]*atomic.Requests
 
-	statelessBlk, blkStatus, err := b.State.GetStatelessBlock(blkID)
-	if err != nil {
-		return nil, err
-	}
-
-	return MakeStateful(
-		statelessBlk,
-		b.manager,
-		b.ctx,
-		blkStatus,
-	)
-}
-
-func (b *blockStateImpl) pinVerifiedBlock(blk Block) {
-	b.verifiedBlks[blk.ID()] = blk
-}
-
-func (b *blockStateImpl) unpinVerifiedBlock(id ids.ID) {
-	delete(b.verifiedBlks, id)
+	// Following Blueberry activation, onBlueberryBaseOptionsState is the base state
+	// over which both commit and abort states are built
+	// TODO ABENEGIA: should this be instead onAcceptState for ProposalBlock as well?
+	// it would fit standard block flow
+	onBlueberryBaseOptionsState state.Diff
 }

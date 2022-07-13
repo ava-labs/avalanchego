@@ -10,17 +10,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ AtomicBlockIntf = &AtomicBlock{}
+var _ Block = &AtomicBlock{}
 
-type AtomicBlockIntf interface {
-	CommonBlockIntf
+// AtomicBlock being accepted results in the atomic transaction contained in the
+// block to be accepted and committed to the chain.
+type AtomicBlock struct {
+	CommonBlock `serialize:"true"`
 
-	// ProposalTx returns list of transactions
-	// contained in the block
-	AtomicTx() *txs.Tx
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (AtomicBlockIntf, error) {
+func NewAtomicBlock(
+	parentID ids.ID,
+	height uint64,
+	tx *txs.Tx,
+) (*AtomicBlock, error) {
 	res := &AtomicBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -31,7 +35,7 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (AtomicBlockIntf
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
-	blk := CommonBlockIntf(res)
+	blk := Block(res)
 	bytes, err := Codec.Marshal(ApricotVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
@@ -42,14 +46,6 @@ func NewAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (AtomicBlockIntf
 	}
 
 	return res, res.Initialize(ApricotVersion, bytes)
-}
-
-// AtomicBlock being accepted results in the atomic transaction contained in the
-// block to be accepted and committed to the chain.
-type AtomicBlock struct {
-	CommonBlock `serialize:"true"`
-
-	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
@@ -68,4 +64,8 @@ func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) AtomicTx() *txs.Tx { return ab.Tx }
+func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
+
+func (ab *AtomicBlock) Visit(v Visitor) error {
+	return v.VisitAtomicBlock(ab)
+}

@@ -346,15 +346,66 @@ func (mr *MockLastAcceptederMockRecorder) GetLastAccepted() *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *MockLastAccepteder) SetLastAccepted(blkID ids.ID, persist bool) {
+func (m *MockLastAccepteder) SetLastAccepted(blkID ids.ID) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", blkID, persist)
+	m.ctrl.Call(m, "SetLastAccepted", blkID)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *MockLastAcceptederMockRecorder) SetLastAccepted(blkID, persist interface{}) *gomock.Call {
+func (mr *MockLastAcceptederMockRecorder) SetLastAccepted(blkID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockLastAccepteder)(nil).SetLastAccepted), blkID, persist)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockLastAccepteder)(nil).SetLastAccepted), blkID)
+}
+
+// MockBlockState is a mock of BlockState interface.
+type MockBlockState struct {
+	ctrl     *gomock.Controller
+	recorder *MockBlockStateMockRecorder
+}
+
+// MockBlockStateMockRecorder is the mock recorder for MockBlockState.
+type MockBlockStateMockRecorder struct {
+	mock *MockBlockState
+}
+
+// NewMockBlockState creates a new mock instance.
+func NewMockBlockState(ctrl *gomock.Controller) *MockBlockState {
+	mock := &MockBlockState{ctrl: ctrl}
+	mock.recorder = &MockBlockStateMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockBlockState) EXPECT() *MockBlockStateMockRecorder {
+	return m.recorder
+}
+
+// AddStatelessBlock mocks base method.
+func (m *MockBlockState) AddStatelessBlock(block stateless.Block, status choices.Status) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddStatelessBlock", block, status)
+}
+
+// AddStatelessBlock indicates an expected call of AddStatelessBlock.
+func (mr *MockBlockStateMockRecorder) AddStatelessBlock(block, status interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockBlockState)(nil).AddStatelessBlock), block, status)
+}
+
+// GetStatelessBlock mocks base method.
+func (m *MockBlockState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
+	ret0, _ := ret[0].(stateless.Block)
+	ret1, _ := ret[1].(choices.Status)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetStatelessBlock indicates an expected call of GetStatelessBlock.
+func (mr *MockBlockStateMockRecorder) GetStatelessBlock(blockID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockBlockState)(nil).GetStatelessBlock), blockID)
 }
 
 // MockState is a mock of State interface.
@@ -441,7 +492,7 @@ func (mr *MockStateMockRecorder) AddRewardUTXO(txID, utxo interface{}) *gomock.C
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockState) AddStatelessBlock(block stateless.CommonBlockIntf, status choices.Status) {
+func (m *MockState) AddStatelessBlock(block stateless.Block, status choices.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddStatelessBlock", block, status)
 }
@@ -670,10 +721,10 @@ func (mr *MockStateMockRecorder) GetStartTime(nodeID interface{}) *gomock.Call {
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockState) GetStatelessBlock(blockID ids.ID) (stateless.CommonBlockIntf, choices.Status, error) {
+func (m *MockState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
-	ret0, _ := ret[0].(stateless.CommonBlockIntf)
+	ret0, _ := ret[0].(stateless.Block)
 	ret1, _ := ret[1].(choices.Status)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -856,15 +907,15 @@ func (mr *MockStateMockRecorder) SetHeight(height interface{}) *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *MockState) SetLastAccepted(blkID ids.ID, persist bool) {
+func (m *MockState) SetLastAccepted(blkID ids.ID) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", blkID, persist)
+	m.ctrl.Call(m, "SetLastAccepted", blkID)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *MockStateMockRecorder) SetLastAccepted(blkID, persist interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) SetLastAccepted(blkID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID, persist)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID)
 }
 
 // SetPendingStakers mocks base method.
@@ -903,20 +954,6 @@ func (m *MockState) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastU
 func (mr *MockStateMockRecorder) SetUptime(nodeID, upDuration, lastUpdated interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), nodeID, upDuration, lastUpdated)
-}
-
-// SyncGenesis mocks base method.
-func (m *MockState) SyncGenesis(genesisBytes []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SyncGenesis", genesisBytes)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SyncGenesis indicates an expected call of SyncGenesis.
-func (mr *MockStateMockRecorder) SyncGenesis(genesisBytes interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncGenesis", reflect.TypeOf((*MockState)(nil).SyncGenesis), genesisBytes)
 }
 
 // UTXOIDs mocks base method.

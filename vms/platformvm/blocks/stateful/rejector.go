@@ -3,31 +3,38 @@
 
 package stateful
 
-import "github.com/ava-labs/avalanchego/snow/choices"
+import (
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+)
 
-var _ rejector = &rejectorImpl{}
+var _ stateless.Visitor = &rejector{}
 
-type rejector interface {
-	rejectProposalBlock(b *ProposalBlock) error
-	rejectAtomicBlock(b *AtomicBlock) error
-	rejectStandardBlock(b *StandardBlock) error
-	rejectCommitBlock(b *CommitBlock) error
-	rejectAbortBlock(b *AbortBlock) error
+// rejector handles the logic for rejecting a block.
+type rejector struct {
+	*backend
 }
 
-type rejectorImpl struct {
-	backend
+func (r *rejector) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+	return r.visitProposalBlock(b)
 }
 
-func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
+func (r *rejector) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+	return r.visitProposalBlock(b)
+}
+
+func (r *rejector) visitProposalBlock(b stateless.Block) error {
+	blkID := b.ID()
+	defer r.free(blkID)
+
 	r.ctx.Log.Verbo(
-		"Rejecting Proposal Block %s at height %d with parent %s",
-		b.ID(),
+		"rejecting Proposal Block %s at height %d with parent %s",
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	tx := b.ProposalTx()
+	tx := b.BlockTxs()[0]
 	if err := r.Mempool.Add(tx); err != nil {
 		r.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
@@ -36,21 +43,22 @@ func (r *rejectorImpl) rejectProposalBlock(b *ProposalBlock) error {
 		)
 	}
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.ProposalBlockIntf, b.status)
-	return r.Commit()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
+func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+	blkID := b.ID()
+	defer r.free(blkID)
+
 	r.ctx.Log.Verbo(
-		"Rejecting Atomic Block %s at height %d with parent %s",
-		b.ID(),
+		"rejecting Atomic Block %s at height %d with parent %s",
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	tx := b.AtomicTx()
+	tx := b.BlockTxs()[0]
 	if err := r.Mempool.Add(tx); err != nil {
 		r.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
@@ -59,21 +67,30 @@ func (r *rejectorImpl) rejectAtomicBlock(b *AtomicBlock) error {
 		)
 	}
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.AtomicBlockIntf, b.status)
-	return r.Commit()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
+func (r *rejector) VisitBlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
+	return r.visitStandardBlock(b)
+}
+
+func (r *rejector) VisitApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
+	return r.visitStandardBlock(b)
+}
+
+func (r *rejector) visitStandardBlock(b stateless.Block) error {
+	blkID := b.ID()
+	defer r.free(blkID)
+
 	r.ctx.Log.Verbo(
-		"Rejecting Standard Block %s at height %d with parent %s",
-		b.ID(),
+		"rejecting Standard Block %s at height %d with parent %s",
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	txes := b.DecisionTxs()
+	txes := b.BlockTxs()
 	for _, tx := range txes {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
@@ -84,36 +101,52 @@ func (r *rejectorImpl) rejectStandardBlock(b *StandardBlock) error {
 		}
 	}
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.StandardBlockIntf, b.status)
-	return r.Commit()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectCommitBlock(b *CommitBlock) error {
+func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
+	blkID := b.ID()
+	defer func() {
+		r.free(blkID)
+		// Note that it's OK to free the parent here.
+		// We're accepting a Commit block, so its sibling, an Abort block,
+		// must be accepted. (This is the only reason we'd reject this block.)
+		// So it's OK to remove the parent's state from [r.blkIDToState] --
+		// this block's sibling doesn't need it anymore.
+		r.free(b.Parent())
+	}()
+
 	r.ctx.Log.Verbo(
-		"Rejecting CommitBlock Block %s at height %d with parent %s",
-		b.ID(),
+		"rejecting Commit Block %s at height %d with parent %s",
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.OptionBlock, b.status)
-	return r.Commit()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }
 
-func (r *rejectorImpl) rejectAbortBlock(b *AbortBlock) error {
+func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
+	blkID := b.ID()
+	defer func() {
+		r.free(blkID)
+		// Note that it's OK to free the parent here.
+		// We're accepting an Abort block, so its sibling, a Commit block,
+		// must be accepted. (This is the only reason we'd reject this block.)
+		// So it's OK to remove the parent's state from [r.blkIDToState] --
+		// this block's sibling doesn't need it anymore.
+		r.free(b.Parent())
+	}()
+
 	r.ctx.Log.Verbo(
-		"Rejecting Abort Block %s at height %d with parent %s",
-		b.ID(),
+		"rejecting Abort Block %s at height %d with parent %s",
+		blkID,
 		b.Height(),
 		b.Parent(),
 	)
 
-	b.status = choices.Rejected
-	defer b.free()
-	r.AddStatelessBlock(b.OptionBlock, b.status)
-	return r.Commit()
+	r.state.AddStatelessBlock(b, choices.Rejected)
+	return r.state.Commit()
 }

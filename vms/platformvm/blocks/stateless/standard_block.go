@@ -11,17 +11,9 @@ import (
 )
 
 var (
-	_ StandardBlockIntf = &ApricotStandardBlock{}
-	_ StandardBlockIntf = &BlueberryStandardBlock{}
+	_ Block = &ApricotStandardBlock{}
+	_ Block = &BlueberryStandardBlock{}
 )
-
-type StandardBlockIntf interface {
-	CommonBlockIntf
-
-	// DecisionTxs returns list of transactions
-	// contained in the block
-	DecisionTxs() []*txs.Tx
-}
 
 func NewStandardBlock(
 	version uint16,
@@ -29,7 +21,7 @@ func NewStandardBlock(
 	parentID ids.ID,
 	height uint64,
 	txes []*txs.Tx,
-) (StandardBlockIntf, error) {
+) (Block, error) {
 	// make sure txs to be included in the block
 	// are duly initialized
 	for _, tx := range txes {
@@ -50,7 +42,7 @@ func NewStandardBlock(
 		}
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
-		blk := CommonBlockIntf(res)
+		blk := Block(res)
 		bytes, err := Codec.Marshal(version, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
@@ -74,7 +66,7 @@ func NewStandardBlock(
 		}
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
-		blk := CommonBlockIntf(res)
+		blk := Block(res)
 		bytes, err := Codec.Marshal(version, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
@@ -92,11 +84,11 @@ type ApricotStandardBlock struct {
 	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (sb *ApricotStandardBlock) Initialize(version uint16, bytes []byte) error {
-	if err := sb.CommonBlock.Initialize(version, bytes); err != nil {
+func (asb *ApricotStandardBlock) Initialize(version uint16, bytes []byte) error {
+	if err := asb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	for _, tx := range sb.Txs {
+	for _, tx := range asb.Txs {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
@@ -104,7 +96,11 @@ func (sb *ApricotStandardBlock) Initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (sb *ApricotStandardBlock) DecisionTxs() []*txs.Tx { return sb.Txs }
+func (asb *ApricotStandardBlock) BlockTxs() []*txs.Tx { return asb.Txs }
+
+func (asb *ApricotStandardBlock) Visit(v Visitor) error {
+	return v.VisitApricotStandardBlock(asb)
+}
 
 type BlueberryStandardBlock struct {
 	CommonBlock `serialize:"true"`
@@ -114,13 +110,13 @@ type BlueberryStandardBlock struct {
 	Txs []*txs.Tx
 }
 
-func (psb *BlueberryStandardBlock) Initialize(version uint16, bytes []byte) error {
-	if err := psb.CommonBlock.Initialize(version, bytes); err != nil {
+func (bsb *BlueberryStandardBlock) Initialize(version uint16, bytes []byte) error {
+	if err := bsb.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	txes := make([]*txs.Tx, 0, len(psb.TxsBytes))
-	for _, txBytes := range psb.TxsBytes {
+	txes := make([]*txs.Tx, 0, len(bsb.TxsBytes))
+	for _, txBytes := range bsb.TxsBytes {
 		var tx txs.Tx
 		_, err := txs.Codec.Unmarshal(txBytes, &tx)
 		if err != nil {
@@ -131,8 +127,12 @@ func (psb *BlueberryStandardBlock) Initialize(version uint16, bytes []byte) erro
 		}
 		txes = append(txes, &tx)
 	}
-	psb.Txs = txes
+	bsb.Txs = txes
 	return nil
 }
 
-func (psb *BlueberryStandardBlock) DecisionTxs() []*txs.Tx { return psb.Txs }
+func (bsb *BlueberryStandardBlock) BlockTxs() []*txs.Tx { return bsb.Txs }
+
+func (bsb *BlueberryStandardBlock) Visit(v Visitor) error {
+	return v.VisitBlueberryStandardBlock(bsb)
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/stretchr/testify/assert"
@@ -78,17 +79,21 @@ func TestApricotPickingOrder(t *testing.T) {
 	// test: decisionTxs must be picked first
 	blk, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
-	stdBlk, ok := blk.(*stateful.StandardBlock)
+	stdBlk, ok := blk.(*stateful.Block)
 	assert.True(ok)
-	assert.Equal(decisionTxs, stdBlk.DecisionTxs())
+	_, ok = stdBlk.Block.(*stateless.ApricotStandardBlock)
+	assert.True(ok)
+	assert.Equal(decisionTxs, stdBlk.BlockTxs())
 	assert.False(h.mempool.HasDecisionTxs())
 
 	// test: reward validator blocks must follow, one per endingValidator
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
-	rewardBlk, ok := blk.(*stateful.ProposalBlock)
+	rewardBlk, ok := blk.(*stateful.OracleBlock)
 	assert.True(ok)
-	rewardTx, ok := rewardBlk.ProposalTx().Unsigned.(*txs.RewardValidatorTx)
+	_, ok = rewardBlk.Block.Block.(*stateless.ApricotProposalBlock)
+	assert.True(ok)
+	rewardTx, ok := rewardBlk.BlockTxs()[0].Unsigned.(*txs.RewardValidatorTx)
 	assert.True(ok)
 	assert.Equal(validatorTx.ID(), rewardTx.TxID)
 
@@ -107,9 +112,11 @@ func TestApricotPickingOrder(t *testing.T) {
 	h.clk.Set(now)
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
-	advanceTimeBlk, ok := blk.(*stateful.ProposalBlock)
+	advanceTimeBlk, ok := blk.(*stateful.OracleBlock)
 	assert.True(ok)
-	advanceTimeTx, ok := advanceTimeBlk.ProposalTx().Unsigned.(*txs.AdvanceTimeTx)
+	_, ok = advanceTimeBlk.Block.Block.(*stateless.ApricotProposalBlock)
+	assert.True(ok)
+	advanceTimeTx, ok := advanceTimeBlk.BlockTxs()[0].Unsigned.(*txs.AdvanceTimeTx)
 	assert.True(ok)
 	assert.True(advanceTimeTx.Timestamp().Equal(now))
 
@@ -125,7 +132,9 @@ func TestApricotPickingOrder(t *testing.T) {
 	// finally mempool addValidatorTx must be picked
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
-	propBlk, ok := blk.(*stateful.ProposalBlock)
+	proposalBlk, ok := blk.(*stateful.OracleBlock)
 	assert.True(ok)
-	assert.Equal(stakerTx, propBlk.ProposalTx())
+	_, ok = proposalBlk.Block.Block.(*stateless.ApricotProposalBlock)
+	assert.True(ok)
+	assert.Equal([]*txs.Tx{stakerTx}, proposalBlk.BlockTxs())
 }

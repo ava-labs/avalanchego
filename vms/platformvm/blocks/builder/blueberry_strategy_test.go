@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	h.cfg.BlueberryTime = time.Time{} // Blueberry already active
+	h.cfg.BlueberryTime = time.Time{}
 
 	chainTime := h.fullState.GetTimestamp()
 	now := chainTime.Add(time.Second)
@@ -78,10 +78,12 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(nextChainTime))
-	stdBlk, ok := blk.(*stateful.StandardBlock)
+	stdBlk, ok := blk.(*stateful.Block)
 	assert.True(ok)
-	assert.True(len(decisionTxs) == len(stdBlk.DecisionTxs()))
-	for i, tx := range stdBlk.DecisionTxs() {
+	_, ok = stdBlk.Block.(*stateless.BlueberryStandardBlock)
+	assert.True(ok)
+	assert.True(len(decisionTxs) == len(stdBlk.BlockTxs()))
+	for i, tx := range stdBlk.BlockTxs() {
 		assert.Equal(decisionTxs[i].ID(), tx.ID())
 	}
 
@@ -91,16 +93,18 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(nextChainTime))
-	rewardBlk, ok := blk.(*stateful.ProposalBlock)
+	rewardBlk, ok := blk.(*stateful.OracleBlock)
 	assert.True(ok)
-	rewardTx, ok := rewardBlk.ProposalTx().Unsigned.(*txs.RewardValidatorTx)
+	_, ok = rewardBlk.Block.Block.(*stateless.BlueberryProposalBlock)
+	assert.True(ok)
+	rewardTx, ok := rewardBlk.BlockTxs()[0].Unsigned.(*txs.RewardValidatorTx)
 	assert.True(ok)
 	assert.Equal(validatorTx.ID(), rewardTx.TxID)
 
 	// accept reward validator tx so that current validator is removed
 	assert.NoError(blk.Verify())
 	assert.NoError(blk.Accept())
-	options, err := blk.(snowman.OracleBlock).Options()
+	options, err := rewardBlk.Options()
 	assert.NoError(err)
 	commitBlk := options[0]
 	assert.NoError(commitBlk.Verify())
@@ -114,9 +118,11 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(now))
-	proposalBlk, ok := blk.(*stateful.ProposalBlock)
+	proposalBlk, ok := blk.(*stateful.OracleBlock)
 	assert.True(ok)
-	assert.Equal(stakerTx.ID(), proposalBlk.ProposalTx().ID())
+	_, ok = proposalBlk.Block.Block.(*stateless.BlueberryProposalBlock)
+	assert.True(ok)
+	assert.Equal(stakerTx.ID(), proposalBlk.BlockTxs()[0].ID())
 
 	// Finally an empty standard block can be issued to advance time
 	// if no mempool txs are available
@@ -127,7 +133,9 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err = h.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(now))
-	emptyStdBlk, ok := blk.(*stateful.StandardBlock)
+	emptyStdBlk, ok := blk.(*stateful.Block)
 	assert.True(ok)
-	assert.True(len(emptyStdBlk.DecisionTxs()) == 0)
+	_, ok = emptyStdBlk.Block.(*stateless.BlueberryStandardBlock)
+	assert.True(ok)
+	assert.True(len(emptyStdBlk.BlockTxs()) == 0)
 }

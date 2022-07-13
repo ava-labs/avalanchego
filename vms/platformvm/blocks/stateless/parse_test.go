@@ -55,7 +55,7 @@ func TestStandardBlocks(t *testing.T) {
 
 		parsedApricotStandardBlk, ok := parsed.(*ApricotStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedApricotStandardBlk.DecisionTxs())
+		assert.Equal(txs, parsedApricotStandardBlk.BlockTxs())
 
 		// check that blueberry standard block can be built and parsed
 		blueberryStandardBlk, err := NewStandardBlock(
@@ -80,10 +80,10 @@ func TestStandardBlocks(t *testing.T) {
 		assert.Equal(blueberryStandardBlk.UnixTimestamp(), parsed.UnixTimestamp())
 		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedBlueberryStandardBlk.DecisionTxs())
+		assert.Equal(txs, parsedBlueberryStandardBlk.BlockTxs())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotStandardBlk.DecisionTxs(), parsedBlueberryStandardBlk.DecisionTxs())
+		assert.Equal(parsedApricotStandardBlk.BlockTxs(), parsedBlueberryStandardBlk.BlockTxs())
 	}
 }
 
@@ -124,7 +124,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		assert.True(ok)
-		assert.Equal(tx, parsedApricotProposalBlk.ProposalTx())
+		assert.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.BlockTxs())
 
 		// check that blueberry proposal block can be built and parsed
 		blueberryProposalBlk, err := NewProposalBlock(
@@ -149,10 +149,10 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal(blueberryProposalBlk.UnixTimestamp(), parsed.UnixTimestamp())
 		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
 		assert.True(ok)
-		assert.Equal(tx, parsedBlueberryProposalBlk.ProposalTx())
+		assert.Equal([]*txs.Tx{tx}, parsedBlueberryProposalBlk.BlockTxs())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotProposalBlk.ProposalTx(), parsedBlueberryProposalBlk.ProposalTx())
+		assert.Equal(parsedApricotProposalBlk.BlockTxs(), parsedBlueberryProposalBlk.BlockTxs())
 	}
 }
 
@@ -297,7 +297,7 @@ func TestAtomicBlocks(t *testing.T) {
 
 		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
 		assert.True(ok)
-		assert.Equal(tx, parsedAtomicBlk.AtomicTx())
+		assert.Equal([]*txs.Tx{tx}, parsedAtomicBlk.BlockTxs())
 	}
 }
 

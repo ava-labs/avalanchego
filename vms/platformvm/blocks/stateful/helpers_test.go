@@ -202,10 +202,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	if ctrl == nil {
 		res.blkManager = NewManager(
 			res.mpool,
-			metrics,
-			res.fullState,
-			res.fullState,
-			res.fullState,
+			*metrics,
 			res.fullState,
 			res.txExecBackend,
 			window,
@@ -214,10 +211,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	} else {
 		res.blkManager = NewManager(
 			res.mpool,
-			metrics,
-			res.mockedFullState,
-			res.mockedFullState,
-			res.mockedFullState,
+			*metrics,
 			res.mockedFullState,
 			res.txExecBackend,
 			window,

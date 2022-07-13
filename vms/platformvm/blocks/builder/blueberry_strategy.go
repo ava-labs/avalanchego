@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -122,47 +121,53 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	// remove selected txs from mempool
 	b.Mempool.Remove(b.txes)
 
-	ctx := b.blockBuilder.txExecutorBackend.Ctx
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
-		return stateful.NewStandardBlock(
+		statelessBlk, err := stateless.NewStandardBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
-			b.blkManager,
-			ctx,
 			b.parentBlkID,
 			b.height,
 			nil,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
-	switch b.txes[0].Unsigned.(type) {
+	tx := b.txes[0]
+	switch tx.Unsigned.(type) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		return stateful.NewProposalBlock(
+		statelessBlk, err := stateless.NewProposalBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
-			b.blkManager,
-			ctx,
 			b.parentBlkID,
 			b.height,
-			b.txes[0],
+			tx,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 
 	case *txs.CreateChainTx,
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		return stateful.NewStandardBlock(
+		statelessBlk, err := stateless.NewStandardBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
-			b.blkManager,
-			ctx,
 			b.parentBlkID,
 			b.height,
 			b.txes,
 		)
+		if err != nil {
+			return nil, err
+		}
+		return b.blkManager.NewBlock(statelessBlk), nil
 
 	default:
 		return nil, fmt.Errorf("unhandled tx type, could not include into a block")

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
@@ -25,22 +24,18 @@ type buildingStrategy interface {
 // Factory method that returns the correct building strategy for the
 // current fork.
 func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
+	// Get the block to build on top of and retrieve the new block's context.
 	preferred, err := b.Preferred()
 	if err != nil {
 		return nil, err
 	}
-	preferredDecision, ok := preferred.(stateful.Decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return nil, fmt.Errorf("expected Decision block but got %T", preferred)
-	}
-	preferredState := preferredDecision.OnAccept()
-
-	// select transactions to include and finally build the block
-	blkVersion := b.blkManager.ExpectedChildVersion(preferred)
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
+	blkVersion := b.blkManager.ExpectedChildVersion(preferred)
 
+	preferredState := b.blkManager.OnAccept(prefBlkID)
+
+	// select transactions to include and finally build the block
 	switch blkVersion {
 	case stateless.ApricotVersion:
 		return &apricotStrategy{

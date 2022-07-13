@@ -41,10 +41,10 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blkIntf, err := h.BlockBuilder.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
-	blk, ok := blkIntf.(*stateful.StandardBlock)
+	blk, ok := blkIntf.(*stateful.Block)
 	assert.True(ok, "expected standard block")
-	assert.Len(blk.DecisionTxs(), 1, "standard block should include a single transaction")
-	assert.Equal(txID, blk.DecisionTxs()[0].ID(), "standard block does not include expected transaction")
+	assert.Len(blk.BlockTxs(), 1, "standard block should include a single transaction")
+	assert.Equal(txID, blk.BlockTxs()[0].ID(), "standard block does not include expected transaction")
 
 	has = h.mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")

@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,12 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-)
-
-var (
-	_ stateless.Metrics = &Metrics{}
-
-	errUnknownBlockType = errors.New("unknown block type")
 )
 
 type Metrics struct {
@@ -160,43 +153,41 @@ func newBlockMetrics(namespace string, name string) prometheus.Counter {
 	})
 }
 
-func (m *Metrics) MarkAcceptedOptionVote() { m.numVotesWon.Inc() }
-func (m *Metrics) MarkRejectedOptionVote() { m.numVotesLost.Inc() }
+func (m *Metrics) MarkVoteWon() {
+	m.numVotesWon.Inc()
+}
 
-func (m *Metrics) MarkAccepted(b stateless.CommonBlockIntf) error {
+func (m *Metrics) MarkVoteLost() {
+	m.numVotesLost.Inc()
+}
+
+// TODO: use a visitor here
+func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
-	case stateless.AtomicBlockIntf:
+	case *stateless.AtomicBlock:
 		m.numAtomicBlocks.Inc()
-		return m.AcceptTx(b.AtomicTx())
-
-	case stateless.ProposalBlockIntf:
+	case *stateless.ApricotProposalBlock,
+		*stateless.BlueberryProposalBlock:
 		m.numProposalBlocks.Inc()
-		return m.AcceptTx(b.ProposalTx())
-
-	case stateless.StandardBlockIntf:
+	case *stateless.ApricotStandardBlock,
+		*stateless.BlueberryStandardBlock:
 		m.numStandardBlocks.Inc()
-		for _, tx := range b.DecisionTxs() {
-			if err := m.AcceptTx(tx); err != nil {
-				return err
-			}
-		}
-		return nil
-
-	case stateless.OptionBlock:
-		switch b.(type) {
-		case *stateless.AbortBlock:
-			m.numAbortBlocks.Inc()
-			return nil
-		case *stateless.CommitBlock:
-			m.numCommitBlocks.Inc()
-			return nil
-		default:
-			return errUnknownBlockType
-		}
+	case *stateless.AbortBlock:
+		m.numAbortBlocks.Inc()
+	case *stateless.CommitBlock:
+		m.numCommitBlocks.Inc()
 
 	default:
-		return errUnknownBlockType
+		return fmt.Errorf("got unexpected block type %T", b)
 	}
+
+	for _, tx := range b.BlockTxs() {
+		if err := m.AcceptTx(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *Metrics) AcceptTx(tx *txs.Tx) error {
