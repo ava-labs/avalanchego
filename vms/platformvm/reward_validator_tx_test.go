@@ -238,13 +238,11 @@ func TestUnsignedRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
-
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -284,7 +282,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	stakerVdr.NextTime = stakerVdr.EndTime
 	stakerVdr.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
-	stakerDel := state.NewPrimaryNetworkStaker(vdrTx.ID(), &delTx.Unsigned.(*txs.AddDelegatorTx).Validator)
+	stakerDel := state.NewPrimaryNetworkStaker(delTx.ID(), &delTx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	stakerDel.PotentialReward = 1000000
 	stakerDel.NextTime = stakerDel.EndTime
 	stakerDel.Priority = state.PrimaryNetworkDelegatorCurrentPriority
@@ -403,7 +401,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	stakerVdr.NextTime = stakerVdr.EndTime
 	stakerVdr.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
-	stakerDel := state.NewPrimaryNetworkStaker(vdrTx.ID(), &delTx.Unsigned.(*txs.AddDelegatorTx).Validator)
+	stakerDel := state.NewPrimaryNetworkStaker(delTx.ID(), &delTx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	stakerDel.PotentialReward = 1000000
 	stakerDel.NextTime = stakerDel.EndTime
 	stakerDel.Priority = state.PrimaryNetworkDelegatorCurrentPriority
