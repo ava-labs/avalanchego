@@ -29,11 +29,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
+	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -590,134 +592,139 @@ func TestGetBalance(t *testing.T) {
 // 	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 // }
 
-// // Test method GetCurrentValidators
-// func TestGetCurrentValidators(t *testing.T) {
-// 	service, _ := defaultService(t)
-// 	defaultAddress(t, service)
-// 	service.vm.ctx.Lock.Lock()
-// 	defer func() {
-// 		if err := service.vm.Shutdown(); err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		service.vm.ctx.Lock.Unlock()
-// 	}()
+// Test method GetCurrentValidators
+func TestGetCurrentValidators(t *testing.T) {
+	service, _ := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.ctx.Lock.Lock()
+	defer func() {
+		if err := service.vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		service.vm.ctx.Lock.Unlock()
+	}()
 
-// 	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis()
 
-// 	// Call getValidators
-// 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
-// 	response := GetCurrentValidatorsReply{}
+	// Call getValidators
+	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	response := GetCurrentValidatorsReply{}
 
-// 	err := service.GetCurrentValidators(nil, &args, &response)
-// 	switch {
-// 	case err != nil:
-// 		t.Fatal(err)
-// 	case len(response.Validators) != len(genesis.Validators):
-// 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-// 	}
+	err := service.GetCurrentValidators(nil, &args, &response)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case len(response.Validators) != len(genesis.Validators):
+		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
+	}
 
-// 	for _, vdr := range genesis.Validators {
-// 		found := false
-// 		for i := 0; i < len(response.Validators) && !found; i++ {
-// 			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
-// 			switch {
-// 			case !ok:
-// 				t.Fatal("expected pchainapi.PrimaryValidator")
-// 			case gotVdr.NodeID != vdr.NodeID:
-// 			case gotVdr.EndTime != vdr.EndTime:
-// 				t.Fatalf("expected end time of %s to be %v but got %v",
-// 					vdr.NodeID,
-// 					vdr.EndTime,
-// 					gotVdr.EndTime,
-// 				)
-// 			case gotVdr.StartTime != vdr.StartTime:
-// 				t.Fatalf("expected start time of %s to be %v but got %v",
-// 					vdr.NodeID,
-// 					vdr.StartTime,
-// 					gotVdr.StartTime,
-// 				)
-// 			case gotVdr.Weight != vdr.Weight:
-// 				t.Fatalf("expected weight of %s to be %v but got %v",
-// 					vdr.NodeID,
-// 					vdr.Weight,
-// 					gotVdr.Weight,
-// 				)
-// 			default:
-// 				found = true
-// 			}
-// 		}
-// 		if !found {
-// 			t.Fatalf("expected validators to contain %s but didn't", vdr.NodeID)
-// 		}
-// 	}
+	for _, vdr := range genesis.Validators {
+		found := false
+		for i := 0; i < len(response.Validators) && !found; i++ {
+			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
+			switch {
+			case !ok:
+				t.Fatal("expected pchainapi.PrimaryValidator")
+			case gotVdr.NodeID != vdr.NodeID:
+			case gotVdr.EndTime != vdr.EndTime:
+				t.Fatalf("expected end time of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.EndTime,
+					gotVdr.EndTime,
+				)
+			case gotVdr.StartTime != vdr.StartTime:
+				t.Fatalf("expected start time of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.StartTime,
+					gotVdr.StartTime,
+				)
+			case gotVdr.Weight != vdr.Weight:
+				t.Fatalf("expected weight of %s to be %v but got %v",
+					vdr.NodeID,
+					vdr.Weight,
+					gotVdr.Weight,
+				)
+			default:
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("expected validators to contain %s but didn't", vdr.NodeID)
+		}
+	}
 
-// 	// Add a delegator
-// 	stakeAmount := service.vm.MinDelegatorStake + 12345
-// 	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
-// 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
-// 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
+	// Add a delegator
+	stakeAmount := service.vm.MinDelegatorStake + 12345
+	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
+	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
+	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
-// 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
-// 		stakeAmount,
-// 		delegatorStartTime,
-// 		delegatorEndTime,
-// 		validatorNodeID,
-// 		ids.GenerateTestShortID(),
-// 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-// 		keys[0].PublicKey().Address(), // change addr
-// 	)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+		stakeAmount,
+		delegatorStartTime,
+		delegatorEndTime,
+		validatorNodeID,
+		ids.GenerateTestShortID(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	service.vm.internalState.AddCurrentStaker(tx, 0)
-// 	service.vm.internalState.AddTx(tx, status.Committed)
-// 	err = service.vm.internalState.Commit()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	err = service.vm.internalState.Load()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
+	staker.PotentialReward = 0
+	staker.NextTime = staker.EndTime
+	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
-// 	// Call getCurrentValidators
-// 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
-// 	err = service.GetCurrentValidators(nil, &args, &response)
-// 	switch {
-// 	case err != nil:
-// 		t.Fatal(err)
-// 	case len(response.Validators) != len(genesis.Validators):
-// 		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
-// 	}
+	service.vm.internalState.PutCurrentDelegator(staker)
+	service.vm.internalState.AddTx(tx, status.Committed)
+	err = service.vm.internalState.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = service.vm.internalState.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	// Make sure the delegator is there
-// 	found := false
-// 	for i := 0; i < len(response.Validators) && !found; i++ {
-// 		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
-// 		if vdr.NodeID != validatorNodeID {
-// 			continue
-// 		}
-// 		found = true
-// 		if len(vdr.Delegators) != 1 {
-// 			t.Fatalf("%s should have 1 delegator", vdr.NodeID)
-// 		}
-// 		delegator := vdr.Delegators[0]
-// 		switch {
-// 		case delegator.NodeID != vdr.NodeID:
-// 			t.Fatal("wrong node ID")
-// 		case uint64(delegator.StartTime) != delegatorStartTime:
-// 			t.Fatal("wrong start time")
-// 		case uint64(delegator.EndTime) != delegatorEndTime:
-// 			t.Fatal("wrong end time")
-// 		case delegator.GetWeight() != stakeAmount:
-// 			t.Fatalf("wrong weight")
-// 		}
-// 	}
-// 	if !found {
-// 		t.Fatalf("didn't find delegator")
-// 	}
-// }
+	// Call getCurrentValidators
+	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
+	err = service.GetCurrentValidators(nil, &args, &response)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case len(response.Validators) != len(genesis.Validators):
+		t.Fatalf("should be %d validators but are %d", len(genesis.Validators), len(response.Validators))
+	}
+
+	// Make sure the delegator is there
+	found := false
+	for i := 0; i < len(response.Validators) && !found; i++ {
+		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
+		if vdr.NodeID != validatorNodeID {
+			continue
+		}
+		found = true
+		if len(vdr.Delegators) != 1 {
+			t.Fatalf("%s should have 1 delegator", vdr.NodeID)
+		}
+		delegator := vdr.Delegators[0]
+		switch {
+		case delegator.NodeID != vdr.NodeID:
+			t.Fatal("wrong node ID")
+		case uint64(delegator.StartTime) != delegatorStartTime:
+			t.Fatal("wrong start time")
+		case uint64(delegator.EndTime) != delegatorEndTime:
+			t.Fatal("wrong end time")
+		case delegator.GetWeight() != stakeAmount:
+			t.Fatalf("wrong weight")
+		}
+	}
+	if !found {
+		t.Fatalf("didn't find delegator")
+	}
+}
 
 func TestGetTimestamp(t *testing.T) {
 	assert := assert.New(t)
