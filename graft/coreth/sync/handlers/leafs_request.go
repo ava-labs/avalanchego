@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
+	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -459,9 +460,9 @@ func (rb *responseBuilder) readLeafsFromSnapshot(ctx context.Context) ([][]byte,
 
 	// Get an iterator into the storage or the main account snapshot.
 	if rb.request.Account == (common.Hash{}) {
-		snapIt = &accountIt{AccountIterator: rb.snap.DiskAccountIterator(startHash)}
+		snapIt = &syncutils.AccountIterator{AccountIterator: rb.snap.DiskAccountIterator(startHash)}
 	} else {
-		snapIt = &storageIt{StorageIterator: rb.snap.DiskStorageIterator(rb.request.Account, startHash)}
+		snapIt = &syncutils.StorageIterator{StorageIterator: rb.snap.DiskStorageIterator(rb.request.Account, startHash)}
 	}
 	defer snapIt.Release()
 	for snapIt.Next() {

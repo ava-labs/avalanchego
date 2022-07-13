@@ -1,7 +1,7 @@
 // (c) 2021-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers
+package syncutils
 
 import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
@@ -9,19 +9,19 @@ import (
 )
 
 var (
-	_ ethdb.Iterator = &accountIt{}
-	_ ethdb.Iterator = &storageIt{}
+	_ ethdb.Iterator = &AccountIterator{}
+	_ ethdb.Iterator = &StorageIterator{}
 )
 
-// accountIt wraps a [snapshot.AccountIterator] to conform to [ethdb.Iterator]
+// AccountIterator wraps a [snapshot.AccountIterator] to conform to [ethdb.Iterator]
 // accounts will be returned in consensus (FullRLP) format for compatibility with trie data.
-type accountIt struct {
+type AccountIterator struct {
 	snapshot.AccountIterator
 	err error
 	val []byte
 }
 
-func (it *accountIt) Next() bool {
+func (it *AccountIterator) Next() bool {
 	if it.err != nil {
 		return false
 	}
@@ -33,36 +33,36 @@ func (it *accountIt) Next() bool {
 	return false
 }
 
-func (it *accountIt) Key() []byte {
+func (it *AccountIterator) Key() []byte {
 	if it.err != nil {
 		return nil
 	}
 	return it.Hash().Bytes()
 }
 
-func (it *accountIt) Value() []byte {
+func (it *AccountIterator) Value() []byte {
 	if it.err != nil {
 		return nil
 	}
 	return it.val
 }
 
-func (it *accountIt) Error() error {
+func (it *AccountIterator) Error() error {
 	if it.err != nil {
 		return it.err
 	}
 	return it.AccountIterator.Error()
 }
 
-// storageIt wraps a [snapshot.StorageIterator] to conform to [ethdb.Iterator]
-type storageIt struct {
+// StorageIterator wraps a [snapshot.StorageIterator] to conform to [ethdb.Iterator]
+type StorageIterator struct {
 	snapshot.StorageIterator
 }
 
-func (it *storageIt) Key() []byte {
+func (it *StorageIterator) Key() []byte {
 	return it.Hash().Bytes()
 }
 
-func (it *storageIt) Value() []byte {
+func (it *StorageIterator) Value() []byte {
 	return it.Slot()
 }

@@ -427,6 +427,7 @@ type syncTest struct {
 }
 
 func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
+	t.Helper()
 	var (
 		serverVM           = vmSetup.serverVM
 		includedAtomicTxs  = vmSetup.includedAtomicTxs

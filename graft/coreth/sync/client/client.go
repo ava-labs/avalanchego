@@ -57,7 +57,7 @@ var _ Client = &client{}
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly requests failed requests until the context to the request is expired.
 type Client interface {
-	// GetLeafs synchronously sends given request, returning parsed *LeafsResponse or error
+	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error
 	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
 

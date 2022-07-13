@@ -32,7 +32,7 @@ const (
 	defaultOfflinePruningBloomFilterSize   uint64 = 512 // Default size (MB) for the offline pruner to use
 	defaultLogLevel                               = "info"
 	defaultPopulateMissingTriesParallelism        = 1024
-	defaultMaxOutboundActiveRequests              = 8
+	defaultMaxOutboundActiveRequests              = 16
 	defaultStateSyncServerTrieCache               = 64 // MB
 
 	// defaultStateSyncMinBlocks is the minimum number of blocks the blockchain
