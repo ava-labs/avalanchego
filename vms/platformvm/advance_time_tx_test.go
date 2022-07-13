@@ -506,7 +506,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	assert.NoError(err)
 
 	_, err = executor.onCommit.GetCurrentValidator(testSubnet1.ID(), subnetValidatorNodeID)
-	assert.NoError(err)
+	assert.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
 	executor.onCommit.Apply(vm.internalState)
