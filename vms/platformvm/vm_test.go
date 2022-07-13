@@ -561,22 +561,19 @@ func TestGenesis(t *testing.T) {
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
 	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, err := testKeyfactory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	nodeID := ids.NodeID(key.PublicKey().Address())
+	nodeID := ids.GenerateTestNodeID()
+	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -584,59 +581,50 @@ func TestAddValidatorCommit(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		rewardAddress,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.blockBuilder.AddUnverifiedTx(tx)
+	assert.NoError(err)
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	blk, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, ok := options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	}
-	_, ok = options[1].(*AbortBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Accept(); err != nil { // commit the proposal
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status of tx should be Committed but is %s", txStatus)
-	}
+	assert.NoError(err)
 
-	pendingStakers := vm.internalState.PendingStakers()
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
+
+	_, ok = options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = commit.Accept() // commit the proposal
+	assert.NoError(err)
+
+	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in pending validator set
-	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
-		t.Fatalf("Should have added validator to the pending queue")
-	}
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.NoError(err)
 }
 
 // verify invalid proposal to add validator to primary network
@@ -697,19 +685,19 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
 	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := testKeyfactory.NewPrivateKey()
-	nodeID := ids.NodeID(key.PublicKey().Address())
+	nodeID := ids.GenerateTestNodeID()
+	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -717,57 +705,52 @@ func TestAddValidatorReject(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		rewardAddress,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.blockBuilder.AddUnverifiedTx(tx)
+	assert.NoError(err)
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	blk, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil { // should pass verification
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil { // should pass verification
-		t.Fatal(err)
-	} else if err := abort.Accept(); err != nil { // reject the proposal
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	}
+	assert.NoError(err)
 
-	pendingStakers := vm.internalState.PendingStakers()
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
 
-	// Verify that new validator NOT in pending validator set
-	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
-		t.Fatalf("Shouldn't have added validator to the pending queue")
-	}
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	err = abort.Accept() // reject the proposal
+	assert.NoError(err)
+
+	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Reject proposal to add validator to primary network
@@ -810,12 +793,12 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -835,70 +818,62 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.blockBuilder.AddUnverifiedTx(tx)
+	assert.NoError(err)
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	blk, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, ok := options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // accept the proposal
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
+	assert.NoError(err)
 
-	pendingStakers := vm.internalState.PendingStakers()
-	vdr := pendingStakers.GetValidator(nodeID)
-	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err := abort.onAcceptState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // accept the proposal
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	_, txStatus, err = vm.internalState.GetTx(tx.ID())
+	assert.NoError(err)
 
 	// Verify that new validator is in pending validator set
-	if !exists {
-		t.Fatalf("Should have added validator to the pending queue")
-	}
+	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
+	assert.NoError(err)
 }
 
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -918,70 +893,62 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.blockBuilder.AddUnverifiedTx(tx)
+	assert.NoError(err)
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	blk, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, ok := options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAcceptState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Accept(); err != nil { // reject the proposal
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	}
+	assert.NoError(err)
 
-	pendingStakers := vm.internalState.PendingStakers()
-	vdr := pendingStakers.GetValidator(nodeID)
-	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err := commit.onAcceptState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	err = abort.Accept() // reject the proposal
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
 
 	// Verify that new validator NOT in pending validator set
-	if exists {
-		t.Fatalf("Shouldn't have added validator to the pending queue")
-	}
+	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -989,101 +956,98 @@ func TestRewardValidatorAccept(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	commit, ok := options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // advance the timestamp
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	assert.True(ok)
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // advance the timestamp
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
 
 	// Verify that chain's timestamp has advanced
-	if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
-		t.Fatal("expected timestamp to have advanced")
-	}
+	timestamp := vm.internalState.GetTimestamp()
+	assert.Equal(defaultValidateEndTime, timestamp)
 
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
-	if err != nil {
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, ok = options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // reward the genesis validator
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
+	assert.NoError(err)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
-		t.Fatal("should have removed a genesis validator")
-	}
+	commit, ok = options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok = options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // reward the genesis validator
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1091,90 +1055,96 @@ func TestRewardValidatorReject(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	if options, err := block.Options(); err != nil {
-		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // advance the timestamp
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
-		t.Fatal("expected timestamp to have advanced")
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	options, err := block.Options()
+	assert.NoError(err)
 
-	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // advance the timestamp
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	timestamp := vm.internalState.GetTimestamp()
+	assert.Equal(defaultValidateEndTime, timestamp)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
+	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	block = blk.(*ProposalBlock)
-	if options, err := block.Options(); err != nil { // Assert preferences are correct
-		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	}
+	options, err = block.Options() // Assert preferences are correct
+	assert.NoError(err)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
-		t.Fatal("should have removed a genesis validator")
-	}
+	commit, ok = options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok = options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = blk.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err = commit.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	err = abort.Accept() // do not reward the genesis validator
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1182,78 +1152,86 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
-	if err != nil {
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	if options, err := block.Options(); err != nil {
-		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // advance the timestamp
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
-		t.Fatal("expected timestamp to have advanced")
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	options, err := block.Options()
+	assert.NoError(err)
 
-	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // advance the timestamp
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	timestamp := vm.internalState.GetTimestamp()
+	assert.Equal(defaultValidateEndTime, timestamp)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
+	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	block = blk.(*ProposalBlock)
-	if options, err := blk.(*ProposalBlock).Options(); err != nil { // Assert preferences are correct
-		t.Fatal(err)
-	} else if commit, ok := options[0].(*CommitBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := commit.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	}
+	options, err = block.Options() // Assert preferences are correct
+	assert.NoError(err)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	if _, err := currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address())); err == nil {
-		t.Fatal("should have removed a genesis validator")
-	}
+	commit, ok = options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok = options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = blk.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err = commit.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	err = abort.Accept() // do not reward the genesis validator
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Ensure BuildBlock errors when there is no block to build
@@ -1329,12 +1307,12 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's start time (moving the validator from pending to current)
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1349,29 +1327,29 @@ func TestCreateSubnet(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 		keys[0].PublicKey().Address(),           // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(createSubnetTx); err != nil {
-		t.Fatal(err)
-	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create subnet
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(createSubnetTx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
+	err = vm.blockBuilder.AddUnverifiedTx(createSubnetTx)
+	assert.NoError(err)
+
+	blk, err := vm.BuildBlock() // should contain proposal to create subnet
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
+
+	err = blk.Accept()
+	assert.NoError(err)
+
+	_, txStatus, err := vm.internalState.GetTx(createSubnetTx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
 
 	subnets, err := vm.internalState.GetSubnets()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	found := false
 	for _, subnet := range subnets {
@@ -1380,15 +1358,13 @@ func TestCreateSubnet(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Fatalf("should have registered new subnet")
-	}
+	assert.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
-	if addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
+	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -1396,178 +1372,155 @@ func TestCreateSubnet(t *testing.T) {
 		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
-		t.Fatal(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(addValidatorTx); err != nil {
-		t.Fatal(err)
-	}
+	)
+	assert.NoError(err)
 
-	blk, err := vm.BuildBlock() // should add validator to the new subnet
-	if err != nil {
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+	assert.NoError(err)
+
+	blk, err = vm.BuildBlock() // should add validator to the new subnet
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, ok := options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil { // Accept the block
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // add the validator to pending validator set
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
-	pendingStakers := vm.internalState.PendingStakers()
-	vdr := pendingStakers.GetValidator(nodeID)
-	_, exists := vdr.SubnetValidators()[createSubnetTx.ID()]
-	if !exists {
-		t.Fatal("should have added a pending validator")
-	}
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok)
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok)
+
+	err = block.Accept() // Accept the block
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // add the validator to pending validator set
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
+	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	assert.NoError(err)
 
 	// Advance time to when new validator should start validating
 	// Create a block with an advance time tx that moves validator
 	// from pending to current validator set
 	vm.clock.Set(startTime)
 	blk, err = vm.BuildBlock() // should be advance time tx
-	if err != nil {
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	commit, ok = options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // move validator addValidatorTx from pending to current
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	assert.True(ok)
 
-	pendingStakers = vm.internalState.PendingStakers()
-	vdr = pendingStakers.GetValidator(nodeID)
-	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
-	if exists {
-		t.Fatal("should have removed the pending validator")
-	}
+	abort, ok = options[1].(*AbortBlock)
+	assert.True(ok)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	cVDR, err := currentStakers.GetValidator(nodeID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, exists = cVDR.SubnetValidators()[createSubnetTx.ID()]
-	if !exists {
-		t.Fatal("should have been added to the validator set")
-	}
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // move validator addValidatorTx from pending to current
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
+	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	_, err = vm.internalState.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	assert.NoError(err)
 
 	// fast forward clock to time validator should stop validating
 	vm.clock.Set(endTime)
 	blk, err = vm.BuildBlock() // should be advance time tx
-	if err != nil {
-		t.Fatal(err)
-	} else if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
+	err = blk.Verify()
+	assert.NoError(err)
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	commit, ok = options[0].(*CommitBlock)
-	if !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*AbortBlock); !ok {
-		t.Fatal(errShouldPrefCommit)
-	} else if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil {
-		t.Fatal(err)
-	} else if _, txStatus, err := abort.onAcceptState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	} else if err := commit.Accept(); err != nil { // remove validator from current validator set
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status should be Committed but is %s", txStatus)
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
-		t.Fatal(err)
-	}
+	assert.True(ok)
 
-	pendingStakers = vm.internalState.PendingStakers()
-	vdr = pendingStakers.GetValidator(nodeID)
-	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
-	if exists {
-		t.Fatal("should have removed the pending validator")
-	}
+	abort, ok = options[1].(*AbortBlock)
+	assert.True(ok)
 
-	currentStakers = vm.internalState.CurrentStakers()
-	cVDR, err = currentStakers.GetValidator(nodeID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, exists = cVDR.SubnetValidators()[createSubnetTx.ID()]
-	if exists {
-		t.Fatal("should have removed from the validator set")
-	}
+	err = block.Accept()
+	assert.NoError(err)
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	_, txStatus, err = abort.onAcceptState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	err = commit.Accept() // remove validator from current validator set
+	assert.NoError(err)
+
+	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
+
+	err = vm.SetPreference(vm.lastAcceptedID)
+	assert.NoError(err)
+
+	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	_, err = vm.internalState.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // test asset import
