@@ -66,7 +66,7 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	blkState.onAbortState = onAbortState
 
 	blkState.timestamp = parentState.GetTimestamp()
-	blkState.inititallyPreferCommit = txExecutor.PrefersCommit
+	blkState.initiallyPreferCommit = txExecutor.PrefersCommit
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	v.blkIDToState[blkID] = blkState

@@ -39,10 +39,6 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
 	}
 
-	if err := a.metrics.MarkAccepted(b); err != nil {
-		return fmt.Errorf("failed to accept atomic block %s: %w", blkID, err)
-	}
-
 	// Note that we do not write this block to state here.
 	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
 	// We do this so that in the event that the node shuts down, the proposal block
@@ -191,8 +187,8 @@ func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
 	a.state.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
-	wasPreferred := parentState.inititallyPreferCommit
 	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
 		if wasPreferred {
 			a.metrics.MarkVoteWon()
 		} else {
@@ -225,7 +221,7 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	a.state.AddStatelessBlock(b, choices.Accepted)
 
 	// Update metrics
-	wasPreferred := parentState.inititallyPreferCommit
+	wasPreferred := parentState.initiallyPreferCommit
 	if a.bootstrapped.GetValue() {
 		if wasPreferred {
 			a.metrics.MarkVoteWon()
@@ -240,7 +236,6 @@ func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
 	return a.updateStateOptionBlock(blkID)
 }
 
-// [b] must be embedded in a Commit or Abort block.
 func (a *acceptor) updateStateOptionBlock(blkID ids.ID) error {
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {

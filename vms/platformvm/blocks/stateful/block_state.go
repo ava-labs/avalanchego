@@ -21,9 +21,9 @@ type atomicBlockState struct {
 }
 
 type proposalBlockState struct {
-	inititallyPreferCommit bool
-	onCommitState          state.Diff
-	onAbortState           state.Diff
+	initiallyPreferCommit bool
+	onCommitState         state.Diff
+	onAbortState          state.Diff
 }
 
 // The state of a block.

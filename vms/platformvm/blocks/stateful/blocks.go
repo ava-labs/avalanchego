@@ -110,7 +110,7 @@ func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 	if !ok {
 		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
 	}
-	if blkState.inititallyPreferCommit {
+	if blkState.initiallyPreferCommit {
 		return [2]snowman.Block{commitBlock, abortBlock}, nil
 	}
 	return [2]snowman.Block{abortBlock, commitBlock}, nil
