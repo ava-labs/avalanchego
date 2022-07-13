@@ -159,16 +159,14 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 
 	a.ctx.Log.Verbo("accepting block %s", blkID)
 
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
-
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
 	}
-
 	if err := a.commonAccept(parentState.statelessBlock); err != nil {
+		return err
+	}
+	if err := a.commonAccept(b); err != nil {
 		return err
 	}
 
@@ -219,7 +217,7 @@ func (a *acceptor) updateChildrenState(blkState *blockState) error {
 func (a *acceptor) commonAccept(b stateless.Block) error {
 	blkID := b.ID()
 	if err := a.metrics.MarkAccepted(b); err != nil {
-		return fmt.Errorf("failed to accept block %s: %w", b.ID(), err)
+		return fmt.Errorf("failed to accept block %s: %w", blkID, err)
 	}
 	a.backend.lastAccepted = blkID
 	a.state.SetLastAccepted(blkID)
