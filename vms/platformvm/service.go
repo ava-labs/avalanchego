@@ -20,7 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
@@ -589,158 +591,148 @@ type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 }
 
-// // GetCurrentValidators returns current validators and delegators
-// func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
-// 	service.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
+// GetCurrentValidators returns current validators and delegators
+func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
+	service.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
 
-// 	reply.Validators = []interface{}{}
+	reply.Validators = []interface{}{}
 
-// 	// Validator's node ID as string --> Delegators to them
-// 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
+	// Validator's node ID as string --> Delegators to them
+	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
-// 	// Create set of nodeIDs
-// 	nodeIDs := ids.NodeIDSet{}
-// 	nodeIDs.Add(args.NodeIDs...)
-// 	includeAllNodes := nodeIDs.Len() == 0
+	// Create set of nodeIDs
+	nodeIDs := ids.NodeIDSet{}
+	nodeIDs.Add(args.NodeIDs...)
+	includeAllNodes := nodeIDs.Len() == 0
 
-// 	currentValidators := service.vm.internalState.CurrentStakers()
+	currentStakerIterator, err := service.vm.internalState.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer currentStakerIterator.Release()
 
-// 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
-// 	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
-// 		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
-// 		if err != nil {
-// 			return err
-// 		}
-// 		switch staker := tx.Unsigned.(type) {
-// 		case *txs.AddDelegatorTx:
-// 			if args.SubnetID != constants.PrimaryNetworkID {
-// 				continue
-// 			}
-// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-// 				continue
-// 			}
+	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
+	for currentStakerIterator.Next() { // Iterates in order of increasing stop time
+		staker := currentStakerIterator.Value()
+		if args.SubnetID != staker.SubnetID {
+			continue
+		}
+		if !includeAllNodes && !nodeIDs.Contains(staker.NodeID) {
+			continue
+		}
 
-// 			weight := json.Uint64(staker.Validator.Weight())
+		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		if err != nil {
+			return err
+		}
 
-// 			var rewardOwner *platformapi.Owner
-// 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-// 			if ok {
-// 				rewardOwner = &platformapi.Owner{
-// 					Locktime:  json.Uint64(owner.Locktime),
-// 					Threshold: json.Uint32(owner.Threshold),
-// 				}
-// 				for _, addr := range owner.Addrs {
-// 					addrStr, err := service.vm.FormatLocalAddress(addr)
-// 					if err != nil {
-// 						return err
-// 					}
-// 					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
-// 				}
-// 			}
+		var _ state.Staker
+		txID := staker.TxID
+		nodeID := staker.NodeID
+		weight := json.Uint64(staker.Weight)
+		startTime := json.Uint64(staker.StartTime.Unix())
+		endTime := json.Uint64(staker.EndTime.Unix())
+		potentialReward := json.Uint64(staker.PotentialReward)
 
-// 			potentialReward := json.Uint64(rewardAmount)
-// 			delegator := platformapi.PrimaryDelegator{
-// 				Staker: platformapi.Staker{
-// 					TxID:        tx.ID(),
-// 					StartTime:   json.Uint64(staker.StartTime().Unix()),
-// 					EndTime:     json.Uint64(staker.EndTime().Unix()),
-// 					StakeAmount: &weight,
-// 					NodeID:      staker.Validator.ID(),
-// 				},
-// 				RewardOwner:     rewardOwner,
-// 				PotentialReward: &potentialReward,
-// 			}
-// 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
-// 		case *txs.AddValidatorTx:
-// 			if args.SubnetID != constants.PrimaryNetworkID {
-// 				continue
-// 			}
-// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-// 				continue
-// 			}
+		switch staker := tx.Unsigned.(type) {
+		case *txs.AddDelegatorTx:
+			var rewardOwner *platformapi.Owner
+			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if ok {
+				rewardOwner = &platformapi.Owner{
+					Locktime:  json.Uint64(owner.Locktime),
+					Threshold: json.Uint32(owner.Threshold),
+				}
+				for _, addr := range owner.Addrs {
+					addrStr, err := service.vm.FormatLocalAddress(addr)
+					if err != nil {
+						return err
+					}
+					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
+				}
+			}
 
-// 			nodeID := staker.Validator.ID()
-// 			startTime := staker.StartTime()
-// 			weight := json.Uint64(staker.Validator.Weight())
-// 			potentialReward := json.Uint64(rewardAmount)
-// 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
-// 			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			uptime := json.Float32(rawUptime)
+			delegator := platformapi.PrimaryDelegator{
+				Staker: platformapi.Staker{
+					TxID:        txID,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					StakeAmount: &weight,
+					NodeID:      nodeID,
+				},
+				RewardOwner:     rewardOwner,
+				PotentialReward: &potentialReward,
+			}
+			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
+		case *txs.AddValidatorTx:
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
+			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, staker.StartTime())
+			if err != nil {
+				return err
+			}
+			uptime := json.Float32(rawUptime)
 
-// 			connected := service.vm.uptimeManager.IsConnected(nodeID)
+			connected := service.vm.uptimeManager.IsConnected(nodeID)
 
-// 			var rewardOwner *platformapi.Owner
-// 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-// 			if ok {
-// 				rewardOwner = &platformapi.Owner{
-// 					Locktime:  json.Uint64(owner.Locktime),
-// 					Threshold: json.Uint32(owner.Threshold),
-// 				}
-// 				for _, addr := range owner.Addrs {
-// 					addrStr, err := service.vm.FormatLocalAddress(addr)
-// 					if err != nil {
-// 						return err
-// 					}
-// 					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
-// 				}
-// 			}
+			var rewardOwner *platformapi.Owner
+			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if ok {
+				rewardOwner = &platformapi.Owner{
+					Locktime:  json.Uint64(owner.Locktime),
+					Threshold: json.Uint32(owner.Threshold),
+				}
+				for _, addr := range owner.Addrs {
+					addrStr, err := service.vm.FormatLocalAddress(addr)
+					if err != nil {
+						return err
+					}
+					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
+				}
+			}
 
-// 			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
-// 				Staker: platformapi.Staker{
-// 					TxID:        tx.ID(),
-// 					NodeID:      nodeID,
-// 					StartTime:   json.Uint64(startTime.Unix()),
-// 					EndTime:     json.Uint64(staker.EndTime().Unix()),
-// 					StakeAmount: &weight,
-// 				},
-// 				Uptime:          &uptime,
-// 				Connected:       connected,
-// 				PotentialReward: &potentialReward,
-// 				RewardOwner:     rewardOwner,
-// 				DelegationFee:   delegationFee,
-// 			})
-// 		case *txs.AddSubnetValidatorTx:
-// 			if args.SubnetID != staker.Validator.Subnet {
-// 				continue
-// 			}
-// 			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-// 				continue
-// 			}
-// 			nodeID := staker.Validator.ID()
-// 			weight := json.Uint64(staker.Validator.Weight())
-// 			connected := service.vm.uptimeManager.IsConnected(nodeID)
-// 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-// 			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
-// 				Staker: platformapi.Staker{
-// 					NodeID:    nodeID,
-// 					TxID:      tx.ID(),
-// 					StartTime: json.Uint64(staker.StartTime().Unix()),
-// 					EndTime:   json.Uint64(staker.EndTime().Unix()),
-// 					Weight:    &weight,
-// 				},
-// 				Connected: connected && tracksSubnet,
-// 			})
-// 		default:
-// 			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
-// 		}
-// 	}
+			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
+				Staker: platformapi.Staker{
+					TxID:        txID,
+					NodeID:      nodeID,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					StakeAmount: &weight,
+				},
+				Uptime:          &uptime,
+				Connected:       connected,
+				PotentialReward: &potentialReward,
+				RewardOwner:     rewardOwner,
+				DelegationFee:   delegationFee,
+			})
+		case *txs.AddSubnetValidatorTx:
+			connected := service.vm.uptimeManager.IsConnected(nodeID)
+			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
+				Staker: platformapi.Staker{
+					NodeID:    nodeID,
+					TxID:      txID,
+					StartTime: startTime,
+					EndTime:   endTime,
+					Weight:    &weight,
+				},
+				Connected: connected && tracksSubnet,
+			})
+		default:
+			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+		}
+	}
 
-// 	for i, vdrIntf := range reply.Validators {
-// 		vdr, ok := vdrIntf.(platformapi.PrimaryValidator)
-// 		if !ok {
-// 			continue
-// 		}
-// 		if delegators, ok := vdrToDelegators[vdr.NodeID]; ok {
-// 			vdr.Delegators = delegators
-// 		}
-// 		reply.Validators[i] = vdr
-// 	}
+	for i, vdrIntf := range reply.Validators {
+		vdr, ok := vdrIntf.(platformapi.PrimaryValidator)
+		if !ok {
+			continue
+		}
+		vdr.Delegators = vdrToDelegators[vdr.NodeID]
+		reply.Validators[i] = vdr
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
 type GetPendingValidatorsArgs struct {
