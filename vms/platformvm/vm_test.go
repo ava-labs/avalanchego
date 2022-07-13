@@ -2371,7 +2371,7 @@ func TestMaxStakeAmount(t *testing.T) {
 			staker, err := GetValidator(vm.internalState, constants.PrimaryNetworkID, test.validatorID)
 			assert.NoError(err)
 
-			amount, err := getMaxWeight(vm.internalState, staker, test.startTime, test.endTime)
+			amount, err := GetMaxWeight(vm.internalState, staker, test.startTime, test.endTime)
 			assert.NoError(err)
 			assert.Equal(test.expectedAmount, amount)
 		})

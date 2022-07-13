@@ -917,14 +917,18 @@ func CanDelegate(
 		return false, nil
 	}
 
-	maxWeight, err := getMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
+	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
 	if err != nil {
 		return false, err
 	}
-	return maxWeight <= weightLimit, nil
+	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
+	if err != nil {
+		return false, err
+	}
+	return newMaxWeight <= weightLimit, nil
 }
 
-func getMaxWeight(
+func GetMaxWeight(
 	chainState state.Chain,
 	validator *state.Staker,
 	startTime time.Time,
