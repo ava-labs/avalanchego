@@ -1,0 +1,11 @@
+# Each line is a file pattern followed by one or more owners.
+
+# These owners will be the default code owners for everything in the repo.
+# Unless a later match takes precedence, these owners will be requested for
+# review whenever someone opens a pull request.
+* @aaronbuchwald
+
+# These owners will override for specific packages.
+sync/ @darioush
+trie/ @darioush
+
