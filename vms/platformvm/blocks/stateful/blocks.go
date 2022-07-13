@@ -55,7 +55,6 @@ func (b *Block) Status() choices.Status {
 	// choices.Unknown means we don't have the bytes of the block.
 	// In this case, we do, so we return choices.Processing.
 	return choices.Processing
-
 }
 
 func (b *Block) Timestamp() time.Time {
