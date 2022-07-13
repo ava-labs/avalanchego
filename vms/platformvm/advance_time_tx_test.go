@@ -639,7 +639,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
+	staker := state.NewPrimaryNetworkStaker(addDelegatorTx.ID(), &addDelegatorTx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.NextTime = staker.StartTime
 	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
