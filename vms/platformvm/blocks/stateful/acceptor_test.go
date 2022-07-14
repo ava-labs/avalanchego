@@ -287,12 +287,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		1,
 	)
 	assert.NoError(err)
-
-	// Set expected calls on the state.
-	// We should error after [commonAccept] is called.
-	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
-	s.EXPECT().SetHeight(blk.Height()).Times(1)
-	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
+	blkID := blk.ID()
 
 	err = acceptor.VisitCommitBlock(blk)
 	assert.Error(err, "should fail because the block isn't in the state map")
@@ -300,7 +295,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
 	childID := ids.GenerateTestID()
-	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
+	acceptor.backend.blkIDToState[blkID] = &blockState{
 		onAcceptState: onAcceptState,
 		children:      []ids.ID{childID},
 	}
@@ -332,25 +327,22 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	acceptor.backend.blkIDToState[parentID] = parentState
 
 	// Set expected calls on dependencies.
-	parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
-	parentStatelessBlk.EXPECT().Height().Return(blk.Height() - 1).Times(1)
-
-	s.EXPECT().SetLastAccepted(parentID).Times(1)
-	s.EXPECT().SetHeight(blk.Height() - 1).Times(1)
-	s.EXPECT().AddStatelessBlock(parentState.statelessBlock, choices.Accepted).Times(1)
-
-	// TODO why do the 3 lines below error?
-	// We should be calling these methods...
-	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
-	s.EXPECT().SetHeight(blk.Height()).Times(1)
-	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
-
-	s.EXPECT().Commit().Return(nil).Times(1)
-
-	onAcceptState.EXPECT().Apply(s).Times(1)
-	childOnAcceptState.EXPECT().Apply(s).Times(1)
-	childOnAbortState.EXPECT().SetBase(gomock.Any()).Times(1)
-	childOnCommitState.EXPECT().SetBase(gomock.Any()).Times(1)
+	// Make sure the parent is accepted first.
+	gomock.InOrder(
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+		s.EXPECT().SetLastAccepted(parentID).Times(1),
+		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
+		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
+		s.EXPECT().AddStatelessBlock(parentState.statelessBlock, choices.Accepted).Times(1),
+		s.EXPECT().SetLastAccepted(blkID).Times(1),
+		s.EXPECT().SetHeight(blk.Height()).Times(1),
+		s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1),
+		onAcceptState.EXPECT().Apply(s).Times(1),
+		s.EXPECT().Commit().Return(nil).Times(1),
+		childOnCommitState.EXPECT().SetBase(gomock.Any()).Times(1),
+		childOnAbortState.EXPECT().SetBase(gomock.Any()).Times(1),
+		childOnAcceptState.EXPECT().Apply(s).Times(1),
+	)
 
 	err = acceptor.VisitCommitBlock(blk)
 	assert.NoError(err)
