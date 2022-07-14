@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package executor
 
 import (
 	"fmt"
@@ -16,60 +16,60 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
-var _ txs.Visitor = &standardTxExecutor{}
+var _ txs.Visitor = &StandardTxExecutor{}
 
-type standardTxExecutor struct {
-	// inputs
-	vm    *VM
-	state state.Diff // state is expected to be modified
-	tx    *txs.Tx
+type StandardTxExecutor struct {
+	// inputs, to be filled before visitor methods are called
+	*Backend
+	State state.Diff // state is expected to be modified
+	Tx    *txs.Tx
 
-	// outputs
-	onAccept       func() // may be nil
-	inputs         ids.Set
-	atomicRequests map[ids.ID]*atomic.Requests // may be nil
+	// outputs of visitor execution
+	OnAccept       func() // may be nil
+	Inputs         ids.Set
+	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
-func (*standardTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error { return errWrongTxType }
-func (*standardTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+func (*StandardTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error { return errWrongTxType }
+func (*StandardTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	return errWrongTxType
 }
-func (*standardTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error       { return errWrongTxType }
-func (*standardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
-func (*standardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
+func (*StandardTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error       { return errWrongTxType }
+func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
+func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
 
-func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
 	// Make sure this transaction has at least one credential for the subnet
 	// authorization.
-	if len(e.tx.Creds) == 0 {
+	if len(e.Tx.Creds) == 0 {
 		return errWrongNumberOfCredentials
 	}
 
 	// Select the credentials for each purpose
-	baseTxCredsLen := len(e.tx.Creds) - 1
-	baseTxCreds := e.tx.Creds[:baseTxCredsLen]
-	subnetCred := e.tx.Creds[baseTxCredsLen]
+	baseTxCredsLen := len(e.Tx.Creds) - 1
+	baseTxCreds := e.Tx.Creds[:baseTxCredsLen]
+	subnetCred := e.Tx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	timestamp := e.state.GetTimestamp()
-	createBlockchainTxFee := e.vm.Config.GetCreateBlockchainTxFee(timestamp)
-	if err := e.vm.utxoHandler.SemanticVerifySpend(
+	timestamp := e.State.GetTimestamp()
+	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(timestamp)
+	if err := e.FlowChecker.VerifySpend(
 		tx,
-		e.state,
+		e.State,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
 		createBlockchainTxFee,
-		e.vm.ctx.AVAXAssetID,
+		e.Ctx.AVAXAssetID,
 	); err != nil {
 		return err
 	}
 
-	subnetIntf, _, err := e.state.GetTx(tx.SubnetID)
+	subnetIntf, _, err := e.State.GetTx(tx.SubnetID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf("%s isn't a known subnet", tx.SubnetID)
 	}
@@ -83,84 +83,84 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify that this chain is authorized by the subnet
-	if err := e.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+	if err := e.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return err
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxo.Consume(e.state, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 	// Add the new chain to the database
-	e.state.AddChain(e.tx)
+	e.State.AddChain(e.Tx)
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.onAccept = func() { e.vm.Config.CreateChain(txID, tx) }
+	e.OnAccept = func() { e.Config.CreateChain(txID, tx) }
 	return nil
 }
 
-func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	// Make sure this transaction is well formed.
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
 	// Verify the flowcheck
-	timestamp := e.state.GetTimestamp()
-	createSubnetTxFee := e.vm.Config.GetCreateSubnetTxFee(timestamp)
-	if err := e.vm.utxoHandler.SemanticVerifySpend(
+	timestamp := e.State.GetTimestamp()
+	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(timestamp)
+	if err := e.FlowChecker.VerifySpend(
 		tx,
-		e.state,
+		e.State,
 		tx.Ins,
 		tx.Outs,
-		e.tx.Creds,
+		e.Tx.Creds,
 		createSubnetTxFee,
-		e.vm.ctx.AVAXAssetID,
+		e.Ctx.AVAXAssetID,
 	); err != nil {
 		return err
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxo.Consume(e.state, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 	// Add the new subnet to the database
-	e.state.AddSubnet(e.tx)
+	e.State.AddSubnet(e.Tx)
 	return nil
 }
 
-func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
-	e.inputs = ids.NewSet(len(tx.ImportedInputs))
+	e.Inputs = ids.NewSet(len(tx.ImportedInputs))
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		utxoID := in.UTXOID.InputID()
 
-		e.inputs.Add(utxoID)
+		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
 	}
 
-	if e.vm.bootstrapped.GetValue() {
-		if err := verify.SameSubnet(e.vm.ctx, tx.SourceChain); err != nil {
+	if e.Bootstrapped.GetValue() {
+		if err := verify.SameSubnet(e.Ctx, tx.SourceChain); err != nil {
 			return err
 		}
 
-		allUTXOBytes, err := e.vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
+		allUTXOBytes, err := e.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 		if err != nil {
 			return fmt.Errorf("failed to get shared memory: %w", err)
 		}
 
 		utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 		for index, input := range tx.Ins {
-			utxo, err := e.state.GetUTXO(input.InputID())
+			utxo, err := e.State.GetUTXO(input.InputID())
 			if err != nil {
 				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
 			}
@@ -168,7 +168,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		}
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
-			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return fmt.Errorf("failed to unmarshal UTXO: %w", err)
 			}
 			utxos[i+len(tx.Ins)] = utxo
@@ -178,27 +178,27 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := e.vm.utxoHandler.SemanticVerifySpendUTXOs(
+		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
 			ins,
 			tx.Outs,
-			e.tx.Creds,
-			e.vm.TxFee,
-			e.vm.ctx.AVAXAssetID,
+			e.Tx.Creds,
+			e.Config.TxFee,
+			e.Ctx.AVAXAssetID,
 		); err != nil {
 			return err
 		}
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxo.Consume(e.state, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
-	e.atomicRequests = map[ids.ID]*atomic.Requests{
+	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
 			RemoveRequests: utxoIDs,
 		},
@@ -206,8 +206,8 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
-	if err := e.tx.SyntacticVerify(e.vm.ctx); err != nil {
+func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
@@ -215,31 +215,31 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
-	if e.vm.bootstrapped.GetValue() {
-		if err := verify.SameSubnet(e.vm.ctx, tx.DestinationChain); err != nil {
+	if e.Bootstrapped.GetValue() {
+		if err := verify.SameSubnet(e.Ctx, tx.DestinationChain); err != nil {
 			return err
 		}
 	}
 
 	// Verify the flowcheck
-	if err := e.vm.utxoHandler.SemanticVerifySpend(
+	if err := e.FlowChecker.VerifySpend(
 		tx,
-		e.state,
+		e.State,
 		tx.Ins,
 		outs,
-		e.tx.Creds,
-		e.vm.TxFee,
-		e.vm.ctx.AVAXAssetID,
+		e.Tx.Creds,
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
 	); err != nil {
-		return fmt.Errorf("failed semanticVerifySpend: %w", err)
+		return fmt.Errorf("failed verifySpend: %w", err)
 	}
 
-	txID := e.tx.ID()
+	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxo.Consume(e.state, tx.Ins)
+	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.state, txID, e.vm.ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
@@ -252,7 +252,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+		utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -267,7 +267,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 		elems[i] = elem
 	}
-	e.atomicRequests = map[ids.ID]*atomic.Requests{
+	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		tx.DestinationChain: {
 			PutRequests: elems,
 		},

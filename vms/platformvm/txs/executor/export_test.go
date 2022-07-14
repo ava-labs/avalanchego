@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package executor
 
 import (
 	"testing"
@@ -15,13 +15,11 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -33,7 +31,7 @@ func TestNewExportTx(t *testing.T) {
 		shouldVerify       bool
 	}
 
-	sourceKey := keys[0]
+	sourceKey := preFundedKeys[0]
 
 	tests := []test{
 		{
@@ -48,7 +46,7 @@ func TestNewExportTx(t *testing.T) {
 			description:        "P->C export",
 			destinationChainID: cChainID,
 			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:          vm.ApricotPhase5Time,
+			timestamp:          env.config.ApricotPhase5Time,
 			shouldErr:          false,
 			shouldVerify:       true,
 		},
@@ -58,21 +56,20 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
-			tx, err := vm.txBuilder.NewExportTx(defaultBalance-defaultTxFee, tt.destinationChainID, to, tt.sourceKeys, ids.ShortEmpty)
+			tx, err := env.txBuilder.NewExportTx(
+				defaultBalance-defaultTxFee, // Amount of tokens to export
+				tt.destinationChainID,
+				to,
+				tt.sourceKeys,
+				ids.ShortEmpty, // Change address
+			)
 			if tt.shouldErr {
 				assert.Error(err)
 				return
 			}
 			assert.NoError(err)
 
-			// Get the preferred block (which we want to build off)
-			preferred, err := vm.Preferred()
-			assert.NoError(err)
-
-			preferredDecision, ok := preferred.(decision)
-			assert.True(ok)
-
-			preferredState := preferredDecision.onAccept()
+			preferredState := env.state
 			fakedState := state.NewDiff(
 				preferredState,
 				preferredState.CurrentStakers(),
@@ -80,10 +77,10 @@ func TestNewExportTx(t *testing.T) {
 			)
 			fakedState.SetTimestamp(tt.timestamp)
 
-			verifier := mempoolTxVerifier{
-				vm:          vm,
-				parentState: fakedState,
-				tx:          tx,
+			verifier := MempoolTxVerifier{
+				Backend:     &env.backend,
+				ParentState: fakedState,
+				Tx:          tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

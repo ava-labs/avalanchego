@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -99,24 +100,24 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	executor := atomicTxExecutor{
-		vm:          ab.vm,
-		parentState: parentState,
-		tx:          ab.Tx,
+	atomicExecutor := executor.AtomicTxExecutor{
+		Backend:     &ab.vm.txExecutorBackend,
+		ParentState: parentState,
+		Tx:          ab.Tx,
 	}
-	err = ab.Tx.Unsigned.Visit(&executor)
+	err = ab.Tx.Unsigned.Visit(&atomicExecutor)
 	if err != nil {
 		txID := ab.Tx.ID()
 		ab.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 
-	executor.onAccept.AddTx(ab.Tx, status.Committed)
+	atomicExecutor.OnAccept.AddTx(ab.Tx, status.Committed)
 
-	ab.onAcceptState = executor.onAccept
-	ab.inputs = executor.inputs
-	ab.atomicRequests = executor.atomicRequests
-	ab.timestamp = executor.onAccept.GetTimestamp()
+	ab.onAcceptState = atomicExecutor.OnAccept
+	ab.inputs = atomicExecutor.Inputs
+	ab.atomicRequests = atomicExecutor.AtomicRequests
+	ab.timestamp = atomicExecutor.OnAccept.GetTimestamp()
 
 	conflicts, err := parentIntf.conflicts(ab.inputs)
 	if err != nil {

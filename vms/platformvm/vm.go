@@ -41,20 +41,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
-	// MaxValidatorWeightFactor is the maximum factor of the validator stake
-	// that is allowed to be placed on a validator.
-	MaxValidatorWeightFactor uint64 = 5
-
-	validatorSetsCacheSize = 64
-
-	// Maximum future start time for staking/delegating
-	maxFutureStartTime = 24 * 7 * 2 * time.Hour
-
+	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
@@ -64,7 +57,6 @@ var (
 	_ secp256k1fx.VM   = &VM{}
 	_ validators.State = &VM{}
 
-	errInvalidID      = errors.New("invalid ID")
 	errWrongCacheType = errors.New("unexpectedly cached type")
 )
 
@@ -115,7 +107,8 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder builder.TxBuilder
+	txBuilder         builder.TxBuilder
+	txExecutorBackend executor.Backend
 }
 
 // Initialize this blockchain.
@@ -213,6 +206,17 @@ func (vm *VM) Initialize(
 		vm.AtomicUTXOManager,
 		vm.utxoHandler,
 	)
+
+	vm.txExecutorBackend = executor.Backend{
+		Config:       &vm.Config,
+		Ctx:          vm.ctx,
+		Clk:          &vm.clock,
+		Fx:           vm.fx,
+		FlowChecker:  vm.utxoHandler,
+		Uptimes:      vm.uptimeManager,
+		Rewards:      vm.rewards,
+		Bootstrapped: &vm.bootstrapped,
+	}
 
 	vm.lastAcceptedID = is.GetLastAccepted()
 	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)

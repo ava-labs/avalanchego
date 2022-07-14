@@ -53,13 +53,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+)
+
+const (
+	testNetworkID = 10 // To be used in tests
+	defaultWeight = 10000
 )
 
 var (
@@ -108,16 +113,9 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory crypto.FactorySECP256K1R
-)
 
-var (
 	errShouldPrefCommit = errors.New("should prefer to commit proposal")
 	errShouldPrefAbort  = errors.New("should prefer to abort proposal")
-)
-
-const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
 )
 
 type snLookup struct {
@@ -561,7 +559,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
@@ -641,7 +639,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-syncBound).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-executor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -697,7 +695,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -775,7 +773,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -810,7 +808,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -893,7 +891,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -1364,7 +1362,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(syncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
@@ -2395,27 +2393,231 @@ func TestMaxStakeAmount(t *testing.T) {
 	}
 }
 
-// Test that calling Verify on a block with an unverified parent doesn't cause a panic.
-func TestUnverifiedParentPanic(t *testing.T) {
+func TestUptimeDisallowedWithRestart(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
+	db := manager.NewMemDB(version.Semantic1_0_0)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	firstDB := db.NewPrefixDBManager([]byte{})
+	firstVM := &VM{Factory: Factory{
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			UptimePercentage:       .2,
+			RewardConfig:           defaultRewardConfig,
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		},
+	}}
+
+	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
+	firstMsgChan := make(chan common.Message, 1)
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	firstVM.clock.Set(defaultGenesisTime)
+	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
+
+	if err := firstVM.SetState(snow.Bootstrapping); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.SetState(snow.NormalOp); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fast forward clock to time for genesis validators to leave
+	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+
+	if err := firstVM.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+	firstCtx.Lock.Unlock()
+
+	secondDB := db.NewPrefixDBManager([]byte{})
+	secondVM := &VM{Factory: Factory{
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			UptimePercentage:       .21,
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		},
+	}}
+
+	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer func() {
+		if err := secondVM.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		secondCtx.Lock.Unlock()
+	}()
+
+	secondMsgChan := make(chan common.Message, 1)
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
+
+	if err := secondVM.SetState(snow.Bootstrapping); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.SetState(snow.NormalOp); err != nil {
+		t.Fatal(err)
+	}
+
+	secondVM.clock.Set(defaultValidateEndTime)
+	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+
+	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commit, ok := options[0].(*CommitBlock)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+
+	abort, ok := options[1].(*AbortBlock)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+
+	if err := block.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState := abort.onAccept()
+	_, txStatus, err := onAbortState.GetTx(block.Tx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if txStatus != status.Aborted {
+		t.Fatalf("status should be Aborted but is %s", txStatus)
+	}
+
+	if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	}
+
+	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if txStatus != status.Committed {
+		t.Fatalf("status should be Committed but is %s", txStatus)
+	}
+
+	// Verify that chain's timestamp has advanced
+	timestamp := secondVM.internalState.GetTimestamp()
+	if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	blk, err = secondVM.BuildBlock() // should contain proposal to reward genesis validator
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	block = blk.(*ProposalBlock)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commit, ok = options[1].(*CommitBlock)
+	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	}
+
+	abort, ok = options[0].(*AbortBlock)
+	if !ok {
+		t.Fatal(errShouldPrefAbort)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	onCommitState := commit.onAccept()
+	_, txStatus, err = onCommitState.GetTx(block.Tx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if txStatus != status.Committed {
+		t.Fatalf("status should be Committed but is %s", txStatus)
+	}
+
+	if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := abort.Accept(); err != nil { // do not reward the genesis validator
+		t.Fatal(err)
+	}
+
+	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if txStatus != status.Aborted {
+		t.Fatalf("status should be Aborted but is %s", txStatus)
+	}
+
+	currentStakers := secondVM.internalState.CurrentStakers()
+	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	if err == nil {
+		t.Fatal("should have removed a genesis validator")
+	}
+}
+
+func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
+			UptimePercentage:       .2,
+			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
 		},
 	}}
 
-	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
+
+	msgChan := make(chan common.Message, 1)
+	appSender := &common.SenderTest{T: t}
+	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -2423,648 +2625,107 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
-	if err != nil {
-		panic(err)
-	}
-	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+	vm.clock.Set(defaultGenesisTime)
+	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	key0 := keys[0]
-	key1 := keys[1]
-	addr0 := key0.PublicKey().Address()
-	addr1 := key1.PublicKey().Address()
-
-	addSubnetTx0, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr0}, []*crypto.PrivateKeySECP256K1R{key0}, addr0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addSubnetTx1, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addSubnetTx2, err := vm.txBuilder.NewCreateSubnetTx(1, []ids.ShortID{addr1}, []*crypto.PrivateKeySECP256K1R{key1}, addr0)
-	if err != nil {
+	if err := vm.SetState(snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
-	if err != nil {
+	if err := vm.SetState(snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
-	preferredID := preferred.ID()
-	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{addSubnetTx0})
+	// Fast forward clock to time for genesis validators to leave
+	vm.clock.Set(defaultValidateEndTime)
+	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
+
+	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	if err != nil {
 		t.Fatal(err)
-	}
-	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{addSubnetTx1})
-	if err != nil {
+	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*txs.Tx{addSubnetTx2})
+
+	// first the time will be advanced.
+	block := blk.(*ProposalBlock)
+	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.ParseBlock(addSubnetBlk0.Bytes()); err != nil {
+	commit, ok := options[0].(*CommitBlock)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+	abort, ok := options[1].(*AbortBlock)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+
+	if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.ParseBlock(addSubnetBlk1.Bytes()); err != nil {
+	if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vm.ParseBlock(addSubnetBlk2.Bytes()); err != nil {
+	if err := abort.Verify(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := addSubnetBlk0.Verify(); err != nil {
+	// advance the timestamp
+	if err := commit.Accept(); err != nil {
 		t.Fatal(err)
 	}
-	if err := addSubnetBlk0.Accept(); err != nil {
+
+	// Verify that chain's timestamp has advanced
+	timestamp := vm.internalState.GetTimestamp()
+	if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	// should contain proposal to reward genesis validator
+	blk, err = vm.BuildBlock()
+	if err != nil {
 		t.Fatal(err)
 	}
-	// Doesn't matter what verify returns as long as it's not panicking.
-	_ = addSubnetBlk2.Verify()
-}
-
-func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
-	assert := assert.New(t)
-
-	vm, baseDB, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
-	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-
-		vm.ctx.Lock.Unlock()
-	}()
-
-	newValidatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
-	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
-
-	key, err := testKeyfactory.NewPrivateKey()
-	assert.NoError(err)
-
-	nodeID := ids.NodeID(key.PublicKey().Address())
-
-	// Create the tx to add a new validator
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(newValidatorStartTime.Unix()),
-		uint64(newValidatorEndTime.Unix()),
-		nodeID,
-		ids.ShortID(nodeID),
-		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty,
-	)
-	assert.NoError(err)
-
-	// Create the proposal block to add the new validator
-	preferred, err := vm.Preferred()
-	assert.NoError(err)
-
-	preferredID := preferred.ID()
-	preferredHeight := preferred.Height()
-
-	addValidatorProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx)
-	assert.NoError(err)
-
-	err = addValidatorProposalBlk.Verify()
-	assert.NoError(err)
-
-	// Get the commit block to add the new validator
-	addValidatorProposalOptions, err := addValidatorProposalBlk.Options()
-	assert.NoError(err)
-
-	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*CommitBlock)
-	assert.True(ok)
-
-	err = addValidatorProposalCommit.Verify()
-	assert.NoError(err)
-
-	// Verify that the new validator now in pending validator set
-	{
-		onAccept := addValidatorProposalCommit.onAccept()
-		pendingStakers := onAccept.PendingStakers()
-
-		_, _, err := pendingStakers.GetValidatorTx(nodeID)
-		assert.NoError(err)
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Create the UTXO that will be added to shared memory
-	utxo := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID: ids.GenerateTestID(),
-		},
-		Asset: avax.Asset{
-			ID: vm.ctx.AVAXAssetID,
-		},
-		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.TxFee,
-			OutputOwners: secp256k1fx.OutputOwners{},
-		},
+	block = blk.(*ProposalBlock)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Create the import tx that will fail verification
-	unsignedImportTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		SourceChain: vm.ctx.XChainID,
-		ImportedInputs: []*avax.TransferableInput{
-			{
-				UTXOID: utxo.UTXOID,
-				Asset:  utxo.Asset,
-				In: &secp256k1fx.TransferInput{
-					Amt: vm.TxFee,
-				},
-			},
-		},
+	abort, ok = options[0].(*AbortBlock)
+	if !ok {
+		t.Fatal(errShouldPrefAbort)
 	}
-	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
-		{}, // There is one input, with no required signers
-	})
-	assert.NoError(err)
-
-	// Create the standard block that will fail verification, and then be
-	// re-verified.
-	preferredID = addValidatorProposalCommit.ID()
-	preferredHeight = addValidatorProposalCommit.Height()
-
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{signedImportTx})
-	assert.NoError(err)
-
-	// Because the shared memory UTXO hasn't been populated, this block is
-	// currently invalid.
-	err = importBlk.Verify()
-	assert.Error(err)
-
-	// Because we no longer ever reject a block in verification, the status
-	// should remain as processing.
-	importBlkStatus := importBlk.Status()
-	assert.Equal(choices.Processing, importBlkStatus)
-
-	// Populate the shared memory UTXO.
-	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
-
-	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
-	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
-
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
-	assert.NoError(err)
-
-	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(
-		map[ids.ID]*atomic.Requests{
-			vm.ctx.ChainID: {
-				PutRequests: []*atomic.Element{
-					{
-						Key:   inputID[:],
-						Value: utxoBytes,
-					},
-				},
-			},
-		},
-	)
-	assert.NoError(err)
-
-	// Because the shared memory UTXO has now been populated, the block should
-	// pass verification.
-	err = importBlk.Verify()
-	assert.NoError(err)
-
-	// The status shouldn't have been changed during a successful verification.
-	importBlkStatus = importBlk.Status()
-	assert.Equal(choices.Processing, importBlkStatus)
-
-	// Create the tx that would have moved the new validator from the pending
-	// validator set into the current validator set.
-	vm.clock.Set(newValidatorStartTime)
-	advanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime)
-	assert.NoError(err)
-
-	// Create the proposal block that should have moved the new validator from
-	// the pending validator set into the current validator set.
-	preferredID = importBlk.ID()
-	preferredHeight = importBlk.Height()
-
-	advanceTimeProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
-	assert.NoError(err)
-
-	err = advanceTimeProposalBlk.Verify()
-	assert.NoError(err)
-
-	// Get the commit block that advances the timestamp to the point that the
-	// validator should be moved from the pending validator set into the current
-	// validator set.
-	advanceTimeProposalOptions, err := advanceTimeProposalBlk.Options()
-	assert.NoError(err)
-
-	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*CommitBlock)
-	assert.True(ok)
-
-	err = advanceTimeProposalCommit.Verify()
-	assert.NoError(err)
-
-	// Accept all the blocks
-	allBlocks := []smcon.Block{
-		addValidatorProposalBlk,
-		addValidatorProposalCommit,
-		importBlk,
-		advanceTimeProposalBlk,
-		advanceTimeProposalCommit,
-	}
-	for _, blk := range allBlocks {
-		err = blk.Accept()
-		assert.NoError(err)
-
-		status := blk.Status()
-		assert.Equal(choices.Accepted, status)
+	commit, ok = options[1].(*CommitBlock)
+	if !ok {
+		t.Fatal(errShouldPrefAbort)
 	}
 
-	// Force a reload of the state from the database.
-	is, err := NewState(
-		vm,
-		vm.dbManager.Current().Database,
-		nil,
-		prometheus.NewRegistry(),
-	)
-	assert.NoError(err)
-	vm.internalState = is
-
-	// Verify that new validator is now in the current validator set.
-	{
-		currentStakers := vm.internalState.CurrentStakers()
-		_, err = currentStakers.GetValidator(nodeID)
-		assert.NoError(err)
-
-		pendingStakers := vm.internalState.PendingStakers()
-		_, _, err := pendingStakers.GetValidatorTx(nodeID)
-		assert.ErrorIs(err, database.ErrNotFound)
-
-		currentTimestamp := vm.internalState.GetTimestamp()
-		assert.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
-	assert := assert.New(t)
-
-	vm, baseDB, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
-	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
-
-		vm.ctx.Lock.Unlock()
-	}()
-
-	vm.internalState.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
-
-	newValidatorStartTime0 := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
-	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
-
-	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
-
-	// Create the tx to add the first new validator
-	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
-		uint64(newValidatorStartTime0.Unix()),
-		uint64(newValidatorEndTime0.Unix()),
-		nodeID0,
-		ids.ShortID(nodeID0),
-		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty,
-	)
-	assert.NoError(err)
-
-	// Create the proposal block to add the first new validator
-	preferred, err := vm.Preferred()
-	assert.NoError(err)
-
-	preferredID := preferred.ID()
-	preferredHeight := preferred.Height()
-
-	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx0)
-	assert.NoError(err)
-
-	err = addValidatorProposalBlk0.Verify()
-	assert.NoError(err)
-
-	// Get the commit block to add the first new validator
-	addValidatorProposalOptions0, err := addValidatorProposalBlk0.Options()
-	assert.NoError(err)
-
-	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*CommitBlock)
-	assert.True(ok)
-
-	err = addValidatorProposalCommit0.Verify()
-	assert.NoError(err)
-
-	// Verify that first new validator now in pending validator set
-	{
-		onAccept := addValidatorProposalCommit0.onAccept()
-		pendingStakers := onAccept.PendingStakers()
-
-		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
-		assert.NoError(err)
+	if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := abort.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Create the tx that moves the first new validator from the pending
-	// validator set into the current validator set.
-	vm.clock.Set(newValidatorStartTime0)
-	advanceTimeTx0, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime0)
-	assert.NoError(err)
-
-	// Create the proposal block that moves the first new validator from the
-	// pending validator set into the current validator set.
-	preferredID = addValidatorProposalCommit0.ID()
-	preferredHeight = addValidatorProposalCommit0.Height()
-
-	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx0)
-	assert.NoError(err)
-
-	err = advanceTimeProposalBlk0.Verify()
-	assert.NoError(err)
-
-	// Get the commit block that advances the timestamp to the point that the
-	// first new validator should be moved from the pending validator set into
-	// the current validator set.
-	advanceTimeProposalOptions0, err := advanceTimeProposalBlk0.Options()
-	assert.NoError(err)
-
-	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*CommitBlock)
-	assert.True(ok)
-
-	err = advanceTimeProposalCommit0.Verify()
-	assert.NoError(err)
-
-	// Verify that the first new validator is now in the current validator set.
-	{
-		onAccept := advanceTimeProposalCommit0.onAccept()
-		currentStakers := onAccept.CurrentStakers()
-		_, err = currentStakers.GetValidator(nodeID0)
-		assert.NoError(err)
-
-		pendingStakers := onAccept.PendingStakers()
-		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
-		assert.ErrorIs(err, database.ErrNotFound)
-
-		currentTimestamp := onAccept.GetTimestamp()
-		assert.Equal(newValidatorStartTime0.Unix(), currentTimestamp.Unix())
+	// do not reward the genesis validator
+	if err := abort.Accept(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Create the UTXO that will be added to shared memory
-	utxo := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID: ids.GenerateTestID(),
-		},
-		Asset: avax.Asset{
-			ID: vm.ctx.AVAXAssetID,
-		},
-		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.TxFee,
-			OutputOwners: secp256k1fx.OutputOwners{},
-		},
-	}
-
-	// Create the import tx that will fail verification
-	unsignedImportTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		SourceChain: vm.ctx.XChainID,
-		ImportedInputs: []*avax.TransferableInput{
-			{
-				UTXOID: utxo.UTXOID,
-				Asset:  utxo.Asset,
-				In: &secp256k1fx.TransferInput{
-					Amt: vm.TxFee,
-				},
-			},
-		},
-	}
-	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
-		{}, // There is one input, with no required signers
-	})
-	assert.NoError(err)
-
-	// Create the standard block that will fail verification, and then be
-	// re-verified.
-	preferredID = advanceTimeProposalCommit0.ID()
-	preferredHeight = advanceTimeProposalCommit0.Height()
-
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{signedImportTx})
-	assert.NoError(err)
-
-	// Because the shared memory UTXO hasn't been populated, this block is
-	// currently invalid.
-	err = importBlk.Verify()
-	assert.Error(err)
-
-	// Because we no longer ever reject a block in verification, the status
-	// should remain as processing.
-	importBlkStatus := importBlk.Status()
-	assert.Equal(choices.Processing, importBlkStatus)
-
-	// Populate the shared memory UTXO.
-	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
-
-	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
-	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
-
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
-	assert.NoError(err)
-
-	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(
-		map[ids.ID]*atomic.Requests{
-			vm.ctx.ChainID: {
-				PutRequests: []*atomic.Element{
-					{
-						Key:   inputID[:],
-						Value: utxoBytes,
-					},
-				},
-			},
-		},
-	)
-	assert.NoError(err)
-
-	// Because the shared memory UTXO has now been populated, the block should
-	// pass verification.
-	err = importBlk.Verify()
-	assert.NoError(err)
-
-	// The status shouldn't have been changed during a successful verification.
-	importBlkStatus = importBlk.Status()
-	assert.Equal(choices.Processing, importBlkStatus)
-
-	newValidatorStartTime1 := newValidatorStartTime0.Add(syncBound).Add(1 * time.Second)
-	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
-
-	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
-
-	// Create the tx to add the second new validator
-	addValidatorTx1, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MaxValidatorStake,
-		uint64(newValidatorStartTime1.Unix()),
-		uint64(newValidatorEndTime1.Unix()),
-		nodeID1,
-		ids.ShortID(nodeID1),
-		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[1]},
-		ids.ShortEmpty,
-	)
-	assert.NoError(err)
-
-	// Create the proposal block to add the second new validator
-	preferredID = importBlk.ID()
-	preferredHeight = importBlk.Height()
-
-	addValidatorProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx1)
-	assert.NoError(err)
-
-	err = addValidatorProposalBlk1.Verify()
-	assert.NoError(err)
-
-	// Get the commit block to add the second new validator
-	addValidatorProposalOptions1, err := addValidatorProposalBlk1.Options()
-	assert.NoError(err)
-
-	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*CommitBlock)
-	assert.True(ok)
-
-	err = addValidatorProposalCommit1.Verify()
-	assert.NoError(err)
-
-	// Verify that the second new validator now in pending validator set
-	{
-		onAccept := addValidatorProposalCommit1.onAccept()
-		pendingStakers := onAccept.PendingStakers()
-
-		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
-		assert.NoError(err)
-	}
-
-	// Create the tx that moves the second new validator from the pending
-	// validator set into the current validator set.
-	vm.clock.Set(newValidatorStartTime1)
-	advanceTimeTx1, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime1)
-	assert.NoError(err)
-
-	// Create the proposal block that moves the second new validator from the
-	// pending validator set into the current validator set.
-	preferredID = addValidatorProposalCommit1.ID()
-	preferredHeight = addValidatorProposalCommit1.Height()
-
-	advanceTimeProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx1)
-	assert.NoError(err)
-
-	err = advanceTimeProposalBlk1.Verify()
-	assert.NoError(err)
-
-	// Get the commit block that advances the timestamp to the point that the
-	// second new validator should be moved from the pending validator set into
-	// the current validator set.
-	advanceTimeProposalOptions1, err := advanceTimeProposalBlk1.Options()
-	assert.NoError(err)
-
-	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*CommitBlock)
-	assert.True(ok)
-
-	err = advanceTimeProposalCommit1.Verify()
-	assert.NoError(err)
-
-	// Verify that the second new validator is now in the current validator set.
-	{
-		onAccept := advanceTimeProposalCommit1.onAccept()
-		currentStakers := onAccept.CurrentStakers()
-		_, err := currentStakers.GetValidator(nodeID1)
-		assert.NoError(err)
-
-		pendingStakers := onAccept.PendingStakers()
-		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
-		assert.ErrorIs(err, database.ErrNotFound)
-
-		currentTimestamp := onAccept.GetTimestamp()
-		assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
-	}
-
-	// Accept all the blocks
-	allBlocks := []smcon.Block{
-		addValidatorProposalBlk0,
-		addValidatorProposalCommit0,
-		advanceTimeProposalBlk0,
-		advanceTimeProposalCommit0,
-		importBlk,
-		addValidatorProposalBlk1,
-		addValidatorProposalCommit1,
-		advanceTimeProposalBlk1,
-		advanceTimeProposalCommit1,
-	}
-	for _, blk := range allBlocks {
-		err = blk.Accept()
-		assert.NoError(err)
-
-		status := blk.Status()
-		assert.Equal(choices.Accepted, status)
-	}
-
-	// Force a reload of the state from the database.
-	is, err := NewState(
-		vm,
-		vm.dbManager.Current().Database,
-		nil,
-		prometheus.NewRegistry(),
-	)
-	assert.NoError(err)
-	vm.internalState = is
-
-	// Verify that validators are in the current validator set with the correct
-	// reward calculated.
-	{
-		currentStakers := vm.internalState.CurrentStakers()
-		node0, err := currentStakers.GetValidator(nodeID0)
-		assert.NoError(err)
-		potentialReward := node0.PotentialReward()
-		assert.Equal(uint64(60000000), potentialReward)
-
-		node1, err := currentStakers.GetValidator(nodeID1)
-		assert.NoError(err)
-		potentialReward = node1.PotentialReward()
-		assert.EqualValues(uint64(59999999), potentialReward)
-
-		pendingStakers := vm.internalState.PendingStakers()
-		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
-		assert.ErrorIs(err, database.ErrNotFound)
-		_, _, err = pendingStakers.GetValidatorTx(nodeID1)
-		assert.ErrorIs(err, database.ErrNotFound)
-
-		currentTimestamp := vm.internalState.GetTimestamp()
-		assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
+	currentStakers := vm.internalState.CurrentStakers()
+	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	if err == nil {
+		t.Fatal("should have removed a genesis validator")
 	}
 }

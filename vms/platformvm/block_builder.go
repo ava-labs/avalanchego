@@ -18,12 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
-	// syncBound is the synchrony bound used for safe decision making
-	syncBound = 10 * time.Second
-
 	// TargetTxSize is the maximum number of bytes a transaction can use to be
 	// allowed into the mempool.
 	TargetTxSize = 64 * units.KiB
@@ -105,12 +103,11 @@ func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		// The preferred block should always be a decision block
 		return errInvalidBlockType
 	}
-
 	preferredState := preferredDecision.onAccept()
-	verifier := mempoolTxVerifier{
-		vm:          m.vm,
-		parentState: preferredState,
-		tx:          tx,
+	verifier := executor.MempoolTxVerifier{
+		Backend:     &m.vm.txExecutorBackend,
+		ParentState: preferredState,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&verifier)
 	if err != nil {
@@ -211,7 +208,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(maxFutureStartTime)
+	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
 		m.AddProposalTx(tx)
 
@@ -339,7 +336,7 @@ func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	now := m.vm.clock.Time()
-	syncTime := now.Add(syncBound)
+	syncTime := now.Add(executor.SyncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()

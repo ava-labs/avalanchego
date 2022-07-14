@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -102,29 +103,29 @@ func (sb *StandardBlock) Verify() error {
 
 	funcs := make([]func(), 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		executor := standardTxExecutor{
-			vm:    sb.vm,
-			state: sb.onAcceptState,
-			tx:    tx,
+		txExecutor := executor.StandardTxExecutor{
+			Backend: &sb.vm.txExecutorBackend,
+			State:   sb.onAcceptState,
+			Tx:      tx,
 		}
-		err := tx.Unsigned.Visit(&executor)
+		err := tx.Unsigned.Visit(&txExecutor)
 		if err != nil {
 			txID := tx.ID()
 			sb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
 		}
 
-		if sb.inputs.Overlaps(executor.inputs) {
+		if sb.inputs.Overlaps(txExecutor.Inputs) {
 			return errConflictingBatchTxs
 		}
-		sb.inputs.Union(executor.inputs)
+		sb.inputs.Union(txExecutor.Inputs)
 
 		sb.onAcceptState.AddTx(tx, status.Committed)
-		if executor.onAccept != nil {
-			funcs = append(funcs, executor.onAccept)
+		if txExecutor.OnAccept != nil {
+			funcs = append(funcs, txExecutor.OnAccept)
 		}
 
-		for chainID, txRequests := range executor.atomicRequests {
+		for chainID, txRequests := range txExecutor.AtomicRequests {
 			// Add/merge in the atomic requests represented by [tx]
 			chainRequests, exists := sb.atomicRequests[chainID]
 			if !exists {

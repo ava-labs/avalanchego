@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -39,7 +40,7 @@ const (
 
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
-	minAddStakerDelay = 2 * syncBound
+	minAddStakerDelay = 2 * executor.SyncBound
 )
 
 var (
@@ -515,7 +516,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		subnet, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
 		if !ok {
-			return errWrongTxType
+			return fmt.Errorf("expected tx type *txs.CreateSubnetTx but got %T", subnetTx.Unsigned)
 		}
 		owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 		if !ok {
@@ -924,7 +925,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1028,7 +1029,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1130,7 +1131,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	now := service.vm.clock.Time()
 	minAddStakerTime := now.Add(minAddStakerDelay)
 	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
 	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
 
 	if args.StartTime == 0 {
@@ -1802,7 +1803,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			chainID := chainTx.ID()
 			chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 			if !ok {
-				return errWrongTxType
+				return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
 			}
 			response.Blockchains = append(response.Blockchains, APIBlockchain{
 				ID:       chainID,
@@ -1821,7 +1822,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		chainID := chainTx.ID()
 		chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
 		if !ok {
-			return errWrongTxType
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
 		}
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chainID,

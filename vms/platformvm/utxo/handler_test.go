@@ -30,7 +30,7 @@ func (du *dummyUnsignedTx) Visit(txs.Visitor) error {
 	return nil
 }
 
-func TestSemanticVerifySpendUTXOs(t *testing.T) {
+func TestVerifySpendUTXOs(t *testing.T) {
 	fx := &secp256k1fx.Fx{}
 
 	if err := fx.InitializeVM(&secp256k1fx.TestVM{}); err != nil {
@@ -776,7 +776,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 		h.clk.Set(now)
 
 		t.Run(test.description, func(t *testing.T) {
-			err := h.SemanticVerifySpendUTXOs(
+			err := h.VerifySpendUTXOs(
 				&unsignedTx,
 				test.utxos,
 				test.ins,

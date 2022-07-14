@@ -105,7 +105,7 @@ type Verifier interface {
 	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
 	// [outs].
 	// Precondition: [tx] has already been syntactically verified.
-	SemanticVerifySpend(
+	VerifySpend(
 		tx txs.UnsignedTx,
 		utxoDB state.UTXOGetter,
 		ins []*avax.TransferableInput,
@@ -122,7 +122,7 @@ type Verifier interface {
 	// The [ins] must have at least [feeAmount] more of [feeAssetID] than the
 	// [outs].
 	// Precondition: [tx] has already been syntactically verified.
-	SemanticVerifySpendUTXOs(
+	VerifySpendUTXOs(
 		tx txs.UnsignedTx,
 		utxos []*avax.UTXO,
 		ins []*avax.TransferableInput,
@@ -441,7 +441,7 @@ func (h *handler) Authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-func (h *handler) SemanticVerifySpend(
+func (h *handler) VerifySpend(
 	tx txs.UnsignedTx,
 	utxoDB state.UTXOGetter,
 	ins []*avax.TransferableInput,
@@ -463,10 +463,10 @@ func (h *handler) SemanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
+	return h.VerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
-func (h *handler) SemanticVerifySpendUTXOs(
+func (h *handler) VerifySpendUTXOs(
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
