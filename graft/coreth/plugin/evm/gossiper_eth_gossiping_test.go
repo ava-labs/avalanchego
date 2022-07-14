@@ -96,8 +96,8 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	ethTxs := getValidEthTxs(key, 3, common.Big1)
@@ -147,7 +147,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:2])
+	errs := vm.txPool.AddRemotesSync(ethTxs[:2])
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to mempool")
 	}
@@ -156,7 +156,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	<-signal1 // wait until reorg processed
 	assert.NoError(vm.gossiper.GossipEthTxs(ethTxs[:2]))
 
-	errs = vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	errs = vm.txPool.AddRemotesSync(ethTxs)
 	assert.Contains(errs[0].Error(), "already known")
 	assert.Contains(errs[1].Error(), "already known")
 	assert.NoError(errs[2], "failed adding coreth tx to mempool")
@@ -182,8 +182,8 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	ethTxs := getValidEthTxs(key, 100, common.Big1)
@@ -210,7 +210,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	errs := vm.txPool.AddRemotesSync(ethTxs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to mempool")
 	}
@@ -242,8 +242,8 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	var (
 		wg          sync.WaitGroup
@@ -297,14 +297,14 @@ func TestMempoolEthTxsRegossipSingleAccount(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	errs := vm.txPool.AddRemotesSync(ethTxs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to remote mempool")
 	}
@@ -337,8 +337,8 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	ethTxs := make([]*types.Transaction, 20)
@@ -351,11 +351,11 @@ func TestMempoolEthTxsRegossip(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:10])
+	errs := vm.txPool.AddRemotesSync(ethTxs[:10])
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to remote mempool")
 	}
-	errs = vm.chain.GetTxPool().AddLocals(ethTxs[10:])
+	errs = vm.txPool.AddLocals(ethTxs[10:])
 	for _, err := range errs {
 		assert.NoError(err, "failed adding coreth tx to local mempool")
 	}

@@ -14,9 +14,9 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/snapshot"
+	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -45,7 +45,7 @@ type stateSyncClientConfig struct {
 
 	lastAcceptedHeight uint64
 
-	chain           *coreth.ETHChain
+	chain           *eth.Ethereum
 	state           *chain.State
 	chaindb         ethdb.Database
 	metadataDB      database.Database

@@ -608,6 +608,17 @@ func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transacti
 	return pending
 }
 
+// PendingSize returns the number of pending txs in the tx pool.
+func (pool *TxPool) PendingSize() int {
+	pending := pool.Pending(true)
+	count := 0
+	for _, txs := range pending {
+		count += len(txs)
+	}
+	return count
+
+}
+
 // Locals retrieves the accounts currently considered local by the pool.
 func (pool *TxPool) Locals() []common.Address {
 	pool.mu.Lock()

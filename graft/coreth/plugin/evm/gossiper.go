@@ -86,8 +86,8 @@ func (vm *VM) createGossiper() Gossiper {
 		gossipActivationTime: time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
 		config:               vm.config,
 		client:               vm.client,
-		blockchain:           vm.chain.BlockChain(),
-		txPool:               vm.chain.GetTxPool(),
+		blockchain:           vm.blockChain,
+		txPool:               vm.txPool,
 		atomicMempool:        vm.mempool,
 		ethTxsToGossipChan:   make(chan []*types.Transaction),
 		ethTxsToGossip:       make(map[common.Hash]*types.Transaction),
@@ -429,7 +429,7 @@ func NewGossipHandler(vm *VM) *GossipHandler {
 	return &GossipHandler{
 		vm:            vm,
 		atomicMempool: vm.mempool,
-		txPool:        vm.chain.GetTxPool(),
+		txPool:        vm.txPool,
 		stats:         vm.gossipStats,
 	}
 }

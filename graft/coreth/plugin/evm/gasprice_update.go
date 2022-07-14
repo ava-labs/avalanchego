@@ -27,7 +27,7 @@ type gasPriceSetter interface {
 // handleGasPriceUpdates creates and runs an instance of
 func (vm *VM) handleGasPriceUpdates() {
 	gpu := &gasPriceUpdater{
-		setter:       vm.chain.GetTxPool(),
+		setter:       vm.txPool,
 		chainConfig:  vm.chainConfig,
 		shutdownChan: vm.shutdownChan,
 		wg:           &vm.shutdownWg,
