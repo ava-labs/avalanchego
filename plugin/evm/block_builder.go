@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -52,7 +52,7 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	chain    *coreth.ETHChain
+	txPool   *core.TxPool
 	mempool  *Mempool
 	gossiper Gossiper
 
@@ -88,7 +88,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 	b := &blockBuilder{
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
-		chain:                vm.chain,
+		txPool:               vm.txPool,
 		mempool:              vm.mempool,
 		gossiper:             vm.gossiper,
 		shutdownChan:         vm.shutdownChan,
@@ -180,7 +180,7 @@ func (b *blockBuilder) handleGenerateBlock() {
 // needToBuild returns true if there are outstanding transactions to be issued
 // into a block.
 func (b *blockBuilder) needToBuild() bool {
-	size := b.chain.PendingSize()
+	size := b.txPool.PendingSize()
 	return size > 0 || b.mempool.Len() > 0
 }
 
@@ -189,7 +189,7 @@ func (b *blockBuilder) needToBuild() bool {
 //
 // NOTE: Only used prior to AP4.
 func (b *blockBuilder) buildEarly() bool {
-	size := b.chain.PendingSize()
+	size := b.txPool.PendingSize()
 	return size > batchSize || b.mempool.Len() > 1
 }
 
@@ -271,7 +271,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 		// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
 		// may orphan transactions that were previously in a preferred block.
-		txSubmitChan := b.chain.GetTxSubmitCh()
+		txSubmitChan := make(chan core.NewTxsEvent)
+		b.txPool.SubscribeNewTxsEvent(txSubmitChan)
 		for {
 			select {
 			case ethTxsEvent := <-txSubmitChan:

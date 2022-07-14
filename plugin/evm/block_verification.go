@@ -11,11 +11,10 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 
+	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
-
-	coreth "github.com/ava-labs/coreth/chain"
 )
 
 var (
@@ -122,7 +121,7 @@ func (v blockValidatorPhase0) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+	if b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
@@ -221,7 +220,7 @@ func (blockValidatorPhase1) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+	if b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
@@ -325,7 +324,7 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+	if b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
@@ -422,7 +421,7 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+	if b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles
@@ -552,7 +551,7 @@ func (blockValidatorPhase5) SyntacticVerify(b *Block) error {
 		return errUncleHashMismatch
 	}
 	// Coinbase must be zero on C-Chain
-	if b.ethBlock.Coinbase() != coreth.BlackholeAddr {
+	if b.ethBlock.Coinbase() != constants.BlackholeAddr {
 		return errInvalidBlock
 	}
 	// Block must not have any uncles

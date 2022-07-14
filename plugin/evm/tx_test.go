@@ -128,7 +128,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	}
 
 	// Retrieve dummy state to test that EVMStateTransfer works correctly
-	sdb, err := vm.chain.BlockState(lastAcceptedBlock.ethBlock)
+	sdb, err := vm.blockChain.StateAt(lastAcceptedBlock.ethBlock.Root())
 	if err != nil {
 		t.Fatal(err)
 	}

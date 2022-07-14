@@ -397,7 +397,7 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 				Ins: test.tx,
 			}
 
-			stateDB, err := vm.chain.CurrentState()
+			stateDB, err := vm.blockChain.State()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1631,7 +1631,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			sdb, err := vm.chain.CurrentState()
+			sdb, err := vm.blockChain.State()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1819,7 +1819,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			stdb, err := vm.chain.CurrentState()
+			stdb, err := vm.blockChain.State()
 			if err != nil {
 				t.Fatal(err)
 			}
