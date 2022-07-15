@@ -13,50 +13,191 @@ import (
 )
 
 func TestMultiIterator(t *testing.T) {
-	assert := assert.New(t)
-	stakers0 := []*Staker{
+	type test struct {
+		name      string
+		iterators []StakerIterator
+		expected  []*Staker
+	}
+
+	txID := ids.GenerateTestID()
+	tests := []test{
 		{
-			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(0, 0),
+			name:      "no iterators",
+			iterators: []StakerIterator{},
+			expected:  []*Staker{},
 		},
 		{
-			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(2, 0),
+			name:      "one empty iterator",
+			iterators: []StakerIterator{EmptyIterator},
+			expected:  []*Staker{},
+		},
+		{
+			name:      "multiple empty iterator",
+			iterators: []StakerIterator{EmptyIterator, EmptyIterator, EmptyIterator},
+			expected:  []*Staker{},
+		},
+		{
+			name:      "mixed empty iterators",
+			iterators: []StakerIterator{EmptyIterator, NewSliceIterator([]*Staker{}...)},
+			expected:  []*Staker{},
+		},
+		{
+			name: "single iterator",
+			iterators: []StakerIterator{
+				NewSliceIterator(
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(0, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(1, 0),
+					},
+				),
+			},
+			expected: []*Staker{
+				{
+					TxID:     txID,
+					NextTime: time.Unix(0, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(1, 0),
+				},
+			},
+		},
+		{
+			name: "multiple iterators",
+			iterators: []StakerIterator{
+				NewSliceIterator(
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(0, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(2, 0),
+					},
+				),
+				NewSliceIterator(
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(1, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(3, 0),
+					},
+				),
+			},
+			expected: []*Staker{
+				{
+					TxID:     txID,
+					NextTime: time.Unix(0, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(1, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(2, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(3, 0),
+				},
+			},
+		},
+		{
+			name: "multiple iterators different lengths",
+			iterators: []StakerIterator{
+				NewSliceIterator(
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(0, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(2, 0),
+					},
+				),
+				NewSliceIterator(
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(1, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(3, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(4, 0),
+					},
+					&Staker{
+						TxID:     txID,
+						NextTime: time.Unix(5, 0),
+					},
+				),
+			},
+			expected: []*Staker{
+				{
+					TxID:     txID,
+					NextTime: time.Unix(0, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(1, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(2, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(3, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(4, 0),
+				},
+				{
+					TxID:     txID,
+					NextTime: time.Unix(5, 0),
+				},
+			},
 		},
 	}
 
-	stakers1 := []*Staker{
-		{
-			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(1, 0),
-		},
-		{
-			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(3, 0),
-		},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			it := NewMultiIterator(tt.iterators...)
+			for _, expected := range tt.expected {
+				assert.True(it.Next())
+				assert.Equal(expected, it.Value())
+			}
+			assert.False(it.Next())
+			it.Release()
+			assert.False(it.Next())
+		})
 	}
 
-	stakers := []*Staker{
-		stakers0[0],
-		stakers1[0],
-		stakers0[1],
-		stakers1[1],
-	}
-
-	it := NewMultiIterator(
-		EmptyIterator,
-		NewSliceIterator(stakers0...),
-		EmptyIterator,
-		NewSliceIterator(stakers1...),
-		EmptyIterator,
-	)
-	for _, staker := range stakers {
-		assert.True(it.Next())
-		assert.Equal(staker, it.Value())
-	}
-	assert.False(it.Next())
-	it.Release()
-	assert.False(it.Next())
+	// it := NewMultiIterator(
+	// 	EmptyIterator,
+	// 	NewSliceIterator(stakers0...),
+	// 	EmptyIterator,
+	// 	NewSliceIterator(stakers1...),
+	// 	EmptyIterator,
+	// )
+	// for _, staker := range stakers {
+	// 	assert.True(it.Next())
+	// 	assert.Equal(staker, it.Value())
+	// }
+	// assert.False(it.Next())
+	// it.Release()
+	// assert.False(it.Next())
 }
 
 func TestMultiIteratorEarlyRelease(t *testing.T) {
@@ -93,4 +234,8 @@ func TestMultiIteratorEarlyRelease(t *testing.T) {
 	assert.True(it.Next())
 	it.Release()
 	assert.False(it.Next())
+}
+
+func TestMultiIteratorFoo(t *testing.T) {
+
 }
