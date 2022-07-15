@@ -22,10 +22,9 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -54,12 +53,12 @@ func TestNewImportTx(t *testing.T) {
 	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
 		*cnt++
 		m := &atomic.Memory{}
-		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, h.baseDB))
+		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, env.baseDB))
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		sm := m.NewSharedMemory(h.ctx.ChainID)
+		sm := m.NewSharedMemory(env.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(peerChain)
 
 		// #nosec G404
@@ -68,7 +67,7 @@ func TestNewImportTx(t *testing.T) {
 				TxID:        ids.GenerateTestID(),
 				OutputIndex: rand.Uint32(),
 			},
-			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amt,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -83,7 +82,7 @@ func TestNewImportTx(t *testing.T) {
 			t.Fatal(err)
 		}
 		inputID := utxo.InputID()
-		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{h.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{env.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
@@ -99,15 +98,15 @@ func TestNewImportTx(t *testing.T) {
 	tests := []test{
 		{
 			description:   "can't pay fee",
-			sourceChainID: h.ctx.XChainID,
-			sharedMemory:  fundedSharedMemory(h.ctx.XChainID, h.cfg.TxFee-1),
+			sourceChainID: env.ctx.XChainID,
+			sharedMemory:  fundedSharedMemory(env.ctx.XChainID, env.config.TxFee-1),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
 			shouldErr:     true,
 		},
 		{
 			description:   "can barely pay fee",
-			sourceChainID: h.ctx.XChainID,
-			sharedMemory:  fundedSharedMemory(h.ctx.XChainID, h.cfg.TxFee),
+			sourceChainID: env.ctx.XChainID,
+			sharedMemory:  fundedSharedMemory(env.ctx.XChainID, env.config.TxFee),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
 			shouldErr:     false,
 			shouldVerify:  true,
@@ -115,9 +114,9 @@ func TestNewImportTx(t *testing.T) {
 		{
 			description:   "attempting to import from C-chain",
 			sourceChainID: cChainID,
-			sharedMemory:  fundedSharedMemory(cChainID, h.cfg.TxFee),
+			sharedMemory:  fundedSharedMemory(cChainID, env.config.TxFee),
 			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:     h.cfg.ApricotPhase5Time,
+			timestamp:     env.config.ApricotPhase5Time,
 			shouldErr:     false,
 			shouldVerify:  true,
 		},
@@ -128,8 +127,8 @@ func TestNewImportTx(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			h.msm.SharedMemory = tt.sharedMemory
-			tx, err := h.txBuilder.NewImportTx(
+			env.msm.SharedMemory = tt.sharedMemory
+			tx, err := env.txBuilder.NewImportTx(
 				tt.sourceChainID,
 				to,
 				tt.sourceKeys,
@@ -157,9 +156,9 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			assert.Equal(h.cfg.TxFee, totalIn-totalOut, "burned too much")
+			assert.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
 
-			preferredState := h.tState
+			preferredState := env.state
 			fakedState := state.NewDiff(
 				preferredState,
 				preferredState.CurrentStakers(),
@@ -168,7 +167,7 @@ func TestNewImportTx(t *testing.T) {
 			fakedState.SetTimestamp(tt.timestamp)
 
 			verifier := MempoolTxVerifier{
-				Backend:     &h.execBackend,
+				Backend:     &env.backend,
 				ParentState: fakedState,
 				Tx:          tx,
 			}

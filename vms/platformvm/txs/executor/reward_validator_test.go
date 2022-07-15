@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -16,19 +18,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
-	h := newTestHelpersCollection()
+	env := newEnvironment()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	dummyHeight := uint64(1)
 
-	currentStakers := h.tState.CurrentStakers()
+	currentStakers := env.state.CurrentStakers()
 	toRemoveTx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -37,14 +38,14 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	toRemove := toRemoveTx.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txExecutor := ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -53,17 +54,17 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	}
 
 	// Advance chain timestamp to time that next validator leaves
-	h.tState.SetTimestamp(toRemove.EndTime())
+	env.state.SetTimestamp(toRemove.EndTime())
 
 	// Case 2: Wrong validator
-	tx, err = h.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txExecutor = ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -72,14 +73,14 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	}
 
 	// Case 3: Happy path
-	tx, err = h.txBuilder.NewRewardValidatorTx(toRemoveTxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txExecutor = ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -100,18 +101,18 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
-	oldBalance, err := avax.GetBalance(h.tState, stakeOwners)
+	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txExecutor.OnCommit.Apply(h.tState)
-	h.tState.SetHeight(dummyHeight)
-	if err := h.tState.Commit(); err != nil {
+	txExecutor.OnCommit.Apply(env.state)
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	onCommitBalance, err := avax.GetBalance(h.tState, stakeOwners)
+	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,15 +124,15 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
-	h := newTestHelpersCollection()
+	env := newEnvironment()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	dummyHeight := uint64(1)
 
-	currentStakers := h.tState.CurrentStakers()
+	currentStakers := env.state.CurrentStakers()
 	toRemoveTx, _, err := currentStakers.GetNextStaker()
 	if err != nil {
 		t.Fatal(err)
@@ -140,14 +141,14 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	toRemove := toRemoveTx.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := h.txBuilder.NewRewardValidatorTx(toRemoveTxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txExecutor := ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -156,17 +157,17 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	}
 
 	// Advance chain timestamp to time that next validator leaves
-	h.tState.SetTimestamp(toRemove.EndTime())
+	env.state.SetTimestamp(toRemove.EndTime())
 
 	// Case 2: Wrong validator
-	tx, err = h.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txExecutor = ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -175,14 +176,14 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	}
 
 	// Case 3: Happy path
-	tx, err = h.txBuilder.NewRewardValidatorTx(toRemoveTxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txExecutor = ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -203,18 +204,18 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
-	oldBalance, err := avax.GetBalance(h.tState, stakeOwners)
+	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txExecutor.OnAbort.Apply(h.tState)
-	h.tState.SetHeight(dummyHeight)
-	if err := h.tState.Commit(); err != nil {
+	txExecutor.OnAbort.Apply(env.state)
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	onAbortBalance, err := avax.GetBalance(h.tState, stakeOwners)
+	onAbortBalance, err := avax.GetBalance(env.state, stakeOwners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,9 +228,9 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert := assert.New(t)
-	h := newTestHelpersCollection()
+	env := newEnvironment()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -242,8 +243,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	vdrTx, err := h.txBuilder.NewAddValidatorTx(
-		h.cfg.MinValidatorStake, // stakeAmt
+	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -257,8 +258,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	delTx, err := h.txBuilder.NewAddDelegatorTx(
-		h.cfg.MinDelegatorStake,
+	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
 		vdrNodeID,
@@ -268,28 +269,28 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	h.tState.AddCurrentStaker(vdrTx, 0)
-	h.tState.AddTx(vdrTx, status.Committed)
-	h.tState.AddCurrentStaker(delTx, 1000000)
-	h.tState.AddTx(delTx, status.Committed)
-	h.tState.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	h.tState.SetHeight(dummyHeight)
-	assert.NoError(h.tState.Commit())
-	err = h.tState.Load()
+	env.state.AddCurrentStaker(vdrTx, 0)
+	env.state.AddTx(vdrTx, status.Committed)
+	env.state.AddCurrentStaker(delTx, 1000000)
+	env.state.AddTx(delTx, status.Committed)
+	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
+	err = env.state.Load()
 	assert.NoError(err)
 	// test validator stake
-	set, ok := h.cfg.Validators.GetValidators(constants.PrimaryNetworkID)
+	set, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 	assert.True(ok)
 	stake, ok := set.GetWeight(vdrNodeID)
 	assert.True(ok)
-	assert.Equal(h.cfg.MinValidatorStake+h.cfg.MinDelegatorStake, stake)
+	assert.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -302,24 +303,24 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	expectedReward := uint64(1000000)
 
-	oldVdrBalance, err := avax.GetBalance(h.tState, vdrDestSet)
+	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	assert.NoError(err)
-	oldDelBalance, err := avax.GetBalance(h.tState, delDestSet)
+	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	assert.NoError(err)
 
-	txExecutor.OnCommit.Apply(h.tState)
-	h.tState.SetHeight(dummyHeight)
-	assert.NoError(h.tState.Commit())
+	txExecutor.OnCommit.Apply(env.state)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
-	commitVdrBalance, err := avax.GetBalance(h.tState, vdrDestSet)
+	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	assert.NoError(err)
 	vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance)
 	assert.NoError(err)
 	assert.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
 
-	commitDelBalance, err := avax.GetBalance(h.tState, delDestSet)
+	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	assert.NoError(err)
 	delReward, err := math.Sub64(commitDelBalance, oldDelBalance)
 	assert.NoError(err)
@@ -330,20 +331,20 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 	stake, ok = set.GetWeight(vdrNodeID)
 	assert.True(ok)
-	assert.Equal(h.cfg.MinValidatorStake, stake)
+	assert.Equal(env.config.MinValidatorStake, stake)
 }
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert := assert.New(t)
-	h := newTestHelpersCollection()
+	env := newEnvironment()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	dummyHeight := uint64(1)
 
-	initialSupply := h.tState.GetCurrentSupply()
+	initialSupply := env.state.GetCurrentSupply()
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
@@ -352,8 +353,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	vdrTx, err := h.txBuilder.NewAddValidatorTx(
-		h.cfg.MinValidatorStake, // stakeAmt
+	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -366,8 +367,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
-	delTx, err := h.txBuilder.NewAddDelegatorTx(
-		h.cfg.MinDelegatorStake,
+	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
 		vdrNodeID,
@@ -377,22 +378,22 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	h.tState.AddCurrentStaker(vdrTx, 0)
-	h.tState.AddTx(vdrTx, status.Committed)
-	h.tState.AddCurrentStaker(delTx, 1000000)
-	h.tState.AddTx(delTx, status.Committed)
-	h.tState.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	h.tState.SetHeight(dummyHeight)
-	assert.NoError(h.tState.Commit())
-	err = h.tState.Load()
+	env.state.AddCurrentStaker(vdrTx, 0)
+	env.state.AddTx(vdrTx, status.Committed)
+	env.state.AddCurrentStaker(delTx, 1000000)
+	env.state.AddTx(delTx, status.Committed)
+	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
+	err = env.state.Load()
 	assert.NoError(err)
 
-	tx, err := h.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:     &h.execBackend,
-		ParentState: h.tState,
+		Backend:     &env.backend,
+		ParentState: env.state,
 		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -405,28 +406,28 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	expectedReward := uint64(1000000)
 
-	oldVdrBalance, err := avax.GetBalance(h.tState, vdrDestSet)
+	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	assert.NoError(err)
-	oldDelBalance, err := avax.GetBalance(h.tState, delDestSet)
+	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	assert.NoError(err)
 
-	txExecutor.OnAbort.Apply(h.tState)
-	h.tState.SetHeight(dummyHeight)
-	assert.NoError(h.tState.Commit())
+	txExecutor.OnAbort.Apply(env.state)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
-	newVdrBalance, err := avax.GetBalance(h.tState, vdrDestSet)
+	newVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	assert.NoError(err)
 	vdrReward, err := math.Sub64(newVdrBalance, oldVdrBalance)
 	assert.NoError(err)
 	assert.Zero(vdrReward, "expected delegatee balance not to increase")
 
-	newDelBalance, err := avax.GetBalance(h.tState, delDestSet)
+	newDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	assert.NoError(err)
 	delReward, err := math.Sub64(newDelBalance, oldDelBalance)
 	assert.NoError(err)
 	assert.Zero(delReward, "expected delegator balance not to increase")
 
-	newSupply := h.tState.GetCurrentSupply()
+	newSupply := env.state.GetCurrentSupply()
 	assert.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }

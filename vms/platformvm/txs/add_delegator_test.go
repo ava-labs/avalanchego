@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -16,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 var preFundedKeys = crypto.BuildTestKeys()

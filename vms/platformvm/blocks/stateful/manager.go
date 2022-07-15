@@ -44,7 +44,7 @@ func NewManager(
 		state:        s,
 		bootstrapped: txExecutorBackend.Bootstrapped,
 		ctx:          txExecutorBackend.Ctx,
-		cfg:          txExecutorBackend.Cfg,
+		cfg:          txExecutorBackend.Config,
 		blkIDToState: map[ids.ID]*blockState{},
 	}
 

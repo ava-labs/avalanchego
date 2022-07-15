@@ -106,46 +106,37 @@ func (r *rejector) visitStandardBlock(b stateless.Block) error {
 }
 
 func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
-	blkID := b.ID()
-	defer func() {
-		r.free(blkID)
-		// Note that it's OK to free the parent here.
-		// We're accepting a Commit block, so its sibling, an Abort block,
-		// must be accepted. (This is the only reason we'd reject this block.)
-		// So it's OK to remove the parent's state from [r.blkIDToState] --
-		// this block's sibling doesn't need it anymore.
-		r.free(b.Parent())
-	}()
-
-	r.ctx.Log.Verbo(
-		"rejecting Commit Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
-	)
-
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	return r.rejectOptionBlock(b, true /* isCommit */)
 }
 
 func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
+	return r.rejectOptionBlock(b, false /* isCommit */)
+}
+
+func (r *rejector) rejectOptionBlock(b stateless.Block, isCommit bool) error {
 	blkID := b.ID()
 	defer func() {
 		r.free(blkID)
-		// Note that it's OK to free the parent here.
-		// We're accepting an Abort block, so its sibling, a Commit block,
-		// must be accepted. (This is the only reason we'd reject this block.)
-		// So it's OK to remove the parent's state from [r.blkIDToState] --
-		// this block's sibling doesn't need it anymore.
+		// We assume that this block's sibling has already been accepted
+		// and doesn't need the parent's state anymore.
 		r.free(b.Parent())
 	}()
 
-	r.ctx.Log.Verbo(
-		"rejecting Abort Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
-	)
+	if isCommit {
+		r.ctx.Log.Verbo(
+			"rejecting Commit Block %s at height %d with parent %s",
+			blkID,
+			b.Height(),
+			b.Parent(),
+		)
+	} else {
+		r.ctx.Log.Verbo(
+			"rejecting Abort Block %s at height %d with parent %s",
+			blkID,
+			b.Height(),
+			b.Parent(),
+		)
+	}
 
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()

@@ -169,13 +169,13 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	}
 
 	res.txExecBackend = executor.Backend{
-		Cfg:          res.cfg,
+		Config:       res.cfg,
 		Ctx:          res.ctx,
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		SpendHandler: res.utxosMan,
-		UptimeMan:    res.uptimeMan,
+		FlowChecker:  res.utxosMan,
+		Uptimes:      res.uptimeMan,
 		Rewards:      rewardsCalc,
 	}
 

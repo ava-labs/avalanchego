@@ -22,15 +22,15 @@ import (
 
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	tx, err := h.txBuilder.NewCreateChainTx(
+	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -47,11 +47,11 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
 	executor := StandardTxExecutor{
-		Backend: &h.execBackend,
+		Backend: &env.backend,
 		State: state.NewDiff(
-			h.tState,
-			h.tState.CurrentStakers(),
-			h.tState.PendingStakers(),
+			env.state,
+			env.state.CurrentStakers(),
+			env.state.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -63,15 +63,15 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	tx, err := h.txBuilder.NewCreateChainTx(
+	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -99,11 +99,11 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 	executor := StandardTxExecutor{
-		Backend: &h.execBackend,
+		Backend: &env.backend,
 		State: state.NewDiff(
-			h.tState,
-			h.tState.CurrentStakers(),
-			h.tState.PendingStakers(),
+			env.state,
+			env.state.CurrentStakers(),
+			env.state.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -116,15 +116,15 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // Ensure Execute fails when the Subnet the blockchain specifies as
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	tx, err := h.txBuilder.NewCreateChainTx(
+	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -140,11 +140,11 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
 	executor := StandardTxExecutor{
-		Backend: &h.execBackend,
+		Backend: &env.backend,
 		State: state.NewDiff(
-			h.tState,
-			h.tState.CurrentStakers(),
-			h.tState.PendingStakers(),
+			env.state,
+			env.state.CurrentStakers(),
+			env.state.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -156,15 +156,15 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	tx, err := h.txBuilder.NewCreateChainTx(
+	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -178,11 +178,11 @@ func TestCreateChainTxValid(t *testing.T) {
 	}
 
 	executor := StandardTxExecutor{
-		Backend: &h.execBackend,
+		Backend: &env.backend,
 		State: state.NewDiff(
-			h.tState,
-			h.tState.CurrentStakers(),
-			h.tState.PendingStakers(),
+			env.state,
+			env.state.CurrentStakers(),
+			env.state.PendingStakers(),
 		),
 		Tx: tx,
 	}
@@ -223,18 +223,18 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			h := newTestHelpersCollection()
-			h.cfg.ApricotPhase3Time = ap3Time
+			env := newEnvironment()
+			env.config.ApricotPhase3Time = ap3Time
 
 			defer func() {
-				if err := internalStateShutdown(h); err != nil {
+				if err := shutdownEnvironment(env); err != nil {
 					t.Fatal(err)
 				}
 			}()
-			ins, outs, _, signers, err := h.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
-			subnetAuth, subnetSigners, err := h.utxosHandler.Authorize(h.tState, testSubnet1.ID(), preFundedKeys)
+			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
 			assert.NoError(err)
 
 			signers = append(signers, subnetSigners)
@@ -243,8 +243,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			utx := &txs.CreateChainTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    h.ctx.NetworkID,
-					BlockchainID: h.ctx.ChainID,
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
 					Ins:          ins,
 					Outs:         outs,
 				}},
@@ -257,14 +257,14 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			assert.NoError(err)
 
 			vs := state.NewDiff(
-				h.tState,
-				h.tState.CurrentStakers(),
-				h.tState.PendingStakers(),
+				env.state,
+				env.state.CurrentStakers(),
+				env.state.PendingStakers(),
 			)
 			vs.SetTimestamp(test.time)
 
 			executor := StandardTxExecutor{
-				Backend: &h.execBackend,
+				Backend: &env.backend,
 				State:   vs,
 				Tx:      tx,
 			}

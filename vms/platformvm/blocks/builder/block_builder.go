@@ -98,7 +98,7 @@ func NewBlockBuilder(
 	blkBuilder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
 		blkBuilder,
-		txExecutorBackend.Cfg.ApricotPhase4Time,
+		txExecutorBackend.Config.ApricotPhase4Time,
 		appSender,
 	)
 	return blkBuilder
