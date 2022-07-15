@@ -183,21 +183,6 @@ func TestMultiIterator(t *testing.T) {
 			assert.False(it.Next())
 		})
 	}
-
-	// it := NewMultiIterator(
-	// 	EmptyIterator,
-	// 	NewSliceIterator(stakers0...),
-	// 	EmptyIterator,
-	// 	NewSliceIterator(stakers1...),
-	// 	EmptyIterator,
-	// )
-	// for _, staker := range stakers {
-	// 	assert.True(it.Next())
-	// 	assert.Equal(staker, it.Value())
-	// }
-	// assert.False(it.Next())
-	// it.Release()
-	// assert.False(it.Next())
 }
 
 func TestMultiIteratorEarlyRelease(t *testing.T) {
