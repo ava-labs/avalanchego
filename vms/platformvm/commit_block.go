@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ Block    = &CommitBlock{}
-	_ decision = &CommitBlock{}
-)
+var _ Block = &CommitBlock{}
 
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
@@ -62,7 +59,7 @@ func (c *CommitBlock) Verify() error {
 	c.timestamp = c.onAcceptState.GetTimestamp()
 
 	c.vm.currentBlocks[blkID] = c
-	parent.addChild(c)
+	c.vm.stateVersions.SetState(blkID, c.onAcceptState)
 	return nil
 }
 

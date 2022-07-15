@@ -69,18 +69,18 @@ func TestNewExportTx(t *testing.T) {
 			}
 			assert.NoError(err)
 
-			preferredState := env.state
-			fakedState := state.NewDiff(
-				preferredState,
-				preferredState.CurrentStakers(),
-				preferredState.PendingStakers(),
-			)
+			fakedState, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+			assert.NoError(err)
+
 			fakedState.SetTimestamp(tt.timestamp)
 
+			fakedParent := ids.GenerateTestID()
+			env.backend.StateVersions.SetState(fakedParent, fakedState)
+
 			verifier := MempoolTxVerifier{
-				Backend:     &env.backend,
-				ParentState: fakedState,
-				Tx:          tx,
+				Backend:  &env.backend,
+				ParentID: fakedParent,
+				Tx:       tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

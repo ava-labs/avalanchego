@@ -1654,23 +1654,17 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	blockIntf, err := service.vm.getBlock(blockID)
-	if err != nil {
-		return false, err
-	}
-
-	block, ok := blockIntf.(decision)
+	state, ok := service.vm.stateVersions.GetState(blockID)
 	if !ok {
-		parentBlockIntf, err := blockIntf.parentBlock()
+		block, err := service.vm.getBlock(blockID)
 		if err != nil {
 			return false, err
 		}
-		block, ok = parentBlockIntf.(decision)
+		state, ok = service.vm.stateVersions.GetState(block.Parent())
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
 	}
-	state := block.onAccept()
 
 	tx, _, err := state.GetTx(chainID)
 	if err == database.ErrNotFound {
@@ -1915,17 +1909,11 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	preferred, err := service.vm.Preferred()
-	if err != nil {
-		return err
-	}
-
-	block, ok := preferred.(decision)
+	onAccept, ok := service.vm.stateVersions.GetState(service.vm.preferred)
 	if !ok {
 		return errInvalidBlockType
 	}
 
-	onAccept := block.onAccept()
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.

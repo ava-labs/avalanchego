@@ -67,14 +67,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	addValidatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
 
 	vm.clock.Set(validatorStartTime)
 
 	firstAdvanceTimeBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, firstAdvanceTimeBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, firstAdvanceTimeBlock)
 
 	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -97,14 +97,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	addFirstDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
 
 	vm.clock.Set(firstDelegatorStartTime)
 
 	secondAdvanceTimeBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, secondAdvanceTimeBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, secondAdvanceTimeBlock)
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -129,7 +129,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	addSecondDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -206,7 +206,7 @@ func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
 	addValidatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
 
 	// create valid tx
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -228,7 +228,7 @@ func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
 	addFirstDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -250,7 +250,7 @@ func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
 	addSecondDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
 
 	// create valid tx
 	addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -272,7 +272,7 @@ func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
 	addThirdDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addThirdDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addThirdDelegatorBlock)
 
 	// create valid tx
 	addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -294,7 +294,7 @@ func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
 	addFourthDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addFourthDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addFourthDelegatorBlock)
 }
 
 // Test that calling Verify on a block with an unverified parent doesn't cause a
@@ -471,9 +471,10 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that the new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit.onAccept()
-		pendingStakers := onAccept.PendingStakers()
+		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit.ID())
+		assert.True(ok)
 
+		pendingStakers := onAccept.PendingStakers()
 		_, _, err := pendingStakers.GetValidatorTx(nodeID)
 		assert.NoError(err)
 	}
@@ -697,9 +698,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that first new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit0.onAccept()
-		pendingStakers := onAccept.PendingStakers()
+		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit0.ID())
+		assert.True(ok)
 
+		pendingStakers := onAccept.PendingStakers()
 		_, _, err := pendingStakers.GetValidatorTx(nodeID0)
 		assert.NoError(err)
 	}
@@ -736,7 +738,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the first new validator is now in the current validator set.
 	{
-		onAccept := advanceTimeProposalCommit0.onAccept()
+		onAccept, ok := vm.stateVersions.GetState(advanceTimeProposalCommit0.ID())
+		assert.True(ok)
+
 		currentStakers := onAccept.CurrentStakers()
 		_, err = currentStakers.GetValidator(nodeID0)
 		assert.NoError(err)
@@ -880,9 +884,10 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator now in pending validator set
 	{
-		onAccept := addValidatorProposalCommit1.onAccept()
-		pendingStakers := onAccept.PendingStakers()
+		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit1.ID())
+		assert.True(ok)
 
+		pendingStakers := onAccept.PendingStakers()
 		_, _, err := pendingStakers.GetValidatorTx(nodeID1)
 		assert.NoError(err)
 	}
@@ -919,7 +924,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator is now in the current validator set.
 	{
-		onAccept := advanceTimeProposalCommit1.onAccept()
+		onAccept, ok := vm.stateVersions.GetState(advanceTimeProposalCommit1.ID())
+		assert.True(ok)
+
 		currentStakers := onAccept.CurrentStakers()
 		_, err := currentStakers.GetValidator(nodeID1)
 		assert.NoError(err)
@@ -987,7 +994,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 }
 
-func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Block) {
+func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {
 	// Verify the proposed block
 	assert.NoError(blk.Verify())
 
@@ -1006,4 +1013,5 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Bl
 	assert.NoError(proposalBlk.Accept())
 	assert.NoError(commit.Accept())
 	assert.NoError(abort.Reject())
+	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 }

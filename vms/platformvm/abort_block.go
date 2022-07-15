@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ Block    = &AbortBlock{}
-	_ decision = &AbortBlock{}
-)
+var _ Block = &AbortBlock{}
 
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.
@@ -62,7 +59,7 @@ func (a *AbortBlock) Verify() error {
 	a.timestamp = a.onAcceptState.GetTimestamp()
 
 	a.vm.currentBlocks[blkID] = a
-	parent.addChild(a)
+	a.vm.stateVersions.SetState(blkID, a.onAcceptState)
 	return nil
 }
 
