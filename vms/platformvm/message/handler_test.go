@@ -6,10 +6,10 @@ package message
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type CounterHandler struct {

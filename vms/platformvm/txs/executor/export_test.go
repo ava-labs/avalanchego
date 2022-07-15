@@ -15,10 +15,10 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	h := newTestHelpersCollection()
-	h.ctx.Lock.Lock()
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -47,7 +47,7 @@ func TestNewExportTx(t *testing.T) {
 			description:        "P->C export",
 			destinationChainID: cChainID,
 			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:          h.cfg.ApricotPhase5Time,
+			timestamp:          env.config.ApricotPhase5Time,
 			shouldErr:          false,
 			shouldVerify:       true,
 		},
@@ -57,7 +57,7 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
-			tx, err := h.txBuilder.NewExportTx(
+			tx, err := env.txBuilder.NewExportTx(
 				defaultBalance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,
@@ -70,7 +70,7 @@ func TestNewExportTx(t *testing.T) {
 			}
 			assert.NoError(err)
 
-			preferredState := h.tState
+			preferredState := env.state
 			fakedState := state.NewDiff(
 				preferredState,
 				preferredState.CurrentStakers(),
@@ -79,7 +79,7 @@ func TestNewExportTx(t *testing.T) {
 			fakedState.SetTimestamp(tt.timestamp)
 
 			verifier := MempoolTxVerifier{
-				Backend:     &h.execBackend,
+				Backend:     &env.backend,
 				ParentState: fakedState,
 				Tx:          tx,
 			}
