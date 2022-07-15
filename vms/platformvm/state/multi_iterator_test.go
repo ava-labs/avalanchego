@@ -235,7 +235,3 @@ func TestMultiIteratorEarlyRelease(t *testing.T) {
 	it.Release()
 	assert.False(it.Next())
 }
-
-func TestMultiIteratorFoo(t *testing.T) {
-
-}
