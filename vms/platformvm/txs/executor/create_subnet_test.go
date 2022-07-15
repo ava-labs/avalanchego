@@ -48,23 +48,23 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			h := newTestHelpersCollection()
-			h.cfg.ApricotPhase3Time = ap3Time
-			h.ctx.Lock.Lock()
+			env := newEnvironment()
+			env.config.ApricotPhase3Time = ap3Time
+			env.ctx.Lock.Lock()
 			defer func() {
-				if err := internalStateShutdown(h); err != nil {
+				if err := shutdownEnvironment(env); err != nil {
 					t.Fatal(err)
 				}
 			}()
 
-			ins, outs, _, signers, err := h.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			assert.NoError(err)
 
 			// Create the tx
 			utx := &txs.CreateSubnetTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    h.ctx.NetworkID,
-					BlockchainID: h.ctx.ChainID,
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
 					Ins:          ins,
 					Outs:         outs,
 				}},
@@ -74,16 +74,16 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(txs.Codec, signers)
 			assert.NoError(err)
 
-			versionedState := state.NewDiff(
-				h.tState,
-				h.tState.CurrentStakers(),
-				h.tState.PendingStakers(),
+			stateDiff := state.NewDiff(
+				env.state,
+				env.state.CurrentStakers(),
+				env.state.PendingStakers(),
 			)
-			versionedState.SetTimestamp(test.time)
+			stateDiff.SetTimestamp(test.time)
 
 			executor := StandardTxExecutor{
-				Backend: &h.execBackend,
-				State:   versionedState,
+				Backend: &env.backend,
+				State:   stateDiff,
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)

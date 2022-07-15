@@ -53,39 +53,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
-// TODO: move to mempool package
-// // shows that valid tx is not added to mempool if this would exceed its maximum
-// // size
-// func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	vm, _, _, _ := defaultVM()
-// 	vm.ctx.Lock.Lock()
-// 	defer func() {
-// 		err := vm.Shutdown()
-// 		assert.NoError(err)
-// 		vm.ctx.Lock.Unlock()
-// 	}()
-// 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-// 	blockBuilder := &vm.blockBuilder
-// 	mempool := blockBuilder.Mempool.(*mempool)
-
-// 	// create candidate tx
-// 	tx := getValidTx(vm, t)
-
-// 	// shortcut to simulated almost filled mempool
-// 	mempool.bytesAvailable = len(tx.Bytes()) - 1
-
-// 	err := blockBuilder.AddVerifiedTx(tx)
-// 	assert.Equal(errMempoolFull, err, "max mempool size breached")
-
-// 	// shortcut to simulated almost filled mempool
-// 	mempool.bytesAvailable = len(tx.Bytes())
-
-// 	err = blockBuilder.AddVerifiedTx(tx)
-// 	assert.NoError(err, "should have added tx to mempool")
-// }
-
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 

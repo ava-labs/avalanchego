@@ -19,8 +19,8 @@ type StandardBlock struct {
 	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (sb *StandardBlock) Initialize(bytes []byte) error {
-	if err := sb.CommonBlock.Initialize(bytes); err != nil {
+func (sb *StandardBlock) initialize(bytes []byte) error {
+	if err := sb.CommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
@@ -68,5 +68,5 @@ func NewStandardBlock(
 		}
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.initialize(bytes)
 }

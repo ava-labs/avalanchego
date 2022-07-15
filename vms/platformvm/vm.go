@@ -182,12 +182,12 @@ func (vm *VM) Initialize(
 	)
 
 	vm.txExecutorBackend = executor.Backend{
-		Cfg:          &vm.Config,
+		Config:       &vm.Config,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
-		SpendHandler: vm.utxoHandler,
-		UptimeMan:    vm.uptimeManager,
+		FlowChecker:  vm.utxoHandler,
+		Uptimes:      vm.uptimeManager,
 		Rewards:      vm.rewards,
 		Bootstrapped: &vm.bootstrapped,
 	}

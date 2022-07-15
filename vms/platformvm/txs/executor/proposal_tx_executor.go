@@ -72,26 +72,26 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	}
 
 	switch {
-	case tx.Validator.Wght < e.Cfg.MinValidatorStake:
+	case tx.Validator.Wght < e.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 
-	case tx.Validator.Wght > e.Cfg.MaxValidatorStake:
+	case tx.Validator.Wght > e.Config.MaxValidatorStake:
 		// Ensure validator isn't staking too much
 		return errWeightTooLarge
 
-	case tx.Shares < e.Cfg.MinDelegationFee:
+	case tx.Shares < e.Config.MinDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
 		return errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < e.Cfg.MinStakeDuration:
+	case duration < e.Config.MinStakeDuration:
 		// Ensure staking length is not too short
 		return errStakeTooShort
 
-	case duration > e.Cfg.MaxStakeDuration:
+	case duration > e.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
 	}
@@ -148,20 +148,20 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.SpendHandler.SemanticVerifySpend(
+		if err := e.FlowChecker.VerifySpend(
 			tx,
 			e.ParentState,
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
-			e.Cfg.AddStakerTxFee,
+			e.Config.AddStakerTxFee,
 			e.Ctx.AVAXAssetID,
 		); err != nil {
-			return fmt.Errorf("failed semanticVerifySpend: %w", err)
+			return fmt.Errorf("failed verifySpend: %w", err)
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow SemanticVerification to explicitly check for this
+		// last to allow the verifier visitor to explicitly check for this
 		// error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if startTime.After(maxStartTime) {
@@ -199,11 +199,11 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < e.Cfg.MinStakeDuration:
+	case duration < e.Config.MinStakeDuration:
 		// Ensure staking length is not too short
 		return errStakeTooShort
 
-	case duration > e.Cfg.MaxStakeDuration:
+	case duration > e.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
 
@@ -311,20 +311,20 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		}
 
 		// Verify the flowcheck
-		if err := e.SpendHandler.SemanticVerifySpend(
+		if err := e.FlowChecker.VerifySpend(
 			tx,
 			e.ParentState,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
-			e.Cfg.TxFee,
+			e.Config.TxFee,
 			e.Ctx.AVAXAssetID,
 		); err != nil {
 			return err
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow SemanticVerification to explicitly check for this
+		// last to allow the verifier visitor to explicitly check for this
 		// error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if validatorStartTime.After(maxStartTime) {
@@ -362,15 +362,15 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < e.Cfg.MinStakeDuration:
+	case duration < e.Config.MinStakeDuration:
 		// Ensure staking length is not too short
 		return errStakeTooShort
 
-	case duration > e.Cfg.MaxStakeDuration:
+	case duration > e.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
 
-	case tx.Validator.Wght < e.Cfg.MinDelegatorStake:
+	case tx.Validator.Wght < e.Config.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
@@ -452,8 +452,8 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			return errStakeOverflow
 		}
 
-		if !currentTimestamp.Before(e.Cfg.ApricotPhase3Time) {
-			maximumWeight = math.Min64(maximumWeight, e.Cfg.MaxValidatorStake)
+		if !currentTimestamp.Before(e.Config.ApricotPhase3Time) {
+			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
 		}
 
 		canDelegate, err := state.CanDelegate(
@@ -471,16 +471,16 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		}
 
 		// Verify the flowcheck
-		if err := e.SpendHandler.SemanticVerifySpend(
+		if err := e.FlowChecker.VerifySpend(
 			tx,
 			e.ParentState,
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
-			e.Cfg.AddStakerTxFee,
+			e.Config.AddStakerTxFee,
 			e.Ctx.AVAXAssetID,
 		); err != nil {
-			return fmt.Errorf("failed semanticVerifySpend: %w", err)
+			return fmt.Errorf("failed verifySpend: %w", err)
 		}
 
 		// Make sure the tx doesn't start too far in the future. This is done
@@ -868,11 +868,11 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errShouldBeDSValidator
 	}
 
-	uptime, err := e.UptimeMan.CalculateUptimePercentFrom(nodeID, startTime)
+	uptime, err := e.Uptimes.CalculateUptimePercentFrom(nodeID, startTime)
 	if err != nil {
 		return fmt.Errorf("failed to calculate uptime: %w", err)
 	}
 
-	e.PrefersCommit = uptime >= e.Cfg.UptimePercentage
+	e.PrefersCommit = uptime >= e.Config.UptimePercentage
 	return nil
 }

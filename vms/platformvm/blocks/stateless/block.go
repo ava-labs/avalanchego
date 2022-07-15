@@ -10,7 +10,7 @@ import (
 
 // Interface introduced for marshalling/unmarshalling
 type Block interface {
-	Initialize(bytes []byte) error
+	initialize(bytes []byte) error
 	ID() ids.ID
 	Bytes() []byte
 	Parent() ids.ID

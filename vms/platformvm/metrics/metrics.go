@@ -162,6 +162,8 @@ func (m *Metrics) MarkVoteLost() {
 // TODO: use a visitor here
 func (m *Metrics) MarkAccepted(b stateless.Block) error {
 	switch b := b.(type) {
+	case *stateless.MockBlock:
+		// TODO make metrics an interface so we don't need this
 	case *stateless.AbortBlock:
 		m.numAbortBlocks.Inc()
 	case *stateless.AtomicBlock:

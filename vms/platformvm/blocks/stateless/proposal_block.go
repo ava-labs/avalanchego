@@ -19,8 +19,8 @@ type ProposalBlock struct {
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (pb *ProposalBlock) Initialize(bytes []byte) error {
-	if err := pb.CommonBlock.Initialize(bytes); err != nil {
+func (pb *ProposalBlock) initialize(bytes []byte) error {
+	if err := pb.CommonBlock.initialize(bytes); err != nil {
 		return err
 	}
 
@@ -67,5 +67,5 @@ func NewProposalBlock(
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.initialize(bytes)
 }
