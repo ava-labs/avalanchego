@@ -19,8 +19,8 @@ type AtomicBlock struct {
 	Tx          *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (ab *AtomicBlock) Initialize(bytes []byte) error {
-	if err := ab.CommonBlock.Initialize(bytes); err != nil {
+func (ab *AtomicBlock) initialize(bytes []byte) error {
+	if err := ab.CommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx.Unsigned)
@@ -66,5 +66,5 @@ func NewAtomicBlock(
 		return nil, fmt.Errorf("failed to sign block: %w", err)
 	}
 
-	return res, res.Initialize(bytes)
+	return res, res.initialize(bytes)
 }

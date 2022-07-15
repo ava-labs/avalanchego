@@ -56,8 +56,8 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
-	createBlockchainTxFee := e.Cfg.GetCreateBlockchainTxFee(timestamp)
-	if err := e.SpendHandler.SemanticVerifySpend(
+	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(timestamp)
+	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -98,7 +98,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.OnAccept = func() { e.Cfg.CreateChain(txID, tx) }
+	e.OnAccept = func() { e.Config.CreateChain(txID, tx) }
 	return nil
 }
 
@@ -110,8 +110,8 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
-	createSubnetTxFee := e.Cfg.GetCreateSubnetTxFee(timestamp)
-	if err := e.SpendHandler.SemanticVerifySpend(
+	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(timestamp)
+	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
@@ -178,13 +178,13 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-		if err := e.SpendHandler.SemanticVerifySpendUTXOs(
+		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
 			ins,
 			tx.Outs,
 			e.Tx.Creds,
-			e.Cfg.TxFee,
+			e.Config.TxFee,
 			e.Ctx.AVAXAssetID,
 		); err != nil {
 			return err
@@ -222,16 +222,16 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	if err := e.SpendHandler.SemanticVerifySpend(
+	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
 		tx.Ins,
 		outs,
 		e.Tx.Creds,
-		e.Cfg.TxFee,
+		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
 	); err != nil {
-		return fmt.Errorf("failed semanticVerifySpend: %w", err)
+		return fmt.Errorf("failed verifySpend: %w", err)
 	}
 
 	txID := e.Tx.ID()

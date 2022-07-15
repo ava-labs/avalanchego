@@ -308,6 +308,106 @@ func (mr *MockChainMockRecorder) SetTimestamp(tm interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockChain)(nil).SetTimestamp), tm)
 }
 
+// MockLastAccepteder is a mock of LastAccepteder interface.
+type MockLastAccepteder struct {
+	ctrl     *gomock.Controller
+	recorder *MockLastAcceptederMockRecorder
+}
+
+// MockLastAcceptederMockRecorder is the mock recorder for MockLastAccepteder.
+type MockLastAcceptederMockRecorder struct {
+	mock *MockLastAccepteder
+}
+
+// NewMockLastAccepteder creates a new mock instance.
+func NewMockLastAccepteder(ctrl *gomock.Controller) *MockLastAccepteder {
+	mock := &MockLastAccepteder{ctrl: ctrl}
+	mock.recorder = &MockLastAcceptederMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockLastAccepteder) EXPECT() *MockLastAcceptederMockRecorder {
+	return m.recorder
+}
+
+// GetLastAccepted mocks base method.
+func (m *MockLastAccepteder) GetLastAccepted() ids.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastAccepted")
+	ret0, _ := ret[0].(ids.ID)
+	return ret0
+}
+
+// GetLastAccepted indicates an expected call of GetLastAccepted.
+func (mr *MockLastAcceptederMockRecorder) GetLastAccepted() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockLastAccepteder)(nil).GetLastAccepted))
+}
+
+// SetLastAccepted mocks base method.
+func (m *MockLastAccepteder) SetLastAccepted(blkID ids.ID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastAccepted", blkID)
+}
+
+// SetLastAccepted indicates an expected call of SetLastAccepted.
+func (mr *MockLastAcceptederMockRecorder) SetLastAccepted(blkID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockLastAccepteder)(nil).SetLastAccepted), blkID)
+}
+
+// MockBlockState is a mock of BlockState interface.
+type MockBlockState struct {
+	ctrl     *gomock.Controller
+	recorder *MockBlockStateMockRecorder
+}
+
+// MockBlockStateMockRecorder is the mock recorder for MockBlockState.
+type MockBlockStateMockRecorder struct {
+	mock *MockBlockState
+}
+
+// NewMockBlockState creates a new mock instance.
+func NewMockBlockState(ctrl *gomock.Controller) *MockBlockState {
+	mock := &MockBlockState{ctrl: ctrl}
+	mock.recorder = &MockBlockStateMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockBlockState) EXPECT() *MockBlockStateMockRecorder {
+	return m.recorder
+}
+
+// AddStatelessBlock mocks base method.
+func (m *MockBlockState) AddStatelessBlock(block stateless.Block, status choices.Status) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddStatelessBlock", block, status)
+}
+
+// AddStatelessBlock indicates an expected call of AddStatelessBlock.
+func (mr *MockBlockStateMockRecorder) AddStatelessBlock(block, status interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockBlockState)(nil).AddStatelessBlock), block, status)
+}
+
+// GetStatelessBlock mocks base method.
+func (m *MockBlockState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
+	ret0, _ := ret[0].(stateless.Block)
+	ret1, _ := ret[1].(choices.Status)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetStatelessBlock indicates an expected call of GetStatelessBlock.
+func (mr *MockBlockStateMockRecorder) GetStatelessBlock(blockID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockBlockState)(nil).GetStatelessBlock), blockID)
+}
+
 // MockState is a mock of State interface.
 type MockState struct {
 	ctrl     *gomock.Controller
@@ -807,15 +907,15 @@ func (mr *MockStateMockRecorder) SetHeight(height interface{}) *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *MockState) SetLastAccepted(arg0 ids.ID) {
+func (m *MockState) SetLastAccepted(blkID ids.ID) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", arg0)
+	m.ctrl.Call(m, "SetLastAccepted", blkID)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *MockStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) SetLastAccepted(blkID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID)
 }
 
 // SetPendingStakers mocks base method.

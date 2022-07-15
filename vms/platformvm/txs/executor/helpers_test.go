@@ -9,6 +9,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -41,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/prometheus/client_golang/prometheus"
 
 	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
@@ -54,14 +56,14 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             []*crypto.PrivateKeySECP256K1R
+	preFundedKeys             = crypto.BuildTestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
 
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
+	testSubnet1ControlKeys = preFundedKeys[0:3]
 
 	// Used to create and use keys.
 	testKeyfactory crypto.FactorySECP256K1R
@@ -76,20 +78,20 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-type testHelpersCollection struct {
+type environment struct {
 	isBootstrapped *utils.AtomicBool
-	cfg            *config.Config
+	config         *config.Config
 	clk            *mockable.Clock
-	baseDB         database.Database
+	baseDB         *versiondb.Database
 	ctx            *snow.Context
 	msm            *mutableSharedMemory
 	fx             fx.Fx
-	tState         state.State
-	atomicUtxosMan avax.AtomicUTXOManager
-	uptimeMan      uptime.Manager
+	state          state.State
+	atomicUTXOs    avax.AtomicUTXOManager
+	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
 	txBuilder      tx_builder.Builder
-	execBackend    Backend
+	backend        Backend
 }
 
 // TODO: snLookup currently duplicated in vm_test.go. Remove duplication
@@ -105,73 +107,68 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func init() {
-	preFundedKeys = crypto.BuildTestKeys()
-	testSubnet1ControlKeys = preFundedKeys[0:3]
-}
-
-func newTestHelpersCollection() *testHelpersCollection {
+func newEnvironment() *environment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
-	cfg := defaultCfg()
+	config := defaultConfig()
 	clk := defaultClock()
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
-	db := baseDBManager.Current().Database
-	ctx, msm := defaultCtx(db)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	ctx, msm := defaultCtx(baseDB)
 
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
-	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
-	tState := defaultState(&cfg, ctx, db, rewardsCalc)
+	rewards := reward.NewCalculator(config.RewardConfig)
+	state := defaultState(&config, ctx, baseDB, rewards)
 
-	atomicUtxosMan := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimeMan := uptime.NewManager(tState)
-	utxosMan := utxo.NewHandler(ctx, &clk, tState, fx)
+	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	uptimes := uptime.NewManager(state)
+	utxoHandler := utxo.NewHandler(ctx, &clk, state, fx)
 
 	txBuilder := tx_builder.New(
 		ctx,
-		cfg,
+		config,
 		&clk,
 		fx,
-		tState,
-		atomicUtxosMan,
-		utxosMan,
+		state,
+		atomicUTXOs,
+		utxoHandler,
 	)
 
 	execBackend := Backend{
-		Cfg:          &cfg,
+		Config:       &config,
 		Ctx:          ctx,
 		Clk:          &clk,
 		Bootstrapped: &isBootstrapped,
 		Fx:           fx,
-		SpendHandler: utxosMan,
-		UptimeMan:    uptimeMan,
-		Rewards:      rewardsCalc,
+		FlowChecker:  utxoHandler,
+		Uptimes:      uptimes,
+		Rewards:      rewards,
 	}
 
-	addSubnet(tState, txBuilder, execBackend)
+	addSubnet(state, txBuilder, execBackend)
 
-	return &testHelpersCollection{
+	return &environment{
 		isBootstrapped: &isBootstrapped,
-		cfg:            &cfg,
+		config:         &config,
 		clk:            &clk,
-		baseDB:         db,
+		baseDB:         baseDB,
 		ctx:            ctx,
 		msm:            msm,
 		fx:             fx,
-		tState:         tState,
-		atomicUtxosMan: atomicUtxosMan,
-		uptimeMan:      uptimeMan,
-		utxosHandler:   utxosMan,
+		state:          state,
+		atomicUTXOs:    atomicUTXOs,
+		uptimes:        uptimes,
+		utxosHandler:   utxoHandler,
 		txBuilder:      txBuilder,
-		execBackend:    execBackend,
+		backend:        execBackend,
 	}
 }
 
 func addSubnet(
-	tState state.State,
+	baseState state.State,
 	txBuilder tx_builder.Builder,
 	execBackend Backend,
 ) {
@@ -192,15 +189,15 @@ func addSubnet(
 	}
 
 	// store it
-	versionedState := state.NewDiff(
-		tState,
-		tState.CurrentStakers(),
-		tState.PendingStakers(),
+	stateDiff := state.NewDiff(
+		baseState,
+		baseState.CurrentStakers(),
+		baseState.PendingStakers(),
 	)
 
 	executor := StandardTxExecutor{
 		Backend: &execBackend,
-		State:   versionedState,
+		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
@@ -208,15 +205,15 @@ func addSubnet(
 		panic(err)
 	}
 
-	versionedState.AddTx(testSubnet1, status.Committed)
-	versionedState.Apply(tState)
+	stateDiff.AddTx(testSubnet1, status.Committed)
+	stateDiff.Apply(baseState)
 }
 
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
-	rewardsCalc reward.Calculator,
+	rewards reward.Calculator,
 ) state.State {
 	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "uts",
@@ -230,7 +227,7 @@ func defaultState(
 	})
 
 	genesisBytes := buildGenesisTest(ctx)
-	tState, err := state.New(
+	state, err := state.New(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
@@ -238,21 +235,25 @@ func defaultState(
 		ctx,
 		dummyLocalStake,
 		dummyTotalStake,
-		rewardsCalc,
+		rewards,
 	)
 	if err != nil {
 		panic(err)
 	}
 
 	// persist and reload to init a bunch of in-memory stuff
-	tState.SetHeight(0)
-	if err := tState.Commit(); err != nil {
+	state.SetHeight(0)
+	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	if err := tState.Load(); err != nil {
+	state.SetHeight( /*height*/ 0)
+	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	return tState
+	if err := state.Load(); err != nil {
+		panic(err)
+	}
+	return state
 }
 
 func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
@@ -284,7 +285,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultCfg() config.Config {
+func defaultConfig() config.Config {
 	return config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -408,9 +409,9 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	return genesisBytes
 }
 
-func internalStateShutdown(t *testHelpersCollection) error {
-	if t.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := t.cfg.Validators.GetValidators(constants.PrimaryNetworkID)
+func shutdownEnvironment(env *environment) error {
+	if env.isBootstrapped.GetValue() {
+		primaryValidatorSet, exist := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
 		}
@@ -421,19 +422,19 @@ func internalStateShutdown(t *testHelpersCollection) error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
+		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		t.tState.SetHeight( /*height*/ math.MaxUint64)
-		if err := t.tState.Commit(); err != nil {
+		env.state.SetHeight( /*height*/ math.MaxUint64)
+		if err := env.state.Commit(); err != nil {
 			return err
 		}
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		t.tState.Close(),
-		t.baseDB.Close(),
+		env.state.Close(),
+		env.baseDB.Close(),
 	)
 	return errs.Err
 }

@@ -113,10 +113,7 @@ var (
 	testKeyFactory crypto.FactorySECP256K1R
 )
 
-var (
-	errShouldPrefCommit = errors.New("should prefer to commit proposal")
-	errShouldPrefAbort  = errors.New("should prefer to abort proposal")
-)
+var errShouldPrefCommit = errors.New("should prefer to commit proposal")
 
 const (
 	testNetworkID = 10 // To be used in tests

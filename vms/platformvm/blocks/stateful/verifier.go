@@ -94,7 +94,7 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 
 	parentState := v.OnAccept(b.Parent())
 
-	cfg := v.txExecutorBackend.Cfg
+	cfg := v.txExecutorBackend.Config
 	currentTimestamp := parentState.GetTimestamp()
 	enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time)
 
