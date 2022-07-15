@@ -45,35 +45,6 @@ func NewTreeIterator(tree *btree.BTree) StakerIterator {
 	return it
 }
 
-func NewTreeIteratorAfter(tree *btree.BTree, staker *Staker) StakerIterator {
-	if tree == nil {
-		return EmptyIterator
-	}
-	it := &treeIterator{
-		next:    make(chan *Staker),
-		release: make(chan struct{}),
-	}
-	it.wg.Add(1)
-	go func() {
-		defer it.wg.Done()
-		tree.AscendGreaterOrEqual(staker, func(i btree.Item) bool {
-			next := i.(*Staker)
-			if next.TxID == staker.TxID {
-				return true
-			}
-
-			select {
-			case it.next <- next:
-				return true
-			case <-it.release:
-				return false
-			}
-		})
-		close(it.next)
-	}()
-	return it
-}
-
 func (i *treeIterator) Next() bool {
 	next, ok := <-i.next
 	i.current = next
