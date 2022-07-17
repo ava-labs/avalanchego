@@ -2183,7 +2183,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	if startTime.After(staker.EndTime) {
 		return nil
 	}
-	if staker.StartTime.Before(endTime) {
+	if endTime.Before(staker.StartTime) {
 		return nil
 	}
 
