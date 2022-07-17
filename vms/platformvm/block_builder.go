@@ -18,12 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
-	// syncBound is the synchrony bound used for safe decision making
-	syncBound = 10 * time.Second
-
 	// TargetTxSize is the maximum number of bytes a transaction can use to be
 	// allowed into the mempool.
 	TargetTxSize = 64 * units.KiB
@@ -94,11 +92,10 @@ func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	verifier := mempoolTxVerifier{
-		vm:            m.vm,
-		parentID:      m.vm.preferred, // We want to build off of the preferred block
-		stateVersions: m.vm.stateVersions,
-		tx:            tx,
+	verifier := executor.MempoolTxVerifier{
+		Backend:  &m.vm.txExecutorBackend,
+		ParentID: m.vm.preferred, // We want to build off of the preferred block
+		Tx:       tx,
 	}
 	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		m.MarkDropped(txID, err.Error())
@@ -198,7 +195,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(maxFutureStartTime)
+	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
 		m.AddProposalTx(tx)
 
@@ -255,7 +252,7 @@ func (m *blockBuilder) ResetTimer() {
 	}
 
 	now := m.vm.clock.Time()
-	nextStakerChangeTime, err := GetNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
@@ -313,7 +310,7 @@ func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bo
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
 func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
-	nextStakerChangeTime, err := GetNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
 	}
@@ -330,7 +327,7 @@ func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	now := m.vm.clock.Time()
-	syncTime := now.Add(syncBound)
+	syncTime := now.Add(executor.SyncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()

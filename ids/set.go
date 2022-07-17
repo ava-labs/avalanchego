@@ -73,8 +73,7 @@ func (ids *Set) Contains(id ID) bool {
 func (ids *Set) Overlaps(big Set) bool {
 	small := *ids
 	if small.Len() > big.Len() {
-		small = big
-		big = *ids
+		small, big = big, small
 	}
 
 	for id := range small {

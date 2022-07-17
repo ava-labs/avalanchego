@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ Block = &ProposalBlock{}
@@ -92,7 +93,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 
 // Verify this block is valid.
 //
-// The parent block must either be a Commit or an Abort block.
+// The parent block must be a decision block
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
@@ -102,22 +103,21 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	executor := proposalTxExecutor{
-		vm:            pb.vm,
-		parentID:      pb.PrntID,
-		stateVersions: pb.vm.stateVersions,
-		tx:            pb.Tx,
+	txExecutor := executor.ProposalTxExecutor{
+		Backend:  &pb.vm.txExecutorBackend,
+		ParentID: pb.PrntID,
+		Tx:       pb.Tx,
 	}
-	err := pb.Tx.Unsigned.Visit(&executor)
+	err := pb.Tx.Unsigned.Visit(&txExecutor)
 	if err != nil {
 		txID := pb.Tx.ID()
 		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
 
-	pb.onCommitState = executor.onCommit
-	pb.onAbortState = executor.onAbort
-	pb.prefersCommit = executor.prefersCommit
+	pb.onCommitState = txExecutor.OnCommit
+	pb.onAbortState = txExecutor.OnAbort
+	pb.prefersCommit = txExecutor.PrefersCommit
 
 	pb.onCommitState.AddTx(pb.Tx, status.Committed)
 	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
@@ -128,6 +128,11 @@ func (pb *ProposalBlock) Verify() error {
 
 	pb.vm.blockBuilder.RemoveProposalTx(pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
+
+	// Notice that we do not add an entry to the state versions here for this
+	// block. This block must be followed by either a Commit or an Abort block.
+	// These blocks will get their parent state by referencing [onCommitState]
+	// or [onAbortState] directly.
 	return nil
 }
 

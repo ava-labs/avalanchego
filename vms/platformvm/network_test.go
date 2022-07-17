@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/stretchr/testify/assert"
 )
 
 func getValidTx(vm *VM, t *testing.T) *txs.Tx {

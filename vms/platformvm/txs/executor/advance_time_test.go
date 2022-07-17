@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package executor
 
 import (
 	"fmt"
@@ -22,25 +22,22 @@ import (
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
+	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor := ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -50,64 +47,59 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
+	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
 	assert.NoError(t, err)
 
 	{
-		tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
+		tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:            vm,
-			parentID:      vm.preferred,
-			stateVersions: vm.stateVersions,
-			tx:            tx,
+		executor := ProposalTxExecutor{
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
 			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 		}
 	}
-	if err := vm.Shutdown(); err != nil {
+
+	if err := shutdownEnvironment(env); err != nil {
 		t.Fatal(err)
 	}
-	vm.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator end time
-	vm, _, _, _ = defaultVM()
-	vm.ctx.Lock.Lock()
+	env = newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
 
 	// fast forward clock to 10 seconds before genesis validators stop validating
-	vm.clock.Set(defaultValidateEndTime.Add(-10 * time.Second))
+	env.clk.Set(defaultValidateEndTime.Add(-10 * time.Second))
 
 	{
 		// Proposes advancing timestamp to 1 second after genesis validators stop validating
-		tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
+		tx, err := env.txBuilder.NewAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		executor := proposalTxExecutor{
-			vm:            vm,
-			parentID:      vm.preferred,
-			stateVersions: vm.stateVersions,
-			tx:            tx,
+		executor := ProposalTxExecutor{
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -120,51 +112,49 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		assert.NoError(vm.Shutdown())
-		vm.ctx.Lock.Unlock()
+		assert.NoError(shutdownEnvironment(env))
 	}()
+	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	addPendingValidatorTx, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
+	addPendingValidatorTx, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
 	assert.NoError(err)
 
-	tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(err)
 
-	executor := proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor := ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
 
-	validatorStaker, err := executor.onCommit.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	validatorStaker, err := executor.OnCommit.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	assert.NoError(err)
 	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
 	assert.EqualValues(1370, validatorStaker.PotentialReward)
 
-	_, err = executor.onCommit.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = executor.OnCommit.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = executor.onAbort.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = executor.OnAbort.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	validatorStaker, err = executor.onAbort.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	validatorStaker, err = executor.OnAbort.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	assert.NoError(err)
 	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
 
 	// Test VM validators
-	executor.onCommit.Apply(vm.internalState)
-	assert.NoError(vm.internalState.Commit())
-	assert.True(vm.Validators.Contains(constants.PrimaryNetworkID, nodeID))
+	executor.OnCommit.Apply(env.state)
+	assert.NoError(env.state.Write(dummyHeight))
+	assert.True(env.config.Validators.Contains(constants.PrimaryNetworkID, nodeID))
 }
 
 // Ensure semantic verification updates the current and pending staker sets correctly.
@@ -190,13 +180,13 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 		expectedSubnetStakers map[ids.NodeID]stakerStatus
 	}
 
-	// Chronological order:
-	// 1. staker1 start,
-	// 2. staker2 start,
-	// 3. staker3 start and staker 4 start,
-	// 4. staker3 and staker4 end,
-	// 5. staker2 end and staker5 start,
-	// 6. staker1 end
+	// Chronological order (not in scale):
+	// Staker1:    |----------------------------------------------------------|
+	// Staker2:        |------------------------|
+	// Staker3:            |------------------------|
+	// Staker3sub:             |----------------|
+	// Staker4:            |------------------------|
+	// Staker5:                                 |--------------------|
 	staker1 := staker{
 		nodeID:    ids.GenerateTestNodeID(),
 		startTime: defaultGenesisTime.Add(1 * time.Minute),
@@ -338,34 +328,33 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(ts *testing.T) {
 			assert := assert.New(ts)
-			vm, _, _, _ := defaultVM()
-			vm.ctx.Lock.Lock()
+			env := newEnvironment()
 			defer func() {
-				assert.NoError(vm.Shutdown())
-				vm.ctx.Lock.Unlock()
+				assert.NoError(shutdownEnvironment(env))
 			}()
-			vm.WhitelistedSubnets.Add(testSubnet1.ID())
+			env.config.WhitelistedSubnets.Add(testSubnet1.ID())
+			dummyHeight := uint64(1)
 
 			for _, staker := range test.stakers {
 				_, err := addPendingValidator(
-					vm,
+					env,
 					staker.startTime,
 					staker.endTime,
 					staker.nodeID,
-					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 				)
 				assert.NoError(err)
 			}
 
 			for _, staker := range test.subnetStakers {
-				tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
 					uint64(staker.startTime.Unix()),
 					uint64(staker.endTime.Unix()),
 					staker.nodeID,    // validator ID
 					testSubnet1.ID(), // Subnet ID
-					[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]}, // Keys
-					ids.ShortEmpty, // reward address
+					[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
+					ids.ShortEmpty,
 				)
 				assert.NoError(err)
 
@@ -373,48 +362,47 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				staker.NextTime = staker.StartTime
 				staker.Priority = state.SubnetValidatorPendingPriority
 
-				vm.internalState.PutPendingValidator(staker)
-				vm.internalState.AddTx(tx, status.Committed)
+				env.state.PutPendingValidator(staker)
+				env.state.AddTx(tx, status.Committed)
 			}
-			assert.NoError(vm.internalState.Commit())
-			assert.NoError(vm.internalState.Load())
+			assert.NoError(env.state.Write(dummyHeight))
+			assert.NoError(env.state.Load())
 
 			for _, newTime := range test.advanceTimeTo {
-				vm.clock.Set(newTime)
-				tx, err := vm.txBuilder.NewAdvanceTimeTx(newTime)
+				env.clk.Set(newTime)
+				tx, err := env.txBuilder.NewAdvanceTimeTx(newTime)
 				assert.NoError(err)
 
-				executor := proposalTxExecutor{
-					vm:            vm,
-					parentID:      vm.preferred,
-					stateVersions: vm.stateVersions,
-					tx:            tx,
+				executor := ProposalTxExecutor{
+					Backend:  &env.backend,
+					ParentID: lastAcceptedID,
+					Tx:       tx,
 				}
 				assert.NoError(tx.Unsigned.Visit(&executor))
 
-				executor.onCommit.Apply(vm.internalState)
+				executor.OnCommit.Apply(env.state)
 			}
-			assert.NoError(vm.internalState.Commit())
+			assert.NoError(env.state.Write(dummyHeight))
 
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
 				case pending:
-					_, err := vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
+					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
 					assert.NoError(err)
-					assert.False(vm.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
+					assert.False(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
 				case current:
-					_, err := vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
+					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
 					assert.NoError(err)
-					assert.True(vm.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
+					assert.True(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
 				}
 			}
 
 			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
-					assert.False(vm.Validators.Contains(testSubnet1.ID(), stakerNodeID))
+					assert.False(env.config.Validators.Contains(testSubnet1.ID(), stakerNodeID))
 				case current:
-					assert.True(vm.Validators.Contains(testSubnet1.ID(), stakerNodeID))
+					assert.True(env.config.Validators.Contains(testSubnet1.ID(), stakerNodeID))
 				}
 			}
 		})
@@ -427,26 +415,25 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		assert.NoError(vm.Shutdown())
-		vm.ctx.Lock.Unlock()
+		assert.NoError(shutdownEnvironment(env))
 	}()
-	vm.WhitelistedSubnets.Add(testSubnet1.ID())
+	env.config.WhitelistedSubnets.Add(testSubnet1.ID())
+	dummyHeight := uint64(1)
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
+	subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
 	// Starts after the corre
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
-	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
 		subnetValidatorNodeID,              // Node ID
 		testSubnet1.ID(),                   // Subnet ID
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]}, // Keys
-		ids.ShortEmpty, // reward address
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
+		ids.ShortEmpty,
 	)
 	assert.NoError(err)
 
@@ -454,22 +441,22 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	staker.NextTime = staker.EndTime
 	staker.Priority = state.SubnetValidatorCurrentPriority
 
-	vm.internalState.PutCurrentValidator(staker)
-	vm.internalState.AddTx(tx, status.Committed)
-	assert.NoError(vm.internalState.Commit())
-	assert.NoError(vm.internalState.Load())
+	env.state.PutCurrentValidator(staker)
+	env.state.AddTx(tx, status.Committed)
+	assert.NoError(env.state.Write(dummyHeight))
+	assert.NoError(env.state.Load())
 
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := ids.NodeID(keys[1].PublicKey().Address())
-	tx, err = vm.txBuilder.NewAddSubnetValidatorTx(
+	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
+	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
 		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
 		testSubnet1.ID(), // Subnet ID
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]}, // Keys
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]}, // Keys
 		ids.ShortEmpty, // reward address
 	)
 	assert.NoError(err)
@@ -478,64 +465,61 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	staker.NextTime = staker.StartTime
 	staker.Priority = state.SubnetValidatorPendingPriority
 
-	vm.internalState.PutPendingValidator(staker)
-	vm.internalState.AddTx(tx, status.Committed)
-	assert.NoError(vm.internalState.Commit())
-	assert.NoError(vm.internalState.Load())
+	env.state.PutPendingValidator(staker)
+	env.state.AddTx(tx, status.Committed)
+	assert.NoError(env.state.Write(dummyHeight))
+	assert.NoError(env.state.Load())
 
 	// The above validator is now in the pending staker set
 
 	// Advance time to the first staker's end time.
-	vm.clock.Set(subnetVdr1EndTime)
-	tx, err = vm.txBuilder.NewAdvanceTimeTx(subnetVdr1EndTime)
+	env.clk.Set(subnetVdr1EndTime)
+	tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1EndTime)
 	assert.NoError(err)
 
-	executor := proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor := ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
 
-	_, err = executor.onCommit.GetCurrentValidator(testSubnet1.ID(), subnetValidatorNodeID)
+	_, err = executor.OnCommit.GetCurrentValidator(testSubnet1.ID(), subnetValidatorNodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
-	executor.onCommit.Apply(vm.internalState)
-	assert.NoError(vm.internalState.Commit())
-	assert.False(vm.Validators.Contains(testSubnet1.ID(), subnetVdr2NodeID))
-	assert.False(vm.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
+	executor.OnCommit.Apply(env.state)
+	assert.NoError(env.state.Write(dummyHeight))
+	assert.False(env.config.Validators.Contains(testSubnet1.ID(), subnetVdr2NodeID))
+	assert.False(env.config.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 }
 
 func TestWhitelistedSubnet(t *testing.T) {
 	for _, whitelist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
-			vm, _, _, _ := defaultVM()
-			vm.ctx.Lock.Lock()
+			env := newEnvironment()
 			defer func() {
-				if err := vm.Shutdown(); err != nil {
+				if err := shutdownEnvironment(env); err != nil {
 					t.Fatal(err)
 				}
-				vm.ctx.Lock.Unlock()
 			}()
-
+			dummyHeight := uint64(1)
 			if whitelist {
-				vm.WhitelistedSubnets.Add(testSubnet1.ID())
+				env.config.WhitelistedSubnets.Add(testSubnet1.ID())
 			}
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := keys[0].PublicKey().Address()
+			subnetValidatorNodeID := preFundedKeys[0].PublicKey().Address()
 
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
 				ids.NodeID(subnetValidatorNodeID),  // Node ID
 				testSubnet1.ID(),                   // Subnet ID
-				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]}, // Keys
-				ids.ShortEmpty, // reward address
+				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
+				ids.ShortEmpty,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -545,90 +529,88 @@ func TestWhitelistedSubnet(t *testing.T) {
 			staker.NextTime = staker.StartTime
 			staker.Priority = state.SubnetValidatorPendingPriority
 
-			vm.internalState.PutPendingValidator(staker)
-			vm.internalState.AddTx(tx, status.Committed)
-			if err := vm.internalState.Commit(); err != nil {
+			env.state.PutPendingValidator(staker)
+			env.state.AddTx(tx, status.Committed)
+			if err := env.state.Write(dummyHeight); err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.internalState.Load(); err != nil {
+			if err := env.state.Load(); err != nil {
 				t.Fatal(err)
 			}
 
 			// Advance time to the staker's start time.
-			vm.clock.Set(subnetVdr1StartTime)
-			tx, err = vm.txBuilder.NewAdvanceTimeTx(subnetVdr1StartTime)
+			env.clk.Set(subnetVdr1StartTime)
+			tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1StartTime)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			executor := proposalTxExecutor{
-				vm:            vm,
-				parentID:      vm.preferred,
-				stateVersions: vm.stateVersions,
-				tx:            tx,
+			executor := ProposalTxExecutor{
+				Backend:  &env.backend,
+				ParentID: lastAcceptedID,
+				Tx:       tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			executor.onCommit.Apply(vm.internalState)
-			assert.NoError(t, vm.internalState.Commit())
-			assert.Equal(t, whitelist, vm.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
+			executor.OnCommit.Apply(env.state)
+			assert.NoError(t, env.state.Write(dummyHeight))
+			assert.Equal(t, whitelist, env.config.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
 		})
 	}
 }
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
+	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
+	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
 	assert.NoError(t, err)
 
-	tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
-	executor := proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor := ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(vm.internalState)
-	assert.NoError(t, vm.internalState.Commit())
+	executor.OnCommit.Apply(env.state)
+	assert.NoError(t, env.state.Write(dummyHeight))
 
 	// Test validator weight before delegation
-	primarySet, ok := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 	assert.True(t, ok)
 	vdrWeight, _ := primarySet.GetWeight(nodeID)
-	assert.Equal(t, vm.MinValidatorStake, vdrWeight)
+	assert.Equal(t, env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
-	addDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
+
+	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
-		keys[0].PublicKey().Address(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[4]},
-		ids.ShortEmpty, // change addr
+		preFundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
+		ids.ShortEmpty,
 	)
 	assert.NoError(t, err)
 
@@ -636,82 +618,79 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	staker.NextTime = staker.StartTime
 	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
-	vm.internalState.PutPendingDelegator(staker)
-	vm.internalState.AddTx(addDelegatorTx, status.Committed)
-	assert.NoError(t, vm.internalState.Commit())
-	assert.NoError(t, vm.internalState.Load())
+	env.state.PutPendingDelegator(staker)
+	env.state.AddTx(addDelegatorTx, status.Committed)
+	assert.NoError(t, env.state.Write(dummyHeight))
+	assert.NoError(t, env.state.Load())
 
 	// Advance Time
-	tx, err = vm.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
+	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
-	executor = proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor = ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(vm.internalState)
-	assert.NoError(t, vm.internalState.Commit())
+	executor.OnCommit.Apply(env.state)
+	assert.NoError(t, env.state.Write(dummyHeight))
 
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)
-	assert.Equal(t, vm.MinDelegatorStake+vm.MinValidatorStake, vdrWeight)
+	assert.Equal(t, env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
+	dummyHeight := uint64(1)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	_, err := addPendingValidator(vm, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{keys[0]})
+	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
 	assert.NoError(t, err)
 
-	tx, err := vm.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
-	executor := proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor := ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(vm.internalState)
-	assert.NoError(t, vm.internalState.Commit())
+	executor.OnCommit.Apply(env.state)
+	assert.NoError(t, env.state.Write(dummyHeight))
 
 	// Test validator weight before delegation
-	primarySet, ok := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 	assert.True(t, ok)
 	vdrWeight, _ := primarySet.GetWeight(nodeID)
-	assert.Equal(t, vm.MinValidatorStake, vdrWeight)
+	assert.Equal(t, env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
-	addDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
+	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
-		keys[0].PublicKey().Address(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[4]},
-		ids.ShortEmpty, // change addr
+		preFundedKeys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
+		ids.ShortEmpty,
 	)
 	assert.NoError(t, err)
 
@@ -719,88 +698,81 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	staker.NextTime = staker.StartTime
 	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
-	vm.internalState.PutPendingDelegator(staker)
-	vm.internalState.AddTx(addDelegatorTx, status.Committed)
-	assert.NoError(t, vm.internalState.Commit())
-	assert.NoError(t, vm.internalState.Load())
+	env.state.PutPendingDelegator(staker)
+	env.state.AddTx(addDelegatorTx, status.Committed)
+	assert.NoError(t, env.state.Write(dummyHeight))
+	assert.NoError(t, env.state.Load())
 
 	// Advance Time
-	tx, err = vm.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
+	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
-	executor = proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor = ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	executor.onCommit.Apply(vm.internalState)
-	assert.NoError(t, vm.internalState.Commit())
+	executor.OnCommit.Apply(env.state)
+	assert.NoError(t, env.state.Write(dummyHeight))
 
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)
-	assert.Equal(t, vm.MinDelegatorStake+vm.MinValidatorStake, vdrWeight)
+	assert.Equal(t, env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
-
-	vm.clock.Set(defaultGenesisTime) // VM's clock reads the genesis time
+	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 
 	// Proposed advancing timestamp to 1 second after sync bound
-	tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(syncBound))
+	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	executor := proposalTxExecutor{
-		vm:            vm,
-		parentID:      vm.preferred,
-		stateVersions: vm.stateVersions,
-		tx:            tx,
+	executor := ProposalTxExecutor{
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
-	if !executor.prefersCommit {
+	if !executor.PrefersCommit {
 		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
 	}
 }
 
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+	env := newEnvironment()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
+	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	bytes, err := Codec.Marshal(txs.Version, tx)
+	bytes, err := txs.Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var unmarshaledTx txs.Tx
-	if _, err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
+	if _, err := txs.Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	} else if tx.Unsigned.(*txs.AdvanceTimeTx).Time != unmarshaledTx.Unsigned.(*txs.AdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")
@@ -808,20 +780,21 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 }
 
 func addPendingValidator(
-	vm *VM,
-	startTime, endTime time.Time,
+	env *environment,
+	startTime time.Time,
+	endTime time.Time,
 	nodeID ids.NodeID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (*txs.Tx, error) {
-	addPendingValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
+	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
 		ids.ShortID(nodeID),
 		reward.PercentDenominator,
 		keys,
-		ids.ShortEmpty, // change addr
+		ids.ShortEmpty,
 	)
 	if err != nil {
 		return nil, err
@@ -834,13 +807,14 @@ func addPendingValidator(
 	staker.NextTime = staker.StartTime
 	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
-	vm.internalState.PutPendingValidator(staker)
-	vm.internalState.AddTx(addPendingValidatorTx, status.Committed)
-	if err := vm.internalState.Commit(); err != nil {
+	env.state.PutPendingValidator(staker)
+	env.state.AddTx(addPendingValidatorTx, status.Committed)
+	dummyHeight := uint64(1)
+	if err := env.state.Write(dummyHeight); err != nil {
 		return nil, err
 	}
-	if err := vm.internalState.Load(); err != nil {
+	if err := env.state.Load(); err != nil {
 		return nil, err
 	}
-	return addPendingValidatorTx, err
+	return addPendingValidatorTx, nil
 }

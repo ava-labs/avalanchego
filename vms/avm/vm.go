@@ -473,7 +473,7 @@ func (vm *VM) initState(tx txs.Tx) error {
 		return err
 	}
 	for _, utxo := range tx.UTXOs() {
-		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			return err
 		}
 	}
