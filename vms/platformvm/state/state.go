@@ -68,7 +68,7 @@ var (
 // Chain collects all methods to manage the state of the chain for block
 // execution.
 type Chain interface {
-	Validators
+	Stakers
 	UTXOAdder
 	UTXOGetter
 	UTXODeleter
@@ -128,8 +128,8 @@ type state struct {
 
 	baseDB database.Database
 
-	currentValidators *baseValidators
-	pendingValidators *baseValidators
+	currentValidators *baseStakers
+	pendingValidators *baseStakers
 
 	uptimes        map[ids.NodeID]*currentValidatorState // nodeID -> uptimes
 	updatedUptimes map[ids.NodeID]struct{}               // nodeID -> nil
@@ -309,8 +309,8 @@ func New(
 
 		baseDB: baseDB,
 
-		currentValidators: newBaseValidators(),
-		pendingValidators: newBaseValidators(),
+		currentValidators: newBaseStakers(),
+		pendingValidators: newBaseStakers(),
 
 		uptimes:        make(map[ids.NodeID]*currentValidatorState),
 		updatedUptimes: make(map[ids.NodeID]struct{}),
@@ -799,7 +799,7 @@ func (s *state) loadMetadata() error {
 }
 
 func (s *state) loadCurrentValidators() error {
-	s.currentValidators = newBaseValidators()
+	s.currentValidators = newBaseStakers()
 
 	validatorIt := s.currentValidatorList.NewIterator()
 	defer validatorIt.Release()
@@ -917,7 +917,7 @@ func (s *state) loadCurrentValidators() error {
 }
 
 func (s *state) loadPendingValidators() error {
-	s.pendingValidators = newBaseValidators()
+	s.pendingValidators = newBaseStakers()
 
 	validatorIt := s.pendingValidatorList.NewIterator()
 	defer validatorIt.Release()

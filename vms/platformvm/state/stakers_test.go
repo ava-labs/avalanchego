@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBaseValidatorsPruning(t *testing.T) {
+func TestBaseStakersPruning(t *testing.T) {
 	assert := assert.New(t)
 	staker := newTestStaker()
 	delegator := newTestStaker()
 	delegator.SubnetID = staker.SubnetID
 	delegator.NodeID = staker.NodeID
 
-	v := newBaseValidators()
+	v := newBaseStakers()
 
 	v.PutValidator(staker)
 
@@ -63,12 +63,12 @@ func TestBaseValidatorsPruning(t *testing.T) {
 	assert.Empty(v.validators)
 }
 
-func TestBaseValidatorsStaker(t *testing.T) {
+func TestBaseStakersValidator(t *testing.T) {
 	assert := assert.New(t)
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := newBaseValidators()
+	v := newBaseStakers()
 
 	v.PutDelegator(delegator)
 
@@ -104,11 +104,11 @@ func TestBaseValidatorsStaker(t *testing.T) {
 	assertIteratorsEqual(t, EmptyIterator, stakerIterator)
 }
 
-func TestBaseValidatorsDelegator(t *testing.T) {
+func TestBaseStakersDelegator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := newBaseValidators()
+	v := newBaseStakers()
 
 	delegatorIterator := v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
@@ -135,7 +135,7 @@ func TestBaseValidatorsDelegator(t *testing.T) {
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
-func TestDiffValidatorsStaker(t *testing.T) {
+func TestDiffStakersValidator(t *testing.T) {
 	assert := assert.New(t)
 	staker := newTestStaker()
 	delegator := newTestStaker()
@@ -172,7 +172,7 @@ func TestDiffValidatorsStaker(t *testing.T) {
 	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
 }
 
-func TestDiffValidatorsDelegator(t *testing.T) {
+func TestDiffStakersDelegator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 

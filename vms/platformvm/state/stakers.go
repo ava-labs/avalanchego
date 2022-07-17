@@ -10,12 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-type Validators interface {
-	CurrentValidators
-	PendingValidators
+type Stakers interface {
+	CurrentStakers
+	PendingStakers
 }
 
-type CurrentValidators interface {
+type CurrentStakers interface {
 	GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
 	PutCurrentValidator(staker *Staker)
 	DeleteCurrentValidator(staker *Staker)
@@ -29,7 +29,7 @@ type CurrentValidators interface {
 	GetCurrentStakerIterator() (StakerIterator, error)
 }
 
-type PendingValidators interface {
+type PendingStakers interface {
 	GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
 	PutPendingValidator(staker *Staker)
 	DeletePendingValidator(staker *Staker)
@@ -43,26 +43,26 @@ type PendingValidators interface {
 	GetPendingStakerIterator() (StakerIterator, error)
 }
 
-type baseValidators struct {
-	validators     map[ids.ID]map[ids.NodeID]*baseValidator
+type baseStakers struct {
+	validators     map[ids.ID]map[ids.NodeID]*baseStaker
 	stakers        *btree.BTree
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 }
 
-type baseValidator struct {
+type baseStaker struct {
 	validator  *Staker
 	delegators *btree.BTree
 }
 
-func newBaseValidators() *baseValidators {
-	return &baseValidators{
-		validators:     make(map[ids.ID]map[ids.NodeID]*baseValidator),
+func newBaseStakers() *baseStakers {
+	return &baseStakers{
+		validators:     make(map[ids.ID]map[ids.NodeID]*baseStaker),
 		stakers:        btree.New(defaultTreeDegree),
 		validatorDiffs: make(map[ids.ID]map[ids.NodeID]*diffValidator),
 	}
 }
 
-func (v *baseValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (v *baseStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	subnetValidators, ok := v.validators[subnetID]
 	if !ok {
 		return nil, database.ErrNotFound
@@ -77,7 +77,7 @@ func (v *baseValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Stak
 	return validator.validator, nil
 }
 
-func (v *baseValidators) PutValidator(staker *Staker) {
+func (v *baseStakers) PutValidator(staker *Staker) {
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	validator.validator = staker
 
@@ -89,7 +89,7 @@ func (v *baseValidators) PutValidator(staker *Staker) {
 	v.stakers.ReplaceOrInsert(staker)
 }
 
-func (v *baseValidators) DeleteValidator(staker *Staker) {
+func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	validator.validator = nil
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
@@ -102,7 +102,7 @@ func (v *baseValidators) DeleteValidator(staker *Staker) {
 	v.stakers.Delete(staker)
 }
 
-func (v *baseValidators) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
+func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
 	subnetValidators, ok := v.validators[subnetID]
 	if !ok {
 		return EmptyIterator
@@ -114,7 +114,7 @@ func (v *baseValidators) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID
 	return NewTreeIterator(validator.delegators)
 }
 
-func (v *baseValidators) PutDelegator(staker *Staker) {
+func (v *baseStakers) PutDelegator(staker *Staker) {
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	if validator.delegators == nil {
 		validator.delegators = btree.New(defaultTreeDegree)
@@ -130,7 +130,7 @@ func (v *baseValidators) PutDelegator(staker *Staker) {
 	v.stakers.ReplaceOrInsert(staker)
 }
 
-func (v *baseValidators) DeleteDelegator(staker *Staker) {
+func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	if validator.delegators != nil {
 		validator.delegators.Delete(staker)
@@ -146,25 +146,25 @@ func (v *baseValidators) DeleteDelegator(staker *Staker) {
 	v.stakers.Delete(staker)
 }
 
-func (v *baseValidators) GetStakerIterator() StakerIterator {
+func (v *baseStakers) GetStakerIterator() StakerIterator {
 	return NewTreeIterator(v.stakers)
 }
 
-func (v *baseValidators) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseValidator {
+func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseStaker {
 	subnetValidators, ok := v.validators[subnetID]
 	if !ok {
-		subnetValidators = make(map[ids.NodeID]*baseValidator)
+		subnetValidators = make(map[ids.NodeID]*baseStaker)
 		v.validators[subnetID] = subnetValidators
 	}
 	validator, ok := subnetValidators[nodeID]
 	if !ok {
-		validator = &baseValidator{}
+		validator = &baseStaker{}
 		subnetValidators[nodeID] = validator
 	}
 	return validator
 }
 
-func (v *baseValidators) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
+func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 	subnetValidators := v.validators[subnetID]
 	validator := subnetValidators[nodeID]
 	if validator.validator != nil {
@@ -179,7 +179,7 @@ func (v *baseValidators) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 	}
 }
 
-func (v *baseValidators) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
 	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
 	if !ok {
 		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
