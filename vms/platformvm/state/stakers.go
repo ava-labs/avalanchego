@@ -24,8 +24,8 @@ type CurrentStakers interface {
 	PutCurrentDelegator(staker *Staker)
 	DeleteCurrentDelegator(staker *Staker)
 
-	// GetCurrentStakerIterator returns the stakers in the validator set sorted
-	// in order of their future removal.
+	// GetCurrentStakerIterator returns stakers in order of their removal from
+	// the current validator set.
 	GetCurrentStakerIterator() (StakerIterator, error)
 }
 
@@ -38,8 +38,8 @@ type PendingStakers interface {
 	PutPendingDelegator(staker *Staker)
 	DeletePendingDelegator(staker *Staker)
 
-	// GetPendingStakerIterator returns the stakers in the validator set sorted
-	// in order of their future removal.
+	// GetCurrentStakerIterator returns stakers in order of their removal from
+	// the pending validator set.
 	GetPendingStakerIterator() (StakerIterator, error)
 }
 
