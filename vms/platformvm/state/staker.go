@@ -31,8 +31,17 @@ type Staker struct {
 	EndTime         time.Time
 	PotentialReward uint64
 
-	// The following fields are only used for the staker tree.
+	// NextTime is the next time this staker will be moved from a validator set.
+	// If the staker is in the pending validator set, NextTime will equal
+	// StartTime. If the staker is in the current validator set, NextTime will
+	// equal EndTime.
 	NextTime time.Time
+
+	// Priority specifies how to break ties between stakers with the same
+	// NextTime. This ensures that stakers created by the same transaction type
+	// are grouped together. The ordering of these groups is documented in
+	// [priorities.go] and depends on if the stakers are in the pending or
+	// current valdiator set.
 	Priority byte
 }
 
