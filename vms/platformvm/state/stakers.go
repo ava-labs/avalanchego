@@ -208,8 +208,14 @@ type diffValidator struct {
 	deletedDelegators map[ids.ID]*Staker
 }
 
-// GetValidator may return [nil, true] if the validator was deleted in this
-// diff.
+// GetValidator attempts to fetch the validator with the given subnetID and
+// nodeID.
+//
+// Returns:
+// 1. If the validator was added in this diff, [staker, true] will be returned.
+// 2. If the validator was removed in this diff, [nil, true] will be returned.
+// 3. If the validator was not modified by this diff, [nil, false] will be
+//    returned.
 func (v *diffValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
 	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
 	if !ok {
