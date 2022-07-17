@@ -17,7 +17,7 @@ type multiIterator struct {
 	heap        []StakerIterator
 }
 
-// Returns an iterator that returns the elements of [stakers] in order.
+// Returns an iterator that returns all of the elements of [stakers] in order.
 func NewMultiIterator(stakers ...StakerIterator) StakerIterator {
 	// Filter out iterators that are already exhausted.
 	i := 0
@@ -50,8 +50,9 @@ func (it *multiIterator) Next() bool {
 
 	if !it.initialized {
 		// We call Next() on each iterator in NewMultiIterator.
-		// Note that on the first call to Next() (i.e. here) we
-		// don't call Next() on the current iterator.
+		//
+		// Note that on the first call to Next() (i.e. here) we don't call
+		// Next() on the current iterator.
 		it.initialized = true
 		return true
 	}
@@ -74,7 +75,8 @@ func (it *multiIterator) Value() *Staker {
 	return it.heap[0].Value()
 }
 
-// When Release() returns, Release() has been called on each element of [stakers].
+// When Release() returns, Release() has been called on each element of
+// [stakers].
 func (it *multiIterator) Release() {
 	for _, it := range it.heap {
 		it.Release()
@@ -95,7 +97,7 @@ func (it *multiIterator) Swap(i, j int) {
 	it.heap[j], it.heap[i] = it.heap[i], it.heap[j]
 }
 
-// Push is never actually used - but we need it to implement [heap.Interface].
+// Push is never actually used - but we need it to implement heap.Interface.
 func (it *multiIterator) Push(value interface{}) {
 	it.heap = append(it.heap, value.(StakerIterator))
 }
