@@ -66,6 +66,8 @@ var (
 	errMissingVMID                = errors.New("argument 'vmID' not given")
 	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
 	errMissingPrivateKey          = errors.New("argument 'privateKey' not given")
+	errStartAfterEndTime          = errors.New("start time must be before end time")
+	errStartTimeInThePast         = errors.New("start time in the past")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -2156,22 +2158,39 @@ type GetMaxStakeAmountReply struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
-// // GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
-// // node during the time period.
-// func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
-// 	startTime := time.Unix(int64(args.StartTime), 0)
-// 	endTime := time.Unix(int64(args.EndTime), 0)
+// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
+// node during the time period.
+func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs, reply *GetMaxStakeAmountReply) error {
+	startTime := time.Unix(int64(args.StartTime), 0)
+	endTime := time.Unix(int64(args.EndTime), 0)
 
-// 	maxStakeAmount, err := service.vm.internalState.MaxStakeAmount(
-// 		args.SubnetID,
-// 		args.NodeID,
-// 		startTime,
-// 		endTime,
-// 	)
+	if startTime.After(endTime) {
+		return errStartAfterEndTime
+	}
+	currentTime := service.vm.internalState.GetTimestamp()
+	if startTime.Before(currentTime) {
+		return errStartTimeInThePast
+	}
 
-// 	reply.Amount = json.Uint64(maxStakeAmount)
-// 	return err
-// }
+	staker, err := executor.GetValidator(service.vm.internalState, args.SubnetID, args.NodeID)
+	if err == database.ErrNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if startTime.After(staker.EndTime) {
+		return nil
+	}
+	if staker.StartTime.Before(endTime) {
+		return nil
+	}
+
+	maxStakeAmount, err := executor.GetMaxWeight(service.vm.internalState, staker, startTime, endTime)
+	reply.Amount = json.Uint64(maxStakeAmount)
+	return err
+}
 
 // GetRewardUTXOsReply defines the GetRewardUTXOs replies returned from the API
 type GetRewardUTXOsReply struct {
