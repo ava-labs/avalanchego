@@ -389,7 +389,8 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	}
 	if err := blk.Accept(); err != nil {
 		panic(err)
-	} else if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
 		panic(err)
 	}
 
