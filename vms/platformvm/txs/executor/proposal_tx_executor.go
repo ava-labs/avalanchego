@@ -893,8 +893,7 @@ func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
 		earliest = currentStakerIterator.Value().EndTime
 	}
 	if pendingStakers.Next() {
-		startTime := pendingStakers.Value().StartTime
-		if startTime.Before(earliest) {
+		if startTime := pendingStakers.Value().StartTime; startTime.Before(earliest) {
 			earliest = startTime
 		}
 	}
