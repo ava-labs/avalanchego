@@ -225,7 +225,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		_, err := GetValidator(parentState, tx.Validator.Subnet, tx.Validator.NodeID)
 		if err == nil {
 			return fmt.Errorf(
-				"%s is already validating the subnet",
+				"attempted to issue duplicate subnet validation for %s",
 				tx.Validator.NodeID,
 			)
 		}
