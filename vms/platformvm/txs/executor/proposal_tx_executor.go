@@ -123,7 +123,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		_, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err == nil {
 			return fmt.Errorf(
-				"%s is already validating the primary network",
+				"attempted to issue duplicate validation for %s",
 				tx.Validator.NodeID,
 			)
 		}
