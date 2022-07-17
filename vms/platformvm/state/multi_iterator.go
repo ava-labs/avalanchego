@@ -95,7 +95,7 @@ func (it *multiIterator) Swap(i, j int) {
 	it.heap[j], it.heap[i] = it.heap[i], it.heap[j]
 }
 
-// Push is never actually used - but we need it to implement heap.Interface.
+// Push is never actually used - but we need it to implement [heap.Interface].
 func (it *multiIterator) Push(value interface{}) {
 	it.heap = append(it.heap, value.(StakerIterator))
 }
