@@ -408,7 +408,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
 		}
 
-		canDelegate, err := CanDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
+		canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
 		if err != nil {
 			return err
 		}
@@ -914,7 +914,9 @@ func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state
 	return state.GetPendingValidator(subnetID, nodeID)
 }
 
-func CanDelegate(
+// canDelegate returns true if [delegator] can be added as a delegator of
+// [validator].
+func canDelegate(
 	state state.Chain,
 	validator *state.Staker,
 	weightLimit uint64,
