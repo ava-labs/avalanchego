@@ -4,6 +4,7 @@
 package state
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -165,4 +167,145 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 	assert.NoError(err)
 	assert.NotNil(state)
 	return state
+}
+
+func TestValidatorWeightDiff(t *testing.T) {
+	type test struct {
+		name      string
+		ops       []func(*ValidatorWeightDiff) error
+		shouldErr bool
+		expected  ValidatorWeightDiff
+	}
+
+	tests := []test{
+		{
+			name:      "no ops",
+			ops:       []func(*ValidatorWeightDiff) error{},
+			shouldErr: false,
+			expected:  ValidatorWeightDiff{},
+		},
+		{
+			name: "simple decrease",
+			ops: []func(*ValidatorWeightDiff) error{
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 1)
+				},
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 1)
+				},
+			},
+			shouldErr: false,
+			expected: ValidatorWeightDiff{
+				Decrease: true,
+				Amount:   2,
+			},
+		},
+		{
+			name: "decrease overflow",
+			ops: []func(*ValidatorWeightDiff) error{
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, math.MaxUint64)
+				},
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 1)
+				},
+			},
+			shouldErr: true,
+			expected:  ValidatorWeightDiff{},
+		},
+		{
+			name: "simple increase",
+			ops: []func(*ValidatorWeightDiff) error{
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 1)
+				},
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 1)
+				},
+			},
+			shouldErr: false,
+			expected: ValidatorWeightDiff{
+				Decrease: false,
+				Amount:   2,
+			},
+		},
+		{
+			name: "increase overflow",
+			ops: []func(*ValidatorWeightDiff) error{
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, math.MaxUint64)
+				},
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 1)
+				},
+			},
+			shouldErr: true,
+			expected:  ValidatorWeightDiff{},
+		},
+		{
+			name: "varied use",
+			ops: []func(*ValidatorWeightDiff) error{
+				// Add to 0
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 2) // Value 2
+				},
+				// Subtract from positive number
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 1) // Value 1
+				},
+				// Subtract from positive number
+				// to make it negative
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 3) // Value -2
+				},
+				// Subtract from a negative number
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 3) // Value -5
+				},
+				// Add to a negative number
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 1) // Value -4
+				},
+				// Add to a negative number
+				// to make it positive
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 5) // Value 1
+				},
+				// Add to a positive number
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(false, 1) // Value 2
+				},
+				// Get to zero
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 2) // Value 0
+				},
+				// Subtract from zero
+				func(d *ValidatorWeightDiff) error {
+					return d.Add(true, 2) // Value -2
+				},
+			},
+			shouldErr: false,
+			expected: ValidatorWeightDiff{
+				Decrease: true,
+				Amount:   2,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			diff := &ValidatorWeightDiff{}
+			errs := wrappers.Errs{}
+			for _, op := range tt.ops {
+				errs.Add(op(diff))
+			}
+			if tt.shouldErr {
+				assert.Error(errs.Err)
+				return
+			}
+			assert.NoError(errs.Err)
+			assert.Equal(tt.expected, *diff)
+		})
+	}
 }
