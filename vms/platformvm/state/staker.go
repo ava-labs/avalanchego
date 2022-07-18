@@ -41,7 +41,7 @@ type Staker struct {
 	// NextTime. This ensures that stakers created by the same transaction type
 	// are grouped together. The ordering of these groups is documented in
 	// [priorities.go] and depends on if the stakers are in the pending or
-	// current valdiator set.
+	// current validator set.
 	Priority byte
 }
 
