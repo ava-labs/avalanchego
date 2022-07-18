@@ -45,6 +45,7 @@ const (
 )
 
 var (
+	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
 	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
 	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
 	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
@@ -1654,7 +1655,17 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	state := service.vm.manager.OnAccept(blockID)
+	state, ok := service.vm.stateVersions.GetState(blockID)
+	if !ok {
+		block, err := service.vm.manager.GetBlock(blockID)
+		if err != nil {
+			return false, err
+		}
+		state, ok = service.vm.stateVersions.GetState(block.Parent())
+		if !ok {
+			return false, errMissingDecisionBlock
+		}
+	}
 
 	tx, _, err := state.GetTx(chainID)
 	if err == database.ErrNotFound {
@@ -1663,7 +1674,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	if err != nil {
 		return false, err
 	}
-	_, ok := tx.Unsigned.(*txs.CreateChainTx)
+	_, ok = tx.Unsigned.(*txs.CreateChainTx)
 	return ok, nil
 }
 
@@ -1899,12 +1910,10 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	preferred, err := service.vm.Preferred()
-	if err != nil {
-		return err
+	onAccept, ok := service.vm.stateVersions.GetState(service.vm.preferred)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for block %s, which should be a decision block", service.vm.preferred)
 	}
-
-	onAccept := service.vm.manager.OnAccept(preferred.ID())
 
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {

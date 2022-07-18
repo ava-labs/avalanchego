@@ -17,13 +17,6 @@ import (
 var _ Manager = &manager{}
 
 type Manager interface {
-	// This function should only be called after Verify is called on [blkID].
-	// OnAccept returns:
-	// 1) The current state of the chain, if this block is decided or hasn't
-	//    been verified.
-	// 2) The state of the chain after this block is accepted, if this block was
-	//    verified successfully.
-	OnAccept(blkID ids.ID) state.Chain
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
 	GetBlock(id ids.ID) (snowman.Block, error)
@@ -42,7 +35,9 @@ func NewManager(
 		state:        s,
 		bootstrapped: txExecutorBackend.Bootstrapped,
 		ctx:          txExecutorBackend.Ctx,
-		blkIDToState: map[ids.ID]*blockState{},
+
+		blkIDToState:  map[ids.ID]*blockState{},
+		stateVersions: txExecutorBackend.StateVersions,
 	}
 
 	manager := &manager{

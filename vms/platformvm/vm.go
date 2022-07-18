@@ -83,8 +83,9 @@ type VM struct {
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	state       state.State
-	utxoHandler utxo.Handler
+	state         state.State
+	utxoHandler   utxo.Handler
+	stateVersions state.Versions
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -165,6 +166,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	lastAcceptedID := vm.state.GetLastAccepted()
+	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+	vm.stateVersions = state.NewVersions(lastAcceptedID, vm.state)
+
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.state, vm.fx)
@@ -182,14 +187,15 @@ func (vm *VM) Initialize(
 	)
 
 	vm.txExecutorBackend = executor.Backend{
-		Config:       &vm.Config,
-		Ctx:          vm.ctx,
-		Clk:          &vm.clock,
-		Fx:           vm.fx,
-		FlowChecker:  vm.utxoHandler,
-		Uptimes:      vm.uptimeManager,
-		Rewards:      vm.rewards,
-		Bootstrapped: &vm.bootstrapped,
+		Config:        &vm.Config,
+		Ctx:           vm.ctx,
+		Clk:           &vm.clock,
+		Fx:            vm.fx,
+		FlowChecker:   vm.utxoHandler,
+		Uptimes:       vm.uptimeManager,
+		Rewards:       vm.rewards,
+		Bootstrapped:  &vm.bootstrapped,
+		StateVersions: vm.stateVersions,
 	}
 
 	// Note: there is a circular dependency among mempool and blkBuilder
@@ -235,9 +241,6 @@ func (vm *VM) Initialize(
 		)
 	}
 
-	// Build off the most recently accepted block
-	lastAcceptedID := vm.state.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
 	return vm.SetPreference(lastAcceptedID)
 }
 

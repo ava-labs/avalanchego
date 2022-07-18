@@ -33,9 +33,9 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -63,9 +63,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -97,9 +97,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -134,9 +134,9 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -411,9 +411,9 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				}
 
 				executor := ProposalTxExecutor{
-					Backend:     &env.backend,
-					ParentState: env.state,
-					Tx:          tx,
+					Backend:  &env.backend,
+					ParentID: lastAcceptedID,
+					Tx:       tx,
 				}
 				err = tx.Unsigned.Visit(&executor)
 				if err != nil {
@@ -535,9 +535,9 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err != nil {
@@ -613,9 +613,9 @@ func TestWhitelistedSubnet(t *testing.T) {
 			}
 
 			executor := ProposalTxExecutor{
-				Backend:     &env.backend,
-				ParentState: env.state,
-				Tx:          tx,
+				Backend:  &env.backend,
+				ParentID: lastAcceptedID,
+				Tx:       tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil {
@@ -652,9 +652,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor := ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -694,9 +694,9 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor = ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -732,9 +732,9 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor := ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -773,9 +773,9 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor = ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -807,9 +807,9 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:     &env.backend,
-		ParentState: env.state,
-		Tx:          tx,
+		Backend:  &env.backend,
+		ParentID: lastAcceptedID,
+		Tx:       tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)

@@ -85,20 +85,12 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	preferred, err := b.vm.Preferred()
-	if err != nil {
-		return fmt.Errorf("couldn't get preferred block: %w", err)
-	}
-
-	preferredState := b.vm.manager.OnAccept(preferred.ID())
-
 	verifier := executor.MempoolTxVerifier{
-		Backend:     &b.vm.txExecutorBackend,
-		ParentState: preferredState,
-		Tx:          tx,
+		Backend:  &b.vm.txExecutorBackend,
+		ParentID: b.vm.preferred,
+		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&verifier)
-	if err != nil {
+	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		b.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -127,7 +119,10 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
-	preferredState := b.vm.manager.OnAccept(preferredID)
+	preferredState, ok := b.vm.stateVersions.GetState(preferredID)
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve state for block %s, which should be a decision block", preferredID)
+	}
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
@@ -217,12 +212,11 @@ func (b *blockBuilder) resetTimer() {
 		return
 	}
 
-	preferred, err := b.vm.Preferred()
-	if err != nil {
+	preferredState, ok := b.vm.stateVersions.GetState(b.vm.preferred)
+	if !ok {
+		b.vm.ctx.Log.Error("could not retrieve state for block %s. Preferred block must be a decision block", b.vm.preferred)
 		return
 	}
-
-	preferredState := b.vm.manager.OnAccept(preferred.ID())
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {

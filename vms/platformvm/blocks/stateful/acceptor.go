@@ -95,7 +95,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 			err,
 		)
 	}
-	return a.updateChildrenState(blkState)
+	return nil
 }
 
 func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
@@ -128,10 +128,6 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 
 	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
-	}
-
-	if err := a.updateChildrenState(blkState); err != nil {
-		return err
 	}
 
 	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
@@ -187,31 +183,7 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 
 	// Update the state of the chain in the database
 	blkState.onAcceptState.Apply(a.state)
-
-	if err := a.state.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's state: %w", err)
-	}
-	return a.updateChildrenState(blkState)
-}
-
-// Update the state of the children of the block which is being accepted.
-func (a *acceptor) updateChildrenState(blkState *blockState) error {
-	for _, childID := range blkState.children {
-		childState, ok := a.blkIDToState[childID]
-		if !ok {
-			return fmt.Errorf("couldn't find state of block %s, child of %s", childID, blkState.statelessBlock.ID())
-		}
-		if childState.onCommitState != nil {
-			childState.onCommitState.SetBase(a.state)
-		}
-		if childState.onAbortState != nil {
-			childState.onAbortState.SetBase(a.state)
-		}
-		if childState.onAcceptState != nil {
-			childState.onAcceptState.Apply(a.state)
-		}
-	}
-	return nil
+	return a.state.Commit()
 }
 
 func (a *acceptor) commonAccept(b stateless.Block) error {
@@ -220,9 +192,13 @@ func (a *acceptor) commonAccept(b stateless.Block) error {
 		return fmt.Errorf("failed to accept block %s: %w", blkID, err)
 	}
 	a.backend.lastAccepted = blkID
+
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.state.AddStatelessBlock(b, choices.Accepted)
+	a.stateVersions.DeleteState(b.Parent())
+	a.stateVersions.SetState(blkID, a.state)
+
 	a.recentlyAccepted.Add(blkID)
 	return nil
 }

@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -14,8 +15,8 @@ var _ txs.Visitor = &MempoolTxVerifier{}
 
 type MempoolTxVerifier struct {
 	*Backend
-	ParentState state.Chain
-	Tx          *txs.Tx
+	ParentID ids.ID
+	Tx       *txs.Tx
 }
 
 func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
@@ -57,9 +58,9 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:     v.Backend,
-		ParentState: v.ParentState,
-		Tx:          v.Tx,
+		Backend:  v.Backend,
+		ParentID: v.ParentID,
+		Tx:       v.Tx,
 	}
 	err := tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
@@ -71,14 +72,18 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 }
 
 func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
+	state, err := state.NewDiff(
+		v.ParentID,
+		v.StateVersions,
+	)
+	if err != nil {
+		return err
+	}
+
 	executor := StandardTxExecutor{
 		Backend: v.Backend,
-		State: state.NewDiff(
-			v.ParentState,
-			v.ParentState.CurrentStakers(),
-			v.ParentState.PendingStakers(),
-		),
-		Tx: v.Tx,
+		State:   state,
+		Tx:      v.Tx,
 	}
 	return tx.Visit(&executor)
 }
