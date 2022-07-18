@@ -5,7 +5,7 @@ package state
 
 const (
 	// First subnet delegators are removed from the current validator set,
-	SubnetDelegatorCurrentPriority = iota
+	SubnetDelegatorCurrentPriority = iota + 1
 	// then subnet validators,
 	SubnetValidatorCurrentPriority
 	// then primary network delegators,
@@ -17,7 +17,7 @@ const (
 const (
 	// First primary network delegators are moved from the pending to the
 	// current validator set,
-	PrimaryNetworkDelegatorPendingPriority = iota
+	PrimaryNetworkDelegatorPendingPriority = iota + 1
 	// then primary network validators,
 	PrimaryNetworkValidatorPendingPriority
 	// then subnet validators,
