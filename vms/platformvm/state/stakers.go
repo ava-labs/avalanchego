@@ -44,8 +44,10 @@ type PendingStakers interface {
 }
 
 type baseStakers struct {
-	validators     map[ids.ID]map[ids.NodeID]*baseStaker
-	stakers        *btree.BTree
+	// subnetID --> nodeID --> current state for the validator of the subnet
+	validators map[ids.ID]map[ids.NodeID]*baseStaker
+	stakers    *btree.BTree
+	// subnetID --> nodeID --> diff for that validator since the last db write
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 }
 
@@ -194,6 +196,7 @@ func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeI
 }
 
 type diffValidators struct {
+	// subnetID --> nodeID --> diff for that validator
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 	addedStakers   *btree.BTree
 	deletedStakers map[ids.ID]*Staker

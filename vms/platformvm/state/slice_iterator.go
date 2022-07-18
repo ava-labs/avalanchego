@@ -5,6 +5,7 @@ package state
 
 var _ StakerIterator = &sliceIterator{}
 
+// Returns the elements of [stakers] in order. Doesn't sort by anything.
 type sliceIterator struct {
 	index   int
 	stakers []*Staker

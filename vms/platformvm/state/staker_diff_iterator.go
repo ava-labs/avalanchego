@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	_ StakerIterator = &multiIterator{}
-	_ heap.Interface = &multiIterator{}
+	_ StakerDiffIterator = &stakerDiffIterator{}
+	_ heap.Interface     = &mutableStakerIterator{}
 )
 
 type StakerDiffIterator interface {

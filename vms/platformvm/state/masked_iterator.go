@@ -7,8 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ StakerIterator = &treeIterator{}
+var _ StakerIterator = &maskedIterator{}
 
+// Skips the stakers in [parentIterator] that are present in [maskedStakers].
 type maskedIterator struct {
 	parentIterator StakerIterator
 	maskedStakers  map[ids.ID]*Staker
