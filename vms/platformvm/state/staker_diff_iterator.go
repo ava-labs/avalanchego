@@ -12,6 +12,15 @@ var (
 	_ heap.Interface     = &mutableStakerIterator{}
 )
 
+// StakerDiffIterator is an iterator that iterates over the events that will be
+// performed on the current staker set.
+//
+// The ordering of operations is:
+// - Staker operations are performed in order of their [NextTime].
+// - If operations have the same [NextTime], stakers are first added to the
+//   current staker set, then removed.
+// - Further ties are broken by *Staker.Less(), returning the lesser staker
+//   first.
 type StakerDiffIterator interface {
 	Next() bool
 	// Returns:
@@ -54,6 +63,9 @@ func (it *stakerDiffIterator) Next() bool {
 	default:
 		nextStakerRemoved := it.currentIterator.Value()
 		nextStakerAdded := it.pendingIterator.Value()
+		// If the next operations share the same time, we default to adding the
+		// staker to the current staker set. This means that we default to
+		// advancing the pending iterator.
 		if nextStakerRemoved.EndTime.Before(nextStakerAdded.StartTime) {
 			it.advanceCurrent()
 		} else {
