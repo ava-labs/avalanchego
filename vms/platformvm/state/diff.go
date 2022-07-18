@@ -91,6 +91,8 @@ func (d *diff) SetCurrentSupply(currentSupply uint64) {
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	// If the validator was modified in this diff, return the modified
+	// validator.
 	newValidator, ok := d.currentValidatorDiffs.GetValidator(subnetID, nodeID)
 	if ok {
 		if newValidator == nil {
@@ -98,6 +100,8 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		}
 		return newValidator, nil
 	}
+
+	// If the validator wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, errMissingParentState
@@ -150,6 +154,8 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 }
 
 func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	// If the validator was modified in this diff, return the modified
+	// validator.
 	newValidator, ok := d.pendingValidatorDiffs.GetValidator(subnetID, nodeID)
 	if ok {
 		if newValidator == nil {
@@ -157,6 +163,8 @@ func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		}
 		return newValidator, nil
 	}
+
+	// If the validator wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, errMissingParentState
