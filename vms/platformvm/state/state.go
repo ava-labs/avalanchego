@@ -131,8 +131,8 @@ type state struct {
 	currentValidators *baseStakers
 	pendingValidators *baseStakers
 
-	uptimes        map[ids.NodeID]*currentValidatorState // nodeID -> uptimes
-	updatedUptimes map[ids.NodeID]struct{}               // nodeID -> nil
+	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
+	updatedUptimes map[ids.NodeID]struct{}         // nodeID -> nil
 
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
@@ -217,7 +217,7 @@ type txAndStatus struct {
 	status status.Status
 }
 
-type currentValidatorState struct {
+type uptimeAndReward struct {
 	txID        ids.ID
 	lastUpdated time.Time
 
@@ -312,7 +312,7 @@ func New(
 		currentValidators: newBaseStakers(),
 		pendingValidators: newBaseStakers(),
 
-		uptimes:        make(map[ids.NodeID]*currentValidatorState),
+		uptimes:        make(map[ids.NodeID]*uptimeAndReward),
 		updatedUptimes: make(map[ids.NodeID]struct{}),
 
 		validatorsDB:                 validatorsDB,
@@ -815,7 +815,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		uptimeBytes := validatorIt.Value()
-		uptime := &currentValidatorState{
+		uptime := &uptimeAndReward{
 			txID: txID,
 		}
 		if _, err := txs.Codec.Unmarshal(uptimeBytes, uptime); err != nil {
@@ -1085,7 +1085,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 				delete(s.uptimes, nodeID)
 				delete(s.updatedUptimes, nodeID)
 			} else {
-				vdr := &currentValidatorState{
+				vdr := &uptimeAndReward{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
