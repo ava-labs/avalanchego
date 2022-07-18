@@ -38,5 +38,4 @@ type backend struct {
 
 func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
-	b.stateVersions.DeleteState(blkID)
 }

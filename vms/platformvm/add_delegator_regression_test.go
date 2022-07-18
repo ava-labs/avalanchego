@@ -324,8 +324,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {
 	// Verify the proposed block
-	err := blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	proposalBlk := blk.(snowman.OracleBlock)
@@ -350,16 +349,8 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	assert.NoError(err)
 
 	// Accept the proposal block and the commit block
-	err = proposalBlk.Accept()
-	assert.NoError(err)
-
-	err = commit.Accept()
-	assert.NoError(err)
-
-	err = abort.Reject()
-	assert.NoError(err)
-
-	lastAcceptedID, err := vm.LastAccepted()
-	assert.NoError(err)
-	assert.NoError(vm.SetPreference(lastAcceptedID))
+	assert.NoError(proposalBlk.Accept())
+	assert.NoError(commit.Accept())
+	assert.NoError(abort.Reject())
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 }

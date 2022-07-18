@@ -75,10 +75,12 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
+	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState: make(map[ids.ID]*blockState),
-			state:        s,
+			blkIDToState:  make(map[ids.ID]*blockState),
+			state:         s,
+			stateVersions: state.NewVersions(parentID, s),
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -93,7 +95,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	}
 
 	blk, err := stateless.NewAtomicBlock(
-		ids.GenerateTestID(),
+		parentID,
 		1,
 		&txs.Tx{
 			Unsigned: &txs.AddDelegatorTx{
@@ -144,9 +146,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
-	childOnAcceptState.EXPECT().Apply(s).Times(1)
-	childOnAbortState.EXPECT().SetBase(gomock.Any()).Times(1)
-	childOnCommitState.EXPECT().SetBase(gomock.Any()).Times(1)
 
 	err = acceptor.VisitAtomicBlock(blk)
 	assert.NoError(err)
@@ -164,10 +163,12 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
+	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState: make(map[ids.ID]*blockState),
-			state:        s,
+			blkIDToState:  make(map[ids.ID]*blockState),
+			state:         s,
+			stateVersions: state.NewVersions(parentID, s),
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -182,7 +183,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	}
 
 	blk, err := stateless.NewStandardBlock(
-		ids.GenerateTestID(),
+		parentID,
 		1,
 		[]*txs.Tx{
 			{
@@ -239,9 +240,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
-	childOnAcceptState.EXPECT().Apply(s).Times(1)
-	childOnAbortState.EXPECT().SetBase(gomock.Any()).Times(1)
-	childOnCommitState.EXPECT().SetBase(gomock.Any()).Times(1)
 
 	err = acceptor.VisitStandardBlock(blk)
 	assert.NoError(err)
@@ -261,10 +259,12 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
+	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState: make(map[ids.ID]*blockState),
-			state:        s,
+			blkIDToState:  make(map[ids.ID]*blockState),
+			state:         s,
+			stateVersions: state.NewVersions(parentID, s),
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -279,7 +279,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		}),
 	}
 
-	parentID := ids.GenerateTestID()
 	blk, err := stateless.NewCommitBlock(
 		parentID,
 		1,
@@ -331,14 +330,14 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
 		s.EXPECT().AddStatelessBlock(parentState.statelessBlock, choices.Accepted).Times(1),
+		parentStatelessBlk.EXPECT().Parent().Return(ids.Empty).Times(1),
+
 		s.EXPECT().SetLastAccepted(blkID).Times(1),
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1),
+
 		onAcceptState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().Commit().Return(nil).Times(1),
-		childOnCommitState.EXPECT().SetBase(gomock.Any()).Times(1),
-		childOnAbortState.EXPECT().SetBase(gomock.Any()).Times(1),
-		childOnAcceptState.EXPECT().Apply(s).Times(1),
 	)
 
 	err = acceptor.VisitCommitBlock(blk)
