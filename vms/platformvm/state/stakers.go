@@ -16,30 +16,66 @@ type Stakers interface {
 }
 
 type CurrentStakers interface {
+	// GetCurrentValidator returns the [staker] describing the validator on
+	// [subnetID] with [nodeID]. If the validator does not exist,
+	// [database.ErrNotFound] is returned.
 	GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
+
+	// PutCurrentValidator adds the [staker] describing a validator to the
+	// staker set.
 	PutCurrentValidator(staker *Staker)
+
+	// DeleteCurrentValidator removes the [staker] describing a validator from
+	// the staker set.
 	DeleteCurrentValidator(staker *Staker)
 
+	// GetCurrentDelegatorIterator returns stakers in order of their removal
+	// from the current staker set that represent delegators of the validator on
+	// [subnetID] with [nodeID].
 	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
+
+	// PutCurrentDelegator adds the [staker] describing a delegator to the
+	// staker set.
 	PutCurrentDelegator(staker *Staker)
+
+	// DeleteCurrentDelegator removes the [staker] describing a delegator from
+	// the staker set.
 	DeleteCurrentDelegator(staker *Staker)
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from
-	// the current validator set.
+	// the current staker set.
 	GetCurrentStakerIterator() (StakerIterator, error)
 }
 
 type PendingStakers interface {
+	// GetPendingValidator returns the Staker describing the validator on
+	// [subnetID] with [nodeID]. If the validator does not exist,
+	// [database.ErrNotFound] is returned.
 	GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
+
+	// PutPendingValidator adds the [staker] describing a validator to the
+	// staker set.
 	PutPendingValidator(staker *Staker)
+
+	// DeletePendingValidator removes the [staker] describing a validator from
+	// the staker set.
 	DeletePendingValidator(staker *Staker)
 
+	// GetPendingDelegatorIterator returns stakers in order of their removal
+	// from the pending staker set that represent delegators of the validator on
+	// [subnetID] with [nodeID].
 	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
+
+	// PutPendingDelegator adds the [staker] describing a delegator to the
+	// staker set.
 	PutPendingDelegator(staker *Staker)
+
+	// DeletePendingDelegator removes the [staker] describing a delegator from
+	// the staker set.
 	DeletePendingDelegator(staker *Staker)
 
-	// GetCurrentStakerIterator returns stakers in order of their removal from
-	// the pending validator set.
+	// GetPendingStakerIterator returns stakers in order of their removal from
+	// the pending staker set.
 	GetPendingStakerIterator() (StakerIterator, error)
 }
 
