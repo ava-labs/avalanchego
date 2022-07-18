@@ -776,7 +776,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// We're removing a delegator, so we need to fetch the validator they
-		// are delgated to.
+		// are delegated to.
 		vdrStaker, err := parentState.GetCurrentValidator(constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
 		if err != nil {
 			return fmt.Errorf(
