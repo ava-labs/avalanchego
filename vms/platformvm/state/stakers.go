@@ -204,8 +204,9 @@ type diffValidators struct {
 
 type diffValidator struct {
 	validatorModified bool
-	validatorDeleted  bool
-	validator         *Staker
+	// [validatorDeleted] implies [validatorModified]
+	validatorDeleted bool
+	validator        *Staker
 
 	addedDelegators   *btree.BTree
 	deletedDelegators map[ids.ID]*Staker
