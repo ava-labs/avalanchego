@@ -24,9 +24,7 @@ func TestAtomicTxImports(t *testing.T) {
 	vm, baseDB, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -39,9 +37,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	m := &atomic.Memory{}
 	err := m.Initialize(prefixdb.New([]byte{5}, baseDB))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
@@ -57,19 +53,16 @@ func TestAtomicTxImports(t *testing.T) {
 		},
 	}
 	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
 		},
-	}}}}); err != nil {
-		t.Fatal(err)
-	}
+	}}}})
+	assert.NoError(err)
 
 	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
@@ -77,9 +70,8 @@ func TestAtomicTxImports(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	vm.internalState.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
 
 	vm.mempool.AddDecisionTx(tx)
