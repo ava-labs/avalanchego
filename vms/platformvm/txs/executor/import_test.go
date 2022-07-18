@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -53,7 +52,7 @@ func TestNewImportTx(t *testing.T) {
 	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
 		*cnt++
 		m := &atomic.Memory{}
-		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, env.baseDB))
+		err := m.Initialize(prefixdb.New([]byte{*cnt}, env.baseDB))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -39,7 +38,7 @@ func TestAtomicTxImports(t *testing.T) {
 	recipientKey := keys[1]
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err := m.Initialize(prefixdb.New([]byte{5}, baseDB))
 	if err != nil {
 		t.Fatal(err)
 	}
