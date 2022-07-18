@@ -185,6 +185,25 @@ var (
 
 var originalStderr *os.File
 
+// legacyApiNames maps pre geth v1.10.20 api names to their updated counterparts.
+// used in attachEthService for backward configuration compatibility.
+var legacyApiNames = map[string]string{
+	"internal-public-eth":              "internal-eth",
+	"internal-public-blockchain":       "internal-blockchain",
+	"internal-public-transaction-pool": "internal-transaction",
+	"internal-public-tx-pool":          "internal-tx-pool",
+	"internal-public-debug":            "internal-debug",
+	"internal-private-debug":           "internal-debug",
+	"internal-public-account":          "internal-account",
+	"internal-private-personal":        "internal-personal",
+
+	"public-eth":        "eth",
+	"public-eth-filter": "eth-filter",
+	"private-admin":     "admin",
+	"public-debug":      "debug",
+	"private-debug":     "debug",
+}
+
 func init() {
 	// Preserve [os.Stderr] prior to the call in plugin/main.go to plugin.Serve(...).
 	// Preserving the log level allows us to update the root handler while writing to the original
@@ -1774,6 +1793,14 @@ func (vm *VM) readLastAccepted() (common.Hash, uint64, error) {
 func attachEthService(handler *rpc.Server, apis []rpc.API, names []string) error {
 	enabledServicesSet := make(map[string]struct{})
 	for _, ns := range names {
+		// handle pre geth v1.10.20 api names as aliases for their updated values
+		// to allow configurations to be backwards compatible.
+		if newName, isLegacy := legacyApiNames[ns]; isLegacy {
+			log.Info("deprecated api name referenced in configuration.", "deprecated", ns, "new", newName)
+			enabledServicesSet[newName] = struct{}{}
+			continue
+		}
+
 		enabledServicesSet[ns] = struct{}{}
 	}
 
