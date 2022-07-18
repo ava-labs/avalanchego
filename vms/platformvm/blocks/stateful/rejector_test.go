@@ -22,176 +22,98 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRejectorVisitProposalBlock(t *testing.T) {
-	assert := assert.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	blk, err := stateless.NewProposalBlock(
-		ids.GenerateTestID(),
-		1,
-		&txs.Tx{
-			Unsigned: &txs.AddDelegatorTx{
-				// Without the line below, this function will error.
-				RewardsOwner: &secp256k1fx.OutputOwners{},
-			},
-			Creds: []verify.Verifiable{},
-		},
-	)
-	assert.NoError(err)
-
-	metrics := metrics.Metrics{}
-	err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
-	mempool := mempool.NewMockMempool(ctrl)
-	stateVersions := state.NewMockVersions(ctrl)
-	state := state.NewMockState(ctrl)
-	rejector := &rejector{
-		backend: &backend{
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			Mempool:       mempool,
-			stateVersions: stateVersions,
-			state:         state,
-		},
-	}
-
-	// Set expected calls on dependencies.
-	gomock.InOrder(
-		mempool.EXPECT().Add(blk.Tx).Return(nil).Times(1),
-		stateVersions.EXPECT().DeleteState(blk.ID()).Times(1),
-		state.EXPECT().AddStatelessBlock(blk, choices.Rejected).Times(1),
-		state.EXPECT().Commit().Return(nil).Times(1),
-	)
-
-	err = rejector.VisitProposalBlock(blk)
-	assert.NoError(err)
-	assert.NotContains(rejector.blkIDToState, blk.ID())
-}
-
-func TestRejectorVisitAtomicBlock(t *testing.T) {
-	assert := assert.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	blk, err := stateless.NewAtomicBlock(
-		ids.GenerateTestID(),
-		1,
-		&txs.Tx{
-			Unsigned: &txs.AddDelegatorTx{
-				// Without the line below, this function will error.
-				RewardsOwner: &secp256k1fx.OutputOwners{},
-			},
-			Creds: []verify.Verifiable{},
-		},
-	)
-	assert.NoError(err)
-
-	metrics := metrics.Metrics{}
-	err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
-	mempool := mempool.NewMockMempool(ctrl)
-	stateVersions := state.NewMockVersions(ctrl)
-	state := state.NewMockState(ctrl)
-	rejector := &rejector{
-		backend: &backend{
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			Mempool:       mempool,
-			stateVersions: stateVersions,
-			state:         state,
-		},
-	}
-
-	// Set expected calls on dependencies.
-	gomock.InOrder(
-		mempool.EXPECT().Add(blk.Tx).Return(nil).Times(1),
-		stateVersions.EXPECT().DeleteState(blk.ID()).Times(1),
-		state.EXPECT().AddStatelessBlock(blk, choices.Rejected).Times(1),
-		state.EXPECT().Commit().Return(nil).Times(1),
-	)
-
-	err = rejector.VisitAtomicBlock(blk)
-	assert.NoError(err)
-	assert.NotContains(rejector.blkIDToState, blk.ID())
-}
-
-func TestRejectorVisitStandardBlock(t *testing.T) {
-	assert := assert.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	blk, err := stateless.NewStandardBlock(
-		ids.GenerateTestID(),
-		1,
-		[]*txs.Tx{
-			{
-				Unsigned: &txs.AddDelegatorTx{
-					// Without the line below, this function will error.
-					RewardsOwner: &secp256k1fx.OutputOwners{},
-				},
-				Creds: []verify.Verifiable{},
-			},
-		},
-	)
-	assert.NoError(err)
-
-	metrics := metrics.Metrics{}
-	err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
-	mempool := mempool.NewMockMempool(ctrl)
-	stateVersions := state.NewMockVersions(ctrl)
-	state := state.NewMockState(ctrl)
-	rejector := &rejector{
-		backend: &backend{
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			Mempool:       mempool,
-			stateVersions: stateVersions,
-			state:         state,
-		},
-	}
-
-	// Set expected calls on dependencies.
-	for _, tx := range blk.Txs {
-		mempool.EXPECT().Add(tx).Return(nil).Times(1)
-	}
-
-	gomock.InOrder(
-		stateVersions.EXPECT().DeleteState(blk.ID()).Times(1),
-		state.EXPECT().AddStatelessBlock(blk, choices.Rejected).Times(1),
-		state.EXPECT().Commit().Return(nil).Times(1),
-	)
-
-	err = rejector.VisitStandardBlock(blk)
-	assert.NoError(err)
-	assert.NotContains(rejector.blkIDToState, blk.ID())
-}
-
-func TestRejectorVisitOptionBlock(t *testing.T) {
+func TestRejectBlock(t *testing.T) {
 	type test struct {
-		name       string
-		newBlkFunc func() (stateless.Block, error)
-		rejectFunc func(*rejector, interface{}) error
+		name                  string
+		parentShouldBeRemoved bool
+		newBlockFunc          func() (stateless.Block, error)
+		rejectFunc            func(*rejector, stateless.Block) error
 	}
 
 	tests := []test{
 		{
-			name: "commit",
-			newBlkFunc: func() (stateless.Block, error) {
+			name: "proposal block",
+			newBlockFunc: func() (stateless.Block, error) {
+				return stateless.NewProposalBlock(
+					ids.GenerateTestID(),
+					1,
+					&txs.Tx{
+						Unsigned: &txs.AddDelegatorTx{
+							// Without the line below, this function will error.
+							RewardsOwner: &secp256k1fx.OutputOwners{},
+						},
+						Creds: []verify.Verifiable{},
+					},
+				)
+			},
+			rejectFunc: func(r *rejector, b stateless.Block) error {
+				return r.VisitProposalBlock(b.(*stateless.ProposalBlock))
+			},
+		},
+		{
+			name: "atomic block",
+			newBlockFunc: func() (stateless.Block, error) {
+				return stateless.NewAtomicBlock(
+					ids.GenerateTestID(),
+					1,
+					&txs.Tx{
+						Unsigned: &txs.AddDelegatorTx{
+							// Without the line below, this function will error.
+							RewardsOwner: &secp256k1fx.OutputOwners{},
+						},
+						Creds: []verify.Verifiable{},
+					},
+				)
+			},
+			rejectFunc: func(r *rejector, b stateless.Block) error {
+				return r.VisitAtomicBlock(b.(*stateless.AtomicBlock))
+			},
+		},
+		{
+			name: "standard block",
+			newBlockFunc: func() (stateless.Block, error) {
+				return stateless.NewStandardBlock(
+					ids.GenerateTestID(),
+					1,
+					[]*txs.Tx{
+						{
+							Unsigned: &txs.AddDelegatorTx{
+								// Without the line below, this function will error.
+								RewardsOwner: &secp256k1fx.OutputOwners{},
+							},
+							Creds: []verify.Verifiable{},
+						},
+					},
+				)
+			},
+			rejectFunc: func(r *rejector, b stateless.Block) error {
+				return r.VisitStandardBlock(b.(*stateless.StandardBlock))
+			},
+		},
+		{
+			name:                  "commit",
+			parentShouldBeRemoved: true,
+			newBlockFunc: func() (stateless.Block, error) {
 				return stateless.NewCommitBlock(
 					ids.GenerateTestID(),
 					1,
 				)
 			},
-			rejectFunc: func(r *rejector, blk interface{}) error {
+			rejectFunc: func(r *rejector, blk stateless.Block) error {
 				return r.VisitCommitBlock(blk.(*stateless.CommitBlock))
+			},
+		},
+		{
+			name:                  "abort",
+			parentShouldBeRemoved: true,
+			newBlockFunc: func() (stateless.Block, error) {
+				return stateless.NewAbortBlock(
+					ids.GenerateTestID(),
+					1,
+				)
+			},
+			rejectFunc: func(r *rejector, blk stateless.Block) error {
+				return r.VisitAbortBlock(blk.(*stateless.AbortBlock))
 			},
 		},
 	}
@@ -202,7 +124,7 @@ func TestRejectorVisitOptionBlock(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			blk, err := tt.newBlkFunc()
+			blk, err := tt.newBlockFunc()
 			assert.NoError(err)
 
 			metrics := metrics.Metrics{}
@@ -212,11 +134,16 @@ func TestRejectorVisitOptionBlock(t *testing.T) {
 			mempool := mempool.NewMockMempool(ctrl)
 			stateVersions := state.NewMockVersions(ctrl)
 			state := state.NewMockState(ctrl)
+			blkIDToState := map[ids.ID]*blockState{
+				blk.Parent(): nil,
+				blk.ID():     nil,
+			}
 			rejector := &rejector{
 				backend: &backend{
 					ctx: &snow.Context{
 						Log: logging.NoLog{},
 					},
+					blkIDToState:  blkIDToState,
 					Mempool:       mempool,
 					stateVersions: stateVersions,
 					state:         state,
@@ -224,6 +151,9 @@ func TestRejectorVisitOptionBlock(t *testing.T) {
 			}
 
 			// Set expected calls on dependencies.
+			for _, tx := range blk.BlockTxs() {
+				mempool.EXPECT().Add(tx).Return(nil).Times(1)
+			}
 			gomock.InOrder(
 				stateVersions.EXPECT().DeleteState(blk.ID()).Times(1),
 				state.EXPECT().AddStatelessBlock(blk, choices.Rejected).Times(1),
@@ -232,6 +162,11 @@ func TestRejectorVisitOptionBlock(t *testing.T) {
 
 			err = tt.rejectFunc(rejector, blk)
 			assert.NoError(err)
+			// Make sure block and its parent are removed from the state map.
+			assert.NotContains(rejector.blkIDToState, blk.ID())
+			if tt.parentShouldBeRemoved {
+				assert.NotContains(rejector.blkIDToState, blk.Parent())
+			}
 		})
 	}
 }
