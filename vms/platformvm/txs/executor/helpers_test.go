@@ -260,7 +260,7 @@ func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}

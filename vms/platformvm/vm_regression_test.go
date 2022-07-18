@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -331,7 +330,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}
@@ -536,7 +535,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Populate the shared memory UTXO.
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err = m.Initialize(prefixdb.New([]byte{5}, baseDB))
 	assert.NoError(err)
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
@@ -810,7 +809,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Populate the shared memory UTXO.
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err = m.Initialize(prefixdb.New([]byte{5}, baseDB))
 	assert.NoError(err)
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)

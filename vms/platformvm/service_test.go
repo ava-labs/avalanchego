@@ -191,7 +191,7 @@ func TestGetTxStatus(t *testing.T) {
 	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
+	err = m.Initialize(prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
