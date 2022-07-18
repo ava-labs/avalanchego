@@ -35,10 +35,6 @@ type blockState struct {
 	statelessBlock stateless.Block
 	onAcceptState  state.Diff
 
-	// TODO ABENEGIA: children must disapper, this is the whole point of Stephen's PR
-	// // This block's children which have passed verification.
-	// children       []ids.ID
-
 	timestamp      time.Time
 	atomicRequests map[ids.ID]*atomic.Requests
 }
