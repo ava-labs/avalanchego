@@ -157,7 +157,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := m.getStakerToReward(preferredState)
+	stakerTxID, shouldReward, err := m.getNextStakerToReward(preferredState)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (m *blockBuilder) ResetTimer() {
 		return
 	}
 
-	_, shouldReward, err := m.getStakerToReward(preferredState)
+	_, shouldReward, err := m.getNextStakerToReward(preferredState)
 	if err != nil {
 		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
 		return
@@ -277,13 +277,13 @@ func (m *blockBuilder) Shutdown() {
 	m.vm.ctx.Lock.Lock()
 }
 
-// getStakerToReward return the staker txID to remove from the primary network
-// staking set, if one exists.
+// getNextStakerToReward returns the next staker txID to remove from the staking
+// set with a RewardValidatorTx rather than an AdvanceTimeTx.
 // Returns:
 // - [txID] of the next staker to reward
 // - [shouldBeRewarded] if the txID is ready to be rewarded
 // - [err] if something bad happened
-func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
+func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
@@ -297,12 +297,11 @@ func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bo
 
 	for currentStakerIterator.Next() {
 		currentStaker := currentStakerIterator.Value()
-
-		if currentStaker.PotentialReward == 0 {
-			continue
+		priority := currentStaker.Priority
+		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
+			priority == state.PrimaryNetworkValidatorCurrentPriority {
+			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
 		}
-
-		return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
 	}
 	return ids.Empty, false, nil
 }
