@@ -36,8 +36,7 @@ func TestAtomicTxImports(t *testing.T) {
 	recipientKey := keys[1]
 
 	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
+	assert.NoError(m.Initialize(prefixdb.New([]byte{5}, baseDB)))
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
