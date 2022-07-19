@@ -29,9 +29,9 @@ type CurrentStakers interface {
 	// the staker set.
 	DeleteCurrentValidator(staker *Staker)
 
-	// GetCurrentDelegatorIterator returns stakers in order of their removal
-	// from the current staker set that represent delegators of the validator on
-	// [subnetID] with [nodeID].
+	// GetCurrentDelegatorIterator returns the delegators associated with the
+	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
+	// removal from current staker set.
 	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
 
 	// PutCurrentDelegator adds the [staker] describing a delegator to the
@@ -61,9 +61,9 @@ type PendingStakers interface {
 	// the staker set.
 	DeletePendingValidator(staker *Staker)
 
-	// GetPendingDelegatorIterator returns stakers in order of their removal
-	// from the pending staker set that represent delegators of the validator on
-	// [subnetID] with [nodeID].
+	// GetPendingDelegatorIterator returns the delegators associated with the
+	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
+	// removal from pending staker set.
 	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
 
 	// PutPendingDelegator adds the [staker] describing a delegator to the
