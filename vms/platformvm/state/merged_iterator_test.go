@@ -38,7 +38,7 @@ func TestMergedIterator(t *testing.T) {
 		},
 		{
 			name:      "mixed empty iterators",
-			iterators: []StakerIterator{EmptyIterator, NewSliceIterator([]*Staker{}...)},
+			iterators: []StakerIterator{EmptyIterator, NewSliceIterator()},
 			expected:  []*Staker{},
 		},
 		{
