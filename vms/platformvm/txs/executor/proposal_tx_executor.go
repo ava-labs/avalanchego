@@ -985,7 +985,7 @@ func GetMaxWeight(
 	for delegatorChangesIterator.Next() {
 		delegator, isAdded := delegatorChangesIterator.Value()
 		if delegator.NextTime.After(endTime) {
-			// This delegation change (and all following changes) occur after
+			// This delegation change (and all following changes) occurs after
 			// [endTime]. Since we're calculating the max amount staked in
 			// [startTime, endTime], we can stop.
 			break
