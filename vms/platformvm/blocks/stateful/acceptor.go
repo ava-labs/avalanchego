@@ -87,6 +87,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		)
 	}
 
+	// Note that this method writes [batch] to the database.
 	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
 		return fmt.Errorf(
 			"failed to atomically accept tx %s in block %s: %w",
@@ -126,6 +127,7 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 		)
 	}
 
+	// Note that this method writes [batch] to the database.
 	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
