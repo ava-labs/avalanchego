@@ -99,12 +99,7 @@ func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
 
 func (r *rejector) rejectOptionBlock(b stateless.Block, isCommit bool) error {
 	blkID := b.ID()
-	defer func() {
-		r.free(blkID)
-		// We assume that this block's sibling has already been accepted
-		// and doesn't need the parent's state anymore.
-		r.free(b.Parent())
-	}()
+	defer r.free(blkID)
 
 	if isCommit {
 		r.ctx.Log.Verbo(

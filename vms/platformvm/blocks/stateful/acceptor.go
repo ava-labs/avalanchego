@@ -74,7 +74,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
 
-	// Update the state of the chain in the database
+	// Update the state to reflect the changes made in [onAcceptState].
 	blkState.onAcceptState.Apply(a.state)
 
 	defer a.state.Abort()
@@ -103,7 +103,12 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
-	a.ctx.Log.Verbo("accepting block with ID %s", blkID)
+	a.ctx.Log.Verbo(
+		"Accepting Standard Block %s at height %d with parent %s",
+		blkID,
+		b.Height(),
+		b.Parent(),
+	)
 
 	if err := a.commonAccept(b); err != nil {
 		return err
@@ -114,7 +119,7 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
 
-	// Update the state of the chain in the database
+	// Update the state to reflect the changes made in [onAcceptState].
 	blkState.onAcceptState.Apply(a.state)
 
 	defer a.state.Abort()
@@ -183,7 +188,7 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
 
-	// Update the state of the chain in the database
+	// Update the state to reflect the changes made in [onAcceptState].
 	blkState.onAcceptState.Apply(a.state)
 	return a.state.Commit()
 }
