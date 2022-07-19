@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestMultiIterator(t *testing.T) {
+func TestMergedIterator(t *testing.T) {
 	type test struct {
 		name      string
 		iterators []StakerIterator
@@ -173,7 +173,7 @@ func TestMultiIterator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert := assert.New(t)
-			it := NewMultiIterator(tt.iterators...)
+			it := NewMergedIterator(tt.iterators...)
 			for _, expected := range tt.expected {
 				assert.True(it.Next())
 				assert.Equal(expected, it.Value())
@@ -185,7 +185,7 @@ func TestMultiIterator(t *testing.T) {
 	}
 }
 
-func TestMultiIteratorEarlyRelease(t *testing.T) {
+func TestMergedIteratorEarlyRelease(t *testing.T) {
 	assert := assert.New(t)
 	stakers0 := []*Staker{
 		{
@@ -209,7 +209,7 @@ func TestMultiIteratorEarlyRelease(t *testing.T) {
 		},
 	}
 
-	it := NewMultiIterator(
+	it := NewMergedIterator(
 		EmptyIterator,
 		NewSliceIterator(stakers0...),
 		EmptyIterator,

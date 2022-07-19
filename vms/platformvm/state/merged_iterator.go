@@ -8,17 +8,17 @@ import (
 )
 
 var (
-	_ StakerIterator = &multiIterator{}
-	_ heap.Interface = &multiIterator{}
+	_ StakerIterator = &mergedIterator{}
+	_ heap.Interface = &mergedIterator{}
 )
 
-type multiIterator struct {
+type mergedIterator struct {
 	initialized bool
 	heap        []StakerIterator
 }
 
 // Returns an iterator that returns all of the elements of [stakers] in order.
-func NewMultiIterator(stakers ...StakerIterator) StakerIterator {
+func NewMergedIterator(stakers ...StakerIterator) StakerIterator {
 	// Filter out iterators that are already exhausted.
 	i := 0
 	for i < len(stakers) {
@@ -35,7 +35,7 @@ func NewMultiIterator(stakers ...StakerIterator) StakerIterator {
 		stakers = stakers[:newLength]
 	}
 
-	it := &multiIterator{
+	it := &mergedIterator{
 		heap: stakers,
 	}
 
@@ -43,7 +43,7 @@ func NewMultiIterator(stakers ...StakerIterator) StakerIterator {
 	return it
 }
 
-func (it *multiIterator) Next() bool {
+func (it *mergedIterator) Next() bool {
 	if len(it.heap) == 0 {
 		return false
 	}
@@ -71,13 +71,13 @@ func (it *multiIterator) Next() bool {
 	return len(it.heap) > 0
 }
 
-func (it *multiIterator) Value() *Staker {
+func (it *mergedIterator) Value() *Staker {
 	return it.heap[0].Value()
 }
 
 // When Release() returns, Release() has been called on each element of
 // [stakers].
-func (it *multiIterator) Release() {
+func (it *mergedIterator) Release() {
 	for _, it := range it.heap {
 		it.Release()
 	}
@@ -85,24 +85,24 @@ func (it *multiIterator) Release() {
 }
 
 // Returns the number of sub-iterators in [it].
-func (it *multiIterator) Len() int {
+func (it *mergedIterator) Len() int {
 	return len(it.heap)
 }
 
-func (it *multiIterator) Less(i, j int) bool {
+func (it *mergedIterator) Less(i, j int) bool {
 	return it.heap[i].Value().Less(it.heap[j].Value())
 }
 
-func (it *multiIterator) Swap(i, j int) {
+func (it *mergedIterator) Swap(i, j int) {
 	it.heap[j], it.heap[i] = it.heap[i], it.heap[j]
 }
 
 // Push is never actually used - but we need it to implement heap.Interface.
-func (it *multiIterator) Push(value interface{}) {
+func (it *mergedIterator) Push(value interface{}) {
 	it.heap = append(it.heap, value.(StakerIterator))
 }
 
-func (it *multiIterator) Pop() interface{} {
+func (it *mergedIterator) Pop() interface{} {
 	newLength := len(it.heap) - 1
 	value := it.heap[newLength]
 	it.heap[newLength] = nil

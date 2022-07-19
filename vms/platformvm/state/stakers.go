@@ -318,7 +318,7 @@ func (v *diffValidators) GetDelegatorIterator(
 	}
 
 	return NewMaskedIterator(
-		NewMultiIterator(
+		NewMergedIterator(
 			parentIterator,
 			addedDelegatorIterator,
 		),
@@ -354,7 +354,7 @@ func (v *diffValidators) DeleteDelegator(staker *Staker) {
 
 func (v *diffValidators) GetStakerIterator(parentIterator StakerIterator) StakerIterator {
 	return NewMaskedIterator(
-		NewMultiIterator(
+		NewMergedIterator(
 			parentIterator,
 			NewTreeIterator(v.addedStakers),
 		),
