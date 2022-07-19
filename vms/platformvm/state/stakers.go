@@ -231,7 +231,7 @@ func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeI
 	return validatorDiff
 }
 
-type diffValidators struct {
+type diffStakers struct {
 	// subnetID --> nodeID --> diff for that validator
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 	addedStakers   *btree.BTree
@@ -256,8 +256,8 @@ type diffValidator struct {
 // 2. If the validator was removed in this diff, [nil, true] will be returned.
 // 3. If the validator was not modified by this diff, [nil, false] will be
 //    returned.
-func (v *diffValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
-	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
+func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
+	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
 		return nil, false
 	}
@@ -277,31 +277,31 @@ func (v *diffValidators) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Stak
 	return validatorDiff.validator, true
 }
 
-func (v *diffValidators) PutValidator(staker *Staker) {
-	validatorDiff := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+func (s *diffStakers) PutValidator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
 	validatorDiff.validatorModified = true
 	validatorDiff.validatorDeleted = false
 	validatorDiff.validator = staker
 
-	if v.addedStakers == nil {
-		v.addedStakers = btree.New(defaultTreeDegree)
+	if s.addedStakers == nil {
+		s.addedStakers = btree.New(defaultTreeDegree)
 	}
-	v.addedStakers.ReplaceOrInsert(staker)
+	s.addedStakers.ReplaceOrInsert(staker)
 }
 
-func (v *diffValidators) DeleteValidator(staker *Staker) {
-	validatorDiff := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+func (s *diffStakers) DeleteValidator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
 	validatorDiff.validatorModified = true
 	validatorDiff.validatorDeleted = true
 	validatorDiff.validator = staker
 
-	if v.deletedStakers == nil {
-		v.deletedStakers = make(map[ids.ID]*Staker)
+	if s.deletedStakers == nil {
+		s.deletedStakers = make(map[ids.ID]*Staker)
 	}
-	v.deletedStakers[staker.TxID] = staker
+	s.deletedStakers[staker.TxID] = staker
 }
 
-func (v *diffValidators) GetDelegatorIterator(
+func (s *diffStakers) GetDelegatorIterator(
 	parentIterator StakerIterator,
 	subnetID ids.ID,
 	nodeID ids.NodeID,
@@ -310,7 +310,7 @@ func (v *diffValidators) GetDelegatorIterator(
 		addedDelegatorIterator = EmptyIterator
 		deletedDelegators      map[ids.ID]*Staker
 	)
-	if subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]; ok {
+	if subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]; ok {
 		if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
 			addedDelegatorIterator = NewTreeIterator(validatorDiff.addedDelegators)
 			deletedDelegators = validatorDiff.deletedDelegators
@@ -326,50 +326,50 @@ func (v *diffValidators) GetDelegatorIterator(
 	)
 }
 
-func (v *diffValidators) PutDelegator(staker *Staker) {
-	validatorDiff := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+func (s *diffStakers) PutDelegator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
 	if validatorDiff.addedDelegators == nil {
 		validatorDiff.addedDelegators = btree.New(defaultTreeDegree)
 	}
 	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 
-	if v.addedStakers == nil {
-		v.addedStakers = btree.New(defaultTreeDegree)
+	if s.addedStakers == nil {
+		s.addedStakers = btree.New(defaultTreeDegree)
 	}
-	v.addedStakers.ReplaceOrInsert(staker)
+	s.addedStakers.ReplaceOrInsert(staker)
 }
 
-func (v *diffValidators) DeleteDelegator(staker *Staker) {
-	validatorDiff := v.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+func (s *diffStakers) DeleteDelegator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
 	if validatorDiff.deletedDelegators == nil {
 		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
 	}
 	validatorDiff.deletedDelegators[staker.TxID] = staker
 
-	if v.deletedStakers == nil {
-		v.deletedStakers = make(map[ids.ID]*Staker)
+	if s.deletedStakers == nil {
+		s.deletedStakers = make(map[ids.ID]*Staker)
 	}
-	v.deletedStakers[staker.TxID] = staker
+	s.deletedStakers[staker.TxID] = staker
 }
 
-func (v *diffValidators) GetStakerIterator(parentIterator StakerIterator) StakerIterator {
+func (s *diffStakers) GetStakerIterator(parentIterator StakerIterator) StakerIterator {
 	return NewMaskedIterator(
 		NewMergedIterator(
 			parentIterator,
-			NewTreeIterator(v.addedStakers),
+			NewTreeIterator(s.addedStakers),
 		),
-		v.deletedStakers,
+		s.deletedStakers,
 	)
 }
 
-func (v *diffValidators) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
-	if v.validatorDiffs == nil {
-		v.validatorDiffs = make(map[ids.ID]map[ids.NodeID]*diffValidator)
+func (s *diffStakers) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+	if s.validatorDiffs == nil {
+		s.validatorDiffs = make(map[ids.ID]map[ids.NodeID]*diffValidator)
 	}
-	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
+	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
 		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
-		v.validatorDiffs[subnetID] = subnetValidatorDiffs
+		s.validatorDiffs[subnetID] = subnetValidatorDiffs
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {

@@ -128,8 +128,8 @@ type state struct {
 
 	baseDB database.Database
 
-	currentValidators *baseStakers
-	pendingValidators *baseStakers
+	currentStakers *baseStakers
+	pendingStakers *baseStakers
 
 	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
 	updatedUptimes map[ids.NodeID]struct{}         // nodeID -> nil
@@ -309,8 +309,8 @@ func New(
 
 		baseDB: baseDB,
 
-		currentValidators: newBaseStakers(),
-		pendingValidators: newBaseStakers(),
+		currentStakers: newBaseStakers(),
+		pendingStakers: newBaseStakers(),
 
 		uptimes:        make(map[ids.NodeID]*uptimeAndReward),
 		updatedUptimes: make(map[ids.NodeID]struct{}),
@@ -358,59 +358,59 @@ func New(
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	return s.currentValidators.GetValidator(subnetID, nodeID)
+	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
 func (s *state) PutCurrentValidator(staker *Staker) {
-	s.currentValidators.PutValidator(staker)
+	s.currentStakers.PutValidator(staker)
 }
 
 func (s *state) DeleteCurrentValidator(staker *Staker) {
-	s.currentValidators.DeleteValidator(staker)
+	s.currentStakers.DeleteValidator(staker)
 }
 
 func (s *state) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
-	return s.currentValidators.GetDelegatorIterator(subnetID, nodeID), nil
+	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
 func (s *state) PutCurrentDelegator(staker *Staker) {
-	s.currentValidators.PutDelegator(staker)
+	s.currentStakers.PutDelegator(staker)
 }
 
 func (s *state) DeleteCurrentDelegator(staker *Staker) {
-	s.currentValidators.DeleteDelegator(staker)
+	s.currentStakers.DeleteDelegator(staker)
 }
 
 func (s *state) GetCurrentStakerIterator() (StakerIterator, error) {
-	return s.currentValidators.GetStakerIterator(), nil
+	return s.currentStakers.GetStakerIterator(), nil
 }
 
 func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	return s.pendingValidators.GetValidator(subnetID, nodeID)
+	return s.pendingStakers.GetValidator(subnetID, nodeID)
 }
 
 func (s *state) PutPendingValidator(staker *Staker) {
-	s.pendingValidators.PutValidator(staker)
+	s.pendingStakers.PutValidator(staker)
 }
 
 func (s *state) DeletePendingValidator(staker *Staker) {
-	s.pendingValidators.DeleteValidator(staker)
+	s.pendingStakers.DeleteValidator(staker)
 }
 
 func (s *state) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
-	return s.pendingValidators.GetDelegatorIterator(subnetID, nodeID), nil
+	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
 func (s *state) PutPendingDelegator(staker *Staker) {
-	s.pendingValidators.PutDelegator(staker)
+	s.pendingStakers.PutDelegator(staker)
 }
 
 func (s *state) DeletePendingDelegator(staker *Staker) {
-	s.pendingValidators.DeleteDelegator(staker)
+	s.pendingStakers.DeleteDelegator(staker)
 }
 
 func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
-	return s.pendingValidators.GetStakerIterator(), nil
+	return s.pendingStakers.GetStakerIterator(), nil
 }
 
 func (s *state) ShouldInit() (bool, error) {
@@ -628,7 +628,7 @@ func (s *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdat
 }
 
 func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
-	staker, err := s.currentValidators.GetValidator(constants.PrimaryNetworkID, nodeID)
+	staker, err := s.currentStakers.GetValidator(constants.PrimaryNetworkID, nodeID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -684,7 +684,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 
 func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	vdrs := validators.NewSet()
-	for nodeID, validator := range s.currentValidators.validators[subnetID] {
+	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
 		if staker != nil {
 			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
@@ -799,7 +799,7 @@ func (s *state) loadMetadata() error {
 }
 
 func (s *state) loadCurrentValidators() error {
-	s.currentValidators = newBaseStakers()
+	s.currentStakers = newBaseStakers()
 
 	validatorIt := s.currentValidatorList.NewIterator()
 	defer validatorIt.Release()
@@ -833,10 +833,10 @@ func (s *state) loadCurrentValidators() error {
 		staker.NextTime = staker.EndTime
 		staker.Priority = PrimaryNetworkValidatorCurrentPriority
 
-		validator := s.currentValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
-		s.currentValidators.stakers.ReplaceOrInsert(staker)
+		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
 		s.uptimes[addValidatorTx.Validator.NodeID] = uptime
 	}
@@ -874,13 +874,13 @@ func (s *state) loadCurrentValidators() error {
 		staker.NextTime = staker.EndTime
 		staker.Priority = PrimaryNetworkDelegatorCurrentPriority
 
-		validator := s.currentValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		if validator.delegators == nil {
 			validator.delegators = btree.New(defaultTreeDegree)
 		}
 		validator.delegators.ReplaceOrInsert(staker)
 
-		s.currentValidators.stakers.ReplaceOrInsert(staker)
+		s.currentStakers.stakers.ReplaceOrInsert(staker)
 	}
 	if err := delegatorIt.Error(); err != nil {
 		return err
@@ -908,16 +908,16 @@ func (s *state) loadCurrentValidators() error {
 		staker.NextTime = staker.EndTime
 		staker.Priority = SubnetValidatorCurrentPriority
 
-		validator := s.currentValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
-		s.currentValidators.stakers.ReplaceOrInsert(staker)
+		s.currentStakers.stakers.ReplaceOrInsert(staker)
 	}
 	return subnetValidatorIt.Error()
 }
 
 func (s *state) loadPendingValidators() error {
-	s.pendingValidators = newBaseStakers()
+	s.pendingStakers = newBaseStakers()
 
 	validatorIt := s.pendingValidatorList.NewIterator()
 	defer validatorIt.Release()
@@ -941,10 +941,10 @@ func (s *state) loadPendingValidators() error {
 		staker.NextTime = staker.StartTime
 		staker.Priority = PrimaryNetworkValidatorPendingPriority
 
-		validator := s.pendingValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
-		s.pendingValidators.stakers.ReplaceOrInsert(staker)
+		s.pendingStakers.stakers.ReplaceOrInsert(staker)
 	}
 	if err := validatorIt.Error(); err != nil {
 		return err
@@ -972,13 +972,13 @@ func (s *state) loadPendingValidators() error {
 		staker.NextTime = staker.StartTime
 		staker.Priority = PrimaryNetworkDelegatorPendingPriority
 
-		validator := s.pendingValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		if validator.delegators == nil {
 			validator.delegators = btree.New(defaultTreeDegree)
 		}
 		validator.delegators.ReplaceOrInsert(staker)
 
-		s.pendingValidators.stakers.ReplaceOrInsert(staker)
+		s.pendingStakers.stakers.ReplaceOrInsert(staker)
 	}
 	if err := delegatorIt.Error(); err != nil {
 		return err
@@ -1006,10 +1006,10 @@ func (s *state) loadPendingValidators() error {
 		staker.NextTime = staker.StartTime
 		staker.Priority = SubnetValidatorPendingPriority
 
-		validator := s.pendingValidators.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
-		s.pendingValidators.stakers.ReplaceOrInsert(staker)
+		s.pendingStakers.stakers.ReplaceOrInsert(staker)
 	}
 	return subnetValidatorIt.Error()
 }
@@ -1067,7 +1067,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 	diffDB := linkeddb.NewDefault(rawDiffDB)
 
 	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
-	for nodeID, validatorDiff := range s.currentValidators.validatorDiffs[constants.PrimaryNetworkID] {
+	for nodeID, validatorDiff := range s.currentStakers.validatorDiffs[constants.PrimaryNetworkID] {
 		weightDiff := &ValidatorWeightDiff{}
 		weightDiffs[nodeID] = weightDiff
 
@@ -1175,8 +1175,8 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 }
 
 func (s *state) writeCurrentSubnetStakers(height uint64) error {
-	for subnetID, subnetValidatorDiffs := range s.currentValidators.validatorDiffs {
-		delete(s.currentValidators.validatorDiffs, subnetID)
+	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
+		delete(s.currentStakers.validatorDiffs, subnetID)
 
 		if subnetID == constants.PrimaryNetworkID {
 			// It is assumed that this case is handled separately before calling
@@ -1252,7 +1252,7 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 }
 
 func (s *state) writePendingPrimaryNetworkStakers() error {
-	for _, validatorDiff := range s.pendingValidators.validatorDiffs[constants.PrimaryNetworkID] {
+	for _, validatorDiff := range s.pendingStakers.validatorDiffs[constants.PrimaryNetworkID] {
 		if validatorDiff.validatorModified {
 			staker := validatorDiff.validator
 
@@ -1288,8 +1288,8 @@ func (s *state) writePendingPrimaryNetworkStakers() error {
 }
 
 func (s *state) writePendingSubnetStakers() error {
-	for subnetID, subnetValidatorDiffs := range s.pendingValidators.validatorDiffs {
-		delete(s.pendingValidators.validatorDiffs, subnetID)
+	for subnetID, subnetValidatorDiffs := range s.pendingStakers.validatorDiffs {
+		delete(s.pendingStakers.validatorDiffs, subnetID)
 
 		if subnetID == constants.PrimaryNetworkID {
 			// It is assumed that this case is handled separately before calling

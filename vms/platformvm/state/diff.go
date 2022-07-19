@@ -34,8 +34,8 @@ type diff struct {
 
 	currentSupply uint64
 
-	currentValidatorDiffs diffValidators
-	pendingValidatorDiffs diffValidators
+	currentStakerDiffs diffStakers
+	pendingStakerDiffs diffStakers
 
 	addedSubnets  []*txs.Tx
 	cachedSubnets []*txs.Tx
@@ -93,7 +93,7 @@ func (d *diff) SetCurrentSupply(currentSupply uint64) {
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
-	newValidator, ok := d.currentValidatorDiffs.GetValidator(subnetID, nodeID)
+	newValidator, ok := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
 	if ok {
 		if newValidator == nil {
 			return nil, database.ErrNotFound
@@ -110,11 +110,11 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) {
-	d.currentValidatorDiffs.PutValidator(staker)
+	d.currentStakerDiffs.PutValidator(staker)
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
-	d.currentValidatorDiffs.DeleteValidator(staker)
+	d.currentStakerDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -128,15 +128,15 @@ func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 		return nil, err
 	}
 
-	return d.currentValidatorDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
+	return d.currentStakerDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
 }
 
 func (d *diff) PutCurrentDelegator(staker *Staker) {
-	d.currentValidatorDiffs.PutDelegator(staker)
+	d.currentStakerDiffs.PutDelegator(staker)
 }
 
 func (d *diff) DeleteCurrentDelegator(staker *Staker) {
-	d.currentValidatorDiffs.DeleteDelegator(staker)
+	d.currentStakerDiffs.DeleteDelegator(staker)
 }
 
 func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
@@ -150,13 +150,13 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 		return nil, err
 	}
 
-	return d.currentValidatorDiffs.GetStakerIterator(parentIterator), nil
+	return d.currentStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
 func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
-	newValidator, ok := d.pendingValidatorDiffs.GetValidator(subnetID, nodeID)
+	newValidator, ok := d.pendingStakerDiffs.GetValidator(subnetID, nodeID)
 	if ok {
 		if newValidator == nil {
 			return nil, database.ErrNotFound
@@ -173,11 +173,11 @@ func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 }
 
 func (d *diff) PutPendingValidator(staker *Staker) {
-	d.pendingValidatorDiffs.PutValidator(staker)
+	d.pendingStakerDiffs.PutValidator(staker)
 }
 
 func (d *diff) DeletePendingValidator(staker *Staker) {
-	d.pendingValidatorDiffs.DeleteValidator(staker)
+	d.pendingStakerDiffs.DeleteValidator(staker)
 }
 
 func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
@@ -191,15 +191,15 @@ func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 		return nil, err
 	}
 
-	return d.pendingValidatorDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
+	return d.pendingStakerDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
 }
 
 func (d *diff) PutPendingDelegator(staker *Staker) {
-	d.pendingValidatorDiffs.PutDelegator(staker)
+	d.pendingStakerDiffs.PutDelegator(staker)
 }
 
 func (d *diff) DeletePendingDelegator(staker *Staker) {
-	d.pendingValidatorDiffs.DeleteDelegator(staker)
+	d.pendingStakerDiffs.DeleteDelegator(staker)
 }
 
 func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
@@ -213,7 +213,7 @@ func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 		return nil, err
 	}
 
-	return d.pendingValidatorDiffs.GetStakerIterator(parentIterator), nil
+	return d.pendingStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
 func (d *diff) GetSubnets() ([]*txs.Tx, error) {
@@ -403,7 +403,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState State) {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetCurrentSupply(d.currentSupply)
-	for _, subnetValidatorDiffs := range d.currentValidatorDiffs.validatorDiffs {
+	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			if validatorDiff.validatorModified {
 				if validatorDiff.validatorDeleted {
@@ -424,7 +424,7 @@ func (d *diff) Apply(baseState State) {
 			}
 		}
 	}
-	for _, subnetValidatorDiffs := range d.pendingValidatorDiffs.validatorDiffs {
+	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			if validatorDiff.validatorModified {
 				if validatorDiff.validatorDeleted {

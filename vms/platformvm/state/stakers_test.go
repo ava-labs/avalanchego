@@ -140,7 +140,7 @@ func TestDiffStakersValidator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := diffValidators{}
+	v := diffStakers{}
 
 	v.PutDelegator(delegator)
 
@@ -176,7 +176,7 @@ func TestDiffStakersDelegator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := diffValidators{}
+	v := diffStakers{}
 
 	v.PutValidator(staker)
 
