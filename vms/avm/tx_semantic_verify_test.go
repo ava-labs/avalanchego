@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -1300,7 +1299,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}

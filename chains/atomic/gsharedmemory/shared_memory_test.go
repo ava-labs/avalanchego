@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -42,7 +41,7 @@ func TestInterface(t *testing.T) {
 		memoryDB := prefixdb.New([]byte{0}, baseDB)
 		testDB := prefixdb.New([]byte{1}, baseDB)
 
-		err := m.Initialize(logging.NoLog{}, memoryDB)
+		err := m.Initialize(memoryDB)
 		assert.NoError(err)
 
 		sm0, conn0 := wrapSharedMemory(t, m.NewSharedMemory(chainID0), baseDB)

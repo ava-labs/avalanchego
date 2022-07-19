@@ -344,7 +344,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	ctx := defaultContext()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}
@@ -425,7 +425,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	ctx := defaultContext()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}
@@ -1563,7 +1563,7 @@ func TestAtomicImport(t *testing.T) {
 	recipientKey := keys[1]
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err := m.Initialize(prefixdb.New([]byte{5}, baseDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2467,7 +2467,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}
@@ -2701,7 +2701,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Populate the shared memory UTXO.
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err = m.Initialize(prefixdb.New([]byte{5}, baseDB))
 	assert.NoError(err)
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
@@ -3005,7 +3005,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Populate the shared memory UTXO.
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	err = m.Initialize(prefixdb.New([]byte{5}, baseDB))
 	assert.NoError(err)
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)

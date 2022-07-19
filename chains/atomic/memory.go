@@ -7,17 +7,10 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
-)
-
-const (
-	codecVersion = 0
 )
 
 type rcLock struct {
@@ -25,31 +18,25 @@ type rcLock struct {
 	count int
 }
 
-// Memory is the interface for shared memory inside a subnet
+// Memory is used to set up a bidirectional communication channel between a pair
+// of chains.
+//
+// For any such pair, we compute a hash of the ordered pair of IDs to use as a
+// prefix DB that can be shared across the two chains. On top of the prefix DB
+// shared among two chains, we use constant prefixes to determine the
+// inbound/outbound and value/index database assignments.
 type Memory struct {
 	lock  sync.Mutex
-	log   logging.Logger
-	codec codec.Manager
 	locks map[ids.ID]*rcLock
 	db    database.Database
 }
 
-// Initialize the SharedMemory
-func (m *Memory) Initialize(log logging.Logger, db database.Database) error {
-	c := linearcodec.NewDefault()
-	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		return err
-	}
-
-	m.log = log
-	m.codec = manager
+func (m *Memory) Initialize(db database.Database) error {
 	m.locks = make(map[ids.ID]*rcLock)
 	m.db = db
 	return nil
 }
 
-// NewSharedMemory returns a new SharedMemory
 func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 	return &sharedMemory{
 		m:           m,
@@ -59,6 +46,9 @@ func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 
 // GetSharedDatabase returns a new locked prefix db on top of an existing
 // database
+//
+// Invariant: ReleaseSharedDatabase must be called after to free the database
+//            associated with [sharedID]
 func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()
@@ -66,11 +56,18 @@ func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) databa
 }
 
 // ReleaseSharedDatabase unlocks the provided DB
+//
+// Note: ReleaseSharedDatabase must be called only after a corresponding call to
+//       GetSharedDatabase.
+//       If ReleaseSharedDatabase is called without a corresponding one-to-one
+//       call with GetSharedDatabase, it will panic.
 func (m *Memory) ReleaseSharedDatabase(sharedID ids.ID) {
 	lock := m.releaseLock(sharedID)
 	lock.Unlock()
 }
 
+// makeLock returns the lock associated with [sharedID], or creates a new one if
+// it doesn't exist yet, and increments the reference count.
 func (m *Memory) makeLock(sharedID ids.ID) *sync.Mutex {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -84,13 +81,17 @@ func (m *Memory) makeLock(sharedID ids.ID) *sync.Mutex {
 	return &rc.lock
 }
 
+// releaseLock returns the lock associated with [sharedID] and decrements its
+// reference count. If this brings the count to 0, it will remove the lock from
+// the internal map of locks. If there is no lock associated with [sharedID],
+// releaseLock will panic.
 func (m *Memory) releaseLock(sharedID ids.ID) *sync.Mutex {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	rc, exists := m.locks[sharedID]
 	if !exists {
-		panic("Attemping to free an unknown lock")
+		panic("attempting to free an unknown lock")
 	}
 	rc.count--
 	if rc.count == 0 {
@@ -101,12 +102,14 @@ func (m *Memory) releaseLock(sharedID ids.ID) *sync.Mutex {
 
 // sharedID calculates the ID of the shared memory space
 func (m *Memory) sharedID(id1, id2 ids.ID) ids.ID {
+	// Swap IDs locally to ensure id1 <= id2.
 	if bytes.Compare(id1[:], id2[:]) == 1 {
 		id1, id2 = id2, id1
 	}
 
-	combinedBytes, err := m.codec.Marshal(codecVersion, [2]ids.ID{id1, id2})
-	m.log.AssertNoError(err)
-
+	combinedBytes, err := codecManager.Marshal(codecVersion, [2]ids.ID{id1, id2})
+	if err != nil {
+		panic(err)
+	}
 	return hashing.ComputeHash256Array(combinedBytes)
 }
