@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -88,6 +89,10 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	assert.Equal(onCommitState, gotBlkState.onCommitState)
 	assert.Equal(onAbortState, gotBlkState.onAbortState)
 	assert.Equal(timestamp, gotBlkState.timestamp)
+
+	// Visiting again should return nil without using dependencies.
+	err = verifier.VisitProposalBlock(blk)
+	assert.NoError(err)
 }
 
 func TestVerifierVisitAtomicBlock(t *testing.T) {
@@ -95,6 +100,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
@@ -165,4 +171,102 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	assert.Equal(onAccept, gotBlkState.onAcceptState)
 	assert.Equal(ids.Set{}, gotBlkState.inputs)
 	assert.Equal(timestamp, gotBlkState.timestamp)
+
+	// Visiting again should return nil without using dependencies.
+	err = verifier.VisitAtomicBlock(blk)
+	assert.NoError(err)
+}
+
+func TestVerifierVisitStandardBlock(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	stateVersions := state.NewMockVersions(ctrl)
+	parentState := state.NewMockState(ctrl)
+	verifier := &verifier{
+		txExecutorBackend: executor.Backend{
+			Config: &config.Config{
+				ApricotPhase5Time: time.Now().Add(time.Hour),
+			},
+		},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock:     parentStatelessBlk,
+					standardBlockState: standardBlockState{},
+				},
+			},
+			Mempool:       mempool,
+			state:         s,
+			stateVersions: stateVersions,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blkTx := txs.NewMockUnsignedTx(ctrl)
+	atomicRequests := map[ids.ID]*atomic.Requests{
+		ids.GenerateTestID(): {
+			RemoveRequests: [][]byte{{1}, {2}},
+			PutRequests: []*atomic.Element{
+				{
+					Key:    []byte{3},
+					Value:  []byte{4},
+					Traits: [][]byte{{5}, {6}},
+				},
+			},
+		},
+	}
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
+		func(e *executor.StandardTxExecutor) error {
+			e.OnAccept = func() {}
+			e.Inputs = ids.Set{}
+			e.AtomicRequests = atomicRequests
+			return nil
+		},
+	).Times(1)
+	blkTx.EXPECT().Initialize(gomock.Any()).Times(2)
+
+	blk, err := stateless.NewStandardBlock(
+		parentID,
+		2,
+		[]*txs.Tx{
+			{
+				Unsigned: blkTx,
+				Creds:    []verify.Verifiable{},
+			},
+		},
+	)
+	assert.NoError(err)
+
+	// Set expectations for dependencies.
+	timestamp := time.Now()
+	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentState.EXPECT().CurrentStakers().Return(nil).Times(1)
+	parentState.EXPECT().PendingStakers().Return(nil).Times(1)
+	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
+	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs(blk.Txs).Times(1)
+	stateVersions.EXPECT().SetState(blk.ID(), gomock.Any()).Times(1)
+
+	err = verifier.VisitStandardBlock(blk)
+	assert.NoError(err)
+
+	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	assert.Equal(blk, gotBlkState.statelessBlock)
+	assert.Equal(ids.Set{}, gotBlkState.inputs)
+	assert.Equal(timestamp, gotBlkState.timestamp)
+
+	// Visiting again should return nil without using dependencies.
+	err = verifier.VisitStandardBlock(blk)
+	assert.NoError(err)
 }
