@@ -19,6 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
+const (
+	// Maximum future start time for staking/delegating
+	MaxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	// SyncBound is the synchrony bound used for safe decision making
+	SyncBound = 10 * time.Second
+
+	MaxValidatorWeightFactor = uint64(5)
+)
+
 var (
 	_ txs.Visitor = &ProposalTxExecutor{}
 
@@ -37,16 +47,6 @@ var (
 	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
 	errWrongTxType               = errors.New("wrong transaction type")
 	errInvalidID                 = errors.New("invalid ID")
-)
-
-const (
-	// Maximum future start time for staking/delegating
-	MaxFutureStartTime = 24 * 7 * 2 * time.Hour
-
-	// SyncBound is the synchrony bound used for safe decision making
-	SyncBound = 10 * time.Second
-
-	MaxValidatorWeightFactor = uint64(5)
 )
 
 type ProposalTxExecutor struct {

@@ -34,8 +34,8 @@ var (
 	_ Mempool     = &mempool{}
 	_ txs.Visitor = &mempoolIssuer{}
 
-	ErrUnknownTxType = errors.New("unknown transaction type")
-	ErrMempoolFull   = errors.New("mempool is full")
+	errUnknownTxType = errors.New("unknown transaction type")
+	errMempoolFull   = errors.New("mempool is full")
 )
 
 type BlockTimer interface {
@@ -169,7 +169,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 	if len(txBytes) > m.bytesAvailable {
 		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",
-			ErrMempoolFull,
+			errMempoolFull,
 			txID,
 			len(txBytes),
 			m.bytesAvailable,
@@ -295,11 +295,11 @@ type mempoolIssuer struct {
 }
 
 func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
-	return fmt.Errorf("%w: %T", ErrUnknownTxType, tx)
+	return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 }
 
 func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
-	return fmt.Errorf("%w: %T", ErrUnknownTxType, tx)
+	return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 }
 
 func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
