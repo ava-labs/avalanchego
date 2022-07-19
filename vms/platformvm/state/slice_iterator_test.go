@@ -14,14 +14,15 @@ import (
 
 func TestSliceIterator(t *testing.T) {
 	assert := assert.New(t)
+	// Note that the stakers are not canonically sorted.
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(0, 0),
+			NextTime: time.Unix(1, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(1, 0),
+			NextTime: time.Unix(0, 0),
 		},
 	}
 
