@@ -15,6 +15,9 @@ var (
 // StakerDiffIterator is an iterator that iterates over the events that will be
 // performed on the current staker set.
 //
+// There are two event types affecting current staker set, removal of an
+// existing staker and addition of a new staker from the pending set.
+//
 // The ordering of operations is:
 // - Staker operations are performed in order of their [NextTime].
 // - If operations have the same [NextTime], stakers are first added to the
