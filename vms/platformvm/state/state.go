@@ -45,14 +45,12 @@ const (
 var (
 	_ State = &state{}
 
-	blockPrefix = []byte("block")
-
-	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
-
+	ErrDelegatorSubset   = errors.New("delegator's time range must be a subset of the validator's time range")
 	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
 
+	blockPrefix           = []byte("block")
 	validatorsPrefix      = []byte("validators")
 	currentPrefix         = []byte("current")
 	pendingPrefix         = []byte("pending")

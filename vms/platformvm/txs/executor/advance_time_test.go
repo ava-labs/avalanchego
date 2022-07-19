@@ -565,7 +565,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 func TestWhitelistedSubnet(t *testing.T) {
 	for _, whitelist := range []bool{true, false} {
-		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(t *testing.T) {
 			env := newEnvironment()
 			env.ctx.Lock.Lock()
 			defer func() {
