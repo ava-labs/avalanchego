@@ -28,8 +28,9 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Verbo(
-			"failed to reissue tx %q due to: %s",
+			"failed to reissue tx %s from block %s due to: %s",
 			b.Tx.ID(),
+			blkID,
 			err,
 		)
 	}
@@ -52,8 +53,9 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Debug(
-			"failed to reissue tx %q due to: %s",
+			"failed to reissue tx %s from block %s due to: %s",
 			b.Tx.ID(),
+			blkID,
 			err,
 		)
 	}
@@ -77,8 +79,9 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	for _, tx := range b.Txs {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
-				"failed to reissue tx %q due to: %s",
+				"failed to reissue tx %s from block %s due to: %s",
 				tx.ID(),
+				blkID,
 				err,
 			)
 		}
