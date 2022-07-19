@@ -5,7 +5,6 @@ package stateless
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -35,10 +34,6 @@ func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
 
 func (sb *StandardBlock) Visit(v Visitor) error {
 	return v.VisitStandardBlock(sb)
-}
-
-func (sb *StandardBlock) Timestamp() time.Time {
-	return time.Time{}
 }
 
 func NewStandardBlock(
