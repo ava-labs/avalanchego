@@ -31,8 +31,8 @@ type StakerIterator interface {
 	Release()
 }
 
-// Staker contains all information required to represent a staker in the current
-// and pending validator sets.
+// Staker contains all information required to represent a validator or
+// delegator in the current and pending validator sets.
 type Staker struct {
 	TxID            ids.ID
 	NodeID          ids.NodeID
