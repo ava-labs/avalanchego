@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -882,8 +881,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 // GetNextStakerChangeTime returns the next time a staker will be either added
 // or removed to/from the current validator set.
-//
-// If there are no planned changes, this returns the maximum time.
 func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
 	currentStakerIterator, err := state.GetCurrentStakerIterator()
 	if err != nil {
@@ -891,22 +888,29 @@ func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
 	}
 	defer currentStakerIterator.Release()
 
-	pendingStakers, err := state.GetPendingStakerIterator()
+	pendingStakerIterator, err := state.GetPendingStakerIterator()
 	if err != nil {
 		return time.Time{}, err
 	}
-	defer pendingStakers.Release()
+	defer pendingStakerIterator.Release()
 
-	earliest := mockable.MaxTime
-	if currentStakerIterator.Next() {
-		earliest = currentStakerIterator.Value().EndTime
-	}
-	if pendingStakers.Next() {
-		if startTime := pendingStakers.Value().StartTime; startTime.Before(earliest) {
-			earliest = startTime
+	hasCurrentStaker := currentStakerIterator.Next()
+	hasPendingStaker := pendingStakerIterator.Next()
+	switch {
+	case hasCurrentStaker && hasPendingStaker:
+		nextCurrentTime := currentStakerIterator.Value().NextTime
+		nextPendingTime := pendingStakerIterator.Value().NextTime
+		if nextCurrentTime.Before(nextPendingTime) {
+			return nextCurrentTime, nil
 		}
+		return nextPendingTime, nil
+	case hasCurrentStaker:
+		return currentStakerIterator.Value().NextTime, nil
+	case hasPendingStaker:
+		return pendingStakerIterator.Value().NextTime, nil
+	default:
+		return time.Time{}, database.ErrNotFound
 	}
-	return earliest, nil
 }
 
 // GetValidator returns information about the given validator, which may be a
