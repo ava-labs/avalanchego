@@ -603,7 +603,8 @@ currentStakerIteratorLoop:
 
 		switch stakerToRemove.Priority {
 		case state.PrimaryNetworkDelegatorCurrentPriority, state.PrimaryNetworkValidatorCurrentPriority:
-			// We shouldn't be removing any permissionless stakers here
+			// Primary network stakers are removed by the RewardValidatorTx, not
+			// an AdvanceTimeTx.
 			break currentStakerIteratorLoop
 		default:
 			currentValidatorsToRemove = append(currentValidatorsToRemove, stakerToRemove)
