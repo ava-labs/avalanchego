@@ -25,7 +25,11 @@ type Metrics interface {
 	MarkOptionVoteLost()
 	// Mark that the given block was accepted.
 	MarkAccepted(stateless.Block) error
+	// Returns an interceptor function to use for API requests
+	// to track API metrics.
 	InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request
+	// Returns an AfterRequest function to use for API requests
+	// to track API metrics.
 	AfterRequestFunc() func(*rpc.RequestInfo)
 	// Mark that a validator set was created.
 	IncValidatorSetsCreated()
@@ -219,11 +223,11 @@ func (m *metrics) MarkAccepted(b stateless.Block) error {
 }
 
 func (m *metrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
-	return nil // TODO
+	return m.apiRequestMetrics.InterceptRequest
 }
 
 func (m *metrics) AfterRequestFunc() func(*rpc.RequestInfo) {
-	return nil // TODO
+	return m.apiRequestMetrics.AfterRequest
 }
 
 func (m *metrics) IncValidatorSetsCreated() {
