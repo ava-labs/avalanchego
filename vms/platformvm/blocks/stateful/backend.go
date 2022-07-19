@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-// TODO improve/add comments.
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
