@@ -880,6 +880,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	return nil
 }
 
+// GetNextStakerChangeTime returns the next time a staker will be either added
+// or removed to/from the current validator set.
+//
+// If there are no planned changes, this returns the maximum time.
 func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
 	currentStakerIterator, err := state.GetCurrentStakerIterator()
 	if err != nil {
