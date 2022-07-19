@@ -31,11 +31,10 @@ func NewManager(
 	recentlyAccepted *window.Window,
 ) Manager {
 	backend := &backend{
-		Mempool:      mempool,
-		state:        s,
-		bootstrapped: txExecutorBackend.Bootstrapped,
-		ctx:          txExecutorBackend.Ctx,
-
+		Mempool:       mempool,
+		state:         s,
+		bootstrapped:  txExecutorBackend.Bootstrapped,
+		ctx:           txExecutorBackend.Ctx,
 		blkIDToState:  map[ids.ID]*blockState{},
 		stateVersions: txExecutorBackend.StateVersions,
 	}
@@ -94,7 +93,6 @@ func newBlock(blk stateless.Block, manager *manager) snowman.Block {
 		manager: manager,
 		Block:   blk,
 	}
-	// TODO should we just have a NewOracleBlock method?
 	if _, ok := blk.(*stateless.ProposalBlock); ok {
 		return &OracleBlock{
 			Block: b,
