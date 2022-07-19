@@ -574,6 +574,11 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
 			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
 		case state.SubnetValidatorPendingPriority:
+			// We require that the [txTimestamp] <= [nextStakerChangeTime].
+			// Additionally, the minimum stake duration is > 0. This means we
+			// know that the staker we are adding here should never be attempted
+			// to be removed in the following loop.
+
 			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
 			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
 		default:
