@@ -198,8 +198,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		backend: &backend{
 			blkIDToState: map[ids.ID]*blockState{
 				parentID: {
-					statelessBlock:     parentStatelessBlk,
-					standardBlockState: standardBlockState{},
+					statelessBlock: parentStatelessBlk,
 				},
 			},
 			Mempool:       mempool,
@@ -260,6 +259,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	err = verifier.VisitStandardBlock(blk)
 	assert.NoError(err)
 
+	// Assert expected state.
 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
 	assert.Equal(blk, gotBlkState.statelessBlock)
@@ -268,5 +268,133 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.VisitStandardBlock(blk)
+	assert.NoError(err)
+}
+
+func TestVerifierVisitCommitBlock(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	stateVersions := state.NewMockVersions(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
+	verifier := &verifier{
+		txExecutorBackend: executor.Backend{},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+					proposalBlockState: proposalBlockState{
+						onCommitState: parentOnCommitState,
+						onAbortState:  parentOnAbortState,
+					},
+					standardBlockState: standardBlockState{},
+				},
+			},
+			Mempool:       mempool,
+			state:         s,
+			stateVersions: stateVersions,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := stateless.NewCommitBlock(
+		parentID,
+		2,
+	)
+	assert.NoError(err)
+
+	// Set expectations for dependencies.
+	timestamp := time.Now()
+	gomock.InOrder(
+		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		stateVersions.EXPECT().SetState(blk.ID(), parentOnCommitState).Times(1),
+	)
+
+	// Verify the block.
+	err = verifier.VisitCommitBlock(blk)
+	assert.NoError(err)
+
+	// Assert expected state.
+	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	assert.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	assert.Equal(timestamp, gotBlkState.timestamp)
+
+	// Visiting again should return nil without using dependencies.
+	err = verifier.VisitCommitBlock(blk)
+	assert.NoError(err)
+}
+
+func TestVerifierVisitAbortBlock(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	stateVersions := state.NewMockVersions(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
+	verifier := &verifier{
+		txExecutorBackend: executor.Backend{},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+					proposalBlockState: proposalBlockState{
+						onCommitState: parentOnCommitState,
+						onAbortState:  parentOnAbortState,
+					},
+					standardBlockState: standardBlockState{},
+				},
+			},
+			Mempool:       mempool,
+			state:         s,
+			stateVersions: stateVersions,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := stateless.NewAbortBlock(
+		parentID,
+		2,
+	)
+	assert.NoError(err)
+
+	// Set expectations for dependencies.
+	timestamp := time.Now()
+	gomock.InOrder(
+		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		stateVersions.EXPECT().SetState(blk.ID(), parentOnCommitState).Times(1),
+	)
+
+	// Verify the block.
+	err = verifier.VisitAbortBlock(blk)
+	assert.NoError(err)
+
+	// Assert expected state.
+	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	assert.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	assert.Equal(timestamp, gotBlkState.timestamp)
+
+	// Visiting again should return nil without using dependencies.
+	err = verifier.VisitAbortBlock(blk)
 	assert.NoError(err)
 }
