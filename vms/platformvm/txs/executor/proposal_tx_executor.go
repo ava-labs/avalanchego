@@ -684,11 +684,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	stakerTx, _, err := parentState.GetTx(stakerToRemove.TxID)
-	if err == database.ErrNotFound {
-		return fmt.Errorf("failed to get next staker stop time: %w", err)
-	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
 	e.OnCommit, err = state.NewDiff(e.ParentID, e.StateVersions)
