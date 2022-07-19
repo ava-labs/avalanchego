@@ -281,7 +281,7 @@ func (m *blockBuilder) Shutdown() {
 // set with a RewardValidatorTx rather than an AdvanceTimeTx.
 // Returns:
 // - [txID] of the next staker to reward
-// - [shouldBeRewarded] if the txID is ready to be rewarded
+// - [shouldReward] if the txID exists and is ready to be rewarded
 // - [err] if something bad happened
 func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
@@ -298,6 +298,8 @@ func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID
 	for currentStakerIterator.Next() {
 		currentStaker := currentStakerIterator.Value()
 		priority := currentStaker.Priority
+		// If the staker is a primary network staker (not a subnet validator),
+		// it's the next staker we will want to reward.
 		if priority == state.PrimaryNetworkDelegatorCurrent ||
 			priority == state.PrimaryNetworkValidatorCurrent {
 			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
