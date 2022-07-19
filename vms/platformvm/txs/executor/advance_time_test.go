@@ -139,7 +139,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	validatorStaker, err := executor.OnCommit.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	assert.NoError(err)
 	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
-	assert.EqualValues(1370, validatorStaker.PotentialReward)
+	assert.EqualValues(1370, validatorStaker.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = executor.OnCommit.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
@@ -496,7 +496,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 func TestWhitelistedSubnet(t *testing.T) {
 	for _, whitelist := range []bool{true, false} {
-		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(t *testing.T) {
 			env := newEnvironment()
 			defer func() {
 				if err := shutdownEnvironment(env); err != nil {
