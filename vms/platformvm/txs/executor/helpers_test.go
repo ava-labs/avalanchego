@@ -264,7 +264,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}

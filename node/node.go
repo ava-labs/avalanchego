@@ -795,7 +795,7 @@ func (n *Node) initVMs() error {
 func (n *Node) initSharedMemory() error {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
-	return n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
+	return n.sharedMemory.Initialize(sharedMemoryDB)
 }
 
 // initKeystoreAPI initializes the keystore service, which is an on-node wallet.
