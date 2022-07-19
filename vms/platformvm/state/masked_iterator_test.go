@@ -42,10 +42,10 @@ func TestMaskedIterator(t *testing.T) {
 		NewSliceIterator(stakers[:3]...),
 		maskedStakers,
 	)
-	for _, staker := range stakers[1:2] {
-		assert.True(it.Next())
-		assert.Equal(staker, it.Value())
-	}
+
+	assert.True(it.Next())
+	assert.Equal(stakers[1], it.Value())
+
 	assert.False(it.Next())
 	it.Release()
 	assert.False(it.Next())

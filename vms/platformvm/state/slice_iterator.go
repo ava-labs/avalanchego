@@ -5,12 +5,13 @@ package state
 
 var _ StakerIterator = &sliceIterator{}
 
-// Returns the elements of [stakers] in order. Doesn't sort by anything.
 type sliceIterator struct {
 	index   int
 	stakers []*Staker
 }
 
+// NewSliceIterator returns an iterator that contains the elements of [stakers]
+// in order. Doesn't sort by anything.
 func NewSliceIterator(stakers ...*Staker) StakerIterator {
 	return &sliceIterator{
 		index:   -1,

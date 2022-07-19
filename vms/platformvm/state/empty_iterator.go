@@ -3,6 +3,7 @@
 
 package state
 
+// EmptyIterator contains no stakers.
 var EmptyIterator StakerIterator = emptyIterator{}
 
 type emptyIterator struct{}

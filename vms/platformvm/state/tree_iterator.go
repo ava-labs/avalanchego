@@ -21,6 +21,8 @@ type treeIterator struct {
 	wg          sync.WaitGroup
 }
 
+// NewTreeIterator returns a new iterator of the stakers in [tree] in ascending
+// order.
 func NewTreeIterator(tree *btree.BTree) StakerIterator {
 	if tree == nil {
 		return EmptyIterator

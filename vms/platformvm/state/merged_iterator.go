@@ -14,7 +14,9 @@ var (
 
 type mergedIterator struct {
 	initialized bool
-	heap        []StakerIterator
+	// heap only contains iterators that have been initialized and are not
+	// exhausted.
+	heap []StakerIterator
 }
 
 // Returns an iterator that returns all of the elements of [stakers] in order.

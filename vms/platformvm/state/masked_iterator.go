@@ -9,12 +9,13 @@ import (
 
 var _ StakerIterator = &maskedIterator{}
 
-// Skips the stakers in [parentIterator] that are present in [maskedStakers].
 type maskedIterator struct {
 	parentIterator StakerIterator
 	maskedStakers  map[ids.ID]*Staker
 }
 
+// NewMaskedIterator returns a new iterator that skips the stakers in
+// [parentIterator] that are present in [maskedStakers].
 func NewMaskedIterator(parentIterator StakerIterator, maskedStakers map[ids.ID]*Staker) StakerIterator {
 	return &maskedIterator{
 		parentIterator: parentIterator,
