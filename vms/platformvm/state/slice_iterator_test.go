@@ -3,34 +3,29 @@
 
 package state
 
-import (
-	"testing"
-	"time"
+var _ StakerIterator = &sliceIterator{}
 
-	"github.com/stretchr/testify/assert"
-
-	"github.com/ava-labs/avalanchego/ids"
-)
-
-func TestSliceIterator(t *testing.T) {
-	assert := assert.New(t)
-	// Note that the stakers are not canonically sorted.
-	stakers := []*Staker{
-		{
-			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(1, 0),
-		},
-		{
-			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(0, 0),
-		},
-	}
-
-	it := NewSliceIterator(stakers...)
-	for _, staker := range stakers {
-		assert.True(it.Next())
-		assert.Equal(staker, it.Value())
-	}
-	assert.False(it.Next())
-	it.Release()
+type sliceIterator struct {
+	index   int
+	stakers []*Staker
 }
+
+// NewSliceIterator returns an iterator that contains the elements of [stakers]
+// in order. Doesn't sort by anything.
+func NewSliceIterator(stakers ...*Staker) StakerIterator {
+	return &sliceIterator{
+		index:   -1,
+		stakers: stakers,
+	}
+}
+
+func (i *sliceIterator) Next() bool {
+	i.index++
+	return i.index < len(i.stakers)
+}
+
+func (i *sliceIterator) Value() *Staker {
+	return i.stakers[i.index]
+}
+
+func (i *sliceIterator) Release() {}
