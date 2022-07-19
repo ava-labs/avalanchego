@@ -173,7 +173,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
+	newStaker.Priority = state.PrimaryNetworkValidatorPending
 	e.OnCommit.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -323,7 +323,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.SubnetValidatorPendingPriority
+	newStaker.Priority = state.SubnetValidatorPending
 	e.OnCommit.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -376,7 +376,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
+	newStaker.Priority = state.PrimaryNetworkDelegatorPending
 
 	if e.Bootstrapped.GetValue() {
 		currentTimestamp := parentState.GetTimestamp()
@@ -541,7 +541,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		stakerToAdd.Priority = state.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorPendingPriority:
+		case state.PrimaryNetworkDelegatorPending:
 			potentialReward := e.Rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
@@ -557,7 +557,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 			currentDelegatorsToAdd = append(currentDelegatorsToAdd, &stakerToAdd)
 			pendingDelegatorsToRemove = append(pendingDelegatorsToRemove, stakerToRemove)
-		case state.PrimaryNetworkValidatorPendingPriority:
+		case state.PrimaryNetworkValidatorPending:
 			potentialReward := e.Rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
@@ -573,7 +573,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
 			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
-		case state.SubnetValidatorPendingPriority:
+		case state.SubnetValidatorPending:
 			// We require that the [txTimestamp] <= [nextStakerChangeTime].
 			// Additionally, the minimum stake duration is > 0. This means we
 			// know that the staker we are adding here should never be attempted
@@ -602,7 +602,7 @@ currentStakerIteratorLoop:
 		}
 
 		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorCurrentPriority, state.PrimaryNetworkValidatorCurrentPriority:
+		case state.PrimaryNetworkDelegatorCurrent, state.PrimaryNetworkValidatorCurrent:
 			// Primary network stakers are removed by the RewardValidatorTx, not
 			// an AdvanceTimeTx.
 			break currentStakerIteratorLoop

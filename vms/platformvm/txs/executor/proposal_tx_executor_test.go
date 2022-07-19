@@ -57,7 +57,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		)
 		staker.PotentialReward = 0
 		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+		staker.Priority = state.PrimaryNetworkValidatorCurrent
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -92,7 +92,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		)
 		staker.PotentialReward = 0
 		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+		staker.Priority = state.PrimaryNetworkValidatorCurrent
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -435,7 +435,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	)
 	staker.PotentialReward = 0
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	staker.Priority = state.PrimaryNetworkValidatorCurrent
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
@@ -583,7 +583,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
 	)
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetValidatorCurrentPriority
+	staker.Priority = state.SubnetValidatorCurrent
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
@@ -740,7 +740,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
 		)
 		staker.NextTime = staker.EndTime
-		staker.Priority = state.SubnetValidatorCurrentPriority
+		staker.Priority = state.SubnetValidatorCurrent
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
@@ -886,7 +886,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		)
 		staker.PotentialReward = 0
 		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+		staker.Priority = state.PrimaryNetworkValidatorCurrent
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)

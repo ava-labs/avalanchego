@@ -298,8 +298,8 @@ func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID
 	for currentStakerIterator.Next() {
 		currentStaker := currentStakerIterator.Value()
 		priority := currentStaker.Priority
-		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
-			priority == state.PrimaryNetworkValidatorCurrentPriority {
+		if priority == state.PrimaryNetworkDelegatorCurrent ||
+			priority == state.PrimaryNetworkValidatorCurrent {
 			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
 		}
 	}

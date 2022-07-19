@@ -42,7 +42,7 @@ type Staker struct {
 	// are grouped together. The ordering of these groups is documented in
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
-	Priority byte
+	Priority Priority
 }
 
 // A *Staker is considered to be less than another *Staker when:
