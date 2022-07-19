@@ -75,7 +75,7 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
-	// Transactions that have not been put into blocks yet
+	// If true, drop transactions added to the mempool via Add.
 	dropIncoming bool
 
 	bytesAvailableMetric prometheus.Gauge
