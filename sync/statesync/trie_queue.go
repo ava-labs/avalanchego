@@ -59,6 +59,9 @@ func (t *trieQueue) StorageTrieDone(root common.Hash) error {
 
 // getNextTrie returns the next storage trie to sync, along with a slice
 // of accounts that point to the returned storage trie.
+// Returns true if there are more storage tries to sync and false otherwise.
+// Note: if a non-nil root is returned, getNextTrie guarantees that there will be at least
+// one account hash in the returned slice.
 func (t *trieQueue) getNextTrie() (common.Hash, []common.Hash, bool, error) {
 	it := rawdb.NewSyncStorageTriesIterator(t.db, t.nextStorageRoot)
 	defer it.Release()
@@ -69,16 +72,22 @@ func (t *trieQueue) getNextTrie() (common.Hash, []common.Hash, bool, error) {
 		more     bool
 	)
 
+	// Iterate over the keys to find the next storage trie root and all of the account hashes that contain the same storage root.
 	for it.Next() {
+		// Unpack the state root and account hash from the current key
 		nextRoot, nextAccount := rawdb.UnpackSyncStorageTrieKey(it.Key())
+		// Set the root for the first pass
 		if root == (common.Hash{}) {
 			root = nextRoot
 		}
+		// If the next root is different than the originally set root, then we've iterated over all of the account hashes that
+		// have the same storage trie root. Set more to be true, since there is at least one more storage trie.
 		if root != nextRoot {
 			t.nextStorageRoot = nextRoot[:]
 			more = true
 			break
 		}
+		// If we found another account with the same root, add the accountHash.
 		accounts = append(accounts, nextAccount)
 	}
 
