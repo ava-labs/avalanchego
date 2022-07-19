@@ -178,6 +178,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	if err := syncDisabledVM.blockChain.Snapshots().Verify(lastRoot); err != nil {
 		t.Fatal(err)
 	}
+	syncDisabledVM.blockChain.DrainAcceptorQueue()
 
 	// Create a new VM from the same database with state sync enabled.
 	syncReEnabledVM := &VM{}

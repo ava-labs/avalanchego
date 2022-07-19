@@ -5,6 +5,7 @@ package statesync
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/coreth/core/state/snapshot"
@@ -53,10 +54,10 @@ type stateSync struct {
 	triesInProgress map[common.Hash]*trieToSync
 
 	// track completion and progress of work
-	mainTrieDone  chan struct{}
-	trieCompleted chan struct{}
-	done          chan error
-	stats         *trieSyncStats
+	mainTrieDone       chan struct{}
+	triesInProgressSem chan struct{}
+	done               chan error
+	stats              *trieSyncStats
 }
 
 func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
@@ -70,13 +71,16 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		stats:           newTrieSyncStats(),
 		triesInProgress: make(map[common.Hash]*trieToSync),
 
+		// [triesInProgressSem] is used to keep the number of tries syncing
+		// less than or equal to [defaultNumThreads].
+		triesInProgressSem: make(chan struct{}, defaultNumThreads),
+
 		// Each [trieToSync] will have a maximum of [numSegments] segments.
 		// We set the capacity of [segments] such that [defaultNumThreads]
 		// storage tries can sync concurrently.
-		segments:      make(chan syncclient.LeafSyncTask, defaultNumThreads*numStorageTrieSegments),
-		mainTrieDone:  make(chan struct{}),
-		trieCompleted: make(chan struct{}, 1),
-		done:          make(chan error, 1),
+		segments:     make(chan syncclient.LeafSyncTask, defaultNumThreads*numStorageTrieSegments),
+		mainTrieDone: make(chan struct{}),
+		done:         make(chan error, 1),
 	}
 	ss.syncer = syncclient.NewCallbackLeafSyncer(config.Client, ss.segments)
 	ss.codeSyncer = newCodeSyncer(CodeSyncerConfig{
@@ -98,14 +102,19 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		return nil, err
 	}
 	ss.addTrieInProgress(ss.root, ss.mainTrie)
+	ss.mainTrie.startSyncing() // start syncing after tracking the trie as in progress
 	return ss, nil
 }
 
 // onStorageTrieFinished is called after a storage trie finishes syncing.
 func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
+	<-t.triesInProgressSem // allow another trie to start (release the semaphore)
+	// mark the storage trie as done in trieQueue
+	if err := t.trieQueue.StorageTrieDone(root); err != nil {
+		return err
+	}
 	// track the completion of this storage trie
-	t.removeTrieInProgress(root)
-	return t.trieQueue.StorageTrieDone(root)
+	return t.removeTrieInProgress(root)
 }
 
 // onMainTrieFinishes is called after the main trie finishes syncing.
@@ -119,10 +128,9 @@ func (t *stateSync) onMainTrieFinished() error {
 	}
 	t.stats.setTriesRemaining(numStorageTries)
 
-	// mark the main trie done and check if the sync operation is complete
+	// mark the main trie done
 	close(t.mainTrieDone)
-	t.removeTrieInProgress(t.root)
-	return nil
+	return t.removeTrieInProgress(t.root)
 }
 
 // onSyncComplete is called after the account trie and
@@ -147,22 +155,7 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	// Each storage trie may split up to [numStorageTrieSegments],
-	// so we keep the number of storage tries in progress limited
-	// to ensure the segments channel has capacity when segments
-	// are created.
-	maxStorageTriesInProgess := cap(t.segments) / numStorageTrieSegments
 	for {
-
-		for t.countTriesInProgress() >= maxStorageTriesInProgess {
-			// wait for a trie to complete to avoid spinning
-			select {
-			case <-t.trieCompleted:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-
 		// check ctx here to exit the loop early
 		if err := ctx.Err(); err != nil {
 			return err
@@ -172,15 +165,26 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		// it is possible there are no storage tries.
+		// If there are no storage tries, then root will be the empty hash on the first pass.
 		if root != (common.Hash{}) {
+			// acquire semaphore (to keep number of tries in progress limited)
+			select {
+			case t.triesInProgressSem <- struct{}{}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+			// Arbitrarily use the first account for making requests to the server.
+			// Note: getNextTrie guarantees that if a non-nil storage root is returned, then the
+			// slice of account hashes is non-empty.
+			syncAccount := accounts[0]
 			// create a trieToSync for the storage trie and mark it as in progress.
-			syncAccount := accounts[0] // arbitrarily use the first account for making requests to the server
 			storageTrie, err := NewTrieToSync(t, root, syncAccount, NewStorageTrieTask(t, root, accounts))
 			if err != nil {
 				return err
 			}
 			t.addTrieInProgress(root, storageTrie)
+			storageTrie.startSyncing() // start syncing after tracking the trie as in progress
 		}
 		// if there are no more storage tries, close
 		// the task queue and exit the producer.
@@ -232,25 +236,16 @@ func (t *stateSync) addTrieInProgress(root common.Hash, trie *trieToSync) {
 // tries in progress and notifies the storage root producer
 // so it can continue in case it was paused due to the
 // maximum number of tries in progress being previously reached.
-func (t *stateSync) removeTrieInProgress(root common.Hash) {
+func (t *stateSync) removeTrieInProgress(root common.Hash) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.stats.trieDone(root)
-	delete(t.triesInProgress, root)
-
-	select {
-	case t.trieCompleted <- struct{}{}:
-	default:
+	if _, ok := t.triesInProgress[root]; !ok {
+		return fmt.Errorf("removeTrieInProgress for unexpected root: %s", root)
 	}
-}
-
-// countTriesInProgress returns the number of tries in progress.
-func (t *stateSync) countTriesInProgress() int {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	return len(t.triesInProgress)
+	delete(t.triesInProgress, root)
+	return nil
 }
 
 // onSyncFailure is called if the sync fails, this writes all

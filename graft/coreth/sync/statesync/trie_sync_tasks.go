@@ -70,7 +70,7 @@ func (m *mainTrieTask) OnLeafs(db ethdb.KeyValueWriter, keys, vals [][]byte) err
 		}
 
 		// persist the account data
-		writeAccountSnapshot(db, common.BytesToHash(key), acc)
+		writeAccountSnapshot(db, accountHash, acc)
 
 		// check if this account has storage root that we need to fetch
 		if acc.Root != (common.Hash{}) && acc.Root != types.EmptyRootHash {

@@ -121,7 +121,7 @@ func (t *trieToSync) loadSegments() error {
 				// don't go past the end of the segment
 				break
 			}
-			lastKey = it.Key()
+			lastKey = common.CopyBytes(it.Key())
 			segment.leafs++
 		}
 		if lastKey != nil {
@@ -129,9 +129,15 @@ func (t *trieToSync) loadSegments() error {
 			segment.pos = lastKey // syncing will start from this key
 		}
 		log.Debug("statesync: loading segment", "segment", segment)
-		t.sync.segments <- segment // this will queue the segment for syncing
 	}
 	return it.Error()
+}
+
+// startSyncing adds the trieToSync's segments to the work queue
+func (t *trieToSync) startSyncing() {
+	for _, segment := range t.segments {
+		t.sync.segments <- segment // this will queue the segment for syncing
+	}
 }
 
 // addSegment appends a newly created segment specified by [start] and
