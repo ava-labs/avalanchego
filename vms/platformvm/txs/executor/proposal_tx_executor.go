@@ -267,7 +267,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		subnetIntf, _, err := parentState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			return fmt.Errorf(
-				"couldn't find subnet %s with %w",
+				"couldn't find subnet %q: %w",
 				tx.Validator.Subnet,
 				err,
 			)
