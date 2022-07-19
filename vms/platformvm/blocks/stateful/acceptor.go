@@ -144,14 +144,14 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 }
 
 func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
-	return a.acceptOptionBlock(b)
+	return a.acceptOptionBlock(b, true /* isCommit */)
 }
 
 func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
-	return a.acceptOptionBlock(b)
+	return a.acceptOptionBlock(b, false /* isCommit */)
 }
 
-func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
+func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -160,12 +160,27 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 	// need the parent's state when it's rejected.
 	defer a.free(parentID)
 
-	a.ctx.Log.Verbo("accepting block %s", blkID)
+	if isCommit {
+		a.ctx.Log.Verbo(
+			"Accepting Commit Block %s at height %d with parent %s",
+			blkID,
+			b.Height(),
+			b.Parent(),
+		)
+	} else {
+		a.ctx.Log.Verbo(
+			"Accepting Abort Block %s at height %d with parent %s",
+			blkID,
+			b.Height(),
+			b.Parent(),
+		)
+	}
 
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
 	}
+	// Note that the parent must be accepted first.
 	if err := a.commonAccept(parentState.statelessBlock); err != nil {
 		return err
 	}
