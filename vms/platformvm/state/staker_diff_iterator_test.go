@@ -133,8 +133,7 @@ func TestMutableStakerIterator(t *testing.T) {
 		},
 	}
 
-	it, exhausted := newMutableStakerIterator(NewSliceIterator(initialStakers...))
-	hasNext := !exhausted
+	it := newMutableStakerIterator(NewSliceIterator(initialStakers...))
 
 	addedStakers := []*Staker{
 		{
@@ -156,6 +155,11 @@ func TestMutableStakerIterator(t *testing.T) {
 			Priority: PrimaryNetworkValidatorCurrent,
 		},
 	}
+
+	// Next must be called before Add.
+	hasNext := it.Next()
+	assert.True(hasNext)
+
 	for _, staker := range addedStakers {
 		it.Add(staker)
 	}
@@ -175,7 +179,7 @@ func TestMutableStakerIterator(t *testing.T) {
 		assert.Equal(expectedStakerTxID, staker.TxID)
 		hasNext = it.Next()
 	}
-	assert.False(it.Next())
+	assert.False(hasNext)
 	it.Release()
 	assert.False(it.Next())
 }

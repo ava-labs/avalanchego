@@ -9,6 +9,7 @@ import (
 
 var (
 	_ StakerDiffIterator = &stakerDiffIterator{}
+	_ StakerIterator     = &mutableStakerIterator{}
 	_ heap.Interface     = &mutableStakerIterator{}
 )
 
@@ -46,9 +47,9 @@ type stakerDiffIterator struct {
 }
 
 func NewStakerDiffIterator(currentIterator, pendingIterator StakerIterator) StakerDiffIterator {
-	mutableCurrentIterator, currentIteratorExhausted := newMutableStakerIterator(currentIterator)
+	mutableCurrentIterator := newMutableStakerIterator(currentIterator)
 	return &stakerDiffIterator{
-		currentIteratorExhausted: currentIteratorExhausted,
+		currentIteratorExhausted: !mutableCurrentIterator.Next(),
 		currentIterator:          mutableCurrentIterator,
 		pendingIteratorExhausted: !pendingIterator.Next(),
 		pendingIterator:          pendingIterator,
@@ -111,97 +112,74 @@ func (it *stakerDiffIterator) advancePending() {
 type mutableStakerIterator struct {
 	iteratorExhausted bool
 	iterator          StakerIterator
-
-	addedStakerHeap []*Staker
-
-	nextStaker *Staker
+	heap              []*Staker
 }
 
-// TODO: This function returns a partially consumed iterator to make the
-//       implementation of [Add] easier. We should figure out a better way to do
-//       this.
-func newMutableStakerIterator(iterator StakerIterator) (*mutableStakerIterator, bool) {
-	hasFirst := iterator.Next()
-	var nextStaker *Staker
-	if hasFirst {
-		nextStaker = iterator.Value()
-	}
+func newMutableStakerIterator(iterator StakerIterator) *mutableStakerIterator {
 	return &mutableStakerIterator{
 		iteratorExhausted: !iterator.Next(),
 		iterator:          iterator,
-		nextStaker:        nextStaker,
-	}, !hasFirst
+	}
 }
 
+// Add should not be called until after Next has been called at least once.
 func (it *mutableStakerIterator) Add(staker *Staker) {
-	if it.nextStaker == nil {
-		it.nextStaker = staker
-		return
-	}
-	if it.nextStaker.Less(staker) {
-		heap.Push(it, staker)
-		return
-	}
-	heap.Push(it, it.nextStaker)
-	it.nextStaker = staker
+	heap.Push(it, staker)
 }
 
 func (it *mutableStakerIterator) Next() bool {
-	switch {
-	case it.iteratorExhausted && len(it.addedStakerHeap) == 0:
-		it.nextStaker = nil
-		return false
-	case it.iteratorExhausted:
-		it.nextStaker = it.addedStakerHeap[0]
+	// The only time the heap should be empty - is when the iterator is
+	// exhausted or uninitialized.
+	if len(it.heap) > 0 {
 		heap.Pop(it)
-	case len(it.addedStakerHeap) == 0:
-		it.nextStaker = it.iterator.Value()
+	}
+
+	// If the iterator is exhausted, the only elements left to iterate over are
+	// in the heap.
+	if it.iteratorExhausted {
+		return len(it.heap) > 0
+	}
+
+	// If the heap doesn't contain the next staker to return, we need to move
+	// the next element from the iterator into the heap.
+	nextIteratorStaker := it.iterator.Value()
+	if len(it.heap) == 0 || nextIteratorStaker.Less(it.heap[0]) {
+		it.Add(nextIteratorStaker)
 		it.iteratorExhausted = !it.iterator.Next()
-	default:
-		nextIteratorStaker := it.iterator.Value()
-		nextHeapStaker := it.addedStakerHeap[0]
-		if nextIteratorStaker.Less(nextHeapStaker) {
-			it.nextStaker = nextIteratorStaker
-			it.iteratorExhausted = !it.iterator.Next()
-		} else {
-			it.nextStaker = nextHeapStaker
-			heap.Pop(it)
-		}
 	}
 	return true
 }
 
 func (it *mutableStakerIterator) Value() *Staker {
-	return it.nextStaker
+	return it.heap[0]
 }
 
 func (it *mutableStakerIterator) Release() {
 	it.iteratorExhausted = true
 	it.iterator.Release()
-	it.addedStakerHeap = nil
-	it.nextStaker = nil
+	it.heap = nil
 }
 
 func (it *mutableStakerIterator) Len() int {
-	return len(it.addedStakerHeap)
+	return len(it.heap)
 }
 
 func (it *mutableStakerIterator) Less(i, j int) bool {
-	return it.addedStakerHeap[i].Less(it.addedStakerHeap[j])
+	return it.heap[i].Less(it.heap[j])
 }
 
 func (it *mutableStakerIterator) Swap(i, j int) {
-	it.addedStakerHeap[j], it.addedStakerHeap[i] = it.addedStakerHeap[i], it.addedStakerHeap[j]
+	it.heap[j], it.heap[i] = it.heap[i], it.heap[j]
 }
 
 func (it *mutableStakerIterator) Push(value interface{}) {
-	it.addedStakerHeap = append(it.addedStakerHeap, value.(*Staker))
+	it.heap = append(it.heap, value.(*Staker))
 }
 
 func (it *mutableStakerIterator) Pop() interface{} {
-	newLength := len(it.addedStakerHeap) - 1
-	value := it.addedStakerHeap[newLength]
-	it.addedStakerHeap[newLength] = nil
-	it.addedStakerHeap = it.addedStakerHeap[:newLength]
+	newLength := len(it.heap) - 1
+	value := it.heap[newLength]
+	it.heap[newLength] = nil
+	it.heap = it.heap[:newLength]
 	return value
 }
