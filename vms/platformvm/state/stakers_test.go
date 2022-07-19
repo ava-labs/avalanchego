@@ -207,7 +207,7 @@ func newTestStaker() *Staker {
 		PotentialReward: 1,
 
 		NextTime: endTime,
-		Priority: PrimaryNetworkDelegatorCurrent,
+		Priority: PrimaryNetworkDelegatorCurrentPriority,
 	}
 }
 

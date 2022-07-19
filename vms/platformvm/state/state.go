@@ -739,7 +739,7 @@ func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
 		staker := NewPrimaryNetworkStaker(vdrTx.ID(), &tx.Validator)
 		staker.PotentialReward = potentialReward
 		staker.NextTime = staker.EndTime
-		staker.Priority = PrimaryNetworkValidatorCurrent
+		staker.Priority = PrimaryNetworkValidatorCurrentPriority
 
 		s.PutCurrentValidator(staker)
 		s.AddTx(vdrTx, status.Committed)
@@ -831,7 +831,7 @@ func (s *state) loadCurrentValidators() error {
 		staker := NewPrimaryNetworkStaker(txID, &addValidatorTx.Validator)
 		staker.PotentialReward = uptime.PotentialReward
 		staker.NextTime = staker.EndTime
-		staker.Priority = PrimaryNetworkValidatorCurrent
+		staker.Priority = PrimaryNetworkValidatorCurrentPriority
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -872,7 +872,7 @@ func (s *state) loadCurrentValidators() error {
 		staker := NewPrimaryNetworkStaker(txID, &addDelegatorTx.Validator)
 		staker.PotentialReward = potentialReward
 		staker.NextTime = staker.EndTime
-		staker.Priority = PrimaryNetworkDelegatorCurrent
+		staker.Priority = PrimaryNetworkDelegatorCurrentPriority
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		if validator.delegators == nil {
@@ -906,7 +906,7 @@ func (s *state) loadCurrentValidators() error {
 
 		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
 		staker.NextTime = staker.EndTime
-		staker.Priority = SubnetValidatorCurrent
+		staker.Priority = SubnetValidatorCurrentPriority
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -939,7 +939,7 @@ func (s *state) loadPendingValidators() error {
 
 		staker := NewPrimaryNetworkStaker(txID, &addValidatorTx.Validator)
 		staker.NextTime = staker.StartTime
-		staker.Priority = PrimaryNetworkValidatorPending
+		staker.Priority = PrimaryNetworkValidatorPendingPriority
 
 		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -970,7 +970,7 @@ func (s *state) loadPendingValidators() error {
 
 		staker := NewPrimaryNetworkStaker(txID, &addDelegatorTx.Validator)
 		staker.NextTime = staker.StartTime
-		staker.Priority = PrimaryNetworkDelegatorPending
+		staker.Priority = PrimaryNetworkDelegatorPendingPriority
 
 		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		if validator.delegators == nil {
@@ -1004,7 +1004,7 @@ func (s *state) loadPendingValidators() error {
 
 		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
 		staker.NextTime = staker.StartTime
-		staker.Priority = SubnetValidatorPending
+		staker.Priority = SubnetValidatorPendingPriority
 
 		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker

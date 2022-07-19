@@ -5,32 +5,32 @@ package state
 
 const (
 	// First subnet delegators are removed from the current validator set,
-	SubnetDelegatorCurrent Priority = iota + 1
+	SubnetDelegatorCurrentPriority Priority = iota + 1
 	// then subnet validators,
-	SubnetValidatorCurrent
+	SubnetValidatorCurrentPriority
 	// then primary network delegators,
-	PrimaryNetworkDelegatorCurrent
+	PrimaryNetworkDelegatorCurrentPriority
 	// then primary network validators.
-	PrimaryNetworkValidatorCurrent
+	PrimaryNetworkValidatorCurrentPriority
 )
 
 const (
 	// First primary network delegators are moved from the pending to the
 	// current validator set,
-	PrimaryNetworkDelegatorPending Priority = iota + 1
+	PrimaryNetworkDelegatorPendingPriority Priority = iota + 1
 	// then primary network validators,
-	PrimaryNetworkValidatorPending
+	PrimaryNetworkValidatorPendingPriority
 	// then subnet validators,
-	SubnetValidatorPending
+	SubnetValidatorPendingPriority
 	// then subnet delegators.
-	SubnetDelegatorPending
+	SubnetDelegatorPendingPriority
 )
 
 var PendingToCurrentPriorities = []Priority{
-	PrimaryNetworkValidatorPending: PrimaryNetworkValidatorCurrent,
-	PrimaryNetworkDelegatorPending: PrimaryNetworkDelegatorCurrent,
-	SubnetValidatorPending:         SubnetValidatorCurrent,
-	SubnetDelegatorPending:         SubnetDelegatorCurrent,
+	PrimaryNetworkValidatorPendingPriority: PrimaryNetworkValidatorCurrentPriority,
+	PrimaryNetworkDelegatorPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
+	SubnetValidatorPendingPriority:         SubnetValidatorCurrentPriority,
+	SubnetDelegatorPendingPriority:         SubnetDelegatorCurrentPriority,
 }
 
 type Priority byte

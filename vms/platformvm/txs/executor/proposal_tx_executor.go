@@ -172,7 +172,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkValidatorPending
+	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
 	e.OnCommit.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -322,7 +322,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.SubnetValidatorPending
+	newStaker.Priority = state.SubnetValidatorPendingPriority
 	e.OnCommit.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -375,67 +375,67 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkDelegatorPending
+	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
-	if e.Bootstrapped.GetValue() {
-		currentTimestamp := parentState.GetTimestamp()
-		// Ensure the proposed validator starts after the current timestamp
-		validatorStartTime := tx.StartTime()
-		if !currentTimestamp.Before(validatorStartTime) {
-			return fmt.Errorf(
-				"chain timestamp (%s) not before validator's start time (%s)",
-				currentTimestamp,
-				validatorStartTime,
-			)
-		}
-
-		primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch the primary network validator for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
-		if err != nil {
-			return errStakeOverflow
-		}
-
-		if !currentTimestamp.Before(e.Config.ApricotPhase3Time) {
-			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
-		}
-
-		canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
-		if err != nil {
-			return err
-		}
-		if !canDelegate {
-			return errOverDelegated
-		}
-
-		// Verify the flowcheck
-		if err := e.FlowChecker.VerifySpend(
-			tx,
-			parentState,
-			tx.Ins,
-			outs,
-			e.Tx.Creds,
-			e.Config.AddStakerTxFee,
-			e.Ctx.AVAXAssetID,
-		); err != nil {
-			return fmt.Errorf("failed verifySpend: %w", err)
-		}
-
-		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow the verifier visitor to explicitly check for this
-		// error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if validatorStartTime.After(maxStartTime) {
-			return errFutureStakeTime
-		}
+	// if e.Bootstrapped.GetValue() {
+	currentTimestamp := parentState.GetTimestamp()
+	// Ensure the proposed validator starts after the current timestamp
+	validatorStartTime := tx.StartTime()
+	if !currentTimestamp.Before(validatorStartTime) {
+		return fmt.Errorf(
+			"chain timestamp (%s) not before validator's start time (%s)",
+			currentTimestamp,
+			validatorStartTime,
+		)
 	}
+
+	primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to fetch the primary network validator for %s: %w",
+			tx.Validator.NodeID,
+			err,
+		)
+	}
+
+	maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
+	if err != nil {
+		return errStakeOverflow
+	}
+
+	if !currentTimestamp.Before(e.Config.ApricotPhase3Time) {
+		maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
+	}
+
+	canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
+	if err != nil {
+		return err
+	}
+	if !canDelegate {
+		return errOverDelegated
+	}
+
+	// Verify the flowcheck
+	if err := e.FlowChecker.VerifySpend(
+		tx,
+		parentState,
+		tx.Ins,
+		outs,
+		e.Tx.Creds,
+		e.Config.AddStakerTxFee,
+		e.Ctx.AVAXAssetID,
+	); err != nil {
+		return fmt.Errorf("failed verifySpend: %w", err)
+	}
+
+	// Make sure the tx doesn't start too far in the future. This is done
+	// last to allow the verifier visitor to explicitly check for this
+	// error.
+	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+	if validatorStartTime.After(maxStartTime) {
+		return errFutureStakeTime
+	}
+	// }
 
 	// Set up the state if this tx is committed
 	onCommit, err := state.NewDiff(e.ParentID, e.StateVersions)
@@ -540,7 +540,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		stakerToAdd.Priority = state.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorPending:
+		case state.PrimaryNetworkDelegatorPendingPriority:
 			potentialReward := e.Rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
@@ -556,7 +556,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 			currentDelegatorsToAdd = append(currentDelegatorsToAdd, &stakerToAdd)
 			pendingDelegatorsToRemove = append(pendingDelegatorsToRemove, stakerToRemove)
-		case state.PrimaryNetworkValidatorPending:
+		case state.PrimaryNetworkValidatorPendingPriority:
 			potentialReward := e.Rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
@@ -572,7 +572,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
 			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
-		case state.SubnetValidatorPending:
+		case state.SubnetValidatorPendingPriority:
 			// We require that the [txTimestamp] <= [nextStakerChangeTime].
 			// Additionally, the minimum stake duration is > 0. This means we
 			// know that the staker we are adding here should never be attempted
@@ -601,7 +601,7 @@ currentStakerIteratorLoop:
 		}
 
 		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorCurrent, state.PrimaryNetworkValidatorCurrent:
+		case state.PrimaryNetworkDelegatorCurrentPriority, state.PrimaryNetworkValidatorCurrentPriority:
 			// Primary network stakers are removed by the RewardValidatorTx, not
 			// an AdvanceTimeTx.
 			break currentStakerIteratorLoop

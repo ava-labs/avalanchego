@@ -529,7 +529,7 @@ func TestGetStake(t *testing.T) {
 	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.PotentialReward = 0
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrent
+	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	service.vm.internalState.PutCurrentDelegator(staker)
 	service.vm.internalState.AddTx(tx, status.Committed)
@@ -576,7 +576,7 @@ func TestGetStake(t *testing.T) {
 
 	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPending
+	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
 	service.vm.internalState.PutPendingValidator(staker)
 	service.vm.internalState.AddTx(tx, status.Committed)
@@ -684,7 +684,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.PotentialReward = 0
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrent
+	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	service.vm.internalState.PutCurrentDelegator(staker)
 	service.vm.internalState.AddTx(tx, status.Committed)

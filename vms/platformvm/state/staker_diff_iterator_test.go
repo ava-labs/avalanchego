@@ -19,7 +19,7 @@ func TestStakerDiffIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(10, 0),
 			NextTime: time.Unix(10, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 	pendingStakers := []*Staker{
@@ -28,28 +28,28 @@ func TestStakerDiffIterator(t *testing.T) {
 			StartTime: time.Unix(0, 0),
 			EndTime:   time.Unix(5, 0),
 			NextTime:  time.Unix(5, 0),
-			Priority:  PrimaryNetworkDelegatorPending,
+			Priority:  PrimaryNetworkDelegatorPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(5, 0),
 			EndTime:   time.Unix(10, 0),
 			NextTime:  time.Unix(10, 0),
-			Priority:  PrimaryNetworkDelegatorPending,
+			Priority:  PrimaryNetworkDelegatorPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(20, 0),
-			Priority:  PrimaryNetworkValidatorPending,
+			Priority:  PrimaryNetworkValidatorPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(20, 0),
-			Priority:  PrimaryNetworkDelegatorPending,
+			Priority:  PrimaryNetworkDelegatorPendingPriority,
 		},
 	}
 
@@ -117,19 +117,19 @@ func TestMutableStakerIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(10, 0),
 			NextTime: time.Unix(10, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(20, 0),
 			NextTime: time.Unix(20, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(30, 0),
 			NextTime: time.Unix(30, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 
@@ -140,19 +140,19 @@ func TestMutableStakerIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(5, 0),
 			NextTime: time.Unix(5, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(15, 0),
 			NextTime: time.Unix(15, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(25, 0),
 			NextTime: time.Unix(25, 0),
-			Priority: PrimaryNetworkValidatorCurrent,
+			Priority: PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 

@@ -360,7 +360,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 
 				staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 				staker.NextTime = staker.StartTime
-				staker.Priority = state.SubnetValidatorPending
+				staker.Priority = state.SubnetValidatorPendingPriority
 
 				env.state.PutPendingValidator(staker)
 				env.state.AddTx(tx, status.Committed)
@@ -439,7 +439,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetValidatorCurrent
+	staker.Priority = state.SubnetValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -463,7 +463,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	staker = state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.SubnetValidatorPending
+	staker.Priority = state.SubnetValidatorPendingPriority
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -527,7 +527,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 			staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 			staker.NextTime = staker.StartTime
-			staker.Priority = state.SubnetValidatorPending
+			staker.Priority = state.SubnetValidatorPendingPriority
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)
@@ -616,7 +616,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 	staker := state.NewPrimaryNetworkStaker(addDelegatorTx.ID(), &addDelegatorTx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkDelegatorPending
+	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
@@ -696,7 +696,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 	staker := state.NewPrimaryNetworkStaker(addDelegatorTx.ID(), &addDelegatorTx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkDelegatorPending
+	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
@@ -805,7 +805,7 @@ func addPendingValidator(
 		&addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx).Validator,
 	)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPending
+	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(addPendingValidatorTx, status.Committed)

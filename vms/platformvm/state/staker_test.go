@@ -26,12 +26,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorCurrent,
+				Priority: PrimaryNetworkValidatorCurrentPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(1, 0),
-				Priority: PrimaryNetworkValidatorCurrent,
+				Priority: PrimaryNetworkValidatorCurrentPriority,
 			},
 			less: true,
 		},
@@ -40,12 +40,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(1, 0),
-				Priority: PrimaryNetworkValidatorCurrent,
+				Priority: PrimaryNetworkValidatorCurrentPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorCurrent,
+				Priority: PrimaryNetworkValidatorCurrentPriority,
 			},
 			less: false,
 		},
@@ -54,12 +54,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkDelegatorPending,
+				Priority: PrimaryNetworkDelegatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorPending,
+				Priority: PrimaryNetworkValidatorPendingPriority,
 			},
 			less: true,
 		},
@@ -68,12 +68,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorPending,
+				Priority: PrimaryNetworkValidatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkDelegatorPending,
+				Priority: PrimaryNetworkDelegatorPendingPriority,
 			},
 			less: false,
 		},
@@ -82,12 +82,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{0}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorPending,
+				Priority: PrimaryNetworkValidatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{1}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorPending,
+				Priority: PrimaryNetworkValidatorPendingPriority,
 			},
 			less: true,
 		},
@@ -96,12 +96,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{1}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorPending,
+				Priority: PrimaryNetworkValidatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{0}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorPending,
+				Priority: PrimaryNetworkValidatorPendingPriority,
 			},
 			less: false,
 		},
@@ -110,12 +110,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorCurrent,
+				Priority: PrimaryNetworkValidatorCurrentPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: PrimaryNetworkValidatorCurrent,
+				Priority: PrimaryNetworkValidatorCurrentPriority,
 			},
 			less: false,
 		},

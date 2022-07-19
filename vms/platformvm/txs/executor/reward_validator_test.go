@@ -226,7 +226,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	)
 	vdrStaker.PotentialReward = 0
 	vdrStaker.NextTime = vdrStaker.EndTime
-	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrent
+	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 	delStaker := state.NewPrimaryNetworkStaker(
 		delTx.ID(),
@@ -234,7 +234,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	)
 	delStaker.PotentialReward = 1000000
 	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkDelegatorCurrent
+	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
@@ -351,7 +351,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	vdrStaker.PotentialReward = 0
 	vdrStaker.NextTime = vdrStaker.EndTime
-	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrent
+	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 	delStaker := state.NewPrimaryNetworkStaker(
 		delTx.ID(),
@@ -359,7 +359,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	delStaker.PotentialReward = 1000000
 	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkDelegatorCurrent
+	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
