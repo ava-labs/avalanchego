@@ -27,14 +27,19 @@ func TestMaskedIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			NextTime: time.Unix(2, 0),
 		},
+		{
+			TxID:     ids.GenerateTestID(),
+			NextTime: time.Unix(3, 0),
+		},
 	}
 	maskedStakers := map[ids.ID]*Staker{
 		stakers[0].TxID: stakers[0],
 		stakers[2].TxID: stakers[2],
+		stakers[3].TxID: stakers[3],
 	}
 
 	it := NewMaskedIterator(
-		NewSliceIterator(stakers...),
+		NewSliceIterator(stakers[:3]...),
 		maskedStakers,
 	)
 	for _, staker := range stakers[1:2] {
