@@ -971,6 +971,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		assert.NoError(err)
 		assert.EqualValues(59999999, staker1.PotentialReward)
 
+		_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		assert.ErrorIs(err, database.ErrNotFound)
+
 		_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 
