@@ -377,22 +377,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: remove this to make ParseBlock stateless
-	if block, err := vm.GetBlock(statelessBlk.ID()); err == nil {
-		// If we have seen this block before, return it with the most up-to-date
-		// info
-		return block, nil
-	}
-
-	/* TODO
-	return stateful.MakeStateful(
-		statelessBlk,
-		vm.manager,
-		vm.ctx,
-		choices.Processing,
-	)
-	*/
 	return vm.manager.NewBlock(statelessBlk), nil
 }
 
