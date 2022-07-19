@@ -95,14 +95,12 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	parentID := b.Parent()
 	parentState, ok := v.stateVersions.GetState(parentID)
 	if !ok {
-		return fmt.Errorf("could not retrieve state for parent block %s", parentID)
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 
 	cfg := v.txExecutorBackend.Config
 	currentTimestamp := parentState.GetTimestamp()
-	enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time)
-
-	if enbledAP5 {
+	if enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time); enbledAP5 {
 		return fmt.Errorf(
 			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
 			currentTimestamp.Unix(),
@@ -125,25 +123,27 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
 	// Check for conflicts in atomic inputs.
-	var nextBlock stateless.Block = b
-	for {
-		parentID := nextBlock.Parent()
-		parentState := v.blkIDToState[parentID]
-		if parentState == nil {
-			// The parent state isn't pinned in memory.
-			// This means the parent must be accepted already.
-			break
+	if len(atomicExecutor.Inputs) > 0 {
+		var nextBlock stateless.Block = b
+		for {
+			parentID := nextBlock.Parent()
+			parentState := v.blkIDToState[parentID]
+			if parentState == nil {
+				// The parent state isn't pinned in memory.
+				// This means the parent must be accepted already.
+				break
+			}
+			if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
+				return errConflictingParentTxs
+			}
+			parent, _, err := v.state.GetStatelessBlock(parentID)
+			if err != nil {
+				// The parent isn't in memory, so it should be on disk,
+				// but it isn't.
+				return err
+			}
+			nextBlock = parent
 		}
-		if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
-			return errConflictingParentTxs
-		}
-		parent, _, err := v.state.GetStatelessBlock(parentID)
-		if err != nil {
-			// The parent isn't in memory, so it should be on disk,
-			// but it isn't.
-			return err
-		}
-		nextBlock = parent
 	}
 
 	blkState := &blockState{
@@ -278,11 +278,15 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	}
 
 	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
-		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
+		return err
 	}
 
 	parentID := b.Parent()
-	onAcceptState := v.blkIDToState[parentID].onCommitState
+	parentState, ok := v.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+	}
+	onAcceptState := parentState.onCommitState
 	blkState := &blockState{
 		statelessBlock: b,
 		timestamp:      onAcceptState.GetTimestamp(),
@@ -306,7 +310,11 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 	}
 
 	parentID := b.Parent()
-	onAcceptState := v.blkIDToState[parentID].onAbortState
+	parentState, ok := v.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+	}
+	onAcceptState := parentState.onAbortState
 
 	blkState := &blockState{
 		statelessBlock: b,
