@@ -359,7 +359,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	delStaker.PotentialReward = 1000000
 	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
