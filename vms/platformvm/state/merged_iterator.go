@@ -49,7 +49,7 @@ func (it *mergedIterator) Next() bool {
 	}
 
 	if !it.initialized {
-		// We call Next() on each iterator in NewMultiIterator.
+		// We call Next() on each iterator in NewMergedIterator.
 		//
 		// Note that on the first call to Next() (i.e. here) we don't call
 		// Next() on the current iterator.
