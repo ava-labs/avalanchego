@@ -926,6 +926,11 @@ func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state
 
 // canDelegate returns true if [delegator] can be added as a delegator of
 // [validator].
+//
+// A [delegator] can be added if:
+// - [delegator]'s start time is not before [validator]'s start time
+// - [delegator]'s end time is not after [validator]'s end time
+// - the maximum total weight on [validator] will not exceed [weightLimit]
 func canDelegate(
 	state state.Chain,
 	validator *state.Staker,
@@ -969,6 +974,10 @@ func GetMaxWeight(
 
 	// TODO: We can optimize this by moving the current total weight to be
 	//       stored in the validator state.
+	//
+	// Calculate the current total weight on this validator, including the
+	// weight of the actual validator and the sum of the weights of all of the
+	// currently active delegators.
 	currentWeight := validator.Weight
 	for currentDelegatorIterator.Next() {
 		currentDelegator := currentDelegatorIterator.Value()
@@ -993,9 +1002,13 @@ func GetMaxWeight(
 	delegatorChangesIterator := state.NewStakerDiffIterator(currentDelegatorIterator, pendingDelegatorIterator)
 	defer delegatorChangesIterator.Release()
 
+	// Iterate over the future stake weight changes and calculate the maximum
+	// total weight on the validator, only including the points in the time
+	// range [startTime, endTime].
 	var currentMax uint64
 	for delegatorChangesIterator.Next() {
 		delegator, isAdded := delegatorChangesIterator.Value()
+		// [delegator.NextTime] > [endTime]
 		if delegator.NextTime.After(endTime) {
 			// This delegation change (and all following changes) occurs after
 			// [endTime]. Since we're calculating the max amount staked in
@@ -1003,6 +1016,7 @@ func GetMaxWeight(
 			break
 		}
 
+		// [delegator.NextTime] >= [startTime]
 		if !delegator.NextTime.Before(startTime) {
 			// We have advanced time to be at the inside of the delegation
 			// window. Make sure that the max weight is updated accordingly.
@@ -1020,7 +1034,8 @@ func GetMaxWeight(
 			return 0, err
 		}
 	}
-	// We have advanced time to be at the end of the delegation window. Make
-	// sure that the max weight is updated accordingly.
+	// Because we assume [startTime] < [endTime], we have advanced time to
+	// be at the end of the delegation window. Make sure that the max weight is
+	// updated accordingly.
 	return math.Max64(currentMax, currentWeight), nil
 }
