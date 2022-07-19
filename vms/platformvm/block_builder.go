@@ -299,7 +299,8 @@ func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID
 		currentStaker := currentStakerIterator.Value()
 		priority := currentStaker.Priority
 		// If the staker is a primary network staker (not a subnet validator),
-		// it's the next staker we will want to reward.
+		// it's the next staker we will want to remove with a RewardValidatorTx
+		// rather than an AdvanceTimeTx.
 		if priority == state.PrimaryNetworkDelegatorCurrent ||
 			priority == state.PrimaryNetworkValidatorCurrent {
 			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
