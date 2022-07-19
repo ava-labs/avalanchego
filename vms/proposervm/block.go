@@ -251,7 +251,10 @@ func (p *postForkCommonComponents) setInnerBlk(innerBlk snowman.Block) {
 func verifyIsOracleBlock(b snowman.Block) error {
 	oracle, ok := b.(snowman.OracleBlock)
 	if !ok {
-		return fmt.Errorf("%w: expected block %s to be a snowman.OracleBlock but it is a %T", errUnexpectedBlockType, b.ID(), b)
+		return fmt.Errorf(
+			"%w: expected block %s to be a snowman.OracleBlock but it's a %T",
+			errUnexpectedBlockType, b.ID(), b,
+		)
 	}
 	_, err := oracle.Options()
 	return err
@@ -265,7 +268,10 @@ func verifyIsNotOracleBlock(b snowman.Block) error {
 	_, err := oracle.Options()
 	switch err {
 	case nil:
-		return fmt.Errorf("%w: expected block %s not to be oracle block but it is", errUnexpectedBlockType, b.ID())
+		return fmt.Errorf(
+			"%w: expected block %s not to be oracle block but it's a %T",
+			errUnexpectedBlockType, b.ID(), b,
+		)
 	case snowman.ErrNotOracle:
 		return nil
 	default:
