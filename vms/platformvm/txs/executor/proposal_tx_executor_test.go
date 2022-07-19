@@ -886,7 +886,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		)
 		staker.PotentialReward = 0
 		staker.NextTime = staker.EndTime
-		staker.Priority = state.SubnetValidatorCurrentPriority
+		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
