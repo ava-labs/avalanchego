@@ -131,10 +131,11 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
+	inputs := ids.Set{ids.GenerateTestID(): struct{}{}}
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
-			e.Inputs = ids.Set{}
+			e.Inputs = inputs
 			return nil
 		},
 	).Times(1)
@@ -169,7 +170,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
 	assert.Equal(blk, gotBlkState.statelessBlock)
 	assert.Equal(onAccept, gotBlkState.onAcceptState)
-	assert.Equal(ids.Set{}, gotBlkState.inputs)
+	assert.Equal(inputs, gotBlkState.inputs)
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
