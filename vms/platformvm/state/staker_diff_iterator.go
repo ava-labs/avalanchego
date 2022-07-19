@@ -158,10 +158,10 @@ func (it *mutableStakerIterator) Next() bool {
 		nextIteratorStaker := it.iterator.Value()
 		nextHeapStaker := it.addedStakerHeap[0]
 		if nextIteratorStaker.Less(nextHeapStaker) {
-			it.nextStaker = it.iterator.Value()
+			it.nextStaker = nextIteratorStaker
 			it.iteratorExhausted = !it.iterator.Next()
 		} else {
-			it.nextStaker = it.addedStakerHeap[0]
+			it.nextStaker = nextHeapStaker
 			heap.Pop(it)
 		}
 	}
