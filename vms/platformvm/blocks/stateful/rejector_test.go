@@ -24,10 +24,9 @@ import (
 
 func TestRejectBlock(t *testing.T) {
 	type test struct {
-		name                  string
-		parentShouldBeRemoved bool
-		newBlockFunc          func() (stateless.Block, error)
-		rejectFunc            func(*rejector, stateless.Block) error
+		name         string
+		newBlockFunc func() (stateless.Block, error)
+		rejectFunc   func(*rejector, stateless.Block) error
 	}
 
 	tests := []test{
@@ -91,8 +90,7 @@ func TestRejectBlock(t *testing.T) {
 			},
 		},
 		{
-			name:                  "commit",
-			parentShouldBeRemoved: true,
+			name: "commit",
 			newBlockFunc: func() (stateless.Block, error) {
 				return stateless.NewCommitBlock(
 					ids.GenerateTestID(),
@@ -104,8 +102,7 @@ func TestRejectBlock(t *testing.T) {
 			},
 		},
 		{
-			name:                  "abort",
-			parentShouldBeRemoved: true,
+			name: "abort",
 			newBlockFunc: func() (stateless.Block, error) {
 				return stateless.NewAbortBlock(
 					ids.GenerateTestID(),
@@ -164,9 +161,6 @@ func TestRejectBlock(t *testing.T) {
 			assert.NoError(err)
 			// Make sure block and its parent are removed from the state map.
 			assert.NotContains(rejector.blkIDToState, blk.ID())
-			if tt.parentShouldBeRemoved {
-				assert.NotContains(rejector.blkIDToState, blk.Parent())
-			}
 		})
 	}
 }
