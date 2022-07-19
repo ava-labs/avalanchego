@@ -202,6 +202,8 @@ func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *
 	return validator
 }
 
+// pruneValidator assumes that the named validator is currently in the
+// [validators] map.
 func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 	subnetValidators := v.validators[subnetID]
 	validator := subnetValidators[nodeID]
