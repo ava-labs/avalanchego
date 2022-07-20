@@ -1069,8 +1069,6 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 	for nodeID, validatorDiff := range s.currentStakers.validatorDiffs[constants.PrimaryNetworkID] {
 		weightDiff := &ValidatorWeightDiff{}
-		weightDiffs[nodeID] = weightDiff
-
 		if validatorDiff.validatorModified {
 			staker := validatorDiff.validator
 
@@ -1136,6 +1134,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		if weightDiff.Amount == 0 {
 			continue
 		}
+		weightDiffs[nodeID] = weightDiff
 
 		weightDiffBytes, err := genesis.Codec.Marshal(txs.Version, weightDiff)
 		if err != nil {
@@ -1198,8 +1197,6 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 		weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
 			weightDiff := &ValidatorWeightDiff{}
-			weightDiffs[nodeID] = weightDiff
-
 			if validatorDiff.validatorModified {
 				staker := validatorDiff.validator
 
@@ -1221,6 +1218,7 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 			if weightDiff.Amount == 0 {
 				continue
 			}
+			weightDiffs[nodeID] = weightDiff
 
 			weightDiffBytes, err := genesis.Codec.Marshal(txs.Version, weightDiff)
 			if err != nil {

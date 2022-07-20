@@ -78,6 +78,173 @@ func TestStateSyncGenesis(t *testing.T) {
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
+func TestGetValidatorWeightDiffs(t *testing.T) {
+	assert := assert.New(t)
+	stateIntf, _ := newInitializedState(assert)
+	state := stateIntf.(*state)
+
+	txID0 := ids.GenerateTestID()
+	txID1 := ids.GenerateTestID()
+	txID2 := ids.GenerateTestID()
+	txID3 := ids.GenerateTestID()
+
+	nodeID0 := ids.GenerateTestNodeID()
+
+	subnetID0 := ids.GenerateTestID()
+
+	type stakerDiff struct {
+		validatorsToAdd    []*Staker
+		delegatorsToAdd    []*Staker
+		validatorsToRemove []*Staker
+		delegatorsToRemove []*Staker
+
+		expectedValidatorWeightDiffs map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff
+	}
+	stakerDiffs := []*stakerDiff{
+		{
+			validatorsToAdd: []*Staker{
+				{
+					TxID:     txID0,
+					NodeID:   nodeID0,
+					SubnetID: constants.PrimaryNetworkID,
+					Weight:   1,
+				},
+			},
+			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
+				constants.PrimaryNetworkID: {
+					nodeID0: {
+						Decrease: false,
+						Amount:   1,
+					},
+				},
+			},
+		},
+		{
+			validatorsToAdd: []*Staker{
+				{
+					TxID:     txID3,
+					NodeID:   nodeID0,
+					SubnetID: subnetID0,
+					Weight:   10,
+				},
+			},
+			delegatorsToAdd: []*Staker{
+				{
+					TxID:     txID1,
+					NodeID:   nodeID0,
+					SubnetID: constants.PrimaryNetworkID,
+					Weight:   5,
+				},
+			},
+			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
+				constants.PrimaryNetworkID: {
+					nodeID0: {
+						Decrease: false,
+						Amount:   5,
+					},
+				},
+				subnetID0: {
+					nodeID0: {
+						Decrease: false,
+						Amount:   10,
+					},
+				},
+			},
+		},
+		{
+			delegatorsToAdd: []*Staker{
+				{
+					TxID:     txID2,
+					NodeID:   nodeID0,
+					SubnetID: constants.PrimaryNetworkID,
+					Weight:   15,
+				},
+			},
+			delegatorsToRemove: []*Staker{
+				{
+					TxID:     txID1,
+					NodeID:   nodeID0,
+					SubnetID: constants.PrimaryNetworkID,
+					Weight:   5,
+				},
+			},
+			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
+				constants.PrimaryNetworkID: {
+					nodeID0: {
+						Decrease: false,
+						Amount:   10,
+					},
+				},
+			},
+		},
+		{
+			validatorsToRemove: []*Staker{
+				{
+					TxID:     txID0,
+					NodeID:   nodeID0,
+					SubnetID: constants.PrimaryNetworkID,
+					Weight:   1,
+				},
+				{
+					TxID:     txID3,
+					NodeID:   nodeID0,
+					SubnetID: subnetID0,
+					Weight:   10,
+				},
+			},
+			delegatorsToRemove: []*Staker{
+				{
+					TxID:     txID2,
+					NodeID:   nodeID0,
+					SubnetID: constants.PrimaryNetworkID,
+					Weight:   15,
+				},
+			},
+			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
+				constants.PrimaryNetworkID: {
+					nodeID0: {
+						Decrease: true,
+						Amount:   16,
+					},
+				},
+				subnetID0: {
+					nodeID0: {
+						Decrease: true,
+						Amount:   10,
+					},
+				},
+			},
+		},
+		{},
+	}
+
+	for i, stakerDiff := range stakerDiffs {
+		for _, validator := range stakerDiff.validatorsToAdd {
+			state.PutCurrentValidator(validator)
+		}
+		for _, delegator := range stakerDiff.delegatorsToAdd {
+			state.PutCurrentDelegator(delegator)
+		}
+		for _, validator := range stakerDiff.validatorsToRemove {
+			state.DeleteCurrentValidator(validator)
+		}
+		for _, delegator := range stakerDiff.delegatorsToRemove {
+			state.DeleteCurrentDelegator(delegator)
+		}
+		assert.NoError(state.Write(uint64(i + 1)))
+
+		for j, stakerDiff := range stakerDiffs[:i+1] {
+			for subnetID, expectedValidatorWeightDiffs := range stakerDiff.expectedValidatorWeightDiffs {
+				validatorWeightDiffs, err := state.GetValidatorWeightDiffs(uint64(j+1), subnetID)
+				assert.NoError(err)
+				assert.Equal(expectedValidatorWeightDiffs, validatorWeightDiffs)
+			}
+
+			state.validatorDiffsCache.Flush()
+		}
+	}
+}
+
 func newInitializedState(assert *assert.Assertions) (State, database.Database) {
 	state, db := newUninitializedState(assert)
 
