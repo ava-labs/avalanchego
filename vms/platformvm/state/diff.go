@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -13,19 +14,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Diff = &diff{}
+var (
+	_ Diff = &diff{}
+
+	errMissingParentState = errors.New("missing parent state")
+)
 
 type Diff interface {
 	Chain
 
-	SetBase(Chain)
 	Apply(State)
 }
 
 type diff struct {
 	Stakers
 
-	parentState Chain
+	parentID      ids.ID
+	stateVersions Versions
 
 	timestamp time.Time
 
@@ -53,16 +58,42 @@ type utxoModification struct {
 }
 
 func NewDiff(
-	parentState Chain,
-	current CurrentStakers,
-	pending PendingStakers,
-) Diff {
+	parentID ids.ID,
+	stateVersions Versions,
+) (Diff, error) {
+	parentState, ok := stateVersions.GetState(parentID)
+	if !ok {
+		return nil, errMissingParentState
+	}
 	return &diff{
-		Stakers:       NewStakers(current, pending),
-		parentState:   parentState,
+		Stakers: NewStakers(
+			parentState.CurrentStakers(),
+			parentState.PendingStakers(),
+		),
+		parentID:      parentID,
+		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
 		currentSupply: parentState.GetCurrentSupply(),
+	}, nil
+}
+
+func NewDiffWithValidators(
+	parentID ids.ID,
+	stateVersions Versions,
+	current CurrentStakers,
+	pending PendingStakers,
+) (Diff, error) {
+	parentState, ok := stateVersions.GetState(parentID)
+	if !ok {
+		return nil, errMissingParentState
 	}
+	return &diff{
+		Stakers:       NewStakers(current, pending),
+		parentID:      parentID,
+		stateVersions: stateVersions,
+		timestamp:     parentState.GetTimestamp(),
+		currentSupply: parentState.GetCurrentSupply(),
+	}, nil
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -83,12 +114,22 @@ func (d *diff) SetCurrentSupply(currentSupply uint64) {
 
 func (d *diff) GetSubnets() ([]*txs.Tx, error) {
 	if len(d.addedSubnets) == 0 {
-		return d.parentState.GetSubnets()
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return nil, errMissingParentState
+		}
+		return parentState.GetSubnets()
 	}
+
 	if len(d.cachedSubnets) != 0 {
 		return d.cachedSubnets, nil
 	}
-	subnets, err := d.parentState.GetSubnets()
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, errMissingParentState
+	}
+	subnets, err := parentState.GetSubnets()
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +153,11 @@ func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	addedChains := d.addedChains[subnetID]
 	if len(addedChains) == 0 {
 		// No chains have been added to this subnet
-		return d.parentState.GetChains(subnetID)
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return nil, errMissingParentState
+		}
+		return parentState.GetChains(subnetID)
 	}
 
 	// There have been chains added to the requested subnet
@@ -128,7 +173,11 @@ func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	}
 
 	// This chain wasn't cached yet
-	chains, err := d.parentState.GetChains(subnetID)
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, errMissingParentState
+	}
+	chains, err := parentState.GetChains(subnetID)
 	if err != nil {
 		return nil, err
 	}
@@ -160,11 +209,15 @@ func (d *diff) AddChain(createChainTx *txs.Tx) {
 }
 
 func (d *diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
-	tx, exists := d.addedTxs[txID]
-	if !exists {
-		return d.parentState.GetTx(txID)
+	if tx, exists := d.addedTxs[txID]; exists {
+		return tx.tx, tx.status, nil
 	}
-	return tx.tx, tx.status, nil
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, status.Unknown, errMissingParentState
+	}
+	return parentState.GetTx(txID)
 }
 
 func (d *diff) AddTx(tx *txs.Tx, status status.Status) {
@@ -186,7 +239,12 @@ func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	if utxos, exists := d.addedRewardUTXOs[txID]; exists {
 		return utxos, nil
 	}
-	return d.parentState.GetRewardUTXOs(txID)
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, errMissingParentState
+	}
+	return parentState.GetRewardUTXOs(txID)
 }
 
 func (d *diff) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
@@ -199,7 +257,11 @@ func (d *diff) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
 func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	utxo, modified := d.modifiedUTXOs[utxoID]
 	if !modified {
-		return d.parentState.GetUTXO(utxoID)
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return nil, errMissingParentState
+		}
+		return parentState.GetUTXO(utxoID)
 	}
 	if utxo.utxo == nil {
 		return nil, database.ErrNotFound
@@ -232,10 +294,6 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	} else {
 		d.modifiedUTXOs[utxoID] = newUTXO
 	}
-}
-
-func (d *diff) SetBase(parentState Chain) {
-	d.parentState = parentState
 }
 
 func (d *diff) Apply(baseState State) {

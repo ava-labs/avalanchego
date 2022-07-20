@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -18,7 +17,7 @@ var (
 
 func TestMemorySharedID(t *testing.T) {
 	m := Memory{}
-	err := m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(memdb.New())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +32,7 @@ func TestMemorySharedID(t *testing.T) {
 
 func TestMemoryMakeReleaseLock(t *testing.T) {
 	m := Memory{}
-	err := m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(memdb.New())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +60,7 @@ func TestMemoryMakeReleaseLock(t *testing.T) {
 
 func TestMemoryUnknownFree(t *testing.T) {
 	m := Memory{}
-	err := m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(memdb.New())
 	if err != nil {
 		t.Fatal(err)
 	}

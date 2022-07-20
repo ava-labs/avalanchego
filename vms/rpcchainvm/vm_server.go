@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/emptypb"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -113,6 +115,12 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		return nil, err
 	}
 
+	// gRPC client metrics
+	grpcClientMetrics := grpc_prometheus.NewClientMetrics()
+	if err := registerer.Register(grpcClientMetrics); err != nil {
+		return nil, err
+	}
+
 	// Register metrics for each Go plugin processes
 	vm.processMetrics = registerer
 
@@ -126,7 +134,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 			return nil, err
 		}
 
-		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr)
+		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr, grpcutils.DialOptsWithMetrics(grpcClientMetrics)...)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
@@ -147,7 +155,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	}
 	vm.dbManager = dbManager
 
-	clientConn, err := grpcutils.Dial(req.ServerAddr)
+	clientConn, err := grpcutils.Dial(req.ServerAddr, grpcutils.DialOptsWithMetrics(grpcClientMetrics)...)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()

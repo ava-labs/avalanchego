@@ -282,9 +282,9 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			}
 
 			executor := ProposalTxExecutor{
-				Backend:     &freshTH.backend,
-				ParentState: freshTH.state,
-				Tx:          tx,
+				Backend:  &freshTH.backend,
+				ParentID: lastAcceptedID,
+				Tx:       tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
@@ -325,9 +325,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -354,9 +354,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -405,9 +405,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -445,9 +445,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -472,9 +472,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -499,9 +499,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -529,9 +529,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -583,9 +583,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          duplicateSubnetTx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -618,9 +618,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -651,9 +651,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -683,9 +683,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -720,9 +720,9 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -764,9 +764,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -791,9 +791,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -818,9 +818,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -861,9 +861,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -897,9 +897,9 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:     &env.backend,
-			ParentState: env.state,
-			Tx:          tx,
+			Backend:  &env.backend,
+			ParentID: lastAcceptedID,
+			Tx:       tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

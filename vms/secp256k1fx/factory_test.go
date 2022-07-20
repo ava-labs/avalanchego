@@ -5,13 +5,14 @@ package secp256k1fx
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFactory(t *testing.T) {
+	assert := assert.New(t)
 	factory := Factory{}
-	if fx, err := factory.New(nil); err != nil {
-		t.Fatal(err)
-	} else if fx == nil {
-		t.Fatalf("Factory.New returned nil")
-	}
+	fx, err := factory.New(nil)
+	assert.NoError(err)
+	assert.NotNil(fx)
 }

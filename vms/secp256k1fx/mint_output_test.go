@@ -6,19 +6,20 @@ package secp256k1fx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOutputVerifyNil(t *testing.T) {
+	assert := assert.New(t)
 	out := (*MintOutput)(nil)
-	if err := out.Verify(); err == nil {
-		t.Fatalf("MintOutput.Verify should have returned an error due to an nil output")
-	}
+	assert.ErrorIs(out.Verify(), errNilOutput)
 }
 
 func TestMintOutputState(t *testing.T) {
+	assert := assert.New(t)
 	intf := interface{}(&MintOutput{})
-	if _, ok := intf.(verify.State); !ok {
-		t.Fatalf("should be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	assert.True(ok)
 }

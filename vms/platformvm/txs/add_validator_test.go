@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -34,12 +33,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	err = stx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, errNilSignedTx))
+	assert.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
 
 	// Case : unsigned tx is nil
-	err = addValidatorTx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, ErrNilTx))
+	assert.ErrorIs(addValidatorTx.SyntacticVerify(ctx), ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()

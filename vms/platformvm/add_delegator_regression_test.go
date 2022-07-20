@@ -57,14 +57,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	addValidatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
 
 	vm.clock.Set(validatorStartTime)
 
 	firstAdvanceTimeBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, firstAdvanceTimeBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, firstAdvanceTimeBlock)
 
 	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -88,14 +88,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	addFirstDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
 
 	vm.clock.Set(firstDelegatorStartTime)
 
 	secondAdvanceTimeBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, secondAdvanceTimeBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, secondAdvanceTimeBlock)
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -121,7 +121,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	addSecondDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
+	verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -223,7 +223,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			addValidatorBlock, err := vm.BuildBlock()
 			assert.NoError(err)
 
-			verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
+			verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
 
 			// create valid tx
 			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -245,7 +245,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			addFirstDelegatorBlock, err := vm.BuildBlock()
 			assert.NoError(err)
 
-			verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
+			verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
 
 			// create valid tx
 			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -267,7 +267,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			addSecondDelegatorBlock, err := vm.BuildBlock()
 			assert.NoError(err)
 
-			verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
+			verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
 
 			// create valid tx
 			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -289,7 +289,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			addThirdDelegatorBlock, err := vm.BuildBlock()
 			assert.NoError(err)
 
-			verifyAndAcceptProposalCommitment(assert, addThirdDelegatorBlock)
+			verifyAndAcceptProposalCommitment(assert, vm, addThirdDelegatorBlock)
 
 			// create valid tx
 			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -317,15 +317,14 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			assert.NoError(err)
 
-			verifyAndAcceptProposalCommitment(assert, addFourthDelegatorBlock)
+			verifyAndAcceptProposalCommitment(assert, vm, addFourthDelegatorBlock)
 		})
 	}
 }
 
-func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Block) {
+func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {
 	// Verify the proposed block
-	err := blk.Verify()
-	assert.NoError(err)
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	proposalBlk := blk.(snowman.OracleBlock)
@@ -350,12 +349,8 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Bl
 	assert.NoError(err)
 
 	// Accept the proposal block and the commit block
-	err = proposalBlk.Accept()
-	assert.NoError(err)
-
-	err = commit.Accept()
-	assert.NoError(err)
-
-	err = abort.Reject()
-	assert.NoError(err)
+	assert.NoError(proposalBlk.Accept())
+	assert.NoError(commit.Accept())
+	assert.NoError(abort.Reject())
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 }
