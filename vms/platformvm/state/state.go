@@ -1057,6 +1057,12 @@ func (s *state) Close() error {
 }
 
 func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
+	validatorDiffs, exists := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID]
+	if !exists {
+		// If there are no validator changes, we shouldn't update any diffs.
+		return nil
+	}
+
 	prefixStruct := heightWithSubnet{
 		Height:   height,
 		SubnetID: constants.PrimaryNetworkID,
@@ -1069,7 +1075,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 	diffDB := linkeddb.NewDefault(rawDiffDB)
 
 	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
-	for nodeID, validatorDiff := range s.currentStakers.validatorDiffs[constants.PrimaryNetworkID] {
+	for nodeID, validatorDiff := range validatorDiffs {
 		weightDiff := &ValidatorWeightDiff{}
 		if validatorDiff.validatorModified {
 			staker := validatorDiff.validator
