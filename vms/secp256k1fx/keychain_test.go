@@ -4,8 +4,9 @@
 package secp256k1fx
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -26,93 +27,71 @@ var (
 )
 
 func TestNewKeychain(t *testing.T) {
-	kc := NewKeychain()
-	if kc == nil {
-		t.Fatalf("NewKeychain returned a nil keychain")
-	}
+	assert := assert.New(t)
+	assert.NotNil(NewKeychain())
 }
 
 func TestKeychainGetUnknownAddr(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	addr, _ := ids.ShortFromString(addrs[0])
-	if _, exists := kc.Get(addr); exists {
-		t.Fatalf("Shouldn't have returned a key from an empty keychain")
-	}
+	_, exists := kc.Get(addr)
+	assert.False(exists)
 }
 
 func TestKeychainAdd(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	skBytes, err := formatting.Decode(formatting.HexNC, keys[0])
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	skIntff, err := kc.factory.ToPrivateKey(skBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	sk, ok := skIntff.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		t.Fatalf("Factory should have returned secp256k1r private key")
-	}
-
+	assert.True(ok, "Factory should have returned secp256k1r private key")
 	kc.Add(sk)
 
 	addr, _ := ids.ShortFromString(addrs[0])
-	if rsk, exists := kc.Get(addr); !exists {
-		t.Fatalf("Should have returned the key from the keychain")
-	} else if !bytes.Equal(rsk.Bytes(), sk.Bytes()) {
-		t.Fatalf("Returned wrong key from the keychain")
-	}
+	rsk, exists := kc.Get(addr)
+	assert.True(exists)
+	assert.Equal(sk.Bytes(), rsk.Bytes())
 
-	if addrs := kc.Addresses(); addrs.Len() != 1 {
-		t.Fatalf("Should have returned one address from the keychain")
-	} else if !addrs.Contains(addr) {
-		t.Fatalf("Keychain contains the wrong address")
-	}
+	addrs := kc.Addresses()
+	assert.Equal(1, addrs.Len())
+	assert.True(addrs.Contains(addr))
 }
 
 func TestKeychainNew(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
-	if addrs := kc.Addresses(); addrs.Len() != 0 {
-		t.Fatalf("Shouldn't have returned any addresses from the empty keychain")
-	}
+	assert.Equal(0, kc.Addresses().Len())
 
 	sk, err := kc.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	addr := sk.PublicKey().Address()
 
-	if addrs := kc.Addresses(); addrs.Len() != 1 {
-		t.Fatalf("Should have returned one address from the keychain")
-	} else if !addrs.Contains(addr) {
-		t.Fatalf("Keychain contains the wrong address")
-	}
+	addrs := kc.Addresses()
+	assert.Equal(1, addrs.Len())
+	assert.True(addrs.Contains(addr))
 }
 
 func TestKeychainMatch(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(err)
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(err)
 		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		if !ok {
-			t.Fatalf("Factory should have returned secp256k1r private key")
-		}
+		assert.True(ok, "Factory should have returned secp256k1r private key")
 		sks = append(sks, sk)
 	}
 
@@ -125,61 +104,41 @@ func TestKeychainMatch(t *testing.T) {
 			sks[2].PublicKey().Address(),
 		},
 	}
-	if err := owners.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(owners.Verify())
 
-	if _, _, ok := kc.Match(&owners, 0); ok {
-		t.Fatalf("Shouldn't have been able to match with the owners")
-	}
+	_, _, ok := kc.Match(&owners, 0)
+	assert.False(ok)
 
 	kc.Add(sks[1])
 
-	if indices, keys, ok := kc.Match(&owners, 1); !ok {
-		t.Fatalf("Should have been able to match with the owners")
-	} else if numIndices := len(indices); numIndices != 1 {
-		t.Fatalf("Should have returned one index")
-	} else if numKeys := len(keys); numKeys != 1 {
-		t.Fatalf("Should have returned one key")
-	} else if index := indices[0]; index != 0 {
-		t.Fatalf("Should have returned index 0 for the key")
-	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
-		t.Fatalf("Returned wrong key")
-	}
+	indices, keys, ok := kc.Match(&owners, 1)
+	assert.True(ok)
+	assert.Equal([]uint32{0}, indices)
+	assert.Len(keys, 1)
+	assert.Equal(sks[1].PublicKey().Address(), keys[0].PublicKey().Address())
 
 	kc.Add(sks[2])
 
-	if indices, keys, ok := kc.Match(&owners, 1); !ok {
-		t.Fatalf("Should have been able to match with the owners")
-	} else if numIndices := len(indices); numIndices != 1 {
-		t.Fatalf("Should have returned one index")
-	} else if numKeys := len(keys); numKeys != 1 {
-		t.Fatalf("Should have returned one key")
-	} else if index := indices[0]; index != 0 {
-		t.Fatalf("Should have returned index 0 for the key")
-	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
-		t.Fatalf("Returned wrong key")
-	}
+	indices, keys, ok = kc.Match(&owners, 1)
+	assert.True(ok)
+	assert.Equal([]uint32{0}, indices)
+	assert.Len(keys, 1)
+	assert.Equal(sks[1].PublicKey().Address(), keys[0].PublicKey().Address())
 }
 
 func TestKeychainSpendMint(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(err)
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(err)
 		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		if !ok {
-			t.Fatalf("Factory should have returned secp256k1r private key")
-		}
+		assert.True(ok, "Factory should have returned secp256k1r private key")
 		sks = append(sks, sk)
 	}
 
@@ -190,57 +149,40 @@ func TestKeychainSpendMint(t *testing.T) {
 			sks[2].PublicKey().Address(),
 		},
 	}}
-	if err := mint.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(mint.Verify())
 
-	if _, _, err := kc.Spend(&mint, 0); err == nil {
-		t.Fatalf("Shouldn't have been able to spend with no keys")
-	}
+	_, _, err := kc.Spend(&mint, 0)
+	assert.ErrorIs(err, errCantSpend)
 
 	kc.Add(sks[0])
 	kc.Add(sks[1])
 	kc.Add(sks[2])
 
-	if input, keys, err := kc.Spend(&mint, 0); err != nil {
-		t.Fatal(err)
-	} else if input, ok := input.(*Input); !ok {
-		t.Fatalf("Wrong input type returned")
-	} else if err := input.Verify(); err != nil {
-		t.Fatal(err)
-	} else if numSigs := len(input.SigIndices); numSigs != 2 {
-		t.Fatalf("Should have returned two signers")
-	} else if sig := input.SigIndices[0]; sig != 0 {
-		t.Fatalf("Should have returned index of secret key 1")
-	} else if sig := input.SigIndices[1]; sig != 1 {
-		t.Fatalf("Should have returned index of secret key 2")
-	} else if numKeys := len(keys); numKeys != 2 {
-		t.Fatalf("Should have returned two keys")
-	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
-		t.Fatalf("Returned wrong key")
-	} else if key := keys[1]; key.PublicKey().Address() != sks[2].PublicKey().Address() {
-		t.Fatalf("Returned wrong key")
-	}
+	vinput, keys, err := kc.Spend(&mint, 0)
+	assert.NoError(err)
+
+	input, ok := vinput.(*Input)
+	assert.True(ok)
+	assert.NoError(input.Verify())
+	assert.Equal([]uint32{0, 1}, input.SigIndices)
+	assert.Len(keys, 2)
+	assert.Equal(sks[1].PublicKey().Address(), keys[0].PublicKey().Address())
+	assert.Equal(sks[2].PublicKey().Address(), keys[1].PublicKey().Address())
 }
 
 func TestKeychainSpendTransfer(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(err)
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(err)
 		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		if !ok {
-			t.Fatalf("Factory should have returned secp256k1r private key")
-		}
+		assert.True(ok, "Factory should have returned secp256k1r private key")
 		sks = append(sks, sk)
 	}
 
@@ -255,93 +197,61 @@ func TestKeychainSpendTransfer(t *testing.T) {
 			},
 		},
 	}
-	if err := transfer.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(transfer.Verify())
 
-	if _, _, err := kc.Spend(&transfer, 54321); err == nil {
-		t.Fatalf("Shouldn't have been able to spend with no keys")
-	}
+	_, _, err := kc.Spend(&transfer, 54321)
+	assert.ErrorIs(err, errCantSpend)
 
 	kc.Add(sks[0])
 	kc.Add(sks[1])
 	kc.Add(sks[2])
 
-	if _, _, err := kc.Spend(&transfer, 4321); err == nil {
-		t.Fatalf("Shouldn't have been able timelocked funds")
-	}
+	_, _, err = kc.Spend(&transfer, 4321)
+	assert.ErrorIs(err, errCantSpend)
 
-	if input, keys, err := kc.Spend(&transfer, 54321); err != nil {
-		t.Fatal(err)
-	} else if input, ok := input.(*TransferInput); !ok {
-		t.Fatalf("Wrong input type returned")
-	} else if err := input.Verify(); err != nil {
-		t.Fatal(err)
-	} else if amt := input.Amount(); amt != 12345 {
-		t.Fatalf("Wrong amount returned from input")
-	} else if numSigs := len(input.SigIndices); numSigs != 2 {
-		t.Fatalf("Should have returned two signers")
-	} else if sig := input.SigIndices[0]; sig != 0 {
-		t.Fatalf("Should have returned index of secret key 1")
-	} else if sig := input.SigIndices[1]; sig != 1 {
-		t.Fatalf("Should have returned index of secret key 2")
-	} else if numKeys := len(keys); numKeys != 2 {
-		t.Fatalf("Should have returned two keys")
-	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
-		t.Fatalf("Returned wrong key")
-	} else if key := keys[1]; key.PublicKey().Address() != sks[2].PublicKey().Address() {
-		t.Fatalf("Returned wrong key")
-	}
+	vinput, keys, err := kc.Spend(&transfer, 54321)
+	assert.NoError(err)
+
+	input, ok := vinput.(*TransferInput)
+	assert.True(ok)
+	assert.NoError(input.Verify())
+	assert.Equal(uint64(12345), input.Amount())
+	assert.Equal([]uint32{0, 1}, input.SigIndices)
+	assert.Len(keys, 2)
+	assert.Equal(sks[1].PublicKey().Address(), keys[0].PublicKey().Address())
+	assert.Equal(sks[2].PublicKey().Address(), keys[1].PublicKey().Address())
 }
 
 func TestKeychainString(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	skBytes, err := formatting.Decode(formatting.HexNC, keys[0])
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	skIntf, err := kc.factory.ToPrivateKey(skBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		t.Fatalf("Factory should have returned secp256k1r private key")
-	}
-
+	assert.True(ok, "Factory should have returned secp256k1r private key")
 	kc.Add(sk)
 
 	expected := "Key[0]: Key: 0xb1ed77ad48555d49f03a7465f0685a7d86bfd5f3a3ccf1be01971ea8dec5471c Address: B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW"
-
-	if result := kc.String(); result != expected {
-		t.Fatalf("Keychain.String returned:\n%s\nexpected:\n%s", result, expected)
-	}
+	assert.Equal(expected, kc.String())
 }
 
 func TestKeychainPrefixedString(t *testing.T) {
+	assert := assert.New(t)
 	kc := NewKeychain()
 
 	skBytes, err := formatting.Decode(formatting.HexNC, keys[0])
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	skIntf, err := kc.factory.ToPrivateKey(skBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		t.Fatalf("Factory should have returned secp256k1r private key")
-	}
-
+	assert.True(ok, "Factory should have returned secp256k1r private key")
 	kc.Add(sk)
 
 	expected := "xDKey[0]: Key: 0xb1ed77ad48555d49f03a7465f0685a7d86bfd5f3a3ccf1be01971ea8dec5471c Address: B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW"
-
-	if result := kc.PrefixedString("xD"); result != expected {
-		t.Fatalf(`Keychain.PrefixedString("xD") returned:\n%s\nexpected:\n%s`, result, expected)
-	}
+	assert.Equal(expected, kc.PrefixedString("xD"))
 }

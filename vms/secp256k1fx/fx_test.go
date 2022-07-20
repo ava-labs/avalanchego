@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -50,26 +52,23 @@ func init() {
 }
 
 func TestFxInitialize(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
-	err := fx.Initialize(&vm)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 }
 
 func TestFxInitializeInvalid(t *testing.T) {
+	assert := assert.New(t)
 	fx := Fx{}
-	err := fx.Initialize(nil)
-	if err == nil {
-		t.Fatalf("Should have returned an error")
-	}
+	assert.ErrorIs(fx.Initialize(nil), errWrongVMType)
 }
 
 func TestFxVerifyTransfer(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -77,15 +76,9 @@ func TestFxVerifyTransfer(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapping(); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapped(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
+	assert.NoError(fx.Bootstrapping())
+	assert.NoError(fx.Bootstrapped())
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -109,12 +102,11 @@ func TestFxVerifyTransfer(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.VerifyTransfer(tx, in, cred, out))
 }
 
 func TestFxVerifyTransferNilTx(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -122,9 +114,7 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	out := &TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -147,12 +137,11 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(nil, in, cred, out); err == nil {
-		t.Fatalf("Should have failed verification due to a nil tx")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(nil, in, cred, out), errWrongTxType)
 }
 
 func TestFxVerifyTransferNilOutput(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -160,9 +149,7 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	in := &TransferInput{
 		Amt: 1,
@@ -176,12 +163,11 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, nil); err == nil {
-		t.Fatalf("Should have failed verification due to a nil output")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, cred, nil), errWrongUTXOType)
 }
 
 func TestFxVerifyTransferNilInput(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -189,9 +175,7 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -209,12 +193,11 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, nil, cred, out); err == nil {
-		t.Fatalf("Should have failed verification due to a nil input")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, nil, cred, out), errWrongInputType)
 }
 
 func TestFxVerifyTransferNilCredential(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -222,9 +205,7 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -243,12 +224,11 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, nil, out); err == nil {
-		t.Fatalf("Should have failed verification due to a nil credential")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, nil, out), errWrongCredentialType)
 }
 
 func TestFxVerifyTransferInvalidOutput(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -256,9 +236,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -282,12 +260,11 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to an invalid output")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errOutputUnoptimized)
 }
 
 func TestFxVerifyTransferWrongAmounts(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -295,9 +272,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -321,12 +296,11 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to different amounts")
-	}
+	assert.Error(fx.VerifyTransfer(tx, in, cred, out))
 }
 
 func TestFxVerifyTransferTimelocked(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -334,9 +308,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -360,12 +332,11 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to a timelocked output")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errTimelocked)
 }
 
 func TestFxVerifyTransferTooManySigners(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -373,9 +344,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -400,12 +369,11 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to too many signers")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errTooManySigners)
 }
 
 func TestFxVerifyTransferTooFewSigners(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -413,9 +381,7 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -437,12 +403,11 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 		Sigs: [][crypto.SECP256K1RSigLen]byte{},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to too few signers")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errTooFewSigners)
 }
 
 func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -450,9 +415,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -477,12 +440,11 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to too mismatched signers")
-	}
+	assert.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errInputCredentialSignersMismatch)
 }
 
 func TestFxVerifyTransferInvalidSignature(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -490,12 +452,8 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapping(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
+	assert.NoError(fx.Bootstrapping())
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -519,20 +477,13 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fx.Bootstrapped(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to an invalid signature")
-	}
+	assert.NoError(fx.VerifyTransfer(tx, in, cred, out))
+	assert.NoError(fx.Bootstrapped())
+	assert.Error(fx.VerifyTransfer(tx, in, cred, out), errAddrsNotSortedUnique)
 }
 
 func TestFxVerifyTransferWrongSigner(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -540,12 +491,8 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapping(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
+	assert.NoError(fx.Bootstrapping())
 	tx := &TestTx{UnsignedBytes: txBytes}
 	out := &TransferOutput{
 		Amt: 1,
@@ -569,20 +516,13 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		},
 	}
 
-	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fx.Bootstrapped(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
-		t.Fatalf("Should have errored due to a wrong signer")
-	}
+	assert.NoError(fx.VerifyTransfer(tx, in, cred, out))
+	assert.NoError(fx.Bootstrapped())
+	assert.Error(fx.VerifyTransfer(tx, in, cred, out))
 }
 
 func TestFxVerifyOperation(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -590,9 +530,7 @@ func TestFxVerifyOperation(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
@@ -632,13 +570,11 @@ func TestFxVerifyOperation(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	err := fx.VerifyOperation(tx, op, cred, utxos)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.VerifyOperation(tx, op, cred, utxos))
 }
 
 func TestFxVerifyOperationUnknownTx(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -646,9 +582,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
@@ -687,13 +621,11 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	err := fx.VerifyOperation(nil, op, cred, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to an invalid tx type")
-	}
+	assert.ErrorIs(fx.VerifyOperation(nil, op, cred, utxos), errWrongTxType)
 }
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -701,9 +633,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
@@ -720,13 +650,11 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	err := fx.VerifyOperation(tx, nil, cred, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to an invalid operation type")
-	}
+	assert.ErrorIs(fx.VerifyOperation(tx, nil, cred, utxos), errWrongOpType)
 }
 
 func TestFxVerifyOperationUnknownCredential(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -734,9 +662,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
@@ -771,13 +697,11 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	err := fx.VerifyOperation(tx, op, nil, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to an invalid credential type")
-	}
+	assert.ErrorIs(fx.VerifyOperation(tx, op, nil, utxos), errWrongCredentialType)
 }
 
 func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -785,9 +709,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
@@ -827,13 +749,11 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo, utxo}
-	err := fx.VerifyOperation(tx, op, cred, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to a wrong number of utxos")
-	}
+	assert.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongNumberOfUTXOs)
 }
 
 func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -841,9 +761,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	op := &MintOperation{
 		MintInput: Input{
@@ -875,13 +793,11 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	}
 
 	utxos := []interface{}{nil}
-	err := fx.VerifyOperation(tx, op, cred, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to an invalid utxo type")
-	}
+	assert.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongUTXOType)
 }
 
 func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -889,9 +805,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
@@ -928,13 +842,11 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	err := fx.VerifyOperation(tx, op, cred, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to a failed verify")
-	}
+	assert.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errOutputUnspendable)
 }
 
 func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -942,9 +854,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.CLK.Set(date)
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
 	tx := &TestTx{UnsignedBytes: txBytes}
 	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
@@ -979,27 +889,19 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	err := fx.VerifyOperation(tx, op, cred, utxos)
-	if err == nil {
-		t.Fatalf("Should have errored due to the wrong MintOutput being created")
-	}
+	assert.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongMintCreated)
 }
 
 func TestVerifyPermission(t *testing.T) {
+	assert := assert.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapping(); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapped(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(fx.Initialize(&vm))
+	assert.NoError(fx.Bootstrapping())
+	assert.NoError(fx.Bootstrapped())
 
 	type test struct {
 		description string
@@ -1134,10 +1036,11 @@ func TestVerifyPermission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if err := fx.VerifyPermission(test.tx, test.in, test.cred, test.cg); err != nil && !test.shouldErr {
-			t.Fatalf("test '%s' errored but it shouldn't have: %s", test.description, err)
-		} else if err == nil && test.shouldErr {
-			t.Fatalf("test '%s' should have errored but didn't", test.description)
+		err := fx.VerifyPermission(test.tx, test.in, test.cred, test.cg)
+		if test.shouldErr {
+			assert.Errorf(err, "test '%s' should have errored but didn't", test.description)
+		} else {
+			assert.NoErrorf(err, "test '%s' errored but it shouldn't have", test.description)
 		}
 	}
 }

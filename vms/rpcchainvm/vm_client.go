@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"time"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
-
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
