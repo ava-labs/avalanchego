@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -353,6 +354,105 @@ func TestDiffTx(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(status.Committed, gotStatus)
 		assert.Equal(parentTx, gotParentTx)
+	}
+}
+
+func TestDiffRewardUTXO(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := NewMockState(ctrl)
+	// Called in NewDiff
+	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	d, err := NewDiff(lastAcceptedID, states)
+	assert.NoError(err)
+
+	// Put a reward UTXO
+	txID := ids.GenerateTestID()
+	rewardUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID},
+	}
+	d.AddRewardUTXO(txID, rewardUTXO)
+
+	{
+		// Assert that we get the UTXO back
+		gotRewardUTXOs, err := d.GetRewardUTXOs(txID)
+		assert.NoError(err)
+		assert.Len(gotRewardUTXOs, 1)
+		assert.Equal(rewardUTXO, gotRewardUTXOs[0])
+	}
+
+	{
+		// Assert that we can get a UTXO from the parent state
+		// [state] returns 1 UTXO.
+		txID2 := ids.GenerateTestID()
+		parentRewardUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{TxID: txID2},
+		}
+		state.EXPECT().GetRewardUTXOs(txID2).Return([]*avax.UTXO{parentRewardUTXO}, nil).Times(1)
+		gotParentRewardUTXOs, err := d.GetRewardUTXOs(txID2)
+		assert.NoError(err)
+		assert.Len(gotParentRewardUTXOs, 1)
+		assert.Equal(parentRewardUTXO, gotParentRewardUTXOs[0])
+	}
+}
+
+func TestDiffUTXO(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := NewMockState(ctrl)
+	// Called in NewDiff
+	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	d, err := NewDiff(lastAcceptedID, states)
+	assert.NoError(err)
+
+	// Put a UTXO
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
+	}
+	d.AddUTXO(utxo)
+
+	{
+		// Assert that we get the UTXO back
+		gotUTXO, err := d.GetUTXO(utxo.InputID())
+		assert.NoError(err)
+		assert.Equal(utxo, gotUTXO)
+	}
+
+	{
+		// Assert that we can get a UTXO from the parent state
+		// [state] returns 1 UTXO.
+		parentUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
+		}
+		state.EXPECT().GetUTXO(parentUTXO.InputID()).Return(parentUTXO, nil).Times(1)
+		gotParentUTXO, err := d.GetUTXO(parentUTXO.InputID())
+		assert.NoError(err)
+		assert.Equal(parentUTXO, gotParentUTXO)
+	}
+
+	{
+		// Delete the UTXO
+		d.DeleteUTXO(utxo.InputID())
+
+		// Make sure it's gone
+		_, err = d.GetUTXO(utxo.InputID())
+		assert.Error(err)
 	}
 }
 
