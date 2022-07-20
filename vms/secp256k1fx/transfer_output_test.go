@@ -4,8 +4,9 @@
 package secp256k1fx
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestOutputAmount(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -24,12 +26,11 @@ func TestOutputAmount(t *testing.T) {
 			},
 		},
 	}
-	if amount := out.Amount(); amount != 1 {
-		t.Fatalf("Output.Amount returned the wrong amount. Result: %d ; Expected: %d", amount, 1)
-	}
+	assert.Equal(uint64(1), out.Amount())
 }
 
 func TestOutputVerify(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -40,21 +41,17 @@ func TestOutputVerify(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(out.Verify())
 }
 
 func TestOutputVerifyNil(t *testing.T) {
+	assert := assert.New(t)
 	out := (*TransferOutput)(nil)
-	err := out.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a nil output")
-	}
+	assert.ErrorIs(out.Verify(), errNilOutput)
 }
 
 func TestOutputVerifyNoValue(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 0,
 		OutputOwners: OutputOwners{
@@ -65,13 +62,11 @@ func TestOutputVerifyNoValue(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a no value output")
-	}
+	assert.ErrorIs(out.Verify(), errNoValueOutput)
 }
 
 func TestOutputVerifyUnspendable(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -82,13 +77,11 @@ func TestOutputVerifyUnspendable(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with an unspendable output")
-	}
+	assert.ErrorIs(out.Verify(), errOutputUnspendable)
 }
 
 func TestOutputVerifyUnoptimized(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -99,13 +92,11 @@ func TestOutputVerifyUnoptimized(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with an unoptimized output")
-	}
+	assert.ErrorIs(out.Verify(), errOutputUnoptimized)
 }
 
 func TestOutputVerifyUnsorted(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -117,13 +108,11 @@ func TestOutputVerifyUnsorted(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with an unsorted output")
-	}
+	assert.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
 }
 
 func TestOutputVerifyDuplicated(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -135,18 +124,14 @@ func TestOutputVerifyDuplicated(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a duplicated output")
-	}
+	assert.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
 }
 
 func TestOutputSerialize(t *testing.T) {
+	assert := assert.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(0, c); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -187,22 +172,15 @@ func TestOutputSerialize(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(out.Verify())
 
 	result, err := m.Marshal(0, &out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	assert.NoError(err)
+	assert.Equal(expected, result)
 }
 
 func TestOutputAddresses(t *testing.T) {
+	assert := assert.New(t)
 	out := TransferOutput{
 		Amt: 12345,
 		OutputOwners: OutputOwners{
@@ -222,27 +200,16 @@ func TestOutputAddresses(t *testing.T) {
 			},
 		},
 	}
-	err := out.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	addrs := out.Addresses()
-	if len(addrs) != 2 {
-		t.Fatalf("Wrong number of addresses")
-	}
-
-	if addr := addrs[0]; !bytes.Equal(addr, out.Addrs[0].Bytes()) {
-		t.Fatalf("Wrong address returned")
-	}
-	if addr := addrs[1]; !bytes.Equal(addr, out.Addrs[1].Bytes()) {
-		t.Fatalf("Wrong address returned")
-	}
+	assert.NoError(out.Verify())
+	assert.Equal([][]byte{
+		out.Addrs[0].Bytes(),
+		out.Addrs[1].Bytes(),
+	}, out.Addresses())
 }
 
 func TestTransferOutputState(t *testing.T) {
+	assert := assert.New(t)
 	intf := interface{}(&TransferOutput{})
-	if _, ok := intf.(verify.State); !ok {
-		t.Fatalf("should be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	assert.True(ok)
 }

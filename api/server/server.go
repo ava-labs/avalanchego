@@ -27,7 +27,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const baseURL = "/ext"
+const (
+	baseURL           = "/ext"
+	readHeaderTimeout = 10 * time.Second
+)
 
 var (
 	errUnknownLockOption = errors.New("invalid lock options")
@@ -164,7 +167,10 @@ func (s *server) Dispatch() error {
 		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
 	}
 
-	s.srv = &http.Server{Handler: s.handler}
+	s.srv = &http.Server{
+		Handler:           s.handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
 	return s.srv.Serve(listener)
 }
 
@@ -191,7 +197,11 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
 	}
 
-	s.srv = &http.Server{Addr: listenAddress, Handler: s.handler}
+	s.srv = &http.Server{
+		Addr:              listenAddress,
+		Handler:           s.handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
 	return s.srv.Serve(listener)
 }
 
