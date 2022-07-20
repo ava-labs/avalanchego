@@ -61,13 +61,14 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             []*crypto.PrivateKeySECP256K1R
+	preFundedKeys             = crypto.BuildTestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
-	testSubnet1               *txs.Tx
-	testSubnet1ControlKeys    []*crypto.PrivateKeySECP256K1R
+
+	testSubnet1            *txs.Tx
+	testSubnet1ControlKeys = preFundedKeys[0:3]
 
 	testKeyFactory = crypto.FactorySECP256K1R{}
 )
@@ -102,6 +103,7 @@ type testHelpersCollection struct {
 	utxosMan       utxo.Handler
 	txBuilder      tx_builder.Builder
 	txExecBackend  executor.Backend
+	stateVersions  state.Versions
 }
 
 // TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
@@ -115,11 +117,6 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 		return ids.ID{}, errors.New("")
 	}
 	return subnetID, nil
-}
-
-func init() {
-	preFundedKeys = crypto.BuildTestKeys()
-	testSubnet1ControlKeys = preFundedKeys[0:3]
 }
 
 func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
@@ -156,15 +153,18 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 		res.utxosMan,
 	)
 
+	genesisID := res.fullState.GetLastAccepted()
+	res.stateVersions = state.NewVersions(genesisID, res.fullState)
 	res.txExecBackend = executor.Backend{
-		Config:       res.cfg,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosMan,
-		Uptimes:      res.uptimeMan,
-		Rewards:      rewardsCalc,
+		Config:        res.cfg,
+		Ctx:           res.ctx,
+		Clk:           res.clk,
+		Bootstrapped:  res.isBootstrapped,
+		Fx:            res.fx,
+		FlowChecker:   res.utxosMan,
+		Uptimes:       res.uptimeMan,
+		Rewards:       rewardsCalc,
+		StateVersions: res.stateVersions,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -188,7 +188,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	}
 	res.blkManager = stateful.NewManager(
 		res.mpool,
-		*metrics,
+		metrics,
 		res.fullState,
 		res.txExecBackend,
 		window,
@@ -203,8 +203,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 		res.sender,
 	)
 
-	lastAcceptedID := res.fullState.GetLastAccepted()
-	if err := res.BlockBuilder.SetPreference(lastAcceptedID); err != nil {
+	if err := res.BlockBuilder.SetPreference(genesisID); err != nil {
 		panic(fmt.Errorf("failed setting last accepted block: %w", err))
 	}
 
@@ -214,9 +213,9 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 }
 
 func addSubnet(
-	tState state.State,
+	baseState state.State,
 	txBuilder tx_builder.Builder,
-	txExecBackend executor.Backend,
+	backend executor.Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -235,23 +234,25 @@ func addSubnet(
 	}
 
 	// store it
-	versionedState := state.NewDiff(
-		tState,
-		tState.CurrentStakers(),
-		tState.PendingStakers(),
-	)
+	genesisID := baseState.GetLastAccepted()
+	stateDiff, err := state.NewDiff(genesisID, backend.StateVersions)
+	if err != nil {
+		panic(err)
+	}
 
 	executor := executor.StandardTxExecutor{
-		Backend: &txExecBackend,
-		State:   versionedState,
+		Backend: &backend,
+		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {
 		panic(err)
 	}
-	versionedState.AddTx(testSubnet1, status.Committed)
-	versionedState.Apply(tState)
+
+	stateDiff.AddTx(testSubnet1, status.Committed)
+	stateDiff.Apply(baseState)
+	backend.StateVersions.SetState(genesisID, baseState)
 }
 
 func defaultState(
@@ -296,7 +297,7 @@ func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
+	err := m.Initialize(atomicDB)
 	if err != nil {
 		panic(err)
 	}

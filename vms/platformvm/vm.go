@@ -81,7 +81,8 @@ type VM struct {
 	atomicUtxosManager avax.AtomicUTXOManager
 	uptimeManager      uptime.Manager
 
-	state state.State
+	state         state.State
+	stateVersions state.Versions
 
 	fx            fx.Fx
 	codecRegistry codec.Registry
@@ -160,6 +161,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	lastAcceptedID := vm.state.GetLastAccepted()
+	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+	vm.stateVersions = state.NewVersions(lastAcceptedID, vm.state)
+
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.state, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state)
@@ -176,14 +181,15 @@ func (vm *VM) Initialize(
 	)
 
 	vm.txExecutorBackend = executor.Backend{
-		Config:       &vm.Config,
-		Ctx:          vm.ctx,
-		Clk:          &vm.clock,
-		Fx:           vm.fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      vm.uptimeManager,
-		Rewards:      rewards,
-		Bootstrapped: &vm.bootstrapped,
+		Config:        &vm.Config,
+		Ctx:           vm.ctx,
+		Clk:           &vm.clock,
+		Fx:            vm.fx,
+		FlowChecker:   utxoHandler,
+		Uptimes:       vm.uptimeManager,
+		Rewards:       rewards,
+		Bootstrapped:  &vm.bootstrapped,
+		StateVersions: vm.stateVersions,
 	}
 
 	// Note: there is a circular dependency among mempool and blkBuilder
@@ -195,7 +201,7 @@ func (vm *VM) Initialize(
 
 	vm.manager = stateful.NewManager(
 		mempool,
-		*vm.metrics,
+		vm.metrics,
 		vm.state,
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
@@ -223,10 +229,6 @@ func (vm *VM) Initialize(
 		)
 	}
 
-	lastAcceptedID := vm.state.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
-
-	// Build off the most recently accepted block
 	return vm.SetPreference(lastAcceptedID)
 }
 
@@ -360,22 +362,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: remove this to make ParseBlock stateless
-	if block, err := vm.GetBlock(statelessBlk.ID()); err == nil {
-		// If we have seen this block before, return it with the most up-to-date
-		// info
-		return block, nil
-	}
-
-	/* TODO
-	return stateful.MakeStateful(
-		statelessBlk,
-		vm.manager,
-		vm.ctx,
-		choices.Processing,
-	)
-	*/
 	return vm.manager.NewBlock(statelessBlk), nil
 }
 

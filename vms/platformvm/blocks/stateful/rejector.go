@@ -28,12 +28,14 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Verbo(
-			"failed to reissue tx %q due to: %s",
+			"failed to reissue tx %s from block %s due to: %s",
 			b.Tx.ID(),
+			blkID,
 			err,
 		)
 	}
 
+	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -51,12 +53,14 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Debug(
-			"failed to reissue tx %q due to: %s",
+			"failed to reissue tx %s from block %s due to: %s",
 			b.Tx.ID(),
+			blkID,
 			err,
 		)
 	}
 
+	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -75,13 +79,15 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	for _, tx := range b.Txs {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
-				"failed to reissue tx %q due to: %s",
+				"failed to reissue tx %s from block %s due to: %s",
 				tx.ID(),
+				blkID,
 				err,
 			)
 		}
 	}
 
+	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -96,12 +102,7 @@ func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
 
 func (r *rejector) rejectOptionBlock(b stateless.Block, isCommit bool) error {
 	blkID := b.ID()
-	defer func() {
-		r.free(blkID)
-		// We assume that this block's sibling has already been accepted
-		// and doesn't need the parent's state anymore.
-		r.free(b.Parent())
-	}()
+	defer r.free(blkID)
 
 	if isCommit {
 		r.ctx.Log.Verbo(
@@ -119,6 +120,7 @@ func (r *rejector) rejectOptionBlock(b stateless.Block, isCommit bool) error {
 		)
 	}
 
+	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }

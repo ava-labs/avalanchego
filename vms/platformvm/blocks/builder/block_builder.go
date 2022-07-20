@@ -132,21 +132,12 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	// Get the preferred block (which we want to build off)
-	preferred, err := b.Preferred()
-	if err != nil {
-		return fmt.Errorf("couldn't get preferred block: %w", err)
-	}
-
-	preferredState := b.blkManager.OnAccept(preferred.ID())
-
 	verifier := executor.MempoolTxVerifier{
-		Backend:     &b.txExecutorBackend,
-		ParentState: preferredState,
-		Tx:          tx,
+		Backend:  &b.txExecutorBackend,
+		ParentID: b.preferredBlockID,
+		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&verifier)
-	if err != nil {
+	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		b.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -159,7 +150,11 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 
 // BuildBlock builds a block to be added to consensus
 func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
-	ctx := b.txExecutorBackend.Ctx
+	var (
+		ctx           = b.txExecutorBackend.Ctx
+		stateVersions = b.txExecutorBackend.StateVersions
+	)
+
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
@@ -176,7 +171,10 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
-	preferredState := b.blkManager.OnAccept(preferredID)
+	preferredState, ok := stateVersions.GetState(preferredID)
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve state for block %s, which should be a decision block", preferredID)
+	}
 
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
@@ -286,13 +284,17 @@ func (b *blockBuilder) resetTimer() {
 		b.notifyBlockReady()
 		return
 	}
-	ctx := b.txExecutorBackend.Ctx
-	preferred, err := b.Preferred()
-	if err != nil {
+
+	var (
+		ctx           = b.txExecutorBackend.Ctx
+		stateVersions = b.txExecutorBackend.StateVersions
+	)
+
+	preferredState, ok := stateVersions.GetState(b.preferredBlockID)
+	if !ok {
+		ctx.Log.Error("could not retrieve state for block %s. Preferred block must be a decision block", b.preferredBlockID)
 		return
 	}
-
-	preferredState := b.blkManager.OnAccept(preferred.ID())
 
 	_, shouldReward, err := b.getStakerToReward(preferredState)
 	if err != nil {

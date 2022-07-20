@@ -12,21 +12,20 @@ import (
 )
 
 func TestMintOutputOwnersVerifyNil(t *testing.T) {
+	assert := assert.New(t)
 	out := (*OutputOwners)(nil)
-	if err := out.Verify(); err == nil {
-		t.Fatalf("OutputOwners.Verify should have returned an error due to an nil output")
-	}
+	assert.ErrorIs(out.Verify(), errNilOutput)
 }
 
 func TestMintOutputOwnersExactEquals(t *testing.T) {
+	assert := assert.New(t)
 	out0 := (*OutputOwners)(nil)
 	out1 := (*OutputOwners)(nil)
-	if !out0.Equals(out1) {
-		t.Fatalf("Outputs should have equaled")
-	}
+	assert.True(out0.Equals(out1))
 }
 
 func TestMintOutputOwnersNotEqual(t *testing.T) {
+	assert := assert.New(t)
 	out0 := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
@@ -39,12 +38,11 @@ func TestMintOutputOwnersNotEqual(t *testing.T) {
 			{1},
 		},
 	}
-	if out0.Equals(out1) {
-		t.Fatalf("Outputs should not have equaled")
-	}
+	assert.False(out0.Equals(out1))
 }
 
 func TestMintOutputOwnersNotSorted(t *testing.T) {
+	assert := assert.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
@@ -52,16 +50,13 @@ func TestMintOutputOwnersNotSorted(t *testing.T) {
 			{0},
 		},
 	}
-	if err := out.Verify(); err == nil {
-		t.Fatalf("Verification should have failed due to unsorted addresses")
-	}
+	assert.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
 	out.Sort()
-	if err := out.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(out.Verify())
 }
 
 func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
+	assert := assert.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
@@ -71,11 +66,11 @@ func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
 	}
 
 	_, err := out.MarshalJSON()
-	assert.Error(t, err)
-	assert.Equal(t, err.Error(), "cannot marshal without ctx")
+	assert.ErrorIs(err, errMarshal)
 }
 
 func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
+	assert := assert.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
 		Locktime:  2,
@@ -83,8 +78,8 @@ func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
 	}
 
 	b, err := out.MarshalJSON()
-	assert.NoError(t, err)
+	assert.NoError(err)
 
 	jsonData := string(b)
-	assert.Equal(t, jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
+	assert.Equal(jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
 }

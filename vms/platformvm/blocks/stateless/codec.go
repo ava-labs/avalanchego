@@ -12,10 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	// Version is the current default codec version
-	Version = 0
-)
+// Version is the current default codec version
+const Version = 0
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -51,8 +49,6 @@ func init() {
 // RegisterBlockTypes allows registering relevant type of blocks package
 // in the right sequence. Following repackaging of platformvm package, a few
 // subpackage-level codecs were introduced, each handling serialization of specific types.
-// RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
-// are coherent with components one.
 func RegisterBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(

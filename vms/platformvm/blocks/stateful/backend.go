@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-// TODO improve/add comments.
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
@@ -19,23 +18,21 @@ type backend struct {
 	// proposal block's status, it may be accepted but not have an accepted
 	// child, in which case it's in [blkIDToState].
 	lastAccepted ids.ID
+
+	// TODO ABENEGIA: consider handling these differently following merge conflicts solution
+	// vvvvvvvvvvvvvvvvvvvvvvvv
 	// blkIDToState is a map from a block's ID to the state of the block.
 	// Blocks are put into this map when they are verified.
 	// Proposal blocks are removed from this map when they are rejected
 	// or when a child is accepted.
 	// All other blocks are removed when they are accepted/rejected.
-	blkIDToState map[ids.ID]*blockState
-	state        state.State
+	blkIDToState  map[ids.ID]*blockState
+	state         state.State
+	stateVersions state.Versions
+	// ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 	ctx          *snow.Context
 	bootstrapped *utils.AtomicBool
-}
-
-func (b *backend) OnAccept(blkID ids.ID) state.Chain {
-	blockState, ok := b.blkIDToState[blkID]
-	if !ok {
-		return b.state
-	}
-	return blockState.onAcceptState
 }
 
 func (b *backend) free(blkID ids.ID) {

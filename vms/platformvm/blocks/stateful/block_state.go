@@ -34,8 +34,7 @@ type blockState struct {
 	atomicBlockState
 	statelessBlock stateless.Block
 	onAcceptState  state.Diff
-	// This block's children which have passed verification.
-	children       []ids.ID
+
 	timestamp      time.Time
 	atomicRequests map[ids.ID]*atomic.Requests
 }
