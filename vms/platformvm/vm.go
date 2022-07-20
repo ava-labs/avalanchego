@@ -138,9 +138,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Initialize metrics as soon as possible
-	if err := vm.Metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
-		return err
+	vm.Metrics, err = metrics.New("", registerer, vm.WhitelistedSubnets)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
@@ -159,8 +159,7 @@ func (vm *VM) Initialize(
 		registerer,
 		&vm.Config,
 		vm.ctx,
-		vm.LocalStake,
-		vm.TotalStake,
+		vm.Metrics,
 		vm.rewards,
 	); err != nil {
 		return err
@@ -415,8 +414,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.Metrics.APIRequestMetrics.InterceptRequest)
-	server.RegisterAfterFunc(vm.Metrics.APIRequestMetrics.AfterRequest)
+	server.RegisterInterceptFunc(vm.Metrics.InterceptRequestFunc())
+	server.RegisterAfterFunc(vm.Metrics.AfterRequestFunc())
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}
@@ -475,7 +474,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 		if !ok {
 			return nil, errWrongCacheType
 		}
-		vm.Metrics.ValidatorSetsCached.Inc()
+		vm.Metrics.IncValidatorSetsCached()
 		return validatorSet, nil
 	}
 
@@ -535,9 +534,9 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 	validatorSetsCache.Put(height, vdrSet)
 
 	endTime := vm.Clock().Time()
-	vm.Metrics.ValidatorSetsCreated.Inc()
-	vm.Metrics.ValidatorSetsDuration.Add(float64(endTime.Sub(startTime)))
-	vm.Metrics.ValidatorSetsHeightDiff.Add(float64(lastAcceptedHeight - height))
+	vm.Metrics.IncValidatorSetsCreated()
+	vm.AddValidatorSetsDuration(endTime.Sub(startTime))
+	vm.AddValidatorSetsHeightDiff(float64(lastAcceptedHeight - height))
 	return vdrSet, nil
 }
 
@@ -588,8 +587,8 @@ func (vm *VM) updateValidators() error {
 	}
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.LocalStake.Set(float64(weight))
-	vm.LocalStake.Set(float64(primaryValidators.Weight()))
+	vm.SetLocalStake(float64(weight))
+	vm.SetLocalStake(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)

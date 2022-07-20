@@ -12,13 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -122,10 +120,6 @@ func TestRejectBlock(t *testing.T) {
 			defer ctrl.Finish()
 
 			blk, err := tt.newBlockFunc()
-			assert.NoError(err)
-
-			metrics := metrics.Metrics{}
-			err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
 			assert.NoError(err)
 
 			mempool := mempool.NewMockMempool(ctrl)
