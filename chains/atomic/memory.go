@@ -31,6 +31,11 @@ type Memory struct {
 	db    database.Database
 }
 
+func NewMemory(db database.Database) (*Memory, error) {
+	m := &Memory{}
+	return m, m.Initialize(db)
+}
+
 func (m *Memory) Initialize(db database.Database) error {
 	m.locks = make(map[ids.ID]*rcLock)
 	m.db = db
