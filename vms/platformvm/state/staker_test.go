@@ -22,7 +22,7 @@ func TestStakerLess(t *testing.T) {
 		less  bool
 	}{
 		{
-			name: "left time earlier",
+			name: "left time < right time",
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
@@ -36,7 +36,7 @@ func TestStakerLess(t *testing.T) {
 			less: true,
 		},
 		{
-			name: "right time earlier",
+			name: "left time > right time",
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(1, 0),
@@ -50,7 +50,7 @@ func TestStakerLess(t *testing.T) {
 			less: false,
 		},
 		{
-			name: "left priority earlier",
+			name: "left priority < right priority",
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
@@ -64,7 +64,7 @@ func TestStakerLess(t *testing.T) {
 			less: true,
 		},
 		{
-			name: "right priority earlier",
+			name: "left priority > right priority",
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
@@ -78,7 +78,7 @@ func TestStakerLess(t *testing.T) {
 			less: false,
 		},
 		{
-			name: "left txID earlier",
+			name: "left txID < right txID",
 			left: &Staker{
 				TxID:     ids.ID([32]byte{0}),
 				NextTime: time.Unix(0, 0),
@@ -92,7 +92,7 @@ func TestStakerLess(t *testing.T) {
 			less: true,
 		},
 		{
-			name: "right txID earlier",
+			name: "left txID > right txID",
 			left: &Staker{
 				TxID:     ids.ID([32]byte{1}),
 				NextTime: time.Unix(0, 0),
