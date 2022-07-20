@@ -288,7 +288,6 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
 		consensusRouter,
-		n.benchlistManager,
 	)
 
 	return err
