@@ -4,8 +4,9 @@
 package secp256k1fx
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -13,83 +14,71 @@ import (
 )
 
 func TestTransferInputAmount(t *testing.T) {
+	assert := assert.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	if amount := in.Amount(); amount != 1 {
-		t.Fatalf("Input.Amount returned the wrong amount. Result: %d ; Expected: %d", amount, 1)
-	}
+	assert.Equal(uint64(1), in.Amount())
 }
 
 func TestTransferInputVerify(t *testing.T) {
+	assert := assert.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	err := in.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(in.Verify())
 }
 
 func TestTransferInputVerifyNil(t *testing.T) {
+	assert := assert.New(t)
 	in := (*TransferInput)(nil)
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a nil input")
-	}
+	assert.ErrorIs(in.Verify(), errNilInput)
 }
 
 func TestTransferInputVerifyNoValue(t *testing.T) {
+	assert := assert.New(t)
 	in := TransferInput{
 		Amt: 0,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a no value input")
-	}
+	assert.ErrorIs(in.Verify(), errNoValueInput)
 }
 
 func TestTransferInputVerifyDuplicated(t *testing.T) {
+	assert := assert.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 0},
 		},
 	}
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with duplicated indices")
-	}
+	assert.ErrorIs(in.Verify(), errNotSortedUnique)
 }
 
 func TestTransferInputVerifyUnsorted(t *testing.T) {
+	assert := assert.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{1, 0},
 		},
 	}
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with unsorted indices")
-	}
+	assert.ErrorIs(in.Verify(), errNotSortedUnique)
 }
 
 func TestTransferInputSerialize(t *testing.T) {
+	assert := assert.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(0, c); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -109,24 +98,16 @@ func TestTransferInputSerialize(t *testing.T) {
 			SigIndices: []uint32{3, 7},
 		},
 	}
-	err := in.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(in.Verify())
 
 	result, err := m.Marshal(0, &in)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	assert.NoError(err)
+	assert.Equal(expected, result)
 }
 
 func TestTransferInputNotState(t *testing.T) {
+	assert := assert.New(t)
 	intf := interface{}(&TransferInput{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	assert.False(ok)
 }
