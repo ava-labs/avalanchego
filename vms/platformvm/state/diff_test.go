@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestDiffMissingState(t *testing.T) {
@@ -226,6 +227,38 @@ func TestDiffPendingDelegator(t *testing.T) {
 	gotPendingDelegatorIter, err = d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
 	assert.NoError(err)
 	assert.False(gotPendingDelegatorIter.Next())
+}
+
+func TestDiffSubnet(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := NewMockState(ctrl)
+	// Called in NewDiff
+	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	d, err := NewDiff(lastAcceptedID, states)
+	assert.NoError(err)
+
+	// Put a subnet
+	createSubnetTx := &txs.Tx{}
+	d.AddSubnet(createSubnetTx)
+
+	// Assert that we get the subnet back
+	// [state] returns 1 subnet.
+	parentStateCreateSubnetTx := &txs.Tx{}
+	state.EXPECT().GetSubnets().Return([]*txs.Tx{parentStateCreateSubnetTx}, nil).Times(1)
+	gotSubnets, err := d.GetSubnets()
+	assert.NoError(err)
+	assert.Len(gotSubnets, 2)
+	assert.Equal(gotSubnets[0], parentStateCreateSubnetTx)
+	assert.Equal(gotSubnets[1], createSubnetTx)
 }
 
 func assertChainsEqual(t *testing.T, expected, actual Chain) {
