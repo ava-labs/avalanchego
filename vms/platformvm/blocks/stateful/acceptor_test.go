@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,8 +42,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	metrics, err := metrics.NewMetrics("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
+	metrics := metrics.NewNoopMetrics()
 
 	acceptor := &acceptor{
 		backend: &backend{
@@ -67,9 +65,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	metrics, err := metrics.NewMetrics("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
@@ -84,7 +79,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics,
+		metrics: metrics.NewNoopMetrics(),
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
@@ -154,9 +149,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	metrics, err := metrics.NewMetrics("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
@@ -171,7 +163,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics,
+		metrics: metrics.NewNoopMetrics(),
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
@@ -249,9 +241,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	metrics, err := metrics.NewMetrics("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
@@ -267,7 +256,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 			bootstrapped: &utils.AtomicBool{},
 		},
-		metrics: metrics,
+		metrics: metrics.NewNoopMetrics(),
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
@@ -346,9 +335,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	metrics, err := metrics.NewMetrics("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
-
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
@@ -364,7 +350,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 			bootstrapped: &utils.AtomicBool{},
 		},
-		metrics: metrics,
+		metrics: metrics.NewNoopMetrics(),
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,

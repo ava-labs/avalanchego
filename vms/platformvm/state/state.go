@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -155,11 +156,10 @@ type State interface {
 }
 
 type state struct {
-	cfg        *config.Config
-	ctx        *snow.Context
-	localStake prometheus.Gauge
-	totalStake prometheus.Gauge
-	rewards    reward.Calculator
+	cfg     *config.Config
+	ctx     *snow.Context
+	metrics metrics.Metrics
+	rewards reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -262,16 +262,15 @@ type currentValidatorState struct {
 func New(
 	db database.Database,
 	genesisBytes []byte,
-	metrics prometheus.Registerer,
+	metricsReg prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,
-	localStake prometheus.Gauge,
-	totalStake prometheus.Gauge,
+	metrics metrics.Metrics,
 	rewards reward.Calculator,
 ) (State, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: blockCacheSize},
 	)
 	if err != nil {
@@ -296,7 +295,7 @@ func New(
 
 	validatorDiffsCache, err := metercacher.New(
 		"validator_diffs_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: validatorDiffsCacheSize},
 	)
 	if err != nil {
@@ -305,7 +304,7 @@ func New(
 
 	txCache, err := metercacher.New(
 		"tx_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: txCacheSize},
 	)
 	if err != nil {
@@ -315,7 +314,7 @@ func New(
 	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	rewardUTXOsCache, err := metercacher.New(
 		"reward_utxos_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: rewardUTXOsCacheSize},
 	)
 	if err != nil {
@@ -323,7 +322,7 @@ func New(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, genesis.Codec, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, genesis.Codec, metricsReg)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +331,7 @@ func New(
 
 	chainCache, err := metercacher.New(
 		"chain_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: chainCacheSize},
 	)
 	if err != nil {
@@ -341,7 +340,7 @@ func New(
 
 	chainDBCache, err := metercacher.New(
 		"chain_db_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: chainDBCacheSize},
 	)
 	if err != nil {
@@ -349,12 +348,11 @@ func New(
 	}
 
 	s := &state{
-		cfg:        cfg,
-		ctx:        ctx,
-		localStake: localStake,
-		totalStake: totalStake,
-		rewards:    rewards,
-		baseDB:     baseDB,
+		cfg:     cfg,
+		ctx:     ctx,
+		metrics: metrics,
+		rewards: rewards,
+		baseDB:  baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1433,8 +1431,8 @@ func (s *state) writeCurrentStakers(height uint64) error {
 		return nil
 	}
 	weight, _ := primaryValidators.GetWeight(s.ctx.NodeID)
-	s.localStake.Set(float64(weight))
-	s.totalStake.Set(float64(primaryValidators.Weight()))
+	s.metrics.SetLocalStake(float64(weight))
+	s.metrics.SetTotalStake(float64(primaryValidators.Weight()))
 	return nil
 }
 

@@ -20,7 +20,7 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get percent connected: %w", err)
 	}
-	vm.metrics.PercentConnected.Set(primaryPercentConnected)
+	vm.metrics.SetPercentConnected(primaryPercentConnected)
 	details := map[string]float64{
 		"primary-PercentConnected": primaryPercentConnected,
 	}
@@ -43,7 +43,7 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 		}
 
 		subnetIDStr := subnetID.String()
-		vm.metrics.SubnetPercentConnected.WithLabelValues(subnetIDStr).Set(percentConnected)
+		vm.metrics.SetSubnetPercentConnected(subnetIDStr, percentConnected)
 		key := fmt.Sprintf("%s-percentConnected", subnetID)
 		details[key] = percentConnected
 

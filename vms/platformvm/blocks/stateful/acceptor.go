@@ -17,7 +17,7 @@ var _ stateless.Visitor = &acceptor{}
 // acceptor handles the logic for accepting a block.
 type acceptor struct {
 	*backend
-	metrics          *metrics.Metrics
+	metrics          metrics.Metrics
 	recentlyAccepted *window.Window
 }
 
@@ -192,9 +192,9 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
 	if a.bootstrapped.GetValue() {
 		wasPreferred := parentState.initiallyPreferCommit
 		if wasPreferred {
-			a.metrics.MarkVoteWon()
+			a.metrics.MarkOptionVoteWon()
 		} else {
-			a.metrics.MarkVoteLost()
+			a.metrics.MarkOptionVoteLost()
 		}
 	}
 

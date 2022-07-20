@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -48,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
-	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
@@ -177,7 +177,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := p_metrics.NewMetrics("", registerer, res.cfg.WhitelistedSubnets)
+	metrics, err := metrics.New("", registerer, res.cfg.WhitelistedSubnets)
 	if err != nil {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
@@ -261,17 +261,6 @@ func defaultState(
 	baseDB *versiondb.Database,
 	rewardsCalc reward.Calculator,
 ) state.State {
-	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	dummyTotalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
-
 	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
 		baseDB,
@@ -279,8 +268,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		dummyLocalStake,
-		dummyTotalStake,
+		metrics.NewNoopMetrics(),
 		rewardsCalc,
 	)
 	if err != nil {
