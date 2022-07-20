@@ -377,65 +377,65 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	newStaker.NextTime = newStaker.StartTime
 	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
-	// if e.Bootstrapped.GetValue() {
-	currentTimestamp := parentState.GetTimestamp()
-	// Ensure the proposed validator starts after the current timestamp
-	validatorStartTime := tx.StartTime()
-	if !currentTimestamp.Before(validatorStartTime) {
-		return fmt.Errorf(
-			"chain timestamp (%s) not before validator's start time (%s)",
-			currentTimestamp,
-			validatorStartTime,
-		)
-	}
+	if e.Bootstrapped.GetValue() {
+		currentTimestamp := parentState.GetTimestamp()
+		// Ensure the proposed validator starts after the current timestamp
+		validatorStartTime := tx.StartTime()
+		if !currentTimestamp.Before(validatorStartTime) {
+			return fmt.Errorf(
+				"chain timestamp (%s) not before validator's start time (%s)",
+				currentTimestamp,
+				validatorStartTime,
+			)
+		}
 
-	primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to fetch the primary network validator for %s: %w",
-			tx.Validator.NodeID,
-			err,
-		)
-	}
+		primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to fetch the primary network validator for %s: %w",
+				tx.Validator.NodeID,
+				err,
+			)
+		}
 
-	maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
-	if err != nil {
-		return errStakeOverflow
-	}
+		maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
+		if err != nil {
+			return errStakeOverflow
+		}
 
-	if !currentTimestamp.Before(e.Config.ApricotPhase3Time) {
-		maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
-	}
+		if !currentTimestamp.Before(e.Config.ApricotPhase3Time) {
+			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
+		}
 
-	canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
-	if err != nil {
-		return err
-	}
-	if !canDelegate {
-		return errOverDelegated
-	}
+		canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
+		if err != nil {
+			return err
+		}
+		if !canDelegate {
+			return errOverDelegated
+		}
 
-	// Verify the flowcheck
-	if err := e.FlowChecker.VerifySpend(
-		tx,
-		parentState,
-		tx.Ins,
-		outs,
-		e.Tx.Creds,
-		e.Config.AddStakerTxFee,
-		e.Ctx.AVAXAssetID,
-	); err != nil {
-		return fmt.Errorf("failed verifySpend: %w", err)
-	}
+		// Verify the flowcheck
+		if err := e.FlowChecker.VerifySpend(
+			tx,
+			parentState,
+			tx.Ins,
+			outs,
+			e.Tx.Creds,
+			e.Config.AddStakerTxFee,
+			e.Ctx.AVAXAssetID,
+		); err != nil {
+			return fmt.Errorf("failed verifySpend: %w", err)
+		}
 
-	// Make sure the tx doesn't start too far in the future. This is done
-	// last to allow the verifier visitor to explicitly check for this
-	// error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if validatorStartTime.After(maxStartTime) {
-		return errFutureStakeTime
+		// Make sure the tx doesn't start too far in the future. This is done
+		// last to allow the verifier visitor to explicitly check for this
+		// error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if validatorStartTime.After(maxStartTime) {
+			return errFutureStakeTime
+		}
 	}
-	// }
 
 	// Set up the state if this tx is committed
 	onCommit, err := state.NewDiff(e.ParentID, e.StateVersions)
