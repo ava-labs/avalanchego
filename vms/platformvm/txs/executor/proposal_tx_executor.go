@@ -593,21 +593,21 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	}
 
 	var currentValidatorsToRemove []*state.Staker
-currentStakerIteratorLoop:
 	for currentStakerIterator.Next() {
 		stakerToRemove := currentStakerIterator.Value()
 		if stakerToRemove.EndTime.After(txTimestamp) {
 			break
 		}
 
-		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorCurrentPriority, state.PrimaryNetworkValidatorCurrentPriority:
+		priority := stakerToRemove.Priority
+		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
+			priority == state.PrimaryNetworkValidatorCurrentPriority {
 			// Primary network stakers are removed by the RewardValidatorTx, not
 			// an AdvanceTimeTx.
-			break currentStakerIteratorLoop
-		default:
-			currentValidatorsToRemove = append(currentValidatorsToRemove, stakerToRemove)
+			break
 		}
+
+		currentValidatorsToRemove = append(currentValidatorsToRemove, stakerToRemove)
 	}
 	currentStakerIterator.Release()
 
