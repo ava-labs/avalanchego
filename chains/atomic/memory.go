@@ -31,15 +31,12 @@ type Memory struct {
 	db    database.Database
 }
 
-func NewMemory(db database.Database) (*Memory, error) {
-	m := &Memory{}
-	return m, m.Initialize(db)
-}
-
-func (m *Memory) Initialize(db database.Database) error {
-	m.locks = make(map[ids.ID]*rcLock)
-	m.db = db
-	return nil
+func NewMemory(db database.Database) *Memory {
+	m := &Memory{
+		locks: make(map[ids.ID]*rcLock),
+		db:    db,
+	}
+	return m
 }
 
 func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
