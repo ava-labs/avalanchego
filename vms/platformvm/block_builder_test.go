@@ -17,12 +17,10 @@ import (
 // removed by inclusion in a block
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
@@ -55,12 +53,10 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 // size
 func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
@@ -85,12 +81,10 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
-
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping

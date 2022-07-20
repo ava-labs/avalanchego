@@ -94,7 +94,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 
 	verifier := executor.MempoolTxVerifier{
 		Backend:  &m.vm.txExecutorBackend,
-		ParentID: m.vm.preferred,
+		ParentID: m.vm.preferred, // We want to build off of the preferred block
 		Tx:       tx,
 	}
 	if err := tx.Unsigned.Visit(&verifier); err != nil {
@@ -157,7 +157,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := m.getStakerToReward(preferredState)
+	stakerTxID, shouldReward, err := m.getNextStakerToReward(preferredState)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (m *blockBuilder) ResetTimer() {
 		return
 	}
 
-	_, shouldReward, err := m.getStakerToReward(preferredState)
+	_, shouldReward, err := m.getNextStakerToReward(preferredState)
 	if err != nil {
 		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
 		return
@@ -252,7 +252,7 @@ func (m *blockBuilder) ResetTimer() {
 	}
 
 	now := m.vm.clock.Time()
-	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
@@ -277,31 +277,42 @@ func (m *blockBuilder) Shutdown() {
 	m.vm.ctx.Lock.Lock()
 }
 
-// getStakerToReward return the staker txID to remove from the primary network
-// staking set, if one exists.
-func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
+// getNextStakerToReward returns the next staker txID to remove from the staking
+// set with a RewardValidatorTx rather than an AdvanceTimeTx.
+// Returns:
+// - [txID] of the next staker to reward
+// - [shouldReward] if the txID exists and is ready to be rewarded
+// - [err] if something bad happened
+func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
 	}
 
-	currentStakers := preferredState.CurrentStakers()
-	tx, _, err := currentStakers.GetNextStaker()
+	currentStakerIterator, err := preferredState.GetCurrentStakerIterator()
 	if err != nil {
 		return ids.Empty, false, err
 	}
+	defer currentStakerIterator.Release()
 
-	staker, ok := tx.Unsigned.(txs.StakerTx)
-	if !ok {
-		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
+	for currentStakerIterator.Next() {
+		currentStaker := currentStakerIterator.Value()
+		priority := currentStaker.Priority
+		// If the staker is a primary network staker (not a subnet validator),
+		// it's the next staker we will want to remove with a RewardValidatorTx
+		// rather than an AdvanceTimeTx.
+		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
+			priority == state.PrimaryNetworkValidatorCurrentPriority {
+			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
+		}
 	}
-	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
+	return ids.Empty, false, nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
 func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
-	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
 	}

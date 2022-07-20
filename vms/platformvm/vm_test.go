@@ -372,15 +372,25 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	)
 	if err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	}
+	if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	}
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
 		panic(err)
-	} else if err := blk.Verify(); err != nil {
+	}
+	if err := blk.Verify(); err != nil {
 		panic(err)
-	} else if err := blk.Accept(); err != nil {
+	}
+	if err := vm.SetPreference(blk.ID()); err != nil {
 		panic(err)
-	} else if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+	}
+	if err := blk.Accept(); err != nil {
+		panic(err)
+	}
+	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
 		panic(err)
 	}
 
@@ -549,22 +559,18 @@ func TestGenesis(t *testing.T) {
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
 	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, err := testKeyfactory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	nodeID := ids.NodeID(key.PublicKey().Address())
+	nodeID := ids.GenerateTestNodeID()
+	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -572,53 +578,39 @@ func TestAddValidatorCommit(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		rewardAddress,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	blk, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit := options[0].(*CommitBlock)
-	if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Accept(); err != nil { // commit the proposal
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Committed {
-		t.Fatalf("status of tx should be Committed but is %s", txStatus)
-	}
+	assert.NoError(err)
 
-	pendingStakers := vm.internalState.PendingStakers()
+	commit := options[0].(*CommitBlock)
+
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(commit.Accept()) // commit the proposal
+
+	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in pending validator set
-	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err != nil {
-		t.Fatalf("Should have added validator to the pending queue")
-	}
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.NoError(err)
 }
 
 // verify invalid proposal to add validator to primary network
@@ -679,19 +671,18 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
+	assert := assert.New(t)
 	vm, _, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
 
 	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := testKeyfactory.NewPrivateKey()
-	nodeID := ids.NodeID(key.PublicKey().Address())
+	nodeID := ids.GenerateTestNodeID()
+	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
@@ -699,57 +690,40 @@ func TestAddValidatorReject(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		ids.ShortID(nodeID),
+		rewardAddress,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
-		t.Fatal(err)
-	}
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
 
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	blk, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	commit := options[0].(*CommitBlock)
 	abort := options[1].(*AbortBlock)
-	if err := block.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := commit.Verify(); err != nil { // should pass verification
-		t.Fatal(err)
-	} else if err := abort.Verify(); err != nil { // should pass verification
-		t.Fatal(err)
-	} else if err := abort.Accept(); err != nil { // reject the proposal
-		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
-		t.Fatal(err)
-	} else if txStatus != status.Aborted {
-		t.Fatalf("status should be Aborted but is %s", txStatus)
-	}
 
-	pendingStakers := vm.internalState.PendingStakers()
+	assert.NoError(block.Accept())
+	assert.NoError(commit.Verify())
+	assert.NoError(abort.Verify())
+	assert.NoError(abort.Accept()) // reject the proposal
 
-	// Verify that new validator NOT in pending validator set
-	if _, _, err := pendingStakers.GetValidatorTx(nodeID); err == nil {
-		t.Fatalf("Shouldn't have added validator to the pending queue")
-	}
+	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, txStatus)
+
+	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Reject proposal to add validator to primary network
@@ -854,10 +828,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in pending validator set
-	pendingStakers := vm.internalState.PendingStakers()
-	vdr := pendingStakers.GetValidator(nodeID)
-	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
-	assert.True(exists)
+	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
+	assert.NoError(err)
 }
 
 // Reject proposal to add validator to subnet
@@ -924,10 +896,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.Equal(status.Aborted, txStatus)
 
 	// Verify that new validator NOT in pending validator set
-	pendingStakers := vm.internalState.PendingStakers()
-	vdr := pendingStakers.GetValidator(nodeID)
-	_, exists := vdr.SubnetValidators()[testSubnet1.ID()]
-	assert.False(exists)
+	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // Test case where primary network validator rewarded
@@ -1012,8 +982,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1097,8 +1066,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1183,8 +1151,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1358,10 +1325,8 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	pendingStakers := vm.internalState.PendingStakers()
-	vdr := pendingStakers.GetValidator(nodeID)
-	_, exists := vdr.SubnetValidators()[createSubnetTx.ID()]
-	assert.True(exists)
+	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	assert.NoError(err)
 
 	// Advance time to when new validator should start validating
 	// Create a block with an advance time tx that moves validator
@@ -1400,17 +1365,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	pendingStakers = vm.internalState.PendingStakers()
-	vdr = pendingStakers.GetValidator(nodeID)
-	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
-	assert.False(exists)
+	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 
-	currentStakers := vm.internalState.CurrentStakers()
-	cVDR, err := currentStakers.GetValidator(nodeID)
+	_, err = vm.internalState.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	assert.NoError(err)
-
-	_, exists = cVDR.SubnetValidators()[createSubnetTx.ID()]
-	assert.True(exists)
 
 	// fast forward clock to time validator should stop validating
 	vm.clock.Set(endTime)
@@ -1447,17 +1406,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	pendingStakers = vm.internalState.PendingStakers()
-	vdr = pendingStakers.GetValidator(nodeID)
-	_, exists = vdr.SubnetValidators()[createSubnetTx.ID()]
-	assert.False(exists)
+	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 
-	currentStakers = vm.internalState.CurrentStakers()
-	cVDR, err = currentStakers.GetValidator(nodeID)
-	assert.NoError(err)
-
-	_, exists = cVDR.SubnetValidators()[createSubnetTx.ID()]
-	assert.False(exists)
+	_, err = vm.internalState.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
 }
 
 // test asset import
@@ -1988,7 +1941,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet {
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
@@ -2096,7 +2049,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet {
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAccepted, inMsg.Op())
@@ -2114,7 +2067,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet {
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		assert.NoError(t, err)
 		assert.Equal(t, message.GetAncestors, inMsg.Op())
@@ -2250,67 +2203,44 @@ func TestMaxStakeAmount(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+
 	tests := []struct {
-		description    string
-		startTime      time.Time
-		endTime        time.Time
-		validatorID    ids.NodeID
-		expectedAmount uint64
+		description string
+		startTime   time.Time
+		endTime     time.Time
 	}{
 		{
-			description:    "startTime after validation period ends",
-			startTime:      defaultValidateEndTime.Add(time.Minute),
-			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: 0,
+			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
+			startTime:   defaultValidateStartTime,
+			endTime:     defaultValidateEndTime,
 		},
 		{
-			description:    "startTime when validation period ends",
-			startTime:      defaultValidateEndTime,
-			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
+			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
+			startTime:   defaultValidateStartTime.Add(time.Minute),
+			endTime:     defaultValidateEndTime,
 		},
 		{
-			description:    "startTime before validation period ends",
-			startTime:      defaultValidateEndTime.Add(-time.Minute),
-			endTime:        defaultValidateEndTime.Add(2 * time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
+			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
+			startTime:   defaultValidateStartTime,
+			endTime:     defaultValidateEndTime.Add(-time.Minute),
 		},
 		{
-			description:    "endTime after validation period ends",
-			startTime:      defaultValidateStartTime,
-			endTime:        defaultValidateEndTime.Add(time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
-		},
-		{
-			description:    "endTime when validation period ends",
-			startTime:      defaultValidateStartTime,
-			endTime:        defaultValidateEndTime,
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
-		},
-		{
-			description:    "endTime before validation period ends",
-			startTime:      defaultValidateStartTime,
-			endTime:        defaultValidateEndTime.Add(-time.Minute),
-			validatorID:    ids.NodeID(keys[0].PublicKey().Address()),
-			expectedAmount: defaultWeight,
+			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
+			startTime:   defaultValidateStartTime.Add(time.Minute),
+			endTime:     defaultValidateEndTime.Add(-time.Minute),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			amount, err := vm.internalState.MaxStakeAmount(vm.ctx.SubnetID, test.validatorID, test.startTime, test.endTime)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if amount != test.expectedAmount {
-				t.Fatalf("wrong max stake amount. Expected %d ; Returned %d",
-					test.expectedAmount, amount)
-			}
+			assert := assert.New(t)
+			staker, err := executor.GetValidator(vm.internalState, constants.PrimaryNetworkID, nodeID)
+			assert.NoError(err)
+
+			amount, err := executor.GetMaxWeight(vm.internalState, staker, test.startTime, test.endTime)
+			assert.NoError(err)
+			assert.EqualValues(defaultWeight, amount)
 		})
 	}
 }
@@ -2449,8 +2379,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	currentStakers := secondVM.internalState.CurrentStakers()
-	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = secondVM.internalState.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		ids.NodeID(keys[1].PublicKey().Address()),
+	)
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -2532,7 +2464,9 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.NoError(abort.Accept()) // do not reward the genesis validator
 	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
 
-	currentStakers := vm.internalState.CurrentStakers()
-	_, err = currentStakers.GetValidator(ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.internalState.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		ids.NodeID(keys[1].PublicKey().Address()),
+	)
 	assert.ErrorIs(err, database.ErrNotFound)
 }

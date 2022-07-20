@@ -51,9 +51,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment()
 			env.config.ApricotPhase3Time = ap3Time
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				assert.NoError(shutdownEnvironment(env))
 			}()
 
 			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
@@ -70,8 +68,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			err = tx.Sign(txs.Codec, signers)
-			assert.NoError(err)
+			assert.NoError(tx.Sign(txs.Codec, signers))
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
 			assert.NoError(err)

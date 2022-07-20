@@ -15,213 +15,166 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
+	assert := assert.New(t)
 	env := newEnvironment()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
-	currentStakers := env.state.CurrentStakers()
-	toRemoveTx, _, err := currentStakers.GetNextStaker()
-	if err != nil {
-		t.Fatal(err)
-	}
-	toRemoveTxID := toRemoveTx.ID()
-	toRemove := toRemoveTx.Unsigned.(*txs.AddValidatorTx)
+	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+	assert.NoError(err)
+	assert.True(currentStakerIterator.Next())
+
+	stakerToRemove := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
+	assert.NoError(err)
+	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		Backend:  &env.backend,
 		ParentID: lastAcceptedID,
 		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	if err == nil {
-		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
-	}
+	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(toRemove.EndTime())
+	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		Backend:  &env.backend,
 		ParentID: lastAcceptedID,
 		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	if err == nil {
-		t.Fatalf("should have failed because validator ID is wrong")
-	}
+	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		Backend:  &env.backend,
 		ParentID: lastAcceptedID,
 		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onCommitCurrentStakers := txExecutor.OnCommit.CurrentStakers()
-	nextToRemoveTx, _, err := onCommitCurrentStakers.GetNextStaker()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if toRemoveTxID == nextToRemoveTx.ID() {
-		t.Fatalf("Should have removed the previous validator")
-	}
+	onCommitStakerIterator, err := txExecutor.OnCommit.GetCurrentStakerIterator()
+	assert.NoError(err)
+	assert.True(onCommitStakerIterator.Next())
+
+	nextToRemove := onCommitStakerIterator.Value()
+	onCommitStakerIterator.Release()
+	assert.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward is given back
-	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	txExecutor.OnCommit.Apply(env.state)
-	if err := env.state.Write(dummyHeight); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(env.state.Write(dummyHeight))
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if onCommitBalance != oldBalance+toRemove.Validator.Weight()+27 {
-		t.Fatalf("on commit, should have old balance (%d) + staked amount (%d) + reward (%d) but have %d",
-			oldBalance, toRemove.Validator.Weight(), 27, onCommitBalance)
-	}
+	assert.NoError(err)
+	assert.Equal(oldBalance+stakerToRemove.Weight+27, onCommitBalance)
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
+	assert := assert.New(t)
 	env := newEnvironment()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
-	currentStakers := env.state.CurrentStakers()
-	toRemoveTx, _, err := currentStakers.GetNextStaker()
-	if err != nil {
-		t.Fatal(err)
-	}
-	toRemoveTxID := toRemoveTx.ID()
-	toRemove := toRemoveTx.Unsigned.(*txs.AddValidatorTx)
+	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+	assert.NoError(err)
+	assert.True(currentStakerIterator.Next())
+
+	stakerToRemove := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
+	assert.NoError(err)
+	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		Backend:  &env.backend,
 		ParentID: lastAcceptedID,
 		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	if err == nil {
-		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
-	}
+	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(toRemove.EndTime())
+	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		Backend:  &env.backend,
 		ParentID: lastAcceptedID,
 		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	if err == nil {
-		t.Fatalf("should have failed because validator ID is wrong")
-	}
+	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(toRemoveTxID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		Backend:  &env.backend,
 		ParentID: lastAcceptedID,
 		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onAbortCurrentStakers := txExecutor.OnAbort.CurrentStakers()
-	nextToRemoveTx, _, err := onAbortCurrentStakers.GetNextStaker()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if toRemoveTxID == nextToRemoveTx.ID() {
-		t.Fatalf("Should have removed the previous validator")
-	}
+	onAbortStakerIterator, err := txExecutor.OnAbort.GetCurrentStakerIterator()
+	assert.NoError(err)
+	assert.True(onAbortStakerIterator.Next())
+
+	nextToRemove := onAbortStakerIterator.Value()
+	onAbortStakerIterator.Release()
+	assert.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward isn't given back
-	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	txExecutor.OnAbort.Apply(env.state)
-	if err := env.state.Write(dummyHeight); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(env.state.Write(dummyHeight))
 
 	onAbortBalance, err := avax.GetBalance(env.state, stakeOwners)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
-		t.Fatalf("on abort, should have old balance (%d) + staked amount (%d) but have %d",
-			oldBalance, toRemove.Validator.Weight(), onAbortBalance)
-	}
+	assert.NoError(err)
+	assert.Equal(oldBalance+stakerToRemove.Weight, onAbortBalance)
 }
 
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
@@ -267,9 +220,25 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	env.state.AddCurrentStaker(vdrTx, 0)
+	vdrStaker := state.NewPrimaryNetworkStaker(
+		vdrTx.ID(),
+		&vdrTx.Unsigned.(*txs.AddValidatorTx).Validator,
+	)
+	vdrStaker.PotentialReward = 0
+	vdrStaker.NextTime = vdrStaker.EndTime
+	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+	delStaker := state.NewPrimaryNetworkStaker(
+		delTx.ID(),
+		&delTx.Unsigned.(*txs.AddDelegatorTx).Validator,
+	)
+	delStaker.PotentialReward = 1000000
+	delStaker.NextTime = delStaker.EndTime
+	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+
+	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
-	env.state.AddCurrentStaker(delTx, 1000000)
+	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = env.state.Write(dummyHeight)
@@ -376,9 +345,25 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	env.state.AddCurrentStaker(vdrTx, 0)
+	vdrStaker := state.NewPrimaryNetworkStaker(
+		vdrTx.ID(),
+		&vdrTx.Unsigned.(*txs.AddValidatorTx).Validator,
+	)
+	vdrStaker.PotentialReward = 0
+	vdrStaker.NextTime = vdrStaker.EndTime
+	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+	delStaker := state.NewPrimaryNetworkStaker(
+		delTx.ID(),
+		&delTx.Unsigned.(*txs.AddDelegatorTx).Validator,
+	)
+	delStaker.PotentialReward = 1000000
+	delStaker.NextTime = delStaker.EndTime
+	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+
+	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
-	env.state.AddCurrentStaker(delTx, 1000000)
+	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = env.state.Write(dummyHeight)

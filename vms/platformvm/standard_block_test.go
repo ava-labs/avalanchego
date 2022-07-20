@@ -20,15 +20,13 @@ import (
 )
 
 func TestAtomicTxImports(t *testing.T) {
+	assert := assert.New(t)
 	vm, baseDB, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
-	assert := assert.New(t)
 
 	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
@@ -38,10 +36,7 @@ func TestAtomicTxImports(t *testing.T) {
 	recipientKey := keys[1]
 
 	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{5}, baseDB))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(m.Initialize(prefixdb.New([]byte{5}, baseDB)))
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
@@ -57,19 +52,16 @@ func TestAtomicTxImports(t *testing.T) {
 		},
 	}
 	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
 		},
-	}}}}); err != nil {
-		t.Fatal(err)
-	}
+	}}}})
+	assert.NoError(err)
 
 	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
@@ -77,19 +69,16 @@ func TestAtomicTxImports(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	vm.internalState.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
 
 	vm.mempool.AddDecisionTx(tx)
 	b, err := vm.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work
-	err = b.Verify()
-	assert.NoError(err)
-	err = b.Accept()
-	assert.NoError(err)
+	assert.NoError(b.Verify())
+	assert.NoError(b.Accept())
 	_, txStatus, err := vm.internalState.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state

@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -437,15 +438,13 @@ func TestGetBalance(t *testing.T) {
 	}
 }
 
-// Test method GetStake
 func TestGetStake(t *testing.T) {
 	assert := assert.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown()
-		assert.NoError(err)
+		assert.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -455,6 +454,7 @@ func TestGetStake(t *testing.T) {
 	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
 		addrsStrs = append(addrsStrs, addr)
+
 		args := GetStakeArgs{
 			api.JSONAddresses{
 				Addresses: []string{addr},
@@ -462,18 +462,19 @@ func TestGetStake(t *testing.T) {
 			formatting.Hex,
 		}
 		response := GetStakeReply{}
-		err := service.GetStake(nil, &args, &response)
-		assert.NoError(err)
+		assert.NoError(service.GetStake(nil, &args, &response))
 		assert.EqualValues(uint64(defaultWeight), uint64(response.Staked))
 		assert.Len(response.Outputs, 1)
+
 		// Unmarshal into an output
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
 		assert.NoError(err)
+
 		var output avax.TransferableOutput
 		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
-		out, ok := output.Out.(*secp256k1fx.TransferOutput)
-		assert.True(ok)
+
+		out := output.Out.(*secp256k1fx.TransferOutput)
 		assert.EqualValues(out.Amount(), defaultWeight)
 		assert.EqualValues(out.Threshold, 1)
 		assert.Len(out.Addrs, 1)
@@ -489,18 +490,19 @@ func TestGetStake(t *testing.T) {
 		formatting.Hex,
 	}
 	response := GetStakeReply{}
-	err := service.GetStake(nil, &args, &response)
-	assert.NoError(err)
+	assert.NoError(service.GetStake(nil, &args, &response))
 	assert.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
 	assert.Len(response.Outputs, len(genesis.Validators))
+
 	for _, outputStr := range response.Outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
 		assert.NoError(err)
+
 		var output avax.TransferableOutput
 		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
-		out, ok := output.Out.(*secp256k1fx.TransferOutput)
-		assert.True(ok)
+
+		out := output.Out.(*secp256k1fx.TransferOutput)
 		assert.EqualValues(defaultWeight, out.Amount())
 		assert.EqualValues(out.Threshold, 1)
 		assert.EqualValues(out.Locktime, 0)
@@ -524,20 +526,23 @@ func TestGetStake(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	service.vm.internalState.AddCurrentStaker(tx, 0)
+	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
+	staker.PotentialReward = 0
+	staker.NextTime = staker.EndTime
+	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+
+	service.vm.internalState.PutCurrentDelegator(staker)
 	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
-	assert.NoError(err)
-	err = service.vm.internalState.Load()
-	assert.NoError(err)
+	assert.NoError(service.vm.internalState.Commit())
+	assert.NoError(service.vm.internalState.Load())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
-	err = service.GetStake(nil, &args, &response)
-	assert.NoError(err)
+	assert.NoError(service.GetStake(nil, &args, &response))
 	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
 	assert.Len(response.Outputs, 2)
+
 	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
@@ -546,6 +551,7 @@ func TestGetStake(t *testing.T) {
 		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
+
 	// Make sure the stake amount is as expected
 	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
@@ -568,26 +574,29 @@ func TestGetStake(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	service.vm.internalState.AddPendingStaker(tx)
+	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
+	staker.NextTime = staker.StartTime
+	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+
+	service.vm.internalState.PutPendingValidator(staker)
 	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
-	assert.NoError(err)
-	err = service.vm.internalState.Load()
-	assert.NoError(err)
+	assert.NoError(service.vm.internalState.Commit())
+	assert.NoError(service.vm.internalState.Load())
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
-	err = service.GetStake(nil, &args, &response)
-	assert.NoError(err)
+	assert.NoError(service.GetStake(nil, &args, &response))
 	assert.EqualValues(oldStake+stakeAmount, response.Staked)
 	assert.Len(response.Outputs, 3)
-	outputs = make([]avax.TransferableOutput, 3)
+
 	// Unmarshal
+	outputs = make([]avax.TransferableOutput, 3)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
 		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
+
 	// Make sure the stake amount is as expected
 	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
@@ -672,7 +681,12 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service.vm.internalState.AddCurrentStaker(tx, 0)
+	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
+	staker.PotentialReward = 0
+	staker.NextTime = staker.EndTime
+	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+
+	service.vm.internalState.PutCurrentDelegator(staker)
 	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	if err != nil {
@@ -723,28 +737,21 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	assert := assert.New(t)
-
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown()
-		assert.NoError(err)
-
+		assert.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTimestampReply{}
-	err := service.GetTimestamp(nil, nil, &reply)
-	assert.NoError(err)
-
+	assert.NoError(service.GetTimestamp(nil, nil, &reply))
 	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
 	service.vm.internalState.SetTimestamp(newTimestamp)
 
-	err = service.GetTimestamp(nil, nil, &reply)
-	assert.NoError(err)
-
+	assert.NoError(service.GetTimestamp(nil, nil, &reply))
 	assert.Equal(newTimestamp, reply.Timestamp)
 }
 
