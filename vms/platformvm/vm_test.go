@@ -359,7 +359,8 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	}
 
 	// Create a subnet and store it in testSubnet1
-	testSubnet1, err := vm.txBuilder.NewCreateSubnetTx(
+	var err error
+	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
@@ -432,7 +433,8 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	}
 
 	// Create a subnet and store it in testSubnet1
-	testSubnet1, err := vm.txBuilder.NewCreateSubnetTx(
+	var err error
+	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
