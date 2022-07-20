@@ -627,6 +627,8 @@ func (s *state) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdat
 	return nil
 }
 
+// Returns the Primary Network start time of current validator [nodeID].
+// Errors if [nodeID] isn't a current validator of the Primary Network.
 func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	staker, err := s.currentStakers.GetValidator(constants.PrimaryNetworkID, nodeID)
 	if err != nil {
