@@ -982,6 +982,121 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 }
 
+func TestValidatorSetAtUnknownRegression(t *testing.T) {
+	assert := assert.New(t)
+
+	vm, _, _, _ := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+
+		vm.ctx.Lock.Unlock()
+	}()
+
+	nodeID0 := ids.NodeID(keys[0].PublicKey().Address())
+	nodeID1 := ids.NodeID(keys[1].PublicKey().Address())
+	nodeID2 := ids.NodeID(keys[2].PublicKey().Address())
+	nodeID3 := ids.NodeID(keys[3].PublicKey().Address())
+	nodeID4 := ids.NodeID(keys[4].PublicKey().Address())
+
+	currentHeight, err := vm.GetCurrentHeight()
+	assert.NoError(err)
+	assert.EqualValues(1, currentHeight)
+
+	expectedValidators1 := map[ids.NodeID]uint64{
+		nodeID0: defaultWeight,
+		nodeID1: defaultWeight,
+		nodeID2: defaultWeight,
+		nodeID3: defaultWeight,
+		nodeID4: defaultWeight,
+	}
+	validators, err := vm.GetValidatorSet(1, constants.PrimaryNetworkID)
+	assert.NoError(err)
+	assert.Equal(expectedValidators1, validators)
+
+	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
+
+	nodeID5 := ids.GenerateTestNodeID()
+
+	// Create the tx to add the first new validator
+	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
+		vm.MaxValidatorStake,
+		uint64(newValidatorStartTime0.Unix()),
+		uint64(newValidatorEndTime0.Unix()),
+		nodeID5,
+		ids.GenerateTestShortID(),
+		reward.PercentDenominator,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.GenerateTestShortID(),
+	)
+	assert.NoError(err)
+
+	// Create the proposal block to add the first new validator
+	preferred, err := vm.Preferred()
+	assert.NoError(err)
+
+	preferredID := preferred.ID()
+	preferredHeight := preferred.Height()
+
+	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx0)
+	assert.NoError(err)
+
+	verifyAndAcceptProposalCommitment(assert, vm, addValidatorProposalBlk0)
+
+	currentHeight, err = vm.GetCurrentHeight()
+	assert.NoError(err)
+	assert.EqualValues(3, currentHeight)
+
+	for i := uint64(1); i <= 3; i++ {
+		validators, err = vm.GetValidatorSet(i, constants.PrimaryNetworkID)
+		assert.NoError(err)
+		assert.Equal(expectedValidators1, validators)
+	}
+
+	// Create the tx that moves the first new validator from the pending
+	// validator set into the current validator set.
+	vm.clock.Set(newValidatorStartTime0)
+	advanceTimeTx0, err := vm.txBuilder.NewAdvanceTimeTx(newValidatorStartTime0)
+	assert.NoError(err)
+
+	// Create the proposal block that moves the first new validator from the
+	// pending validator set into the current validator set.
+	preferred, err = vm.Preferred()
+	assert.NoError(err)
+
+	preferredID = preferred.ID()
+	preferredHeight = preferred.Height()
+
+	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx0)
+	assert.NoError(err)
+
+	verifyAndAcceptProposalCommitment(assert, vm, advanceTimeProposalBlk0)
+
+	currentHeight, err = vm.GetCurrentHeight()
+	assert.NoError(err)
+	assert.EqualValues(5, currentHeight)
+
+	for i := uint64(1); i <= 4; i++ {
+		validators, err = vm.GetValidatorSet(i, constants.PrimaryNetworkID)
+		assert.NoError(err)
+		assert.Equal(expectedValidators1, validators)
+	}
+
+	expectedValidators2 := map[ids.NodeID]uint64{
+		nodeID0: defaultWeight,
+		nodeID1: defaultWeight,
+		nodeID2: defaultWeight,
+		nodeID3: defaultWeight,
+		nodeID4: defaultWeight,
+		nodeID5: vm.MaxValidatorStake,
+	}
+	validators, err = vm.GetValidatorSet(5, constants.PrimaryNetworkID)
+	assert.NoError(err)
+	assert.Equal(expectedValidators2, validators)
+}
+
 func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {
 	// Verify the proposed block
 	assert.NoError(blk.Verify())
