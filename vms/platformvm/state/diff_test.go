@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -259,6 +261,99 @@ func TestDiffSubnet(t *testing.T) {
 	assert.Len(gotSubnets, 2)
 	assert.Equal(gotSubnets[0], parentStateCreateSubnetTx)
 	assert.Equal(gotSubnets[1], createSubnetTx)
+}
+
+func TestDiffChain(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := NewMockState(ctrl)
+	// Called in NewDiff
+	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	d, err := NewDiff(lastAcceptedID, states)
+	assert.NoError(err)
+
+	// Put a chain
+	subnetID := ids.GenerateTestID()
+	createChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID,
+		},
+	}
+	d.AddChain(createChainTx)
+
+	// Assert that we get the chain back
+	// [state] returns 1 chain.
+	parentStateCreateChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID, // note this is the same subnet as [createChainTx]
+		},
+	}
+	state.EXPECT().GetChains(subnetID).Return([]*txs.Tx{parentStateCreateChainTx}, nil).Times(1)
+	gotChains, err := d.GetChains(subnetID)
+	assert.NoError(err)
+	assert.Len(gotChains, 2)
+	assert.Equal(gotChains[0], parentStateCreateChainTx)
+	assert.Equal(gotChains[1], createChainTx)
+}
+
+func TestDiffTx(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := NewMockState(ctrl)
+	// Called in NewDiff
+	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	d, err := NewDiff(lastAcceptedID, states)
+	assert.NoError(err)
+
+	// Put a tx
+	subnetID := ids.GenerateTestID()
+	tx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID,
+		},
+	}
+	tx.Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
+	d.AddTx(tx, status.Committed)
+
+	{
+		// Assert that we get the tx back
+		gotTx, gotStatus, err := d.GetTx(tx.ID())
+		assert.NoError(err)
+		assert.Equal(status.Committed, gotStatus)
+		assert.Equal(tx, gotTx)
+	}
+
+	{
+		// Assert that we can get a tx from the parent state
+		// [state] returns 1 tx.
+		parentTx := &txs.Tx{
+			Unsigned: &txs.CreateChainTx{
+				SubnetID: subnetID,
+			},
+		}
+		parentTx.Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
+		state.EXPECT().GetTx(parentTx.ID()).Return(parentTx, status.Committed, nil).Times(1)
+		gotParentTx, gotStatus, err := d.GetTx(parentTx.ID())
+		assert.NoError(err)
+		assert.Equal(status.Committed, gotStatus)
+		assert.Equal(parentTx, gotParentTx)
+	}
 }
 
 func assertChainsEqual(t *testing.T, expected, actual Chain) {
