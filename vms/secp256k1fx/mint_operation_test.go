@@ -6,18 +6,20 @@ package secp256k1fx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {
+	assert := assert.New(t)
 	op := (*MintOperation)(nil)
-	if err := op.Verify(); err == nil {
-		t.Fatalf("MintOperation.Verify should have returned an error due to an nil operation")
-	}
+	assert.ErrorIs(op.Verify(), errNilMintOperation)
 }
 
 func TestMintOperationOuts(t *testing.T) {
+	assert := assert.New(t)
 	op := &MintOperation{
 		MintInput: Input{
 			SigIndices: []uint32{0},
@@ -39,15 +41,12 @@ func TestMintOperationOuts(t *testing.T) {
 		},
 	}
 
-	outs := op.Outs()
-	if len(outs) != 2 {
-		t.Fatalf("Wrong number of outputs")
-	}
+	assert.Len(op.Outs(), 2)
 }
 
 func TestMintOperationState(t *testing.T) {
+	assert := assert.New(t)
 	intf := interface{}(&MintOperation{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	assert.False(ok)
 }
