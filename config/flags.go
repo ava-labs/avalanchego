@@ -113,7 +113,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Logging
 	fs.String(LogsDirKey, defaultLogDir, "Logging directory for Avalanche")
-	fs.String(LogLevelKey, "debug", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
+	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogFormatKey, "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
 	fs.Uint(LogRotaterMaxSizeKey, 8, "The maximum file size in megabytes of the log file before it gets rotated.")
