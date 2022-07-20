@@ -233,6 +233,9 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 		}
 		assert.NoError(state.Write(uint64(i + 1)))
 
+		// Calling write again should not change the state.
+		assert.NoError(state.Write(uint64(i + 1)))
+
 		for j, stakerDiff := range stakerDiffs[:i+1] {
 			for subnetID, expectedValidatorWeightDiffs := range stakerDiff.expectedValidatorWeightDiffs {
 				validatorWeightDiffs, err := state.GetValidatorWeightDiffs(uint64(j+1), subnetID)
