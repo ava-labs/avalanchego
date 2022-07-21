@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
@@ -69,7 +71,9 @@ func (p *process) Start() error {
 	// update fd limit
 	fdLimit := p.config.FdLimit
 	if err := ulimit.Set(fdLimit, log); err != nil {
-		log.Fatal("failed to set fd-limit: %s", err)
+		log.Fatal("failed to set fd-limit",
+			zap.Error(err),
+		)
 		logFactory.Close()
 		return err
 	}
@@ -134,7 +138,9 @@ func (p *process) Start() error {
 	go p.config.IPUpdater.Dispatch(log)
 
 	if err := p.node.Initialize(&p.config, log, logFactory); err != nil {
-		log.Fatal("error initializing node: %s", err)
+		log.Fatal("error initializing node",
+			zap.Error(err),
+		)
 		mapper.UnmapAllPorts()
 		p.config.IPUpdater.Stop()
 		log.Stop()
@@ -164,7 +170,9 @@ func (p *process) Start() error {
 		}()
 
 		err := p.node.Dispatch()
-		log.Debug("dispatch returned with: %s", err)
+		log.Debug("dispatch returned",
+			zap.Error(err),
+		)
 	}()
 	return nil
 }
