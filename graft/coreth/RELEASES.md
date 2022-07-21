@@ -1,5 +1,14 @@
 # Release Notes
 
+## [v0.8.14](https://github.com/ava-labs/coreth/releases/tag/v0.8.14)
+
+- Bump go-ethereum dependency to v1.10.20
+- Update API names used to enable services in `eth-api` config flag. Prior names are supported but deprecated, please update your configuration [accordingly](https://docs.avax.network/nodes/maintain/chain-config-flags#c-chain-configs)
+- Optimizes state sync by parallelizing trie syncing
+- Adds `eth_syncing` API for compatibility. Note: This API is only accessible after bootstrapping and always returns `"false"`, since the node will no longer be syncing at that point.
+- Adds metrics to atomic transaction mempool
+- Adds metrics for incoming/outgoing mempool gossip
+
 ## [v0.8.13](https://github.com/ava-labs/coreth/releases/tag/v0.8.13)
 
 - Bump go-ethereum dependency to v1.10.18
