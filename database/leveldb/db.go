@@ -19,6 +19,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -177,11 +179,10 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 			return nil, fmt.Errorf("failed to parse db config: %w", err)
 		}
 	}
-	configJSON, err := json.Marshal(&parsedConfig)
-	if err != nil {
-		return nil, err
-	}
-	log.Info("leveldb config: %s", string(configJSON))
+
+	log.Info("creating new leveldb",
+		zap.Reflect("config", parsedConfig),
+	)
 
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
