@@ -15,11 +15,11 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"go.uber.org/zap"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"go.uber.org/zap"
 
 	coreth "github.com/ava-labs/coreth/plugin/evm"
 
