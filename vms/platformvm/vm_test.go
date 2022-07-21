@@ -338,11 +338,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 
-	m := &atomic.Memory{}
-	err := m.Initialize(atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),
 	}
@@ -363,6 +359,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	}
 
 	// Create a subnet and store it in testSubnet1
+	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
@@ -429,11 +426,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 
-	m := &atomic.Memory{}
-	err := m.Initialize(atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
@@ -450,6 +443,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	}
 
 	// Create a subnet and store it in testSubnet1
+	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
@@ -1431,11 +1425,7 @@ func TestAtomicImport(t *testing.T) {
 	amount := uint64(50000)
 	recipientKey := keys[1]
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{5}, baseDB))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)

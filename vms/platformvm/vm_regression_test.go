@@ -330,11 +330,8 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	m := &atomic.Memory{}
-	err := m.Initialize(atomicDB)
-	if err != nil {
-		panic(err)
-	}
+
+	m := atomic.NewMemory(atomicDB)
 	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	key0 := keys[0]
@@ -534,9 +531,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.Equal(choices.Processing, importBlkStatus)
 
 	// Populate the shared memory UTXO.
-	m := &atomic.Memory{}
-	err = m.Initialize(prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
+	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
@@ -803,9 +798,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.Equal(choices.Processing, importBlkStatus)
 
 	// Populate the shared memory UTXO.
-	m := &atomic.Memory{}
-	err = m.Initialize(prefixdb.New([]byte{5}, baseDB))
-	assert.NoError(err)
+	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)

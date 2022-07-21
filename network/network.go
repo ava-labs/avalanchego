@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -157,7 +156,6 @@ func NewNetwork(
 	listener net.Listener,
 	dialer dialer.Dialer,
 	router router.ExternalHandler,
-	benchlistManager benchlist.Manager,
 ) (Network, error) {
 	primaryNetworkValidators, ok := config.Validators.GetValidators(constants.PrimaryNetworkID)
 	if !ok {
