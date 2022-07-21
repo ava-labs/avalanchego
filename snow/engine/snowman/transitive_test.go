@@ -201,6 +201,23 @@ func TestEngineQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
+	chitted := new(bool)
+	sender.SendChitsF = func(inVdr ids.NodeID, requestID uint32, prefSet []ids.ID) {
+		if *chitted {
+			t.Fatalf("Sent multiple chits")
+		}
+		*chitted = true
+		if requestID != 15 {
+			t.Fatalf("Wrong request ID")
+		}
+		if len(prefSet) != 1 {
+			t.Fatal("Should only be one vote")
+		}
+		if gBlk.ID() != prefSet[0] {
+			t.Fatalf("Wrong chits block")
+		}
+	}
+
 	blocked := new(bool)
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		*blocked = true
@@ -231,6 +248,9 @@ func TestEngineQuery(t *testing.T) {
 	if err := te.PullQuery(vdr, 15, blk.ID()); err != nil {
 		t.Fatal(err)
 	}
+	if !*chitted {
+		t.Fatalf("Didn't respond with chits")
+	}
 	if !*blocked {
 		t.Fatalf("Didn't request block")
 	}
@@ -256,23 +276,6 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	chitted := new(bool)
-	sender.SendChitsF = func(inVdr ids.NodeID, requestID uint32, prefSet []ids.ID) {
-		if *chitted {
-			t.Fatalf("Sent multiple chits")
-		}
-		*chitted = true
-		if requestID != 15 {
-			t.Fatalf("Wrong request ID")
-		}
-		if len(prefSet) != 1 {
-			t.Fatal("Should only be one vote")
-		}
-		if blk.ID() != prefSet[0] {
-			t.Fatalf("Wrong chits block")
-		}
-	}
-
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		if !bytes.Equal(b, blk.Bytes()) {
 			t.Fatalf("Wrong bytes")
@@ -286,9 +289,6 @@ func TestEngineQuery(t *testing.T) {
 
 	if !*queried {
 		t.Fatalf("Didn't ask for preferences")
-	}
-	if !*chitted {
-		t.Fatalf("Didn't provide preferences")
 	}
 
 	blk1 := &snowman.TestBlock{
@@ -764,7 +764,7 @@ func TestEnginePushQuery(t *testing.T) {
 		if len(votes) != 1 {
 			t.Fatal("votes should only have one element")
 		}
-		if blk.ID() != votes[0] {
+		if gBlk.ID() != votes[0] {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
@@ -1104,21 +1104,21 @@ func TestEngineAbandonQuery(t *testing.T) {
 		*reqID = requestID
 	}
 
+	sender.CantSendChits = false
+
 	if err := te.PullQuery(vdr, 0, blkID); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(te.blocked) != 1 {
-		t.Fatalf("Should have blocked on request")
+	if te.blkReqs.Len() != 1 {
+		t.Fatalf("Should have issued request")
 	}
-
-	sender.CantSendChits = false
 
 	if err := te.GetFailed(vdr, *reqID); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(te.blocked) != 0 {
+	if te.blkReqs.Len() != 0 {
 		t.Fatalf("Should have removed request")
 	}
 }
@@ -1248,16 +1248,17 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	sender.CantSendChits = false
+
 	if err := te.PushQuery(vdr, 0, blockingBlk.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(te.blocked) != 3 {
-		t.Fatalf("Both inserts should be blocking in addition to the chit request")
+	if len(te.blocked) != 2 {
+		t.Fatalf("Both inserts should be blocking")
 	}
 
 	sender.CantSendPushQuery = false
-	sender.CantSendChits = false
 
 	missingBlk.StatusV = choices.Processing
 	if err := te.issue(missingBlk); err != nil {
@@ -1371,6 +1372,7 @@ func TestEngineRetryFetch(t *testing.T) {
 	sender.SendGetF = func(_ ids.NodeID, requestID uint32, _ ids.ID) {
 		*reqID = requestID
 	}
+	sender.CantSendChits = false
 
 	if err := te.PullQuery(vdr, 0, missingBlk.ID()); err != nil {
 		t.Fatal(err)
@@ -1378,7 +1380,6 @@ func TestEngineRetryFetch(t *testing.T) {
 
 	vm.CantGetBlock = true
 	sender.SendGetF = nil
-	sender.CantSendChits = false
 
 	if err := te.GetFailed(vdr, *reqID); err != nil {
 		t.Fatal(err)
@@ -1560,6 +1561,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 			t.Fatalf("Wrong block requested")
 		}
 	}
+	sender.CantSendChits = false
 
 	if err := te.PushQuery(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
@@ -1591,7 +1593,6 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 	sender.CantSendPushQuery = false
-	sender.CantSendChits = false
 
 	missingBlk.StatusV = choices.Processing
 
@@ -1662,6 +1663,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 			t.Fatalf("Wrong block requested")
 		}
 	}
+	sender.CantSendChits = false
 
 	if err := te.PushQuery(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
@@ -1696,7 +1698,6 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 	sender.CantSendPushQuery = false
-	sender.CantSendChits = false
 
 	if err := te.Put(vdr, *reqID, missingBlk.Bytes()); err != nil {
 		t.Fatal(err)

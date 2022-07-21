@@ -160,9 +160,8 @@ func (tx *UniqueTx) Accept() error {
 	}
 	// Add new utxos
 	for _, utxo := range outputUTXOs {
-		utxoID := utxo.InputID()
-		if err := tx.vm.state.PutUTXO(utxoID, utxo); err != nil {
-			return fmt.Errorf("couldn't put UTXO %s: %w", utxoID, err)
+		if err := tx.vm.state.PutUTXO(utxo); err != nil {
+			return fmt.Errorf("couldn't put UTXO %s: %w", utxo.InputID(), err)
 		}
 	}
 
@@ -175,7 +174,7 @@ func (tx *UniqueTx) Accept() error {
 		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
-	err = tx.Tx.Visit(&executeTx{
+	err = tx.Tx.Unsigned.Visit(&executeTx{
 		tx:           tx.Tx,
 		batch:        commitBatch,
 		sharedMemory: tx.vm.ctx.SharedMemory,
@@ -244,8 +243,8 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 			txID: txID,
 		})
 	}
-	consumedIDs := tx.Tx.ConsumedAssetIDs()
-	for assetID := range tx.Tx.AssetIDs() {
+	consumedIDs := tx.Tx.Unsigned.ConsumedAssetIDs()
+	for assetID := range tx.Tx.Unsigned.AssetIDs() {
 		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
 			continue
 		}
@@ -289,7 +288,7 @@ func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
 	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
 		return tx.inputUTXOs
 	}
-	tx.inputUTXOs = tx.Tx.InputUTXOs()
+	tx.inputUTXOs = tx.Tx.Unsigned.InputUTXOs()
 	return tx.inputUTXOs
 }
 
@@ -366,7 +365,7 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	return tx.Visit(&txSemanticVerify{
+	return tx.Unsigned.Visit(&txSemanticVerify{
 		tx: tx.Tx,
 		vm: tx.vm,
 	})

@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -30,43 +29,36 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
-	// MaxValidatorWeightFactor is the maximum factor of the validator stake
-	// that is allowed to be placed on a validator.
-	MaxValidatorWeightFactor uint64 = 5
-
-	validatorSetsCacheSize = 64
-
-	// Maximum future start time for staking/delegating
-	maxFutureStartTime = 24 * 7 * 2 * time.Hour
-
+	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 var (
-	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooEarly = errors.New("start time is before the current chain time")
-	errStartAfterEndTime = errors.New("start time is after the end time")
-	errWrongCacheType    = errors.New("unexpectedly cached type")
+	_ block.ChainVM    = &VM{}
+	_ secp256k1fx.VM   = &VM{}
+	_ validators.State = &VM{}
 
-	_ block.ChainVM        = &VM{}
-	_ validators.Connector = &VM{}
-	_ secp256k1fx.VM       = &VM{}
-	_ validators.State     = &VM{}
+	errWrongCacheType      = errors.New("unexpectedly cached type")
+	errMissingValidatorSet = errors.New("missing validator set")
 )
 
 type VM struct {
@@ -90,6 +82,8 @@ type VM struct {
 	dbManager manager.Manager
 
 	internalState InternalState
+	utxoHandler   utxo.Handler
+	stateVersions state.Versions
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -114,6 +108,9 @@ type VM struct {
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
+
+	txBuilder         builder.TxBuilder
+	txExecutorBackend executor.Backend
 }
 
 // Initialize this blockchain.
@@ -168,11 +165,17 @@ func (vm *VM) Initialize(
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 
-	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
+	is, err := NewState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)
 	if err != nil {
 		return err
 	}
 	vm.internalState = is
+	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
+
+	vm.lastAcceptedID = is.GetLastAccepted()
+	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
+
+	vm.stateVersions = state.NewVersions(vm.lastAcceptedID, is)
 
 	// Initialize the utility to track validator uptimes
 	vm.uptimeManager = uptime.NewManager(is)
@@ -200,8 +203,28 @@ func (vm *VM) Initialize(
 			TTL:     recentlyAcceptedWindowTTL,
 		},
 	)
-	vm.lastAcceptedID = is.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
+
+	vm.txBuilder = builder.NewTxBuilder(
+		vm.ctx,
+		vm.Config,
+		&vm.clock,
+		vm.fx,
+		vm.internalState,
+		vm.AtomicUTXOManager,
+		vm.utxoHandler,
+	)
+
+	vm.txExecutorBackend = executor.Backend{
+		Config:        &vm.Config,
+		Ctx:           vm.ctx,
+		Clk:           &vm.clock,
+		Fx:            vm.fx,
+		FlowChecker:   vm.utxoHandler,
+		Uptimes:       vm.uptimeManager,
+		Rewards:       vm.rewards,
+		Bootstrapped:  &vm.bootstrapped,
+		StateVersions: vm.stateVersions,
+	}
 
 	// Build off the most recently accepted block
 	return vm.SetPreference(vm.lastAcceptedID)
@@ -240,37 +263,12 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		return err
 	}
 	for _, chain := range chains {
-		if err := vm.createChain(chain); err != nil {
-			return err
+		tx, ok := chain.Unsigned.(*txs.CreateChainTx)
+		if !ok {
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
+		vm.Config.CreateChain(chain.ID(), tx)
 	}
-	return nil
-}
-
-// Create the blockchain described in [tx], but only if this node is a member of
-// the subnet that validates the chain
-func (vm *VM) createChain(tx *Tx) error {
-	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
-	if !ok {
-		return errWrongTxType
-	}
-
-	if vm.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
-		constants.PrimaryNetworkID != unsignedTx.SubnetID && // All nodes must validate the primary network
-		!vm.WhitelistedSubnets.Contains(unsignedTx.SubnetID) { // This node doesn't validate this blockchain
-		return nil
-	}
-
-	chainParams := chains.ChainParameters{
-		ID:          tx.ID(),
-		SubnetID:    unsignedTx.SubnetID,
-		GenesisData: unsignedTx.GenesisData,
-		VMAlias:     unsignedTx.VMID.String(),
-	}
-	for _, fxID := range unsignedTx.FxIDs {
-		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-	}
-	vm.Chains.CreateChain(chainParams)
 	return nil
 }
 
@@ -437,7 +435,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	if err := server.RegisterService(&StaticService{}, "platform"); err != nil {
+	if err := server.RegisterService(&api.StaticService{}, "platform"); err != nil {
 		return nil, err
 	}
 
@@ -449,7 +447,7 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-func (vm *VM) Connected(vdrID ids.NodeID, _ version.Application) error {
+func (vm *VM) Connected(vdrID ids.NodeID, _ *version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
@@ -494,7 +492,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 
 	currentValidators, ok := vm.Validators.GetValidators(subnetID)
 	if !ok {
-		return nil, errNotEnoughValidators
+		return nil, errMissingValidatorSet
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -514,11 +512,11 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 			if diff.Decrease {
 				// The validator's weight was decreased at this block, so in the
 				// prior block it was higher.
-				op = safemath.Add64
+				op = math.Add64
 			} else {
 				// The validator's weight was increased at this block, so in the
 				// prior block it was lower.
-				op = safemath.Sub64
+				op = math.Sub64
 			}
 
 			newWeight, err := op(vdrSet[nodeID], diff.Amount)
@@ -580,8 +578,7 @@ func (vm *VM) GetCurrentHeight() (uint64, error) {
 }
 
 func (vm *VM) updateValidators() error {
-	currentValidators := vm.internalState.CurrentStakerChainState()
-	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
+	primaryValidators, err := vm.internalState.ValidatorSet(constants.PrimaryNetworkID)
 	if err != nil {
 		return err
 	}
@@ -594,7 +591,7 @@ func (vm *VM) updateValidators() error {
 	vm.totalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
-		subnetValidators, err := currentValidators.ValidatorSet(subnetID)
+		subnetValidators, err := vm.internalState.ValidatorSet(subnetID)
 		if err != nil {
 			return err
 		}
@@ -632,7 +629,7 @@ func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
 		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
-		connectedStake, err = safemath.Add64(connectedStake, vdr.Weight())
+		connectedStake, err = math.Add64(connectedStake, vdr.Weight())
 		if err != nil {
 			return 0, err
 		}

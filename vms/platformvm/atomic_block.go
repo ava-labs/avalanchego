@@ -7,16 +7,18 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
 	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
-	_ Block    = &AtomicBlock{}
-	_ decision = &AtomicBlock{}
+	_ Block = &AtomicBlock{}
 )
 
 // AtomicBlock being accepted results in the atomic transaction contained in the
@@ -24,27 +26,23 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
 	inputs ids.Set
+
+	atomicRequests map[ids.ID]*atomic.Requests
 }
 
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
+	if err := ab.Tx.Sign(Codec, nil); err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	ab.Tx.Initialize(unsignedBytes, signedBytes)
-	ab.Tx.InitCtx(vm.ctx)
+	ab.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
 }
 
@@ -76,33 +74,10 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
-	if !ok {
-		return errWrongTxType
-	}
-	ab.inputs = tx.InputUTXOs()
-
-	parentIntf, err := ab.parentBlock()
-	if err != nil {
-		return err
-	}
-
-	conflicts, err := parentIntf.conflicts(ab.inputs)
-	if err != nil {
-		return err
-	}
-	if conflicts {
-		return errConflictingParentTxs
-	}
-
-	// AtomicBlock is not a modifier on a proposal block, so its parent must be
-	// a decision.
-	parent, ok := parentIntf.(decision)
+	parentState, ok := ab.vm.stateVersions.GetState(ab.PrntID)
 	if !ok {
 		return errInvalidBlockType
 	}
-
-	parentState := parent.onAccept()
 
 	currentTimestamp := parentState.GetTimestamp()
 	enabledAP5 := !currentTimestamp.Before(ab.vm.ApricotPhase5Time)
@@ -115,25 +90,49 @@ func (ab *AtomicBlock) Verify() error {
 		)
 	}
 
-	onAccept, err := tx.AtomicExecute(ab.vm, parentState, &ab.Tx)
+	atomicExecutor := executor.AtomicTxExecutor{
+		Backend:  &ab.vm.txExecutorBackend,
+		ParentID: ab.PrntID,
+		Tx:       ab.Tx,
+	}
+	err := ab.Tx.Unsigned.Visit(&atomicExecutor)
 	if err != nil {
-		txID := tx.ID()
+		txID := ab.Tx.ID()
 		ab.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
-	onAccept.AddTx(&ab.Tx, status.Committed)
 
-	ab.onAcceptState = onAccept
-	ab.timestamp = onAccept.GetTimestamp()
+	atomicExecutor.OnAccept.AddTx(ab.Tx, status.Committed)
 
-	ab.vm.blockBuilder.RemoveDecisionTxs([]*Tx{&ab.Tx})
+	ab.onAcceptState = atomicExecutor.OnAccept
+	ab.inputs = atomicExecutor.Inputs
+	ab.atomicRequests = atomicExecutor.AtomicRequests
+	ab.timestamp = atomicExecutor.OnAccept.GetTimestamp()
+
+	if ab.inputs.Len() > 0 {
+		parent, err := ab.parentBlock()
+		if err != nil {
+			return err
+		}
+
+		conflicts, err := parent.conflicts(ab.inputs)
+		if err != nil {
+			return err
+		}
+		if conflicts {
+			return errConflictingParentTxs
+		}
+	}
+
+	ab.vm.blockBuilder.RemoveDecisionTxs([]*txs.Tx{ab.Tx})
 	ab.vm.currentBlocks[blkID] = ab
-	parentIntf.addChild(ab)
+	ab.vm.stateVersions.SetState(blkID, ab.onAcceptState)
 	return nil
 }
 
 func (ab *AtomicBlock) Accept() error {
 	blkID := ab.ID()
+
 	ab.vm.ctx.Log.Verbo(
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
@@ -143,11 +142,6 @@ func (ab *AtomicBlock) Accept() error {
 
 	if err := ab.CommonBlock.Accept(); err != nil {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
-	}
-
-	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
-	if !ok {
-		return errWrongTxType
 	}
 
 	// Update the state of the chain in the database
@@ -163,26 +157,12 @@ func (ab *AtomicBlock) Accept() error {
 		)
 	}
 
-	if err := tx.AtomicAccept(ab.vm.ctx, batch); err != nil {
-		return fmt.Errorf(
-			"failed to atomically accept tx %s in block %s: %w",
-			tx.ID(),
-			blkID,
-			err,
-		)
+	if err = ab.vm.ctx.SharedMemory.Apply(ab.atomicRequests, batch); err != nil {
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
 	}
 
-	for _, child := range ab.children {
-		child.setBaseState()
-	}
 	if ab.onAcceptFunc != nil {
-		if err := ab.onAcceptFunc(); err != nil {
-			return fmt.Errorf(
-				"failed to execute onAcceptFunc of %s: %w",
-				blkID,
-				err,
-			)
-		}
+		ab.onAcceptFunc()
 	}
 
 	ab.free()
@@ -197,7 +177,7 @@ func (ab *AtomicBlock) Reject() error {
 		ab.Parent(),
 	)
 
-	if err := ab.vm.blockBuilder.AddVerifiedTx(&ab.Tx); err != nil {
+	if err := ab.vm.blockBuilder.AddVerifiedTx(ab.Tx); err != nil {
 		ab.vm.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			ab.Tx.ID(),
@@ -209,7 +189,7 @@ func (ab *AtomicBlock) Reject() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
@@ -223,7 +203,7 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(ab)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

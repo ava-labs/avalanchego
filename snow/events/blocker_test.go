@@ -12,12 +12,11 @@ import (
 func TestBlocker(t *testing.T) {
 	b := Blocker(nil)
 
-	a := &blockable{}
-	a.Default()
+	a := newTestBlockable()
 
-	id0 := GenerateID()
-	id1 := GenerateID()
-	id2 := GenerateID()
+	id0 := ids.GenerateTestID()
+	id1 := ids.GenerateTestID()
+	id2 := ids.GenerateTestID()
 
 	calledDep := new(bool)
 	a.dependencies = func() ids.Set {
@@ -76,3 +75,24 @@ func TestBlocker(t *testing.T) {
 		t.Fatalf("Called wrong function")
 	}
 }
+
+type testBlockable struct {
+	dependencies func() ids.Set
+	fulfill      func(ids.ID)
+	abandon      func(ids.ID)
+	update       func()
+}
+
+func newTestBlockable() *testBlockable {
+	return &testBlockable{
+		dependencies: func() ids.Set { return ids.Set{} },
+		fulfill:      func(ids.ID) {},
+		abandon:      func(ids.ID) {},
+		update:       func() {},
+	}
+}
+
+func (b *testBlockable) Dependencies() ids.Set { return b.dependencies() }
+func (b *testBlockable) Fulfill(id ids.ID)     { b.fulfill(id) }
+func (b *testBlockable) Abandon(id ids.ID)     { b.abandon(id) }
+func (b *testBlockable) Update()               { b.update() }

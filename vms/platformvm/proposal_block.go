@@ -9,7 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ Block = &ProposalBlock{}
@@ -27,12 +30,13 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
-	onCommitState VersionedState
+	onCommitState state.Diff
 	// The state that the chain will have if this block's proposal is aborted
-	onAbortState VersionedState
+	onAbortState  state.Diff
+	prefersCommit bool
 }
 
 func (pb *ProposalBlock) free() {
@@ -66,7 +70,7 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.vm.blockBuilder.AddVerifiedTx(&pb.Tx); err != nil {
+	if err := pb.vm.blockBuilder.AddVerifiedTx(pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			pb.Tx.ID(),
@@ -80,28 +84,16 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	if err := pb.CommonBlock.initialize(vm, bytes, status, self); err != nil {
 		return err
 	}
-
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
+	if err := pb.Tx.Sign(Codec, nil); err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	pb.Tx.Initialize(unsignedBytes, signedBytes)
-	pb.Tx.InitCtx(vm.ctx)
+	pb.Tx.Unsigned.InitCtx(vm.ctx)
 	return nil
-}
-
-func (pb *ProposalBlock) setBaseState() {
-	pb.onCommitState.SetBase(pb.vm.internalState)
-	pb.onAbortState.SetBase(pb.vm.internalState)
 }
 
 // Verify this block is valid.
 //
-// The parent block must either be a Commit or an Abort block.
+// The parent block must be a decision block
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
@@ -111,66 +103,52 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
-	if !ok {
-		return errWrongTxType
+	txExecutor := executor.ProposalTxExecutor{
+		Backend:  &pb.vm.txExecutorBackend,
+		ParentID: pb.PrntID,
+		Tx:       pb.Tx,
 	}
-
-	parentIntf, parentErr := pb.parentBlock()
-	if parentErr != nil {
-		return parentErr
-	}
-
-	// The parent of a proposal block (ie this block) must be a decision block
-	parent, ok := parentIntf.(decision)
-	if !ok {
-		return errInvalidBlockType
-	}
-
-	// parentState is the state if this block's parent is accepted
-	parentState := parent.onAccept()
-
-	var err error
-	pb.onCommitState, pb.onAbortState, err = tx.Execute(pb.vm, parentState, &pb.Tx)
+	err := pb.Tx.Unsigned.Visit(&txExecutor)
 	if err != nil {
-		txID := tx.ID()
+		txID := pb.Tx.ID()
 		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
-	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
-	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
 
-	pb.timestamp = parentState.GetTimestamp()
+	pb.onCommitState = txExecutor.OnCommit
+	pb.onAbortState = txExecutor.OnAbort
+	pb.prefersCommit = txExecutor.PrefersCommit
 
-	pb.vm.blockBuilder.RemoveProposalTx(&pb.Tx)
+	pb.onCommitState.AddTx(pb.Tx, status.Committed)
+	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
+
+	// It is safe to use [pb.onAbortState] here because the timestamp will never
+	// be modified by an Abort block.
+	pb.timestamp = pb.onAbortState.GetTimestamp()
+
+	pb.vm.blockBuilder.RemoveProposalTx(pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
-	parentIntf.addChild(pb)
+
+	// Notice that we do not add an entry to the state versions here for this
+	// block. This block must be followed by either a Commit or an Abort block.
+	// These blocks will get their parent state by referencing [onCommitState]
+	// or [onAbortState] directly.
 	return nil
 }
 
 // Options returns the possible children of this block in preferential order.
 func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
-	if !ok {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"%w, expected UnsignedProposalTx but got %T",
-			errWrongTxType,
-			pb.Tx.UnsignedTx,
-		)
-	}
-
 	blkID := pb.ID()
 	nextHeight := pb.Height() + 1
-	prefersCommit := tx.InitiallyPrefersCommit(pb.vm)
 
-	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, prefersCommit)
+	commit, err := pb.vm.newCommitBlock(blkID, nextHeight, pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",
 			err,
 		)
 	}
-	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !prefersCommit)
+	abort, err := pb.vm.newAbortBlock(blkID, nextHeight, !pb.prefersCommit)
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",
@@ -178,7 +156,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	if prefersCommit {
+	if pb.prefersCommit {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil
@@ -189,7 +167,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -201,9 +179,9 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(CodecVersion, &block)
+	bytes, err := Codec.Marshal(txs.Version, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	return pb, pb.initialize(vm, bytes, choices.Processing, pb)
+	return pb, pb.CommonBlock.initialize(vm, bytes, choices.Processing, pb)
 }

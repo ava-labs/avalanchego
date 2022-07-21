@@ -565,7 +565,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
 	ipResolutionFreq := v.GetDuration(DynamicUpdateDurationKey)
 	if v.IsSet(PublicIPResolutionFreqKey) {
-		ipResolutionService = v.GetString(PublicIPResolutionFreqKey)
+		ipResolutionFreq = v.GetDuration(PublicIPResolutionFreqKey)
 	}
 	if ipResolutionFreq <= 0 {
 		return node.IPConfig{}, fmt.Errorf("%q must be > 0", PublicIPResolutionFreqKey)
@@ -593,7 +593,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	}
 	if ipResolutionService != "" {
 		// User specified to use dynamic IP resolution.
-		resolver, err := dynamicip.NewResolver(dynamicip.ResolverName(ipResolutionService))
+		resolver, err := dynamicip.NewResolver(ipResolutionService)
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't create IP resolver: %w", err)
 		}

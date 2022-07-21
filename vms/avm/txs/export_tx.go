@@ -10,12 +10,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
 	errNoExportOutputs = errors.New("no export outputs")
 
-	_ UnsignedTx = &ExportTx{}
+	_ UnsignedTx             = &ExportTx{}
+	_ secp256k1fx.UnsignedTx = &ExportTx{}
 )
 
 // ExportTx is a transaction that exports an asset to another blockchain.
@@ -51,7 +53,11 @@ func (t *ExportTx) SyntacticVerify(
 		return errNoExportOutputs
 	}
 
-	if err := t.MetadataVerify(ctx); err != nil {
+	// We don't call [t.BaseTx.SyntacticVerify] because the flow check performed
+	// here is more strict than the flow check performed in the [BaseTx].
+	// Therefore, we avoid performing a useless flow check by performing the
+	// other verifications here.
+	if err := t.BaseTx.BaseTx.Verify(ctx); err != nil {
 		return err
 	}
 

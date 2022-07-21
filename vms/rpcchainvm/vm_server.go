@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/emptypb"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -113,20 +115,26 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		return nil, err
 	}
 
+	// gRPC client metrics
+	grpcClientMetrics := grpc_prometheus.NewClientMetrics()
+	if err := registerer.Register(grpcClientMetrics); err != nil {
+		return nil, err
+	}
+
 	// Register metrics for each Go plugin processes
 	vm.processMetrics = registerer
 
 	// Dial each database in the request and construct the database manager
 	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
 	for i, vDBReq := range req.DbServers {
-		version, err := version.DefaultParser.Parse(vDBReq.Version)
+		version, err := version.Parse(vDBReq.Version)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
 			return nil, err
 		}
 
-		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr)
+		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr, grpcutils.DialOptsWithMetrics(grpcClientMetrics)...)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
@@ -147,7 +155,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	}
 	vm.dbManager = dbManager
 
-	clientConn, err := grpcutils.Dial(req.ServerAddr)
+	clientConn, err := grpcutils.Dial(req.ServerAddr, grpcutils.DialOptsWithMetrics(grpcClientMetrics)...)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()
@@ -347,7 +355,7 @@ func (vm *VMServer) Connected(_ context.Context, req *vmpb.ConnectedRequest) (*e
 		return nil, err
 	}
 
-	peerVersion, err := version.DefaultApplicationParser.Parse(req.Version)
+	peerVersion, err := version.ParseApplication(req.Version)
 	if err != nil {
 		return nil, err
 	}

@@ -8,12 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ Block    = &AbortBlock{}
-	_ decision = &AbortBlock{}
-)
+var _ Block = &AbortBlock{}
 
 // AbortBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being rejected.
@@ -61,7 +59,7 @@ func (a *AbortBlock) Verify() error {
 	a.timestamp = a.onAcceptState.GetTimestamp()
 
 	a.vm.currentBlocks[blkID] = a
-	parent.addChild(a)
+	a.vm.stateVersions.SetState(blkID, a.onAcceptState)
 	return nil
 }
 
@@ -84,7 +82,7 @@ func (vm *VM) newAbortBlock(parentID ids.ID, height uint64, wasPreferred bool) (
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(abort)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}

@@ -30,7 +30,6 @@ type Config struct {
 	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
-	VersionParser        version.ApplicationParser
 	MySubnets            ids.Set
 	Beacons              validators.Set
 	NetworkID            uint32

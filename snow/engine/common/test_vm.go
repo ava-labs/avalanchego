@@ -47,7 +47,7 @@ type TestVM struct {
 	ShutdownF             func() error
 	CreateHandlersF       func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF func() (map[string]*HTTPHandler, error)
-	ConnectedF            func(nodeID ids.NodeID, nodeVersion version.Application) error
+	ConnectedF            func(nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF         func(nodeID ids.NodeID) error
 	HealthCheckF          func() (interface{}, error)
 	AppRequestF           func(nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
@@ -191,7 +191,7 @@ func (vm *TestVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return errAppGossip
 }
 
-func (vm *TestVM) Connected(id ids.NodeID, nodeVersion version.Application) error {
+func (vm *TestVM) Connected(id ids.NodeID, nodeVersion *version.Application) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(id, nodeVersion)
 	}

@@ -206,7 +206,7 @@ func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) erro
 	return b.fetch(blkID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
@@ -214,8 +214,10 @@ func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion version.Applicat
 	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}
-
-	b.fetchFrom.Add(nodeID)
+	// Ensure fetchFrom reflects proper validator list
+	if b.Beacons.Contains(nodeID) {
+		b.fetchFrom.Add(nodeID)
+	}
 
 	if b.started || !b.StartupTracker.ShouldStart() {
 		return nil

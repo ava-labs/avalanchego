@@ -483,7 +483,7 @@ func (ss *stateSyncer) Notify(msg common.Message) error {
 	return ss.onDoneStateSyncing(ss.requestID)
 }
 
-func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion version.Application) error {
+func (ss *stateSyncer) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := ss.VM.Connected(nodeID, nodeVersion); err != nil {
 		return err
 	}

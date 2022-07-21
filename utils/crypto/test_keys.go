@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
 func BuildTestKeys() []*PrivateKeySECP256K1R {
@@ -21,7 +21,7 @@ func BuildTestKeys() []*PrivateKeySECP256K1R {
 	)
 
 	for i, key := range keyStrings {
-		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
+		privKeyBytes, err := cb58.Decode(key)
 		if err != nil {
 			panic(err)
 		}

@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	UncompressingBuilder OutboundMsgBuilder
-	TestCodec            Codec
+	UncompressingBuilder  OutboundMsgBuilder
+	TestInboundMsgBuilder InboundMsgBuilder
+	TestCodec             Codec
 
 	dummyNodeID             = ids.EmptyNodeID
 	dummyOnFinishedHandling = func() {}
@@ -33,6 +34,7 @@ func init() {
 	}
 	TestCodec = codec
 	UncompressingBuilder = NewOutboundBuilder(codec, false /*compress*/)
+	TestInboundMsgBuilder = NewInboundBuilder(codec)
 }
 
 func TestBuildVersion(t *testing.T) {
@@ -42,7 +44,12 @@ func TestBuildVersion(t *testing.T) {
 		IP: net.IPv4(1, 2, 3, 4),
 	}
 
-	myVersion := version.NewDefaultVersion(1, 2, 3).String()
+	myVersion := &version.Semantic{
+		Major: 1,
+		Minor: 2,
+		Patch: 3,
+	}
+	myVersionStr := myVersion.String()
 	myVersionTime := uint64(time.Now().Unix())
 	sig := make([]byte, 65)
 	subnetID := ids.Empty.Prefix(1)
@@ -51,7 +58,7 @@ func TestBuildVersion(t *testing.T) {
 		networkID,
 		myTime,
 		ip,
-		myVersion,
+		myVersionStr,
 		myVersionTime,
 		sig,
 		[]ids.ID{subnetID},
@@ -68,7 +75,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
 	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
 	assert.EqualValues(t, ip, parsedMsg.Get(IP))
-	assert.EqualValues(t, myVersion, parsedMsg.Get(VersionStr))
+	assert.EqualValues(t, myVersionStr, parsedMsg.Get(VersionStr))
 	assert.EqualValues(t, myVersionTime, parsedMsg.Get(VersionTime))
 	assert.EqualValues(t, sig, parsedMsg.Get(SigBytes))
 	assert.EqualValues(t, subnetIDs, parsedMsg.Get(TrackedSubnets))
@@ -265,6 +272,35 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+}
+
+func TestBuildChitsV2(t *testing.T) {
+	chainID := ids.Empty.Prefix(0)
+	requestID := uint32(5)
+	containerID := ids.Empty.Prefix(1)
+	containerIDs := [][]byte{containerID[:]}
+
+	msg := TestInboundMsgBuilder.InboundChitsV2(chainID, requestID, []ids.ID{containerID}, containerID, dummyNodeID)
+	assert.NotNil(t, msg)
+	assert.Equal(t, ChitsV2, msg.Op())
+	assert.Equal(t, chainID[:], msg.Get(ChainID))
+	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
+	assert.Equal(t, containerID[:], msg.Get(ContainerID))
+
+	outboundMsg, err := UncompressingBuilder.ChitsV2(chainID, requestID, []ids.ID{containerID}, containerID)
+	assert.NoError(t, err)
+	assert.NotNil(t, outboundMsg)
+	assert.Equal(t, ChitsV2, outboundMsg.Op())
+
+	parsedMsg, err := TestCodec.Parse(outboundMsg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedMsg)
+	assert.Equal(t, ChitsV2, parsedMsg.Op())
+	assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
+	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+	assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
 }
 
 func TestBuildAncestors(t *testing.T) {

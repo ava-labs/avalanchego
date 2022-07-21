@@ -68,7 +68,7 @@ type Peer interface {
 
 	// Version returns the claimed node version this peer is running. It should
 	// only be called after [Ready] returns true.
-	Version() version.Application
+	Version() *version.Application
 
 	// TrackedSubnets returns the subnets this peer is running. It should only
 	// be called after [Ready] returns true.
@@ -117,7 +117,7 @@ type peer struct {
 	ip *SignedIP
 	// version is the claimed version the peer is running that we received in
 	// the Version message.
-	version version.Application
+	version *version.Application
 	// trackedSubnets is the subset of subnetIDs the peer sent us in the Version
 	// message that we are also tracking.
 	trackedSubnets ids.Set
@@ -157,6 +157,10 @@ type peer struct {
 	lastSent, lastReceived int64
 }
 
+// Start a new peer instance.
+//
+// Invariant: There must only be one peer running at a time with a reference to
+// the same [config.InboundMsgThrottler].
 func Start(
 	config *Config,
 	conn net.Conn,
@@ -177,8 +181,6 @@ func Start(
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
 	}
-
-	p.trackedSubnets.Add(constants.PrimaryNetworkID)
 
 	go p.readMessages()
 	go p.writeMessages()
@@ -237,7 +239,7 @@ func (p *peer) Info() Info {
 
 func (p *peer) IP() *SignedIP { return p.ip }
 
-func (p *peer) Version() version.Application { return p.version }
+func (p *peer) Version() *version.Application { return p.version }
 
 func (p *peer) TrackedSubnets() ids.Set { return p.trackedSubnets }
 
@@ -338,16 +340,29 @@ func (p *peer) readMessages() {
 		}
 
 		// Wait until the throttler says we can proceed to read the message.
-		// Note that when we are done handling this message, or give up
-		// trying to read it, we must call [p.InboundMsgThrottler.Release]
-		// to give back the bytes used by this message.
-		p.InboundMsgThrottler.Acquire(p.onClosingCtx, uint64(msgLen), p.id)
-
+		//
 		// Invariant: When done processing this message, onFinishedHandling() is
 		// called exactly once. If this is not honored, the message throttler
 		// will leak until no new messages can be read. You can look at message
 		// throttler metrics to verify that there is no leak.
-		onFinishedHandling := func() { p.InboundMsgThrottler.Release(uint64(msgLen), p.id) }
+		//
+		// Invariant: There must only be one call to Acquire at any given time
+		// with the same nodeID. In this package, only this goroutine ever
+		// performs Acquire. Additionally, we ensure that this goroutine has
+		// exited before calling [Network.Disconnected] to guarantee that there
+		// can't be multiple instances of this goroutine running over different
+		// peer instances.
+		onFinishedHandling := p.InboundMsgThrottler.Acquire(
+			p.onClosingCtx,
+			uint64(msgLen),
+			p.id,
+		)
+
+		// If the peer is shutting down, there's no need to read the message.
+		if p.onClosingCtx.Err() != nil {
+			onFinishedHandling()
+			return
+		}
 
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
@@ -608,7 +623,7 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	}
 
 	peerVersionStr := msg.Get(message.VersionStr).(string)
-	peerVersion, err := p.VersionParser.Parse(peerVersionStr)
+	peerVersion, err := version.ParseApplication(peerVersionStr)
 	if err != nil {
 		p.Log.Debug(
 			"version of %s could not be parsed: %s",

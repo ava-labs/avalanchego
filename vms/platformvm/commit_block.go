@@ -8,12 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ Block    = &CommitBlock{}
-	_ decision = &CommitBlock{}
-)
+var _ Block = &CommitBlock{}
 
 // CommitBlock being accepted results in the proposal of its parent (which must
 // be a proposal block) being enacted.
@@ -61,7 +59,7 @@ func (c *CommitBlock) Verify() error {
 	c.timestamp = c.onAcceptState.GetTimestamp()
 
 	c.vm.currentBlocks[blkID] = c
-	parent.addChild(c)
+	c.vm.stateVersions.SetState(blkID, c.onAcceptState)
 	return nil
 }
 
@@ -84,7 +82,7 @@ func (vm *VM) newCommitBlock(parentID ids.ID, height uint64, wasPreferred bool) 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(commit)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal commit block: %w", err)
 	}
