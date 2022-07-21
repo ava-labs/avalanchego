@@ -1,5 +1,42 @@
 # Release Notes
 
+## [v1.7.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.15)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
+
+### PlatformVM
+
+- Replaced copy-on-write validator set data-structure to use tree diffs to optimize validator set additions
+- Replaced validation transactions with a standardized representation to remove transaction type handling
+- Migrated transaction execution to its own package
+- Removed child pointers from processing blocks
+- Added P-chain wallet helper for providing initial transactions
+
+### Coreth
+
+- Bumped go-ethereum dependency to v1.10.20
+- Updated API names used to enable services in `eth-api` config flag. Prior names are supported but deprecated, please update configurations [accordingly](https://docs.avax.network/nodes/maintain/chain-config-flags#c-chain-configs)
+- Optimized state sync by parallelizing trie syncing
+- Added `eth_syncing` API for compatibility. Note: This API is only accessible after bootstrapping and always returns `"false"`, since the node will no longer be syncing at that point
+- Added metrics to the atomic transaction mempool
+- Added metrics for incoming/outgoing mempool gossip
+
+### Fixes
+
+- Updated Snowman and Avalanche consensus engines to report original container preferences before processing the provided container
+- Fixed inbound message byte throttler context cancellation cleanup
+- Removed case sensitivity of IP resolver services
+- Added failing health check when a whitelisted subnet fails to initialize a chain
+
+### Miscellaneous
+
+- Added gRPC client metrics for dynamically created connections
+- Added uninitialized continuous time averager for when initial predictions are unreliable
+- Updated linter version
+- Documented various platform invariants
+- Cleaned up various dead parameters
+- Improved various tests
+
 ## [v1.7.14](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.14)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged.
