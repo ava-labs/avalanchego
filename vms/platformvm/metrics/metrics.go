@@ -18,6 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+var (
+	_ Metrics = &metrics{}
+	_ Metrics = &noopMetrics{}
+)
+
 type Metrics interface {
 	// Mark that an option vote that we initially preferred was accepted.
 	MarkOptionVoteWon()
