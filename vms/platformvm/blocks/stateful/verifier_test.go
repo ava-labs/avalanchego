@@ -249,8 +249,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetCurrentValidator(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
-	parentState.EXPECT().GetPendingValidator(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
