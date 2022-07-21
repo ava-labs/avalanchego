@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"time"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -82,6 +84,17 @@ var (
 		}),
 	}
 )
+
+// DialOptsWithMetrics registers gRPC client metrics via chain interceptors.
+func DialOptsWithMetrics(clientMetrics *grpc_prometheus.ClientMetrics) []grpc.DialOption {
+	return append(DefaultDialOptions,
+		// Use chain interceptors to ensure custom/default interceptors are
+		// applied correctly.
+		// ref. https://github.com/kubernetes/kubernetes/pull/105069
+		grpc.WithChainStreamInterceptor(clientMetrics.StreamClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(clientMetrics.UnaryClientInterceptor()),
+	)
+}
 
 func Errorf(code int, tmpl string, args ...interface{}) error {
 	return GetGRPCErrorFromHTTPResponse(&httppb.HandleSimpleHTTPResponse{

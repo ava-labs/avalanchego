@@ -39,9 +39,9 @@ func TestBlueberryPickingOrder(t *testing.T) {
 
 	// accept validator as pending
 	txExecutor := executor.ProposalTxExecutor{
-		Backend:     &h.txExecBackend,
-		ParentState: h.fullState,
-		Tx:          validatorTx,
+		Backend:          &h.txExecBackend,
+		ReferenceBlockID: h.fullState.GetLastAccepted(),
+		Tx:               validatorTx,
 	}
 	assert.NoError(validatorTx.Unsigned.Visit(&txExecutor))
 	txExecutor.OnCommit.Apply(h.fullState)
@@ -126,7 +126,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 
 	// Finally an empty standard block can be issued to advance time
 	// if no mempool txs are available
-	now, err = h.fullState.GetNextStakerChangeTime()
+	now, err = executor.GetNextStakerChangeTime(h.fullState)
 	assert.NoError(err)
 	h.clk.Set(now)
 

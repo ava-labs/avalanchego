@@ -41,18 +41,18 @@ func (a *apricotStrategy) hasContent() (bool, error) {
 // if it must
 func (a *apricotStrategy) selectBlockContent() error {
 	// try including as many standard txs as possible. No need to advance chain time
-	if a.HasDecisionTxs() {
-		a.txes = a.PeekDecisionTxs(TargetBlockSize)
+	if a.Mempool.HasDecisionTxs() {
+		a.txes = a.Mempool.PeekDecisionTxs(TargetBlockSize)
 		return nil
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTx, shouldReward, err := a.getStakerToReward(a.parentState)
+	stakerTxID, shouldReward, err := a.blockBuilder.getNextStakerToReward(a.parentState)
 	if err != nil {
 		return fmt.Errorf("could not find next staker to reward %s", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := a.txBuilder.NewRewardValidatorTx(stakerTx.ID())
+		rewardValidatorTx, err := a.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
 			return fmt.Errorf("could not build tx to reward staker %s", err)
 		}
@@ -84,11 +84,11 @@ func (a *apricotStrategy) trySelectMempoolProposalTx() ([]*txs.Tx, error) {
 	a.dropTooEarlyMempoolProposalTxs()
 
 	// try including a mempool proposal tx is available.
-	if !a.HasProposalTx() {
+	if !a.Mempool.HasProposalTx() {
 		a.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return []*txs.Tx{}, errNoPendingBlocks
 	}
-	tx := a.PeekProposalTx()
+	tx := a.Mempool.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// if the chain timestamp is too far in the past to issue this transaction

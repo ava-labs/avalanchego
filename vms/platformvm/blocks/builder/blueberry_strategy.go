@@ -53,19 +53,19 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	blkTime := b.parentState.GetTimestamp()
 
 	// try including as many standard txs as possible. No need to advance chain time
-	if b.HasDecisionTxs() {
-		b.txes = b.PeekDecisionTxs(TargetBlockSize)
+	if b.Mempool.HasDecisionTxs() {
+		b.txes = b.Mempool.PeekDecisionTxs(TargetBlockSize)
 		b.blkTime = blkTime
 		return nil
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTx, shouldReward, err := b.getStakerToReward(b.parentState)
+	stakerTxID, shouldReward, err := b.blockBuilder.getNextStakerToReward(b.parentState)
 	if err != nil {
 		return fmt.Errorf("could not find next staker to reward %s", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := b.txBuilder.NewRewardValidatorTx(stakerTx.ID())
+		rewardValidatorTx, err := b.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
 			return fmt.Errorf("could not build tx to reward staker %s", err)
 		}
@@ -90,11 +90,11 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	b.dropTooEarlyMempoolProposalTxs()
 
 	// try including a mempool proposal tx is available.
-	if !b.HasProposalTx() {
+	if !b.Mempool.HasProposalTx() {
 		b.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return errNoPendingBlocks
 	}
-	tx := b.PeekProposalTx()
+	tx := b.Mempool.PeekProposalTx()
 
 	// if the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to

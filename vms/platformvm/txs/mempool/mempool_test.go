@@ -45,7 +45,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
 	err = mpool.Add(tx)
-	assert.True(errors.Is(err, ErrMempoolFull), err, "max mempool size breached")
+	assert.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())

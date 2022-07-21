@@ -33,15 +33,10 @@ type blockState struct {
 	proposalBlockState
 	atomicBlockState
 	statelessBlock stateless.Block
-	onAcceptState  state.Diff
-	// This block's children which have passed verification.
-	children       []ids.ID
+
+	// Following Blueberry activation, onAcceptState is defined for proposal blocks too
+	onAcceptState state.Diff
+
 	timestamp      time.Time
 	atomicRequests map[ids.ID]*atomic.Requests
-
-	// Following Blueberry activation, onBlueberryBaseOptionsState is the base state
-	// over which both commit and abort states are built
-	// TODO ABENEGIA: should this be instead onAcceptState for ProposalBlock as well?
-	// it would fit standard block flow
-	onBlueberryBaseOptionsState state.Diff
 }

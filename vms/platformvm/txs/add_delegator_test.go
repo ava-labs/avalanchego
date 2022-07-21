@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -35,12 +34,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	err = stx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, errNilSignedTx))
+	assert.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
 
 	// Case : unsigned tx is nil
-	err = addDelegatorTx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, ErrNilTx))
+	assert.ErrorIs(addDelegatorTx.SyntacticVerify(ctx), ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	inputs := []*avax.TransferableInput{{
@@ -101,8 +98,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: signed tx not initialized
 	stx = &Tx{Unsigned: addDelegatorTx}
-	err = stx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, errSignedTxNotInitialized))
+	assert.ErrorIs(stx.SyntacticVerify(ctx), errSignedTxNotInitialized)
 
 	// Case: valid tx
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
@@ -123,7 +119,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	addDelegatorTx.Validator.Wght = 2 * validatorWeight
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
 	assert.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, errDelegatorWeightMismatch))
+	assert.ErrorIs(stx.SyntacticVerify(ctx), errDelegatorWeightMismatch)
 	addDelegatorTx.Validator.Wght = validatorWeight
 }

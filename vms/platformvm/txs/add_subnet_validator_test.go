@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -32,12 +31,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	err = stx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, errNilSignedTx))
+	assert.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
 
 	// Case : unsigned tx is nil
-	err = addSubnetValidatorTx.SyntacticVerify(ctx)
-	assert.True(errors.Is(err, ErrNilTx))
+	assert.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}

@@ -131,21 +131,12 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	// Get the preferred block (which we want to build off)
-	preferred, err := b.Preferred()
-	if err != nil {
-		return fmt.Errorf("couldn't get preferred block: %w", err)
-	}
-
-	preferredState := b.blkManager.OnAccept(preferred.ID())
-
 	verifier := executor.MempoolTxVerifier{
-		Backend:     &b.txExecutorBackend,
-		ParentState: preferredState,
-		Tx:          tx,
+		Backend:  &b.txExecutorBackend,
+		ParentID: b.preferredBlockID, // We want to build off of the preferred block
+		Tx:       tx,
 	}
-	err = tx.Unsigned.Visit(&verifier)
-	if err != nil {
+	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		b.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -207,14 +198,18 @@ func (b *blockBuilder) resetTimer() {
 	}
 
 	// Wake up when it's time to add/remove the next validator
-	ctx := b.txExecutorBackend.Ctx
-	now := b.txExecutorBackend.Clk.Time()
-	preferred, err := b.Preferred()
-	if err != nil {
+	var (
+		ctx           = b.txExecutorBackend.Ctx
+		now           = b.txExecutorBackend.Clk.Time()
+		stateVersions = b.txExecutorBackend.StateVersions
+	)
+
+	preferredState, ok := stateVersions.GetState(b.preferredBlockID)
+	if !ok {
+		ctx.Log.Error("could not retrieve state for block %s. Preferred block must be a decision block", b.preferredBlockID)
 		return
 	}
-	preferredState := b.blkManager.OnAccept(preferred.ID())
-	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time: %s", err)
 		return
@@ -224,31 +219,42 @@ func (b *blockBuilder) resetTimer() {
 	b.timer.SetTimeoutIn(waitTime)
 }
 
-// getStakerToReward return the staker txID to remove from the primary network
-// staking set, if one exists.
-func (b *blockBuilder) getStakerToReward(preferredState state.Chain) (*txs.Tx, bool, error) {
+// getNextStakerToReward returns the next staker txID to remove from the staking
+// set with a RewardValidatorTx rather than an AdvanceTimeTx.
+// Returns:
+// - [txID] of the next staker to reward
+// - [shouldReward] if the txID exists and is ready to be rewarded
+// - [err] if something bad happened
+func (b *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
-		return nil, false, errEndOfTime
+		return ids.Empty, false, errEndOfTime
 	}
 
-	currentStakers := preferredState.CurrentStakers()
-	tx, _, err := currentStakers.GetNextStaker()
+	currentStakerIterator, err := preferredState.GetCurrentStakerIterator()
 	if err != nil {
-		return nil, false, err
+		return ids.Empty, false, err
 	}
+	defer currentStakerIterator.Release()
 
-	staker, ok := tx.Unsigned.(txs.StakerTx)
-	if !ok {
-		return nil, false, fmt.Errorf("expected staker tx to be StakerTx but got %T", tx.Unsigned)
+	for currentStakerIterator.Next() {
+		currentStaker := currentStakerIterator.Value()
+		priority := currentStaker.Priority
+		// If the staker is a primary network staker (not a subnet validator),
+		// it's the next staker we will want to remove with a RewardValidatorTx
+		// rather than an AdvanceTimeTx.
+		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
+			priority == state.PrimaryNetworkValidatorCurrentPriority {
+			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
+		}
 	}
-	return tx, currentChainTimestamp.Equal(staker.EndTime()), nil
+	return ids.Empty, false, nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
 func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
-	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
 	}

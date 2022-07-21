@@ -33,7 +33,11 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 	nextHeight := preferred.Height() + 1
 	blkVersion := b.blkManager.ExpectedChildVersion(preferred)
 
-	preferredState := b.blkManager.OnAccept(prefBlkID)
+	stateVersions := b.txExecutorBackend.StateVersions
+	preferredState, ok := stateVersions.GetState(prefBlkID)
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
+	}
 
 	// select transactions to include and finally build the block
 	switch blkVersion {

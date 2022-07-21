@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -61,6 +62,7 @@ var (
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
+	lastAcceptedID            = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
@@ -121,34 +123,35 @@ func newEnvironment() *environment {
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	state := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(&config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimes := uptime.NewManager(state)
-	utxoHandler := utxo.NewHandler(ctx, &clk, state, fx)
+	uptimes := uptime.NewManager(baseState)
+	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
 	txBuilder := tx_builder.New(
 		ctx,
 		config,
 		&clk,
 		fx,
-		state,
+		baseState,
 		atomicUTXOs,
 		utxoHandler,
 	)
 
-	execBackend := Backend{
-		Config:       &config,
-		Ctx:          ctx,
-		Clk:          &clk,
-		Bootstrapped: &isBootstrapped,
-		Fx:           fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      uptimes,
-		Rewards:      rewards,
+	backend := Backend{
+		Config:        &config,
+		Ctx:           ctx,
+		Clk:           &clk,
+		Bootstrapped:  &isBootstrapped,
+		Fx:            fx,
+		FlowChecker:   utxoHandler,
+		Uptimes:       uptimes,
+		Rewards:       rewards,
+		StateVersions: state.NewVersions(lastAcceptedID, baseState),
 	}
 
-	addSubnet(state, txBuilder, execBackend)
+	addSubnet(baseState, txBuilder, backend)
 
 	return &environment{
 		isBootstrapped: &isBootstrapped,
@@ -158,19 +161,19 @@ func newEnvironment() *environment {
 		ctx:            ctx,
 		msm:            msm,
 		fx:             fx,
-		state:          state,
+		state:          baseState,
 		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
 		utxosHandler:   utxoHandler,
 		txBuilder:      txBuilder,
-		backend:        execBackend,
+		backend:        backend,
 	}
 }
 
 func addSubnet(
 	baseState state.State,
 	txBuilder tx_builder.Builder,
-	execBackend Backend,
+	backend Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -189,14 +192,13 @@ func addSubnet(
 	}
 
 	// store it
-	stateDiff := state.NewDiff(
-		baseState,
-		baseState.CurrentStakers(),
-		baseState.PendingStakers(),
-	)
+	stateDiff, err := state.NewDiff(lastAcceptedID, backend.StateVersions)
+	if err != nil {
+		panic(err)
+	}
 
 	executor := StandardTxExecutor{
-		Backend: &execBackend,
+		Backend: &backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
@@ -215,17 +217,6 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	dummyTotalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
-
 	genesisBytes := buildGenesisTest(ctx)
 	state, err := state.New(
 		db,
@@ -233,8 +224,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		dummyLocalStake,
-		dummyTotalStake,
+		metrics.NewNoopMetrics(),
 		rewards,
 	)
 	if err != nil {
@@ -263,11 +253,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),

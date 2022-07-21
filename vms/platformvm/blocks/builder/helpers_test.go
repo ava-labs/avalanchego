@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -48,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
-	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
@@ -61,14 +61,14 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             []*crypto.PrivateKeySECP256K1R
+	preFundedKeys             = crypto.BuildTestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
-	testSubnet1               *txs.Tx
-	testSubnet1ControlKeys    []*crypto.PrivateKeySECP256K1R
 
+	testSubnet1            *txs.Tx
+	testSubnet1ControlKeys = preFundedKeys[0:3]
 	testKeyFactory = crypto.FactorySECP256K1R{}
 )
 
@@ -106,6 +106,7 @@ type testHelpersCollection struct {
 	utxosMan       utxo.Handler
 	txBuilder      tx_builder.Builder
 	txExecBackend  executor.Backend
+	stateVersions  state.Versions
 }
 
 // TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
@@ -119,11 +120,6 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 		return ids.ID{}, errors.New("")
 	}
 	return subnetID, nil
-}
-
-func init() {
-	preFundedKeys = crypto.BuildTestKeys()
-	testSubnet1ControlKeys = preFundedKeys[0:3]
 }
 
 func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpersCollection {
@@ -160,15 +156,18 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 		res.utxosMan,
 	)
 
+	genesisID := res.fullState.GetLastAccepted()
+	res.stateVersions = state.NewVersions(genesisID, res.fullState)
 	res.txExecBackend = executor.Backend{
-		Config:       res.cfg,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosMan,
-		Uptimes:      res.uptimeMan,
-		Rewards:      rewardsCalc,
+		Config:        res.cfg,
+		Ctx:           res.ctx,
+		Clk:           res.clk,
+		Bootstrapped:  res.isBootstrapped,
+		Fx:            res.fx,
+		FlowChecker:   res.utxosMan,
+		Uptimes:       res.uptimeMan,
+		Rewards:       rewardsCalc,
+		StateVersions: res.stateVersions,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -181,7 +180,7 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := p_metrics.NewMetrics("", registerer, res.cfg.WhitelistedSubnets)
+	metrics, err := metrics.New("", registerer, res.cfg.WhitelistedSubnets)
 	if err != nil {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
@@ -198,7 +197,7 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 	}
 	res.blkManager = stateful.NewManager(
 		res.mempool,
-		*metrics,
+		metrics,
 		res.fullState,
 		res.txExecBackend,
 		window,
@@ -213,8 +212,7 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 		res.sender,
 	)
 
-	lastAcceptedID := res.fullState.GetLastAccepted()
-	if err := res.BlockBuilder.SetPreference(lastAcceptedID); err != nil {
+	if err := res.BlockBuilder.SetPreference(genesisID); err != nil {
 		panic(fmt.Errorf("failed setting last accepted block: %w", err))
 	}
 
@@ -224,9 +222,9 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 }
 
 func addSubnet(
-	tState state.State,
+	baseState state.State,
 	txBuilder tx_builder.Builder,
-	txExecBackend executor.Backend,
+	backend executor.Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -245,23 +243,25 @@ func addSubnet(
 	}
 
 	// store it
-	versionedState := state.NewDiff(
-		tState,
-		tState.CurrentStakers(),
-		tState.PendingStakers(),
-	)
+	genesisID := baseState.GetLastAccepted()
+	stateDiff, err := state.NewDiff(genesisID, backend.StateVersions)
+	if err != nil {
+		panic(err)
+	}
 
 	executor := executor.StandardTxExecutor{
-		Backend: &txExecBackend,
-		State:   versionedState,
+		Backend: &backend,
+		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {
 		panic(err)
 	}
-	versionedState.AddTx(testSubnet1, status.Committed)
-	versionedState.Apply(tState)
+
+	stateDiff.AddTx(testSubnet1, status.Committed)
+	stateDiff.Apply(baseState)
+	backend.StateVersions.SetState(genesisID, baseState)
 }
 
 func defaultState(
@@ -270,17 +270,6 @@ func defaultState(
 	baseDB *versiondb.Database,
 	rewardsCalc reward.Calculator,
 ) state.State {
-	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	dummyTotalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
-
 	genesisBytes := buildGenesisTest(ctx)
 	tState, err := state.New(
 		baseDB,
@@ -288,8 +277,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		dummyLocalStake,
-		dummyTotalStake,
+		metrics.NewNoopMetrics(),
 		rewardsCalc,
 	)
 	if err != nil {
@@ -305,11 +293,7 @@ func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),

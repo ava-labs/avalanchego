@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -189,11 +191,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := p_metrics.NewMetrics("", registerer, res.cfg.WhitelistedSubnets)
-	if err != nil {
-		panic(fmt.Errorf("failed to create metrics: %w", err))
-	}
-
+	metrics := p_metrics.NewNoopMetrics()
 	res.mpool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
@@ -202,7 +200,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	if ctrl == nil {
 		res.blkManager = NewManager(
 			res.mpool,
-			*metrics,
+			metrics,
 			res.fullState,
 			res.txExecBackend,
 			window,
@@ -211,7 +209,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	} else {
 		res.blkManager = NewManager(
 			res.mpool,
-			*metrics,
+			metrics,
 			res.mockedFullState,
 			res.txExecBackend,
 			window,
@@ -224,9 +222,9 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 }
 
 func addSubnet(
-	tState state.State,
+	baseState state.State,
 	txBuilder tx_builder.Builder,
-	txExecBackend executor.Backend,
+	backend executor.Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -245,57 +243,58 @@ func addSubnet(
 	}
 
 	// store it
-	versionedState := state.NewDiff(
-		tState,
-		tState.CurrentStakers(),
-		tState.PendingStakers(),
-	)
+	stateDiff, err := state.NewDiff(baseState.GetLastAccepted(), backend.StateVersions)
+	if err != nil {
+		panic(err)
+	}
 
 	executor := executor.StandardTxExecutor{
-		Backend: &txExecBackend,
-		State:   versionedState,
+		Backend: &backend,
+		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
 	err = testSubnet1.Unsigned.Visit(&executor)
 	if err != nil {
 		panic(err)
 	}
-	versionedState.AddTx(testSubnet1, status.Committed)
-	versionedState.Apply(tState)
+
+	stateDiff.AddTx(testSubnet1, status.Committed)
+	stateDiff.Apply(baseState)
 }
 
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
-	baseDB *versiondb.Database,
-	rewardsCalc reward.Calculator,
+	db database.Database,
+	rewards reward.Calculator,
 ) state.State {
-	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	dummyTotalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
-
 	genesisBytes := buildGenesisTest(ctx)
-	tState, err := state.New(
-		baseDB,
+	state, err := state.New(
+		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		dummyLocalStake,
-		dummyTotalStake,
-		rewardsCalc,
+		metrics.NewNoopMetrics(),
+		rewards,
 	)
 	if err != nil {
 		panic(err)
 	}
-	return tState
+
+	// persist and reload to init a bunch of in-memory stuff
+	state.SetHeight(0)
+	if err := state.Commit(); err != nil {
+		panic(err)
+	}
+	state.SetHeight( /*height*/ 0)
+	if err := state.Commit(); err != nil {
+		panic(err)
+	}
+	if err := state.Load(); err != nil {
+		panic(err)
+	}
+	return state
 }
 
 func defaultCtx(baseDB *versiondb.Database) *snow.Context {
@@ -305,11 +304,7 @@ func defaultCtx(baseDB *versiondb.Database) *snow.Context {
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 

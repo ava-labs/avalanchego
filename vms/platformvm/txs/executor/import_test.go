@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -52,11 +51,7 @@ func TestNewImportTx(t *testing.T) {
 	// where [recipientKey] has a balance of [amt]
 	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
 		*cnt++
-		m := &atomic.Memory{}
-		err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, env.baseDB))
-		if err != nil {
-			t.Fatal(err)
-		}
+		m := atomic.NewMemory(prefixdb.New([]byte{*cnt}, env.baseDB))
 
 		sm := m.NewSharedMemory(env.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(peerChain)
@@ -158,18 +153,18 @@ func TestNewImportTx(t *testing.T) {
 
 			assert.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
 
-			preferredState := env.state
-			fakedState := state.NewDiff(
-				preferredState,
-				preferredState.CurrentStakers(),
-				preferredState.PendingStakers(),
-			)
+			fakedState, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+			assert.NoError(err)
+
 			fakedState.SetTimestamp(tt.timestamp)
 
+			fakedParent := ids.GenerateTestID()
+			env.backend.StateVersions.SetState(fakedParent, fakedState)
+
 			verifier := MempoolTxVerifier{
-				Backend:     &env.backend,
-				ParentState: fakedState,
-				Tx:          tx,
+				Backend:  &env.backend,
+				ParentID: fakedParent,
+				Tx:       tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

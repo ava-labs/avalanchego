@@ -41,9 +41,9 @@ func TestApricotPickingOrder(t *testing.T) {
 
 	// accept validator as pending
 	txExecutor := executor.ProposalTxExecutor{
-		Backend:     &h.txExecBackend,
-		ParentState: h.fullState,
-		Tx:          validatorTx,
+		Backend:          &h.txExecBackend,
+		ReferenceBlockID: h.fullState.GetLastAccepted(),
+		Tx:               validatorTx,
 	}
 	assert.NoError(validatorTx.Unsigned.Visit(&txExecutor))
 	txExecutor.OnCommit.Apply(h.fullState)
