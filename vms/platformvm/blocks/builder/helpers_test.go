@@ -54,7 +54,6 @@ import (
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxValidatorStake  = 500 * units.MilliAvax
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
@@ -69,8 +68,6 @@ var (
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
-
-	testKeyFactory = crypto.FactorySECP256K1R{}
 )
 
 const (
@@ -284,11 +281,7 @@ func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
-	m := &atomic.Memory{}
-	err := m.Initialize(atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),

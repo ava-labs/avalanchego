@@ -39,9 +39,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 
 	h := newTestHelpersCollection(t)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(internalStateShutdown(h))
 	}()
 	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 	h.ctx.Lock.Lock()
@@ -92,9 +90,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 
 	h := newTestHelpersCollection(t)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(internalStateShutdown(h))
 	}()
 	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 	h.ctx.Lock.Lock()
@@ -122,9 +118,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	h := newTestHelpersCollection(t)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(internalStateShutdown(h))
 	}()
 	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 	h.ctx.Lock.Lock()

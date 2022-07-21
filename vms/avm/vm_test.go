@@ -268,11 +268,7 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		tb.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
@@ -1466,11 +1462,7 @@ func TestIssueImportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -1643,11 +1635,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -1662,7 +1650,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	err = vm.Initialize(
+	err := vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -1755,11 +1743,7 @@ func TestIssueExportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
@@ -1883,11 +1867,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)

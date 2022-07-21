@@ -37,11 +37,7 @@ func TestAtomicTxImports(t *testing.T) {
 	amount := uint64(70000)
 	recipientKey := preFundedKeys[1]
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{5}, h.baseDB))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{5}, h.baseDB))
 
 	h.msm.SharedMemory = m.NewSharedMemory(h.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(h.ctx.XChainID)
@@ -57,11 +53,10 @@ func TestAtomicTxImports(t *testing.T) {
 		},
 	}
 	utxoBytes, err := stateless.Codec.Marshal(stateless.Version, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		h.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
@@ -69,10 +64,8 @@ func TestAtomicTxImports(t *testing.T) {
 				recipientKey.PublicKey().Address().Bytes(),
 			},
 		}}},
-	},
-	); err != nil {
-		t.Fatal(err)
-	}
+	})
+	assert.NoError(err)
 
 	tx, err := h.txBuilder.NewImportTx(
 		h.ctx.XChainID,
@@ -80,19 +73,16 @@ func TestAtomicTxImports(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	h.fullState.SetTimestamp(h.cfg.ApricotPhase5Time.Add(100 * time.Second))
 
 	h.BlockBuilder.AddDecisionTx(tx)
 	b, err := h.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work
-	err = b.Verify()
-	assert.NoError(err)
-	err = b.Accept()
-	assert.NoError(err)
+	assert.NoError(b.Verify())
+	assert.NoError(b.Accept())
 	_, txStatus, err := h.fullState.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state
