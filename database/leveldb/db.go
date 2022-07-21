@@ -227,7 +227,9 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 			for {
 				err := wrappedDB.updateMetrics()
 				if !wrappedDB.closed.GetValue() && err != nil {
-					log.Warn("failed to update leveldb metrics: %s", err)
+					log.Warn("failed to update leveldb metrics",
+						zap.Error(err),
+					)
 				}
 
 				select {

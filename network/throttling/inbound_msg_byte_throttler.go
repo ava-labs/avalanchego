@@ -98,10 +98,9 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 
 	// If there is already a message waiting, log the error but continue
 	if existingID, exists := t.nodeToWaitingMsgID[nodeID]; exists {
-		t.log.Error(
-			"attempting to wait on new message from node %s while waiting for message %s",
-			nodeID,
-			existingID,
+		t.log.Error("node already waiting on message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("messageID", existingID),
 		)
 		t.lock.Unlock()
 		return t.metrics.awaitingRelease.Dec
