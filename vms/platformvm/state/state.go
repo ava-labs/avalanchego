@@ -270,6 +270,38 @@ func New(
 	totalStake prometheus.Gauge,
 	rewards reward.Calculator,
 ) (State, error) {
+	s, err := new(
+		db,
+		metrics,
+		cfg,
+		ctx,
+		localStake,
+		totalStake,
+		rewards,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = s.Close()
+
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func new(
+	db database.Database,
+	metrics prometheus.Registerer,
+	cfg *config.Config,
+	ctx *snow.Context,
+	localStake prometheus.Gauge,
+	totalStake prometheus.Gauge,
+	rewards reward.Calculator,
+) (*state, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metrics,
@@ -406,13 +438,6 @@ func New(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}
-
-	if err := s.sync(genesisBytes); err != nil {
-		// Drop any errors on close to return the first error
-		_ = s.Close()
-
-		return nil, err
 	}
 
 	return s, nil

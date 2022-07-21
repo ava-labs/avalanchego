@@ -707,7 +707,7 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*stateless.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -2422,7 +2422,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(abort.Verify())
 	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	proposalTx := blk.(*stateful.Block).BlockTxs()[0]
+	proposalTx := blk.(*stateful.OracleBlock).BlockTxs()[0]
 	{
 		onAccept, ok := secondVM.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -2464,7 +2464,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	proposalTx = blk.(*stateful.Block).BlockTxs()[0]
+	proposalTx = blk.(*stateful.OracleBlock).BlockTxs()[0]
 	{
 		onAccept, ok := secondVM.stateVersions.GetState(commit.ID())
 		assert.True(ok)

@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	stateless "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -46,6 +46,7 @@ func TestStateInitialization(t *testing.T) {
 	assert.True(shouldInit)
 
 	assert.NoError(s.(*state).doneInit())
+	assert.NoError(s.Commit())
 
 	s = newStateFromDB(assert, db)
 
@@ -324,9 +325,8 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	assert.NoError(vdrs.Set(constants.PrimaryNetworkID, validators.NewSet()))
 
-	state, err := New(
+	state, err := new(
 		db,
-		[]byte{}, // genesisBytes missing. // TODO ABENEGIA: Check it's fine to pass nil
 		prometheus.NewRegistry(),
 		&config.Config{
 			Validators: vdrs,
@@ -341,18 +341,6 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 	)
-
-	// state, err := state.New(
-	// 	db,
-	// 	genesisBytes,
-	// 	prometheus.NewRegistry(),
-	// 	cfg,
-	// 	ctx,
-	// 	dummyLocalStake,
-	// 	dummyTotalStake,
-	// 	rewards,
-	// )
-
 	assert.NoError(err)
 	assert.NotNil(state)
 	return state
