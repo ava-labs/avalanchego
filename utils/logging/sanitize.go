@@ -3,19 +3,20 @@
 
 package logging
 
-import "strings"
+import (
+	"strings"
 
-// TODO: remove when we transition to support structured logging
+	"go.uber.org/zap"
+)
 
-func Sanitize(s string) string {
-	return strings.ReplaceAll(s, "\n", "\\n")
+type sanitizedString string
+
+func (s sanitizedString) String() string {
+	return strings.ReplaceAll(string(s), "\n", "\\n")
 }
 
-func SanitizeArgs(a []interface{}) []interface{} {
-	for i, v := range a {
-		if v, ok := v.(string); ok {
-			a[i] = Sanitize(v)
-		}
-	}
-	return a
+// UserString constructs a field with the given key and the value stripped of
+// newlines. The value is sanitized lazily.
+func UserString(key, val string) zap.Field {
+	return zap.Stringer(key, sanitizedString(val))
 }
