@@ -104,7 +104,7 @@ func (p *process) Start() error {
 
 	mapper := nat.NewPortMapper(log, p.config.Nat)
 
-	// Open staking port we want for NAT Traversal to have the external port
+	// Open staking port we want for NAT traversal to have the external port
 	// (config.IP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
 	if p.config.IPPort.IPPort().Port != 0 {
@@ -120,7 +120,7 @@ func (p *process) Start() error {
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if p.config.HTTPHost != "127.0.0.1" && p.config.HTTPHost != "localhost" && p.config.HTTPPort != 0 {
-		// For NAT Traversal we want to route from the external port
+		// For NAT traversal we want to route from the external port
 		// (config.ExternalHTTPPort) to our internal port (config.HTTPPort)
 		mapper.Map(
 			"TCP",
