@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -50,7 +51,15 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		target.state.AddCurrentStaker(tx, 0)
+		staker := state.NewPrimaryNetworkStaker(
+			tx.ID(),
+			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+		)
+		staker.PotentialReward = 0
+		staker.NextTime = staker.EndTime
+		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		if err := target.state.Commit(); err != nil {
@@ -78,7 +87,15 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		target.state.AddCurrentStaker(tx, 0)
+		staker := state.NewPrimaryNetworkStaker(
+			tx.ID(),
+			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+		)
+		staker.PotentialReward = 0
+		staker.NextTime = staker.EndTime
+		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		if err := target.state.Commit(); err != nil {
@@ -415,7 +432,15 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 	}
 
-	env.state.AddCurrentStaker(addDSTx, 0)
+	staker := state.NewPrimaryNetworkStaker(
+		addDSTx.ID(),
+		&addDSTx.Unsigned.(*txs.AddValidatorTx).Validator,
+	)
+	staker.PotentialReward = 0
+	staker.NextTime = staker.EndTime
+	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
@@ -557,7 +582,14 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env.state.AddCurrentStaker(subnetTx, 0)
+	staker = state.NewSubnetStaker(
+		subnetTx.ID(),
+		&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
+	)
+	staker.NextTime = staker.EndTime
+	staker.Priority = state.SubnetValidatorCurrentPriority
+
+	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	if err := env.state.Commit(); err != nil {
@@ -593,7 +625,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 	}
 
-	env.state.DeleteCurrentStaker(subnetTx)
+	env.state.DeleteCurrentValidator(staker)
 	env.state.SetHeight(dummyHeight)
 	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
@@ -709,7 +741,14 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env.state.AddCurrentStaker(tx, 0)
+		staker = state.NewSubnetStaker(
+			subnetTx.ID(),
+			&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
+		)
+		staker.NextTime = staker.EndTime
+		staker.Priority = state.SubnetValidatorCurrentPriority
+
+		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		if err := env.state.Commit(); err != nil {
@@ -849,7 +888,15 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env.state.AddCurrentStaker(tx, 0)
+		staker := state.NewPrimaryNetworkStaker(
+			tx.ID(),
+			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+		)
+		staker.PotentialReward = 0
+		staker.NextTime = staker.EndTime
+		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+
+		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
 		dummyHeight := uint64(1)
 		env.state.SetHeight(dummyHeight)
