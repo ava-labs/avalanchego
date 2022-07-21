@@ -7,6 +7,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
@@ -14,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // See inbound_msg_throttler.go
@@ -270,7 +273,10 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 			}
 		} else {
 			// This should never happen
-			t.log.Warn("couldn't find message %s from %s", msgID, nodeID)
+			t.log.Warn("couldn't find message",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint64("messageID", msgID),
+			)
 		}
 	}
 	if vdrBytesToReturn > 0 {

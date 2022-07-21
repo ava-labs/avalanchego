@@ -8,12 +8,15 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
+	"golang.org/x/time/rate"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/time/rate"
 )
 
 var _ bandwidthThrottler = &bandwidthThrottlerImpl{}
@@ -117,12 +120,19 @@ func (t *bandwidthThrottlerImpl) Acquire(
 	t.lock.RUnlock()
 	if !ok {
 		// This should never happen. If it is, the caller is misusing this struct.
-		t.log.Debug("tried to acquire %d bytes for %s but that node isn't registered", msgSize, nodeID)
+		t.log.Debug("tried to acquire throttler but the node isn't registered",
+			zap.Uint64("messageSize", msgSize),
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 	if err := limiter.WaitN(ctx, int(msgSize)); err != nil {
 		// This should only happen on shutdown.
-		t.log.Debug("error while awaiting %d bytes for %s: %s", msgSize, nodeID, err)
+		t.log.Debug("error while waiting for throttler",
+			zap.Uint64("messageSize", msgSize),
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
+		)
 	}
 }
 
@@ -132,7 +142,9 @@ func (t *bandwidthThrottlerImpl) AddNode(nodeID ids.NodeID) {
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; ok {
-		t.log.Debug("tried to add %s but it's already registered", nodeID)
+		t.log.Debug("tried to add peer but it's already registered",
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 	t.limiters[nodeID] = rate.NewLimiter(rate.Limit(t.RefillRate), int(t.MaxBurstSize))
@@ -144,7 +156,9 @@ func (t *bandwidthThrottlerImpl) RemoveNode(nodeID ids.NodeID) {
 	defer t.lock.Unlock()
 
 	if _, ok := t.limiters[nodeID]; !ok {
-		t.log.Debug("tried to remove %s but it isn't registered", nodeID)
+		t.log.Debug("tried to remove peer but it isn't registered",
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 	delete(t.limiters, nodeID)
