@@ -109,7 +109,7 @@ type Node struct {
 	keystore keystore.Keystore
 
 	// Manages shared memory
-	sharedMemory atomic.Memory
+	sharedMemory *atomic.Memory
 
 	// Monitors node health and runs health checks
 	health health.Health
@@ -681,7 +681,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,
 		Keystore:                                n.keystore,
-		AtomicMemory:                            &n.sharedMemory,
+		AtomicMemory:                            n.sharedMemory,
 		AVAXAssetID:                             avaxAssetID,
 		XChainID:                                xChainID,
 		CriticalChains:                          criticalChains,
@@ -791,10 +791,10 @@ func (n *Node) initVMs() error {
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
-func (n *Node) initSharedMemory() error {
+func (n *Node) initSharedMemory() {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
-	return n.sharedMemory.Initialize(sharedMemoryDB)
+	n.sharedMemory = atomic.NewMemory(sharedMemoryDB)
 }
 
 // initKeystoreAPI initializes the keystore service, which is an on-node wallet.
@@ -1197,9 +1197,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
 
-	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
-		return fmt.Errorf("problem initializing shared memory: %w", err)
-	}
+	n.initSharedMemory() // Initialize shared memory
 
 	// message.Creator is shared between networking, chainManager and the engine.
 	// It must be initiated before networking (initNetworking), chain manager (initChainManager)

@@ -1298,11 +1298,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	m := &atomic.Memory{}
-	err := m.Initialize(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	ctx.Lock.Lock()

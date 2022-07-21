@@ -259,11 +259,7 @@ func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
-	m := &atomic.Memory{}
-	err := m.Initialize(atomicDB)
-	if err != nil {
-		panic(err)
-	}
+	m := atomic.NewMemory(atomicDB)
 
 	msm := &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(ctx.ChainID),
