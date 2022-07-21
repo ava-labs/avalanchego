@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -249,7 +248,6 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 					numConnected--
 				},
 			},
-			benchlist.NewManager(&benchlist.Config{}),
 		)
 		assert.NoError(err)
 		networks[i] = net

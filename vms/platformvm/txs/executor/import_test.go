@@ -51,11 +51,7 @@ func TestNewImportTx(t *testing.T) {
 	// where [recipientKey] has a balance of [amt]
 	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
 		*cnt++
-		m := &atomic.Memory{}
-		err := m.Initialize(prefixdb.New([]byte{*cnt}, env.baseDB))
-		if err != nil {
-			t.Fatal(err)
-		}
+		m := atomic.NewMemory(prefixdb.New([]byte{*cnt}, env.baseDB))
 
 		sm := m.NewSharedMemory(env.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(peerChain)
