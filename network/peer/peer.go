@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -400,7 +399,7 @@ func (p *peer) readMessages() {
 
 		p.Log.Verbo("parsing message",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("message", formatting.DumpBytes(msgBytes)),
+			zap.Binary("message", msgBytes),
 		)
 
 		// Parse the message
@@ -408,7 +407,7 @@ func (p *peer) readMessages() {
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
-				zap.Stringer("message", formatting.DumpBytes(msgBytes)),
+				zap.Binary("message", msgBytes),
 				zap.Error(err),
 			)
 
@@ -477,7 +476,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
 		zap.Stringer("nodeID", p.id),
-		zap.Stringer("message", formatting.DumpBytes(msgBytes)),
+		zap.Binary("message", msgBytes),
 	)
 
 	msgLen := uint32(len(msgBytes))
