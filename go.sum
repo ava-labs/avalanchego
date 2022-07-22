@@ -64,10 +64,10 @@ github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kd
 github.com/apache/arrow/go/arrow v0.0.0-20191024131854-af6fa24be0db/go.mod h1:VTxUBvSJ3s3eHAg65PNgrsn5BtqCRPdmyXh6rAfdxN0=
 github.com/ava-labs/avalanche-network-runner v1.1.4-0.20220713145155-91f8e925868f h1:JM5NcXWks9M98N/9RPVzb/eSqvAtXPM2nXIeiBBeJjQ=
 github.com/ava-labs/avalanche-network-runner v1.1.4-0.20220713145155-91f8e925868f/go.mod h1:GMMz3hOD8uqt8zNh0qPffXKijW9g5CF+8D20TyO3YOc=
-github.com/ava-labs/avalanchego v1.7.14 h1:IPLRR/djYNMhGEDggLVKfraROSk18UAduYt3qKpHLAE=
-github.com/ava-labs/avalanchego v1.7.14/go.mod h1:Vc3X0yzaLg15yYYSj9zrTKK+mwOSOd6ISWHJjLCZjko=
-github.com/ava-labs/coreth v0.8.13-rc.5 h1:XvGJaYaQMrEzvYBVI8KTbvzff+ETxqcEc6Cvm62izIg=
-github.com/ava-labs/coreth v0.8.13-rc.5/go.mod h1:KAth/eOSTqdKKB2TTT/1Gms+z8kd5VVKDS6MBwgP814=
+github.com/ava-labs/avalanchego v1.7.15 h1:jifdNp/Djn4EkwKrD8jN0ngXfvtQFIVkV8L26tylR48=
+github.com/ava-labs/avalanchego v1.7.15/go.mod h1:S0SlkuHBqr1EQL+N4XydI5c6q5A0YIpxAndAt3ellrM=
+github.com/ava-labs/coreth v0.8.14-rc.0 h1:TNAOGjMPq++MC8auTnbRZn3Bf+k96XP13E6yWGE/X8Q=
+github.com/ava-labs/coreth v0.8.14-rc.0/go.mod h1:zNaqrwglzMC20zOk28pBlBNu1Mbae9VNOckVrtFlSR8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -252,6 +252,8 @@ github.com/golang/snappy v0.0.4/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEW
 github.com/golangci/lint-1 v0.0.0-20181222135242-d2cdd8c08219/go.mod h1:/X8TswGSh1pIozq4ZwCfxS0WA5JGXguxk94ar/4c87Y=
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
+github.com/google/btree v1.1.2 h1:xf4v41cLI2Z6FxbKm+8Bu+m8ifhj15JuZ9sa0jZCMUU=
+github.com/google/btree v1.1.2/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
 github.com/google/flatbuffers v1.11.0/go.mod h1:1AeVuKshWv4vARoZatz6mlQ0JxURH0Kv5+zNeJKJCa8=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
