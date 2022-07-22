@@ -1,0 +1,34 @@
+name: Create and push to docker registry step-subnet image
+
+on:
+  push:
+    branches: ["master", "ci-debug"]
+
+env:
+  DOCKER_USER: ${{secrets.DOCKER_USER}}
+  DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+  REPO_NAME: ${{secrets.REPO_NAME}}
+  IMAGE_NAME: step-node
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        continue-on-error: true
+      - name: Login docker
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build image, tag and push to registry
+        run: | 
+          docker buildx build \
+            --tag $DOCKER_USER/$IMAGE_NAME:$(git rev-parse --short HEAD) \
+            --tag $DOCKER_USER/$IMAGE_NAME:$(git rev-parse --abbrev-ref HEAD) \
+            --tag $DOCKER_USER/$IMAGE_NAME:latest \
+            --push \
+            --cache-from=type=registry,ref=$REPO_NAME/$DOCKER_USER/$IMAGE_NAME:$(git rev-parse --abbrev-ref HEAD) \
+            .
