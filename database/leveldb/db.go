@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -43,6 +44,12 @@ const (
 	// DefaultBitsPerKey is the number of bits to add to the bloom filter per
 	// key.
 	DefaultBitsPerKey = 10
+
+	// DefaultMaxManifestFileSize is the default maximum size of a manifest
+	// file.
+	//
+	// This avoids https://github.com/syndtr/goleveldb/issues/413.
+	DefaultMaxManifestFileSize = math.MaxInt64
 
 	// DefaultMetricUpdateFrequency is the frequency to poll the LevelDB
 	// metrics.
@@ -157,6 +164,13 @@ type config struct {
 	WriteBuffer      int `json:"writeBuffer"`
 	FilterBitsPerKey int `json:"filterBitsPerKey"`
 
+	// MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
+	// When the MANIFEST-****** file grows beyond this size, LevelDB will create
+	// a new MANIFEST file.
+	//
+	// The default value is infinity.
+	MaxManifestFileSize int64 `json:"maxManifestFileSize"`
+
 	// MetricUpdateFrequency is the frequency to poll LevelDB metrics.
 	// If <= 0, LevelDB metrics aren't polled.
 	MetricUpdateFrequency time.Duration `json:"metricUpdateFrequency"`
@@ -170,6 +184,7 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 		OpenFilesCacheCapacity: DefaultHandleCap,
 		WriteBuffer:            DefaultWriteBufferSize / 2,
 		FilterBitsPerKey:       DefaultBitsPerKey,
+		MaxManifestFileSize:    DefaultMaxManifestFileSize,
 		MetricUpdateFrequency:  DefaultMetricUpdateFrequency,
 	}
 	if len(configBytes) > 0 {
@@ -199,6 +214,7 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 		OpenFilesCacheCapacity:        parsedConfig.OpenFilesCacheCapacity,
 		WriteBuffer:                   parsedConfig.WriteBuffer,
 		Filter:                        filter.NewBloomFilter(parsedConfig.FilterBitsPerKey),
+		MaxManifestFileSize:           parsedConfig.MaxManifestFileSize,
 	})
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
