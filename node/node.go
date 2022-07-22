@@ -20,8 +20,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	coreth "github.com/ava-labs/coreth/plugin/evm"
-
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
@@ -762,7 +760,6 @@ func (n *Node) initVMs() error {
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
-		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
