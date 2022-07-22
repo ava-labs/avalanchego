@@ -9,6 +9,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -83,14 +85,23 @@ func (b *blockJob) Execute() error {
 	case choices.Processing:
 		blkID := b.blk.ID()
 		if err := b.blk.Verify(); err != nil {
-			b.log.Error("block %s failed verification during bootstrapping due to %s", blkID, err)
+			b.log.Error("block failed verification during bootstrapping",
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
 			return fmt.Errorf("failed to verify block in bootstrapping: %w", err)
 		}
 
 		b.numAccepted.Inc()
-		b.log.Trace("accepting block (%s, %d) in bootstrapping", blkID, b.blk.Height())
+		b.log.Trace("accepting block in bootstrapping",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("blkHeight", b.blk.Height()),
+		)
 		if err := b.blk.Accept(); err != nil {
-			b.log.Debug("block %s failed to accept during bootstrapping due to %s", blkID, err)
+			b.log.Debug("failed to accept block during bootstrapping",
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
 			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)
 		}
 	}

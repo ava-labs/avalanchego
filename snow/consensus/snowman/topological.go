@@ -573,7 +573,7 @@ func (ts *Topological) acceptPreferredChild(n *snowmanBlock) error {
 	}
 
 	ts.ctx.Log.Trace("accepting block",
-		zap.Stringer("blockID", pref),
+		zap.Stringer("blkID", pref),
 	)
 	if err := child.Accept(); err != nil {
 		return err
