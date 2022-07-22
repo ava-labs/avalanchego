@@ -243,6 +243,7 @@ func defaultState(
 	if err := state.Load(); err != nil {
 		panic(err)
 	}
+	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
 

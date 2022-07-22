@@ -98,13 +98,13 @@ func (v *verifier) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlo
 		statelessBlock: b,
 	}
 
+	if err := v.verifyCommonBlock(b); err != nil {
+		return err
+	}
+
 	tx := b.BlockTxs()[0]
 	if _, ok := tx.Unsigned.(*txs.AdvanceTimeTx); ok {
 		return errAdvanceTimeTxCannotBeIncluded
-	}
-
-	if err := v.verifyCommonBlock(b); err != nil {
-		return err
 	}
 
 	parentID := b.Parent()
@@ -624,7 +624,8 @@ func (v *verifier) verifyCommonBlock(b stateless.Block) error {
 
 	// verify block version
 	blkVersion := b.Version()
-	expectedVersion := v.expectedChildVersion(parentBlk.Timestamp())
+	parentTimestamp := parentBlk.Timestamp()
+	expectedVersion := v.expectedChildVersion(parentTimestamp)
 	if expectedVersion != blkVersion {
 		return fmt.Errorf(
 			"expected block to have version %d, but found %d",
@@ -633,7 +634,7 @@ func (v *verifier) verifyCommonBlock(b stateless.Block) error {
 		)
 	}
 
-	return v.validateBlockTimestamp(b, parentBlk.Timestamp())
+	return v.validateBlockTimestamp(b, parentTimestamp)
 }
 
 func (v *verifier) validateBlockTimestamp(blk stateless.Block, parentBlkTime time.Time) error {

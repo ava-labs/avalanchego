@@ -69,8 +69,10 @@ var (
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
-	testSubnet1               *txs.Tx
-	testSubnet1ControlKeys    []*crypto.PrivateKeySECP256K1R
+	lastAcceptedID            = ids.GenerateTestID()
+
+	testSubnet1            *txs.Tx
+	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 )
 
 const (
@@ -142,6 +144,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	rewardsCalc := reward.NewCalculator(res.cfg.RewardConfig)
 	res.atomicUtxosMan = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
+	var stateVersions state.Versions
 	if ctrl == nil {
 		res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimeMan = uptime.NewManager(res.fullState)
@@ -155,6 +158,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 			res.atomicUtxosMan,
 			res.utxosMan,
 		)
+		stateVersions = state.NewVersions(lastAcceptedID, res.fullState)
 	} else {
 		res.mockedFullState = state.NewMockState(ctrl)
 		res.uptimeMan = uptime.NewManager(res.mockedFullState)
@@ -168,17 +172,20 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 			res.atomicUtxosMan,
 			res.utxosMan,
 		)
+		stateVersions = state.NewVersions(lastAcceptedID, res.mockedFullState)
+		// Note: no loaded expectation for res.mockedFullState.GetLastAccepted() here
 	}
 
 	res.txExecBackend = executor.Backend{
-		Config:       res.cfg,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosMan,
-		Uptimes:      res.uptimeMan,
-		Rewards:      rewardsCalc,
+		Config:        res.cfg,
+		Ctx:           res.ctx,
+		Clk:           res.clk,
+		Bootstrapped:  res.isBootstrapped,
+		Fx:            res.fx,
+		FlowChecker:   res.utxosMan,
+		Uptimes:       res.uptimeMan,
+		Rewards:       rewardsCalc,
+		StateVersions: stateVersions,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -243,7 +250,7 @@ func addSubnet(
 	}
 
 	// store it
-	stateDiff, err := state.NewDiff(baseState.GetLastAccepted(), backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, backend.StateVersions)
 	if err != nil {
 		panic(err)
 	}
@@ -294,6 +301,7 @@ func defaultState(
 	if err := state.Load(); err != nil {
 		panic(err)
 	}
+	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
 
