@@ -253,7 +253,8 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
 		if extension != "" && err != nil {
-			s.log.Error("could not add route to chain's API handler because route is malformed",
+			s.log.Error("could not add route to chain's API handler",
+				zap.String("reason", "route is malformed"),
 				zap.Error(err),
 			)
 			continue
