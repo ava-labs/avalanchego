@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -132,12 +134,10 @@ func (ab *AtomicBlock) Verify() error {
 
 func (ab *AtomicBlock) Accept() error {
 	blkID := ab.ID()
-
-	ab.vm.ctx.Log.Verbo(
-		"Accepting Atomic Block %s at height %d with parent %s",
-		blkID,
-		ab.Height(),
-		ab.Parent(),
+	ab.vm.ctx.Log.Verbo("accepting Atomic Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", ab.Height()),
+		zap.Stringer("parentID", ab.Parent()),
 	)
 
 	if err := ab.CommonBlock.Accept(); err != nil {
@@ -170,18 +170,16 @@ func (ab *AtomicBlock) Accept() error {
 }
 
 func (ab *AtomicBlock) Reject() error {
-	ab.vm.ctx.Log.Verbo(
-		"Rejecting Atomic Block %s at height %d with parent %s",
-		ab.ID(),
-		ab.Height(),
-		ab.Parent(),
+	ab.vm.ctx.Log.Verbo("rejecting Atomic Block",
+		zap.Stringer("blkID", ab.ID()),
+		zap.Uint64("height", ab.Height()),
+		zap.Stringer("parentID", ab.Parent()),
 	)
 
 	if err := ab.vm.blockBuilder.AddVerifiedTx(ab.Tx); err != nil {
-		ab.vm.ctx.Log.Debug(
-			"failed to reissue tx %q due to: %s",
-			ab.Tx.ID(),
-			err,
+		ab.vm.ctx.Log.Debug("failed to reissue tx",
+			zap.Stringer("txID", ab.Tx.ID()),
+			zap.Error(err),
 		)
 	}
 	return ab.CommonDecisionBlock.Reject()

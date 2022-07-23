@@ -338,7 +338,7 @@ func (p *peer) readMessages() {
 		if msgLen > constants.DefaultMaxMessageSize {
 			p.Log.Verbo("message is too large",
 				zap.Stringer("nodeID", p.id),
-				zap.Uint32("messageLength", msgLen),
+				zap.Uint32("messageLen", msgLen),
 			)
 			return
 		}
