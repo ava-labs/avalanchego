@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
-  
+
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/api/server"

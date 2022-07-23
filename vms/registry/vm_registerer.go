@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
-	
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/server"
