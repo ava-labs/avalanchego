@@ -12,7 +12,6 @@ import (
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -65,7 +64,7 @@ func TestExtensive(t *testing.T) {
 		if key, err := f.NewPrivateKey(); err != nil {
 			t.Fatalf("Generated bad private key")
 		} else if _, err := key.SignHash(hash); err != nil {
-			t.Fatalf("Failed signing with:\n%s", formatting.DumpBytes(key.Bytes()))
+			t.Fatalf("Failed signing with:\n0x%x", key.Bytes())
 		}
 	}
 }
