@@ -180,13 +180,13 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 				ctx.Log.Info("executing operations",
 					zap.Int("numExecuted", numExecuted),
 					zap.Uint64("numToExecute", numToExecute),
-					zap.Duration("ETA", eta),
+					zap.Duration("eta", eta),
 				)
 			} else {
 				ctx.Log.Debug("executing operations",
 					zap.Int("numExecuted", numExecuted),
 					zap.Uint64("numToExecute", numToExecute),
-					zap.Duration("ETA", eta),
+					zap.Duration("eta", eta),
 				)
 			}
 		}

@@ -466,13 +466,13 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 				b.Ctx.Log.Info("fetching blocks",
 					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("ETA", eta),
+					zap.Duration("eta", eta),
 				)
 			} else {
 				b.Ctx.Log.Debug("fetching blocks",
 					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("ETA", eta),
+					zap.Duration("eta", eta),
 				)
 			}
 		}

@@ -80,7 +80,9 @@ func (p *process) Start() error {
 
 	// Track if sybil control is enforced
 	if !p.config.EnableStaking {
-		log.Warn("Staking is disabled. Sybil control is not enforced.")
+		log.Warn("sybil control is not enforced",
+			zap.String("reason", "staking is disabled"),
+		)
 	}
 
 	// Check if transaction signatures should be checked
