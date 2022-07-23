@@ -309,7 +309,7 @@ func (b *bootstrapper) Startup() error {
 
 	b.bootstrapAttempts++
 	if b.pendingSendAcceptedFrontier.Len() == 0 {
-		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
+		b.Ctx.Log.Info("bootstrapping skipped due to no provided bootstraps")
 		return b.Bootstrapable.ForceAccepted(nil)
 	}
 
