@@ -563,7 +563,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			// My parent is rejected, so I should be rejected
 			ta.ctx.Log.Trace("rejecting vertex",
 				zap.String("reason", "rejected parent"),
-				zap.Stringer("vertex", vtxID),
+				zap.Stringer("vtxID", vtxID),
 				zap.Stringer("parentID", dep.ID()),
 			)
 			if !txv.Status().Decided() {
@@ -656,7 +656,7 @@ func (ta *Topological) update(vtx Vertex) error {
 		// I'm rejectable, why not reject?
 		ta.ctx.Log.Trace("rejecting vertex",
 			zap.String("reason", "conflicting acceptance"),
-			zap.Stringer("vertex", vtxID),
+			zap.Stringer("vtxID", vtxID),
 		)
 		if !txv.Status().Decided() {
 			if err := ta.cg.Remove(vtxID); err != nil {
