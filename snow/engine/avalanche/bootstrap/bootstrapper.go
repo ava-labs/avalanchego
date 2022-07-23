@@ -310,7 +310,7 @@ func (b *bootstrapper) Shutdown() error {
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
 func (b *bootstrapper) Start(startReqID uint32) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.Log.Info("starting bootstrap")
 
 	b.Ctx.SetState(snow.Bootstrapping)
 	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
