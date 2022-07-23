@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -235,7 +237,9 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	// reset scheduler
 	minDelay, err := vm.Windower.Delay(blk.Height()+1, pChainHeight, vm.ctx.NodeID)
 	if err != nil {
-		vm.ctx.Log.Debug("failed to fetch the expected delay due to: %s", err)
+		vm.ctx.Log.Debug("failed to fetch the expected delay",
+			zap.Error(err),
+		)
 		// A nil error is returned here because it is possible that
 		// bootstrapping caused the last accepted block to move past the latest
 		// P-chain height. This will cause building blocks to return an error
@@ -250,8 +254,11 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	nextStartTime := preferredTime.Add(minDelay)
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
-	vm.ctx.Log.Debug("set preference to %s with timestamp %v; build time scheduled at %v",
-		blk.ID(), preferredTime, nextStartTime)
+	vm.ctx.Log.Debug("set preference",
+		zap.Stringer("blkID", blk.ID()),
+		zap.Time("blockTimestamp", preferredTime),
+		zap.Time("nextStartTime", nextStartTime),
+	)
 	return nil
 }
 
@@ -322,7 +329,9 @@ func (vm *VM) repair(indexerState state.State) error {
 			vm.ctx.Log.Info("block height indexing reset started")
 
 			if err := indexerState.ResetHeightIndex(vm.ctx.Log, vm); err != nil {
-				vm.ctx.Log.Error("block height indexing reset failed with: %s", err)
+				vm.ctx.Log.Error("block height indexing reset failed",
+					zap.Error(err),
+				)
 				return
 			}
 
@@ -345,7 +354,9 @@ func (vm *VM) repair(indexerState state.State) error {
 				break
 			}
 			if err != block.ErrIndexIncomplete {
-				vm.ctx.Log.Error("block height indexing failed with: %s", err)
+				vm.ctx.Log.Error("block height indexing failed",
+					zap.Error(err),
+				)
 				return
 			}
 
@@ -362,7 +373,9 @@ func (vm *VM) repair(indexerState state.State) error {
 		vm.ctx.Lock.Unlock()
 
 		if err != nil {
-			vm.ctx.Log.Error("could not verify the status of height indexing: %s", err)
+			vm.ctx.Log.Error("could not verify height indexing status",
+				zap.Error(err),
+			)
 			return
 		}
 		if !shouldRepair {
@@ -383,7 +396,9 @@ func (vm *VM) repair(indexerState state.State) error {
 		if vm.context.Err() == nil {
 			// The context wasn't closed, so the chain hasn't been shutdown.
 			// This must have been an unexpected error.
-			vm.ctx.Log.Error("block height indexing failed: %s", err)
+			vm.ctx.Log.Error("block height indexing failed",
+				zap.Error(err),
+			)
 		}
 	}()
 	return nil
