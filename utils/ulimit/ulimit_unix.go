@@ -10,8 +10,9 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const DefaultFDLimit = 32 * 1024
