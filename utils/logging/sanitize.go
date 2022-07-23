@@ -20,3 +20,22 @@ func (s sanitizedString) String() string {
 func UserString(key, val string) zap.Field {
 	return zap.Stringer(key, sanitizedString(val))
 }
+
+type sanitizedStrings []string
+
+func (s sanitizedStrings) String() string {
+	var strs strings.Builder
+	for i, str := range s {
+		if i != 0 {
+			_, _ = strs.WriteString(", ")
+		}
+		_, _ = strs.WriteString(strings.ReplaceAll(str, "\n", "\\n"))
+	}
+	return strs.String()
+}
+
+// UserStrings constructs a field with the given key and the values stripped of
+// newlines. The values are sanitized lazily.
+func UserStrings(key string, val []string) zap.Field {
+	return zap.Stringer(key, sanitizedStrings(val))
+}
