@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -173,7 +174,9 @@ func (vm *VM) Initialize(
 	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 
 	vm.lastAcceptedID = is.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
+	ctx.Log.Info("initializing last accepted block ID",
+		zap.Stringer("blkID", vm.lastAcceptedID),
+	)
 
 	vm.stateVersions = state.NewVersions(vm.lastAcceptedID, is)
 
