@@ -6,9 +6,10 @@ package dynamicip
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"go.uber.org/zap"
 )
 
 var _ Updater = &updater{}
