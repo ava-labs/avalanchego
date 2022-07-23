@@ -3,7 +3,7 @@ module github.com/ava-labs/subnet-evm/cmd/simulator
 go 1.17
 
 require (
-	github.com/ava-labs/subnet-evm v0.2.6-0.20220721235439-a427dc4e4181
+	github.com/ava-labs/subnet-evm v0.2.6
 	github.com/ethereum/go-ethereum v1.10.20
 	github.com/spf13/viper v1.10.1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
-	github.com/ava-labs/avalanchego v1.7.14 // indirect
+	github.com/ava-labs/avalanchego v1.7.16 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
