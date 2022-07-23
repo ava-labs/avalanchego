@@ -1,5 +1,13 @@
 # Release Notes
 
+## [v1.7.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.16)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
+
+### LevelDB
+
+- Fix rapid disk growth by manually specifying the maximum manifest file size
+
 ## [v1.7.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.15)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
