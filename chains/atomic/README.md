@@ -1,3 +1,5 @@
+(tedi's comments)
+
 # Shared Memory
 
 Shared memory creates a way for blockchains in the Avalanche Ecosystem to communicate with each other by using a shared database to create a bidirectional communication channel between any two blockchains in the same subnet.
