@@ -12,7 +12,7 @@ import (
 // Logger defines the interface that is used to keep a record of all events that
 // happen to the program
 type Logger interface {
-	io.Writer // For logging pre-msged messages
+	io.Writer // For logging pre-formatted messages
 
 	// Log that a fatal error has occurred. The program should likely exit soon
 	// after this is called
