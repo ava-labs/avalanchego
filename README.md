@@ -53,7 +53,7 @@ Install AvalancheGo using an `apt` repository.
 
 #### Adding the APT Repository
 
-If you have already added the APT repository, you do not need to add it again.
+If you already have the APT repository added, you do not need to add it again.
 
 To add the repository on Ubuntu 18.04 (Bionic), run:
 
@@ -75,7 +75,7 @@ exit
 
 #### Installing the Latest Version
 
-After adding the APT repository, install avalanchego by running:
+After adding the APT repository, install `avalanchego` by running:
 
 ```sh
 sudo apt update
@@ -90,9 +90,9 @@ The Avalanche binary to be executed is named `avalanchego`.
 
 ### Docker Install
 
-Make sure docker is installed on the machine - so commands like `docker run` etc. are available.
+Make sure Docker is installed on the machine - so commands like `docker run` etc. are available.
 
-Building the docker image of latest avalanchego branch can be done by running:
+Building the Docker image of latest `avalanchego` branch can be done by running:
 
 ```sh
 ./scripts/build_image.sh
@@ -104,7 +104,7 @@ To check the built image, run:
 docker image ls
 ```
 
-The image should be tagged as `avaplatform/avalanchego:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Avalanche source it was built from. To run the avalanche node, run:
+The image should be tagged as `avaplatform/avalanchego:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Avalanche source it was built from. To run the Avalanche node, run:
 
 ```sh
 docker run -ti -p 9650:9650 -p 9651:9651 avaplatform/avalanchego:xxxxxxxx /avalanchego/build/avalanchego
@@ -138,17 +138,17 @@ See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a
 
 ## Bootstrapping
 
-A node needs to catch up to the latest network state before it can participate in consensus and serve API calls. This process, called bootstrapping, currently takes several days for a new node connected to Mainnet.
+A node needs to catch up to the latest network state before it can participate in consensus and serve API calls. This process (called bootstrapping) currently takes several days for a new node connected to Mainnet.
 
 A node will not [report healthy](https://docs.avax.network/build/avalanchego-apis/health) until it is done bootstrapping.
 
 Improvements that reduce the amount of time it takes to bootstrap are under development.
 
-The bottleneck during bootstrapping is typically database IO. Using a more powerful CPU or increasing the database IOPS on the computer running a node will decrease the amount of time bootstrapping takes.
+The bottleneck during bootstrapping is typically database IO. Using a more powerful CPU or increasing the database IOPS on the computer running a node, will decrease the amount of time bootstrapping takes.
 
 ## Generating Code
 
-Avalanchego uses multiple tools to generate efficient and boilerplate code.
+AvalancheGo uses multiple tools to generate efficient and boilerplate code.
 
 ### Running protobuf codegen
 
