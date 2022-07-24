@@ -328,7 +328,7 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 
 // GetUTXOs gets all utxos for passed in addresses
 func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
-	service.vm.ctx.Log.Info("EVM: GetUTXOs called for with %s", args.Addresses)
+	log.Info("EVM: GetUTXOs called", "Addresses", args.Addresses)
 
 	if len(args.Addresses) == 0 {
 		return errNoAddresses
