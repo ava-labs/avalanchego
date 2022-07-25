@@ -528,8 +528,12 @@ func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompi
 	return statefulPrecompileConfigs
 }
 
-// CheckConfigurePrecompiles iterates over any stateful precompile configs that go into effect at some point and configures them
-// if they are activated between [parentTimestamp] and [currentTimestamp].
+// CheckConfigurePrecompiles checks if any of the precompiles specified by [c] is enabled by the block
+// transition from [parentTimestamp] to the timestamp set in [blockContext]. If this is the case, it calls [Configure]
+// to apply the necessary state transitions for the upgrade.
+// This function is called:
+// - within genesis setup to configure the starting state for precompiles enabled at genesis,
+// - during block processing to update the state before processing the given block.
 func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, blockContext precompile.BlockContext, statedb precompile.StateDB) {
 	// Iterate the enabled stateful precompiles and configure them if needed
 	for _, config := range c.enabledStatefulPrecompiles() {

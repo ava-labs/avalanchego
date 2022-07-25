@@ -19,6 +19,9 @@ import (
 )
 
 var (
+	_ precompile.BlockContext              = &mockBlockContext{}
+	_ precompile.PrecompileAccessibleState = &mockAccessibleState{}
+
 	testFeeConfig = commontype.FeeConfig{
 		GasLimit:        big.NewInt(8_000_000),
 		TargetBlockRate: 2, // in seconds

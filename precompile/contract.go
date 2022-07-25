@@ -23,12 +23,17 @@ type PrecompileAccessibleState interface {
 	GetBlockContext() BlockContext
 }
 
+// BlockContext defines an interface that provides information to a stateful precompile
+// about the block that activates the upgrade. The precompile can access this information
+// to initialize its state.
 type BlockContext interface {
 	Number() *big.Int
 	Timestamp() *big.Int
 }
 
-// ChainConfig provides an interface for accessing the chain configuration information.
+// ChainContext defines an interface that provides information to a stateful precompile
+// about the chain configuration. The precompile can access this information to initialize
+// its state.
 type ChainConfig interface {
 	// GetFeeConfig returns the original FeeConfig that was set in the genesis.
 	GetFeeConfig() commontype.FeeConfig
