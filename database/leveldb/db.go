@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -49,9 +48,7 @@ const (
 
 	// DefaultMaxManifestFileSize is the default maximum size of a manifest
 	// file.
-	//
-	// This avoids https://github.com/syndtr/goleveldb/issues/413.
-	DefaultMaxManifestFileSize = math.MaxInt64
+	DefaultMaxManifestFileSize = 64 * opt.MiB
 
 	// DefaultMetricUpdateFrequency is the frequency to poll the LevelDB
 	// metrics.
