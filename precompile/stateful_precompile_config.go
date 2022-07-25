@@ -35,9 +35,10 @@ type StatefulPrecompileConfig interface {
 	Contract() StatefulPrecompiledContract
 }
 
-// CheckConfigure checks if [config] is activated by the transition from block at [parentTimestamp] to [currentTimestamp].
-// If it does, then it calls Configure on [config] to make the necessary state update to enable the StatefulPrecompile.
-// Note: this function is called within genesis to configure the starting state if it [config] specifies that it should be
+// CheckConfigure checks if [config] is activated by the transition from block at [parentTimestamp] to the timestamp
+// set in [blockContext].
+// If it does, then it calls Configure on [precompileConfig] to make the necessary state update to enable the StatefulPrecompile.
+// Note: this function is called within genesis to configure the starting state if [precompileConfig] specifies that it should be
 // configured at genesis, or happens during block processing to update the state before processing the given block.
 // TODO: add ability to call Configure at different timestamps, so that developers can easily re-configure by updating the
 // stateful precompile config.
