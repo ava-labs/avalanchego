@@ -235,18 +235,6 @@ func (bc *BlockChain) ContractCode(hash common.Hash) ([]byte, error) {
 	return bc.stateCache.ContractCode(common.Hash{}, hash)
 }
 
-// ContractCodeWithPrefix retrieves a blob of data associated with a contract
-// hash either from ephemeral in-memory cache, or from persistent storage.
-//
-// If the code doesn't exist in the in-memory cache, check the storage with
-// new code scheme.
-func (bc *BlockChain) ContractCodeWithPrefix(hash common.Hash) ([]byte, error) {
-	type codeReader interface {
-		ContractCodeWithPrefix(addrHash, codeHash common.Hash) ([]byte, error)
-	}
-	return bc.stateCache.(codeReader).ContractCodeWithPrefix(common.Hash{}, hash)
-}
-
 // State returns a new mutable state based on the current HEAD block.
 func (bc *BlockChain) State() (*state.StateDB, error) {
 	return bc.StateAt(bc.CurrentBlock().Root())

@@ -116,7 +116,7 @@ func (c *codeSyncer) addCodeToFetchFromDBToQueue() error {
 
 		codeHash := common.BytesToHash(codeToFetchKey[len(rawdb.CodeToFetchPrefix):])
 		// If we already have the codeHash, delete the marker from the database and continue
-		if rawdb.HasCodeWithPrefix(c.DB, codeHash) {
+		if rawdb.HasCode(c.DB, codeHash) {
 			rawdb.DeleteCodeToFetch(batch, codeHash)
 			// Write the batch to disk if it has reached the ideal batch size.
 			if batch.ValueSize() > ethdb.IdealBatchSize {
@@ -212,7 +212,7 @@ func (c *codeSyncer) addCode(codeHashes []common.Hash) error {
 	for _, codeHash := range codeHashes {
 		// Add the code hash to the queue if it's not already on the queue and we do not already have it
 		// in the database.
-		if !c.outstandingCodeHashes.Contains(ids.ID(codeHash)) && !rawdb.HasCodeWithPrefix(c.DB, codeHash) {
+		if !c.outstandingCodeHashes.Contains(ids.ID(codeHash)) && !rawdb.HasCode(c.DB, codeHash) {
 			selectedCodeHashes = append(selectedCodeHashes, codeHash)
 			c.outstandingCodeHashes.Add(ids.ID(codeHash))
 			rawdb.AddCodeToFetch(batch, codeHash)

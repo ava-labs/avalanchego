@@ -40,22 +40,7 @@ func ReadPreimage(db ethdb.KeyValueReader, hash common.Hash) []byte {
 
 // ReadCode retrieves the contract code of the provided code hash.
 func ReadCode(db ethdb.KeyValueReader, hash common.Hash) []byte {
-	// Try with the prefixed code scheme first, if not then try with legacy
-	// scheme.
-	data := ReadCodeWithPrefix(db, hash)
-	if len(data) != 0 {
-		return data
-	}
-	// TODO: we have never used the legacy scheme, so we should be able to
-	// remove the latter attempt.
-	data, _ = db.Get(hash.Bytes())
-	return data
-}
-
-// ReadCodeWithPrefix retrieves the contract code of the provided code hash.
-// The main difference between this function and ReadCode is this function
-// will only check the existence with latest scheme(with prefix).
-func ReadCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) []byte {
+	// Try with the prefixed code scheme first and only. The legacy scheme was never used in coreth.
 	data, _ := db.Get(codeKey(hash))
 	return data
 }
@@ -69,19 +54,7 @@ func ReadTrieNode(db ethdb.KeyValueReader, hash common.Hash) []byte {
 // HasCode checks if the contract code corresponding to the
 // provided code hash is present in the db.
 func HasCode(db ethdb.KeyValueReader, hash common.Hash) bool {
-	// Try with the prefixed code scheme first, if not then try with legacy
-	// scheme.
-	if ok := HasCodeWithPrefix(db, hash); ok {
-		return true
-	}
-	ok, _ := db.Has(hash.Bytes())
-	return ok
-}
-
-// HasCodeWithPrefix checks if the contract code corresponding to the
-// provided code hash is present in the db. This function will only check
-// presence using the prefix-scheme.
-func HasCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) bool {
+	// Try with the prefixed code scheme first and only. The legacy scheme was never used in coreth.
 	ok, _ := db.Has(codeKey(hash))
 	return ok
 }
