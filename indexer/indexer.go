@@ -240,7 +240,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 			zap.String("chainName", name),
 		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s",
+			i.log.Error("error while closing indexer",
 				zap.Error(err),
 			)
 		}
@@ -265,12 +265,12 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	case snowman.Engine:
 		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create block index for %s: %s",
+			i.log.Fatal("couldn't create block index",
 				zap.String("chainName", name),
 				zap.Error(err),
 			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s",
+				i.log.Error("error while closing indexer",
 					zap.Error(err),
 				)
 			}
@@ -313,7 +313,7 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 			zap.String("engineType", engineType),
 		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s",
+			i.log.Error("error while closing indexer",
 				zap.Error(err),
 			)
 		}
