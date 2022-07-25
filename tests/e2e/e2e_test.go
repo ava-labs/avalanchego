@@ -6,19 +6,18 @@ package e2e_test
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/onsi/gomega"
-
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
-
+	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
@@ -33,14 +32,16 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	logLevel            string
-	avalanchegoLogLevel string
+	logLevel string
 
-	networkRunnerGRPCEp string
-	execPath            string
+	networkRunnerGRPCEp              string
+	networkRunnerAvalancheGoExecPath string
+	networkRunnerAvalancheGoLogLevel string
 
+	uris string
+
+	testKeysFile           string
 	enableWhitelistTxTests bool
-	uris                   string
 )
 
 // TODO: support existing keys
@@ -52,12 +53,6 @@ func init() {
 		"info",
 		"log level",
 	)
-	flag.StringVar(
-		&avalanchegoLogLevel,
-		"avalanchego-log-level",
-		"INFO",
-		"avalanchegoLogLevel log level (optional, only required for local network-runner)",
-	)
 
 	flag.StringVar(
 		&networkRunnerGRPCEp,
@@ -66,34 +61,48 @@ func init() {
 		"[optional] gRPC server endpoint for network-runner (only required for local network-runner tests)",
 	)
 	flag.StringVar(
-		&execPath,
-		"avalanchego-path",
+		&networkRunnerAvalancheGoExecPath,
+		"network-runner-avalanchego-path",
 		"",
 		"[optional] avalanchego executable path (only required for local network-runner tests)",
 	)
+	flag.StringVar(
+		&networkRunnerAvalancheGoLogLevel,
+		"network-runner-avalanchego-log-level",
+		"INFO",
+		"[optional] avalanchego log-level (only required for local network-runner tests)",
+	)
 
-	// TODO: set timestamp on the test network machines to be more realistic
+	// e.g., custom network HTTP RPC endpoints
+	flag.StringVar(
+		&uris,
+		"uris",
+		"",
+		"HTTP RPC endpoint URIs for avalanche node (comma-separated, required to run against existing cluster)",
+	)
+
+	// file that contains a list of new-line separated secp256k1 private keys
+	flag.StringVar(
+		&testKeysFile,
+		"test-keys-file",
+		"",
+		"file that contains a list of new-line separated hex-encoded secp256k1 private keys (assume test keys are pre-funded, for test networks)",
+	)
+
 	flag.BoolVar(
 		&enableWhitelistTxTests,
 		"enable-whitelist-vtx-tests",
 		false,
 		"true to enable whitelist vtx tests",
 	)
-	flag.StringVar(
-		&uris,
-		"uris",
-		"",
-		"URIs for avalanche node (comma-separated, required to run against existing cluster)",
-	)
 }
 
 var _ = ginkgo.BeforeSuite(func() {
 	e2e.SetEnableWhitelistTxTests(enableWhitelistTxTests)
 
-	if execPath != "" {
-		_, err := os.Stat(execPath)
+	if networkRunnerAvalancheGoExecPath != "" {
+		_, err := os.Stat(networkRunnerAvalancheGoExecPath)
 		gomega.Expect(err).Should(gomega.BeNil())
-		e2e.SetExecPath(execPath)
 	}
 
 	// run with local network-runner
@@ -109,9 +118,12 @@ var _ = ginkgo.BeforeSuite(func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 		tests.Outf("{{green}}network-runner running in PID %d{{/}}\n", presp.Pid)
 
-		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", execPath)
+		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", networkRunnerAvalancheGoExecPath)
 		ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
-		resp, err := runnerCli.Start(ctx, execPath, runner_client.WithLogLevel(avalanchegoLogLevel))
+		resp, err := runnerCli.Start(ctx, networkRunnerAvalancheGoExecPath,
+			runner_sdk.WithNumNodes(5),
+			runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, networkRunnerAvalancheGoLogLevel)),
+		)
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
 		tests.Outf("{{green}}successfully started network-runner :{{/}} %+v\n", resp.ClusterInfo.NodeNames)
@@ -139,9 +151,13 @@ var _ = ginkgo.BeforeSuite(func() {
 		uriSlice := strings.Split(uris, ",")
 		e2e.SetURIs(uriSlice)
 	}
-
 	uriSlice := e2e.GetURIs()
 	tests.Outf("{{green}}URIs:{{/}} %q\n", uriSlice)
+
+	gomega.Expect(testKeysFile).ShouldNot(gomega.BeEmpty())
+	testKeys, err := tests.LoadHexTestKeys(testKeysFile)
+	gomega.Expect(err).Should(gomega.BeNil())
+	e2e.SetTestKeys(testKeys)
 })
 
 var _ = ginkgo.AfterSuite(func() {
