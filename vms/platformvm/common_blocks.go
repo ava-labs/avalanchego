@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -249,7 +251,9 @@ type DoubleDecisionBlock struct {
 }
 
 func (ddb *DoubleDecisionBlock) Accept() error {
-	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
+	ddb.vm.ctx.Log.Verbo("accepting block",
+		zap.Stringer("blkID", ddb.ID()),
+	)
 
 	parentIntf, err := ddb.parentBlock()
 	if err != nil {

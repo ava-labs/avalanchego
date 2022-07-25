@@ -6,6 +6,8 @@ package platformvm
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -47,11 +49,10 @@ func (pb *ProposalBlock) free() {
 
 func (pb *ProposalBlock) Accept() error {
 	blkID := pb.ID()
-	pb.vm.ctx.Log.Verbo(
-		"Accepting Proposal Block %s at height %d with parent %s",
-		blkID,
-		pb.Height(),
-		pb.Parent(),
+	pb.vm.ctx.Log.Verbo("accepting Proposal Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", pb.Height()),
+		zap.Stringer("parentID", pb.Parent()),
 	)
 
 	pb.status = choices.Accepted
@@ -60,21 +61,19 @@ func (pb *ProposalBlock) Accept() error {
 }
 
 func (pb *ProposalBlock) Reject() error {
-	pb.vm.ctx.Log.Verbo(
-		"Rejecting Proposal Block %s at height %d with parent %s",
-		pb.ID(),
-		pb.Height(),
-		pb.Parent(),
+	pb.vm.ctx.Log.Verbo("rejecting Proposal Block",
+		zap.Stringer("blkID", pb.ID()),
+		zap.Uint64("height", pb.Height()),
+		zap.Stringer("parentID", pb.Parent()),
 	)
 
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
 	if err := pb.vm.blockBuilder.AddVerifiedTx(pb.Tx); err != nil {
-		pb.vm.ctx.Log.Verbo(
-			"failed to reissue tx %q due to: %s",
-			pb.Tx.ID(),
-			err,
+		pb.vm.ctx.Log.Verbo("failed to reissue tx",
+			zap.Stringer("txID", pb.Tx.ID()),
+			zap.Error(err),
 		)
 	}
 	return pb.CommonBlock.Reject()

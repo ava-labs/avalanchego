@@ -6,6 +6,8 @@ package state
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -143,7 +145,9 @@ func (hi *heightIndex) ResetHeightIndex(log logging.Logger, baseDB versiondb.Com
 				return err
 			}
 
-			log.Info("Deleted %d height entries", deleteCount)
+			log.Info("deleted height index entries",
+				zap.Int("numDeleted", deleteCount),
+			)
 
 			// every deleteBatchSize ops, sleep to avoid clogging the node on this
 			processingDuration := time.Since(processingStart)

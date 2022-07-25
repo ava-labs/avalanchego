@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -135,7 +138,9 @@ type ImportKeyArgs struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
-	service.vm.ctx.Log.Debug("Platform: ImportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("Platform: ImportKey called",
+		logging.UserString("username", args.Username),
+	)
 
 	if args.PrivateKey == nil {
 		return errMissingPrivateKey
@@ -186,7 +191,9 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 		args.Addresses = append(args.Addresses, *args.Address)
 	}
 
-	service.vm.ctx.Log.Debug("Platform: GetBalance called for addresses %v", args.Addresses)
+	service.vm.ctx.Log.Debug("Platform: GetBalance called",
+		logging.UserStrings("addresses", args.Addresses),
+	)
 
 	// Parse to address
 	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
@@ -226,8 +233,9 @@ utxoFor:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
 			switch {
 			case !ok:
-				service.vm.ctx.Log.Warn("Unexpected Output type in UTXO: %T",
-					out.TransferableOut)
+				service.vm.ctx.Log.Warn("unexpected output type in UTXO",
+					zap.String("type", fmt.Sprintf("%T", out.TransferableOut)),
+				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
@@ -865,7 +873,9 @@ type SampleValidatorsReply struct {
 
 // SampleValidators returns a sampling of the list of current validators
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
-	service.vm.ctx.Log.Debug("Platform: SampleValidators called with Size = %d", args.Size)
+	service.vm.ctx.Log.Debug("Platform: SampleValidators called",
+		zap.Uint16("size", uint16(args.Size)),
+	)
 
 	validators, ok := service.vm.Validators.GetValidators(args.SubnetID)
 	if !ok {
@@ -1883,7 +1893,9 @@ type GetTxStatusResponse struct {
 
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetTxStatus called with txID: %s", args.TxID)
+	service.vm.ctx.Log.Debug("Platform: GetTxStatus called",
+		zap.Stringer("txID", args.TxID),
+	)
 
 	_, txStatus, err := service.vm.internalState.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
@@ -1961,8 +1973,10 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 	case *txs.AddSubnetValidatorTx:
 		return 0, nil, nil
 	default:
-		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.Unsigned)
-		service.vm.ctx.Log.Error("invalid tx type provided from validator set %s", err)
+		err := fmt.Errorf("expected *txs.AddDelegatorTx, *txs.AddValidatorTx or *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
+		service.vm.ctx.Log.Error("invalid tx type provided from validator set",
+			zap.Error(err),
+		)
 		return 0, nil, err
 	}
 
@@ -2257,14 +2271,14 @@ type GetValidatorsAtReply struct {
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
 func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
-	service.vm.ctx.Log.Info(
-		"Platform: GetValidatorsAt called with Height %d and SubnetID %s",
-		args.Height,
-		args.SubnetID,
+	height := uint64(args.Height)
+	service.vm.ctx.Log.Debug("Platform: GetValidatorsAt called",
+		zap.Uint64("height", height),
+		zap.Stringer("subnetID", args.SubnetID),
 	)
 
 	var err error
-	reply.Validators, err = service.vm.GetValidatorSet(uint64(args.Height), args.SubnetID)
+	reply.Validators, err = service.vm.GetValidatorSet(height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("couldn't get validator set: %w", err)
 	}
@@ -2272,7 +2286,10 @@ func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtAr
 }
 
 func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *api.GetBlockResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetBlock called with args %s", args)
+	service.vm.ctx.Log.Debug("Platform: GetBlock called",
+		zap.Stringer("blkID", args.BlockID),
+		zap.Stringer("encoding", args.Encoding),
+	)
 
 	block, err := service.vm.GetBlock(args.BlockID)
 	if err != nil {

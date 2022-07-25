@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -63,10 +65,9 @@ func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []by
 }
 
 func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
-	n.log.Debug(
-		"AppGossip message handler called from %s with %d bytes",
-		nodeID,
-		len(msgBytes),
+	n.log.Debug("called AppGossip message handler",
+		zap.Stringer("nodeID", nodeID),
+		zap.Int("messageLen", len(msgBytes)),
 	)
 
 	if time.Now().Before(n.gossipActivationTime) {
@@ -76,22 +77,27 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
-		n.log.Debug("dropping AppGossip message due to failing to parse message")
+		n.log.Debug("dropping AppGossip message",
+			zap.String("reason", "failed to parse message"),
+		)
 		return nil
 	}
 
 	msg, ok := msgIntf.(*message.Tx)
 	if !ok {
-		n.log.Debug(
-			"dropping unexpected message from %s",
-			nodeID,
+		n.log.Debug("dropping unexpected message",
+			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
 	}
 
 	tx, err := txs.Parse(Codec, msg.Tx)
 	if err != nil {
-		n.log.Verbo("AppGossip provided invalid tx: %s", err)
+		n.log.Verbo("received invalid tx",
+			zap.Stringer("nodeID", nodeID),
+			zap.Binary("tx", msg.Tx),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -109,10 +115,9 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	// add to mempool
 	if err = n.mempool.AddUnverifiedTx(tx); err != nil {
-		n.log.Debug(
-			"AppResponse failed AddUnverifiedTx from %s: %s",
-			nodeID,
-			err,
+		n.log.Debug("tx failed verification",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
 		)
 	}
 	return nil
@@ -126,7 +131,9 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	}
 	n.recentTxs.Put(txID, nil)
 
-	n.log.Debug("gossiping tx %s", txID)
+	n.log.Debug("gossiping tx",
+		zap.Stringer("txID", txID),
+	)
 
 	msg := &message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(msg)

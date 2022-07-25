@@ -73,7 +73,7 @@ type IPConfig struct {
 	IPPort           ips.DynamicIPPort `json:"ip"`
 	IPUpdater        dynamicip.Updater `json:"-"`
 	IPResolutionFreq time.Duration     `json:"ipResolutionFrequency"`
-	// True if we attempted NAT Traversal
+	// True if we attempted NAT traversal
 	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
 	// Tries to perform network address translation
 	Nat nat.Router `json:"-"`

@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -104,7 +106,10 @@ func (s *Socket) Send(msg []byte) {
 		for _, byteSlice := range [][]byte{lenBytes[:], msg} {
 			if _, err := conn.Write(byteSlice); err != nil {
 				s.removeConn(conn)
-				s.log.Debug("failed to write message to %s: %s", conn.RemoteAddr(), err)
+				s.log.Debug("failed to write message",
+					zap.Stringer("remoteAddress", conn.RemoteAddr()),
+					zap.Error(err),
+				)
 			}
 		}
 	}
@@ -214,14 +219,20 @@ func accept(s *Socket, l net.Listener) {
 		if !s.Running() {
 			return
 		}
-		s.log.Error("socket accept error: %s", err.Error())
+		s.log.Error("socket accept error",
+			zap.Error(err),
+		)
 	}
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
-			s.log.Warn("failed to set no linger due to: %s", err)
+			s.log.Warn("failed to set no linger",
+				zap.Error(err),
+			)
 		}
 		if err := conn.SetNoDelay(true); err != nil {
-			s.log.Warn("failed to set socket nodelay due to: %s", err)
+			s.log.Warn("failed to set socket nodelay",
+				zap.Error(err),
+			)
 		}
 	}
 	s.connLock.Lock()

@@ -9,6 +9,8 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -109,7 +111,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 }
 
 func (b *bootstrapper) Start(startReqID uint32) error {
-	b.Ctx.Log.Info("Starting bootstrap...")
+	b.Ctx.Log.Info("starting bootstrapper")
 
 	b.Ctx.SetState(snow.Bootstrapping)
 	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
@@ -137,50 +139,68 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	return b.Startup()
 }
 
-// Ancestors handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
-// with request ID [requestID]
-func (b *bootstrapper) Ancestors(vdr ids.NodeID, requestID uint32, blks [][]byte) error {
+// Ancestors handles the receipt of multiple containers. Should be received in
+// response to a GetAncestors message to [nodeID] with request ID [requestID]
+func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
+	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made
-		b.Ctx.Log.Debug("received unexpected Ancestors from %s with ID %d", vdr, requestID)
+		b.Ctx.Log.Debug("received unexpected Ancestors",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
 	lenBlks := len(blks)
 	if lenBlks == 0 {
-		b.Ctx.Log.Debug("Ancestors(%s, %d) contains no blocks", vdr, requestID)
+		b.Ctx.Log.Debug("received Ancestors with no block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 
-		b.markUnavailable(vdr)
+		b.markUnavailable(nodeID)
 
 		// Send another request for this
 		return b.fetch(wantedBlkID)
 	}
 
 	// This node has responded - so add it back into the set
-	b.fetchFrom.Add(vdr)
+	b.fetchFrom.Add(nodeID)
 
 	if lenBlks > b.Config.AncestorsMaxContainersReceived {
 		blks = blks[:b.Config.AncestorsMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring %d containers in Ancestors(%s, %d)",
-			lenBlks-b.Config.AncestorsMaxContainersReceived, vdr, requestID)
+		b.Ctx.Log.Debug("ignoring containers in Ancestors",
+			zap.Int("numContainers", lenBlks-b.Config.AncestorsMaxContainersReceived),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 	}
 
 	blocks, err := block.BatchedParseBlock(b.VM, blks)
 	if err != nil { // the provided blocks couldn't be parsed
-		b.Ctx.Log.Debug("failed to parse blocks in Ancestors from %s with ID %d: %s", vdr, requestID, err)
+		b.Ctx.Log.Debug("failed to parse blocks in Ancestors",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
 		return b.fetch(wantedBlkID)
 	}
 
 	if len(blocks) == 0 {
-		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks from %s with ID %d", vdr, requestID)
+		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return b.fetch(wantedBlkID)
 	}
 
 	requestedBlock := blocks[0]
 	if actualID := requestedBlock.ID(); actualID != wantedBlkID {
-		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
-			wantedBlkID, actualID)
+		b.Ctx.Log.Debug("first block is not the requested block",
+			zap.Stringer("expectedBlkID", wantedBlkID),
+			zap.Stringer("blkID", actualID),
+		)
 		return b.fetch(wantedBlkID)
 	}
 
@@ -191,16 +211,18 @@ func (b *bootstrapper) Ancestors(vdr ids.NodeID, requestID uint32, blks [][]byte
 	return b.process(requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(vdr ids.NodeID, requestID uint32) error {
-	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
+func (b *bootstrapper) GetAncestorsFailed(nodeID ids.NodeID, requestID uint32) error {
+	blkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
-		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
-			vdr, requestID)
+		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
 	// This node timed out their request, so we can add them back to [fetchFrom]
-	b.fetchFrom.Add(vdr)
+	b.fetchFrom.Add(nodeID)
 
 	// Send another request for this
 	return b.fetch(blkID)
@@ -282,8 +304,10 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
 	toProcess := make([]snowman.Block, 0, len(pendingContainerIDs))
-	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier",
-		len(pendingContainerIDs), len(acceptedContainerIDs))
+	b.Ctx.Log.Debug("starting bootstrapping",
+		zap.Int("numPendingBlocks", len(pendingContainerIDs)),
+		zap.Int("numAcceptedBlocks", len(acceptedContainerIDs)),
+	)
 	for _, blkID := range pendingContainerIDs {
 		b.Blocked.AddMissingID(blkID)
 
@@ -439,9 +463,17 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 			)
 
 			if !b.Config.SharedCfg.Restarted {
-				b.Ctx.Log.Info("fetched %d of %d blocks. ETA = %s", blocksFetchedSoFar, totalBlocksToFetch, eta)
+				b.Ctx.Log.Info("fetching blocks",
+					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
+					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
+					zap.Duration("eta", eta),
+				)
 			} else {
-				b.Ctx.Log.Debug("fetched %d of %d blocks. ETA = %s", blocksFetchedSoFar, totalBlocksToFetch, eta)
+				b.Ctx.Log.Debug("fetching blocks",
+					zap.Uint64("numFetchedBlocks", blocksFetchedSoFar),
+					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
+					zap.Duration("eta", eta),
+				)
 			}
 		}
 
@@ -490,9 +522,13 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
+		b.Ctx.Log.Info("executing blocks",
+			zap.Uint64("numPendingJobs", b.Blocked.PendingJobs()),
+		)
 	} else {
-		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.Blocked.PendingJobs())
+		b.Ctx.Log.Debug("executing blocks",
+			zap.Uint64("numPendingJobs", b.Blocked.PendingJobs()),
+		)
 	}
 
 	executedBlocks, err := b.Blocked.ExecuteAll(

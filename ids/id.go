@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -127,6 +128,19 @@ func (id ID) String() string {
 
 func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
+}
+
+type SliceStringer []ID
+
+func (s SliceStringer) String() string {
+	var strs strings.Builder
+	for i, id := range s {
+		if i != 0 {
+			_, _ = strs.WriteString(", ")
+		}
+		_, _ = strs.WriteString(id.String())
+	}
+	return strs.String()
 }
 
 type sortIDData []ID

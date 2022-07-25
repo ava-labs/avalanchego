@@ -11,6 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -107,7 +109,9 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
-			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
+			i.log.Verbo("skipping UTXO for indexing",
+				zap.Stringer("utxoID", utxo.InputID()),
+			)
 			continue
 		}
 
@@ -144,7 +148,12 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 			}
 
 			// write the [txID] at the index
-			i.log.Verbo("writing address/assetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
+			i.log.Verbo("writing indexed tx to DB",
+				zap.String("address", address),
+				zap.Stringer("assetID", assetID),
+				zap.Uint64("index", idx),
+				zap.Stringer("txID", txID),
+			)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				return fmt.Errorf("failed to write txID while indexing %s: %w", txID, err)
 			}

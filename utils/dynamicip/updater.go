@@ -6,6 +6,8 @@ package dynamicip
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -69,20 +71,17 @@ func (u *updater) Dispatch(log logging.Logger) {
 
 			newIP, err := u.resolver.Resolve()
 			if err != nil {
-				log.Warn(
-					"couldn't resolve public IP. "+
-						"If this machine's IP recently changed, "+
-						"your node may be sharing the wrong public IP with peers. "+
-						"Error: %s",
-					err,
+				log.Warn("couldn't resolve public IP. If this machine's IP recently changed, it may be sharing the wrong public IP with peers",
+					zap.Error(err),
 				)
 				continue
 			}
 
 			if !newIP.Equal(oldIP) {
 				u.dynamicIP.SetIP(newIP)
-
-				log.Info("updated public IP to %s", newIP)
+				log.Info("updated public IP",
+					zap.Stringer("newIP", newIP),
+				)
 			}
 		case <-u.stopChan:
 			return

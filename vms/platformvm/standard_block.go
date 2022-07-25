@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -163,7 +165,9 @@ func (sb *StandardBlock) Verify() error {
 
 func (sb *StandardBlock) Accept() error {
 	blkID := sb.ID()
-	sb.vm.ctx.Log.Verbo("accepting block with ID %s", blkID)
+	sb.vm.ctx.Log.Verbo("accepting block",
+		zap.Stringer("blkID", blkID),
+	)
 
 	if err := sb.CommonDecisionBlock.Accept(); err != nil {
 		return fmt.Errorf("failed to accept CommonDecisionBlock: %w", err)
@@ -195,19 +199,17 @@ func (sb *StandardBlock) Accept() error {
 }
 
 func (sb *StandardBlock) Reject() error {
-	sb.vm.ctx.Log.Verbo(
-		"Rejecting Standard Block %s at height %d with parent %s",
-		sb.ID(),
-		sb.Height(),
-		sb.Parent(),
+	sb.vm.ctx.Log.Verbo("rejecting Standard Block",
+		zap.Stringer("blkID", sb.ID()),
+		zap.Uint64("height", sb.Height()),
+		zap.Stringer("parentID", sb.Parent()),
 	)
 
 	for _, tx := range sb.Txs {
 		if err := sb.vm.blockBuilder.AddVerifiedTx(tx); err != nil {
-			sb.vm.ctx.Log.Debug(
-				"failed to reissue tx %q due to: %s",
-				tx.ID(),
-				err,
+			sb.vm.ctx.Log.Debug("failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
 			)
 		}
 	}

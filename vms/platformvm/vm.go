@@ -12,6 +12,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -173,7 +175,9 @@ func (vm *VM) Initialize(
 	vm.utxoHandler = utxo.NewHandler(vm.ctx, &vm.clock, vm.internalState, vm.fx)
 
 	vm.lastAcceptedID = is.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", vm.lastAcceptedID)
+	ctx.Log.Info("initializing last accepted block ID",
+		zap.Stringer("blkID", vm.lastAcceptedID),
+	)
 
 	vm.stateVersions = state.NewVersions(vm.lastAcceptedID, is)
 
