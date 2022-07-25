@@ -1,10 +1,10 @@
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 h1:fLjPD/aNc3UIOA6tDi6QXUemppXK3P9BI7mr2hd6gx8=
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/VictoriaMetrics/fastcache v1.10.0 h1:5hDJnLsKLpnUEToub7ETuRu8RCkb40woBZAUiKonXzY=
-github.com/ava-labs/avalanchego v1.7.14 h1:IPLRR/djYNMhGEDggLVKfraROSk18UAduYt3qKpHLAE=
-github.com/ava-labs/avalanchego v1.7.14/go.mod h1:Vc3X0yzaLg15yYYSj9zrTKK+mwOSOd6ISWHJjLCZjko=
-github.com/ava-labs/subnet-evm v0.2.6-0.20220721235439-a427dc4e4181 h1:n55r63QjM7z9SXxRdOMAK0GpV7t8mkXnPdsYmiNTjuY=
-github.com/ava-labs/subnet-evm v0.2.6-0.20220721235439-a427dc4e4181/go.mod h1:iUAnFmAbOyEnavKHOmDcJ2mbcpJYAHprwViSaVqNUnY=
+github.com/ava-labs/avalanchego v1.7.16 h1:8IoVA5nBu1Efus9qcYmxI5aObuYlvEBcBbOcX2R8W8o=
+github.com/ava-labs/avalanchego v1.7.16/go.mod h1:S0SlkuHBqr1EQL+N4XydI5c6q5A0YIpxAndAt3ellrM=
+github.com/ava-labs/subnet-evm v0.2.6 h1:uBhsdjbeU/MJ4DTkuyClOyn8Rtq4mk/zjVo8fKrNg6I=
+github.com/ava-labs/subnet-evm v0.2.6/go.mod h1:FaZCFYBJ6/4Tp1aDuXNhDW+wS+KlwVyIcpS4F0kShR8=
 github.com/btcsuite/btcd v0.23.1 h1:IB8cVQcC2X5mHbnfirLG5IZnkWYNTPlLZVrxUYSotbE=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0 h1:fzn1qaOt32TuLjFlkzYSsBC35Q3KUjT1SwPxiMSCF5k=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0/go.mod h1:U7MHm051Al6XmscBQ0BoNydpOTsFAn707034b5nY8zU=

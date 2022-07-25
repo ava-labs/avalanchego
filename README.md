@@ -24,10 +24,11 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 [v0.2.0] AvalancheGo@v1.7.7-v1.7.9
 [v0.2.1] AvalancheGo@v1.7.10
 [v0.2.2] AvalancheGo@v1.7.11-v1.7.12
-[v0.2.3] AvalancheGo@v1.7.13-v1.7.15
-[v0.2.4] AvalancheGo@v1.7.13-v1.7.15
-[v0.2.5] AvalancheGo@v1.7.13-v1.7.15
-[v0.2.6] AvalancheGo@v1.7.13-v1.7.15
+[v0.2.3] AvalancheGo@v1.7.13-v1.7.16
+[v0.2.4] AvalancheGo@v1.7.13-v1.7.16
+[v0.2.5] AvalancheGo@v1.7.13-v1.7.16
+[v0.2.6] AvalancheGo@v1.7.13-v1.7.16
+[v0.2.7] AvalancheGo@v1.7.13-v1.7.16
 ```
 
 ## API
