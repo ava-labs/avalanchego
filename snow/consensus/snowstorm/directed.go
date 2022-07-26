@@ -8,6 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -153,15 +155,17 @@ func (dg *Directed) VirtuousVoting() ids.Set { return dg.virtuousVoting }
 
 func (dg *Directed) Quiesce() bool {
 	numVirtuous := dg.virtuousVoting.Len()
-	dg.ctx.Log.Verbo("Conflict graph has %d voting virtuous transactions",
-		numVirtuous)
+	dg.ctx.Log.Verbo("conflict graph Quiesce was called",
+		zap.Int("numVirtuous", numVirtuous),
+	)
 	return numVirtuous == 0
 }
 
 func (dg *Directed) Finalized() bool {
 	numPreferences := dg.preferences.Len()
-	dg.ctx.Log.Verbo("Conflict graph has %d preferred transactions",
-		numPreferences)
+	dg.ctx.Log.Verbo("conflict graph Finalized was called",
+		zap.Int("numPreferences", numPreferences),
+	)
 	return numPreferences == 0
 }
 
@@ -192,7 +196,9 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 
 	// Notify the metrics that this transaction is being issued.
 	if tx.HasWhitelist() {
-		dg.ctx.Log.Info("whitelist tx successfully issued %s", txID)
+		dg.ctx.Log.Info("whitelist tx successfully issued",
+			zap.Stringer("txID", txID),
+		)
 		dg.whitelistTxLatency.Issued(txID, dg.pollNumber)
 	} else {
 		dg.Latency.Issued(txID, dg.pollNumber)
@@ -297,7 +303,9 @@ func (dg *Directed) Add(tx Tx) error {
 		if err != nil {
 			return err
 		}
-		dg.ctx.Log.Info("processing whitelist tx %s", txID)
+		dg.ctx.Log.Info("processing whitelist tx",
+			zap.Stringer("txID", txID),
+		)
 
 		// Find all transactions that are not explicitly whitelisted and mark
 		// them as conflicting.
@@ -642,7 +650,9 @@ func (dg *Directed) removeConflict(txIDKey ids.ID, neighborIDs ids.Set) {
 // accept the provided tx.
 func (dg *Directed) acceptTx(tx Tx) error {
 	txID := tx.ID()
-	dg.ctx.Log.Trace("accepting transaction %s", txID)
+	dg.ctx.Log.Trace("accepting transaction",
+		zap.Stringer("txID", txID),
+	)
 
 	// Notify those listening that this tx has been accepted if the transaction
 	// has a binary format.
@@ -660,7 +670,9 @@ func (dg *Directed) acceptTx(tx Tx) error {
 
 	// Update the metrics to account for this transaction's acceptance
 	if tx.HasWhitelist() {
-		dg.ctx.Log.Info("whitelist tx accepted %s", txID)
+		dg.ctx.Log.Info("whitelist tx accepted",
+			zap.Stringer("txID", txID),
+		)
 		dg.whitelistTxLatency.Accepted(txID, dg.pollNumber)
 	} else {
 		// just regular tx
@@ -680,7 +692,10 @@ func (dg *Directed) acceptTx(tx Tx) error {
 // reject the provided tx.
 func (dg *Directed) rejectTx(tx Tx) error {
 	txID := tx.ID()
-	dg.ctx.Log.Trace("rejecting transaction %s due to a conflicting acceptance", txID)
+	dg.ctx.Log.Trace("rejecting transaction",
+		zap.String("reason", "conflicting acceptance"),
+		zap.Stringer("txID", txID),
+	)
 
 	// Reject is called before notifying the IPC so that rejections that
 	// cause fatal errors aren't sent to an IPC peer.
@@ -690,7 +705,9 @@ func (dg *Directed) rejectTx(tx Tx) error {
 
 	// Update the metrics to account for this transaction's rejection
 	if tx.HasWhitelist() {
-		dg.ctx.Log.Info("whitelist tx rejected %s", txID)
+		dg.ctx.Log.Info("whitelist tx rejected",
+			zap.Stringer("txID", txID),
+		)
 		dg.whitelistTxLatency.Rejected(txID, dg.pollNumber)
 	} else {
 		dg.Latency.Rejected(txID, dg.pollNumber)

@@ -6,12 +6,15 @@ package platformvm
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var _ Block = &ProposalBlock{}
@@ -46,11 +49,10 @@ func (pb *ProposalBlock) free() {
 
 func (pb *ProposalBlock) Accept() error {
 	blkID := pb.ID()
-	pb.vm.ctx.Log.Verbo(
-		"Accepting Proposal Block %s at height %d with parent %s",
-		blkID,
-		pb.Height(),
-		pb.Parent(),
+	pb.vm.ctx.Log.Verbo("accepting Proposal Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", pb.Height()),
+		zap.Stringer("parentID", pb.Parent()),
 	)
 
 	pb.status = choices.Accepted
@@ -59,21 +61,19 @@ func (pb *ProposalBlock) Accept() error {
 }
 
 func (pb *ProposalBlock) Reject() error {
-	pb.vm.ctx.Log.Verbo(
-		"Rejecting Proposal Block %s at height %d with parent %s",
-		pb.ID(),
-		pb.Height(),
-		pb.Parent(),
+	pb.vm.ctx.Log.Verbo("rejecting Proposal Block",
+		zap.Stringer("blkID", pb.ID()),
+		zap.Uint64("height", pb.Height()),
+		zap.Stringer("parentID", pb.Parent()),
 	)
 
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
 	if err := pb.vm.blockBuilder.AddVerifiedTx(pb.Tx); err != nil {
-		pb.vm.ctx.Log.Verbo(
-			"failed to reissue tx %q due to: %s",
-			pb.Tx.ID(),
-			err,
+		pb.vm.ctx.Log.Verbo("failed to reissue tx",
+			zap.Stringer("txID", pb.Tx.ID()),
+			zap.Error(err),
 		)
 	}
 	return pb.CommonBlock.Reject()
@@ -90,14 +90,9 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 	return nil
 }
 
-func (pb *ProposalBlock) setBaseState() {
-	pb.onCommitState.SetBase(pb.vm.internalState)
-	pb.onAbortState.SetBase(pb.vm.internalState)
-}
-
 // Verify this block is valid.
 //
-// The parent block must either be a Commit or an Abort block.
+// The parent block must be a decision block
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
@@ -107,44 +102,36 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, parentErr := pb.parentBlock()
-	if parentErr != nil {
-		return parentErr
+	txExecutor := executor.ProposalTxExecutor{
+		Backend:  &pb.vm.txExecutorBackend,
+		ParentID: pb.PrntID,
+		Tx:       pb.Tx,
 	}
-
-	// The parent of a proposal block (ie this block) must be a decision block
-	parent, ok := parentIntf.(decision)
-	if !ok {
-		return errInvalidBlockType
-	}
-
-	// parentState is the state if this block's parent is accepted
-	parentState := parent.onAccept()
-
-	executor := proposalTxExecutor{
-		vm:          pb.vm,
-		parentState: parentState,
-		tx:          pb.Tx,
-	}
-	err := pb.Tx.Unsigned.Visit(&executor)
+	err := pb.Tx.Unsigned.Visit(&txExecutor)
 	if err != nil {
 		txID := pb.Tx.ID()
 		pb.vm.blockBuilder.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
 
-	pb.onCommitState = executor.onCommit
-	pb.onAbortState = executor.onAbort
-	pb.prefersCommit = executor.prefersCommit
+	pb.onCommitState = txExecutor.OnCommit
+	pb.onAbortState = txExecutor.OnAbort
+	pb.prefersCommit = txExecutor.PrefersCommit
 
 	pb.onCommitState.AddTx(pb.Tx, status.Committed)
 	pb.onAbortState.AddTx(pb.Tx, status.Aborted)
 
-	pb.timestamp = parentState.GetTimestamp()
+	// It is safe to use [pb.onAbortState] here because the timestamp will never
+	// be modified by an Abort block.
+	pb.timestamp = pb.onAbortState.GetTimestamp()
 
 	pb.vm.blockBuilder.RemoveProposalTx(pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
-	parentIntf.addChild(pb)
+
+	// Notice that we do not add an entry to the state versions here for this
+	// block. This block must be followed by either a Commit or an Abort block.
+	// These blocks will get their parent state by referencing [onCommitState]
+	// or [onAbortState] directly.
 	return nil
 }
 

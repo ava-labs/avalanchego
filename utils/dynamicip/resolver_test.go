@@ -4,6 +4,7 @@
 package dynamicip
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,33 +12,37 @@ import (
 
 func TestNewResolver(t *testing.T) {
 	type test struct {
-		service      ResolverName
+		service      string
 		validService bool
 	}
 	tests := []test{
 		{
-			service:      OpenDNS,
+			service:      OpenDNSName,
 			validService: true,
 		},
 		{
-			service:      IFConfig,
+			service:      IFConfigName,
 			validService: true,
 		},
 		{
-			service:      IFConfigCo,
+			service:      IFConfigCoName,
 			validService: true,
 		},
 		{
-			service:      IFConfigMe,
+			service:      IFConfigMeName,
 			validService: true,
 		},
 		{
-			service:      ResolverName("not a valid resolver"),
+			service:      strings.ToUpper(IFConfigMeName),
+			validService: true,
+		},
+		{
+			service:      "not a valid resolution service name",
 			validService: false,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(string(tt.service), func(t *testing.T) {
+		t.Run(tt.service, func(t *testing.T) {
 			assert := assert.New(t)
 			_, err := NewResolver(tt.service)
 			if tt.validService {

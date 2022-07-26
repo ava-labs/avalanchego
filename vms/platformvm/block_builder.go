@@ -10,6 +10,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -18,12 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
-	// syncBound is the synchrony bound used for safe decision making
-	syncBound = 10 * time.Second
-
 	// TargetTxSize is the maximum number of bytes a transaction can use to be
 	// allowed into the mempool.
 	TargetTxSize = 64 * units.KiB
@@ -94,26 +94,12 @@ func (m *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	// Get the preferred block (which we want to build off)
-	preferred, err := m.vm.Preferred()
-	if err != nil {
-		return fmt.Errorf("couldn't get preferred block: %w", err)
+	verifier := executor.MempoolTxVerifier{
+		Backend:  &m.vm.txExecutorBackend,
+		ParentID: m.vm.preferred, // We want to build off of the preferred block
+		Tx:       tx,
 	}
-
-	preferredDecision, ok := preferred.(decision)
-	if !ok {
-		// The preferred block should always be a decision block
-		return errInvalidBlockType
-	}
-
-	preferredState := preferredDecision.onAccept()
-	verifier := mempoolTxVerifier{
-		vm:          m.vm,
-		parentState: preferredState,
-		tx:          tx,
-	}
-	err = tx.Unsigned.Visit(&verifier)
-	if err != nil {
+	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		m.MarkDropped(txID, err.Error())
 		return err
 	}
@@ -159,12 +145,12 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	preferredDecision, ok := preferred.(decision)
+
+	preferredState, ok := m.vm.stateVersions.GetState(preferredID)
 	if !ok {
 		// The preferred block should always be a decision block
 		return nil, errInvalidBlockType
 	}
-	preferredState := preferredDecision.onAccept()
 
 	// Try building a standard block.
 	if m.HasDecisionTxs() {
@@ -173,7 +159,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	}
 
 	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := m.getStakerToReward(preferredState)
+	stakerTxID, shouldReward, err := m.getNextStakerToReward(preferredState)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +197,7 @@ func (m *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// If the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(maxFutureStartTime)
+	maxChainStartTime := preferredState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
 		m.AddProposalTx(tx)
 
@@ -234,21 +220,20 @@ func (m *blockBuilder) ResetTimer() {
 		return
 	}
 
-	preferred, err := m.vm.Preferred()
-	if err != nil {
-		return
-	}
-	preferredDecision, ok := preferred.(decision)
+	preferredState, ok := m.vm.stateVersions.GetState(m.vm.preferred)
 	if !ok {
 		// The preferred block should always be a decision block
-		m.vm.ctx.Log.Error("the preferred block %q should be a decision block but was %T", preferred.ID(), preferred)
+		m.vm.ctx.Log.Error("missing preferred block state",
+			zap.Stringer("blkID", m.vm.preferred),
+		)
 		return
 	}
-	preferredState := preferredDecision.onAccept()
 
-	_, shouldReward, err := m.getStakerToReward(preferredState)
+	_, shouldReward, err := m.getNextStakerToReward(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
+		m.vm.ctx.Log.Error("failed to fetch next staker to reward",
+			zap.Error(err),
+		)
 		return
 	}
 	if shouldReward {
@@ -258,7 +243,9 @@ func (m *blockBuilder) ResetTimer() {
 
 	_, shouldAdvanceTime, err := m.getNextChainTime(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("failed to fetch next chain time with %s", err)
+		m.vm.ctx.Log.Error("failed to fetch next chain time",
+			zap.Error(err),
+		)
 		return
 	}
 	if shouldAdvanceTime {
@@ -273,13 +260,18 @@ func (m *blockBuilder) ResetTimer() {
 	}
 
 	now := m.vm.clock.Time()
-	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
-		m.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
+		m.vm.ctx.Log.Error("couldn't get next staker change time",
+			zap.Error(err),
+		)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)
-	m.vm.ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
+	m.vm.ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
 
 	// Wake up when it's time to add/remove the next validator
 	m.timer.SetTimeoutIn(waitTime)
@@ -298,31 +290,42 @@ func (m *blockBuilder) Shutdown() {
 	m.vm.ctx.Lock.Lock()
 }
 
-// getStakerToReward return the staker txID to remove from the primary network
-// staking set, if one exists.
-func (m *blockBuilder) getStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
+// getNextStakerToReward returns the next staker txID to remove from the staking
+// set with a RewardValidatorTx rather than an AdvanceTimeTx.
+// Returns:
+// - [txID] of the next staker to reward
+// - [shouldReward] if the txID exists and is ready to be rewarded
+// - [err] if something bad happened
+func (m *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
 	}
 
-	currentStakers := preferredState.CurrentStakers()
-	tx, _, err := currentStakers.GetNextStaker()
+	currentStakerIterator, err := preferredState.GetCurrentStakerIterator()
 	if err != nil {
 		return ids.Empty, false, err
 	}
+	defer currentStakerIterator.Release()
 
-	staker, ok := tx.Unsigned.(txs.StakerTx)
-	if !ok {
-		return ids.Empty, false, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx.Unsigned)
+	for currentStakerIterator.Next() {
+		currentStaker := currentStakerIterator.Value()
+		priority := currentStaker.Priority
+		// If the staker is a primary network staker (not a subnet validator),
+		// it's the next staker we will want to remove with a RewardValidatorTx
+		// rather than an AdvanceTimeTx.
+		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
+			priority == state.PrimaryNetworkValidatorCurrentPriority {
+			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
+		}
 	}
-	return tx.ID(), currentChainTimestamp.Equal(staker.EndTime()), nil
+	return ids.Empty, false, nil
 }
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
 func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
-	nextStakerChangeTime, err := preferredState.GetNextStakerChangeTime()
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
 	}
@@ -339,7 +342,7 @@ func (m *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 // Returns true/false if mempool is non-empty/empty following cleanup.
 func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 	now := m.vm.clock.Time()
-	syncTime := now.Add(syncBound)
+	syncTime := now.Add(executor.SyncBound)
 	for m.HasProposalTx() {
 		tx := m.PopProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
@@ -356,7 +359,10 @@ func (m *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 		)
 
 		m.vm.blockBuilder.MarkDropped(txID, errMsg) // cache tx as dropped
-		m.vm.ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
+		m.vm.ctx.Log.Debug("dropping tx",
+			zap.String("reason", errMsg),
+			zap.Stringer("txID", txID),
+		)
 	}
 	return false
 }

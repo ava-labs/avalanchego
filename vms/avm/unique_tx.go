@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -160,9 +162,8 @@ func (tx *UniqueTx) Accept() error {
 	}
 	// Add new utxos
 	for _, utxo := range outputUTXOs {
-		utxoID := utxo.InputID()
-		if err := tx.vm.state.PutUTXO(utxoID, utxo); err != nil {
-			return fmt.Errorf("couldn't put UTXO %s: %w", utxoID, err)
+		if err := tx.vm.state.PutUTXO(utxo); err != nil {
+			return fmt.Errorf("couldn't put UTXO %s: %w", utxo.InputID(), err)
 		}
 	}
 
@@ -197,15 +198,23 @@ func (tx *UniqueTx) Reject() error {
 	defer tx.vm.db.Abort()
 
 	if err := tx.setStatus(choices.Rejected); err != nil {
-		tx.vm.ctx.Log.Error("Failed to reject tx %s due to %s", tx.txID, err)
+		tx.vm.ctx.Log.Error("failed to reject tx",
+			zap.Stringer("txID", tx.txID),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	txID := tx.ID()
-	tx.vm.ctx.Log.Debug("Rejecting Tx: %s", txID)
+	tx.vm.ctx.Log.Debug("rejecting tx",
+		zap.Stringer("txID", txID),
+	)
 
 	if err := tx.vm.db.Commit(); err != nil {
-		tx.vm.ctx.Log.Error("Failed to commit reject %s due to %s", tx.txID, err)
+		tx.vm.ctx.Log.Error("failed to commit reject",
+			zap.Stringer("txID", tx.txID),
+			zap.Error(err),
+		)
 		return err
 	}
 

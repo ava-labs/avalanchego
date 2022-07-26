@@ -303,7 +303,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -348,7 +348,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -395,7 +395,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -499,7 +499,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -541,7 +541,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -586,7 +586,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -629,7 +629,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(otherAssetUTXO.InputID(), otherAssetUTXO)
+	err = vm.state.PutUTXO(otherAssetUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -1593,7 +1593,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *tx
 				}},
 			},
 		},
-		DestinationChain: platformChainID,
+		DestinationChain: constants.PlatformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
@@ -1812,12 +1812,12 @@ func TestServiceGetUTXOs(t *testing.T) {
 				},
 			},
 		}
-		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	sm := m.NewSharedMemory(platformChainID)
+	sm := m.NewSharedMemory(constants.PlatformChainID)
 
 	elems := make([]*atomic.Element, numUTXOs)
 	codec := vm.parser.Codec()
@@ -1859,7 +1859,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pAddr, err := vm.FormatAddress(platformChainID, rawAddr)
+	pAddr, err := vm.FormatAddress(constants.PlatformChainID, rawAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2702,7 +2702,7 @@ func TestImport(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			peerSharedMemory := m.NewSharedMemory(platformChainID)
+			peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
 			utxoID := utxo.InputID()
 			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 				Key:   utxoID[:],

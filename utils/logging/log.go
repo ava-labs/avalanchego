@@ -4,7 +4,6 @@
 package logging
 
 import (
-	"fmt"
 	"io"
 
 	"go.uber.org/zap"
@@ -73,51 +72,43 @@ func (l *log) Stop() {
 }
 
 // Should only be called from [Level] functions.
-func (l *log) log(level Level, format string, args ...interface{}) {
-	// This if check is only needed to avoid calling the (potentially expensive)
-	// Sprintf. Once the Sprintf is removed, this check can be removed as well.
-	if !l.internalLogger.Core().Enabled(zapcore.Level(level)) {
-		return
-	}
-	// TODO: remove this Sprintf and convert args to fields to use in ce.Write()
-	args = SanitizeArgs(args)
-	msg := fmt.Sprintf(format, args...)
+func (l *log) log(level Level, msg string, fields ...zap.Field) {
 	if ce := l.internalLogger.Check(zapcore.Level(level), msg); ce != nil {
-		ce.Write()
+		ce.Write(fields...)
 	}
 }
 
-func (l *log) Fatal(format string, args ...interface{}) {
-	l.log(Fatal, format, args...)
+func (l *log) Fatal(msg string, fields ...zap.Field) {
+	l.log(Fatal, msg, fields...)
 }
 
-func (l *log) Error(format string, args ...interface{}) {
-	l.log(Error, format, args...)
+func (l *log) Error(msg string, fields ...zap.Field) {
+	l.log(Error, msg, fields...)
 }
 
-func (l *log) Warn(format string, args ...interface{}) {
-	l.log(Warn, format, args...)
+func (l *log) Warn(msg string, fields ...zap.Field) {
+	l.log(Warn, msg, fields...)
 }
 
-func (l *log) Info(format string, args ...interface{}) {
-	l.log(Info, format, args...)
+func (l *log) Info(msg string, fields ...zap.Field) {
+	l.log(Info, msg, fields...)
 }
 
-func (l *log) Trace(format string, args ...interface{}) {
-	l.log(Trace, format, args...)
+func (l *log) Trace(msg string, fields ...zap.Field) {
+	l.log(Trace, msg, fields...)
 }
 
-func (l *log) Debug(format string, args ...interface{}) {
-	l.log(Debug, format, args...)
+func (l *log) Debug(msg string, fields ...zap.Field) {
+	l.log(Debug, msg, fields...)
 }
 
-func (l *log) Verbo(format string, args ...interface{}) {
-	l.log(Verbo, format, args...)
+func (l *log) Verbo(msg string, fields ...zap.Field) {
+	l.log(Verbo, msg, fields...)
 }
 
 func (l *log) AssertNoError(err error) {
 	if err != nil {
-		l.Fatal("%s", err)
+		l.Fatal("assertion failed", zap.Error(err))
 	}
 	if l.assertionsEnabled && err != nil {
 		l.Stop()
@@ -125,39 +116,36 @@ func (l *log) AssertNoError(err error) {
 	}
 }
 
-func (l *log) AssertTrue(b bool, format string, args ...interface{}) {
+func (l *log) AssertTrue(b bool, msg string, fields ...zap.Field) {
 	if !b {
-		l.Fatal(format, args...)
+		l.Fatal(msg, fields...)
 	}
 	if l.assertionsEnabled && !b {
 		l.Stop()
-		panic(fmt.Sprintf(format, args...))
+		panic(msg)
 	}
 }
 
-func (l *log) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {
+func (l *log) AssertDeferredTrue(f func() bool, msg string, fields ...zap.Field) {
 	// Note, the logger will only be notified here if assertions are enabled
 	if l.assertionsEnabled && !f() {
-		err := fmt.Sprintf(format, args...)
-		l.Fatal(err)
+		l.Fatal(msg, fields...)
 		l.Stop()
-		panic(err)
+		panic(msg)
 	}
 }
 
 func (l *log) AssertDeferredNoError(f func() error) {
 	if l.assertionsEnabled {
 		if err := f(); err != nil {
-			l.Fatal("%s", err)
-			l.Stop()
-			panic(err)
+			l.AssertNoError(err)
 		}
 	}
 }
 
 func (l *log) StopOnPanic() {
 	if r := recover(); r != nil {
-		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Fatal("panicking", zap.Any("reason", r), zap.Stack("from"))
 		l.Stop()
 		panic(r)
 	}
@@ -167,7 +155,7 @@ func (l *log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
 
 func (l *log) stopAndExit(exit func()) {
 	if r := recover(); r != nil {
-		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Fatal("panicking", zap.Any("reason", r), zap.Stack("from"))
 		l.Stop()
 		exit()
 	}

@@ -13,6 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -243,11 +245,9 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
-		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
-			"    ID: %s\n"+
-			"    VMID:%s",
-			chainParams.ID,
-			chainParams.VMAlias,
+		m.Log.Debug("skipped creating non-whitelisted chain",
+			zap.Stringer("chainID", chainParams.ID),
+			zap.String("vmID", chainParams.VMAlias),
 		)
 		return
 	}
@@ -255,15 +255,15 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// (Recall that the string representation of a chain's ID is also an alias
 	//  for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.Log.Debug("there is already a chain with alias '%s'. Chain not created.",
-			alias)
+		m.Log.Debug("skipping chain creation",
+			zap.String("reason", "there is already a chain with same alias"),
+			zap.String("alias", alias),
+		)
 		return
 	}
-	m.Log.Info("creating chain:\n"+
-		"    ID: %s\n"+
-		"    VMID:%s",
-		chainParams.ID,
-		chainParams.VMAlias,
+	m.Log.Info("creating chain",
+		zap.Stringer("chainID", chainParams.ID),
+		zap.String("vmID", chainParams.VMAlias),
 	)
 
 	sb, exists := m.subnets[chainParams.SubnetID]
@@ -284,11 +284,33 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		sb.removeChain(chainParams.ID)
 		if m.CriticalChains.Contains(chainParams.ID) {
 			// Shut down if we fail to create a required chain (i.e. X, P or C)
-			m.Log.Fatal("error creating required chain %s: %s", chainParams.ID, err)
+			m.Log.Fatal("error creating required chain",
+				zap.Stringer("chainID", chainParams.ID),
+				zap.Error(err),
+			)
 			go m.ShutdownNodeFunc(1)
 			return
 		}
-		m.Log.Error("error creating chain %s: %s", chainParams.ID, err)
+
+		chainAlias := m.PrimaryAliasOrDefault(chainParams.ID)
+		m.Log.Error("error creating chain",
+			zap.String("chainAlias", chainAlias),
+			zap.Error(err),
+		)
+
+		// Register the health check for this chain regardless of if it was
+		// created or not. This attempts to notify the node operator that their
+		// node may not be properly validating the subnet they expect to be
+		// validating.
+		healthCheckErr := fmt.Errorf("failed to create chain on whitelisted subnet: %s", chainParams.SubnetID)
+		if err := m.Health.RegisterHealthCheck(chainAlias, health.CheckerFunc(func() (interface{}, error) {
+			return nil, healthCheckErr
+		})); err != nil {
+			m.Log.Error("failed to register failing health check",
+				zap.String("chainAlias", chainAlias),
+				zap.Error(err),
+			)
+		}
 		return
 	}
 

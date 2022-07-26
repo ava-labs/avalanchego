@@ -1,4 +1,0 @@
-avalanche_nodes:
-  hosts:
-    localhost:
-      ansible_connection: local

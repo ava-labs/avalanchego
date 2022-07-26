@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -104,8 +106,11 @@ type Verifier interface {
 	// [unlockedProduced] is the map of assets that were produced and their
 	// amounts.
 	// The [ins] must have at least [unlockedProduced] than the [outs].
+	//
 	// Precondition: [tx] has already been syntactically verified.
-	SemanticVerifySpend(
+	//
+	// Note: [unlockedProduced] is modified by this method.
+	VerifySpend(
 		tx txs.UnsignedTx,
 		utxoDB state.UTXOGetter,
 		ins []*avax.TransferableInput,
@@ -121,8 +126,11 @@ type Verifier interface {
 	// [unlockedProduced] is the map of assets that were produced and their
 	// amounts.
 	// The [ins] must have at least [unlockedProduced] more than the [outs].
+	//
 	// Precondition: [tx] has already been syntactically verified.
-	SemanticVerifySpendUTXOs(
+	//
+	// Note: [unlockedProduced] is modified by this method.
+	VerifySpendUTXOs(
 		tx txs.UnsignedTx,
 		utxos []*avax.UTXO,
 		ins []*avax.TransferableInput,
@@ -229,7 +237,10 @@ func (h *handler) Spend(
 		}
 		in, ok := inIntf.(avax.TransferableIn)
 		if !ok { // should never happen
-			h.ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
+			h.ctx.Log.Warn("wrong input type",
+				zap.String("expectedType", "avax.TransferableIn"),
+				zap.String("actualType", fmt.Sprintf("%T", inIntf)),
+			)
 			continue
 		}
 
@@ -440,7 +451,7 @@ func (h *handler) Authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-func (h *handler) SemanticVerifySpend(
+func (h *handler) VerifySpend(
 	tx txs.UnsignedTx,
 	utxoDB state.UTXOGetter,
 	ins []*avax.TransferableInput,
@@ -461,10 +472,10 @@ func (h *handler) SemanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.SemanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, unlockedProduced)
+	return h.VerifySpendUTXOs(tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
-func (h *handler) SemanticVerifySpendUTXOs(
+func (h *handler) VerifySpendUTXOs(
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
@@ -495,6 +506,8 @@ func (h *handler) SemanticVerifySpendUTXOs(
 	// Time this transaction is being verified
 	now := uint64(h.clk.Time().Unix())
 
+	// Track the amount of unlocked transfers
+	// assetID -> amount
 	unlockedConsumed := make(map[ids.ID]uint64)
 
 	// Track the amount of locked transfers and their owners

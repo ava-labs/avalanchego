@@ -10,6 +10,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -131,7 +133,9 @@ func (cm *chainMetrics) observe(nodeID ids.NodeID, op message.Op, latency time.D
 
 	observer, err := msg.GetMetricWith(labels)
 	if err != nil {
-		cm.ctx.Log.Warn("failed to get observer with validatorID label due to %s", err)
+		cm.ctx.Log.Warn("failed to get observer with validatorID",
+			zap.Error(err),
+		)
 		return
 	}
 	observer.Observe(lat)

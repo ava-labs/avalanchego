@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -69,9 +71,16 @@ func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip i
 	// we attempt a port map, and log an Error if it fails.
 	err := m.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 	if err != nil {
-		m.log.Error("NAT Traversal failed from external port %d to internal port %d with %s", extPort, intPort, err)
+		m.log.Error("NAT traversal failed",
+			zap.Uint16("externalPort", extPort),
+			zap.Uint16("internalPort", intPort),
+			zap.Error(err),
+		)
 	} else {
-		m.log.Info("NAT Traversal successful from external port %d to internal port %d", extPort, intPort)
+		m.log.Info("NAT traversal successful",
+			zap.Uint16("externalPort", extPort),
+			zap.Uint16("internalPort", intPort),
+		)
 	}
 
 	go m.keepPortMapping(protocol, intPort, extPort, desc, ip, updateTime)
@@ -87,8 +96,12 @@ func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc str
 		}
 
 		// log a message, sleep a second and retry.
-		m.log.Error("Renewing port mapping try #%d from external port %d to internal port %d failed with %s",
-			retryCnt+1, extPort, intPort, err)
+		m.log.Error("renewing port mapping failed",
+			zap.Int("attempt", retryCnt+1),
+			zap.Uint16("externalPort", extPort),
+			zap.Uint16("internalPort", intPort),
+			zap.Error(err),
+		)
 		time.Sleep(1 * time.Second)
 	}
 	return err
@@ -104,9 +117,17 @@ func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc 
 	defer func(extPort uint16) {
 		updateTimer.Stop()
 
-		m.log.Debug("Unmap protocol %s external port %d", protocol, extPort)
+		m.log.Debug("unmapping port",
+			zap.String("protocol", protocol),
+			zap.Uint16("externalPort", extPort),
+		)
+
 		if err := m.r.UnmapPort(protocol, intPort, extPort); err != nil {
-			m.log.Debug("Error unmapping port %d to %d: %s", intPort, extPort, err)
+			m.log.Debug("error unmapping port",
+				zap.Uint16("externalPort", extPort),
+				zap.Uint16("internalPort", intPort),
+				zap.Error(err),
+			)
 		}
 
 		m.wg.Done()
@@ -117,8 +138,11 @@ func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc 
 		case <-updateTimer.C:
 			err := m.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
 			if err != nil {
-				m.log.Warn("Renew NAT Traversal failed from external port %d to internal port %d with %s",
-					extPort, intPort, err)
+				m.log.Warn("renew NAT traversal failed",
+					zap.Uint16("externalPort", extPort),
+					zap.Uint16("internalPort", intPort),
+					zap.Error(err),
+				)
 			}
 			m.updateIP(ip)
 			updateTimer.Reset(updateTime)
@@ -134,13 +158,17 @@ func (m *Mapper) updateIP(ip ips.DynamicIPPort) {
 	}
 	newIP, err := m.r.ExternalIP()
 	if err != nil {
-		m.log.Error("failed to get external IP: %s", err)
+		m.log.Error("failed to get external IP",
+			zap.Error(err),
+		)
 		return
 	}
 	oldIP := ip.IPPort().IP
 	ip.SetIP(newIP)
 	if !oldIP.Equal(newIP) {
-		m.log.Info("external IP updated to: %s", newIP)
+		m.log.Info("external IP updated",
+			zap.Stringer("newIP", newIP),
+		)
 	}
 }
 

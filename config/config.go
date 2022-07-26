@@ -595,7 +595,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	}
 	if ipResolutionService != "" {
 		// User specified to use dynamic IP resolution.
-		resolver, err := dynamicip.NewResolver(dynamicip.ResolverName(ipResolutionService))
+		resolver, err := dynamicip.NewResolver(ipResolutionService)
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't create IP resolver: %w", err)
 		}

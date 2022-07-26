@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -49,7 +51,9 @@ func (v *voter) Update() {
 	for _, result := range results {
 		result := result
 
-		v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &result)
+		v.t.Ctx.Log.Debug("finishing poll",
+			zap.Stringer("result", &result),
+		)
 		if err := v.t.Consensus.RecordPoll(result); err != nil {
 			v.t.errs.Add(err)
 			return
@@ -62,11 +66,16 @@ func (v *voter) Update() {
 		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
-			v.t.Ctx.Log.Warn("Failed to fetch %s during attempted re-issuance", orphanID)
+			v.t.Ctx.Log.Warn("failed to fetch tx during attempted re-issuance",
+				zap.Stringer("txID", orphanID),
+				zap.Error(err),
+			)
 		}
 	}
 	if len(txs) > 0 {
-		v.t.Ctx.Log.Debug("Re-issuing %d transactions", len(txs))
+		v.t.Ctx.Log.Debug("re-issuing transactions",
+			zap.Int("numTxs", len(txs)),
+		)
 	}
 	if _, err := v.t.batch(txs, batchOption{force: true}); err != nil {
 		v.t.errs.Add(err)
@@ -74,11 +83,11 @@ func (v *voter) Update() {
 	}
 
 	if v.t.Consensus.Quiesce() {
-		v.t.Ctx.Log.Debug("Avalanche engine can quiesce")
+		v.t.Ctx.Log.Debug("avalanche engine can quiesce")
 		return
 	}
 
-	v.t.Ctx.Log.Debug("Avalanche engine can't quiesce")
+	v.t.Ctx.Log.Debug("avalanche engine can't quiesce")
 	v.t.repoll()
 }
 
@@ -87,8 +96,12 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	for vote, set := range votes {
 		vtx, err := v.t.Manager.GetVtx(vote)
 		if err != nil {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because we failed to fetch the vertex",
-				set.Len(), vote)
+			v.t.Ctx.Log.Debug("dropping vote(s)",
+				zap.String("reason", "failed to fetch vertex"),
+				zap.Stringer("voteID", vote),
+				zap.Int("numVotes", set.Len()),
+				zap.Error(err),
+			)
 			votes.RemoveSet(vote)
 			continue
 		}
@@ -102,22 +115,33 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 		status := vtx.Status()
 
 		if !status.Fetched() {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the vertex is unknown",
-				set.Len(), vtxID)
+			v.t.Ctx.Log.Debug("dropping vote(s)",
+				zap.String("reason", "vertex unknown"),
+				zap.Int("numVotes", set.Len()),
+				zap.Stringer("vtxID", vtxID),
+			)
 			votes.RemoveSet(vtxID)
 			continue
 		}
 
 		if status.Decided() {
-			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided as %s",
-				set.Len(), vtxID, status)
+			v.t.Ctx.Log.Verbo("dropping vote(s)",
+				zap.String("reason", "vertex already decided"),
+				zap.Int("numVotes", set.Len()),
+				zap.Stringer("vtxID", vtxID),
+				zap.Stringer("status", status),
+			)
+
 			votes.RemoveSet(vtxID)
 			continue
 		}
 
 		if !v.t.Consensus.VertexIssued(vtx) {
-			v.t.Ctx.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued",
-				set.Len(), vtxID)
+			v.t.Ctx.Log.Verbo("bubbling vote(s)",
+				zap.String("reason", "vertex not issued"),
+				zap.Int("numVotes", set.Len()),
+				zap.Stringer("vtxID", vtxID),
+			)
 			votes.RemoveSet(vtxID) // Remove votes for this vertex because it hasn't been issued
 
 			parents, err := vtx.Parents()

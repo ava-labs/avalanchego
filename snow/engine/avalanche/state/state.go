@@ -4,12 +4,13 @@
 package state
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -39,14 +40,20 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 	}
 
 	if bytes, err = s.db.Get(id[:]); err != nil {
-		s.log.Verbo("Failed to get vertex %s from database due to %s", id, err)
+		s.log.Verbo("failed to get vertex from database",
+			zap.Binary("key", id[:]),
+			zap.Error(err),
+		)
 		s.dbCache.Put(id, nil)
 		return nil
 	}
 
 	if vtx, err = s.serializer.parseVertex(bytes); err != nil {
-		s.log.Error("Parsing failed on saved vertex. Prefixed key = %s, Bytes = %s due to %s",
-			id, formatting.DumpBytes(bytes), err)
+		s.log.Error("failed parsing saved vertex",
+			zap.Binary("key", id[:]),
+			zap.Binary("vertex", bytes),
+			zap.Error(err),
+		)
 		s.dbCache.Put(id, nil)
 		return nil
 	}
@@ -115,9 +122,11 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 			s.dbCache.Put(id, frontier)
 			return frontier
 		}
-		s.log.Error("Parsing failed on saved ids.\nPrefixed key = %s\nBytes = %s",
-			id,
-			formatting.DumpBytes(b))
+		s.log.Error("failed parsing saved edge",
+			zap.Binary("key", id[:]),
+			zap.Binary("edge", b),
+			zap.Error(err),
+		)
 	}
 
 	s.dbCache.Put(id, nil) // Cache the miss

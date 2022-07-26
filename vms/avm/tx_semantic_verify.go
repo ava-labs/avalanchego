@@ -4,8 +4,6 @@
 package avm
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -92,7 +90,7 @@ func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 		}
 	}
 
-	now := time.Now()
+	now := t.vm.clock.Time()
 	for _, out := range tx.ExportedOuts {
 		fxIndex, err := t.vm.getFx(out.Out)
 		if err != nil {

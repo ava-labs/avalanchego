@@ -10,13 +10,15 @@ import (
 	"fmt"
 	"time"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
 
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"go.uber.org/zap"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -162,7 +164,10 @@ func (vm *VMClient) Initialize(
 		serverAddr := serverListener.Addr().String()
 
 		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
-		vm.ctx.Log.Info("grpc: serving database version: %s on: %s", dbVersion, serverAddr)
+		vm.ctx.Log.Info("grpc: serving database",
+			zap.String("version", dbVersion),
+			zap.String("address", serverAddr),
+		)
 
 		versionedDBServers[i] = &vmpb.VersionedDBServer{
 			ServerAddr: serverAddr,
@@ -184,7 +189,9 @@ func (vm *VMClient) Initialize(
 	serverAddr := serverListener.Addr().String()
 
 	go grpcutils.Serve(serverListener, vm.getInitServer)
-	vm.ctx.Log.Info("grpc: serving vm services on: %s", serverAddr)
+	vm.ctx.Log.Info("grpc: serving vm services",
+		zap.String("address", serverAddr),
+	)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmpb.InitializeRequest{
 		NetworkId:    ctx.NetworkID,

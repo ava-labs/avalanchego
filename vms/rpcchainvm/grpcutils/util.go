@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"time"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -39,6 +41,14 @@ const (
 	// of Timeout and if no activity is seen even after that the connection is
 	// closed. grpc-go default 20s
 	defaultServerKeepAliveTimeout = 20 * time.Second
+	// Duration for the maximum amount of time a http2 connection can exist
+	// before sending GOAWAY. Internally in gRPC a +-10% jitter is added to
+	// mitigate retry storms.
+	defaultServerMaxConnectionAge = 10 * time.Minute
+	// Grace period after max defaultServerMaxConnectionAge after
+	// which the http2 connection is closed. 1 second is the minimum possible
+	// value. Anything less will be internally overridden to 1s by grpc.
+	defaultServerMaxConnectionAgeGrace = 1 * time.Second
 
 	// Client:
 
@@ -77,11 +87,24 @@ var (
 			PermitWithoutStream: defaultPermitWithoutStream,
 		}),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Time:    defaultServerKeepAliveInterval,
-			Timeout: defaultServerKeepAliveTimeout,
+			Time:                  defaultServerKeepAliveInterval,
+			Timeout:               defaultServerKeepAliveTimeout,
+			MaxConnectionAge:      defaultServerMaxConnectionAge,
+			MaxConnectionAgeGrace: defaultServerMaxConnectionAgeGrace,
 		}),
 	}
 )
+
+// DialOptsWithMetrics registers gRPC client metrics via chain interceptors.
+func DialOptsWithMetrics(clientMetrics *grpc_prometheus.ClientMetrics) []grpc.DialOption {
+	return append(DefaultDialOptions,
+		// Use chain interceptors to ensure custom/default interceptors are
+		// applied correctly.
+		// ref. https://github.com/kubernetes/kubernetes/pull/105069
+		grpc.WithChainStreamInterceptor(clientMetrics.StreamClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(clientMetrics.UnaryClientInterceptor()),
+	)
+}
 
 func Errorf(code int, tmpl string, args ...interface{}) error {
 	return GetGRPCErrorFromHTTPResponse(&httppb.HandleSimpleHTTPResponse{

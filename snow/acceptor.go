@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -104,7 +106,12 @@ func (a *acceptorGroup) Accept(ctx *ConsensusContext, containerID ids.ID, contai
 
 	for acceptorName, acceptor := range a.acceptors[ctx.ChainID] {
 		if err := acceptor.Accept(ctx, containerID, container); err != nil {
-			a.log.Error("acceptor %s on chain %s erred while accepting %s: %s", acceptorName, ctx.ChainID, containerID, err)
+			a.log.Error("failed accepting container",
+				zap.String("acceptorName", acceptorName),
+				zap.Stringer("chainID", ctx.ChainID),
+				zap.Stringer("containerID", containerID),
+				zap.Error(err),
+			)
 			if acceptor.dieOnError {
 				return fmt.Errorf("acceptor %s on chain %s erred while accepting %s: %w", acceptorName, ctx.ChainID, containerID, err)
 			}
