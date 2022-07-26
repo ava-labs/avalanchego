@@ -168,7 +168,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnCommit, txID, tx.Outs)
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
@@ -185,7 +185,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
+	utxo.Produce(e.OnAbort, txID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -318,7 +318,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// Consume the UTXOS
 	utxo.Consume(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnCommit, txID, tx.Outs)
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
@@ -335,7 +335,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// Consume the UTXOS
 	utxo.Consume(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnAbort, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnAbort, txID, tx.Outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -447,7 +447,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.OnCommit, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnCommit, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.OnCommit, txID, tx.Outs)
 
 	e.OnCommit.PutPendingDelegator(newStaker)
 
@@ -461,7 +461,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.OnAbort, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnAbort, txID, e.Ctx.AVAXAssetID, outs)
+	utxo.Produce(e.OnAbort, txID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -679,8 +679,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
-	currentTime := parentState.GetTimestamp()
-	if !stakerToRemove.EndTime.Equal(currentTime) {
+	currentChainTime := parentState.GetTimestamp()
+	if !stakerToRemove.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
 			"attempting to remove TxID: %s before their end time %s",
 			tx.TxID,

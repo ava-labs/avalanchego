@@ -58,6 +58,8 @@ func TestVerifySpendUTXOs(t *testing.T) {
 	}
 	unsignedTx.Initialize([]byte{0})
 
+	customAssetID := ids.GenerateTestID()
+
 	// Note that setting [chainTimestamp] also set's the handler's clock.
 	// Adjust input/output locktimes accordingly.
 	tests := []struct {
@@ -767,6 +769,134 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				&secp256k1fx.Credential{},
 			},
 			fee:       0,
+			assetID:   h.ctx.AVAXAssetID,
+			shouldErr: true,
+		},
+		{
+			description: "transfer non-avax asset",
+			utxos: []*avax.UTXO{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			ins: []*avax.TransferableInput{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			},
+			outs: []*avax.TransferableOutput{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       0,
+			assetID:   h.ctx.AVAXAssetID,
+			shouldErr: false,
+		},
+		{
+			description: "lock non-avax asset",
+			utxos: []*avax.UTXO{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			ins: []*avax.TransferableInput{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			},
+			outs: []*avax.TransferableOutput{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					Out: &stakeable.LockOut{
+						Locktime: uint64(now.Add(time.Second).Unix()),
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt: 1,
+						},
+					},
+				},
+			},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       0,
+			assetID:   h.ctx.AVAXAssetID,
+			shouldErr: false,
+		},
+		{
+			description: "attempted asset conversion",
+			utxos: []*avax.UTXO{
+				{
+					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			ins: []*avax.TransferableInput{
+				{
+					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			},
+			outs: []*avax.TransferableOutput{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       0,
+			assetID:   h.ctx.AVAXAssetID,
+			shouldErr: true,
+		},
+		{
+			description: "attempted asset conversion with burn",
+			utxos: []*avax.UTXO{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			ins: []*avax.TransferableInput{
+				{
+					Asset: avax.Asset{ID: customAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			},
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
 			assetID:   h.ctx.AVAXAssetID,
 			shouldErr: true,
 		},

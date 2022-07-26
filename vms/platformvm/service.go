@@ -2180,8 +2180,8 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	if startTime.After(endTime) {
 		return errStartAfterEndTime
 	}
-	currentTime := service.vm.internalState.GetTimestamp()
-	if startTime.Before(currentTime) {
+	currentChainTime := service.vm.internalState.GetTimestamp()
+	if startTime.Before(currentChainTime) {
 		return errStartTimeInThePast
 	}
 
