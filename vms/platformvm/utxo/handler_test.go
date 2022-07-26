@@ -92,17 +92,6 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			description: "no inputs, no outputs, positive fee",
-			utxos:       []*avax.UTXO{},
-			ins:         []*avax.TransferableInput{},
-			outs:        []*avax.TransferableOutput{},
-			creds:       []verify.Verifiable{},
-			producedAmounts: map[ids.ID]uint64{
-				h.ctx.AVAXAssetID: 1,
-			},
-			shouldErr: true,
-		},
-		{
 			description: "wrong utxo assetID, one input, no outputs, no fee",
 			utxos: []*avax.UTXO{{
 				Asset: avax.Asset{ID: customAssetID},
@@ -424,7 +413,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			description: "one locked one unlock input, one locked output, positive fee",
+			description: "one locked and one unlocked input, one locked output, positive fee",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
@@ -480,7 +469,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			description: "one locked one unlock input, one locked output, positive fee, partially locked",
+			description: "one locked and one unlocked input, one locked output, positive fee, partially locked",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
@@ -536,7 +525,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			description: "one unlock input, one locked output, zero fee, unlocked",
+			description: "one unlocked input, one locked output, zero fee",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
@@ -896,7 +885,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			description: "two input, one unlocked output, fee, custom asset",
+			description: "two inputs, one output with custom asset, with fee",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
@@ -1024,7 +1013,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			description: "two input, multiple fee",
+			description: "two inputs, multiple fee",
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
@@ -1088,163 +1077,6 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			outs: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{ID: customAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-			},
-			creds: []verify.Verifiable{
-				&secp256k1fx.Credential{},
-			},
-			producedAmounts: make(map[ids.ID]uint64),
-			shouldErr:       false,
-		},
-		{
-			description: "one input, fee, custom asset",
-			utxos: []*avax.UTXO{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-			},
-			ins: []*avax.TransferableInput{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				},
-			},
-			outs: []*avax.TransferableOutput{},
-			creds: []verify.Verifiable{
-				&secp256k1fx.Credential{},
-			},
-			producedAmounts: map[ids.ID]uint64{
-				h.ctx.AVAXAssetID: 1,
-			},
-			shouldErr: true,
-		},
-		{
-			description: "one input, custom fee",
-			utxos: []*avax.UTXO{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-			},
-			ins: []*avax.TransferableInput{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				},
-			},
-			outs: []*avax.TransferableOutput{},
-			creds: []verify.Verifiable{
-				&secp256k1fx.Credential{},
-			},
-			producedAmounts: map[ids.ID]uint64{
-				ids.Empty.Prefix(12345): 1,
-			},
-			shouldErr: false,
-		},
-		{
-			description: "one input, custom fee, wrong burn",
-			utxos: []*avax.UTXO{
-				{
-					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-			},
-			ins: []*avax.TransferableInput{
-				{
-					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				},
-			},
-			outs: []*avax.TransferableOutput{},
-			creds: []verify.Verifiable{
-				&secp256k1fx.Credential{},
-			},
-			producedAmounts: map[ids.ID]uint64{
-				ids.Empty.Prefix(12345): 1,
-			},
-			shouldErr: true,
-		},
-		{
-			description: "two input, multiple fee",
-			utxos: []*avax.UTXO{
-				{
-					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-			},
-			ins: []*avax.TransferableInput{
-				{
-					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				},
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				},
-			},
-			outs: []*avax.TransferableOutput{},
-			creds: []verify.Verifiable{
-				&secp256k1fx.Credential{},
-				&secp256k1fx.Credential{},
-			},
-			producedAmounts: map[ids.ID]uint64{
-				h.ctx.AVAXAssetID:       1,
-				ids.Empty.Prefix(12345): 1,
-			},
-			shouldErr: false,
-		},
-		{
-			description: "one unlock input, one locked output, zero fee, unlocked, custom asset",
-			utxos: []*avax.UTXO{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					Out: &stakeable.LockOut{
-						Locktime: uint64(now.Unix()) - 1,
-						TransferableOut: &secp256k1fx.TransferOutput{
-							Amt: 1,
-						},
-					},
-				},
-			},
-			ins: []*avax.TransferableInput{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				},
-			},
-			outs: []*avax.TransferableOutput{
-				{
-					Asset: avax.Asset{ID: ids.Empty.Prefix(12345)},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 1,
 					},
