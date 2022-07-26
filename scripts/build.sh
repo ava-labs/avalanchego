@@ -15,7 +15,7 @@ version_lt() {
     local ver1=$1
     local ver2=$2
     # Reverse sort the versions, if the 1st item != ver1 then ver1 < ver2
-    if  [[ $(echo -e -n "$ver1\n$ver2\n" | sort -rV | head -n1) != "$ver1" ]]; then
+    if [[ $(echo -e -n "$ver1\n$ver2\n" | sort -rV | head -n1) != "$ver1" ]]; then
         return 0
     else
         return 1
@@ -27,8 +27,11 @@ if version_lt "$(go_version)" "$go_version_minimum"; then
     exit 1
 fi
 
-# Avalanche root directory
-SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Root directory
+SUBNET_EVM_PATH=$(
+    cd "$(dirname "${BASH_SOURCE[0]}")"
+    cd .. && pwd
+)
 
 # Load the versions
 source "$SUBNET_EVM_PATH"/scripts/versions.sh
