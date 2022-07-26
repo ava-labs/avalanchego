@@ -141,8 +141,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
-			e.Config.AddStakerTxFee,
-			e.Ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.Ctx.AVAXAssetID: e.Config.AddStakerTxFee,
+			},
 		); err != nil {
 			return fmt.Errorf("failed verifySpend: %w", err)
 		}
@@ -291,8 +292,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
-			e.Config.TxFee,
-			e.Ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.Ctx.AVAXAssetID: e.Config.TxFee,
+			},
 		); err != nil {
 			return err
 		}
@@ -422,8 +424,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
-			e.Config.AddStakerTxFee,
-			e.Ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.Ctx.AVAXAssetID: e.Config.AddStakerTxFee,
+			},
 		); err != nil {
 			return fmt.Errorf("failed verifySpend: %w", err)
 		}

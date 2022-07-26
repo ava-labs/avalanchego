@@ -68,8 +68,9 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
-		createBlockchainTxFee,
-		e.Ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: createBlockchainTxFee,
+		},
 	); err != nil {
 		return err
 	}
@@ -122,8 +123,9 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
-		createSubnetTxFee,
-		e.Ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: createSubnetTxFee,
+		},
 	); err != nil {
 		return err
 	}
@@ -203,8 +205,9 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			ins,
 			tx.Outs,
 			e.Tx.Creds,
-			e.Config.TxFee,
-			e.Ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.Ctx.AVAXAssetID: e.Config.TxFee,
+			},
 		); err != nil {
 			return err
 		}
@@ -247,8 +250,9 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		tx.Ins,
 		outs,
 		e.Tx.Creds,
-		e.Config.TxFee,
-		e.Ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: e.Config.TxFee,
+		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
 	}
