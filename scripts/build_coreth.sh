@@ -34,3 +34,12 @@ cd "$AVALANCHE_PATH"
 
 # Building coreth + using go get can mess with the go.mod file.
 go mod tidy -compat=1.17
+
+# Exit build successfully if the Coreth EVM binary is created successfully
+if [[ -f "$evm_path" ]]; then
+        echo "Coreth Build Successful"
+        exit 0
+else
+        echo "Coreth Build Failure" >&2
+        exit 1
+fi
