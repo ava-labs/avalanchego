@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -96,34 +97,26 @@ func ExampleWallet() {
 	}
 	fmt.Printf("issued X->P import %s in %s\n", importTxID, time.Since(importStartTime))
 
-	// Send 100 schmeckles back to the X-chain.
-	exportStartTime = time.Now()
-	exportTxID, err = pWallet.IssueExportTx(
-		xChainID,
-		[]*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{
-					ID: createAssetTxID,
-				},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          100 * units.Schmeckle,
-					OutputOwners: *owner,
-				},
-			},
-		},
+	createSubnetStartTime := time.Now()
+	createSubnetTxID, err := pWallet.IssueCreateSubnetTx(owner)
+	if err != nil {
+		fmt.Printf("failed to issue create subnet transaction with: %s\n", err)
+		return
+	}
+	fmt.Printf("issued create subnet transaction %s in %s\n", createSubnetTxID, time.Since(createSubnetStartTime))
+
+	transformSubnetStartTime := time.Now()
+	transformSubnetTxID, err := pWallet.IssueTransformSubnetTx(
+		createSubnetTxID,
+		createAssetTxID,
+		50*units.Schmeckle,
+		100*units.Schmeckle,
+		.12*reward.PercentDenominator,
+		.10*reward.PercentDenominator,
 	)
 	if err != nil {
-		fmt.Printf("failed to issue P->X export transaction with: %s\n", err)
+		fmt.Printf("failed to issue transform subnet transaction with: %s\n", err)
 		return
 	}
-	fmt.Printf("issued P->X export %s in %s\n", exportTxID, time.Since(exportStartTime))
-
-	// Import the 100 schmeckles from the P-chain into the X-chain.
-	importStartTime = time.Now()
-	importTxID, err = xWallet.IssueImportTx(constants.PlatformChainID, owner)
-	if err != nil {
-		fmt.Printf("failed to issue P->X import transaction with: %s\n", err)
-		return
-	}
-	fmt.Printf("issued P->X import %s in %s\n", importTxID, time.Since(importStartTime))
+	fmt.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTxID, time.Since(transformSubnetStartTime))
 }

@@ -134,6 +134,26 @@ func (w *walletWithOptions) IssueExportTx(
 	)
 }
 
+func (w *walletWithOptions) IssueTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	maxConsumptionRate uint64,
+	minConsumptionRate uint64,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueTransformSubnetTx(
+		subnetID,
+		assetID,
+		initialSupply,
+		maxSupply,
+		maxConsumptionRate,
+		minConsumptionRate,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueUnsignedTx(
 	utx txs.UnsignedTx,
 	options ...common.Option,

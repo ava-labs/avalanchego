@@ -138,3 +138,23 @@ func (b *builderWithOptions) NewExportTx(
 		common.UnionOptions(b.options, options)...,
 	)
 }
+
+func (b *builderWithOptions) NewTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	maxConsumptionRate uint64,
+	minConsumptionRate uint64,
+	options ...common.Option,
+) (*txs.TransformSubnetTx, error) {
+	return b.Builder.NewTransformSubnetTx(
+		subnetID,
+		assetID,
+		initialSupply,
+		maxSupply,
+		maxConsumptionRate,
+		minConsumptionRate,
+		common.UnionOptions(b.options, options)...,
+	)
+}
