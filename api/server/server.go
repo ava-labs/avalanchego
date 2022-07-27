@@ -19,6 +19,8 @@ import (
 
 	"github.com/rs/cors"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -133,7 +135,9 @@ func (s *server) Initialize(
 	s.shutdownTimeout = shutdownTimeout
 	s.router = newRouter()
 
-	s.log.Info("API created with allowed origins: %v", allowedOrigins)
+	s.log.Info("API created",
+		zap.Strings("allowedOrigins", allowedOrigins),
+	)
 
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
@@ -162,9 +166,14 @@ func (s *server) Dispatch() error {
 
 	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
-		s.log.Info("HTTP API server listening on %q", listenAddress)
+		s.log.Info("HTTP API server listening",
+			zap.String("address", listenAddress),
+		)
 	} else {
-		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
+		s.log.Info("HTTP API server listening",
+			zap.String("host", s.listenHost),
+			zap.Uint16("port", ipPort.Port),
+		)
 	}
 
 	s.srv = &http.Server{
@@ -192,9 +201,14 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 
 	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
-		s.log.Info("HTTPS API server listening on %q", listenAddress)
+		s.log.Info("HTTPS API server listening",
+			zap.String("address", listenAddress),
+		)
 	} else {
-		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipPort.Port)
+		s.log.Info("HTTPS API server listening",
+			zap.String("host", s.listenHost),
+			zap.Uint16("port", ipPort.Port),
+		)
 	}
 
 	s.srv = &http.Server{
@@ -220,11 +234,16 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 	handlers, err = engine.GetVM().CreateHandlers()
 	ctx.Lock.Unlock()
 	if err != nil {
-		s.log.Error("failed to create %s handlers: %s", chainName, err)
+		s.log.Error("failed to create handlers",
+			zap.String("chainName", chainName),
+			zap.Error(err),
+		)
 		return
 	}
 
-	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
+	s.log.Verbo("about to add API endpoints",
+		zap.Stringer("chainID", ctx.ChainID),
+	)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
 	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
 
@@ -234,18 +253,26 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
 		if extension != "" && err != nil {
-			s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
+			s.log.Error("could not add route to chain's API handler",
+				zap.String("reason", "route is malformed"),
+				zap.Error(err),
+			)
 			continue
 		}
 		if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension); err != nil {
-			s.log.Error("error adding route: %s", err)
+			s.log.Error("error adding route",
+				zap.Error(err),
+			)
 		}
 	}
 }
 
 func (s *server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
-	s.log.Info("adding route %s%s", url, endpoint)
+	s.log.Info("adding route",
+		zap.String("url", url),
+		zap.String("endpoint", endpoint),
+	)
 	// Apply middleware to grab/release chain's lock before/after calling API method
 	h, err := lockMiddleware(handler.Handler, handler.LockOptions, &ctx.Lock)
 	if err != nil {
@@ -268,7 +295,10 @@ func (s *server) AddRouteWithReadLock(handler *common.HTTPHandler, lock *sync.RW
 
 func (s *server) addRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
-	s.log.Info("adding route %s%s", url, endpoint)
+	s.log.Info("adding route",
+		zap.String("url", url),
+		zap.String("endpoint", endpoint),
+	)
 	// Apply middleware to grab/release chain's lock before/after calling API method
 	h, err := lockMiddleware(handler.Handler, handler.LockOptions, lock)
 	if err != nil {

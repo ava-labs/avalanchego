@@ -6,6 +6,8 @@ package proposervm
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
@@ -112,10 +114,9 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	case database.ErrNotFound:
 		// fork has not been reached since there is not fork height
 		// just return innerSummary
-		vm.ctx.Log.Debug(
-			"built pre-fork summary, ID: %s, height: %d",
-			innerSummary.ID(),
-			innerSummary.Height(),
+		vm.ctx.Log.Debug("built pre-fork summary",
+			zap.Stringer("summaryID", innerSummary.ID()),
+			zap.Uint64("summaryHeight", innerSummary.Height()),
 		)
 		return innerSummary, nil
 	default:
@@ -125,12 +126,19 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 	height := innerSummary.Height()
 	blkID, err := vm.GetBlockIDAtHeight(height)
 	if err != nil {
-		vm.ctx.Log.Debug("failed to fetch proposervm block ID at height %d with %s", height, err)
+		vm.ctx.Log.Debug("failed to fetch proposervm block ID",
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 	block, err := vm.getPostForkBlock(blkID)
 	if err != nil {
-		vm.ctx.Log.Warn("failed to fetch proposervm block %s at height %d with %s", blkID, height, err)
+		vm.ctx.Log.Warn("failed to fetch proposervm block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -139,10 +147,9 @@ func (vm *VM) buildStateSummary(innerSummary block.StateSummary) (block.StateSum
 		return nil, err
 	}
 
-	vm.ctx.Log.Debug(
-		"built post-fork summary, ID: %s, height: %d",
-		statelessSummary.ID(),
-		forkHeight,
+	vm.ctx.Log.Debug("built post-fork summary",
+		zap.Stringer("summaryID", statelessSummary.ID()),
+		zap.Uint64("summaryHeight", forkHeight),
 	)
 	return &stateSummary{
 		StateSummary: statelessSummary,

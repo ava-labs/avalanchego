@@ -6,6 +6,8 @@ package proposervm
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -80,8 +82,10 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 			return err
 		}
 
-		b.vm.ctx.Log.Debug("allowing pre-fork block %s after the fork time because the parent is an oracle block",
-			b.ID())
+		b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time",
+			zap.String("reason", "parent is an oracle block"),
+			zap.Stringer("blkID", b.ID()),
+		)
 	}
 
 	return child.Block.Verify()
@@ -101,7 +105,11 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	childPChainHeight := child.PChainHeight()
 	currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight()
 	if err != nil {
-		b.vm.ctx.Log.Error("couldn't retrieve current P-Chain height while verifying %s: %s", childID, err)
+		b.vm.ctx.Log.Error("block verification failed",
+			zap.String("reason", "failed to get current P-Chain height"),
+			zap.Stringer("blkID", childID),
+			zap.Error(err),
+		)
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
@@ -160,8 +168,10 @@ func (b *preForkBlock) buildChild() (Block, error) {
 			return nil, err
 		}
 
-		b.vm.ctx.Log.Info("built block %s - parent timestamp %s",
-			innerBlock.ID(), parentTimestamp)
+		b.vm.ctx.Log.Info("built block",
+			zap.Stringer("blkID", innerBlock.ID()),
+			zap.Time("parentTimestamp", parentTimestamp),
+		)
 
 		return &preForkBlock{
 			Block: innerBlock,
@@ -208,8 +218,10 @@ func (b *preForkBlock) buildChild() (Block, error) {
 		},
 	}
 
-	b.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
-		blk.ID(), parentTimestamp, newTimestamp)
+	b.vm.ctx.Log.Info("built block",
+		zap.Stringer("blkID", blk.ID()),
+		zap.Time("parentTimestamp", parentTimestamp),
+		zap.Time("blockTimestamp", newTimestamp))
 	return blk, nil
 }
 

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -74,10 +76,9 @@ func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []by
 }
 
 func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
-	n.ctx.Log.Debug(
-		"AppGossip message handler called from %s with %d bytes",
-		nodeID,
-		len(msgBytes),
+	n.ctx.Log.Debug("called AppGossip message handler",
+		zap.Stringer("nodeID", nodeID),
+		zap.Int("messageLen", len(msgBytes)),
 	)
 
 	if time.Now().Before(n.gossipActivationTime) {
@@ -87,22 +88,27 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
-		n.ctx.Log.Debug("dropping AppGossip message due to failing to parse message")
+		n.ctx.Log.Debug("dropping AppGossip message",
+			zap.String("reason", "failed to parse message"),
+		)
 		return nil
 	}
 
 	msg, ok := msgIntf.(*message.Tx)
 	if !ok {
-		n.ctx.Log.Debug(
-			"dropping unexpected message from %s",
-			nodeID,
+		n.ctx.Log.Debug("dropping unexpected message",
+			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
 	}
 
 	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
-		n.ctx.Log.Verbo("AppGossip provided invalid tx: %s", err)
+		n.ctx.Log.Verbo("received invalid tx",
+			zap.Stringer("nodeID", nodeID),
+			zap.Binary("tx", msg.Tx),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -120,10 +126,9 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	// add to mempool
 	if err = n.blkBuilder.AddUnverifiedTx(tx); err != nil {
-		n.ctx.Log.Debug(
-			"AppResponse failed AddUnverifiedTx from %s: %s",
-			nodeID,
-			err,
+		n.ctx.Log.Debug("tx failed verification",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
 		)
 	}
 	return nil
@@ -137,7 +142,9 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	}
 	n.recentTxs.Put(txID, nil)
 
-	n.ctx.Log.Debug("gossiping tx %s", txID)
+	n.ctx.Log.Debug("gossiping tx",
+		zap.Stringer("txID", txID),
+	)
 
 	msg := &message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(msg)

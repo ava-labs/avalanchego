@@ -6,6 +6,8 @@ package scheduler
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -77,7 +79,10 @@ waitloop:
 				default:
 					// If the channel to the engine is full, drop the message
 					// from the VM to avoid deadlock
-					s.log.Debug("dropping message %s from VM because channel to engine is full", msg)
+					s.log.Debug("dropping message from VM",
+						zap.String("reason", "channel to engine is full"),
+						zap.Stringer("message", msg),
+					)
 				}
 			case buildBlockTime, ok := <-s.newBuildBlockTime:
 				// The time at which we should notify the engine that it should

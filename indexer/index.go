@@ -9,6 +9,8 @@ import (
 	"io"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -96,14 +98,18 @@ func newIndex(
 	nextAcceptedIndex, err := database.GetUInt64(i.vDB, nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
-		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+		i.log.Info("created new index",
+			zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+		)
 		return i, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
 	i.nextAcceptedIndex = nextAcceptedIndex
-	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+	i.log.Info("created new index",
+		zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+	)
 	return i, nil
 }
 
@@ -132,14 +138,19 @@ func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container
 	// Make sure we don't index the same container twice in that event.
 	_, err := i.containerToIndex.Get(containerID[:])
 	if err == nil {
-		ctx.Log.Debug("not indexing already accepted container %s", containerID)
+		ctx.Log.Debug("not indexing already accepted container",
+			zap.Stringer("containerID", containerID),
+		)
 		return nil
 	}
 	if err != database.ErrNotFound {
 		return fmt.Errorf("couldn't get whether %s is accepted: %w", containerID, err)
 	}
 
-	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
+	ctx.Log.Debug("indexing container",
+		zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+		zap.Stringer("containerID", containerID),
+	)
 	// Persist index --> Container
 	nextAcceptedIndexBytes := database.PackUInt64(i.nextAcceptedIndex)
 	bytes, err := i.codec.Marshal(codecVersion, Container{
@@ -195,7 +206,9 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 	containerBytes, err := i.indexToContainer.Get(indexBytes)
 	if err != nil {
-		i.log.Error("couldn't read container from database: %s", err)
+		i.log.Error("couldn't read container from database",
+			zap.Error(err),
+		)
 		return Container{}, fmt.Errorf("couldn't read from database: %w", err)
 	}
 	var container Container

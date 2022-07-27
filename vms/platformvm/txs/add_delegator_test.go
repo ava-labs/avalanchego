@@ -25,6 +25,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	assert := assert.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
+	ctx.AVAXAssetID = ids.GenerateTestID()
 	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
 
 	var (
@@ -45,14 +46,14 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
 			OutputIndex: 2,
 		},
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: ctx.AVAXAssetID},
 		In: &secp256k1fx.TransferInput{
 			Amt:   uint64(5678),
 			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 		},
 	}}
 	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -62,7 +63,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		},
 	}}
 	stakes := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+		Asset: avax.Asset{ID: ctx.AVAXAssetID},
 		Out: &stakeable.LockOut{
 			Locktime: uint64(clk.Time().Add(time.Second).Unix()),
 			TransferableOut: &secp256k1fx.TransferOutput{
@@ -121,4 +122,80 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	assert.NoError(err)
 	assert.ErrorIs(stx.SyntacticVerify(ctx), errDelegatorWeightMismatch)
 	addDelegatorTx.Validator.Wght = validatorWeight
+}
+
+func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
+	assert := assert.New(t)
+	clk := mockable.Clock{}
+	ctx := snow.DefaultContextTest()
+	ctx.AVAXAssetID = ids.GenerateTestID()
+	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
+
+	var (
+		stx            *Tx
+		addDelegatorTx *AddDelegatorTx
+		err            error
+	)
+
+	assetID := ids.GenerateTestID()
+	validatorWeight := uint64(2022)
+	inputs := []*avax.TransferableInput{{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.ID{'t', 'x', 'I', 'D'},
+			OutputIndex: 2,
+		},
+		Asset: avax.Asset{ID: assetID},
+		In: &secp256k1fx.TransferInput{
+			Amt:   uint64(5678),
+			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+		},
+	}}
+	outputs := []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: uint64(1234),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			},
+		},
+	}}
+	stakes := []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: assetID},
+		Out: &stakeable.LockOut{
+			Locktime: uint64(clk.Time().Add(time.Second).Unix()),
+			TransferableOut: &secp256k1fx.TransferOutput{
+				Amt: validatorWeight,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				},
+			},
+		},
+	}}
+	addDelegatorTx = &AddDelegatorTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+			Outs:         outputs,
+			Ins:          inputs,
+			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
+		}},
+		Validator: validator.Validator{
+			NodeID: ctx.NodeID,
+			Start:  uint64(clk.Time().Unix()),
+			End:    uint64(clk.Time().Add(time.Hour).Unix()),
+			Wght:   validatorWeight,
+		},
+		Stake: stakes,
+		RewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+		},
+	}
+
+	stx, err = NewSigned(addDelegatorTx, Codec, signers)
+	assert.NoError(err)
+	assert.Error(stx.SyntacticVerify(ctx))
 }

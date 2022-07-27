@@ -18,6 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+var (
+	_ Metrics = &metrics{}
+	_ Metrics = &noopMetrics{}
+)
+
 type Metrics interface {
 	// Mark that an option vote that we initially preferred was accepted.
 	MarkOptionVoteWon()
@@ -56,7 +61,7 @@ func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
-) (Metrics, error) {
+) (*metrics, error) {
 	m := &metrics{
 		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -266,7 +271,7 @@ func (m *metrics) AcceptTx(tx *txs.Tx) error {
 
 type noopMetrics struct{}
 
-func NewNoopMetrics() Metrics {
+func NewNoopMetrics() *noopMetrics {
 	return &noopMetrics{}
 }
 

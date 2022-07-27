@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
@@ -84,8 +86,10 @@ func NewThrottledMessageQueue(
 func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMessage) bool {
 	if err := ctx.Err(); err != nil {
 		q.log.Debug(
-			"dropping %s message to %s due to a context error: %s",
-			msg.Op(), q.id, err,
+			"dropping outgoing message",
+			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("nodeID", q.id),
+			zap.Error(err),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -94,8 +98,10 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	// Acquire space on the outbound message queue, or drop [msg] if we can't.
 	if !q.outboundMsgThrottler.Acquire(msg, q.id) {
 		q.log.Debug(
-			"dropping %s message to %s due to rate-limiting",
-			msg.Op(), q.id,
+			"dropping outgoing message",
+			zap.String("reason", "rate-limiting"),
+			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("nodeID", q.id),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -110,8 +116,10 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 
 	if q.closed {
 		q.log.Debug(
-			"dropping %s message to %s due to a closed queue",
-			msg.Op(), q.id,
+			"dropping outgoing message",
+			zap.String("reason", "closed queue"),
+			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("nodeID", q.id),
 		)
 		q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
@@ -212,15 +220,17 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	select {
 	case <-q.closing:
 		q.log.Debug(
-			"dropping %s message due to a closed queue",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "closed queue"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	case <-ctxDone:
 		q.log.Debug(
-			"dropping %s message due to a cancelled context",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "cancelled context"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -232,15 +242,17 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 		return true
 	case <-ctxDone:
 		q.log.Debug(
-			"dropping %s message due to a cancelled context",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "cancelled context"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	case <-q.closing:
 		q.log.Debug(
-			"dropping %s message due to a closed queue",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "closed queue"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false

@@ -83,6 +83,9 @@ type Config struct {
 
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
+
+	// Time of the Blueberry network upgrade
+	BlueberryTime time.Time
 }
 
 func (c *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {

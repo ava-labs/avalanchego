@@ -40,12 +40,12 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 		return err
 	}
 
-	txExecutor := executor.ProposalTxExecutor{
+	txExecutor := &executor.ProposalTxExecutor{
 		Backend:  &v.txExecutorBackend,
 		ParentID: b.Parent(),
 		Tx:       b.Tx,
 	}
-	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
+	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
@@ -108,13 +108,13 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		)
 	}
 
-	atomicExecutor := executor.AtomicTxExecutor{
+	atomicExecutor := &executor.AtomicTxExecutor{
 		Backend:  &v.txExecutorBackend,
 		ParentID: parentID,
 		Tx:       b.Tx,
 	}
 
-	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
+	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
@@ -187,12 +187,12 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 
 	funcs := make([]func(), 0, len(b.Txs))
 	for _, tx := range b.Txs {
-		txExecutor := executor.StandardTxExecutor{
+		txExecutor := &executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
 			State:   onAcceptState,
 			Tx:      tx,
 		}
-		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+		if err := tx.Unsigned.Visit(txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err

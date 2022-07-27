@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -52,7 +54,9 @@ func (v *voter) Update() {
 	for _, result := range results {
 		result := result
 
-		v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &result)
+		v.t.Ctx.Log.Debug("finishing poll",
+			zap.Stringer("result", &result),
+		)
 		if err := v.t.Consensus.RecordPoll(result); err != nil {
 			v.t.errs.Add(err)
 		}
@@ -91,12 +95,22 @@ votesLoop:
 		count := votes.Count(vote)
 		// use rootID in case of this is a non-verified block ID
 		rootID := v.t.nonVerifieds.GetRoot(vote)
-		v.t.Ctx.Log.Verbo("Bubbling %d vote(s) for %s to %s through unverified blocks", count, vote, rootID)
+		v.t.Ctx.Log.Verbo("bubbling vote(s) through unverified blocks",
+			zap.Int("numVotes", count),
+			zap.Stringer("voteID", vote),
+			zap.Stringer("parentID", rootID),
+		)
 
 		blk, err := v.t.GetBlock(rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
-			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched", count, vote, rootID)
+			v.t.Ctx.Log.Debug("dropping vote(s)",
+				zap.String("reason", "parent couldn't be fetched"),
+				zap.Stringer("parentID", rootID),
+				zap.Int("numVotes", count),
+				zap.Stringer("voteID", vote),
+				zap.Error(err),
+			)
 			continue
 		}
 
@@ -115,14 +129,23 @@ votesLoop:
 		// from [blk] to any of its ancestors that are also in consensus.
 		for status.Fetched() && !(v.t.Consensus.Decided(blk) || v.t.Consensus.Processing(blkID)) {
 			parentID := blk.Parent()
-			v.t.Ctx.Log.Verbo("Pushing %d vote(s) from %s (%s) to %s", count, blkID, status, parentID)
+			v.t.Ctx.Log.Verbo("pushing vote(s)",
+				zap.Int("numVotes", count),
+				zap.Stringer("voteID", vote),
+				zap.Stringer("parentID", rootID),
+			)
 
 			blkID = parentID
 			blk, err = v.t.GetBlock(blkID)
 			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
-				v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched",
-					count, vote, blkID)
+				v.t.Ctx.Log.Debug("dropping vote(s)",
+					zap.String("reason", "block couldn't be fetched"),
+					zap.Stringer("blkID", blkID),
+					zap.Int("numVotes", count),
+					zap.Stringer("voteID", vote),
+					zap.Error(err),
+				)
 				continue votesLoop
 			}
 			status = blk.Status()
@@ -130,10 +153,18 @@ votesLoop:
 
 		// If [blkID] is currently in consensus, count the votes
 		if v.t.Consensus.Processing(blkID) {
-			v.t.Ctx.Log.Verbo("Applying %d vote(s) to %s (%s)", count, blkID, status)
+			v.t.Ctx.Log.Verbo("applying vote(s)",
+				zap.Int("numVotes", count),
+				zap.Stringer("blkID", blkID),
+				zap.Stringer("status", status),
+			)
 			bubbledVotes.AddCount(blkID, count)
 		} else {
-			v.t.Ctx.Log.Verbo("Dropping %d vote(s) to %s (%s)", count, blkID, status)
+			v.t.Ctx.Log.Verbo("dropping vote(s)",
+				zap.Int("numVotes", count),
+				zap.Stringer("blkID", blkID),
+				zap.Stringer("status", status),
+			)
 		}
 	}
 	return bubbledVotes

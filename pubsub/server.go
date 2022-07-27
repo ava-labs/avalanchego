@@ -10,6 +10,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -74,7 +76,9 @@ func New(networkID uint32, log logging.Logger) *Server {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.log.Debug("Failed to upgrade %s", err)
+		s.log.Debug("failed to upgrade",
+			zap.Error(err),
+		)
 		return
 	}
 	conn := &connection{

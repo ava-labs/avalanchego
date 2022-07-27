@@ -8,10 +8,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/gomega"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -24,6 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = ginkgo.Describe("[StaticHandlers]", func() {

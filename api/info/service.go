@@ -231,7 +231,9 @@ type IsBootstrappedResponse struct {
 // IsBootstrapped returns nil and sets [reply.IsBootstrapped] == true iff [args.Chain] exists and is done bootstrapping
 // Returns an error if the chain doesn't exist
 func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *IsBootstrappedResponse) error {
-	service.log.Debug("Info: IsBootstrapped called with chain: %s", args.Chain)
+	service.log.Debug("Info: IsBootstrapped called",
+		logging.UserString("chain", args.Chain),
+	)
 
 	if args.Chain == "" {
 		return errNoChainProvided
