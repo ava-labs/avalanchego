@@ -10,6 +10,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -214,13 +216,18 @@ func (b *blockBuilder) resetTimer() {
 
 	preferredState, ok := b.vm.stateVersions.GetState(b.vm.preferred)
 	if !ok {
-		b.vm.ctx.Log.Error("could not retrieve state for block %s. Preferred block must be a decision block", b.vm.preferred)
+		// The preferred block should always be a decision block
+		b.vm.ctx.Log.Error("couldn't get preferred block state",
+			zap.Stringer("blkID", b.vm.preferred),
+		)
 		return
 	}
 
 	_, shouldReward, err := b.getNextStakerToReward(preferredState)
 	if err != nil {
-		b.vm.ctx.Log.Error("failed to fetch next staker to reward with %s", err)
+		b.vm.ctx.Log.Error("failed to fetch next staker to reward",
+			zap.Error(err),
+		)
 		return
 	}
 	if shouldReward {
@@ -230,7 +237,9 @@ func (b *blockBuilder) resetTimer() {
 
 	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
-		b.vm.ctx.Log.Error("failed to fetch next chain time with %s", err)
+		b.vm.ctx.Log.Error("failed to fetch next chain time",
+			zap.Error(err),
+		)
 		return
 	}
 	if shouldAdvanceTime {
@@ -247,11 +256,16 @@ func (b *blockBuilder) resetTimer() {
 	now := b.vm.clock.Time()
 	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
-		b.vm.ctx.Log.Error("couldn't get next staker change time: %s", err)
+		b.vm.ctx.Log.Error("couldn't get next staker change time",
+			zap.Error(err),
+		)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)
-	b.vm.ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
+	b.vm.ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
 
 	// Wake up when it's time to add/remove the next validator
 	b.timer.SetTimeoutIn(waitTime)
@@ -339,7 +353,10 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 		)
 
 		b.vm.blockBuilder.MarkDropped(txID, errMsg) // cache tx as dropped
-		b.vm.ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
+		b.vm.ctx.Log.Debug("dropping tx",
+			zap.String("reason", errMsg),
+			zap.Stringer("txID", txID),
+		)
 	}
 	return false
 }

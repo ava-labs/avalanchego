@@ -205,12 +205,9 @@ func (b *builder) NewImportTx(
 	importedInputs := []*avax.TransferableInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 
-	importedAmount := uint64(0)
+	importedAmounts := make(map[ids.ID]uint64)
 	now := b.clk.Unix()
 	for _, utxo := range atomicUTXOs {
-		if utxo.AssetID() != b.ctx.AVAXAssetID {
-			continue
-		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
 		if err != nil {
 			continue
@@ -219,7 +216,8 @@ func (b *builder) NewImportTx(
 		if !ok {
 			continue
 		}
-		importedAmount, err = math.Add64(importedAmount, input.Amount())
+		assetID := utxo.AssetID()
+		importedAmounts[assetID], err = math.Add64(importedAmounts[assetID], input.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -232,24 +230,34 @@ func (b *builder) NewImportTx(
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
 
-	if importedAmount == 0 {
+	if len(importedAmounts) == 0 {
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
+	importedAVAX := importedAmounts[b.ctx.AVAXAssetID]
+
 	ins := []*avax.TransferableInput{}
 	outs := []*avax.TransferableOutput{}
-	if importedAmount < b.cfg.TxFee { // imported amount goes toward paying tx fee
+	switch {
+	case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
-		ins, outs, _, baseSigners, err = b.Spend(keys, 0, b.cfg.TxFee-importedAmount, changeAddr)
+		ins, outs, _, baseSigners, err = b.Spend(keys, 0, b.cfg.TxFee-importedAVAX, changeAddr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
 		signers = append(baseSigners, signers...)
-	} else if importedAmount > b.cfg.TxFee {
+		delete(importedAmounts, b.ctx.AVAXAssetID)
+	case importedAVAX == b.cfg.TxFee:
+		delete(importedAmounts, b.ctx.AVAXAssetID)
+	default:
+		importedAmounts[b.ctx.AVAXAssetID] -= b.cfg.TxFee
+	}
+
+	for assetID, amount := range importedAmounts {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: importedAmount - b.cfg.TxFee,
+				Amt: amount,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -258,6 +266,8 @@ func (b *builder) NewImportTx(
 			},
 		})
 	}
+
+	avax.SortTransferableOutputs(outs, txs.Codec) // sort imported outputs
 
 	// Create the transaction
 	utx := &txs.ImportTx{
@@ -277,6 +287,7 @@ func (b *builder) NewImportTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
+// TODO: should support other assets than AVAX
 func (b *builder) NewExportTx(
 	amount uint64,
 	chainID ids.ID,

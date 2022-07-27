@@ -12,6 +12,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
@@ -95,7 +97,9 @@ func (c *connection) readPump() {
 		err := c.readMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.s.log.Debug("Unexpected close in websockets: %s", err)
+				c.s.log.Debug("unexpected close in websockets",
+					zap.Error(err),
+				)
 			}
 			break
 		}
@@ -122,7 +126,10 @@ func (c *connection) writePump() {
 		select {
 		case message, ok := <-c.send:
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				c.s.log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				c.s.log.Debug("closing the connection",
+					zap.String("reason", "failed to set the write deadline"),
+					zap.Error(err),
+				)
 				return
 			}
 			if !ok {
@@ -137,7 +144,10 @@ func (c *connection) writePump() {
 			}
 		case <-ticker.C:
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-				c.s.log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				c.s.log.Debug("closing the connection",
+					zap.String("reason", "failed to set the write deadline"),
+					zap.Error(err),
+				)
 				return
 			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {

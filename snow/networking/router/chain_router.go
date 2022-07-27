@@ -13,6 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -157,7 +159,9 @@ func (cr *ChainRouter) RegisterRequest(
 	failedOp, exists := message.ResponseToFailedOps[op]
 	if !exists {
 		// This should never happen
-		cr.log.Error("failed to convert operation type: %s", op)
+		cr.log.Error("failed to convert message operation",
+			zap.Stringer("messageOp", op),
+		)
 		return
 	}
 
@@ -190,12 +194,11 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists || !chain.IsValidator(nodeID) {
-		cr.log.Debug(
-			"Message %s from (%s. %s) dropped. Error: %s",
-			op,
-			nodeID,
-			chainID,
-			errUnknownChain,
+		cr.log.Debug("dropping message",
+			zap.Stringer("messageOp", op),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", chainID),
+			zap.Error(errUnknownChain),
 		)
 
 		msg.OnFinishedHandling()
@@ -207,7 +210,10 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
 		(op == message.Put && requestID == constants.GossipMsgRequestID) {
 		if ctx.IsExecuting() {
-			cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
+			cr.log.Debug("dropping message and skipping queue",
+				zap.String("reason", "the chain is currently executing"),
+				zap.Stringer("messageOp", op),
+			)
 			cr.metrics.droppedRequests.Inc()
 
 			msg.OnFinishedHandling()
@@ -236,7 +242,10 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	}
 
 	if ctx.IsExecuting() {
-		cr.log.Debug("dropping %s and skipping queue since the chain is currently executing", op)
+		cr.log.Debug("dropping message and skipping queue",
+			zap.String("reason", "the chain is currently executing"),
+			zap.Stringer("messageOp", op),
+		)
 		cr.metrics.droppedRequests.Inc()
 
 		msg.OnFinishedHandling()
@@ -292,7 +301,9 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 	defer cr.lock.Unlock()
 
 	chainID := chain.Context().ChainID
-	cr.log.Debug("registering chain %s with chain router", chainID)
+	cr.log.Debug("registering chain with chain router",
+		zap.Stringer("chainID", chainID),
+	)
 	chain.SetOnStopped(func() {
 		cr.removeChain(chainID)
 	})
@@ -458,7 +469,9 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	cr.lock.Lock()
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		cr.log.Debug("can't remove unknown chain %s", chainID)
+		cr.log.Debug("can't remove unknown chain",
+			zap.Stringer("chainID", chainID),
+		)
 		cr.lock.Unlock()
 		return
 	}

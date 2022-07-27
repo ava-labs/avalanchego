@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -559,7 +561,11 @@ func (ta *Topological) update(vtx Vertex) error {
 		switch status := dep.Status(); status {
 		case choices.Rejected:
 			// My parent is rejected, so I should be rejected
-			ta.ctx.Log.Trace("rejecting vertex %s due to rejected parent %s", vtxID, dep.ID())
+			ta.ctx.Log.Trace("rejecting vertex",
+				zap.String("reason", "rejected parent"),
+				zap.Stringer("vtxID", vtxID),
+				zap.Stringer("parentID", dep.ID()),
+			)
 			if !txv.Status().Decided() {
 				if err := ta.cg.Remove(vtxID); err != nil {
 					return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
@@ -648,7 +654,10 @@ func (ta *Topological) update(vtx Vertex) error {
 		ta.Latency.Accepted(vtxID, ta.pollNumber)
 	case rejectable:
 		// I'm rejectable, why not reject?
-		ta.ctx.Log.Trace("rejecting vertex %s due to a conflicting acceptance", vtxID)
+		ta.ctx.Log.Trace("rejecting vertex",
+			zap.String("reason", "conflicting acceptance"),
+			zap.Stringer("vtxID", vtxID),
+		)
 		if !txv.Status().Decided() {
 			if err := ta.cg.Remove(vtxID); err != nil {
 				return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)

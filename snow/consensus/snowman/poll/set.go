@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
-
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
@@ -57,7 +58,9 @@ func NewSet(
 		Help:      "Number of pending network polls",
 	})
 	if err := reg.Register(numPolls); err != nil {
-		log.Error("failed to register polls statistics due to %s", err)
+		log.Error("failed to register polls statistics",
+			zap.Error(err),
+		)
 	}
 
 	durPolls, err := metric.NewAverager(
@@ -67,7 +70,9 @@ func NewSet(
 		reg,
 	)
 	if err != nil {
-		log.Error("failed to register poll_duration statistics due to %s", err)
+		log.Error("failed to register poll_duration statistics",
+			zap.Error(err),
+		)
 	}
 
 	return &set{
@@ -84,13 +89,17 @@ func NewSet(
 //         should be made.
 func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 	if _, exists := s.polls.Get(requestID); exists {
-		s.log.Debug("dropping poll due to duplicated requestID: %d", requestID)
+		s.log.Debug("dropping poll",
+			zap.String("reason", "duplicated request"),
+			zap.Uint32("requestID", requestID),
+		)
 		return false
 	}
 
-	s.log.Verbo("creating poll with requestID %d and validators %s",
-		requestID,
-		&vdrs)
+	s.log.Verbo("creating poll",
+		zap.Uint32("requestID", requestID),
+		zap.Stringer("validators", &vdrs),
+	)
 
 	s.polls.Put(requestID, poll{
 		Poll:  s.factory.New(vdrs), // create the new poll
@@ -105,19 +114,22 @@ func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
-		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
-			vdr,
-			requestID)
+		s.log.Verbo("dropping vote",
+			zap.String("reason", "unknown poll"),
+			zap.Stringer("validator", vdr),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
 	holder := pollHolderIntf.(pollHolder)
 	p := holder.GetPoll()
 
-	s.log.Verbo("processing vote from %s in the poll with requestID: %d with the vote %s",
-		vdr,
-		requestID,
-		vote)
+	s.log.Verbo("processing vote",
+		zap.Stringer("validator", vdr),
+		zap.Uint32("requestID", requestID),
+		zap.Stringer("vote", vote),
+	)
 
 	p.Vote(vdr, vote)
 	if !p.Finished() {
@@ -142,7 +154,10 @@ func (s *set) processFinishedPolls() []ids.Bag {
 			break
 		}
 
-		s.log.Verbo("poll with requestID %d finished as %s", iter.Key(), holder.GetPoll())
+		s.log.Verbo("poll finished",
+			zap.Any("requestID", iter.Key()),
+			zap.Stringer("poll", holder.GetPoll()),
+		)
 		s.durPolls.Observe(float64(time.Since(holder.StartTime())))
 		s.numPolls.Dec() // decrease the metrics
 
@@ -160,15 +175,18 @@ func (s *set) processFinishedPolls() []ids.Bag {
 func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
-		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
-			vdr,
-			requestID)
+		s.log.Verbo("dropping vote",
+			zap.String("reason", "unknown poll"),
+			zap.Stringer("validator", vdr),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	s.log.Verbo("processing dropped vote from %s in the poll with requestID: %d",
-		vdr,
-		requestID)
+	s.log.Verbo("processing dropped vote",
+		zap.Stringer("validator", vdr),
+		zap.Uint32("requestID", requestID),
+	)
 
 	pollHolder := pollHolderIntf.(pollHolder)
 	poll := pollHolder.GetPoll()

@@ -8,6 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -120,7 +122,9 @@ func (m *messageQueue) Pop() (message.InboundMessage, bool) {
 	i := 0
 	for {
 		if i == n {
-			m.log.Debug("canPop is false for all %d unprocessed messages", n)
+			m.log.Debug("canPop is false for all unprocessed messages",
+				zap.Int("numMessages", n),
+			)
 		}
 		msg := m.msgs[0]
 		m.msgs[0] = nil
