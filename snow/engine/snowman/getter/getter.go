@@ -4,6 +4,8 @@
 package getter
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -54,14 +56,22 @@ func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) e
 	// nodes, including those disabling state sync to serve state summaries if
 	// these are available
 	if gh.ssVM == nil {
-		gh.log.Debug("state sync not supported. Dropping GetStateSummaryFrontier(%s, %d)", nodeID, requestID)
+		gh.log.Debug("dropping GetStateSummaryFrontier message",
+			zap.String("reason", "state sync not supported"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
 	summary, err := gh.ssVM.GetLastStateSummary()
 	if err != nil {
-		gh.log.Debug("couldn't get state summary frontier with %s. Dropping GetStateSummaryFrontier(%s, %d)",
-			err, nodeID, requestID)
+		gh.log.Debug("dropping GetStateSummaryFrontier message",
+			zap.String("reason", "couldn't get state summary frontier"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -81,8 +91,11 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, h
 	// nodes, including those disabling state sync to serve state summaries if
 	// these are available
 	if gh.ssVM == nil {
-		gh.log.Debug("state sync not supported. Dropping GetAcceptedStateSummary(%s, %d)",
-			nodeID, requestID)
+		gh.log.Debug("dropping GetAcceptedStateSummary message",
+			zap.String("reason", "state sync not supported"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
@@ -90,13 +103,18 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, h
 	for _, height := range heights {
 		summary, err := gh.ssVM.GetStateSummary(height)
 		if err == block.ErrStateSyncableVMNotImplemented {
-			gh.log.Debug("state sync not supported. Dropping GetAcceptedStateSummary(%s, %d)",
-				nodeID, requestID)
+			gh.log.Debug("dropping GetAcceptedStateSummary message",
+				zap.String("reason", "state sync not supported"),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+			)
 			return nil
 		}
 		if err != nil {
-			gh.log.Debug("couldn't get state summary with height %d due to %s",
-				height, err)
+			gh.log.Debug("couldn't get state summary",
+				zap.Uint64("height", height),
+				zap.Error(err),
+			)
 			continue
 		}
 		summaryIDs = append(summaryIDs, summary.ID())
@@ -135,8 +153,13 @@ func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 		gh.cfg.MaxTimeGetAncestors,
 	)
 	if err != nil {
-		gh.log.Verbo("couldn't get ancestors with %s. Dropping GetAncestors(%s, %d, %s)",
-			err, nodeID, requestID, blkID)
+		gh.log.Verbo("dropping GetAncestors message",
+			zap.String("reason", "couldn't get ancestors"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -151,7 +174,12 @@ func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
 		// block has been pruned.
-		gh.log.Debug("Get(%s, %d, %s) failed with: %s", nodeID, requestID, blkID, err)
+		gh.log.Debug("failed Get request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
+		)
 		return nil
 	}
 

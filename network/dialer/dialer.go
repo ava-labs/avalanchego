@@ -9,6 +9,8 @@ import (
 	"net"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -48,9 +50,9 @@ func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 		throttler = throttling.NewDialThrottler(int(dialerConfig.ThrottleRps))
 	}
 	log.Debug(
-		"dialer has outgoing connection limit of %d/second and dial timeout %s",
-		dialerConfig.ThrottleRps,
-		dialerConfig.ConnectionTimeout,
+		"creating dialer",
+		zap.Uint32("throttleRPS", dialerConfig.ThrottleRps),
+		zap.Duration("dialTimeout", dialerConfig.ConnectionTimeout),
 	)
 	return &dialer{
 		dialer:    net.Dialer{Timeout: dialerConfig.ConnectionTimeout},
@@ -64,7 +66,9 @@ func (d *dialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) {
 	if err := d.throttler.Acquire(ctx); err != nil {
 		return nil, err
 	}
-	d.log.Verbo("dialing %s", ip)
+	d.log.Verbo("dialing",
+		zap.Stringer("ip", ip),
+	)
 	conn, err := d.dialer.DialContext(ctx, d.network, ip.String())
 	if err != nil {
 		return nil, fmt.Errorf("error while dialing %s: %w", ip, err)

@@ -6,6 +6,7 @@ package stateful
 import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"go.uber.org/zap"
 )
 
 var _ stateless.Visitor = &rejector{}
@@ -20,18 +21,18 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"rejecting Proposal Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"rejecting Proposal Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Verbo(
-			"failed to reissue tx %s from block %s due to: %s",
-			b.Tx.ID(),
-			blkID,
-			err,
+			"failed to reissue tx",
+			zap.Stringer("txID", b.Tx.ID()),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
 		)
 	}
 
@@ -45,18 +46,18 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"rejecting Atomic Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"rejecting Atomic Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Debug(
-			"failed to reissue tx %s from block %s due to: %s",
-			b.Tx.ID(),
-			blkID,
-			err,
+			"failed to reissue tx",
+			zap.Stringer("txID", b.Tx.ID()),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
 		)
 	}
 
@@ -70,19 +71,19 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"rejecting Standard Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"rejecting Standard Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	for _, tx := range b.Txs {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
-				"failed to reissue tx %s from block %s due to: %s",
-				tx.ID(),
-				blkID,
-				err,
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
 			)
 		}
 	}
@@ -106,17 +107,17 @@ func (r *rejector) rejectOptionBlock(b stateless.Block, isCommit bool) error {
 
 	if isCommit {
 		r.ctx.Log.Verbo(
-			"rejecting Commit Block %s at height %d with parent %s",
-			blkID,
-			b.Height(),
-			b.Parent(),
+			"rejecting Commit Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
 		)
 	} else {
 		r.ctx.Log.Verbo(
-			"rejecting Abort Block %s at height %d with parent %s",
-			blkID,
-			b.Height(),
-			b.Parent(),
+			"rejecting Abort Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
 		)
 	}
 

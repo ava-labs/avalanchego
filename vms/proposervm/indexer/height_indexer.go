@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -111,7 +113,7 @@ func (hi *heightIndexer) RepairHeightIndex(ctx context.Context) error {
 // if height index needs repairing, doRepair would do that. It
 // iterates back via parents, checking and rebuilding height indexing.
 // Note: batch commit is deferred to doRepair caller
-func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, currentHeight uint64) error {
+func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, lastIndexedHeight uint64) error {
 	var (
 		start           = time.Now()
 		lastLogTime     = start
@@ -130,7 +132,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, c
 			// verified that we needed to perform a repair, we know that this
 			// will not happen on the first iteration. This guarantees that
 			// forkHeight will be correctly initialized.
-			forkHeight := currentHeight + 1
+			forkHeight := lastIndexedHeight + 1
 			if err := hi.state.SetForkHeight(forkHeight); err != nil {
 				return err
 			}
@@ -140,11 +142,10 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, c
 			hi.MarkRepaired(true)
 
 			// it will commit on exit
-			hi.log.Info(
-				"indexing finished after %d blocks, duration %v, with fork height %d",
-				indexedBlks,
-				time.Since(start),
-				forkHeight,
+			hi.log.Info("indexing finished",
+				zap.Int("numIndexedBlocks", indexedBlks),
+				zap.Duration("duration", time.Since(start)),
+				zap.Uint64("forkHeight", forkHeight),
 			)
 			return nil
 		}
@@ -164,15 +165,14 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, c
 				return err
 			}
 
-			hi.log.Debug(
-				"indexed %d blocks",
-				indexedBlks,
+			hi.log.Debug("indexed blocks",
+				zap.Int("numIndexBlocks", indexedBlks),
 			)
 			lastIndexedBlks = indexedBlks
 		}
 
 		// Rebuild height block index.
-		if err := hi.state.SetBlockIDAtHeight(currentHeight, currentProBlkID); err != nil {
+		if err := hi.state.SetBlockIDAtHeight(lastIndexedHeight, currentProBlkID); err != nil {
 			return err
 		}
 
@@ -181,16 +181,15 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, c
 		now := time.Now()
 		if now.Sub(lastLogTime) > 15*time.Second {
 			lastLogTime = now
-			hi.log.Info(
-				"indexed %d blocks, last height = %d",
-				indexedBlks,
-				currentHeight,
+			hi.log.Info("indexed blocks",
+				zap.Int("numIndexBlocks", indexedBlks),
+				zap.Uint64("lastIndexedHeight", lastIndexedHeight),
 			)
 		}
 
 		// keep checking the parent
 		currentProBlkID = currentAcceptedBlk.ParentID()
-		currentHeight--
+		lastIndexedHeight--
 
 		processingDuration := time.Since(processingStart)
 		// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block

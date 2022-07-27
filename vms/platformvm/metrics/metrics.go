@@ -61,7 +61,7 @@ func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
-) (Metrics, error) {
+) (*metrics, error) {
 	m := &metrics{
 		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -271,7 +271,7 @@ func (m *metrics) AcceptTx(tx *txs.Tx) error {
 
 type noopMetrics struct{}
 
-func NewNoopMetrics() Metrics {
+func NewNoopMetrics() *noopMetrics {
 	return &noopMetrics{}
 }
 

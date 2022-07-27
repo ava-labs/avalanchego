@@ -11,6 +11,8 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
@@ -150,25 +152,38 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 
 	ctx := engine.Context()
 	if i.closed {
-		i.log.Debug("not registering chain %s because indexer is closed", name)
+		i.log.Debug("not registering chain to indexer",
+			zap.String("reason", "indexer is closed"),
+			zap.String("chainName", name),
+		)
 		return
 	} else if ctx.SubnetID != constants.PrimaryNetworkID {
-		i.log.Debug("not registering chain %s because it's not in primary network", name)
+		i.log.Debug("not registering chain to indexer",
+			zap.String("reason", "not in the primary network"),
+			zap.String("chainName", name),
+		)
 		return
 	}
 
 	chainID := ctx.ChainID
 	if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
-		i.log.Warn("chain %s is already being indexed", chainID)
+		i.log.Warn("chain is already being indexed",
+			zap.Stringer("chainID", chainID),
+		)
 		return
 	}
 
 	// If the index is incomplete, make sure that's OK. Otherwise, cause node to die.
 	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
-		i.log.Error("couldn't get whether chain %s is incomplete: %s", name, err)
+		i.log.Error("couldn't get whether chain is incomplete",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
@@ -176,9 +191,14 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	// See if this chain was indexed in a previous run
 	previouslyIndexed, err := i.previouslyIndexed(chainID)
 	if err != nil {
-		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
+		i.log.Error("couldn't get whether chain was previously indexed",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
@@ -187,9 +207,13 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		if previouslyIndexed && !i.allowIncompleteIndex {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
-			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
+			i.log.Fatal("running would cause index to become incomplete but incomplete indices are disabled",
+				zap.String("chainName", name),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer",
+					zap.Error(err),
+				)
 			}
 			return
 		}
@@ -199,26 +223,40 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		if err == nil {
 			return
 		}
-		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
+		i.log.Fatal("couldn't mark chain as incomplete",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
-		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
+		i.log.Fatal("index is incomplete but incomplete indices are disabled. Shutting down",
+			zap.String("chainName", name),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
 
 	// Mark that in this run, this chain was indexed
 	if err := i.markPreviouslyIndexed(chainID); err != nil {
-		i.log.Error("couldn't mark chain %s as indexed: %s", name, err)
+		i.log.Error("couldn't mark chain as indexed",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
@@ -227,9 +265,14 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	case snowman.Engine:
 		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create block index for %s: %s", name, err)
+			i.log.Fatal("failed to create block index",
+				zap.String("chainName", name),
+				zap.Error(err),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer",
+					zap.Error(err),
+				)
 			}
 			return
 		}
@@ -237,9 +280,14 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	case avalanche.Engine:
 		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
+			i.log.Fatal("couldn't create vertex index",
+				zap.String("chainName", name),
+				zap.Error(err),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer",
+					zap.Error(err),
+				)
 			}
 			return
 		}
@@ -247,17 +295,27 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 
 		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
+			i.log.Fatal("couldn't create tx index for",
+				zap.String("chainName", name),
+				zap.Error(err),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer:",
+					zap.Error(err),
+				)
 			}
 			return
 		}
 		i.txIndices[chainID] = txIndex
 	default:
-		i.log.Error("got unexpected engine type %T", engine)
+		engineType := fmt.Sprintf("%T", engine)
+		i.log.Error("got unexpected engine type",
+			zap.String("engineType", engineType),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}

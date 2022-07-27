@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"go.uber.org/zap"
 )
 
 var _ stateless.Visitor = &acceptor{}
@@ -41,12 +42,11 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	*/
 
 	blkID := b.ID()
-
 	a.ctx.Log.Verbo(
-		"Accepting Proposal Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"accepting Proposal Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	// See comment for [lastAccepted].
@@ -59,10 +59,10 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"Accepting Atomic Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"accepting Atomic Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -104,10 +104,10 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"Accepting Standard Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"accepting Standard Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -162,17 +162,17 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
 
 	if isCommit {
 		a.ctx.Log.Verbo(
-			"Accepting Commit Block %s at height %d with parent %s",
-			blkID,
-			b.Height(),
-			b.Parent(),
+			"accepting Commit Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
 		)
 	} else {
 		a.ctx.Log.Verbo(
-			"Accepting Abort Block %s at height %d with parent %s",
-			blkID,
-			b.Height(),
-			b.Parent(),
+			"accepting Abort Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
 		)
 	}
 

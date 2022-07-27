@@ -8,6 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -127,8 +129,8 @@ func (m *Metrics) Sent(msg message.OutboundMessage) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"unknown message being sent with op %s",
-			op,
+			"unknown message being sent",
+			zap.Stringer("messageOp", op),
 		)
 		msg.DecRef()
 		return
@@ -146,9 +148,9 @@ func (m *Metrics) MultipleSendsFailed(op message.Op, count int) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"%d unknown messages failed to be sent with op %s",
-			count,
-			op,
+			"unknown messages failed to be sent",
+			zap.Stringer("messageOp", op),
+			zap.Int("messageCount", count),
 		)
 		return
 	}
@@ -162,8 +164,8 @@ func (m *Metrics) SendFailed(msg message.OutboundMessage) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"unknown message failed to be sent with op %s",
-			op,
+			"unknown message failed to be sent",
+			zap.Stringer("messageOp", op),
 		)
 		msg.DecRef()
 		return
@@ -177,8 +179,8 @@ func (m *Metrics) Received(msg message.InboundMessage, msgLen uint32) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"unknown message received with op %s",
-			op,
+			"unknown message received",
+			zap.Stringer("messageOp", op),
 		)
 		return
 	}

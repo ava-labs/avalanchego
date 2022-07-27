@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -111,7 +113,9 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	j.state.DisableCaching()
 	for {
 		if halter.Halted() {
-			ctx.Log.Info("Interrupted execution after executing %d operations", numExecuted)
+			ctx.Log.Info("interrupted execution",
+				zap.Int("numExecuted", numExecuted),
+			)
 			return numExecuted, nil
 		}
 
@@ -124,7 +128,9 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 		}
 
 		jobID := job.ID()
-		ctx.Log.Debug("Executing: %s", jobID)
+		ctx.Log.Debug("executing",
+			zap.Stringer("jobID", jobID),
+		)
 		jobBytes := job.Bytes()
 		// Note that acceptor.Accept must be called before executing [job] to
 		// honor Acceptor.Accept's invariant.
@@ -171,17 +177,29 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 			)
 
 			if !restarted {
-				ctx.Log.Info("executed %d of %d operations. ETA = %s", numExecuted, numToExecute, eta)
+				ctx.Log.Info("executing operations",
+					zap.Int("numExecuted", numExecuted),
+					zap.Uint64("numToExecute", numToExecute),
+					zap.Duration("eta", eta),
+				)
 			} else {
-				ctx.Log.Debug("executed %d of %d  operations. ETA = %s", numExecuted, numToExecute, eta)
+				ctx.Log.Debug("executing operations",
+					zap.Int("numExecuted", numExecuted),
+					zap.Uint64("numToExecute", numToExecute),
+					zap.Duration("eta", eta),
+				)
 			}
 		}
 	}
 
 	if !restarted {
-		ctx.Log.Info("executed %d operations", numExecuted)
+		ctx.Log.Info("executed operations",
+			zap.Int("numExecuted", numExecuted),
+		)
 	} else {
-		ctx.Log.Debug("executed %d operations", numExecuted)
+		ctx.Log.Debug("executed operations",
+			zap.Int("numExecuted", numExecuted),
+		)
 	}
 	return numExecuted, nil
 }
