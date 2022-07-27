@@ -6,6 +6,8 @@ package logging
 import (
 	"errors"
 	"io"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -21,27 +23,27 @@ type NoLog struct{}
 
 func (NoLog) Write([]byte) (int, error) { return 0, errNoLoggerWrite }
 
-func (NoLog) Fatal(format string, args ...interface{}) {}
+func (NoLog) Fatal(string, ...zap.Field) {}
 
-func (NoLog) Error(format string, args ...interface{}) {}
+func (NoLog) Error(string, ...zap.Field) {}
 
-func (NoLog) Warn(format string, args ...interface{}) {}
+func (NoLog) Warn(string, ...zap.Field) {}
 
-func (NoLog) Info(format string, args ...interface{}) {}
+func (NoLog) Info(string, ...zap.Field) {}
 
-func (NoLog) Trace(format string, args ...interface{}) {}
+func (NoLog) Trace(string, ...zap.Field) {}
 
-func (NoLog) Debug(format string, args ...interface{}) {}
+func (NoLog) Debug(string, ...zap.Field) {}
 
-func (NoLog) Verbo(format string, args ...interface{}) {}
+func (NoLog) Verbo(string, ...zap.Field) {}
 
 func (NoLog) AssertNoError(error) {}
 
-func (NoLog) AssertTrue(b bool, format string, args ...interface{}) {}
+func (NoLog) AssertTrue(bool, string, ...zap.Field) {}
 
-func (NoLog) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {}
+func (NoLog) AssertDeferredTrue(func() bool, string, ...zap.Field) {}
 
-func (NoLog) AssertDeferredNoError(f func() error) {}
+func (NoLog) AssertDeferredNoError(func() error) {}
 
 func (NoLog) StopOnPanic() {}
 

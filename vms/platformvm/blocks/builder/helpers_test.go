@@ -69,7 +69,7 @@ var (
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
-	testKeyFactory = crypto.FactorySECP256K1R{}
+	testKeyFactory         = crypto.FactorySECP256K1R{}
 )
 
 const (

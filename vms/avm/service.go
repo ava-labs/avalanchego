@@ -9,12 +9,15 @@ import (
 	"math"
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -60,7 +63,9 @@ type FormattedAssetID struct {
 
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
-	service.vm.ctx.Log.Debug("AVM: IssueTx called with %s", args.Tx)
+	service.vm.ctx.Log.Debug("AVM: IssueTx called",
+		logging.UserString("tx", args.Tx),
+	)
 
 	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
@@ -102,8 +107,14 @@ type GetAddressTxsReply struct {
 
 // GetAddressTxs returns list of transactions for a given address
 func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
+	cursor := uint64(args.Cursor)
 	pageSize := uint64(args.PageSize)
+	service.vm.ctx.Log.Debug("AVM: GetAddressTxs called",
+		logging.UserString("address", args.Address),
+		logging.UserString("assetID", args.AssetID),
+		zap.Uint64("cursor", cursor),
+		zap.Uint64("pageSize", pageSize),
+	)
 	if pageSize > maxPageSize {
 		return fmt.Errorf("pageSize > maximum allowed (%d)", maxPageSize)
 	} else if pageSize == 0 {
@@ -122,15 +133,23 @@ func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, 
 		return fmt.Errorf("specified `assetID` is invalid: %w", err)
 	}
 
-	cursor := uint64(args.Cursor)
+	service.vm.ctx.Log.Debug("fetching transactions",
+		logging.UserString("address", args.Address),
+		logging.UserString("assetID", args.AssetID),
+		zap.Uint64("cursor", cursor),
+		zap.Uint64("pageSize", pageSize),
+	)
 
-	service.vm.ctx.Log.Debug("Fetching up to %d transactions for address %s, assetID %s, cursor %d", pageSize, address, assetID, cursor)
 	// Read transactions from the indexer
 	reply.TxIDs, err = service.vm.addressTxsIndexer.Read(address[:], assetID, cursor, pageSize)
 	if err != nil {
 		return err
 	}
-	service.vm.ctx.Log.Debug("Fetched %d transactions for address %s, assetID %s, cursor %d", len(reply.TxIDs), address, assetID, cursor)
+	service.vm.ctx.Log.Debug("fetched transactions",
+		logging.UserString("address", args.Address),
+		logging.UserString("assetID", args.AssetID),
+		zap.Int("numTxs", len(reply.TxIDs)),
+	)
 
 	// To get the next set of tx IDs, the user should provide this cursor.
 	// e.g. if they provided cursor 5, and read 6 tx IDs, they should start
@@ -141,7 +160,9 @@ func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, 
 
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetTxStatus called with %s", args.TxID)
+	service.vm.ctx.Log.Debug("AVM: GetTxStatus called",
+		zap.Stringer("txID", args.TxID),
+	)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
@@ -158,7 +179,9 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 
 // GetTx returns the specified transaction
 func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.GetTxReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetTx called with %s", args.TxID)
+	service.vm.ctx.Log.Debug("AVM: GetTx called",
+		zap.Stringer("txID", args.TxID),
+	)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
@@ -194,7 +217,9 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 
 // GetUTXOs gets all utxos for passed in addresses
 func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetUTXOs called for with %s", args.Addresses)
+	service.vm.ctx.Log.Debug("AVM: GetUTXOs called",
+		logging.UserStrings("addresses", args.Addresses),
+	)
 
 	if len(args.Addresses) == 0 {
 		return errNoAddresses
@@ -302,7 +327,9 @@ type GetAssetDescriptionReply struct {
 
 // GetAssetDescription creates an empty account with the name passed in
 func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescriptionArgs, reply *GetAssetDescriptionReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetAssetDescription called with %s", args.AssetID)
+	service.vm.ctx.Log.Debug("AVM: GetAssetDescription called",
+		logging.UserString("assetID", args.AssetID),
+	)
 
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
@@ -348,7 +375,10 @@ type GetBalanceReply struct {
 // Otherwise, returned balance includes assets held only partially by the
 // address, and includes balances with locktime in the future.
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
+	service.vm.ctx.Log.Debug("AVM: GetBalance called",
+		logging.UserString("address", args.Address),
+		logging.UserString("assetID", args.AssetID),
+	)
 
 	addr, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
@@ -416,7 +446,9 @@ type GetAllBalancesReply struct {
 // Otherwise, returned balance/UTXOs includes assets held only partially by the
 // address, and includes balances with locktime in the future.
 func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
-	service.vm.ctx.Log.Debug("AVM: GetAllBalances called with address: %s", args.Address)
+	service.vm.ctx.Log.Debug("AVM: GetAllBalances called",
+		logging.UserString("address", args.Address),
+	)
 
 	address, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
@@ -498,11 +530,11 @@ type AssetIDChangeAddr struct {
 
 // CreateAsset returns ID of the newly created asset
 func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: CreateAsset called with name: %s symbol: %s number of holders: %d number of minters: %d",
-		args.Name,
-		args.Symbol,
-		len(args.InitialHolders),
-		len(args.MinterSets),
+	service.vm.ctx.Log.Debug("AVM: CreateAsset called",
+		logging.UserString("name", args.Name),
+		logging.UserString("symbol", args.Symbol),
+		zap.Int("numInitialHolders", len(args.InitialHolders)),
+		zap.Int("numMinters", len(args.MinterSets)),
 	)
 
 	if len(args.InitialHolders) == 0 && len(args.MinterSets) == 0 {
@@ -618,10 +650,10 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 
 // CreateFixedCapAsset returns ID of the newly created asset
 func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
-		args.Name,
-		args.Symbol,
-		len(args.InitialHolders),
+	service.vm.ctx.Log.Debug("AVM: CreateFixedCapAsset called",
+		logging.UserString("name", args.Name),
+		logging.UserString("symbol", args.Symbol),
+		zap.Int("numInitialHolders", len(args.InitialHolders)),
 	)
 
 	return service.CreateAsset(nil, args, reply)
@@ -629,10 +661,10 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetAr
 
 // CreateVariableCapAsset returns ID of the newly created asset
 func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
-		args.Name,
-		args.Symbol,
-		len(args.MinterSets),
+	service.vm.ctx.Log.Debug("AVM: CreateVariableCapAsset called",
+		logging.UserString("name", args.Name),
+		logging.UserString("symbol", args.Symbol),
+		zap.Int("numMinters", len(args.MinterSets)),
 	)
 
 	return service.CreateAsset(nil, args, reply)
@@ -648,10 +680,10 @@ type CreateNFTAssetArgs struct {
 
 // CreateNFTAsset returns ID of the newly created asset
 func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
-		args.Name,
-		args.Symbol,
-		len(args.MinterSets),
+	service.vm.ctx.Log.Debug("AVM: CreateNFTAsset called",
+		logging.UserString("name", args.Name),
+		logging.UserString("symbol", args.Symbol),
+		zap.Int("numMinters", len(args.MinterSets)),
 	)
 
 	if len(args.MinterSets) == 0 {
@@ -754,7 +786,9 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 
 // CreateAddress creates an address for the user [args.Username]
 func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply *api.JSONAddress) error {
-	service.vm.ctx.Log.Debug("AVM: CreateAddress called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: CreateAddress called",
+		logging.UserString("username", args.Username),
+	)
 
 	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -779,7 +813,9 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 
 // ListAddresses returns all of the addresses controlled by user [args.Username]
 func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
-	service.vm.ctx.Log.Debug("AVM: ListAddresses called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ListAddresses called",
+		logging.UserString("username", args.Username),
+	)
 
 	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
@@ -822,7 +858,9 @@ type ExportKeyReply struct {
 
 // ExportKey returns a private key from the provided user
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	service.vm.ctx.Log.Debug("AVM: ExportKey called for user %q", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ExportKey called",
+		logging.UserString("username", args.Username),
+	)
 
 	addr, err := avax.ParseServiceAddress(service.vm, args.Address)
 	if err != nil {
@@ -858,7 +896,9 @@ type ImportKeyReply struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
-	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ImportKey called",
+		logging.UserString("username", args.Username),
+	)
 
 	if args.PrivateKey == nil {
 		return errMissingPrivateKey
@@ -930,7 +970,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 
 // SendMultiple sends a transaction with multiple outputs.
 func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: SendMultiple called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: SendMultiple called",
+		logging.UserString("username", args.Username),
+	)
 
 	// Validate the memo field
 	memoBytes := []byte(args.Memo)
@@ -1078,7 +1120,9 @@ type MintArgs struct {
 
 // Mint issues a transaction that mints more of the asset
 func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: Mint called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Mint called",
+		logging.UserString("username", args.Username),
+	)
 
 	if args.Amount == 0 {
 		return errInvalidMintAmount
@@ -1193,7 +1237,9 @@ type SendNFTArgs struct {
 
 // SendNFT sends an NFT
 func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: SendNFT called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: SendNFT called",
+		logging.UserString("username", args.Username),
+	)
 
 	// Parse the asset ID
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
@@ -1302,7 +1348,9 @@ type MintNFTArgs struct {
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: MintNFT called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: MintNFT called",
+		logging.UserString("username", args.Username),
+	)
 
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
@@ -1425,7 +1473,9 @@ type ImportArgs struct {
 // The AVAX must have already been exported from the P/C-Chain.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSONTxID) error {
-	service.vm.ctx.Log.Debug("AVM: Import called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Import called",
+		logging.UserString("username", args.Username),
+	)
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
@@ -1544,7 +1594,9 @@ type ExportArgs struct {
 // After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Debug("AVM: Export called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Export called",
+		logging.UserString("username", args.Username),
+	)
 
 	// Parse the asset ID
 	assetID, err := service.vm.lookupAssetID(args.AssetID)

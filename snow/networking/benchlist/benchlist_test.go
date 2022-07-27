@@ -123,7 +123,7 @@ func TestBenchlistAdd(t *testing.T) {
 	assert.Equal(t, b.benchlistSet.Len(), 1)
 
 	next := b.benchedQueue[0]
-	assert.Equal(t, vdr0.ID(), next.validatorID)
+	assert.Equal(t, vdr0.ID(), next.nodeID)
 	assert.True(t, !next.benchedUntil.After(now.Add(duration)))
 	assert.True(t, !next.benchedUntil.Before(now.Add(duration/2)))
 	assert.Len(t, b.failureStreaks, 0)
@@ -283,7 +283,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	minEndTime := b.benchedQueue[0].benchedUntil
 	benchedIDs := []ids.NodeID{vdr0.ID(), vdr1.ID(), vdr4.ID()}
 	for _, benchedVdr := range b.benchedQueue {
-		assert.Contains(t, benchedIDs, benchedVdr.validatorID)
+		assert.Contains(t, benchedIDs, benchedVdr.nodeID)
 		assert.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
 	}
 
@@ -375,7 +375,7 @@ func TestBenchlistRemove(t *testing.T) {
 	minEndTime := b.benchedQueue[0].benchedUntil
 	benchedIDs := []ids.NodeID{vdr0.ID(), vdr1.ID(), vdr2.ID()}
 	for _, benchedVdr := range b.benchedQueue {
-		assert.Contains(t, benchedIDs, benchedVdr.validatorID)
+		assert.Contains(t, benchedIDs, benchedVdr.nodeID)
 		assert.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
 	}
 

@@ -403,16 +403,11 @@ func (b *builder) NewImportTx(
 		avaxAssetID     = b.backend.AVAXAssetID()
 		txFee           = b.backend.BaseTxFee()
 
-		importedInputs = make([]*avax.TransferableInput, 0, len(utxos))
-		importedAmount uint64
+		importedInputs  = make([]*avax.TransferableInput, 0, len(utxos))
+		importedAmounts = make(map[ids.ID]uint64)
 	)
 	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
-		if utxo.AssetID() != avaxAssetID {
-			// Currently - only AVAX is allowed to be imported to the P-chain
-			continue
-		}
-
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue
@@ -434,11 +429,13 @@ func (b *builder) NewImportTx(
 				},
 			},
 		})
-		newImportedAmount, err := math.Add64(importedAmount, out.Amt)
+
+		assetID := utxo.AssetID()
+		newImportedAmount, err := math.Add64(importedAmounts[assetID], out.Amt)
 		if err != nil {
 			return nil, err
 		}
-		importedAmount = newImportedAmount
+		importedAmounts[assetID] = newImportedAmount
 	}
 	avax.SortTransferableInputs(importedInputs) // sort imported inputs
 
@@ -450,29 +447,38 @@ func (b *builder) NewImportTx(
 	}
 
 	var (
-		inputs  []*avax.TransferableInput
-		outputs []*avax.TransferableOutput
+		inputs       []*avax.TransferableInput
+		outputs      = make([]*avax.TransferableOutput, 0, len(importedAmounts))
+		importedAVAX = importedAmounts[avaxAssetID]
 	)
-	if importedAmount < txFee { // imported amount goes toward paying tx fee
-		toBurn := map[ids.ID]uint64{
-			avaxAssetID: txFee - importedAmount,
+	if importedAVAX > txFee {
+		importedAmounts[avaxAssetID] -= txFee
+	} else {
+		if importedAVAX < txFee { // imported amount goes toward paying tx fee
+			toBurn := map[ids.ID]uint64{
+				avaxAssetID: txFee - importedAVAX,
+			}
+			toStake := map[ids.ID]uint64{}
+			var err error
+			inputs, outputs, _, err = b.spend(toBurn, toStake, ops)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+			}
 		}
-		toStake := map[ids.ID]uint64{}
-		var err error
-		inputs, outputs, _, err = b.spend(toBurn, toStake, ops)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-		}
-	} else if importedAmount > txFee {
+		delete(importedAmounts, avaxAssetID)
+	}
+
+	for assetID, amount := range importedAmounts {
 		outputs = append(outputs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: avaxAssetID},
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:          importedAmount - txFee,
+				Amt:          amount,
 				OutputOwners: *to,
 			},
 		})
 	}
 
+	avax.SortTransferableOutputs(outputs, txs.Codec) // sort imported outputs
 	return &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),

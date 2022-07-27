@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"go.uber.org/zap"
 )
 
 var _ stateless.Visitor = &acceptor{}
@@ -22,6 +23,24 @@ type acceptor struct {
 }
 
 func (a *acceptor) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+	// Update the state of the chain in the database
+	// apply baseOptionState first
+	// TODO by dan for alberto: why do we do this?
+	blkID := b.ID()
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	blkState.onAcceptState.Apply(a.state)
+
+	return a.commonVisitProposalBlock(b, false)
+}
+
+func (a *acceptor) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+	return a.commonVisitProposalBlock(b, true)
+}
+
+func (a *acceptor) commonVisitProposalBlock(b stateless.Block, isApricot bool) error {
 	/* Note that:
 
 	* We don't free the proposal block in this method.
@@ -39,50 +58,23 @@ func (a *acceptor) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlo
 	  The snowman.Engine requires that the last committed block is a decision block.
 
 	*/
-
-	blkID := b.ID()
-	// Note that we don't free the proposal block here.
-	// It is freed when its child is accepted.
-	// We need to keep this block's state in memory for its child to use.
-
-	a.ctx.Log.Verbo(
-		"Accepting Proposal Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
-	)
-
-	// Update the state of the chain in the database
-	// apply baseOptionState first
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
-	}
-	blkState.onAcceptState.Apply(a.state)
-
-	if err := a.metrics.MarkAccepted(b); err != nil {
-		return fmt.Errorf("failed to accept proposal block %s: %w", b.ID(), err)
-	}
-
-	// Note that we do not write this block to state here.
-	// That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	// We do this so that in the event that the node shuts down, the proposal block
-	// is not written to disk unless its child is.
-	// (The VM's Shutdown method commits the database.)
-	// The snowman.Engine requires that the last committed block is a decision block.
-	a.backend.lastAccepted = blkID
-	return nil
-}
-
-func (a *acceptor) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
 	blkID := b.ID()
 
-	a.ctx.Log.Verbo(
-		"Accepting Proposal Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
-	)
+	if isApricot {
+		a.ctx.Log.Verbo(
+			"accepting Aprictor Proposal Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
+		)
+	} else {
+		a.ctx.Log.Verbo(
+			"accepting Blueberry Proposal Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
+		)
+	}
 
 	// See comment for [lastAccepted].
 	a.backend.lastAccepted = blkID
@@ -94,10 +86,10 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"Accepting Atomic Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"accepting Atomic Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -147,10 +139,10 @@ func (a *acceptor) visitStandardBlock(b stateless.Block) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"Accepting Standard Block %s at height %d with parent %s",
-		blkID,
-		b.Height(),
-		b.Parent(),
+		"accepting Standard Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -205,17 +197,17 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
 
 	if isCommit {
 		a.ctx.Log.Verbo(
-			"Accepting Commit Block %s at height %d with parent %s",
-			blkID,
-			b.Height(),
-			b.Parent(),
+			"accepting Commit Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
 		)
 	} else {
 		a.ctx.Log.Verbo(
-			"Accepting Abort Block %s at height %d with parent %s",
-			blkID,
-			b.Height(),
-			b.Parent(),
+			"accepting Abort Block",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("height", b.Height()),
+			zap.Stringer("parent", b.Parent()),
 		)
 	}
 
@@ -253,17 +245,17 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
 
 func (a *acceptor) commonAccept(b stateless.Block) error {
 	blkID := b.ID()
+
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept block %s: %w", blkID, err)
 	}
-	a.backend.lastAccepted = blkID
 
+	a.backend.lastAccepted = blkID
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.state.AddStatelessBlock(b, choices.Accepted)
 	a.stateVersions.DeleteState(b.Parent())
 	a.stateVersions.SetState(blkID, a.state)
-
 	a.recentlyAccepted.Add(blkID)
 	return nil
 }

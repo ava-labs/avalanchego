@@ -6,6 +6,8 @@ package proposervm
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -128,6 +130,9 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 		return fmt.Errorf("failed to load fork height: %w", err)
 	}
 
-	vm.ctx.Log.Debug("indexed block %s at height %d", blkID, height)
+	vm.ctx.Log.Debug("indexed block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", height),
+	)
 	return vm.State.SetBlockIDAtHeight(height, blkID)
 }

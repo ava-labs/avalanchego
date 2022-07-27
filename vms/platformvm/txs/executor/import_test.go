@@ -49,71 +49,120 @@ func TestNewImportTx(t *testing.T) {
 
 	// Returns a shared memory where GetDatabase returns a database
 	// where [recipientKey] has a balance of [amt]
-	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
+	fundedSharedMemory := func(peerChain ids.ID, assets map[ids.ID]uint64) atomic.SharedMemory {
 		*cnt++
 		m := atomic.NewMemory(prefixdb.New([]byte{*cnt}, env.baseDB))
 
 		sm := m.NewSharedMemory(env.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(peerChain)
 
-		// #nosec G404
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
-			},
-			Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amt,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
-					Threshold: 1,
+		for assetID, amt := range assets {
+			// #nosec G404
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.GenerateTestID(),
+					OutputIndex: rand.Uint32(),
 				},
-			},
-		}
-		utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
-		inputID := utxo.InputID()
-		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{env.ctx.ChainID: {PutRequests: []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				sourceKey.PublicKey().Address().Bytes(),
-			},
-		}}}}); err != nil {
-			t.Fatal(err)
+				Asset: avax.Asset{ID: assetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amt,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+						Threshold: 1,
+					},
+				},
+			}
+			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inputID := utxo.InputID()
+			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{env.ctx.ChainID: {PutRequests: []*atomic.Element{{
+				Key:   inputID[:],
+				Value: utxoBytes,
+				Traits: [][]byte{
+					sourceKey.PublicKey().Address().Bytes(),
+				},
+			}}}}); err != nil {
+				t.Fatal(err)
+			}
 		}
 
 		return sm
 	}
 
+	customAssetID := ids.GenerateTestID()
+
 	tests := []test{
 		{
 			description:   "can't pay fee",
 			sourceChainID: env.ctx.XChainID,
-			sharedMemory:  fundedSharedMemory(env.ctx.XChainID, env.config.TxFee-1),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			shouldErr:     true,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee - 1,
+				},
+			),
+			sourceKeys: []*crypto.PrivateKeySECP256K1R{sourceKey},
+			shouldErr:  true,
 		},
 		{
 			description:   "can barely pay fee",
 			sourceChainID: env.ctx.XChainID,
-			sharedMemory:  fundedSharedMemory(env.ctx.XChainID, env.config.TxFee),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			shouldErr:     false,
-			shouldVerify:  true,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+				},
+			),
+			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			shouldErr:    false,
+			shouldVerify: true,
 		},
 		{
 			description:   "attempting to import from C-chain",
 			sourceChainID: cChainID,
-			sharedMemory:  fundedSharedMemory(cChainID, env.config.TxFee),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:     env.config.ApricotPhase5Time,
-			shouldErr:     false,
-			shouldVerify:  true,
+			sharedMemory: fundedSharedMemory(
+				cChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+				},
+			),
+			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			timestamp:    env.config.ApricotPhase5Time,
+			shouldErr:    false,
+			shouldVerify: true,
+		},
+		{
+			description:   "attempting to import non-avax from X-chain pre-blueberry",
+			sourceChainID: env.ctx.XChainID,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+					customAssetID:       1,
+				},
+			),
+			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			timestamp:    env.config.BlueberryTime.Add(-time.Second),
+			shouldErr:    false,
+			shouldVerify: false,
+		},
+		{
+			description:   "attempting to import non-avax from X-chain post-blueberry",
+			sourceChainID: env.ctx.XChainID,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+					customAssetID:       1,
+				},
+			),
+			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			timestamp:    env.config.BlueberryTime,
+			shouldErr:    false,
+			shouldVerify: true,
 		},
 	}
 

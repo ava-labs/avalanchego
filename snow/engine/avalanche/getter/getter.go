@@ -6,7 +6,10 @@ package getter
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -47,13 +50,23 @@ type getter struct {
 	getAncestorsVtxs metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(validatorID ids.NodeID, requestID uint32) error {
-	gh.log.Debug("GetStateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetStateSummaryFrontier),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(validatorID ids.NodeID, requestID uint32, heights []uint64) error {
-	gh.log.Debug("GetAcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, _ []uint64) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedStateSummary),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -76,7 +89,11 @@ func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 
 func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
-	gh.log.Verbo("GetAncestors(%s, %d, %s) called", nodeID, requestID, vtxID)
+	gh.log.Verbo("called GetAncestors",
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+		zap.Stringer("vtxID", vtxID),
+	)
 	vertex, err := gh.storage.GetVtx(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		gh.log.Verbo("dropping getAncestors")

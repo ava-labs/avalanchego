@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"go.uber.org/zap"
 
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
@@ -206,16 +207,26 @@ func (b *blockBuilder) resetTimer() {
 
 	preferredState, ok := stateVersions.GetState(b.preferredBlockID)
 	if !ok {
-		ctx.Log.Error("could not retrieve state for block %s. Preferred block must be a decision block", b.preferredBlockID)
+		// The preferred block should always be a decision block
+		ctx.Log.Error("couldn't get preferred block state",
+			zap.Stringer("blkID", b.preferredBlockID),
+		)
 		return
 	}
 	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
-		ctx.Log.Error("couldn't get next staker change time: %s", err)
+		ctx.Log.Error("couldn't get next staker change time",
+			zap.Error(err),
+		)
 		return
 	}
 	waitTime := nextStakerChangeTime.Sub(now)
-	ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextStakerChangeTime, waitTime)
+	ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
+
+	// Wake up when it's time to add/remove the next validator
 	b.timer.SetTimeoutIn(waitTime)
 }
 
@@ -288,7 +299,10 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() {
 		)
 
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
-		ctx.Log.Debug("dropping tx %s: %s", txID, errMsg)
+		ctx.Log.Debug("dropping tx",
+			zap.String("reason", errMsg),
+			zap.Stringer("txID", txID),
+		)
 	}
 }
 

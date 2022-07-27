@@ -45,15 +45,13 @@ func (v *verifier) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) 
 		return err
 	}
 
-	tx := b.BlockTxs()[0]
-	txExecutor := executor.ProposalTxExecutor{
+	txExecutor := &executor.ProposalTxExecutor{
 		Backend:          &v.txExecutorBackend,
 		ReferenceBlockID: b.Parent(),
-		Tx:               tx,
+		Tx:               b.Tx,
 	}
-
-	if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-		txID := tx.ID()
+	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
+		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
@@ -212,20 +210,19 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 		)
 	}
 
-	tx := b.BlockTxs()[0]
-	atomicExecutor := executor.AtomicTxExecutor{
+	atomicExecutor := &executor.AtomicTxExecutor{
 		Backend:  &v.txExecutorBackend,
 		ParentID: parentID,
-		Tx:       tx,
+		Tx:       b.Tx,
 	}
 
-	if err := tx.Unsigned.Visit(&atomicExecutor); err != nil {
-		txID := tx.ID()
+	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
+		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 
-	atomicExecutor.OnAccept.AddTx(tx, status.Committed)
+	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
 	// Check for conflicts in atomic inputs.
 	if len(atomicExecutor.Inputs) > 0 {
@@ -292,12 +289,12 @@ func (v *verifier) VisitApricotStandardBlock(b *stateless.ApricotStandardBlock) 
 
 	funcs := make([]func(), 0, len(b.Txs))
 	for _, tx := range b.Txs {
-		txExecutor := executor.StandardTxExecutor{
+		txExecutor := &executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
 			State:   onAcceptState,
 			Tx:      tx,
 		}
-		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+		if err := tx.Unsigned.Visit(txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err

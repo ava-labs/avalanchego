@@ -8,7 +8,10 @@ import (
 	"sync"
 	"time"
 
-	runner_client "github.com/ava-labs/avalanche-network-runner/client"
+	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -22,15 +25,15 @@ const (
 
 var (
 	runnerMu     sync.RWMutex
-	runnerCli    runner_client.Client
+	runnerCli    runner_sdk.Client
 	runnerGRPCEp string
 )
 
-func SetRunnerClient(logLevel string, gRPCEp string) (cli runner_client.Client, err error) {
+func SetRunnerClient(logLevel string, gRPCEp string) (cli runner_sdk.Client, err error) {
 	runnerMu.Lock()
 	defer runnerMu.Unlock()
 
-	cli, err = runner_client.New(runner_client.Config{
+	cli, err = runner_sdk.New(runner_sdk.Config{
 		LogLevel:    logLevel,
 		Endpoint:    gRPCEp,
 		DialTimeout: 10 * time.Second,
@@ -46,7 +49,7 @@ func SetRunnerClient(logLevel string, gRPCEp string) (cli runner_client.Client, 
 	return cli, err
 }
 
-func GetRunnerClient() (cli runner_client.Client) {
+func GetRunnerClient() (cli runner_sdk.Client) {
 	runnerMu.RLock()
 	cli = runnerCli
 	runnerMu.RUnlock()
@@ -68,24 +71,6 @@ func GetRunnerGRPCEndpoint() (ep string) {
 }
 
 var (
-	execPathMu sync.RWMutex
-	execPath   string
-)
-
-func SetExecPath(p string) {
-	execPathMu.Lock()
-	execPath = p
-	execPathMu.Unlock()
-}
-
-func GetExecPath() (p string) {
-	execPathMu.RLock()
-	p = execPath
-	execPathMu.RUnlock()
-	return p
-}
-
-var (
 	urisMu sync.RWMutex
 	uris   []string
 )
@@ -101,6 +86,34 @@ func GetURIs() []string {
 	us := uris
 	urisMu.RUnlock()
 	return us
+}
+
+var (
+	testKeysMu sync.RWMutex
+	testKeys   []*crypto.PrivateKeySECP256K1R
+)
+
+func SetTestKeys(ks []*crypto.PrivateKeySECP256K1R) {
+	testKeysMu.Lock()
+	testKeys = ks
+	testKeysMu.Unlock()
+}
+
+func GetTestKeys() []*crypto.PrivateKeySECP256K1R {
+	testKeysMu.RLock()
+	ks := testKeys
+	testKeysMu.RUnlock()
+	return ks
+}
+
+func LoadTestKeys() ([]*crypto.PrivateKeySECP256K1R, []ids.ShortID, *secp256k1fx.Keychain) {
+	testKeys := GetTestKeys()
+	testKeyAddrs := make([]ids.ShortID, len(testKeys))
+	for i := range testKeyAddrs {
+		testKeyAddrs[i] = testKeys[i].PublicKey().Address()
+	}
+	keyChain := secp256k1fx.NewKeychain(testKeys...)
+	return testKeys, testKeyAddrs, keyChain
 }
 
 var (

@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -50,8 +49,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
-	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
@@ -98,7 +97,7 @@ type testHelpersCollection struct {
 	atomicUtxosMan  avax.AtomicUTXOManager
 	uptimeMan       uptime.Manager
 	utxosMan        utxo.Handler
-	txBuilder       tx_builder.Builder
+	txBuilder       builder.Builder
 	txExecBackend   executor.Backend
 }
 
@@ -149,7 +148,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 		res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimeMan = uptime.NewManager(res.fullState)
 		res.utxosMan = utxo.NewHandler(res.ctx, res.clk, res.fullState, res.fx)
-		res.txBuilder = tx_builder.New(
+		res.txBuilder = builder.New(
 			res.ctx,
 			*res.cfg,
 			res.clk,
@@ -163,7 +162,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 		res.mockedFullState = state.NewMockState(ctrl)
 		res.uptimeMan = uptime.NewManager(res.mockedFullState)
 		res.utxosMan = utxo.NewHandler(res.ctx, res.clk, res.mockedFullState, res.fx)
-		res.txBuilder = tx_builder.New(
+		res.txBuilder = builder.New(
 			res.ctx,
 			*res.cfg,
 			res.clk,
@@ -198,7 +197,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics := p_metrics.NewNoopMetrics()
+	metrics := metrics.NewNoopMetrics()
 	res.mpool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
@@ -230,7 +229,7 @@ func newTestHelpersCollection(t *testing.T, ctrl *gomock.Controller) *testHelper
 
 func addSubnet(
 	baseState state.State,
-	txBuilder tx_builder.Builder,
+	txBuilder builder.Builder,
 	backend executor.Backend,
 ) {
 	// Create a subnet

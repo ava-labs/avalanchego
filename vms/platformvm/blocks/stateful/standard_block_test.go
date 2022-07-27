@@ -3,33 +3,28 @@
 
 package stateful
 
-import (
-	"time"
+// TODO dan or alberto: implement this (and more) tests
+// type stakerStatus uint
 
-	"github.com/ava-labs/avalanchego/ids"
-)
+// const (
+// 	pending stakerStatus = iota
+// 	current
+// )
 
-type stakerStatus uint
+// type staker struct {
+// 	nodeID             ids.NodeID
+// 	rewardAddress      ids.ShortID
+// 	startTime, endTime time.Time
+// }
 
-const (
-	pending stakerStatus = iota
-	current
-)
-
-type staker struct {
-	nodeID             ids.NodeID
-	rewardAddress      ids.ShortID
-	startTime, endTime time.Time
-}
-
-type test struct {
-	description           string
-	stakers               []staker
-	subnetStakers         []staker
-	advanceTimeTo         []time.Time
-	expectedStakers       map[ids.NodeID]stakerStatus
-	expectedSubnetStakers map[ids.NodeID]stakerStatus
-}
+// type test struct {
+// 	description           string
+// 	stakers               []staker
+// 	subnetStakers         []staker
+// 	advanceTimeTo         []time.Time
+// 	expectedStakers       map[ids.NodeID]stakerStatus
+// 	expectedSubnetStakers map[ids.NodeID]stakerStatus
+// }
 
 // func TestApricotStandardBlockTimeVerification(t *testing.T) {
 // 	assert := assert.New(t)

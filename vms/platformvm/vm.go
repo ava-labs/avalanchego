@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -162,7 +163,7 @@ func (vm *VM) Initialize(
 	}
 
 	lastAcceptedID := vm.state.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+	ctx.Log.Info("initializing last accepted %s", zap.Stringer("blkID", lastAcceptedID))
 	vm.stateVersions = state.NewVersions(lastAcceptedID, vm.state)
 
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
