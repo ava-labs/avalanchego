@@ -10,6 +10,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -182,13 +184,17 @@ func (h *handler) Start(recoverPanic bool) {
 
 	gear, err := h.selectStartingGear()
 	if err != nil {
-		h.ctx.Log.Error("chain failed to select starting gear with: %s", err)
+		h.ctx.Log.Error("chain failed to select starting gear",
+			zap.Error(err),
+		)
 		h.shutdown()
 		return
 	}
 
 	if err := gear.Start(0); err != nil {
-		h.ctx.Log.Error("chain failed to start with %s", err)
+		h.ctx.Log.Error("chain failed to start",
+			zap.Error(err),
+		)
 		h.shutdown()
 		return
 	}
@@ -273,7 +279,10 @@ func (h *handler) Stop() {
 }
 
 func (h *handler) StopWithError(err error) {
-	h.ctx.Log.Fatal("shutting down chain due to unexpected error: %s", err)
+	h.ctx.Log.Fatal("shutting down chain",
+		zap.String("reason", "received an unexpected error"),
+		zap.Error(err),
+	)
 	h.Stop()
 }
 
@@ -358,7 +367,9 @@ func (h *handler) dispatchChans() {
 }
 
 func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
-	h.ctx.Log.Debug("Forwarding sync message to consensus: %s", msg)
+	h.ctx.Log.Debug("forwarding sync message to consensus",
+		zap.Stringer("message", msg),
+	)
 
 	var (
 		nodeID    = msg.NodeID()
@@ -377,7 +388,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		h.resourceTracker.StopProcessing(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
-		h.ctx.Log.Debug("Finished handling sync message: %s", op)
+		h.ctx.Log.Debug("finished handling sync message",
+			zap.Stringer("messageOp", op),
+		)
 	}()
 
 	engine, err := h.getEngine()
@@ -403,12 +416,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		summaryHeights, err := getSummaryHeights(msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op,
-				nodeID,
-				reqID,
-				err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return nil
 		}
@@ -418,12 +430,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		summaryIDs, err := getIDs(message.SummaryIDs, msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op,
-				nodeID,
-				reqID,
-				err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
 		}
@@ -441,9 +452,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op, nodeID, reqID, err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return engine.GetAcceptedFrontierFailed(nodeID, reqID)
 		}
@@ -457,9 +470,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op, nodeID, reqID, err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return nil
 		}
@@ -469,9 +484,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op, nodeID, reqID, err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return engine.GetAcceptedFailed(nodeID, reqID)
 		}
@@ -526,9 +543,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op, nodeID, reqID, err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return engine.QueryFailed(nodeID, reqID)
 		}
@@ -538,9 +557,11 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		reqID := msg.Get(message.RequestID).(uint32)
 		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
-			h.ctx.Log.Debug(
-				"Malformed message %s from (%s, %d): %s",
-				op, nodeID, reqID, err,
+			h.ctx.Log.Debug("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
 			)
 			return engine.QueryFailed(nodeID, reqID)
 		}
@@ -580,7 +601,9 @@ func (h *handler) handleAsyncMsg(msg message.InboundMessage) {
 }
 
 func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
-	h.ctx.Log.Debug("Forwarding async message to consensus: %s", msg)
+	h.ctx.Log.Debug("forwarding async message to consensus",
+		zap.Stringer("message", msg),
+	)
 
 	var (
 		nodeID    = msg.NodeID()
@@ -596,7 +619,9 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		h.resourceTracker.StopProcessing(nodeID, endTime)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
-		h.ctx.Log.Debug("Finished handling async message: %s", op)
+		h.ctx.Log.Debug("finished handling async message",
+			zap.Stringer("messageOp", op),
+		)
 	}()
 
 	engine, err := h.getEngine()
@@ -632,7 +657,9 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 }
 
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
-	h.ctx.Log.Debug("Forwarding chan message to consensus: %s", msg)
+	h.ctx.Log.Debug("forwarding chan message to consensus",
+		zap.Stringer("message", msg),
+	)
 
 	var (
 		op        = msg.Op()
@@ -648,7 +675,9 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		)
 		histogram.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
-		h.ctx.Log.Debug("Finished handling chan message: %s", op)
+		h.ctx.Log.Debug("finished handling chan message",
+			zap.Stringer("messageOp", op),
+		)
 	}()
 
 	engine, err := h.getEngine()
@@ -700,9 +729,10 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 
 		// If this message's deadline has passed, don't process it.
 		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
-			h.ctx.Log.Verbo(
-				"Dropping message from %s due to timeout: %s",
-				msg.NodeID(), msg,
+			h.ctx.Log.Verbo("dropping message",
+				zap.String("reason", "timeout"),
+				zap.Stringer("nodeID", msg.NodeID()),
+				zap.Stringer("message", msg),
 			)
 			expired.Inc()
 			msg.OnFinishedHandling()
@@ -735,11 +765,15 @@ func (h *handler) shutdown() {
 
 	currentEngine, err := h.getEngine()
 	if err != nil {
-		h.ctx.Log.Error("Error while fetching current engine during shutdown: %s", err)
+		h.ctx.Log.Error("failed fetching current engine during shutdown",
+			zap.Error(err),
+		)
 		return
 	}
 
 	if err := currentEngine.Shutdown(); err != nil {
-		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+		h.ctx.Log.Error("failed while shutting down the chain",
+			zap.Error(err),
+		)
 	}
 }

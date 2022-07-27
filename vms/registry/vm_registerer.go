@@ -8,6 +8,8 @@ import (
 	"path"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -92,7 +94,10 @@ func (r *vmRegisterer) createStaticHandlers(vmID ids.ID, factory vms.Factory) (m
 
 	handlers, err := commonVM.CreateStaticHandlers()
 	if err != nil {
-		r.config.Log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
+		r.config.Log.Error("failed to create static API endpoints",
+			zap.Stringer("vmID", vmID),
+			zap.Error(err),
+		)
 
 		if err := commonVM.Shutdown(); err != nil {
 			return nil, fmt.Errorf("shutting down VM errored with: %w", err)
@@ -107,7 +112,10 @@ func (r *vmRegisterer) createStaticEndpoints(pathAdder server.PathAdder, handler
 	lock := new(sync.RWMutex)
 	// register the static endpoints
 	for extension, service := range handlers {
-		r.config.Log.Verbo("adding static API endpoint: %s%s", defaultEndpoint, extension)
+		r.config.Log.Verbo("adding static API endpoint",
+			zap.String("endpoint", defaultEndpoint),
+			zap.String("extension", extension),
+		)
 		if err := pathAdder.AddRoute(service, lock, defaultEndpoint, extension); err != nil {
 			return fmt.Errorf(
 				"failed to add static API endpoint %s%s: %s",

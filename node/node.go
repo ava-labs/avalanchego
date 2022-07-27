@@ -5,7 +5,6 @@ package node
 
 import (
 	"crypto"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -19,6 +18,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"go.uber.org/zap"
 
 	coreth "github.com/ava-labs/coreth/plugin/evm"
 
@@ -109,7 +110,7 @@ type Node struct {
 	keystore keystore.Keystore
 
 	// Manages shared memory
-	sharedMemory atomic.Memory
+	sharedMemory *atomic.Memory
 
 	// Monitors node health and runs health checks
 	health health.Health
@@ -201,13 +202,17 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
-		n.Log.Info("this node's IP is set to: %q", currentIPPort)
+		n.Log.Info("initializing networking",
+			zap.Stringer("currentNodeIP", currentIPPort),
+		)
 	} else {
 		ipPort = ips.IPPort{
 			IP:   currentIPPort.IP,
 			Port: ipPort.Port,
 		}
-		n.Log.Info("this node's IP is set to: %q", ipPort)
+		n.Log.Info("initializing networking",
+			zap.Stringer("currentNodeIP", ipPort),
+		)
 	}
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
@@ -247,8 +252,10 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Debug("node %s failed to connect to bootstrap nodes %s in time", n.ID, n.beacons)
-				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+				n.Log.Debug("failed to connect to bootstrap nodes in time",
+					zap.Stringer("beacons", n.beacons),
+				)
+				n.Log.Fatal("failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
 		})
@@ -288,7 +295,6 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
 		consensusRouter,
-		n.benchlistManager,
 	)
 
 	return err
@@ -374,7 +380,9 @@ func (n *Node) Dispatch() error {
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
 		if !n.shuttingDown.GetValue() {
-			n.Log.Fatal("API server dispatch failed with %s", err)
+			n.Log.Fatal("API server dispatch failed",
+				zap.Error(err),
+			)
 		}
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does nothing.
@@ -444,7 +452,9 @@ func (n *Node) initDatabase() error {
 	n.DBManager = meterDBManager
 
 	currentDB := dbManager.Current()
-	n.Log.Info("current database version: %s", currentDB.Version)
+	n.Log.Info("initializing database",
+		zap.Stringer("dbVersion", currentDB.Version),
+	)
 	n.DB = currentDB.Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
@@ -682,7 +692,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,
 		Keystore:                                n.keystore,
-		AtomicMemory:                            &n.sharedMemory,
+		AtomicMemory:                            n.sharedMemory,
 		AVAXAssetID:                             avaxAssetID,
 		XChainID:                                xChainID,
 		CriticalChains:                          criticalChains,
@@ -757,11 +767,13 @@ func (n *Node) initVMs() error {
 				ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
 				ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 				ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
+				BlueberryTime:          version.GetBlueberryTime(n.Config.NetworkID),
 			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
+			BlueberryTime:    version.GetBlueberryTime(n.Config.NetworkID),
 		}),
 		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -786,16 +798,19 @@ func (n *Node) initVMs() error {
 	// register any vms that need to be installed as plugins from disk
 	_, failedVMs, err := n.VMRegistry.Reload()
 	for failedVM, err := range failedVMs {
-		n.Log.Error("failed to register %s: %s", failedVM, err)
+		n.Log.Error("failed to register VM",
+			zap.Stringer("vmID", failedVM),
+			zap.Error(err),
+		)
 	}
 	return err
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
-func (n *Node) initSharedMemory() error {
+func (n *Node) initSharedMemory() {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
-	return n.sharedMemory.Initialize(sharedMemoryDB)
+	n.sharedMemory = atomic.NewMemory(sharedMemoryDB)
 }
 
 // initKeystoreAPI initializes the keystore service, which is an on-node wallet.
@@ -866,12 +881,6 @@ func (n *Node) initMetricsAPI() error {
 // initAdminAPI initializes the Admin API service
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
-	// Convert node config to map
-	configJSON, err := json.Marshal(n.Config)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal config: %w", err)
-	}
-	n.Log.Info("node config:\n%s", configJSON)
 	if !n.Config.AdminAPIEnabled {
 		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil
@@ -911,7 +920,9 @@ func (n *Node) initProfiler() {
 	go n.Log.RecoverAndPanic(func() {
 		err := n.profiler.Dispatch()
 		if err != nil {
-			n.Log.Fatal("continuous profiler failed with %s", err)
+			n.Log.Fatal("continuous profiler failed",
+				zap.Error(err),
+			)
 		}
 		n.Shutdown(1)
 	})
@@ -990,7 +1001,9 @@ func (n *Node) initHealthAPI() error {
 
 		var err error
 		if availableDiskBytes < n.Config.RequiredAvailableDiskSpace {
-			n.Log.Fatal("Node low on disk space [%d bytes available]. Node shutting down...", availableDiskBytes)
+			n.Log.Fatal("low on disk space. Shutting down...",
+				zap.Uint64("remainingDiskBytes", availableDiskBytes),
+			)
 			go n.Shutdown(1)
 			err = fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
 		} else if availableDiskBytes < n.Config.WarningThresholdAvailableDiskSpace {
@@ -1175,8 +1188,11 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
-	n.Log.Info("node version is: %s", version.CurrentApp)
-	n.Log.Info("node ID is: %s", n.ID)
+	n.Log.Info("initializing node",
+		zap.Stringer("version", version.CurrentApp),
+		zap.Stringer("nodeID", n.ID),
+		zap.Reflect("config", n.Config),
+	)
 
 	if err = n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
@@ -1198,9 +1214,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
 
-	if err := n.initSharedMemory(); err != nil { // Initialize shared memory
-		return fmt.Errorf("problem initializing shared memory: %w", err)
-	}
+	n.initSharedMemory() // Initialize shared memory
 
 	// message.Creator is shared between networking, chainManager and the engine.
 	// It must be initiated before networking (initNetworking), chain manager (initChainManager)
@@ -1287,7 +1301,9 @@ func (n *Node) Shutdown(exitCode int) {
 }
 
 func (n *Node) shutdown() {
-	n.Log.Info("shutting down node with exit code %d", n.ExitCode())
+	n.Log.Info("shutting down node",
+		zap.Int("exitCode", n.ExitCode()),
+	)
 
 	if n.health != nil {
 		// Passes if the node is not shutting down
@@ -1299,7 +1315,9 @@ func (n *Node) shutdown() {
 
 		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck)
 		if err != nil {
-			n.Log.Debug("couldn't register shuttingDown health check: %s", err)
+			n.Log.Debug("couldn't register shuttingDown health check",
+				zap.Error(err),
+			)
 		}
 
 		time.Sleep(n.Config.ShutdownWait)
@@ -1310,7 +1328,9 @@ func (n *Node) shutdown() {
 	}
 	if n.IPCs != nil {
 		if err := n.IPCs.Shutdown(); err != nil {
-			n.Log.Debug("error during IPC shutdown: %s", err)
+			n.Log.Debug("error during IPC shutdown",
+				zap.Error(err),
+			)
 		}
 	}
 	if n.chainManager != nil {
@@ -1323,10 +1343,14 @@ func (n *Node) shutdown() {
 		n.Net.StartClose()
 	}
 	if err := n.APIServer.Shutdown(); err != nil {
-		n.Log.Debug("error during API shutdown: %s", err)
+		n.Log.Debug("error during API shutdown",
+			zap.Error(err),
+		)
 	}
 	if err := n.indexer.Close(); err != nil {
-		n.Log.Debug("error closing tx indexer: %s", err)
+		n.Log.Debug("error closing tx indexer",
+			zap.Error(err),
+		)
 	}
 
 	// Make sure all plugin subprocesses are killed
@@ -1335,7 +1359,9 @@ func (n *Node) shutdown() {
 
 	if n.DBManager != nil {
 		if err := n.DBManager.Close(); err != nil {
-			n.Log.Warn("error during DB shutdown: %s", err)
+			n.Log.Warn("error during DB shutdown",
+				zap.Error(err),
+			)
 		}
 	}
 

@@ -20,13 +20,17 @@ type service struct {
 }
 
 func (s *service) CreateUser(_ *http.Request, args *api.UserPass, _ *api.EmptyReply) error {
-	s.ks.log.Debug("Keystore: CreateUser called with %.*s", maxUserLen, args.Username)
+	s.ks.log.Debug("Keystore: CreateUser called",
+		logging.UserString("username", args.Username),
+	)
 
 	return s.ks.CreateUser(args.Username, args.Password)
 }
 
 func (s *service) DeleteUser(_ *http.Request, args *api.UserPass, _ *api.EmptyReply) error {
-	s.ks.log.Debug("Keystore: DeleteUser called with %s", args.Username)
+	s.ks.log.Debug("Keystore: DeleteUser called",
+		logging.UserString("username", args.Username),
+	)
 
 	return s.ks.DeleteUser(args.Username, args.Password)
 }
@@ -53,7 +57,9 @@ type ImportUserArgs struct {
 }
 
 func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, _ *api.EmptyReply) error {
-	s.ks.log.Debug("Keystore: ImportUser called for %s", args.Username)
+	s.ks.log.Debug("Keystore: ImportUser called",
+		logging.UserString("username", args.Username),
+	)
 
 	// Decode the user from string to bytes
 	user, err := formatting.Decode(args.Encoding, args.User)
@@ -79,7 +85,9 @@ type ExportUserReply struct {
 }
 
 func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
-	s.ks.log.Debug("Keystore: ExportUser called for %s", args.Username)
+	s.ks.log.Debug("Keystore: ExportUser called",
+		logging.UserString("username", args.Username),
+	)
 
 	userBytes, err := s.ks.ExportUser(args.Username, args.Password)
 	if err != nil {

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -67,6 +70,8 @@ var (
 	errMissingVMID                = errors.New("argument 'vmID' not given")
 	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
 	errMissingPrivateKey          = errors.New("argument 'privateKey' not given")
+	errStartAfterEndTime          = errors.New("start time must be before end time")
+	errStartTimeInThePast         = errors.New("start time in the past")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -134,7 +139,9 @@ type ImportKeyArgs struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
-	service.vm.ctx.Log.Debug("Platform: ImportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("Platform: ImportKey called",
+		logging.UserString("username", args.Username),
+	)
 
 	if args.PrivateKey == nil {
 		return errMissingPrivateKey
@@ -185,7 +192,9 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 		args.Addresses = append(args.Addresses, *args.Address)
 	}
 
-	service.vm.ctx.Log.Debug("Platform: GetBalance called for addresses %v", args.Addresses)
+	service.vm.ctx.Log.Debug("Platform: GetBalance called",
+		logging.UserStrings("addresses", args.Addresses),
+	)
 
 	// Parse to address
 	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
@@ -225,8 +234,9 @@ utxoFor:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
 			switch {
 			case !ok:
-				service.vm.ctx.Log.Warn("Unexpected Output type in UTXO: %T",
-					out.TransferableOut)
+				service.vm.ctx.Log.Warn("unexpected output type in UTXO",
+					zap.String("type", fmt.Sprintf("%T", out.TransferableOut)),
+				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
@@ -560,8 +570,7 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
 	service.vm.ctx.Log.Debug("Platform: GetStakingAssetID called")
 
 	if args.SubnetID != constants.PrimaryNetworkID {
-		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
-			args.SubnetID)
+		return fmt.Errorf("subnet %s doesn't have a valid staking token", args.SubnetID)
 	}
 
 	response.AssetID = service.vm.ctx.AVAXAssetID
@@ -606,25 +615,36 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentValidators := service.vm.state.CurrentStakers()
+	currentStakerIterator, err := service.vm.state.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer currentStakerIterator.Release()
 
 	// TODO: do not iterate over all stakers when nodeIDs given. Use currentValidators.ValidatorSet for iteration
-	for _, tx := range currentValidators.Stakers() { // Iterates in order of increasing stop time
-		_, rewardAmount, err := currentValidators.GetStaker(tx.ID())
+	for currentStakerIterator.Next() { // Iterates in order of increasing stop time
+		staker := currentStakerIterator.Value()
+		if args.SubnetID != staker.SubnetID {
+			continue
+		}
+		if !includeAllNodes && !nodeIDs.Contains(staker.NodeID) {
+			continue
+		}
+
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
+
+		txID := staker.TxID
+		nodeID := staker.NodeID
+		weight := json.Uint64(staker.Weight)
+		startTime := json.Uint64(staker.StartTime.Unix())
+		endTime := json.Uint64(staker.EndTime.Unix())
+		potentialReward := json.Uint64(staker.PotentialReward)
+
 		switch staker := tx.Unsigned.(type) {
 		case *txs.AddDelegatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-
-			weight := json.Uint64(staker.Validator.Weight())
-
 			var rewardOwner *platformapi.Owner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
@@ -641,33 +661,21 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			potentialReward := json.Uint64(rewardAmount)
 			delegator := platformapi.PrimaryDelegator{
 				Staker: platformapi.Staker{
-					TxID:        tx.ID(),
-					StartTime:   json.Uint64(staker.StartTime().Unix()),
-					EndTime:     json.Uint64(staker.EndTime().Unix()),
+					TxID:        txID,
+					StartTime:   startTime,
+					EndTime:     endTime,
 					StakeAmount: &weight,
-					NodeID:      staker.Validator.ID(),
+					NodeID:      nodeID,
 				},
 				RewardOwner:     rewardOwner,
 				PotentialReward: &potentialReward,
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 		case *txs.AddValidatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-
-			nodeID := staker.Validator.ID()
-			startTime := staker.StartTime()
-			weight := json.Uint64(staker.Validator.Weight())
-			potentialReward := json.Uint64(rewardAmount)
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
-			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, startTime)
+			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, staker.StartTime())
 			if err != nil {
 				return err
 			}
@@ -693,10 +701,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
 				Staker: platformapi.Staker{
-					TxID:        tx.ID(),
+					TxID:        txID,
 					NodeID:      nodeID,
-					StartTime:   json.Uint64(startTime.Unix()),
-					EndTime:     json.Uint64(staker.EndTime().Unix()),
+					StartTime:   startTime,
+					EndTime:     endTime,
 					StakeAmount: &weight,
 				},
 				Uptime:          &uptime,
@@ -706,22 +714,14 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				DelegationFee:   delegationFee,
 			})
 		case *txs.AddSubnetValidatorTx:
-			if args.SubnetID != staker.Validator.Subnet {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-			nodeID := staker.Validator.ID()
-			weight := json.Uint64(staker.Validator.Weight())
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
 				Staker: platformapi.Staker{
 					NodeID:    nodeID,
-					TxID:      tx.ID(),
-					StartTime: json.Uint64(staker.StartTime().Unix()),
-					EndTime:   json.Uint64(staker.EndTime().Unix()),
+					TxID:      txID,
+					StartTime: startTime,
+					EndTime:   endTime,
 					Weight:    &weight,
 				},
 				Connected: connected && tracksSubnet,
@@ -736,9 +736,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		if !ok {
 			continue
 		}
-		if delegators, ok := vdrToDelegators[vdr.NodeID]; ok {
-			vdr.Delegators = delegators
-		}
+		vdr.Delegators = vdrToDelegators[vdr.NodeID]
 		reply.Validators[i] = vdr
 	}
 
@@ -776,68 +774,65 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingValidators := service.vm.state.PendingStakers()
+	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer pendingStakerIterator.Release()
 
-	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
+	for pendingStakerIterator.Next() { // Iterates in order of increasing start time
+		staker := pendingStakerIterator.Value()
+		if args.SubnetID != staker.SubnetID {
+			continue
+		}
+		if !includeAllNodes && !nodeIDs.Contains(staker.NodeID) {
+			continue
+		}
+
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
+		if err != nil {
+			return err
+		}
+
+		txID := staker.TxID
+		nodeID := staker.NodeID
+		weight := json.Uint64(staker.Weight)
+		startTime := json.Uint64(staker.StartTime.Unix())
+		endTime := json.Uint64(staker.EndTime.Unix())
+
 		switch staker := tx.Unsigned.(type) {
 		case *txs.AddDelegatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-
-			weight := json.Uint64(staker.Validator.Weight())
 			reply.Delegators = append(reply.Delegators, platformapi.Staker{
-				TxID:        tx.ID(),
-				NodeID:      staker.Validator.ID(),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
+				TxID:        txID,
+				NodeID:      nodeID,
+				StartTime:   startTime,
+				EndTime:     endTime,
 				StakeAmount: &weight,
 			})
 		case *txs.AddValidatorTx:
-			if args.SubnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-
-			nodeID := staker.Validator.ID()
-			weight := json.Uint64(staker.Validator.Weight())
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
 				Staker: platformapi.Staker{
-					TxID:        tx.ID(),
-					NodeID:      staker.Validator.ID(),
-					StartTime:   json.Uint64(staker.StartTime().Unix()),
-					EndTime:     json.Uint64(staker.EndTime().Unix()),
+					TxID:        txID,
+					NodeID:      nodeID,
+					StartTime:   startTime,
+					EndTime:     endTime,
 					StakeAmount: &weight,
 				},
 				DelegationFee: delegationFee,
 				Connected:     connected,
 			})
 		case *txs.AddSubnetValidatorTx:
-			if args.SubnetID != staker.Validator.Subnet {
-				continue
-			}
-			if !includeAllNodes && !nodeIDs.Contains(staker.Validator.ID()) {
-				continue
-			}
-
-			nodeID := staker.Validator.ID()
-			weight := json.Uint64(staker.Validator.Weight())
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
 				Staker: platformapi.Staker{
 					NodeID:    nodeID,
-					TxID:      tx.ID(),
-					StartTime: json.Uint64(staker.StartTime().Unix()),
-					EndTime:   json.Uint64(staker.EndTime().Unix()),
+					TxID:      txID,
+					StartTime: startTime,
+					EndTime:   endTime,
 					Weight:    &weight,
 				},
 				Connected: connected && tracksSubnet,
@@ -879,7 +874,9 @@ type SampleValidatorsReply struct {
 
 // SampleValidators returns a sampling of the list of current validators
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
-	service.vm.ctx.Log.Debug("Platform: SampleValidators called with Size = %d", args.Size)
+	service.vm.ctx.Log.Debug("Platform: SampleValidators called",
+		zap.Uint16("size", uint16(args.Size)),
+	)
 
 	validators, ok := service.vm.Validators.GetValidators(args.SubnetID)
 	if !ok {
@@ -1897,7 +1894,9 @@ type GetTxStatusResponse struct {
 
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetTxStatus called with txID: %s", args.TxID)
+	service.vm.ctx.Log.Debug("Platform: GetTxStatus called",
+		zap.Stringer("txID", args.TxID),
+	)
 
 	_, txStatus, err := service.vm.state.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
@@ -1975,8 +1974,10 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 	case *txs.AddSubnetValidatorTx:
 		return 0, nil, nil
 	default:
-		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.Unsigned)
-		service.vm.ctx.Log.Error("invalid tx type provided from validator set %s", err)
+		err := fmt.Errorf("expected *txs.AddDelegatorTx, *txs.AddValidatorTx or *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
+		service.vm.ctx.Log.Error("invalid tx type provided from validator set",
+			zap.Error(err),
+		)
 		return 0, nil, err
 	}
 
@@ -2044,14 +2045,24 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return err
 	}
 
-	currentStakers := service.vm.state.CurrentStakers()
-	stakers := currentStakers.Stakers()
+	currentStakerIterator, err := service.vm.state.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer currentStakerIterator.Release()
 
 	var (
 		totalStake uint64
-		stakedOuts = make([]avax.TransferableOutput, 0, len(stakers))
+		stakedOuts []avax.TransferableOutput
 	)
-	for _, tx := range stakers { // Iterates over current stakers
+	for currentStakerIterator.Next() { // Iterates over current stakers
+		staker := currentStakerIterator.Value()
+
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
+		if err != nil {
+			return err
+		}
+
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
 			return err
@@ -2063,8 +2074,20 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts = append(stakedOuts, outs...)
 	}
 
-	pendingStakers := service.vm.state.PendingStakers()
-	for _, tx := range pendingStakers.Stakers() { // Iterates over pending stakers
+	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer pendingStakerIterator.Release()
+
+	for pendingStakerIterator.Next() { // Iterates over pending stakers
+		staker := pendingStakerIterator.Value()
+
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
+		if err != nil {
+			return err
+		}
+
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
 			return err
@@ -2155,13 +2178,30 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	startTime := time.Unix(int64(args.StartTime), 0)
 	endTime := time.Unix(int64(args.EndTime), 0)
 
-	maxStakeAmount, err := service.vm.state.MaxStakeAmount(
-		args.SubnetID,
-		args.NodeID,
-		startTime,
-		endTime,
-	)
+	if startTime.After(endTime) {
+		return errStartAfterEndTime
+	}
+	now := service.vm.state.GetTimestamp()
+	if startTime.Before(now) {
+		return errStartTimeInThePast
+	}
 
+	staker, err := executor.GetValidator(service.vm.state, args.SubnetID, args.NodeID)
+	if err == database.ErrNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if startTime.After(staker.EndTime) {
+		return nil
+	}
+	if endTime.Before(staker.StartTime) {
+		return nil
+	}
+
+	maxStakeAmount, err := executor.GetMaxWeight(service.vm.state, staker, startTime, endTime)
 	reply.Amount = json.Uint64(maxStakeAmount)
 	return err
 }
@@ -2232,14 +2272,14 @@ type GetValidatorsAtReply struct {
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
 func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
-	service.vm.ctx.Log.Info(
-		"Platform: GetValidatorsAt called with Height %d and SubnetID %s",
-		args.Height,
-		args.SubnetID,
+	height := uint64(args.Height)
+	service.vm.ctx.Log.Debug("Platform: GetValidatorsAt called",
+		zap.Uint64("height", height),
+		zap.Stringer("subnetID", args.SubnetID),
 	)
 
 	var err error
-	reply.Validators, err = service.vm.GetValidatorSet(uint64(args.Height), args.SubnetID)
+	reply.Validators, err = service.vm.GetValidatorSet(height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("couldn't get validator set: %w", err)
 	}
@@ -2247,7 +2287,10 @@ func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtAr
 }
 
 func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *api.GetBlockResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetBlock called with args %s", args)
+	service.vm.ctx.Log.Debug("Platform: GetBlock called",
+		zap.Stringer("blkID", args.BlockID),
+		zap.Stringer("encoding", args.Encoding),
+	)
 
 	block, err := service.vm.GetBlock(args.BlockID)
 	if err != nil {

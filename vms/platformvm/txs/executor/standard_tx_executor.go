@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -16,7 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
-var _ txs.Visitor = &StandardTxExecutor{}
+var (
+	_ txs.Visitor = &StandardTxExecutor{}
+
+	errCustomAssetBeforeBlueberry = errors.New("custom assets can only be imported after the blueberry upgrade")
+)
 
 type StandardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
@@ -63,8 +68,9 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
-		createBlockchainTxFee,
-		e.Ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: createBlockchainTxFee,
+		},
 	); err != nil {
 		return err
 	}
@@ -92,7 +98,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, tx.Outs)
 	// Add the new chain to the database
 	e.State.AddChain(e.Tx)
 
@@ -117,8 +123,9 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
-		createSubnetTxFee,
-		e.Ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: createSubnetTxFee,
+		},
 	); err != nil {
 		return err
 	}
@@ -128,7 +135,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, tx.Outs)
 	// Add the new subnet to the database
 	e.State.AddSubnet(e.Tx)
 	return nil
@@ -139,6 +146,8 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
+	currentChainTime := e.State.GetTimestamp()
+
 	e.Inputs = ids.NewSet(len(tx.ImportedInputs))
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
@@ -146,6 +155,18 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
+
+		if currentChainTime.Before(e.Config.BlueberryTime) {
+			// TODO: Remove this check once the Blueberry network upgrade is
+			//       complete.
+			//
+			// Blueberry network upgrade allows exporting of all assets to the
+			// P-chain.
+			assetID := in.AssetID()
+			if assetID != e.Ctx.AVAXAssetID {
+				return errCustomAssetBeforeBlueberry
+			}
+		}
 	}
 
 	if e.Bootstrapped.GetValue() {
@@ -184,8 +205,9 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			ins,
 			tx.Outs,
 			e.Tx.Creds,
-			e.Config.TxFee,
-			e.Ctx.AVAXAssetID,
+			map[ids.ID]uint64{
+				e.Ctx.AVAXAssetID: e.Config.TxFee,
+			},
 		); err != nil {
 			return err
 		}
@@ -196,7 +218,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, tx.Outs)
 
 	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
@@ -228,8 +250,9 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		tx.Ins,
 		outs,
 		e.Tx.Creds,
-		e.Config.TxFee,
-		e.Ctx.AVAXAssetID,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: e.Config.TxFee,
+		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
 	}
@@ -239,7 +262,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	// Consume the UTXOS
 	utxo.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, e.Ctx.AVAXAssetID, tx.Outs)
+	utxo.Produce(e.State, txID, tx.Outs)
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {

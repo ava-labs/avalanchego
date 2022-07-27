@@ -4,341 +4,379 @@
 package state
 
 import (
-	"fmt"
-	"time"
+	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
-
-const (
-	// priority values are used as part of the keys in the pending/current
-	// validator state to ensure they are sorted in the order that they should
-	// be added/removed.
-	lowPriority byte = iota
-	mediumPriority
-	topPriority
-)
-
-var _ Stakers = &stakers{}
 
 type Stakers interface {
-	SetCurrentStakers(cs CurrentStakers)
-	CurrentStakers() CurrentStakers
-	SetPendingStakers(ps PendingStakers)
-	PendingStakers() PendingStakers
-
-	// GetNextStakerChangeTime returns the next time that a staker set change
-	// should occur.
-	GetNextStakerChangeTime() (time.Time, error)
+	CurrentStakers
+	PendingStakers
 }
 
-func NewStakers(current CurrentStakers, pending PendingStakers) Stakers {
-	return &stakers{
-		current: current,
-		pending: pending,
+type CurrentStakers interface {
+	// GetCurrentValidator returns the [staker] describing the validator on
+	// [subnetID] with [nodeID]. If the validator does not exist,
+	// [database.ErrNotFound] is returned.
+	GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
+
+	// PutCurrentValidator adds the [staker] describing a validator to the
+	// staker set.
+	PutCurrentValidator(staker *Staker)
+
+	// DeleteCurrentValidator removes the [staker] describing a validator from
+	// the staker set.
+	DeleteCurrentValidator(staker *Staker)
+
+	// GetCurrentDelegatorIterator returns the delegators associated with the
+	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
+	// removal from current staker set.
+	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
+
+	// PutCurrentDelegator adds the [staker] describing a delegator to the
+	// staker set.
+	PutCurrentDelegator(staker *Staker)
+
+	// DeleteCurrentDelegator removes the [staker] describing a delegator from
+	// the staker set.
+	DeleteCurrentDelegator(staker *Staker)
+
+	// GetCurrentStakerIterator returns stakers in order of their removal from
+	// the current staker set.
+	GetCurrentStakerIterator() (StakerIterator, error)
+}
+
+type PendingStakers interface {
+	// GetPendingValidator returns the Staker describing the validator on
+	// [subnetID] with [nodeID]. If the validator does not exist,
+	// [database.ErrNotFound] is returned.
+	GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
+
+	// PutPendingValidator adds the [staker] describing a validator to the
+	// staker set.
+	PutPendingValidator(staker *Staker)
+
+	// DeletePendingValidator removes the [staker] describing a validator from
+	// the staker set.
+	DeletePendingValidator(staker *Staker)
+
+	// GetPendingDelegatorIterator returns the delegators associated with the
+	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
+	// removal from pending staker set.
+	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
+
+	// PutPendingDelegator adds the [staker] describing a delegator to the
+	// staker set.
+	PutPendingDelegator(staker *Staker)
+
+	// DeletePendingDelegator removes the [staker] describing a delegator from
+	// the staker set.
+	DeletePendingDelegator(staker *Staker)
+
+	// GetPendingStakerIterator returns stakers in order of their removal from
+	// the pending staker set.
+	GetPendingStakerIterator() (StakerIterator, error)
+}
+
+type baseStakers struct {
+	// subnetID --> nodeID --> current state for the validator of the subnet
+	validators map[ids.ID]map[ids.NodeID]*baseStaker
+	stakers    *btree.BTree
+	// subnetID --> nodeID --> diff for that validator since the last db write
+	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
+}
+
+type baseStaker struct {
+	validator  *Staker
+	delegators *btree.BTree
+}
+
+func newBaseStakers() *baseStakers {
+	return &baseStakers{
+		validators:     make(map[ids.ID]map[ids.NodeID]*baseStaker),
+		stakers:        btree.New(defaultTreeDegree),
+		validatorDiffs: make(map[ids.ID]map[ids.NodeID]*diffValidator),
 	}
 }
 
-type stakers struct {
-	current CurrentStakers
-	pending PendingStakers
-}
-
-func (s *stakers) CurrentStakers() CurrentStakers {
-	return s.current
-}
-
-func (s *stakers) PendingStakers() PendingStakers {
-	return s.pending
-}
-
-func (s *stakers) SetCurrentStakers(cs CurrentStakers) {
-	s.current = cs
-}
-
-func (s *stakers) SetPendingStakers(ps PendingStakers) {
-	s.pending = ps
-}
-
-func (s *stakers) GetNextStakerChangeTime() (time.Time, error) {
-	earliest := mockable.MaxTime
-	currentStakers := s.CurrentStakers()
-	if currentStakers := currentStakers.Stakers(); len(currentStakers) > 0 {
-		nextStakerToRemove := currentStakers[0]
-		staker, ok := nextStakerToRemove.Unsigned.(txs.StakerTx)
-		if !ok {
-			return time.Time{}, fmt.Errorf("expected tx type StakerTx but got %T", nextStakerToRemove.Unsigned)
-		}
-		if endTime := staker.EndTime(); endTime.Before(earliest) {
-			earliest = endTime
-		}
+func (v *baseStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	subnetValidators, ok := v.validators[subnetID]
+	if !ok {
+		return nil, database.ErrNotFound
 	}
-	pendingStakers := s.PendingStakers()
-	if pendingStakers := pendingStakers.Stakers(); len(pendingStakers) > 0 {
-		nextStakerToAdd := pendingStakers[0]
-		staker, ok := nextStakerToAdd.Unsigned.(txs.StakerTx)
-		if !ok {
-			return time.Time{}, fmt.Errorf("expected tx type txs.StakerTx but got %T", nextStakerToAdd.Unsigned)
-		}
-		if startTime := staker.StartTime(); startTime.Before(earliest) {
-			earliest = startTime
-		}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		return nil, database.ErrNotFound
 	}
-	return earliest, nil
+	if validator.validator == nil {
+		return nil, database.ErrNotFound
+	}
+	return validator.validator, nil
 }
 
-func (s *stakers) maxSubnetStakeAmount(
+func (v *baseStakers) PutValidator(staker *Staker) {
+	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	validator.validator = staker
+
+	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.validatorModified = true
+	validatorDiff.validatorDeleted = false
+	validatorDiff.validator = staker
+
+	v.stakers.ReplaceOrInsert(staker)
+}
+
+func (v *baseStakers) DeleteValidator(staker *Staker) {
+	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	validator.validator = nil
+	v.pruneValidator(staker.SubnetID, staker.NodeID)
+
+	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.validatorModified = true
+	validatorDiff.validatorDeleted = true
+	validatorDiff.validator = staker
+
+	v.stakers.Delete(staker)
+}
+
+func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
+	subnetValidators, ok := v.validators[subnetID]
+	if !ok {
+		return EmptyIterator
+	}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		return EmptyIterator
+	}
+	return NewTreeIterator(validator.delegators)
+}
+
+func (v *baseStakers) PutDelegator(staker *Staker) {
+	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	if validator.delegators == nil {
+		validator.delegators = btree.New(defaultTreeDegree)
+	}
+	validator.delegators.ReplaceOrInsert(staker)
+
+	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.addedDelegators == nil {
+		validatorDiff.addedDelegators = btree.New(defaultTreeDegree)
+	}
+	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
+
+	v.stakers.ReplaceOrInsert(staker)
+}
+
+func (v *baseStakers) DeleteDelegator(staker *Staker) {
+	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	if validator.delegators != nil {
+		validator.delegators.Delete(staker)
+	}
+	v.pruneValidator(staker.SubnetID, staker.NodeID)
+
+	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.deletedDelegators == nil {
+		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
+	}
+	validatorDiff.deletedDelegators[staker.TxID] = staker
+
+	v.stakers.Delete(staker)
+}
+
+func (v *baseStakers) GetStakerIterator() StakerIterator {
+	return NewTreeIterator(v.stakers)
+}
+
+func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseStaker {
+	subnetValidators, ok := v.validators[subnetID]
+	if !ok {
+		subnetValidators = make(map[ids.NodeID]*baseStaker)
+		v.validators[subnetID] = subnetValidators
+	}
+	validator, ok := subnetValidators[nodeID]
+	if !ok {
+		validator = &baseStaker{}
+		subnetValidators[nodeID] = validator
+	}
+	return validator
+}
+
+// pruneValidator assumes that the named validator is currently in the
+// [validators] map.
+func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
+	subnetValidators := v.validators[subnetID]
+	validator := subnetValidators[nodeID]
+	if validator.validator != nil {
+		return
+	}
+	if validator.delegators != nil && validator.delegators.Len() > 0 {
+		return
+	}
+	delete(subnetValidators, nodeID)
+	if len(subnetValidators) == 0 {
+		delete(v.validators, subnetID)
+	}
+}
+
+func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+	subnetValidatorDiffs, ok := v.validatorDiffs[subnetID]
+	if !ok {
+		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
+		v.validatorDiffs[subnetID] = subnetValidatorDiffs
+	}
+	validatorDiff, ok := subnetValidatorDiffs[nodeID]
+	if !ok {
+		validatorDiff = &diffValidator{}
+		subnetValidatorDiffs[nodeID] = validatorDiff
+	}
+	return validatorDiff
+}
+
+type diffStakers struct {
+	// subnetID --> nodeID --> diff for that validator
+	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
+	addedStakers   *btree.BTree
+	deletedStakers map[ids.ID]*Staker
+}
+
+type diffValidator struct {
+	validatorModified bool
+	// [validatorDeleted] implies [validatorModified]
+	validatorDeleted bool
+	validator        *Staker
+
+	addedDelegators   *btree.BTree
+	deletedDelegators map[ids.ID]*Staker
+}
+
+// GetValidator attempts to fetch the validator with the given subnetID and
+// nodeID.
+//
+// Returns:
+// 1. If the validator was added in this diff, [staker, true] will be returned.
+// 2. If the validator was removed in this diff, [nil, true] will be returned.
+// 3. If the validator was not modified by this diff, [nil, false] will be
+//    returned.
+func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
+	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
+	if !ok {
+		return nil, false
+	}
+
+	validatorDiff, ok := subnetValidatorDiffs[nodeID]
+	if !ok {
+		return nil, false
+	}
+
+	if !validatorDiff.validatorModified {
+		return nil, false
+	}
+
+	if validatorDiff.validatorDeleted {
+		return nil, true
+	}
+	return validatorDiff.validator, true
+}
+
+func (s *diffStakers) PutValidator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.validatorModified = true
+	validatorDiff.validatorDeleted = false
+	validatorDiff.validator = staker
+
+	if s.addedStakers == nil {
+		s.addedStakers = btree.New(defaultTreeDegree)
+	}
+	s.addedStakers.ReplaceOrInsert(staker)
+}
+
+func (s *diffStakers) DeleteValidator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.validatorModified = true
+	validatorDiff.validatorDeleted = true
+	validatorDiff.validator = staker
+
+	if s.deletedStakers == nil {
+		s.deletedStakers = make(map[ids.ID]*Staker)
+	}
+	s.deletedStakers[staker.TxID] = staker
+}
+
+func (s *diffStakers) GetDelegatorIterator(
+	parentIterator StakerIterator,
 	subnetID ids.ID,
 	nodeID ids.NodeID,
-	startTime time.Time,
-	endTime time.Time,
-) (uint64, error) {
+) StakerIterator {
 	var (
-		vdrTxAndID SubnetValidatorAndID
-		exists     bool
+		addedDelegatorIterator = EmptyIterator
+		deletedDelegators      map[ids.ID]*Staker
 	)
-	currentValidator, err := s.current.GetValidator(nodeID)
-	pendingValidator := s.pending.GetValidator(nodeID)
-
-	switch err {
-	case nil:
-		vdrTxAndID, exists = currentValidator.SubnetValidators()[subnetID]
-		if !exists {
-			vdrTxAndID = pendingValidator.SubnetValidators()[subnetID]
+	if subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]; ok {
+		if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
+			addedDelegatorIterator = NewTreeIterator(validatorDiff.addedDelegators)
+			deletedDelegators = validatorDiff.deletedDelegators
 		}
-	case database.ErrNotFound:
-		vdrTxAndID = pendingValidator.SubnetValidators()[subnetID]
-	default:
-		return 0, err
 	}
 
-	vdrTx := vdrTxAndID.Tx
-	if vdrTx == nil {
-		return 0, nil
-	}
-	if vdrTx.StartTime().After(endTime) {
-		return 0, nil
-	}
-	if vdrTx.EndTime().Before(startTime) {
-		return 0, nil
-	}
-	return vdrTx.Weight(), nil
-}
-
-func (s *stakers) maxPrimarySubnetStakeAmount(
-	nodeID ids.NodeID,
-	startTime time.Time,
-	endTime time.Time,
-) (uint64, error) {
-	currentValidator, err := s.current.GetValidator(nodeID)
-	pendingValidator := s.pending.GetValidator(nodeID)
-
-	switch err {
-	case nil:
-		vdrTx, _ := currentValidator.AddValidatorTx()
-		if vdrTx.StartTime().After(endTime) {
-			return 0, nil
-		}
-		if vdrTx.EndTime().Before(startTime) {
-			return 0, nil
-		}
-
-		currentWeight := vdrTx.Weight()
-		currentWeight, err = math.Add64(currentWeight, currentValidator.DelegatorWeight())
-		if err != nil {
-			return 0, err
-		}
-		return getMaxStakeAmount(
-			currentValidator.Delegators(),
-			pendingValidator.Delegators(),
-			startTime,
-			endTime,
-			currentWeight,
-		)
-	case database.ErrNotFound:
-		futureValidator, _, err := s.pending.GetValidatorTx(nodeID)
-		if err == database.ErrNotFound {
-			return 0, nil
-		}
-		if err != nil {
-			return 0, err
-		}
-		if futureValidator.StartTime().After(endTime) {
-			return 0, nil
-		}
-		if futureValidator.EndTime().Before(startTime) {
-			return 0, nil
-		}
-
-		return getMaxStakeAmount(
-			nil,
-			pendingValidator.Delegators(),
-			startTime,
-			endTime,
-			futureValidator.Weight(),
-		)
-	default:
-		return 0, err
-	}
-}
-
-// CanDelegate returns if the [new] delegator can be added to a validator who
-// has [current] and [pending] delegators. [currentStake] is the current amount
-// of stake on the validator, include the [current] delegators. [maximumStake]
-// is the maximum amount of stake that can be on the validator at any given
-// time. It is assumed that the validator without adding [new] does not violate
-// [maximumStake].
-func CanDelegate(
-	current,
-	pending []DelegatorAndID, // sorted by next start time first
-	new *txs.AddDelegatorTx,
-	currentStake,
-	maximumStake uint64,
-) (bool, error) {
-	maxStake, err := getMaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
-	if err != nil {
-		return false, err
-	}
-	newMaxStake, err := math.Add64(maxStake, new.Validator.Wght)
-	if err != nil {
-		return false, err
-	}
-	return newMaxStake <= maximumStake, nil
-}
-
-// Return the maximum amount of stake on a node (including delegations) at any
-// given time between [startTime] and [endTime] given that:
-// * The amount of stake on the node right now is [currentStake]
-// * The delegations currently on this node are [current]
-// * [current] is sorted in order of increasing delegation end time.
-// * The stake delegated in [current] are already included in [currentStake]
-// * [startTime] is in the future, and [endTime] > [startTime]
-// * The delegations that will be on this node in the future are [pending]
-// * The start time of all delegations in [pending] are in the future
-// * [pending] is sorted in order of increasing delegation start time
-func getMaxStakeAmount(
-	current,
-	pending []DelegatorAndID, // sorted by next start time first
-	startTime time.Time,
-	endTime time.Time,
-	currentStake uint64,
-) (uint64, error) {
-	// Keep track of which delegators should be removed next so that we can
-	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := validator.EndTimeHeap{}
-	for _, currentDelegator := range current {
-		toRemoveHeap.Add(&currentDelegator.Tx.Validator)
-	}
-
-	var (
-		err error
-		// [maxStake] is the max stake at any point between now [starTime] and [endTime]
-		maxStake uint64
+	return NewMaskedIterator(
+		NewMergedIterator(
+			parentIterator,
+			addedDelegatorIterator,
+		),
+		deletedDelegators,
 	)
+}
 
-	// Calculate what the amount staked will be when each pending delegation
-	// starts.
-	for _, nextPending := range pending { // Iterates in order of increasing start time
-		// Calculate what the amount staked will be when this delegation starts.
-		nextPendingStartTime := nextPending.Tx.StartTime()
-
-		if nextPendingStartTime.After(endTime) {
-			// This delegation starts after [endTime].
-			// Since we're calculating the max amount staked in
-			// [startTime, endTime], we can stop. (Recall that [pending] is
-			// sorted in order of increasing end time.)
-			break
-		}
-
-		// Subtract from [currentStake] all of the current delegations that will
-		// have ended by the time that the delegation [nextPending] starts.
-		for toRemoveHeap.Len() > 0 {
-			// Get the next current delegation that will end.
-			toRemove := toRemoveHeap.Peek()
-			toRemoveEndTime := toRemove.EndTime()
-			if toRemoveEndTime.After(nextPendingStartTime) {
-				break
-			}
-			// This current delegation [toRemove] ends before [nextPending]
-			// starts, so its stake should be subtracted from [currentStake].
-
-			// Changed in AP3:
-			// If the new delegator has started, then this current delegator
-			// should have an end time that is > [startTime].
-			newDelegatorHasStartedBeforeFinish := toRemoveEndTime.After(startTime)
-			if newDelegatorHasStartedBeforeFinish && currentStake > maxStake {
-				// Only update [maxStake] if it's after [startTime]
-				maxStake = currentStake
-			}
-
-			currentStake, err = math.Sub64(currentStake, toRemove.Wght)
-			if err != nil {
-				return 0, err
-			}
-
-			// Changed in AP3:
-			// Remove the delegator from the heap and update the heap so that
-			// the top of the heap is the next delegator to remove.
-			toRemoveHeap.Remove()
-		}
-
-		// Add to [currentStake] the stake of this pending delegator to
-		// calculate what the stake will be when this pending delegation has
-		// started.
-		currentStake, err = math.Add64(currentStake, nextPending.Tx.Validator.Wght)
-		if err != nil {
-			return 0, err
-		}
-
-		// Changed in AP3:
-		// If the new delegator has started, then this pending delegator should
-		// have a start time that is >= [startTime]. Otherwise, the delegator
-		// hasn't started yet and the [currentStake] shouldn't count towards the
-		// [maximumStake] during the delegators delegation period.
-		newDelegatorHasStarted := !nextPendingStartTime.Before(startTime)
-		if newDelegatorHasStarted && currentStake > maxStake {
-			// Only update [maxStake] if it's after [startTime]
-			maxStake = currentStake
-		}
-
-		// This pending delegator is a current delegator relative
-		// when considering later pending delegators that start late
-		toRemoveHeap.Add(&nextPending.Tx.Validator)
+func (s *diffStakers) PutDelegator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.addedDelegators == nil {
+		validatorDiff.addedDelegators = btree.New(defaultTreeDegree)
 	}
+	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 
-	// [currentStake] is now the amount staked before the next pending delegator
-	// whose start time is after [endTime].
-
-	// If there aren't any delegators that will be added before the end of our
-	// delegation period, we should advance through time until our delegation
-	// period starts.
-	for toRemoveHeap.Len() > 0 {
-		toRemove := toRemoveHeap.Peek()
-		toRemoveEndTime := toRemove.EndTime()
-		if toRemoveEndTime.After(startTime) {
-			break
-		}
-
-		currentStake, err = math.Sub64(currentStake, toRemove.Wght)
-		if err != nil {
-			return 0, err
-		}
-
-		// Changed in AP3:
-		// Remove the delegator from the heap and update the heap so that the
-		// top of the heap is the next delegator to remove.
-		toRemoveHeap.Remove()
+	if s.addedStakers == nil {
+		s.addedStakers = btree.New(defaultTreeDegree)
 	}
+	s.addedStakers.ReplaceOrInsert(staker)
+}
 
-	// We have advanced time to be inside the delegation window.
-	// Make sure that the max stake is updated accordingly.
-	if currentStake > maxStake {
-		maxStake = currentStake
+func (s *diffStakers) DeleteDelegator(staker *Staker) {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.deletedDelegators == nil {
+		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
 	}
-	return maxStake, nil
+	validatorDiff.deletedDelegators[staker.TxID] = staker
+
+	if s.deletedStakers == nil {
+		s.deletedStakers = make(map[ids.ID]*Staker)
+	}
+	s.deletedStakers[staker.TxID] = staker
+}
+
+func (s *diffStakers) GetStakerIterator(parentIterator StakerIterator) StakerIterator {
+	return NewMaskedIterator(
+		NewMergedIterator(
+			parentIterator,
+			NewTreeIterator(s.addedStakers),
+		),
+		s.deletedStakers,
+	)
+}
+
+func (s *diffStakers) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffValidator {
+	if s.validatorDiffs == nil {
+		s.validatorDiffs = make(map[ids.ID]map[ids.NodeID]*diffValidator)
+	}
+	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
+	if !ok {
+		subnetValidatorDiffs = make(map[ids.NodeID]*diffValidator)
+		s.validatorDiffs[subnetID] = subnetValidatorDiffs
+	}
+	validatorDiff, ok := subnetValidatorDiffs[nodeID]
+	if !ok {
+		validatorDiff = &diffValidator{}
+		subnetValidatorDiffs[nodeID] = validatorDiff
+	}
+	return validatorDiff
 }

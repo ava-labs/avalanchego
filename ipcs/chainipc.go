@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -60,18 +62,26 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusAc
 // Publish creates a set of eventSockets for the given chainID
 func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 	if es, ok := cipcs.chains[chainID]; ok {
-		cipcs.log.Info("returning existing blockchainID %s", chainID.String())
+		cipcs.log.Info("returning existing event sockets",
+			zap.Stringer("blockchainID", chainID),
+		)
 		return es, nil
 	}
 
 	es, err := newEventSockets(cipcs.context, chainID, cipcs.consensusAcceptorGroup, cipcs.decisionAcceptorGroup)
 	if err != nil {
-		cipcs.log.Error("can't create ipcs: %s", err)
+		cipcs.log.Error("can't create ipcs",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	cipcs.chains[chainID] = es
-	cipcs.log.Info("created IPC sockets for blockchain %s at %s and %s", chainID.String(), es.ConsensusURL(), es.DecisionsURL())
+	cipcs.log.Info("created IPC sockets",
+		zap.Stringer("blockchainID", chainID),
+		zap.String("consensusURL", es.ConsensusURL()),
+		zap.String("decisionsURL", es.DecisionsURL()),
+	)
 	return es, nil
 }
 

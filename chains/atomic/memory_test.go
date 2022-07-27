@@ -16,11 +16,7 @@ var (
 )
 
 func TestMemorySharedID(t *testing.T) {
-	m := Memory{}
-	err := m.Initialize(memdb.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := NewMemory(memdb.New())
 
 	sharedID0 := m.sharedID(blockchainID0, blockchainID1)
 	sharedID1 := m.sharedID(blockchainID1, blockchainID0)
@@ -31,11 +27,7 @@ func TestMemorySharedID(t *testing.T) {
 }
 
 func TestMemoryMakeReleaseLock(t *testing.T) {
-	m := Memory{}
-	err := m.Initialize(memdb.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := NewMemory(memdb.New())
 
 	sharedID := m.sharedID(blockchainID0, blockchainID1)
 
@@ -59,11 +51,7 @@ func TestMemoryMakeReleaseLock(t *testing.T) {
 }
 
 func TestMemoryUnknownFree(t *testing.T) {
-	m := Memory{}
-	err := m.Initialize(memdb.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := NewMemory(memdb.New())
 
 	sharedID := m.sharedID(blockchainID0, blockchainID1)
 

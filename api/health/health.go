@@ -4,10 +4,11 @@
 package health
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -79,44 +80,32 @@ func (h *health) RegisterLivenessCheck(name string, checker Checker) error {
 
 func (h *health) Readiness() (map[string]Result, bool) {
 	results, healthy := h.readiness.Results()
-	if healthy {
-		return results, healthy
+	if !healthy {
+		h.log.Warn("failing readiness check",
+			zap.Reflect("reason", results),
+		)
 	}
-	resultsJSON, err := json.Marshal(results)
-	if err == nil {
-		h.log.Warn("Failing readiness check: %s", string(resultsJSON))
-	} else {
-		h.log.Error("Failed to marshal failing readiness check: %s", err)
-	}
-	return results, false
+	return results, healthy
 }
 
 func (h *health) Health() (map[string]Result, bool) {
 	results, healthy := h.health.Results()
-	if healthy {
-		return results, healthy
+	if !healthy {
+		h.log.Warn("failing health check",
+			zap.Reflect("reason", results),
+		)
 	}
-	resultsJSON, err := json.Marshal(results)
-	if err == nil {
-		h.log.Warn("Failing health check: %s", string(resultsJSON))
-	} else {
-		h.log.Error("Failed to marshal failing health check: %s", err)
-	}
-	return results, false
+	return results, healthy
 }
 
 func (h *health) Liveness() (map[string]Result, bool) {
 	results, healthy := h.liveness.Results()
-	if healthy {
-		return results, healthy
+	if !healthy {
+		h.log.Warn("failing liveness check",
+			zap.Reflect("reason", results),
+		)
 	}
-	resultsJSON, err := json.Marshal(results)
-	if err == nil {
-		h.log.Warn("Failing liveness check: %s", string(resultsJSON))
-	} else {
-		h.log.Error("Failed to marshal failing liveness check: %s", err)
-	}
-	return results, false
+	return results, healthy
 }
 
 func (h *health) Start(freq time.Duration) {

@@ -41,6 +41,14 @@ const (
 	// of Timeout and if no activity is seen even after that the connection is
 	// closed. grpc-go default 20s
 	defaultServerKeepAliveTimeout = 20 * time.Second
+	// Duration for the maximum amount of time a http2 connection can exist
+	// before sending GOAWAY. Internally in gRPC a +-10% jitter is added to
+	// mitigate retry storms.
+	defaultServerMaxConnectionAge = 10 * time.Minute
+	// Grace period after max defaultServerMaxConnectionAge after
+	// which the http2 connection is closed. 1 second is the minimum possible
+	// value. Anything less will be internally overridden to 1s by grpc.
+	defaultServerMaxConnectionAgeGrace = 1 * time.Second
 
 	// Client:
 
@@ -79,8 +87,10 @@ var (
 			PermitWithoutStream: defaultPermitWithoutStream,
 		}),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Time:    defaultServerKeepAliveInterval,
-			Timeout: defaultServerKeepAliveTimeout,
+			Time:                  defaultServerKeepAliveInterval,
+			Timeout:               defaultServerKeepAliveTimeout,
+			MaxConnectionAge:      defaultServerMaxConnectionAge,
+			MaxConnectionAgeGrace: defaultServerMaxConnectionAgeGrace,
 		}),
 	}
 )

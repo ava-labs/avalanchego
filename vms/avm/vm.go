@@ -16,6 +16,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -144,7 +146,9 @@ func (vm *VM) Initialize(
 		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
 			return err
 		}
-		ctx.Log.Info("VM config initialized %+v", avmConfig)
+		ctx.Log.Info("VM config initialized",
+			zap.Reflect("config", avmConfig),
+		)
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -451,7 +455,10 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			}
 		}
 		if index == 0 {
-			vm.ctx.Log.Info("Fee payments are using Asset with Alias: %s, AssetID: %s", genesisTx.Alias, txID)
+			vm.ctx.Log.Info("fee asset is established",
+				zap.String("alias", genesisTx.Alias),
+				zap.Stringer("assetID", txID),
+			)
 			vm.feeAssetID = txID
 		}
 	}
@@ -465,7 +472,9 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 
 func (vm *VM) initState(tx txs.Tx) error {
 	txID := tx.ID()
-	vm.ctx.Log.Info("initializing with AssetID %s", txID)
+	vm.ctx.Log.Info("initializing genesis asset",
+		zap.Stringer("txID", txID),
+	)
 	if err := vm.state.PutTx(txID, &tx); err != nil {
 		return err
 	}

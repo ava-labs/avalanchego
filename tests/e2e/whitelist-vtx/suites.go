@@ -6,27 +6,31 @@ package whitelistvtx
 
 import (
 	"context"
-	"crypto/rand"
-	"math/big"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/onsi/gomega"
-
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var keyFactory crypto.FactorySECP256K1R
+const (
+	metricVtxIssueSuccess = "avalanche_X_whitelist_vtx_issue_success"
+	metricVtxIssueFailure = "avalanche_X_whitelist_vtx_issue_failure"
+	metricTxProcessing    = "avalanche_X_whitelist_tx_processing"
+	metricTxAccepted      = "avalanche_X_whitelist_tx_accepted_count"
+	metricTxRejected      = "avalanche_X_whitelist_tx_rejected_count"
+	metricTxPollsAccepted = "avalanche_X_whitelist_tx_polls_accepted_count"
+	metricTxPollsRejected = "avalanche_X_whitelist_tx_polls_rejected_count"
+)
 
 var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 	ginkgo.It("can issue whitelist vtx", func() {
@@ -37,35 +41,41 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 		uris := e2e.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
-		randomKeyIntf, err := keyFactory.NewPrivateKey()
-		gomega.Expect(err).Should(gomega.BeNil())
-
-		randomKey := randomKeyIntf.(*crypto.PrivateKeySECP256K1R)
-		randomAddr := randomKey.PublicKey().Address()
-		keys := secp256k1fx.NewKeychain(
-			genesis.EWOQKey,
-			randomKey,
-		)
-		var wallet primary.Wallet
+		testKeys, testKeyAddrs, keyChain := e2e.LoadTestKeys()
+		var baseWallet primary.Wallet
 		ginkgo.By("collect whitelist vtx metrics", func() {
 			walletURI := uris[0]
 
 			// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			var err error
-			wallet, err = primary.NewWalletFromURI(ctx, walletURI, keys)
+			baseWallet, err = primary.NewWalletFromURI(ctx, walletURI, keyChain)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
+
+			if baseWallet.P().NetworkID() == constants.MainnetID {
+				ginkgo.Skip("skipping tests (mainnet)")
+			}
 		})
+		avaxAssetID := baseWallet.X().AVAXAssetID()
+		wallets := make([]primary.Wallet, len(testKeys))
+		for i := range wallets {
+			wallets[i] = primary.NewWalletWithOptions(
+				baseWallet,
+				common.WithCustomAddresses(ids.ShortSet{
+					testKeys[i].PublicKey().Address(): struct{}{},
+				}),
+			)
+		}
 
 		allMetrics := []string{
-			"avalanche_X_whitelist_vtx_issue_success",
-			"avalanche_X_whitelist_vtx_issue_failure",
-			"avalanche_X_whitelist_tx_processing",
-			"avalanche_X_whitelist_tx_accepted_count",
-			"avalanche_X_whitelist_tx_polls_accepted_count",
-			"avalanche_X_whitelist_tx_rejected_count",
-			"avalanche_X_whitelist_tx_polls_rejected_count",
+			metricVtxIssueSuccess,
+			metricVtxIssueFailure,
+			metricTxProcessing,
+			metricTxAccepted,
+			metricTxRejected,
+			metricTxPollsAccepted,
+			metricTxPollsRejected,
 		}
 
 		// URI -> "metric name" -> "metric value"
@@ -78,7 +88,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				gomega.Expect(err).Should(gomega.BeNil())
 				tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
 
-				if mm["avalanche_X_whitelist_tx_accepted_count"] > 0 {
+				if mm[metricTxAccepted] > 0 {
 					tests.Outf("{{red}}{{bold}}%q already has whitelist vtx!!!{{/}}\n", u)
 					ginkgo.Skip("the cluster has already accepted whitelist vtx thus skipping")
 				}
@@ -87,47 +97,34 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 			}
 		})
 
-		ewoqWallet := primary.NewWalletWithOptions(
-			wallet,
-			common.WithCustomAddresses(ids.ShortSet{
-				genesis.EWOQKey.PublicKey().Address(): struct{}{},
-			}),
-		)
-		randWallet := primary.NewWalletWithOptions(
-			wallet,
-			common.WithCustomAddresses(ids.ShortSet{
-				randomKey.PublicKey().Address(): struct{}{},
-			}),
-		)
 		ginkgo.By("issue regular, virtuous X-Chain tx, before whitelist vtx, should succeed", func() {
-			balances, err := ewoqWallet.X().Builder().GetFTBalance()
+			balances, err := wallets[0].X().Builder().GetFTBalance()
+			gomega.Expect(err).Should(gomega.BeNil())
+			key1PrevBalX := balances[avaxAssetID]
+			tests.Outf("{{green}}first wallet balance:{{/}} %d\n", key1PrevBalX)
+
+			balances, err = wallets[1].X().Builder().GetFTBalance()
 			gomega.Expect(err).Should(gomega.BeNil())
 
-			avaxAssetID := wallet.X().AVAXAssetID()
-			ewoqPrevBalX := balances[avaxAssetID]
-			tests.Outf("{{green}}ewoq wallet balance:{{/}} %d\n", ewoqPrevBalX)
+			key2PrevBalX := balances[avaxAssetID]
+			tests.Outf("{{green}}second wallet balance:{{/}} %d\n", key2PrevBalX)
 
-			balances, err = randWallet.X().Builder().GetFTBalance()
-			gomega.Expect(err).Should(gomega.BeNil())
-
-			randPrevBalX := balances[avaxAssetID]
-			tests.Outf("{{green}}rand wallet balance:{{/}} %d\n", randPrevBalX)
-
-			amount := genRandUint64(ewoqPrevBalX)
-			tests.Outf("{{green}}amount to transfer:{{/}} %d\n", amount)
+			transferAmount := key1PrevBalX / 10
+			gomega.Expect(transferAmount).Should(gomega.BeNumerically(">", 0.0), "not enough balance in the test wallet")
+			tests.Outf("{{green}}amount to transfer:{{/}} %d\n", transferAmount)
 
 			tests.Outf("{{blue}}issuing regular, virtuous transaction at %q{{/}}\n", uris[0])
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-			_, err = ewoqWallet.X().IssueBaseTx(
+			_, err = wallets[0].X().IssueBaseTx(
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{
 						ID: avaxAssetID,
 					},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: amount,
+						Amt: transferAmount,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
-							Addrs:     []ids.ShortID{randomAddr},
+							Addrs:     []ids.ShortID{testKeyAddrs[1]},
 						},
 					},
 				}},
@@ -138,18 +135,18 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 
 			time.Sleep(3 * time.Second)
 
-			balances, err = ewoqWallet.X().Builder().GetFTBalance()
+			balances, err = wallets[0].X().Builder().GetFTBalance()
 			gomega.Expect(err).Should(gomega.BeNil())
-			ewoqCurBalX := balances[avaxAssetID]
-			tests.Outf("{{green}}ewoq wallet balance:{{/}} %d\n", ewoqCurBalX)
+			key1CurBalX := balances[avaxAssetID]
+			tests.Outf("{{green}}first wallet balance:{{/}} %d\n", key1CurBalX)
 
-			balances, err = randWallet.X().Builder().GetFTBalance()
+			balances, err = wallets[1].X().Builder().GetFTBalance()
 			gomega.Expect(err).Should(gomega.BeNil())
-			randCurBalX := balances[avaxAssetID]
-			tests.Outf("{{green}}ewoq wallet balance:{{/}} %d\n", randCurBalX)
+			key2CurBalX := balances[avaxAssetID]
+			tests.Outf("{{green}}second wallet balance:{{/}} %d\n", key2CurBalX)
 
-			gomega.Expect(ewoqCurBalX).Should(gomega.Equal(ewoqPrevBalX - amount - wallet.X().BaseTxFee()))
-			gomega.Expect(randCurBalX).Should(gomega.Equal(randPrevBalX + amount))
+			gomega.Expect(key1CurBalX).Should(gomega.Equal(key1PrevBalX - transferAmount - baseWallet.X().BaseTxFee()))
+			gomega.Expect(key2CurBalX).Should(gomega.Equal(key2PrevBalX + transferAmount))
 		})
 
 		// issue a whitelist vtx to the first node
@@ -178,21 +175,21 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				prev := curMetrics[u]
 
 				// +1 since the local node engine issues a new whitelist vtx
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_success"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_success"] + 1))
+				gomega.Expect(mm[metricVtxIssueSuccess]).Should(gomega.Equal(prev[metricVtxIssueSuccess] + 1))
 
 				// +0 since no node ever failed to issue a whitelist vtx
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_failure"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_failure"]))
+				gomega.Expect(mm[metricVtxIssueFailure]).Should(gomega.Equal(prev[metricVtxIssueFailure]))
 
 				// +0 since the local node snowstorm successfully issued the whitelist tx or received from the first node, and accepted
-				gomega.Expect(mm["avalanche_X_whitelist_tx_processing"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_processing"]))
+				gomega.Expect(mm[metricTxProcessing]).Should(gomega.Equal(prev[metricTxProcessing]))
 
 				// +1 since the local node snowstorm successfully accepted the whitelist tx or received from the first node
-				gomega.Expect(mm["avalanche_X_whitelist_tx_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_accepted_count"] + 1))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_accepted_count"] + 1))
+				gomega.Expect(mm[metricTxAccepted]).Should(gomega.Equal(prev[metricTxAccepted] + 1))
+				gomega.Expect(mm[metricTxPollsAccepted]).Should(gomega.Equal(prev[metricTxPollsAccepted] + 1))
 
 				// +0 since no node ever rejected a whitelist tx
-				gomega.Expect(mm["avalanche_X_whitelist_tx_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_rejected_count"]))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_rejected_count"]))
+				gomega.Expect(mm[metricTxRejected]).Should(gomega.Equal(prev[metricTxRejected]))
+				gomega.Expect(mm[metricTxPollsRejected]).Should(gomega.Equal(prev[metricTxPollsRejected]))
 
 				curMetrics[u] = mm
 			}
@@ -220,47 +217,48 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				prev := curMetrics[u]
 
 				// +0 since no node should ever successfully issue another whitelist vtx
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_success"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_success"]))
+				gomega.Expect(mm[metricVtxIssueSuccess]).Should(gomega.Equal(prev[metricVtxIssueSuccess]))
 
 				// +1 since the local node engine failed the conflicting whitelist vtx issue request
-				gomega.Expect(mm["avalanche_X_whitelist_vtx_issue_failure"]).Should(gomega.Equal(prev["avalanche_X_whitelist_vtx_issue_failure"] + 1))
+				gomega.Expect(mm[metricVtxIssueFailure]).Should(gomega.Equal(prev[metricVtxIssueFailure] + 1))
 
 				// +0 since the local node snowstorm successfully issued the whitelist tx "before", and no whitelist tx is being processed
-				gomega.Expect(mm["avalanche_X_whitelist_tx_processing"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_processing"]))
+				gomega.Expect(mm[metricTxProcessing]).Should(gomega.Equal(prev[metricTxProcessing]))
 
 				// +0 since the local node snowstorm successfully accepted the whitelist tx "before"
-				gomega.Expect(mm["avalanche_X_whitelist_tx_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_accepted_count"]))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_accepted_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_accepted_count"]))
+				gomega.Expect(mm[metricTxAccepted]).Should(gomega.Equal(prev[metricTxAccepted]))
+				gomega.Expect(mm[metricTxPollsAccepted]).Should(gomega.Equal(prev[metricTxPollsAccepted]))
 
 				// +0 since the local node snowstorm never rejected a whitelist tx
-				gomega.Expect(mm["avalanche_X_whitelist_tx_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_rejected_count"]))
-				gomega.Expect(mm["avalanche_X_whitelist_tx_polls_rejected_count"]).Should(gomega.Equal(prev["avalanche_X_whitelist_tx_polls_rejected_count"]))
+				gomega.Expect(mm[metricTxRejected]).Should(gomega.Equal(prev[metricTxRejected]))
+				gomega.Expect(mm[metricTxPollsRejected]).Should(gomega.Equal(prev[metricTxPollsRejected]))
 
 				curMetrics[u] = mm
 			}
 		})
 
 		ginkgo.By("issue regular, virtuous X-Chain tx, after whitelist vtx, should fail", func() {
-			balances, err := ewoqWallet.X().Builder().GetFTBalance()
+			balances, err := wallets[0].X().Builder().GetFTBalance()
 			gomega.Expect(err).Should(gomega.BeNil())
 
-			avaxAssetID := wallet.X().AVAXAssetID()
-			ewoqPrevBalX := balances[avaxAssetID]
-			tests.Outf("{{green}}ewoq wallet balance:{{/}} %d\n", ewoqPrevBalX)
+			avaxAssetID := baseWallet.X().AVAXAssetID()
+			key1PrevBalX := balances[avaxAssetID]
+			tests.Outf("{{green}}first wallet balance:{{/}} %d\n", key1PrevBalX)
 
-			amount := genRandUint64(ewoqPrevBalX)
+			transferAmount := key1PrevBalX / 10
+			gomega.Expect(transferAmount).Should(gomega.BeNumerically(">", 0.0), "not enough balance in the test wallet")
 			tests.Outf("{{blue}}issuing regular, virtuous transaction at %q{{/}}\n", uris[0])
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-			_, err = ewoqWallet.X().IssueBaseTx(
+			_, err = wallets[0].X().IssueBaseTx(
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{
 						ID: avaxAssetID,
 					},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: amount,
+						Amt: transferAmount,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
-							Addrs:     []ids.ShortID{randomAddr},
+							Addrs:     []ids.ShortID{testKeyAddrs[1]},
 						},
 					},
 				}},
@@ -280,15 +278,3 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 		})
 	})
 })
-
-// use lower 5% as upper-bound
-// we don't want to transfer all at once
-// which fails all subsequent requests.
-func genRandUint64(max uint64) uint64 {
-	mb := new(big.Int).SetUint64(max / 20)
-	nBig, err := rand.Int(rand.Reader, mb)
-	if err != nil {
-		return 0
-	}
-	return nBig.Uint64()
-}
