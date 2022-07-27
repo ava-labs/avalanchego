@@ -231,7 +231,15 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
-		_, err := GetValidator(parentState, tx.Validator.Subnet, tx.Validator.NodeID)
+		_, err := parentState.GetSubnetTransformation(tx.Validator.Subnet)
+		if err == nil {
+			return fmt.Errorf("%s is immutable", tx.Validator.Subnet)
+		}
+		if err != database.ErrNotFound {
+			return err
+		}
+
+		_, err = GetValidator(parentState, tx.Validator.Subnet, tx.Validator.NodeID)
 		if err == nil {
 			return fmt.Errorf(
 				"attempted to issue duplicate subnet validation for %s",

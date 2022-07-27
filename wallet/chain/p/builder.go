@@ -566,6 +566,7 @@ func (b *builder) NewTransformSubnetTx(
 ) (*txs.TransformSubnetTx, error) {
 	toBurn := map[ids.ID]uint64{
 		b.backend.AVAXAssetID(): b.backend.TransformSubnetTxFee(),
+		assetID:                 maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
