@@ -111,7 +111,7 @@ package stateful
 
 // 	// setup and store parent block
 // 	// it's a standard block for simplicity
-// 	parentVersion := uint16(stateless.BlueberryVersion)
+// 	parentVersion := uint16(version.BlueberryBlockVersion)
 // 	parentTime := now
 // 	parentHeight := uint64(2022)
 
@@ -170,7 +170,7 @@ package stateful
 
 // 	// wrong height
 // 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		childTimestamp,
 // 		blueberryParentBlk.ID(),
 // 		blueberryParentBlk.Height(),
@@ -183,7 +183,7 @@ package stateful
 // 	// wrong timestamp, earlier than parent
 // 	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
 // 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		childTimestamp,
 // 		blueberryParentBlk.ID(),
 // 		blueberryParentBlk.Height()+1,
@@ -196,7 +196,7 @@ package stateful
 // 	// wrong timestamp, violated synchrony bound
 // 	childTimestamp = uint64(parentTime.Add(executor.SyncBound).Add(time.Second).Unix())
 // 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		childTimestamp,
 // 		blueberryParentBlk.ID(),
 // 		blueberryParentBlk.Height()+1,
@@ -209,7 +209,7 @@ package stateful
 // 	// wrong timestamp, skipped staker set change event
 // 	childTimestamp = uint64(nextStakerTime.Add(time.Second).Unix())
 // 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		childTimestamp,
 // 		blueberryParentBlk.ID(),
 // 		blueberryParentBlk.Height()+1,
@@ -222,7 +222,7 @@ package stateful
 // 	// valid block, same timestamp as parent block
 // 	childTimestamp = uint64(parentTime.Unix())
 // 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		childTimestamp,
 // 		blueberryParentBlk.ID(),
 // 		blueberryParentBlk.Height()+1,
@@ -235,7 +235,7 @@ package stateful
 // 	// valid
 // 	childTimestamp = uint64(nextStakerTime.Unix())
 // 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		childTimestamp,
 // 		blueberryParentBlk.ID(),
 // 		blueberryParentBlk.Height()+1,
@@ -282,7 +282,7 @@ package stateful
 // 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 // 	assert.NoError(err)
 // 	statelessStandardBlock, err := stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		uint64(pendingValidatorStartTime.Unix()),
 // 		parentBlk.ID(),
 // 		parentBlk.Height()+1,
@@ -484,7 +484,7 @@ package stateful
 // 				parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 // 				assert.NoError(err)
 // 				statelessStandardBlock, err := stateless.NewStandardBlock(
-// 					stateless.BlueberryVersion,
+// 					version.BlueberryBlockVersion,
 // 					uint64(newTime.Unix()),
 // 					parentBlk.ID(),
 // 					parentBlk.Height()+1,
@@ -593,7 +593,7 @@ package stateful
 // 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 // 	assert.NoError(err)
 // 	statelessStandardBlock, err := stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		uint64(subnetVdr1EndTime.Unix()),
 // 		parentBlk.ID(),
 // 		parentBlk.Height()+1,
@@ -665,7 +665,7 @@ package stateful
 // 			parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 // 			assert.NoError(err)
 // 			statelessStandardBlock, err := stateless.NewStandardBlock(
-// 				stateless.BlueberryVersion,
+// 				version.BlueberryBlockVersion,
 // 				uint64(subnetVdr1StartTime.Unix()),
 // 				parentBlk.ID(),
 // 				parentBlk.Height()+1,
@@ -715,7 +715,7 @@ package stateful
 // 	parentBlk, _, err := h.fullState.GetStatelessBlock(preferredID)
 // 	assert.NoError(err)
 // 	statelessStandardBlock, err := stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		uint64(pendingValidatorStartTime.Unix()),
 // 		parentBlk.ID(),
 // 		parentBlk.Height()+1,
@@ -757,7 +757,7 @@ package stateful
 
 // 	// Advance Time
 // 	statelessStandardBlock, err = stateless.NewStandardBlock(
-// 		stateless.BlueberryVersion,
+// 		version.BlueberryBlockVersion,
 // 		uint64(pendingDelegatorStartTime.Unix()),
 // 		parentBlk.ID(),
 // 		parentBlk.Height()+1,

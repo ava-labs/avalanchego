@@ -41,10 +41,6 @@ func NewAtomicBlock(
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	if err := tx.Sign(txs.Codec, nil); err != nil {
-		return nil, fmt.Errorf("failed to sign block: %w", err)
-	}
-
 	return res, res.Initialize(ApricotVersion, bytes)
 }
 
@@ -52,20 +48,14 @@ func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
 	if err := ab.CommonBlock.Initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
+	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
-	signedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	ab.Tx.Initialize(unsignedBytes, signedBytes)
 	return nil
 }
 
 func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
 func (ab *AtomicBlock) Visit(v Visitor) error {
-	return v.VisitAtomicBlock(ab)
+	return v.AtomicBlock(ab)
 }

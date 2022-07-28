@@ -58,7 +58,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		recentlyAccepted: nil,
 	}
 
-	err = acceptor.VisitApricotProposalBlock(proposalBlk)
+	err = acceptor.ApricotProposalBlock(proposalBlk)
 	assert.NoError(err)
 
 	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
@@ -110,7 +110,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.VisitAtomicBlock(blk)
+	err = acceptor.AtomicBlock(blk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -144,7 +144,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.VisitAtomicBlock(blk)
+	err = acceptor.AtomicBlock(blk)
 	assert.NoError(err)
 }
 
@@ -200,7 +200,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.VisitApricotStandardBlock(apricotStandardBlk)
+	err = acceptor.ApricotStandardBlock(apricotStandardBlk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -238,7 +238,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.VisitApricotStandardBlock(apricotStandardBlk)
+	err = acceptor.ApricotStandardBlock(apricotStandardBlk)
 	assert.NoError(err)
 	assert.True(calledOnAcceptFunc)
 	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
@@ -283,7 +283,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	assert.True(ok)
 
 	blkID := blk.ID()
-	err = acceptor.VisitCommitBlock(commitBlk)
+	err = acceptor.CommitBlock(commitBlk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -337,7 +337,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.VisitCommitBlock(commitBlk)
+	err = acceptor.CommitBlock(commitBlk)
 	assert.NoError(err)
 	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
@@ -381,7 +381,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	assert.True(ok)
 
 	blkID := blk.ID()
-	err = acceptor.VisitAbortBlock(abortBlk)
+	err = acceptor.AbortBlock(abortBlk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -435,7 +435,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.VisitAbortBlock(abortBlk)
+	err = acceptor.AbortBlock(abortBlk)
 	assert.NoError(err)
 	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

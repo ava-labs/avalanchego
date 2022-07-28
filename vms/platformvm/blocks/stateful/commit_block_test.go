@@ -9,9 +9,21 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/stretchr/testify/assert"
 )
+
+func testProposalTx() (*txs.Tx, error) {
+	utx := &txs.RewardValidatorTx{
+		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
+	}
+
+	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
+	return txs.NewSigned(utx, txs.Codec, signers)
+}
 
 func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 	assert := assert.New(t)
@@ -25,7 +37,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 
 	now := defaultGenesisTime.Add(time.Hour)
 	h.clk.Set(now)
-	blkVersion := uint16(stateless.BlueberryVersion)
+	blkVersion := uint16(version.BlueberryBlockVersion)
 
 	tests := []struct {
 		description string

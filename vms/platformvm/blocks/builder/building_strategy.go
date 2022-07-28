@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 )
 
@@ -48,7 +49,7 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 			parentState:  preferredState,
 			height:       nextHeight,
 		}, nil
-	case stateless.BlueberryVersion:
+	case version.BlueberryBlockVersion:
 		return &blueberryStrategy{
 			blockBuilder: b,
 			parentBlkID:  prefBlkID,

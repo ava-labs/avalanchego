@@ -15,6 +15,7 @@ var (
 	_ Block = &BlueberryProposalBlock{}
 )
 
+// TODO can we assume [tx] is initialized?
 func NewProposalBlock(
 	version uint16,
 	timestamp uint64,
@@ -22,12 +23,6 @@ func NewProposalBlock(
 	height uint64,
 	tx *txs.Tx,
 ) (Block, error) {
-	// make sure txs to be included in the block
-	// are duly initialized
-	if err := tx.Sign(txs.Codec, nil); err != nil {
-		return nil, fmt.Errorf("failed to sign block: %w", err)
-	}
-
 	switch version {
 	case ApricotVersion:
 		res := &ApricotProposalBlock{
@@ -42,13 +37,19 @@ func NewProposalBlock(
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
 		blk := Block(res)
-		bytes, err := Codec.Marshal(version, &blk)
+		bytes, err := Codec.Marshal(ApricotVersion, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
-		return res, res.Initialize(version, bytes)
+		return res, res.Initialize(ApricotVersion, bytes)
 
 	case BlueberryVersion:
+		// Make sure we have the byte representation of
+		// the [tx] so we can use it in the block.
+		if err := tx.Sign(txs.Codec, nil); err != nil {
+			return nil, fmt.Errorf("failed to sign block: %w", err)
+		}
+
 		res := &BlueberryProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
@@ -62,11 +63,11 @@ func NewProposalBlock(
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
 		blk := Block(res)
-		bytes, err := Codec.Marshal(version, &blk)
+		bytes, err := Codec.Marshal(BlueberryVersion, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
-		return res, res.Initialize(version, bytes)
+		return res, res.Initialize(BlueberryVersion, bytes)
 
 	default:
 		return nil, fmt.Errorf("unsopported block version %d", version)
@@ -84,23 +85,13 @@ func (apb *ApricotProposalBlock) Initialize(version uint16, bytes []byte) error 
 	if err := apb.CommonBlock.Initialize(version, bytes); err != nil {
 		return err
 	}
-
-	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &apb.Tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
-	}
-	signedBytes, err := txs.Codec.Marshal(txs.Version, &apb.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	apb.Tx.Initialize(unsignedBytes, signedBytes)
-	return nil
+	return apb.Tx.Sign(txs.Codec, nil)
 }
 
 func (apb *ApricotProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{apb.Tx} }
 
 func (apb *ApricotProposalBlock) Visit(v Visitor) error {
-	return v.VisitApricotProposalBlock(apb)
+	return v.ApricotProposalBlock(apb)
 }
 
 type BlueberryProposalBlock struct {
@@ -116,21 +107,23 @@ func (bpb *BlueberryProposalBlock) Initialize(version uint16, bytes []byte) erro
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	var tx *txs.Tx
-	_, err := txs.Codec.Unmarshal(bpb.TxBytes, &tx)
-	if err != nil {
-		return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
+	// [Tx] may be initialized from NewProposalBlock
+	// TODO can we do this a better way?
+	if bpb.Tx == nil {
+		var tx txs.Tx
+		if _, err := txs.Codec.Unmarshal(bpb.TxBytes, &tx); err != nil {
+			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
+		}
+		bpb.Tx = &tx
+		if err := bpb.Tx.Sign(txs.Codec, nil); err != nil {
+			return fmt.Errorf("failed to sign block: %w", err)
+		}
 	}
-	bpb.Tx = tx
-	if err := bpb.Tx.Sign(txs.Codec, nil); err != nil {
-		return fmt.Errorf("failed to sign block: %w", err)
-	}
-
 	return nil
 }
 
 func (bpb *BlueberryProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{bpb.Tx} }
 
 func (bpb *BlueberryProposalBlock) Visit(v Visitor) error {
-	return v.VisitBlueberryProposalBlock(bpb)
+	return v.BlueberryProposalBlock(bpb)
 }

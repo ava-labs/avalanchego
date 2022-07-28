@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -33,7 +35,7 @@ type verifier struct {
 	txExecutorBackend executor.Backend
 }
 
-func (v *verifier) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+func (v *verifier) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -85,7 +87,7 @@ func (v *verifier) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) 
 	return nil
 }
 
-func (v *verifier) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+func (v *verifier) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -182,7 +184,7 @@ func (v *verifier) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlo
 	return nil
 }
 
-func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+func (v *verifier) AtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -263,7 +265,7 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (v *verifier) VisitApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
+func (v *verifier) ApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -371,7 +373,7 @@ func (v *verifier) VisitApricotStandardBlock(b *stateless.ApricotStandardBlock) 
 	return nil
 }
 
-func (v *verifier) VisitBlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
+func (v *verifier) BlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -516,7 +518,7 @@ func (v *verifier) VisitBlueberryStandardBlock(b *stateless.BlueberryStandardBlo
 	return nil
 }
 
-func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
+func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -537,7 +539,8 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	onAcceptState := parentState.onCommitState
 
 	var blkStateTime time.Time
-	if blkVersion == stateless.BlueberryVersion {
+	switch blkVersion {
+	case version.BlueberryBlockVersion:
 		if err := v.validateBlockTimestamp(
 			b,
 			parentState.timestamp,
@@ -545,8 +548,10 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 			return err
 		}
 		blkStateTime = time.Unix(b.UnixTimestamp(), 0)
-	} else if blkVersion == stateless.ApricotVersion {
+	case version.ApricotBlockVersion:
 		blkStateTime = onAcceptState.GetTimestamp()
+	default:
+		return fmt.Errorf("invalid block version: %d", blkVersion)
 	}
 
 	blkState := &blockState{
@@ -559,7 +564,7 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	return nil
 }
 
-func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
+func (v *verifier) AbortBlock(b *stateless.AbortBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -572,7 +577,6 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 		return err
 	}
 
-	blkVersion := b.Version()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
@@ -580,18 +584,19 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 	onAcceptState := parentState.onAbortState
 
 	var blkStateTime time.Time
-	if blkVersion == stateless.BlueberryVersion {
-		if err := v.validateBlockTimestamp(
-			b,
-			parentState.timestamp,
-		); err != nil {
+	switch b.Version() {
+	case version.BlueberryBlockVersion:
+		if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
 			return err
 		}
 		blkStateTime = time.Unix(b.UnixTimestamp(), 0)
-	} else if blkVersion == stateless.ApricotVersion {
-		blkStateTime = onAcceptState.GetTimestamp()
-	}
 
+	case stateless.ApricotVersion:
+		blkStateTime = onAcceptState.GetTimestamp()
+
+	default:
+		return fmt.Errorf("invalid block version: %d", b.Version())
+	}
 	blkState := &blockState{
 		statelessBlock: b,
 		timestamp:      blkStateTime,
@@ -605,7 +610,7 @@ func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
 func (v *verifier) verifyCommonBlock(b stateless.Block) error {
 	// retrieve parent block first
 	parentID := b.Parent()
-	parentBlk, err := v.man.GetBlock(parentID)
+	parentBlk, err := v.getStatelessBlock(parentID)
 	if err != nil {
 		return err
 	}
@@ -621,7 +626,19 @@ func (v *verifier) verifyCommonBlock(b stateless.Block) error {
 
 	// verify block version
 	blkVersion := b.Version()
-	parentTimestamp := parentBlk.Timestamp()
+	// We need the parent's timestamp.
+	// Verify was already called on the parent (guaranteed by consensus engine).
+	// The parent hasn't been rejected (guaranteed by consensus engine).
+	// If the parent is accepted, the parent is the most recently
+	// accepted block.
+	// If the parent hasn't been accepted, the parent is in memory.
+	var parentTimestamp time.Time
+	if parentState, ok := v.blkIDToState[parentID]; ok {
+		parentTimestamp = parentState.timestamp
+	} else {
+		parentTimestamp = v.state.GetTimestamp()
+
+	}
 	expectedVersion := v.expectedChildVersion(parentTimestamp)
 	if expectedVersion != blkVersion {
 		return fmt.Errorf(

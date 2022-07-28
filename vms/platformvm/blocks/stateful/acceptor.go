@@ -22,7 +22,7 @@ type acceptor struct {
 	recentlyAccepted *window.Window
 }
 
-func (a *acceptor) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+func (a *acceptor) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
 	// Update the state of the chain in the database
 	// apply baseOptionState first
 	// TODO by dan for alberto: why do we do this?
@@ -36,7 +36,7 @@ func (a *acceptor) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlo
 	return a.commonVisitProposalBlock(b, false)
 }
 
-func (a *acceptor) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+func (a *acceptor) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
 	return a.commonVisitProposalBlock(b, true)
 }
 
@@ -81,7 +81,7 @@ func (a *acceptor) commonVisitProposalBlock(b stateless.Block, isApricot bool) e
 	return nil
 }
 
-func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -126,15 +126,15 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) VisitBlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
-	return a.visitStandardBlock(b)
+func (a *acceptor) BlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
+	return a.standardBlock(b)
 }
 
-func (a *acceptor) VisitApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
-	return a.visitStandardBlock(b)
+func (a *acceptor) ApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
+	return a.standardBlock(b)
 }
 
-func (a *acceptor) visitStandardBlock(b stateless.Block) error {
+func (a *acceptor) standardBlock(b stateless.Block) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -178,11 +178,11 @@ func (a *acceptor) visitStandardBlock(b stateless.Block) error {
 	return nil
 }
 
-func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
+func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
 	return a.acceptOptionBlock(b, true /* isCommit */)
 }
 
-func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
+func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
 	return a.acceptOptionBlock(b, false /* isCommit */)
 }
 

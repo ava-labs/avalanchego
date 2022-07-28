@@ -46,7 +46,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.VisitApricotProposalBlock(b.(*stateless.ApricotProposalBlock))
+				return r.ApricotProposalBlock(b.(*stateless.ApricotProposalBlock))
 			},
 		},
 		{
@@ -65,7 +65,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.VisitAtomicBlock(b.(*stateless.AtomicBlock))
+				return r.AtomicBlock(b.(*stateless.AtomicBlock))
 			},
 		},
 		{
@@ -88,7 +88,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.VisitApricotStandardBlock(b.(*stateless.ApricotStandardBlock))
+				return r.ApricotStandardBlock(b.(*stateless.ApricotStandardBlock))
 			},
 		},
 		{
@@ -102,7 +102,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, blk stateless.Block) error {
-				return r.VisitCommitBlock(blk.(*stateless.CommitBlock))
+				return r.CommitBlock(blk.(*stateless.CommitBlock))
 			},
 		},
 		{
@@ -116,7 +116,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, blk stateless.Block) error {
-				return r.VisitAbortBlock(blk.(*stateless.AbortBlock))
+				return r.AbortBlock(blk.(*stateless.AbortBlock))
 			},
 		},
 	}

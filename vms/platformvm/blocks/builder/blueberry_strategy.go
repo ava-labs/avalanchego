@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -113,7 +114,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 }
 
 func (b *blueberryStrategy) build() (snowman.Block, error) {
-	blkVersion := uint16(stateless.BlueberryVersion)
+	blkVersion := version.BlueberryBlockVersion
 	if err := b.selectBlockContent(); err != nil {
 		return nil, err
 	}

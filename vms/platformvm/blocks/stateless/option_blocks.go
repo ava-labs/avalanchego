@@ -15,8 +15,18 @@ var (
 	_ Block = &CommitBlock{}
 )
 
+type AbortBlock struct {
+	CommonBlock `serialize:"true"`
+}
+
+func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
+
+func (ab *AbortBlock) Visit(v Visitor) error {
+	return v.AbortBlock(ab)
+}
+
 func NewAbortBlock(
-	version uint16,
+	blkVersion uint16,
 	timestamp uint64,
 	parentID ids.ID,
 	height uint64,
@@ -32,26 +42,26 @@ func NewAbortBlock(
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(res)
-	bytes, err := Codec.Marshal(version, &blk)
+	bytes, err := Codec.Marshal(blkVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(version, bytes)
+	return res, res.Initialize(blkVersion, bytes)
 }
 
-func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
-
-func (ab *AbortBlock) Visit(v Visitor) error {
-	return v.VisitAbortBlock(ab)
-}
-
-type AbortBlock struct {
+type CommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
+func (cb *CommitBlock) Visit(v Visitor) error {
+	return v.CommitBlock(cb)
+}
+
+func (*CommitBlock) BlockTxs() []*txs.Tx { return nil }
+
 func NewCommitBlock(
-	version uint16,
+	blkVersion uint16,
 	timestamp uint64,
 	parentID ids.ID,
 	height uint64,
@@ -66,21 +76,12 @@ func NewCommitBlock(
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
+	// TODO is the block version right?
 	blk := Block(res)
-	bytes, err := Codec.Marshal(version, &blk)
+	bytes, err := Codec.Marshal(blkVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(version, bytes)
-}
-
-func (cb *CommitBlock) BlockTxs() []*txs.Tx { return nil }
-
-func (cb *CommitBlock) Visit(v Visitor) error {
-	return v.VisitCommitBlock(cb)
-}
-
-type CommitBlock struct {
-	CommonBlock `serialize:"true"`
+	return res, res.Initialize(blkVersion, bytes)
 }

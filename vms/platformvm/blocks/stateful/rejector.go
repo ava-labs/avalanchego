@@ -16,11 +16,11 @@ type rejector struct {
 	*backend
 }
 
-func (r *rejector) VisitBlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+func (r *rejector) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
 	return r.visitProposalBlock(b)
 }
 
-func (r *rejector) VisitApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+func (r *rejector) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
 	return r.visitProposalBlock(b)
 }
 
@@ -50,7 +50,7 @@ func (r *rejector) visitProposalBlock(b stateless.Block) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -76,11 +76,11 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) VisitBlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
+func (r *rejector) BlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
 	return r.visitStandardBlock(b)
 }
 
-func (r *rejector) VisitApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
+func (r *rejector) ApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
 	return r.visitStandardBlock(b)
 }
 
@@ -112,11 +112,11 @@ func (r *rejector) visitStandardBlock(b stateless.Block) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
+func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
 	return r.rejectOptionBlock(b, true /* isCommit */)
 }
 
-func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
+func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
 	return r.rejectOptionBlock(b, false /* isCommit */)
 }
 
