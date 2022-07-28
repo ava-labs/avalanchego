@@ -16,7 +16,7 @@ type rejector struct {
 	*backend
 }
 
-func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
+func (r *rejector) ProposalBlock(b *stateless.ProposalBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -41,7 +41,7 @@ func (r *rejector) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -66,7 +66,7 @@ func (r *rejector) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
+func (r *rejector) StandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -93,11 +93,11 @@ func (r *rejector) VisitStandardBlock(b *stateless.StandardBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) VisitCommitBlock(b *stateless.CommitBlock) error {
+func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
 	return r.rejectOptionBlock(b, true /* isCommit */)
 }
 
-func (r *rejector) VisitAbortBlock(b *stateless.AbortBlock) error {
+func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
 	return r.rejectOptionBlock(b, false /* isCommit */)
 }
 

@@ -28,7 +28,7 @@ type verifier struct {
 	txExecutorBackend executor.Backend
 }
 
-func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
+func (v *verifier) ProposalBlock(b *stateless.ProposalBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -80,7 +80,7 @@ func (v *verifier) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	return nil
 }
 
-func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+func (v *verifier) AtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -161,7 +161,7 @@ func (v *verifier) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
+func (v *verifier) StandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -269,7 +269,7 @@ func (v *verifier) VisitStandardBlock(b *stateless.StandardBlock) error {
 	return nil
 }
 
-func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
+func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -297,7 +297,7 @@ func (v *verifier) VisitCommitBlock(b *stateless.CommitBlock) error {
 	return nil
 }
 
-func (v *verifier) VisitAbortBlock(b *stateless.AbortBlock) error {
+func (v *verifier) AbortBlock(b *stateless.AbortBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {

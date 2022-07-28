@@ -33,7 +33,7 @@ func (sb *StandardBlock) initialize(bytes []byte) error {
 func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
 
 func (sb *StandardBlock) Visit(v Visitor) error {
-	return v.VisitStandardBlock(sb)
+	return v.StandardBlock(sb)
 }
 
 func NewStandardBlock(
@@ -52,16 +52,9 @@ func NewStandardBlock(
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(res)
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(txs.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-
-	for _, tx := range res.Txs {
-		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return nil, fmt.Errorf("failed to sign block: %w", err)
-		}
-	}
-
 	return res, res.initialize(bytes)
 }

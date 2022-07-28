@@ -5,36 +5,37 @@
 package atomic
 
 import (
+	reflect "reflect"
+
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
-// MockSharedMemory is a mock of SharedMemory interface
+// MockSharedMemory is a mock of SharedMemory interface.
 type MockSharedMemory struct {
 	ctrl     *gomock.Controller
 	recorder *MockSharedMemoryMockRecorder
 }
 
-// MockSharedMemoryMockRecorder is the mock recorder for MockSharedMemory
+// MockSharedMemoryMockRecorder is the mock recorder for MockSharedMemory.
 type MockSharedMemoryMockRecorder struct {
 	mock *MockSharedMemory
 }
 
-// NewMockSharedMemory creates a new mock instance
+// NewMockSharedMemory creates a new mock instance.
 func NewMockSharedMemory(ctrl *gomock.Controller) *MockSharedMemory {
 	mock := &MockSharedMemory{ctrl: ctrl}
 	mock.recorder = &MockSharedMemoryMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockSharedMemory) EXPECT() *MockSharedMemoryMockRecorder {
 	return m.recorder
 }
 
-// Apply mocks base method
+// Apply mocks base method.
 func (m *MockSharedMemory) Apply(arg0 map[ids.ID]*Requests, arg1 ...database.Batch) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0}
@@ -46,14 +47,14 @@ func (m *MockSharedMemory) Apply(arg0 map[ids.ID]*Requests, arg1 ...database.Bat
 	return ret0
 }
 
-// Apply indicates an expected call of Apply
+// Apply indicates an expected call of Apply.
 func (mr *MockSharedMemoryMockRecorder) Apply(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0}, arg1...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockSharedMemory)(nil).Apply), varargs...)
 }
 
-// Get mocks base method
+// Get mocks base method.
 func (m *MockSharedMemory) Get(arg0 ids.ID, arg1 [][]byte) ([][]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0, arg1)
@@ -62,13 +63,13 @@ func (m *MockSharedMemory) Get(arg0 ids.ID, arg1 [][]byte) ([][]byte, error) {
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get
+// Get indicates an expected call of Get.
 func (mr *MockSharedMemoryMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSharedMemory)(nil).Get), arg0, arg1)
 }
 
-// Indexed mocks base method
+// Indexed mocks base method.
 func (m *MockSharedMemory) Indexed(arg0 ids.ID, arg1 [][]byte, arg2, arg3 []byte, arg4 int) ([][]byte, []byte, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Indexed", arg0, arg1, arg2, arg3, arg4)
@@ -79,7 +80,7 @@ func (m *MockSharedMemory) Indexed(arg0 ids.ID, arg1 [][]byte, arg2, arg3 []byte
 	return ret0, ret1, ret2, ret3
 }
 
-// Indexed indicates an expected call of Indexed
+// Indexed indicates an expected call of Indexed.
 func (mr *MockSharedMemoryMockRecorder) Indexed(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Indexed", reflect.TypeOf((*MockSharedMemory)(nil).Indexed), arg0, arg1, arg2, arg3, arg4)
