@@ -4,9 +4,9 @@
 package stateless
 
 type Visitor interface {
-	VisitAtomicBlock(blk *AtomicBlock) error
-	VisitProposalBlock(blk *ProposalBlock) error
-	VisitStandardBlock(blk *StandardBlock) error
-	VisitAbortBlock(blk *AbortBlock) error
-	VisitCommitBlock(blk *CommitBlock) error
+	AtomicBlock(blk *AtomicBlock) error
+	ProposalBlock(blk *ProposalBlock) error
+	StandardBlock(blk *StandardBlock) error
+	AbortBlock(blk *AbortBlock) error
+	CommitBlock(blk *CommitBlock) error
 }
