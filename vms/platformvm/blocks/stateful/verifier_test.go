@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
@@ -49,6 +50,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
+			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
 		},
 	}
 
@@ -131,6 +133,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
+			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
 		},
 	}
 
@@ -213,6 +216,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
+			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
 		},
 	}
 
@@ -309,6 +313,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
+			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
 		},
 	}
 
@@ -375,6 +380,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
+			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
 		},
 	}
 
@@ -430,6 +436,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
+			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
 		},
 	}
 
@@ -527,6 +534,90 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			parentStatelessBlk.EXPECT().Height().Return(parentHeight).Times(1)
 			assert.NoError(err)
 			err = verifier.verifyCommonBlock(statelessAbortBlk)
+			assert.ErrorIs(err, test.result)
+		})
+	}
+}
+
+// TODO combine with TestApricotCommitBlockTimestampChecks
+func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	now := defaultGenesisTime.Add(time.Hour)
+	blkVersion := version.BlueberryBlockVersion
+
+	tests := []struct {
+		description string
+		parentTime  time.Time
+		childTime   time.Time
+		result      error
+	}{
+		{
+			description: "commit block timestamp matching parent's one",
+			parentTime:  now,
+			childTime:   now,
+			result:      nil,
+		},
+		{
+			description: "commit block timestamp before parent's one",
+			childTime:   now.Add(-1 * time.Second),
+			parentTime:  now,
+			result:      errOptionBlockTimestampNotMatchingParent,
+		},
+		{
+			description: "commit block timestamp after parent's one",
+			parentTime:  now,
+			childTime:   now.Add(time.Second),
+			result:      errOptionBlockTimestampNotMatchingParent,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			assert := assert.New(t)
+
+			// Create mocked dependencies.
+			s := state.NewMockState(ctrl)
+			mempool := mempool.NewMockMempool(ctrl)
+			parentID := ids.GenerateTestID()
+			stateVersions := state.NewMockVersions(ctrl)
+			parentStatelessBlk := stateless.NewMockBlock(ctrl)
+			parentHeight := uint64(1)
+			verifier := &verifier{
+				txExecutorBackend: executor.Backend{},
+				backend: &backend{
+					blkIDToState: map[ids.ID]*blockState{
+						parentID: {
+							timestamp:      test.parentTime,
+							statelessBlock: parentStatelessBlk,
+						},
+					},
+					Mempool:       mempool,
+					state:         s,
+					stateVersions: stateVersions,
+					ctx: &snow.Context{
+						Log: logging.NoLog{},
+					},
+					// Blueberry is activated
+					cfg: &config.Config{BlueberryTime: time.Time{}},
+				},
+			}
+
+			// build and verify child block
+			childVersion := blkVersion
+			childHeight := parentHeight + 1
+			statelessCommitBlk, err := stateless.NewCommitBlock(
+				childVersion,
+				uint64(test.childTime.Unix()),
+				parentID,
+				childHeight,
+			)
+
+			// Set expectations for dependencies.
+			parentStatelessBlk.EXPECT().Height().Return(parentHeight).Times(1)
+			assert.NoError(err)
+			err = verifier.verifyCommonBlock(statelessCommitBlk)
 			assert.ErrorIs(err, test.result)
 		})
 	}
