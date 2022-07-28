@@ -23,15 +23,9 @@ func (ab *AtomicBlock) initialize(bytes []byte) error {
 	if err := ab.CommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
+	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
-	signedBytes, err := txs.Codec.Marshal(txs.Version, &ab.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	ab.Tx.Initialize(unsignedBytes, signedBytes)
 	return nil
 }
 
