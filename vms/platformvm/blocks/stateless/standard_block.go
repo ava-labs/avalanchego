@@ -56,12 +56,5 @@ func NewStandardBlock(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-
-	for _, tx := range res.Txs {
-		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return nil, fmt.Errorf("failed to sign block: %w", err)
-		}
-	}
-
 	return res, res.initialize(bytes)
 }
