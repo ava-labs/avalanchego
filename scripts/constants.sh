@@ -22,6 +22,9 @@ evm_path="$plugin_dir/evm"
 # You should probably set it - export DOCKER_REPO='avaplatform/avalanchego'
 avalanchego_dockerhub_repo=${DOCKER_REPO:-"avalanchego"}
 
+# System architecture
+arch=$(uname -m)
+
 # Current branch
 # TODO: fix "fatal: No names found, cannot describe anything" in github CI
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true)
