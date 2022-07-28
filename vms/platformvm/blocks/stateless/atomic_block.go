@@ -38,7 +38,7 @@ func (ab *AtomicBlock) initialize(bytes []byte) error {
 func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
 func (ab *AtomicBlock) Visit(v Visitor) error {
-	return v.VisitAtomicBlock(ab)
+	return v.AtomicBlock(ab)
 }
 
 func NewAtomicBlock(

@@ -22,7 +22,7 @@ type acceptor struct {
 	recentlyAccepted *window.Window
 }
 
-func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
+func (a *acceptor) ProposalBlock(b *stateless.ProposalBlock) error {
 	/* Note that:
 
 	* We don't free the proposal block in this method.
@@ -54,7 +54,7 @@ func (a *acceptor) VisitProposalBlock(b *stateless.ProposalBlock) error {
 	return nil
 }
 
-func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
+func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -99,7 +99,7 @@ func (a *acceptor) VisitAtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
+func (a *acceptor) StandardBlock(b *stateless.StandardBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -143,11 +143,11 @@ func (a *acceptor) VisitStandardBlock(b *stateless.StandardBlock) error {
 	return nil
 }
 
-func (a *acceptor) VisitCommitBlock(b *stateless.CommitBlock) error {
+func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
 	return a.acceptOptionBlock(b, true /* isCommit */)
 }
 
-func (a *acceptor) VisitAbortBlock(b *stateless.AbortBlock) error {
+func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
 	return a.acceptOptionBlock(b, false /* isCommit */)
 }
 

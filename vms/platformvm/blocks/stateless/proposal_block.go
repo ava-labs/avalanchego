@@ -39,7 +39,7 @@ func (pb *ProposalBlock) initialize(bytes []byte) error {
 func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
 
 func (pb *ProposalBlock) Visit(v Visitor) error {
-	return v.VisitProposalBlock(pb)
+	return v.ProposalBlock(pb)
 }
 
 func NewProposalBlock(

@@ -81,7 +81,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	onAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	// Visit the block
-	err = verifier.VisitProposalBlock(blk)
+	err = verifier.ProposalBlock(blk)
 	assert.NoError(err)
 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
@@ -91,7 +91,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.VisitProposalBlock(blk)
+	err = verifier.ProposalBlock(blk)
 	assert.NoError(err)
 }
 
@@ -163,7 +163,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	stateVersions.EXPECT().SetState(blk.ID(), onAccept).Times(1)
 
-	err = verifier.VisitAtomicBlock(blk)
+	err = verifier.AtomicBlock(blk)
 	assert.NoError(err)
 
 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
@@ -174,7 +174,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.VisitAtomicBlock(blk)
+	err = verifier.AtomicBlock(blk)
 	assert.NoError(err)
 }
 
@@ -255,7 +255,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool.EXPECT().RemoveDecisionTxs(blk.Txs).Times(1)
 	stateVersions.EXPECT().SetState(blk.ID(), gomock.Any()).Times(1)
 
-	err = verifier.VisitStandardBlock(blk)
+	err = verifier.StandardBlock(blk)
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -266,7 +266,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.VisitStandardBlock(blk)
+	err = verifier.StandardBlock(blk)
 	assert.NoError(err)
 }
 
@@ -320,7 +320,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.VisitCommitBlock(blk)
+	err = verifier.CommitBlock(blk)
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -330,7 +330,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.VisitCommitBlock(blk)
+	err = verifier.CommitBlock(blk)
 	assert.NoError(err)
 }
 
@@ -384,7 +384,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.VisitAbortBlock(blk)
+	err = verifier.AbortBlock(blk)
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -394,6 +394,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.VisitAbortBlock(blk)
+	err = verifier.AbortBlock(blk)
 	assert.NoError(err)
 }

@@ -33,7 +33,7 @@ func (sb *StandardBlock) initialize(bytes []byte) error {
 func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
 
 func (sb *StandardBlock) Visit(v Visitor) error {
-	return v.VisitStandardBlock(sb)
+	return v.StandardBlock(sb)
 }
 
 func NewStandardBlock(

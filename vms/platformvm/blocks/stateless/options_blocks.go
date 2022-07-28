@@ -22,7 +22,7 @@ type AbortBlock struct {
 func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
 
 func (ab *AbortBlock) Visit(v Visitor) error {
-	return v.VisitAbortBlock(ab)
+	return v.AbortBlock(ab)
 }
 
 func NewAbortBlock(
@@ -54,7 +54,7 @@ type CommitBlock struct {
 func (cb *CommitBlock) BlockTxs() []*txs.Tx { return nil }
 
 func (cb *CommitBlock) Visit(v Visitor) error {
-	return v.VisitCommitBlock(cb)
+	return v.CommitBlock(cb)
 }
 
 func NewCommitBlock(
