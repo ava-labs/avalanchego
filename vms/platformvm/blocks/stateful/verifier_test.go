@@ -60,7 +60,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	blkTx.EXPECT().Initialize(gomock.Any()).Times(2)
+	blkTx.EXPECT().Initialize(gomock.Any()).Times(1)
 
 	blk, err := stateless.NewProposalBlock(
 		parentID,
@@ -139,7 +139,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	blkTx.EXPECT().Initialize(gomock.Any()).Times(2)
+	blkTx.EXPECT().Initialize(gomock.Any()).Times(1)
 
 	blk, err := stateless.NewAtomicBlock(
 		parentID,
@@ -232,7 +232,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	blkTx.EXPECT().Initialize(gomock.Any()).Times(2)
+	blkTx.EXPECT().Initialize(gomock.Any()).Times(1)
 
 	blk, err := stateless.NewStandardBlock(
 		parentID,

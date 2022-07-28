@@ -23,17 +23,7 @@ func (pb *ProposalBlock) initialize(bytes []byte) error {
 	if err := pb.CommonBlock.initialize(bytes); err != nil {
 		return err
 	}
-
-	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &pb.Tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
-	}
-	signedBytes, err := txs.Codec.Marshal(txs.Version, &pb.Tx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal tx: %w", err)
-	}
-	pb.Tx.Initialize(unsignedBytes, signedBytes)
-	return nil
+	return pb.Tx.Sign(txs.Codec, nil)
 }
 
 func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
@@ -62,10 +52,5 @@ func NewProposalBlock(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-
-	if err := tx.Sign(txs.Codec, nil); err != nil {
-		return nil, fmt.Errorf("failed to sign block: %w", err)
-	}
-
 	return res, res.initialize(bytes)
 }
