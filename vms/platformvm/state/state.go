@@ -1242,7 +1242,7 @@ func (s *state) writeBlocks() error {
 		)
 
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := stateless.GenesisCodec.Marshal(stateless.Version, &stBlk)
+		blockBytes, err := stateless.GenesisCodec.Marshal(txs.Version, &stBlk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal block %s: %w", blkID, err)
 		}
