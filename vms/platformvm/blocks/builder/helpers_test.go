@@ -85,10 +85,6 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-type dummyBlkTimer struct{}
-
-func (*dummyBlkTimer) ResetBlockTimer() {}
-
 type testHelpersCollection struct {
 	BlockBuilder
 	blkManager stateful.Manager
@@ -124,7 +120,7 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpersCollection {
+func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	var (
 		res = &testHelpersCollection{}
 		err error
@@ -187,12 +183,7 @@ func newTestHelpersCollection(t *testing.T, mockResetBlockTimer bool) *testHelpe
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
 
-	if mockResetBlockTimer {
-		dummy := &dummyBlkTimer{}
-		res.mempool, err = mempool.NewMempool("mempool", registerer, dummy)
-	} else {
-		res.mempool, err = mempool.NewMempool("mempool", registerer, res)
-	}
+	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))

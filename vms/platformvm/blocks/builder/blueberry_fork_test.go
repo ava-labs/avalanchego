@@ -7,7 +7,7 @@ package builder
 // func TestBlueberryFork(t *testing.T) {
 // 	assert := assert.New(t)
 
-// 	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
+// 	h := newTestHelpersCollection(t)
 // 	defer func() {
 // 		if err := internalStateShutdown(h); err != nil {
 // 			t.Fatal(err)

@@ -637,7 +637,6 @@ func (v *verifier) verifyCommonBlock(b stateless.Block) error {
 		parentTimestamp = parentState.timestamp
 	} else {
 		parentTimestamp = v.state.GetTimestamp()
-
 	}
 	expectedVersion := v.expectedChildVersion(parentTimestamp)
 	if expectedVersion != blkVersion {

@@ -37,7 +37,7 @@ func getValidTx(txBuilder builder.Builder, t *testing.T) *txs.Tx {
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
+	h := newTestHelpersCollection(t)
 	defer func() {
 		assert.NoError(internalStateShutdown(h))
 	}()
@@ -88,7 +88,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
+	h := newTestHelpersCollection(t)
 	defer func() {
 		assert.NoError(internalStateShutdown(h))
 	}()
@@ -116,7 +116,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
+	h := newTestHelpersCollection(t)
 	defer func() {
 		assert.NoError(internalStateShutdown(h))
 	}()

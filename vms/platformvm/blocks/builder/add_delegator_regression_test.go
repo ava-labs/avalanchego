@@ -8,7 +8,7 @@ package builder
 // func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 // 	assert := assert.New(t)
 
-// 	h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
+// 	h := newTestHelpersCollection(t)
 // 	defer func() {
 // 		if err := internalStateShutdown(h); err != nil {
 // 			t.Fatal(err)
@@ -173,7 +173,7 @@ package builder
 // 		t.Run(test.name, func(t *testing.T) {
 // 			assert := assert.New(t)
 
-// 			h := newTestHelpersCollection(t, false /*mockResetBlockTimer*/)
+// 			h := newTestHelpersCollection(t)
 // 			h.cfg.ApricotPhase3Time = test.ap3Time
 // 			defer func() {
 // 				if err := internalStateShutdown(h); err != nil {
