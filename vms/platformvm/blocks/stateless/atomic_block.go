@@ -55,10 +55,5 @@ func NewAtomicBlock(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-
-	if err := tx.Sign(txs.Codec, nil); err != nil {
-		return nil, fmt.Errorf("failed to sign block: %w", err)
-	}
-
 	return res, res.initialize(bytes)
 }
