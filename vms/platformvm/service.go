@@ -2428,3 +2428,31 @@ func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 
 	return nil
 }
+
+// GetLockRuleOffersReply is the response from calling GetLockRuleOffers.
+type GetLockRuleOffersReply struct {
+	Offers []*APILockRuleOffers `json:"offers"`
+}
+
+// GetLockRuleOffers returns active lock rule offers
+func (service *Service) GetLockRuleOffers(_ *http.Request, _ *struct{}, reply *GetLockRuleOffersReply) error {
+	service.vm.ctx.Log.Debug("Platform: GetLockRuleOffers called")
+
+	now := service.vm.Clock().Time()
+	offers := service.vm.internalState.GetLockRuleOffers()
+
+	for _, offer := range offers {
+		if offer.StartTime().Before(now) && offer.EndTime().After(now) {
+			reply.Offers = append(reply.Offers, &APILockRuleOffers{
+				ID:           offer.ID(),
+				InterestRate: json.Float64(offer.InterestRateFloat64()),
+				Start:        json.Uint64(offer.Start),
+				End:          json.Uint64(offer.End),
+				MinAmount:    json.Uint64(offer.MinAmount),
+				Duration:     json.Uint64(offer.Duration),
+			})
+		}
+	}
+
+	return nil
+}

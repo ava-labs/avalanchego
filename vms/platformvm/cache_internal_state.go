@@ -54,6 +54,7 @@ var (
 	subnetPrefix          = []byte("subnet")
 	chainPrefix           = []byte("chain")
 	singletonPrefix       = []byte("singleton")
+	lockRuleOffersPrefix  = []byte("lockRuleOffers")
 
 	timestampKey     = []byte("timestamp")
 	currentSupplyKey = []byte("current supply")
@@ -103,6 +104,8 @@ type InternalState interface {
 
 	GetBlock(blockID ids.ID) (Block, error)
 	AddBlock(block Block)
+
+	GetLockRuleOffers() []*LockRuleOffer
 
 	Abort()
 	Commit() error
@@ -211,6 +214,10 @@ type internalStateImpl struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
+	addedLockRuleOffers []*LockRuleOffer
+	lockRuleOffersByID  map[ids.ID]*LockRuleOffer // map of offer-id -> *lock rule offers; if the offer is nil, it has been removed
+	lockRuleOffersDB    database.Database
+
 	cachedSubnets []*Tx // nil if the subnets haven't been loaded
 	addedSubnets  []*Tx
 	subnetBaseDB  database.Database
@@ -264,6 +271,8 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 
 	validatorDiffsDB := prefixdb.New(validatorDiffsPrefix, validatorsDB)
 
+	lockRuleOffersDB := prefixdb.New(lockRuleOffersPrefix, baseDB)
+
 	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
@@ -311,6 +320,9 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 		chainDB:     prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
+
+		lockRuleOffersDB:   lockRuleOffersDB,
+		lockRuleOffersByID: make(map[ids.ID]*LockRuleOffer),
 	}
 }
 
@@ -793,6 +805,26 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 	return weightDiffs, nil
 }
 
+func (st *internalStateImpl) AddLockRuleOffer(offer *LockRuleOffer) {
+	offer.Initialize()
+	st.lockRuleOffersByID[offer.ID()] = offer
+	st.addedLockRuleOffers = append(st.addedLockRuleOffers, offer)
+}
+
+func (st *internalStateImpl) GetLockRuleOffers() []*LockRuleOffer {
+	offers := make([]*LockRuleOffer, len(st.lockRuleOffersByID))
+	i := 0
+	for _, offer := range st.lockRuleOffersByID {
+		offers[i] = offer
+		i++
+	}
+	return offers
+}
+
+func (st *internalStateImpl) GetLockRuleOfferByID(id ids.ID) *LockRuleOffer {
+	return st.lockRuleOffersByID[id]
+}
+
 func (st *internalStateImpl) Abort() {
 	st.baseDB.Abort()
 }
@@ -836,6 +868,9 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	}
 	if err := st.writeSingletons(); err != nil {
 		return nil, fmt.Errorf("failed to write singletons with: %w", err)
+	}
+	if err := st.writeLockRuleOffers(); err != nil {
+		return nil, fmt.Errorf("failed to write lock rule offers with: %w", err)
 	}
 	return st.baseDB.CommitBatch()
 }
@@ -1261,6 +1296,23 @@ func (st *internalStateImpl) writeSingletons() error {
 	return nil
 }
 
+func (st *internalStateImpl) writeLockRuleOffers() error {
+	for _, offer := range st.addedLockRuleOffers {
+		offerID := offer.ID()
+
+		bytes, err := GenesisCodec.Marshal(CodecVersion, offer)
+		if err != nil {
+			return err
+		}
+
+		if err := st.lockRuleOffersDB.Put(offerID[:], bytes); err != nil {
+			return err
+		}
+	}
+	st.addedLockRuleOffers = nil
+	return nil
+}
+
 func (st *internalStateImpl) load() error {
 	if err := st.loadSingletons(); err != nil {
 		return err
@@ -1600,6 +1652,11 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 
 		st.AddChain(chain)
 		st.AddTx(chain, status.Committed)
+	}
+
+	for _, offer := range genesis.LockRuleOffers {
+		offer.Initialize()
+		st.AddLockRuleOffer(offer)
 	}
 
 	// Create the genesis block and save it as being accepted (We don't just

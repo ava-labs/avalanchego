@@ -190,8 +190,8 @@ func (vm *VM) stake(
 		}
 
 		out := utxo.Out
-		inner, ok := out.(*StakeableLockOut)
-		if ok {
+
+		if inner, ok := out.(*StakeableLockOut); ok {
 			if inner.Locktime > now {
 				// This output is currently locked, so this output can't be
 				// burned. Additionally, it may have already been consumed
