@@ -483,9 +483,9 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return errWrongNumberOfCredentials
 	}
 
-	// Validate proposedChainTime by comparing it with relevant time quantities
+	// Validate [proposedChainTime]
 	proposedChainTime := tx.Timestamp()
-	localTime := e.Clk.Time()
+	now := e.Clk.Time()
 
 	parentState, ok := e.StateVersions.GetState(e.ReferenceBlockID)
 	if !ok {
@@ -504,7 +504,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		proposedChainTime,
 		currentChainTime,
 		nextStakerChangeTime,
-		localTime,
+		now,
 		true, /*enforceStrictness*/
 	); err != nil {
 		return err
@@ -551,7 +551,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	e.PrefersCommit = !proposedChainTime.After(localTime.Add(SyncBound))
+	e.PrefersCommit = !proposedChainTime.After(now.Add(SyncBound))
 	return nil
 }
 

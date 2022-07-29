@@ -15,26 +15,32 @@ var (
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
-// proposedChainTime must be strictly later than currentChainTime
-// and earlier or equal to nextStakerChangeTime, so that no staker
-// event are skipped. Also it must be within syncBound with respect
-// to local clock, to make sure chain time approximate "real" time
-// See example below
+// proposedChainTime returns nil if the [proposedChainTime]
+// is a valid chain time given the [currentChainTime], wall clock
+// time [now] and when the staking set changes next ([nextStakerChangeTime]).
+// The [proposedChainTime] must be >= currentChainTime and <= to
+// [nextStakerChangeTime], so that no staking set changes are skipped.
+// If [mustIncTimestamp], [proposedChainTime] must > [currentChainTime].
+// The [proposedChainTime] must be within syncBound with respect
+// to local clock, to make sure chain time approximates "real" time.
+// In the example below, proposedChainTime is valid because
+// it's after [currentChainTime] and before [nextStakerChangeTime]
+// and [now] + [syncBound].
+//
 // -----|--------|---------X------------|----------------------|
 //      ^        ^         ^            ^                      ^
 //      |        |         |            |                      |
-//  localTime    |         |  localTime + syncBound            |
+//  now |        |         |   now + syncBound                 |
 //        currentChainTime |                          nextStakerChangeTime
 //                  proposedChainTime
-
 func ValidateProposedChainTime(
 	proposedChainTime,
 	currentChainTime,
 	nextStakerChangeTime,
-	localTime time.Time,
-	enforceStrictness bool,
+	now time.Time,
+	mustIncTimestamp bool,
 ) error {
-	if enforceStrictness {
+	if mustIncTimestamp {
 		if !proposedChainTime.After(currentChainTime) {
 			return fmt.Errorf(
 				"%w, proposed timestamp (%s), chain time (%s)",
@@ -67,15 +73,14 @@ func ValidateProposedChainTime(
 
 	// Note: this means we can only have sprees of <SyncBound> blocks
 	// because we increment 1 sec each block and I cannot violate SyncBound
-	localTimestampPlusSync := localTime.Add(SyncBound)
-	if localTimestampPlusSync.Before(proposedChainTime) {
+	upperBound := now.Add(SyncBound)
+	if upperBound.Before(proposedChainTime) {
 		return fmt.Errorf(
 			"%w, proposed time (%s), local time (%s)",
 			ErrChildBlockBeyondSyncBound,
 			proposedChainTime,
-			localTime,
+			now,
 		)
 	}
-
 	return nil
 }
