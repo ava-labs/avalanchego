@@ -43,7 +43,8 @@ func (a *acceptor) ProposalBlock(b *stateless.ProposalBlock) error {
 
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
-		"accepting Proposal Block",
+		"accepting block",
+		zap.String("blockType", "Proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -59,7 +60,8 @@ func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"accepting Atomic Block",
+		"accepting block",
+		zap.String("blockType", "Atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -104,7 +106,8 @@ func (a *acceptor) StandardBlock(b *stateless.StandardBlock) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"accepting Standard Block",
+		"accepting block",
+		zap.String("blockType", "Standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -160,21 +163,19 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
 	// need the parent's state when it's rejected.
 	defer a.free(parentID)
 
+	var blockType string
 	if isCommit {
-		a.ctx.Log.Verbo(
-			"accepting Commit Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
+		blockType = "Commit"
 	} else {
-		a.ctx.Log.Verbo(
-			"accepting Abort Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
+		blockType = "Abort"
 	}
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", blockType),
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
 
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
