@@ -21,7 +21,8 @@ func (r *rejector) ProposalBlock(b *stateless.ProposalBlock) error {
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"rejecting Proposal Block",
+		"rejecting block",
+		zap.String("blockType", "proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -46,7 +47,8 @@ func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"rejecting Atomic Block",
+		"rejecting block",
+		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -71,7 +73,8 @@ func (r *rejector) StandardBlock(b *stateless.StandardBlock) error {
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
-		"rejecting Standard Block",
+		"rejecting block",
+		zap.String("blockType", "standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -94,32 +97,30 @@ func (r *rejector) StandardBlock(b *stateless.StandardBlock) error {
 }
 
 func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
-	return r.rejectOptionBlock(b, true /* isCommit */)
+	r.ctx.Log.Verbo(
+		"rejecting block",
+		zap.String("blockType", "commit"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+	return r.rejectOptionBlock(b)
 }
 
 func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
-	return r.rejectOptionBlock(b, false /* isCommit */)
+	r.ctx.Log.Verbo(
+		"rejecting block",
+		zap.String("blockType", "abort"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+	return r.rejectOptionBlock(b)
 }
 
-func (r *rejector) rejectOptionBlock(b stateless.Block, isCommit bool) error {
+func (r *rejector) rejectOptionBlock(b stateless.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
-
-	if isCommit {
-		r.ctx.Log.Verbo(
-			"rejecting Commit Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
-	} else {
-		r.ctx.Log.Verbo(
-			"rejecting Abort Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
-	}
 
 	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
