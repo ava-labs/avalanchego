@@ -15,6 +15,9 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 echo "Downloading dependencies..."
 go mod download
 
+# TODO: Remove after the plugin directory is removed from the avalanchego
+#       startup logic
+#
 # Create the plugin directory required by AvalancheGo
 mkdir -p $plugin_dir
 
