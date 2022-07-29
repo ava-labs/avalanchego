@@ -20,11 +20,14 @@ type apricotStrategy struct {
 	*blockBuilder
 
 	// inputs
+	// All must be set before [build] is called.
 	parentBlkID ids.ID
 	parentState state.Chain
-	height      uint64
+	// Build a block with this height.
+	nextHeight uint64
 
-	// outputs to build blocks
+	// outputs
+	// Set in [selectBlockContent].
 	txes []*txs.Tx
 }
 
@@ -75,15 +78,19 @@ func (a *apricotStrategy) selectBlockContent() error {
 		return nil
 	}
 
-	a.txes, err = a.trySelectMempoolProposalTx()
+	a.txes, err = a.nextProposalTx()
 	return err
 }
 
-func (a *apricotStrategy) trySelectMempoolProposalTx() ([]*txs.Tx, error) {
-	// clean out the mempool's transactions with invalid timestamps.
-	a.dropTooEarlyMempoolProposalTxs()
+// Try to get/make a proposal tx to put into a block.
+// Returns an error if there's no suitable proposal tx.
+// Doesn't modify [a.Mempool].
+// TODO can this return one tx?
+func (a *apricotStrategy) nextProposalTx() ([]*txs.Tx, error) {
+	// clean out transactions with an invalid timestamp.
+	a.dropExpiredProposalTxs()
 
-	// try including a mempool proposal tx is available.
+	// Check the mempool
 	if !a.Mempool.HasProposalTx() {
 		a.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return []*txs.Tx{}, errNoPendingBlocks
@@ -91,14 +98,15 @@ func (a *apricotStrategy) trySelectMempoolProposalTx() ([]*txs.Tx, error) {
 	tx := a.Mempool.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
-	// if the chain timestamp is too far in the past to issue this transaction
-	// but according to local time, it's ready to be issued, then attempt to
-	// advance the timestamp, so it can be issued.
+	// Check whether this staker starts within at most [MaxFutureStartTime].
+	// If it does, issue the staking tx.
+	// If it doesn't, issue an advance time tx.
 	maxChainStartTime := a.parentState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if !startTime.After(maxChainStartTime) {
 		return []*txs.Tx{tx}, nil
 	}
 
+	// The chain timestamp is too far in the past. Advance it.
 	now := a.txExecutorBackend.Clk.Time()
 	advanceTimeTx, err := a.txBuilder.NewAdvanceTimeTx(now)
 	if err != nil {
@@ -124,7 +132,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 			blkVersion,
 			uint64(0),
 			a.parentBlkID,
-			a.height,
+			a.nextHeight,
 			tx,
 		)
 		if err != nil {
@@ -140,7 +148,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 			blkVersion,
 			uint64(0),
 			a.parentBlkID,
-			a.height,
+			a.nextHeight,
 			a.txes,
 		)
 		if err != nil {

@@ -274,20 +274,24 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 	return nextStakerChangeTime, !now.Before(nextStakerChangeTime), nil
 }
 
-// dropTooEarlyMempoolProposalTxs drops mempool's validators whose start time is
-// too close in the future i.e. within local time plus Delta.
-// dropTooEarlyMempoolProposalTxs makes sure that mempool's top proposal tx has
-// a valid starting time but does not necessarily remove all txs since
-// popped txs are not necessarily ordered by start time.
-// Returns true/false if mempool is non-empty/empty following cleanup.
-func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() {
-	ctx := b.txExecutorBackend.Ctx
-	now := b.txExecutorBackend.Clk.Time()
-	syncTime := now.Add(executor.SyncBound)
+// dropExpiredProposalTxs drops add validator transactions in the mempool
+// whose start time is not sufficiently far in the future
+// (i.e. within local time plus [MaxFutureStartFrom]).
+// Guarantees that [PeekProposalTx] will return a valid tx after calling.
+// May not remove all expired txs since txs aren't necessarily popped
+// ordered by start time.
+func (b *blockBuilder) dropExpiredProposalTxs() {
+	var (
+		ctx      = b.txExecutorBackend.Ctx
+		now      = b.txExecutorBackend.Clk.Time()
+		syncTime = now.Add(executor.SyncBound)
+	)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
+			// The next proposal tx in the mempool starts
+			// sufficiently far in the future.
 			return
 		}
 

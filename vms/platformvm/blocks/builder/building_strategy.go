@@ -47,7 +47,7 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 			blockBuilder: b,
 			parentBlkID:  prefBlkID,
 			parentState:  preferredState,
-			height:       nextHeight,
+			nextHeight:   nextHeight,
 		}, nil
 	case version.BlueberryBlockVersion:
 		return &blueberryStrategy{

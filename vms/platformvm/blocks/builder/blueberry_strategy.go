@@ -22,11 +22,13 @@ type blueberryStrategy struct {
 	*blockBuilder
 
 	// inputs
+	// All must be set before [build] is called.
 	parentBlkID ids.ID
 	parentState state.Chain
 	height      uint64
 
-	// outputs to build blocks
+	// outputs
+	// All set in [selectBlockContent].
 	txes    []*txs.Tx
 	blkTime time.Time
 }
@@ -88,7 +90,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	}
 
 	// clean out the mempool's transactions with invalid timestamps.
-	b.dropTooEarlyMempoolProposalTxs()
+	b.dropExpiredProposalTxs()
 
 	// try including a mempool proposal tx is available.
 	if !b.Mempool.HasProposalTx() {
