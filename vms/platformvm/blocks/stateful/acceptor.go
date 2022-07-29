@@ -23,28 +23,26 @@ type acceptor struct {
 }
 
 func (a *acceptor) ProposalBlock(b *stateless.ProposalBlock) error {
-	/* Note that:
+	//  Note that:
 
-	* We don't free the proposal block in this method.
-	  It is freed when its child is accepted.
-	  We need to keep this block's state in memory for its child to use.
+	// * We don't free the proposal block in this method.
+	//   It is freed when its child is accepted.
+	//   We need to keep this block's state in memory for its child to use.
 
-	* We only update the metrics to reflect this block's
-	  acceptance when its child is accepted.
+	// * We only update the metrics to reflect this block's
+	//   acceptance when its child is accepted.
 
-	* We don't write this block to state here.
-	  That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	  We do this so that in the event that the node shuts down, the proposal block
-	  is not written to disk unless its child is.
-	  (The VM's Shutdown method commits the database.)
-	  The snowman.Engine requires that the last committed block is a decision block.
-
-	*/
+	// * We don't write this block to state here.
+	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
+	//   We do this so that in the event that the node shuts down, the proposal block
+	//   is not written to disk unless its child is.
+	//   (The VM's Shutdown method commits the database.)
+	//   The snowman.Engine requires that the last committed block is a decision block.
 
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "Proposal"),
+		zap.String("blockType", "proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -61,7 +59,7 @@ func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "Atomic"),
+		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -107,7 +105,7 @@ func (a *acceptor) StandardBlock(b *stateless.StandardBlock) error {
 
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "Standard"),
+		zap.String("blockType", "standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -147,35 +145,37 @@ func (a *acceptor) StandardBlock(b *stateless.StandardBlock) error {
 }
 
 func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
-	return a.acceptOptionBlock(b, true /* isCommit */)
-}
-
-func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
-	return a.acceptOptionBlock(b, false /* isCommit */)
-}
-
-func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
-	blkID := b.ID()
-	defer a.free(blkID)
-
-	parentID := b.Parent()
-	// Note: we assume this block's sibling doesn't
-	// need the parent's state when it's rejected.
-	defer a.free(parentID)
-
-	var blockType string
-	if isCommit {
-		blockType = "Commit"
-	} else {
-		blockType = "Abort"
-	}
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", blockType),
-		zap.Stringer("blkID", blkID),
+		zap.String("blockType", "commit"),
+		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
 	)
+	return a.acceptOptionBlock(b)
+}
+
+func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", "abort"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+	return a.acceptOptionBlock(b)
+}
+
+func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
+	blkID := b.ID()
+	parentID := b.Parent()
+
+	defer func() {
+		a.free(blkID)
+		// Note: we assume this block's sibling doesn't
+		// need the parent's state when it's rejected.
+		a.free(parentID)
+	}()
 
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
