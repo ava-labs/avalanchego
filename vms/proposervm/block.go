@@ -284,7 +284,7 @@ func verifyIsNotOracleBlock(b snowman.Block) error {
 	switch err {
 	case nil:
 		return fmt.Errorf(
-			"%w: expected block %s not to be oracle block but it's a %T",
+			"%w: expected block %s not to be an oracle block but it's a %T",
 			errUnexpectedBlockType, b.ID(), b,
 		)
 	case snowman.ErrNotOracle:
