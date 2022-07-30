@@ -54,6 +54,7 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 	config := ethconfig.NewDefaultConfig()
 	chainConfig := &params.ChainConfig{
 		ChainID:             chainID,
+		FeeConfig:           params.DefaultFeeConfig,
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
 		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
@@ -63,7 +64,6 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
-		FeeConfig:           params.DefaultFeeConfig,
 	}
 
 	config.Genesis = &core.Genesis{

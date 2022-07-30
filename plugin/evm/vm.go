@@ -329,10 +329,22 @@ func (vm *VM) Initialize(
 		log.Warn("Chain enabled `AllowFeeRecipients`, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
 	}
 
-	vm.genesisHash = ethConfig.Genesis.ToBlock(nil).Hash()
-
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
+
+	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
+	// Initializing the chain will verify upgradeBytes are compatible with existing values.
+	if len(upgradeBytes) > 0 {
+		var upgradeConfig params.UpgradeConfig
+		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
+			return fmt.Errorf("failed to parse upgrade bytes: %w", err)
+		}
+		vm.chainConfig.UpgradeConfig = upgradeConfig
+	}
+
+	// create genesisHash after applying upgradeBytes in case
+	// upgradeBytes modifies genesis.
+	vm.genesisHash = ethConfig.Genesis.ToBlock(nil).Hash()
 
 	lastAcceptedHash, err := vm.readLastAccepted()
 	if err != nil {

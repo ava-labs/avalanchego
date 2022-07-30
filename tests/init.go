@@ -151,7 +151,9 @@ var Forks = map[string]*params.ChainConfig{
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
-		SubnetEVMTimestamp:  big.NewInt(0),
+		NetworkUpgrades: params.NetworkUpgrades{
+			SubnetEVMTimestamp: big.NewInt(0),
+		},
 	},
 }
 

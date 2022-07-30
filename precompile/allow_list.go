@@ -31,16 +31,10 @@ var (
 	allowListInputLen = common.HashLength
 )
 
-// AllowListConfig specifies the configuration of the allow list.
-// Specifies the block timestamp at which it goes into effect as well as the initial set of allow list admins.
+// AllowListConfig specifies the initial set of allow list admins.
 type AllowListConfig struct {
-	BlockTimestamp *big.Int `json:"blockTimestamp"`
-
 	AllowListAdmins []common.Address `json:"adminAddresses"`
 }
-
-// Timestamp returns the timestamp at which the allow list should be enabled
-func (c *AllowListConfig) Timestamp() *big.Int { return c.BlockTimestamp }
 
 // Configure initializes the address space of [precompileAddr] by initializing the role of each of
 // the addresses in [AllowListAdmins].
@@ -48,6 +42,22 @@ func (c *AllowListConfig) Configure(state StateDB, precompileAddr common.Address
 	for _, adminAddr := range c.AllowListAdmins {
 		setAllowListRole(state, precompileAddr, adminAddr, AllowListAdmin)
 	}
+}
+
+// Equal returns true iff [other] has the same admins in the same order in its allow list.
+func (c *AllowListConfig) Equal(other *AllowListConfig) bool {
+	if other == nil {
+		return false
+	}
+	if len(c.AllowListAdmins) != len(other.AllowListAdmins) {
+		return false
+	}
+	for i, admin := range c.AllowListAdmins {
+		if admin != other.AllowListAdmins[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Valid returns true iff [s] represents a valid role.

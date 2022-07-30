@@ -68,7 +68,10 @@ var (
 var (
 	// SubnetEVMDefaultChainConfig is the default configuration
 	SubnetEVMDefaultChainConfig = &ChainConfig{
-		ChainID:             SubnetEVMChainID,
+		ChainID:            SubnetEVMChainID,
+		FeeConfig:          DefaultFeeConfig,
+		AllowFeeRecipients: false,
+
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
 		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
@@ -79,13 +82,14 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
-		SubnetEVMTimestamp:  big.NewInt(0),
-		FeeConfig:           DefaultFeeConfig,
-		AllowFeeRecipients:  false,
+
+		NetworkUpgrades: NetworkUpgrades{
+			SubnetEVMTimestamp: big.NewInt(0),
+		},
 	}
 
-	TestChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}, precompile.ContractNativeMinterConfig{}, precompile.TxAllowListConfig{}, precompile.FeeConfigManagerConfig{}}
-	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, DefaultFeeConfig, false, precompile.ContractDeployerAllowListConfig{}, precompile.ContractNativeMinterConfig{}, precompile.TxAllowListConfig{}, precompile.FeeConfigManagerConfig{}}
+	TestChainConfig        = &ChainConfig{big.NewInt(1), DefaultFeeConfig, false, big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), NetworkUpgrades{big.NewInt(0)}, PrecompileUpgrade{}, UpgradeConfig{}}
+	TestPreSubnetEVMConfig = &ChainConfig{big.NewInt(1), DefaultFeeConfig, false, big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), NetworkUpgrades{}, PrecompileUpgrade{}, UpgradeConfig{}}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -94,7 +98,9 @@ var (
 // that any network, identified by its genesis block, can have its own
 // set of configuration options.
 type ChainConfig struct {
-	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
+	ChainID            *big.Int             `json:"chainId"`                      // chainId identifies the current chain and is used for replay protection
+	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
+	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 
 	HomesteadBlock *big.Int `json:"homesteadBlock,omitempty"` // Homestead switch block (nil = no fork, 0 = already homestead)
 
@@ -111,24 +117,45 @@ type ChainConfig struct {
 	IstanbulBlock       *big.Int `json:"istanbulBlock,omitempty"`       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 
-	SubnetEVMTimestamp *big.Int `json:"subnetEVMTimestamp,omitempty"` // A placeholder for the latest avalanche forks (nil = no fork, 0 = already activated)
+	NetworkUpgrades              // Config for timestamps that enable avalanche network upgrades
+	PrecompileUpgrade            // Config for enabling precompiles from genesis
+	UpgradeConfig     `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Skip encoding/decoding directly into ChainConfig.
+}
 
-	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
-	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
+// UpgradeConfig includes the following configs that may be specified in upgradeBytes:
+// - Timestamps that enable avalanche network upgrades,
+// - Enabling or disabling precompiles as network upgrades.
+type UpgradeConfig struct {
+	// Config for blocks/timestamps that enable network upgrades.
+	// Note: if NetworkUpgrades is specified in the JSON all previously activated
+	// forks must be present or upgradeBytes will be rejected.
+	NetworkUpgrades *NetworkUpgrades `json:"networkUpgrades,omitempty"`
 
-	ContractDeployerAllowListConfig precompile.ContractDeployerAllowListConfig `json:"contractDeployerAllowListConfig,omitempty"` // Config for the contract deployer allow list precompile
-	ContractNativeMinterConfig      precompile.ContractNativeMinterConfig      `json:"contractNativeMinterConfig,omitempty"`      // Config for the native minter precompile
-	TxAllowListConfig               precompile.TxAllowListConfig               `json:"txAllowListConfig,omitempty"`               // Config for the tx allow list precompile
-	FeeManagerConfig                precompile.FeeConfigManagerConfig          `json:"feeManagerConfig,omitempty"`                // Config for the fee manager precompile
+	// Config for enabling and disabling precompiles as network upgrades.
+	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
+	// convert nested data structures to json
 	feeBytes, err := json.Marshal(c.FeeConfig)
 	if err != nil {
-		feeBytes = []byte("cannot unmarshal FeeConfig")
+		feeBytes = []byte("cannot marshal FeeConfig")
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, ContractDeployerAllowListConfig: %v, ContractNativeMinterConfig: %v, TxAllowListConfig: %v, FeeManagerConfig: %v, Engine: Dummy Consensus Engine}",
+	networkUpgradesBytes, err := json.Marshal(c.NetworkUpgrades)
+	if err != nil {
+		networkUpgradesBytes = []byte("cannot marshal NetworkUpgrades")
+	}
+	precompileUpgradeBytes, err := json.Marshal(c.PrecompileUpgrade)
+	if err != nil {
+		precompileUpgradeBytes = []byte("cannot marshal PrecompileUpgrade")
+	}
+	upgradeConfigBytes, err := json.Marshal(c.UpgradeConfig)
+	if err != nil {
+		upgradeConfigBytes = []byte("cannot marshal UpgradeConfig")
+	}
+
+	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Subnet EVM: %v, FeeConfig: %v, AllowFeeRecipients: %v, NetworkUpgrades: %v, PrecompileUpgrade: %v, UpgradeConfig: %v, Engine: Dummy Consensus Engine}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -142,10 +169,9 @@ func (c *ChainConfig) String() string {
 		c.SubnetEVMTimestamp,
 		string(feeBytes),
 		c.AllowFeeRecipients,
-		c.ContractDeployerAllowListConfig,
-		c.ContractNativeMinterConfig,
-		c.TxAllowListConfig,
-		c.FeeManagerConfig,
+		string(networkUpgradesBytes),
+		string(precompileUpgradeBytes),
+		string(upgradeConfigBytes),
 	)
 }
 
@@ -198,27 +224,31 @@ func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
 
 // IsSubnetEVM returns whether [blockTimestamp] is either equal to the SubnetEVM fork block timestamp or greater.
 func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.SubnetEVMTimestamp, blockTimestamp)
+	return utils.IsForked(c.getNetworkUpgrades().SubnetEVMTimestamp, blockTimestamp)
 }
 
 // IsContractDeployerAllowList returns whether [blockTimestamp] is either equal to the ContractDeployerAllowList fork block timestamp or greater.
 func (c *ChainConfig) IsContractDeployerAllowList(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.ContractDeployerAllowListConfig.Timestamp(), blockTimestamp)
+	config := c.GetContractDeployerAllowListConfig(blockTimestamp)
+	return config != nil && !config.Disable
 }
 
 // IsContractNativeMinter returns whether [blockTimestamp] is either equal to the NativeMinter fork block timestamp or greater.
 func (c *ChainConfig) IsContractNativeMinter(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.ContractNativeMinterConfig.Timestamp(), blockTimestamp)
+	config := c.GetContractNativeMinterConfig(blockTimestamp)
+	return config != nil && !config.Disable
 }
 
 // IsTxAllowList returns whether [blockTimestamp] is either equal to the TxAllowList fork block timestamp or greater.
 func (c *ChainConfig) IsTxAllowList(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.TxAllowListConfig.Timestamp(), blockTimestamp)
+	config := c.GetTxAllowListConfig(blockTimestamp)
+	return config != nil && !config.Disable
 }
 
 // IsFeeConfigManager returns whether [blockTimestamp] is either equal to the FeeConfigManager fork block timestamp or greater.
 func (c *ChainConfig) IsFeeConfigManager(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.FeeManagerConfig.Timestamp(), blockTimestamp)
+	config := c.GetFeeConfigManagerConfig(blockTimestamp)
+	return config != nil && !config.Disable
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -243,6 +273,11 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, timest
 // Verify verifies chain config and returns error
 func (c *ChainConfig) Verify() error {
 	if err := c.FeeConfig.Verify(); err != nil {
+		return err
+	}
+
+	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
+	if err := c.VerifyPrecompileUpgrades(); err != nil {
 		return err
 	}
 
@@ -324,6 +359,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	return nil
 }
 
+// checkCompatible confirms that [newcfg] is backwards compatible with [c] to upgrade with the given head block height and timestamp.
+// This confirms that all Ethereum and Avalanche upgrades are backwards compatible as well as that the precompile config is backwards
+// compatible.
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, headTimestamp *big.Int) *ConfigCompatError {
 	if isForkIncompatible(c.HomesteadBlock, newcfg.HomesteadBlock, headHeight) {
 		return newCompatError("Homestead fork block", c.HomesteadBlock, newcfg.HomesteadBlock)
@@ -337,7 +375,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	if isForkIncompatible(c.EIP158Block, newcfg.EIP158Block, headHeight) {
 		return newCompatError("EIP158 fork block", c.EIP158Block, newcfg.EIP158Block)
 	}
-	if c.IsEIP158(headHeight) && !configNumEqual(c.ChainID, newcfg.ChainID) {
+	if c.IsEIP158(headHeight) && !utils.BigNumEqual(c.ChainID, newcfg.ChainID) {
 		return newCompatError("EIP158 chain ID", c.EIP158Block, newcfg.EIP158Block)
 	}
 	if isForkIncompatible(c.ByzantiumBlock, newcfg.ByzantiumBlock, headHeight) {
@@ -361,49 +399,39 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	}
 
 	// Check subnet-evm specific activations
-	if isForkIncompatible(c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, headTimestamp) {
-		return newCompatError("SubnetEVM fork block timestamp", c.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
+	newNetworkUpgrades := newcfg.getNetworkUpgrades()
+	if c.UpgradeConfig.NetworkUpgrades != nil && newcfg.UpgradeConfig.NetworkUpgrades == nil {
+		// Note: if the current NetworkUpgrades are set via UpgradeConfig, then a new config
+		// without NetworkUpgrades will be treated as having specified an empty set of network
+		// upgrades (ie., treated as the user intends to cancel scheduled forks)
+		newNetworkUpgrades = &NetworkUpgrades{}
+	}
+	if err := c.getNetworkUpgrades().CheckCompatible(newNetworkUpgrades, headTimestamp); err != nil {
+		return err
 	}
 
-	// Check that the configuration of the optional AllowList stateful precompile is compatible.
-	if isForkIncompatible(c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp(), headTimestamp) {
-		return newCompatError("AllowList fork block timestamp", c.ContractDeployerAllowListConfig.Timestamp(), newcfg.ContractDeployerAllowListConfig.Timestamp())
-	}
-
-	// Check that the configuration of the optional ContractNativeMinter stateful precompile is compatible.
-	if isForkIncompatible(c.ContractNativeMinterConfig.Timestamp(), newcfg.ContractNativeMinterConfig.Timestamp(), headTimestamp) {
-		return newCompatError("ContractNativeMinter fork block timestamp", c.ContractNativeMinterConfig.Timestamp(), newcfg.ContractNativeMinterConfig.Timestamp())
-	}
-
-	// Check that the configuration of the optional TxAllowList stateful precompile is compatible.
-	if isForkIncompatible(c.TxAllowListConfig.Timestamp(), newcfg.TxAllowListConfig.Timestamp(), headTimestamp) {
-		return newCompatError("TxAllowList fork block timestamp", c.TxAllowListConfig.Timestamp(), newcfg.TxAllowListConfig.Timestamp())
-	}
-
-	// Check that the configuration of the optional FeeManagerConfig stateful precompile is compatible.
-	if isForkIncompatible(c.FeeManagerConfig.Timestamp(), newcfg.FeeManagerConfig.Timestamp(), headTimestamp) {
-		return newCompatError("FeeManagerConfig fork block timestamp", c.FeeManagerConfig.Timestamp(), newcfg.FeeManagerConfig.Timestamp())
+	// Check that the precompiles on the new config are compatible with the existing precompile config.
+	if err := c.CheckPrecompilesCompatible(newcfg.PrecompileUpgrades, headTimestamp); err != nil {
+		return err
 	}
 
 	// TODO verify that the fee config is fully compatible between [c] and [newcfg].
-
 	return nil
+}
+
+// getNetworkUpgrades returns NetworkUpgrades from upgrade config if set there,
+// otherwise it falls back to the genesis chain config.
+func (c *ChainConfig) getNetworkUpgrades() *NetworkUpgrades {
+	if upgradeConfigOverride := c.UpgradeConfig.NetworkUpgrades; upgradeConfigOverride != nil {
+		return upgradeConfigOverride
+	}
+	return &c.NetworkUpgrades
 }
 
 // isForkIncompatible returns true if a fork scheduled at s1 cannot be rescheduled to
 // block s2 because head is already past the fork.
 func isForkIncompatible(s1, s2, head *big.Int) bool {
-	return (utils.IsForked(s1, head) || utils.IsForked(s2, head)) && !configNumEqual(s1, s2)
-}
-
-func configNumEqual(x, y *big.Int) bool {
-	if x == nil {
-		return y == nil
-	}
-	if y == nil {
-		return x == nil
-	}
-	return x.Cmp(y) == 0
+	return (utils.IsForked(s1, head) || utils.IsForked(s2, head)) && !utils.BigNumEqual(s1, s2)
 }
 
 // ConfigCompatError is raised if the locally-stored blockchain is initialised with a
@@ -495,50 +523,14 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)
-	for _, config := range c.enabledStatefulPrecompiles() {
-		if utils.IsForked(config.Timestamp(), blockTimestamp) {
-			rules.Precompiles[config.Address()] = config.Contract()
+	for _, config := range c.EnabledStatefulPrecompiles(blockTimestamp) {
+		if config.IsDisabled() {
+			continue
 		}
+		rules.Precompiles[config.Address()] = config.Contract()
 	}
 
 	return rules
-}
-
-// enabledStatefulPrecompiles returns a list of stateful precompile configs in the order that they are enabled
-// by block timestamp.
-func (c *ChainConfig) enabledStatefulPrecompiles() []precompile.StatefulPrecompileConfig {
-	statefulPrecompileConfigs := make([]precompile.StatefulPrecompileConfig, 0)
-
-	if c.ContractDeployerAllowListConfig.Timestamp() != nil {
-		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.ContractDeployerAllowListConfig)
-	}
-
-	if c.ContractNativeMinterConfig.Timestamp() != nil {
-		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.ContractNativeMinterConfig)
-	}
-
-	if c.TxAllowListConfig.Timestamp() != nil {
-		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.TxAllowListConfig)
-	}
-
-	if c.FeeManagerConfig.Timestamp() != nil {
-		statefulPrecompileConfigs = append(statefulPrecompileConfigs, &c.FeeManagerConfig)
-	}
-
-	return statefulPrecompileConfigs
-}
-
-// CheckConfigurePrecompiles checks if any of the precompiles specified in the chain config are enabled by the block
-// transition from [parentTimestamp] to the timestamp set in [blockContext]. If this is the case, it calls [Configure]
-// to apply the necessary state transitions for the upgrade.
-// This function is called:
-// - within genesis setup to configure the starting state for precompiles enabled at genesis,
-// - during block processing to update the state before processing the given block.
-func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, blockContext precompile.BlockContext, statedb precompile.StateDB) {
-	// Iterate the enabled stateful precompiles and configure them if needed
-	for _, config := range c.enabledStatefulPrecompiles() {
-		precompile.CheckConfigure(c, parentTimestamp, blockContext, config, statedb)
-	}
 }
 
 // GetFeeConfig returns the FeeConfig

@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -61,9 +62,10 @@ var (
 	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 	// config overridden in vm.Initialize.
-	genesisJSONSubnetEVM = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	firstTxAmount        *big.Int
-	genesisBalance       *big.Int
+	genesisJSONSubnetEVM    = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONPreSubnetEVM = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	firstTxAmount           *big.Int
+	genesisBalance          *big.Int
 )
 
 func init() {
@@ -241,7 +243,7 @@ func TestVMNilConfig(t *testing.T) {
 	assert.NoError(t, vm.Shutdown())
 }
 
-func TestVMContinuosProfiler(t *testing.T) {
+func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
@@ -329,6 +331,34 @@ func TestVMUpgrades(t *testing.T) {
 	}
 }
 
+func issueAndAccept(t *testing.T, issuer <-chan engCommon.Message, vm *VM) snowman.Block {
+	t.Helper()
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	return blk
+}
+
 func TestBuildEthTxBlock(t *testing.T) {
 	// reduce block gas cost
 	issuer, vm, dbManager, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
@@ -359,29 +389,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		}
 	}
 
-	<-issuer
-
-	blk1, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk1.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk1.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := vm.SetPreference(blk1.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk1.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
+	blk1 := issueAndAccept(t, issuer, vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk1.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -403,27 +411,8 @@ func TestBuildEthTxBlock(t *testing.T) {
 		}
 	}
 
-	time.Sleep(2 * time.Second)
-
-	<-issuer
-
-	blk2, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk2.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk2.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := blk2.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
+	vm.clock.Set(vm.clock.Time().Add(2 * time.Second))
+	blk2 := issueAndAccept(t, issuer, vm)
 	newHead = <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk2.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -2055,29 +2044,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		}
 	}
 
-	<-issuer
-
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := vm.SetPreference(blk.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
+	blk := issueAndAccept(t, issuer, vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -2099,25 +2066,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		}
 	}
 
-	<-issuer
-
-	blk, err = vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
+	blk = issueAndAccept(t, issuer, vm)
 	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(100)) < 0 {
 		t.Fatalf("expected blockGasCost to be at least 100 but got %d", ethBlk.BlockGasCost())
@@ -2159,12 +2108,8 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.ContractDeployerAllowListConfig = precompile.ContractDeployerAllowListConfig{
-		AllowListConfig: precompile.AllowListConfig{
-			BlockTimestamp:  big.NewInt(time.Now().Unix()),
-			AllowListAdmins: testEthAddrs,
-		},
-	}
+	genesis.Config.ContractDeployerAllowListConfig = precompile.NewContractDeployerAllowListConfig(big.NewInt(time.Now().Unix()), testEthAddrs)
+
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -2203,29 +2148,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 		}
 	}
 
-	<-issuer
-
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := vm.SetPreference(blk.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
+	blk := issueAndAccept(t, issuer, vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -2249,13 +2172,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-
-	genesis.Config.TxAllowListConfig = precompile.TxAllowListConfig{
-		AllowListConfig: precompile.AllowListConfig{
-			BlockTimestamp:  big.NewInt(0),
-			AllowListAdmins: testEthAddrs[0:1],
-		},
-	}
+	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(0), testEthAddrs[0:1])
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -2279,7 +2196,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	// Check that address 0 is whitelisted and address 1 is not
 	role := precompile.GetTxAllowListStatus(genesisState, testEthAddrs[0])
 	if role != precompile.AllowListAdmin {
-		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListAdmin, role)
+		t.Fatalf("Expected allow list status to be set to admin: %s, but found: %s", precompile.AllowListAdmin, role)
 	}
 	role = precompile.GetTxAllowListStatus(genesisState, testEthAddrs[1])
 	if role != precompile.AllowListNoRole {
@@ -2291,8 +2208,8 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	assert.NoError(t, err)
 
-	err = vm.chain.GetTxPool().AddRemote(signedTx0)
-	if err != nil {
+	errs := vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx0})
+	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
 
@@ -2303,34 +2220,12 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.chain.GetTxPool().AddRemote(signedTx1)
-	if err == nil {
-		t.Fatal("Tx not rejected at index")
+	errs = vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx1})
+	if err := errs[0]; !errors.Is(err, precompile.ErrSenderAddressNotAllowListed) {
+		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
-	// Construct the block
-	<-issuer
-
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := vm.SetPreference(blk.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	}
+	blk := issueAndAccept(t, issuer, vm)
 
 	// Verify that the constructed block only has the whitelisted tx
 	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2344,6 +2239,115 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	assert.Equal(t, signedTx0.Hash(), txs[0].Hash())
 }
 
+// Test that the tx allow list allows whitelisted transactions and blocks non-whitelisted addresses
+// and the allowlist is removed after the precompile is disabled.
+func TestTxAllowListDisablePrecompile(t *testing.T) {
+	// Setup chain params
+	genesis := &core.Genesis{}
+	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
+		t.Fatal(err)
+	}
+	enableAllowListTimestamp := time.Unix(0, 0) // enable at genesis
+	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1])
+	genesisJSON, err := genesis.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+
+	// arbitrary choice ahead of enableAllowListTimestamp
+	disableAllowListTimestamp := enableAllowListTimestamp.Add(10 * time.Hour)
+
+	// configure a network upgrade to remove the allowlist
+	precompileConfigs := &vm.chain.BlockChain().Config().UpgradeConfig
+	precompileConfigs.PrecompileUpgrades = append(
+		precompileConfigs.PrecompileUpgrades,
+		params.PrecompileUpgrade{
+			TxAllowListConfig: precompile.NewDisableTxAllowListConfig(big.NewInt(disableAllowListTimestamp.Unix())),
+		},
+	)
+
+	vm.clock.Set(disableAllowListTimestamp) // upgrade takes effect after a block is issued, so we can set vm's clock here.
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that address 0 is whitelisted and address 1 is not
+	role := precompile.GetTxAllowListStatus(genesisState, testEthAddrs[0])
+	if role != precompile.AllowListAdmin {
+		t.Fatalf("Expected allow list status to be set to admin: %s, but found: %s", precompile.AllowListAdmin, role)
+	}
+	role = precompile.GetTxAllowListStatus(genesisState, testEthAddrs[1])
+	if role != precompile.AllowListNoRole {
+		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListNoRole, role)
+	}
+
+	// Submit a successful transaction
+	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	assert.NoError(t, err)
+
+	errs := vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx0})
+	if err := errs[0]; err != nil {
+		t.Fatalf("Failed to add tx at index: %s", err)
+	}
+
+	// Submit a rejected transaction, should throw an error
+	tx1 := types.NewTransaction(uint64(0), testEthAddrs[1], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errs = vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx1})
+	if err := errs[0]; !errors.Is(err, precompile.ErrSenderAddressNotAllowListed) {
+		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
+	}
+
+	blk := issueAndAccept(t, issuer, vm)
+
+	// Verify that the constructed block only has the whitelisted tx
+	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	txs := block.Transactions()
+	if txs.Len() != 1 {
+		t.Fatalf("Expected number of txs to be %d, but found %d", 1, txs.Len())
+	}
+	assert.Equal(t, signedTx0.Hash(), txs[0].Hash())
+
+	// verify the issued block is after the network upgrade
+	assert.True(t, block.Timestamp().Cmp(big.NewInt(disableAllowListTimestamp.Unix())) >= 0)
+
+	<-newTxPoolHeadChan // wait for new head in tx pool
+
+	// retry the rejected Tx, which should now succeed
+	errs = vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx1})
+	if err := errs[0]; err != nil {
+		t.Fatalf("Failed to add tx at index: %s", err)
+	}
+
+	vm.clock.Set(vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
+	blk = issueAndAccept(t, issuer, vm)
+
+	// Verify that the constructed block only has the previously rejected tx
+	block = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	txs = block.Transactions()
+	if txs.Len() != 1 {
+		t.Fatalf("Expected number of txs to be %d, but found %d", 1, txs.Len())
+	}
+	assert.Equal(t, signedTx1.Hash(), txs[0].Hash())
+}
+
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
 	// Setup chain params
@@ -2351,13 +2355,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-
-	genesis.Config.FeeManagerConfig = precompile.FeeConfigManagerConfig{
-		AllowListConfig: precompile.AllowListConfig{
-			BlockTimestamp:  big.NewInt(0),
-			AllowListAdmins: testEthAddrs[0:1],
-		},
-	}
+	genesis.Config.FeeManagerConfig = precompile.NewFeeManagerConfig(big.NewInt(0), testEthAddrs[0:1])
 
 	// set a lower fee config now
 	testLowFeeConfig := commontype.FeeConfig{
@@ -2397,7 +2395,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	// Check that address 0 is whitelisted and address 1 is not
 	role := precompile.GetFeeConfigManagerStatus(genesisState, testEthAddrs[0])
 	if role != precompile.AllowListAdmin {
-		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
+		t.Fatalf("Expected fee manager list status to be set to admin: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
 	}
 	role = precompile.GetFeeConfigManagerStatus(genesisState, testEthAddrs[1])
 	if role != precompile.AllowListNoRole {
@@ -2432,35 +2430,12 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.chain.GetTxPool().AddRemote(signedTx)
-	if err != nil {
+	errs := vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx})
+	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
 
-	// Construct the block
-	<-issuer
-
-	blk, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
-	}
-
-	if err := vm.SetPreference(blk.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Accept(); err != nil {
-		t.Fatal(err)
-	}
-
+	blk := issueAndAccept(t, issuer, vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")

@@ -32,6 +32,27 @@ var (
 // interface while adding in the ContractNativeMinter specific precompile address.
 type ContractNativeMinterConfig struct {
 	AllowListConfig
+	UpgradeableConfig
+}
+
+// NewContractNativeMinterConfig returns a config for a network upgrade at [blockTimestamp] that enables
+// ContractNativeMinter with the given [admins] as members of the allowlist.
+func NewContractNativeMinterConfig(blockTimestamp *big.Int, admins []common.Address) *ContractNativeMinterConfig {
+	return &ContractNativeMinterConfig{
+		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
+	}
+}
+
+// NewDisableContractNativeMinterConfig returns config for a network upgrade at [blockTimestamp]
+// that disables ContractNativeMinter.
+func NewDisableContractNativeMinterConfig(blockTimestamp *big.Int) *ContractNativeMinterConfig {
+	return &ContractNativeMinterConfig{
+		UpgradeableConfig: UpgradeableConfig{
+			BlockTimestamp: blockTimestamp,
+			Disable:        true,
+		},
+	}
 }
 
 // Address returns the address of the native minter contract.
@@ -47,6 +68,16 @@ func (c *ContractNativeMinterConfig) Configure(_ ChainConfig, state StateDB, _ B
 // Contract returns the singleton stateful precompiled contract to be used for the native minter.
 func (c *ContractNativeMinterConfig) Contract() StatefulPrecompiledContract {
 	return ContractNativeMinterPrecompile
+}
+
+// Equal returns true if [s] is a [*ContractNativeMinterConfig] and it has been configured identical to [c].
+func (c *ContractNativeMinterConfig) Equal(s StatefulPrecompileConfig) bool {
+	// typecast before comparison
+	other, ok := (s).(*ContractNativeMinterConfig)
+	if !ok {
+		return false
+	}
+	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
 }
 
 // GetContractNativeMinterStatus returns the role of [address] for the minter list.

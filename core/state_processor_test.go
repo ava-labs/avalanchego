@@ -51,6 +51,7 @@ func TestStateProcessorErrors(t *testing.T) {
 	var (
 		config = &params.ChainConfig{
 			ChainID:             big.NewInt(1),
+			FeeConfig:           params.DefaultFeeConfig,
 			HomesteadBlock:      big.NewInt(0),
 			EIP150Block:         big.NewInt(0),
 			EIP150Hash:          common.Hash{},
@@ -61,8 +62,9 @@ func TestStateProcessorErrors(t *testing.T) {
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
-			SubnetEVMTimestamp:  big.NewInt(0),
-			FeeConfig:           params.DefaultFeeConfig,
+			NetworkUpgrades: params.NetworkUpgrades{
+				SubnetEVMTimestamp: big.NewInt(0),
+			},
 		}
 		signer     = types.LatestSigner(config)
 		testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -214,6 +216,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			gspec = &Genesis{
 				Config: &params.ChainConfig{
 					ChainID:             big.NewInt(1),
+					FeeConfig:           params.DefaultFeeConfig,
 					HomesteadBlock:      big.NewInt(0),
 					EIP150Block:         big.NewInt(0),
 					EIP150Hash:          common.Hash{},
@@ -224,8 +227,9 @@ func TestStateProcessorErrors(t *testing.T) {
 					PetersburgBlock:     big.NewInt(0),
 					IstanbulBlock:       big.NewInt(0),
 					MuirGlacierBlock:    big.NewInt(0),
-					SubnetEVMTimestamp:  big.NewInt(0),
-					FeeConfig:           params.DefaultFeeConfig,
+					NetworkUpgrades: params.NetworkUpgrades{
+						SubnetEVMTimestamp: big.NewInt(0),
+					},
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{
@@ -308,12 +312,12 @@ func TestStateProcessorErrors(t *testing.T) {
 // non-whitelisted TX Allow List address.
 func TestBadTxAllowListBlock(t *testing.T) {
 	var (
-		db = rawdb.NewMemoryDatabase()
-
+		db       = rawdb.NewMemoryDatabase()
 		testAddr = common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7")
 
 		config = &params.ChainConfig{
 			ChainID:             big.NewInt(1),
+			FeeConfig:           params.DefaultFeeConfig,
 			HomesteadBlock:      big.NewInt(0),
 			EIP150Block:         big.NewInt(0),
 			EIP150Hash:          common.Hash{},
@@ -324,13 +328,11 @@ func TestBadTxAllowListBlock(t *testing.T) {
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
-			SubnetEVMTimestamp:  big.NewInt(0),
-			FeeConfig:           params.DefaultFeeConfig,
-			TxAllowListConfig: precompile.TxAllowListConfig{
-				AllowListConfig: precompile.AllowListConfig{
-					BlockTimestamp:  big.NewInt(0),
-					AllowListAdmins: []common.Address{},
-				},
+			NetworkUpgrades: params.NetworkUpgrades{
+				SubnetEVMTimestamp: big.NewInt(0),
+			},
+			PrecompileUpgrade: params.PrecompileUpgrade{
+				TxAllowListConfig: precompile.NewTxAllowListConfig(big.NewInt(0), []common.Address{}),
 			},
 		}
 		signer     = types.LatestSigner(config)

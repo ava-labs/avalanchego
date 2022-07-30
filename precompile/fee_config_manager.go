@@ -51,11 +51,42 @@ var (
 // interface while adding in the FeeConfigManager specific precompile address.
 type FeeConfigManagerConfig struct {
 	AllowListConfig // Config for the fee config manager allow list
+	UpgradeableConfig
+}
+
+// NewFeeManagerConfig returns a config for a network upgrade at [blockTimestamp] that enables
+// FeeConfigManager with the given [admins] as members of the allowlist.
+func NewFeeManagerConfig(blockTimestamp *big.Int, admins []common.Address) *FeeConfigManagerConfig {
+	return &FeeConfigManagerConfig{
+		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
+	}
+}
+
+// NewDisableFeeManagerConfig returns config for a network upgrade at [blockTimestamp]
+// that disables FeeConfigManager.
+func NewDisableFeeManagerConfig(blockTimestamp *big.Int) *FeeConfigManagerConfig {
+	return &FeeConfigManagerConfig{
+		UpgradeableConfig: UpgradeableConfig{
+			BlockTimestamp: blockTimestamp,
+			Disable:        true,
+		},
+	}
 }
 
 // Address returns the address of the fee config manager contract.
 func (c *FeeConfigManagerConfig) Address() common.Address {
 	return FeeConfigManagerAddress
+}
+
+// Equal returns true if [s] is a [*FeeConfigManagerConfig] and it has been configured identical to [c].
+func (c *FeeConfigManagerConfig) Equal(s StatefulPrecompileConfig) bool {
+	// typecast before comparison
+	other, ok := (s).(*FeeConfigManagerConfig)
+	if !ok {
+		return false
+	}
+	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
 }
 
 // Configure configures [state] with the desired admins based on [c].

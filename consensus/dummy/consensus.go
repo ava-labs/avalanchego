@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -37,22 +38,33 @@ const (
 
 type (
 	DummyEngine struct {
+		clock         *mockable.Clock
 		consensusMode Mode
 	}
 )
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
+		clock:         &mockable.Clock{},
 		consensusMode: ModeSkipBlockFee,
 	}
 }
 
 func NewFaker() *DummyEngine {
-	return &DummyEngine{}
+	return &DummyEngine{
+		clock: &mockable.Clock{},
+	}
+}
+
+func NewFakerWithClock(clock *mockable.Clock) *DummyEngine {
+	return &DummyEngine{
+		clock: clock,
+	}
 }
 
 func NewFullFaker() *DummyEngine {
 	return &DummyEngine{
+		clock:         &mockable.Clock{},
 		consensusMode: ModeSkipHeader,
 	}
 }
@@ -164,7 +176,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return err
 	}
 	// Verify the header's timestamp
-	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
+	if header.Time > uint64(self.clock.Time().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock
 	}
 	// Verify the header's timestamp is not earlier than parent's

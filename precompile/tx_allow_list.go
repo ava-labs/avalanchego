@@ -5,6 +5,7 @@ package precompile
 
 import (
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -21,6 +22,27 @@ var (
 // interface while adding in the TxAllowList specific precompile address.
 type TxAllowListConfig struct {
 	AllowListConfig
+	UpgradeableConfig
+}
+
+// NewTxAllowListConfig returns a config for a network upgrade at [blockTimestamp] that enables
+// TxAllowList with the given [admins] as members of the allowlist.
+func NewTxAllowListConfig(blockTimestamp *big.Int, admins []common.Address) *TxAllowListConfig {
+	return &TxAllowListConfig{
+		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
+	}
+}
+
+// NewDisableTxAllowListConfig returns config for a network upgrade at [blockTimestamp]
+// that disables TxAllowList.
+func NewDisableTxAllowListConfig(blockTimestamp *big.Int) *TxAllowListConfig {
+	return &TxAllowListConfig{
+		UpgradeableConfig: UpgradeableConfig{
+			BlockTimestamp: blockTimestamp,
+			Disable:        true,
+		},
+	}
 }
 
 // Address returns the address of the contract deployer allow list.
@@ -36,6 +58,16 @@ func (c *TxAllowListConfig) Configure(_ ChainConfig, state StateDB, _ BlockConte
 // Contract returns the singleton stateful precompiled contract to be used for the allow list.
 func (c *TxAllowListConfig) Contract() StatefulPrecompiledContract {
 	return TxAllowListPrecompile
+}
+
+// Equal returns true if [s] is a [*TxAllowListConfig] and it has been configured identical to [c].
+func (c *TxAllowListConfig) Equal(s StatefulPrecompileConfig) bool {
+	// typecast before comparison
+	other, ok := (s).(*TxAllowListConfig)
+	if !ok {
+		return false
+	}
+	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
 }
 
 // GetTxAllowListStatus returns the role of [address] for the contract deployer

@@ -171,8 +171,12 @@ func (e *GenesisMismatchError) Error() string {
 //
 //                          genesis == nil       genesis != nil
 //                       +------------------------------------------
-//     db has no genesis |  main-net default  |  genesis
-//     db has genesis    |  from DB           |  genesis (if compatible)
+//     db has no genesis |  ErrNoGenesis      |  genesis
+//     db has genesis    |  ErrNoGenesis      |  genesis (if compatible both block hash and chain config), else error
+
+// The argument [genesis] must be specified and must contain a valid chain config.
+// If the genesis block has already been set up, then we verify the hash matches the genesis passed in
+// and that the chain config contained in genesis is backwards compatible with what is stored in the database.
 //
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
@@ -226,7 +230,9 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 		return newcfg, err
 	}
 	storedcfg := rawdb.ReadChainConfig(db, stored)
+	// If there is no previously stored chain config, write the chain config to disk.
 	if storedcfg == nil {
+		// Note: this can happen since we did not previously write the genesis block and chain config in the same batch.
 		log.Warn("Found genesis block without chain config")
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, nil
@@ -343,12 +349,16 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	if err := config.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
-	rawdb.WriteBlock(db, block)
-	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil)
-	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(db, block.Hash())
-	rawdb.WriteHeadHeaderHash(db, block.Hash())
-	rawdb.WriteChainConfig(db, block.Hash(), config)
+	batch := db.NewBatch()
+	rawdb.WriteBlock(batch, block)
+	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), nil)
+	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
+	rawdb.WriteHeadBlockHash(batch, block.Hash())
+	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteChainConfig(batch, block.Hash(), config)
+	if err := batch.Write(); err != nil {
+		return nil, fmt.Errorf("failed to write genesis block: %w", err)
+	}
 	return block, nil
 }
 

@@ -183,12 +183,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 		"allow list enabled in genesis": {
 			getConfig: func() *params.ChainConfig {
 				config := *params.TestChainConfig
-				config.ContractDeployerAllowListConfig = precompile.ContractDeployerAllowListConfig{
-					AllowListConfig: precompile.AllowListConfig{
-						BlockTimestamp:  big.NewInt(0),
-						AllowListAdmins: []common.Address{addr},
-					},
-				}
+				config.ContractDeployerAllowListConfig = precompile.NewContractDeployerAllowListConfig(big.NewInt(0), []common.Address{addr})
 				return &config
 			},
 			assertState: func(t *testing.T, sdb *state.StateDB) {
