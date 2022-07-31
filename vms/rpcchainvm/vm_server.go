@@ -512,6 +512,58 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
+func (vm *VMServer) CrossChainAppRequest(ctx context.Context, req *vmpb.CrossChainAppRequestMsg) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+	deadline, err := grpcutils.TimestampAsTime(req.Deadline)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(nodeID, sourceChainID, req.RequestId, deadline, req.Request)
+}
+
+func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, req *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(nodeID, sourceChainID, req.RequestId)
+}
+
+func (vm *VMServer) CrossChainAppResponse(ctx context.Context, req *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(nodeID, sourceChainID, req.RequestId, req.Response)
+}
+
+func (vm *VMServer) CrossChainAppGossip(ctx context.Context, req *vmpb.CrossChainAppGossipMsg) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+	return &emptypb.Empty{}, vm.vm.CrossChainAppGossip(nodeID, sourceChainID, req.Msg)
+}
+
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
 	// Gather metrics registered to snow context Gatherer. These
 	// metrics are defined by the underlying vm implementation.

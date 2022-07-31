@@ -42,6 +42,12 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
+
+	// Cross-chain messaging:
+	CrossChainAppRequest
+	CrossChainAppResponse
+	CrossChainAppGossip
+
 	// State sync
 	GetStateSummaryFrontier
 	StateSummaryFrontier
@@ -55,6 +61,7 @@ const (
 	GetFailed
 	QueryFailed
 	AppRequestFailed
+	CrossChainAppRequestFailed
 	Timeout
 	Connected
 	Disconnected
@@ -81,6 +88,7 @@ var (
 		PushQuery,
 		PullQuery,
 		AppRequest,
+		CrossChainAppRequest,
 		GetStateSummaryFrontier,
 		GetAcceptedStateSummary,
 	}
@@ -91,6 +99,7 @@ var (
 		Put,
 		Chits,
 		AppResponse,
+		CrossChainAppResponse,
 		StateSummaryFrontier,
 		AcceptedStateSummary,
 	}
@@ -156,6 +165,11 @@ var (
 		AppGossip,
 		AppRequestFailed,
 		AppResponse,
+
+		CrossChainAppRequest,
+		CrossChainAppGossip,
+		CrossChainAppRequestFailed,
+		CrossChainAppResponse,
 	}
 
 	RequestToResponseOps = map[Op]Op{
@@ -166,6 +180,7 @@ var (
 		PushQuery:               Chits,
 		PullQuery:               Chits,
 		AppRequest:              AppResponse,
+		CrossChainAppRequest:    CrossChainAppResponse,
 		GetStateSummaryFrontier: StateSummaryFrontier,
 		GetAcceptedStateSummary: AcceptedStateSummary,
 	}
@@ -176,6 +191,7 @@ var (
 		Put:                  GetFailed,
 		Chits:                QueryFailed,
 		AppResponse:          AppRequestFailed,
+		CrossChainAppResponse: CrossChainAppRequestFailed,
 		StateSummaryFrontier: GetStateSummaryFrontierFailed,
 		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
 	}
@@ -188,6 +204,7 @@ var (
 		GetFailed:                     Put,
 		QueryFailed:                   Chits,
 		AppRequestFailed:              AppResponse,
+		CrossChainAppRequestFailed:    CrossChainAppResponse,
 	}
 	UnrequestedOps = map[Op]struct{}{
 		GetAcceptedFrontier:     {},
@@ -198,6 +215,8 @@ var (
 		PullQuery:               {},
 		AppRequest:              {},
 		AppGossip:               {},
+		CrossChainAppRequest:    {},
+		CrossChainAppGossip:     {},
 		GetStateSummaryFrontier: {},
 		GetAcceptedStateSummary: {},
 	}
@@ -228,6 +247,11 @@ var (
 		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
 		AppResponse: {ChainID, RequestID, AppBytes},
 		AppGossip:   {ChainID, AppBytes},
+
+		// Cross-chain application messaging
+		CrossChainAppRequest:  {SourceChainID, DestinationChainID, RequestID, Deadline, AppBytes},
+		CrossChainAppResponse: {SourceChainID, DestinationChainID, RequestID, AppBytes},
+		CrossChainAppGossip:   {SourceChainID, DestinationChainID, AppBytes},
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
@@ -240,6 +264,7 @@ func (op Op) Compressible() bool {
 	switch op {
 	case PeerList, Put, Ancestors, PushQuery,
 		AppRequest, AppResponse, AppGossip,
+		CrossChainAppRequest, CrossChainAppResponse, CrossChainAppGossip,
 		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
 		return true
 	default:
@@ -285,6 +310,12 @@ func (op Op) String() string {
 		return "app_response"
 	case AppGossip:
 		return "app_gossip"
+	case CrossChainAppRequest:
+		return "cross_chain_app_request"
+	case CrossChainAppResponse:
+		return "cross_chain_app_response"
+	case CrossChainAppGossip:
+		return "cross_chain_app_gossip"
 	case GetStateSummaryFrontier:
 		return "get_state_summary_frontier"
 	case StateSummaryFrontier:
@@ -306,6 +337,8 @@ func (op Op) String() string {
 		return "query_failed"
 	case AppRequestFailed:
 		return "app_request_failed"
+	case CrossChainAppRequestFailed:
+		return "cross_chain_app_request_failed"
 	case GetStateSummaryFrontierFailed:
 		return "get_state_summary_frontier_failed"
 	case GetAcceptedStateSummaryFailed:

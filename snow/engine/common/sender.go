@@ -142,4 +142,13 @@ type AppSender interface {
 	// A non-nil error should be considered fatal.
 	SendAppGossip(appGossipBytes []byte) error
 	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error
+
+	CrossChainAppSender
+}
+
+type CrossChainAppSender interface {
+	SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appRequestBytes []byte) error
+	SendCrossChainAppResponse(nodeID ids.NodeID, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appResponseBytes []byte) error
+	SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
+	SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
 }

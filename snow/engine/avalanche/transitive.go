@@ -255,6 +255,22 @@ func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return t.VM.AppGossip(nodeID, msg)
 }
 
+func (t *Transitive) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return t.VM.CrossChainAppRequest(nodeID, sourceChainID, requestID, deadline, request)
+}
+
+func (t *Transitive) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+	return t.VM.CrossChainAppRequestFailed(nodeID, sourceChainID, requestID)
+}
+
+func (t *Transitive) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+	return t.VM.CrossChainAppResponse(nodeID, sourceChainID, requestID, response)
+}
+
+func (t *Transitive) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+	return t.VM.CrossChainAppGossip(nodeID, sourceChainID, msg)
+}
+
 func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }

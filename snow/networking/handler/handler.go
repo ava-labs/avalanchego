@@ -49,6 +49,7 @@ type Handler interface {
 	SetOnStopped(onStopped func())
 	Start(recoverPanic bool)
 	Push(msg message.InboundMessage)
+	Len() int
 	Stop()
 	StopWithError(err error)
 	Stopped() chan struct{}
@@ -231,11 +232,16 @@ func (h *handler) HealthCheck() (interface{}, error) {
 // Push the message onto the handler's queue
 func (h *handler) Push(msg message.InboundMessage) {
 	switch msg.Op() {
-	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse:
+	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse,
+		message.CrossChainAppRequest, message.CrossChainAppGossip, message.CrossChainAppRequestFailed, message.CrossChainAppResponse:
 		h.asyncMessageQueue.Push(msg)
 	default:
 		h.syncMessageQueue.Push(msg)
 	}
+}
+
+func (h *handler) Len() int {
+	return h.syncMessageQueue.Len() + h.asyncMessageQueue.Len()
 }
 
 func (h *handler) RegisterTimeout(d time.Duration) {
@@ -944,6 +950,40 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		appBytes := appBytesIntf.([]byte)
 
 		return engine.AppGossip(nodeID, appBytes)
+
+	case message.CrossChainAppRequest:
+		reqID := msg.Get(message.RequestID).(uint32)
+		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
+		if err != nil {
+			return err
+		}
+		appBytes := msg.Get(message.AppBytes).([]byte)
+		return engine.CrossChainAppRequest(nodeID, sourceChainID, reqID, msg.ExpirationTime(), appBytes)
+
+	case message.CrossChainAppResponse:
+		reqID := msg.Get(message.RequestID).(uint32)
+		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
+		if err != nil {
+			return err
+		}
+		appBytes := msg.Get(message.AppBytes).([]byte)
+		return engine.CrossChainAppResponse(nodeID, sourceChainID, reqID, appBytes)
+
+	case message.CrossChainAppRequestFailed:
+		reqID := msg.Get(message.RequestID).(uint32)
+		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
+		if err != nil {
+			return err
+		}
+		return engine.CrossChainAppRequestFailed(nodeID, sourceChainID, reqID)
+
+	case message.CrossChainAppGossip:
+		appBytes := msg.Get(message.AppBytes).([]byte)
+		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
+		if err != nil {
+			return err
+		}
+		return engine.CrossChainAppGossip(nodeID, sourceChainID, appBytes)
 
 	default:
 		return fmt.Errorf(

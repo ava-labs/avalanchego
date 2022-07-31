@@ -118,6 +118,23 @@ type InboundMsgBuilder interface {
 		nodeID ids.NodeID,
 	) InboundMessage
 
+	InboundCrossChainAppRequest(
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		msg []byte,
+		nodeID ids.NodeID,
+	) InboundMessage
+
+	InboundCrossChainAppResponse(
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		msg []byte,
+		nodeID ids.NodeID,
+	) InboundMessage
+
 	InboundGet(
 		chainID ids.ID,
 		requestID uint32,
@@ -427,6 +444,52 @@ func (b *inMsgBuilderWithPacker) InboundAppResponse(
 			ChainID:   chainID[:],
 			RequestID: requestID,
 			AppBytes:  msg,
+		},
+	}
+}
+
+func (b *inMsgBuilderWithPacker) InboundCrossChainAppRequest(
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	msg []byte,
+	nodeID ids.NodeID,
+) InboundMessage {
+	received := b.clock.Time()
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:                    CrossChainAppRequest,
+			nodeID:                nodeID,
+			expirationTime:        received.Add(deadline),
+		},
+		fields: map[Field]interface{}{
+			SourceChainID:      sourceChainID[:],
+			DestinationChainID: destinationChainID[:],
+			RequestID:          requestID,
+			Deadline:           uint64(deadline),
+			AppBytes:           msg,
+		},
+	}
+}
+
+func (b *inMsgBuilderWithPacker) InboundCrossChainAppResponse(
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	msg []byte,
+	nodeID ids.NodeID,
+) InboundMessage {
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: CrossChainAppResponse,
+			nodeID: nodeID,
+		},
+		fields: map[Field]interface{}{
+			SourceChainID:      sourceChainID[:],
+			DestinationChainID: destinationChainID[:],
+			RequestID:          requestID,
+			AppBytes:           msg,
 		},
 	}
 }

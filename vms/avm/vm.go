@@ -5,12 +5,11 @@ package avm
 
 import (
 	"container/list"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -1064,6 +1063,26 @@ func (vm *VM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return nil
+}
+
+func (vm *VM) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+	// TODO implement me
+	panic("implement me")
 }
 
 // UniqueTx de-duplicates the transaction.

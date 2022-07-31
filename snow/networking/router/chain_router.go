@@ -110,7 +110,7 @@ func (cr *ChainRouter) Initialize(
 	cr.timedRequests = linkedhashmap.New[ids.ID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
-	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
+	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Source Chain ID, Destination Chain ID, Request ID, Msg Type
 
 	// Mark myself as connected
 	myself := &peer{
@@ -137,17 +137,37 @@ func (cr *ChainRouter) Initialize(
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-func (cr *ChainRouter) RegisterRequest(
+func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
+	cr.registerRequest(nodeID, sourceChainID, destinationChainID, requestID, op, func(failedOp message.Op) message.InboundMessage {
+		return cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
+	})
+}
+
+func (cr *ChainRouter) RegisterCrossChainRequest(
 	nodeID ids.NodeID,
-	chainID ids.ID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
 	requestID uint32,
 	op message.Op,
+) {
+	cr.registerRequest(nodeID, sourceChainID, destinationChainID, requestID, op, func(failedOp message.Op) message.InboundMessage {
+		return cr.msgCreator.InternalCrossChainFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
+	})
+}
+
+func (cr *ChainRouter) registerRequest(
+	nodeID ids.NodeID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	op message.Op,
+	failedResponseProvider func(failedOp message.Op) message.InboundMessage,
 ) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
+	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time: cr.clock.Time(),
@@ -166,8 +186,8 @@ func (cr *ChainRouter) RegisterRequest(
 	}
 
 	// Register a timeout to fire if we don't get a reply in time.
-	cr.timeoutManager.RegisterRequest(nodeID, chainID, op, uniqueRequestID, func() {
-		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
+	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
+		msg := failedResponseProvider(failedOp)
 		cr.HandleInbound(msg)
 	})
 }
@@ -202,6 +222,18 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
+	var sourceChainID ids.ID
+
+
+	switch op {
+	case message.CrossChainAppRequest, message.CrossChainAppResponse,
+		message.CrossChainAppGossip, message.CrossChainAppRequestFailed:
+		sourceChainID, err = ids.ToID(msg.Get(message.SourceChainID).([]byte))
+		cr.log.AssertNoError(err)
+	}
+
+
+
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
 	// to allow a uniform handling of all messages
@@ -235,6 +267,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("sourceChainID", sourceChainID),
 			zap.Stringer("chainID", chainID),
 			zap.Error(errUnknownChain),
 		)
@@ -266,7 +299,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, chainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
@@ -292,7 +325,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, chainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
@@ -536,11 +569,13 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
 	nodeID ids.NodeID,
-	chainID ids.ID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
 	requestID uint32,
 ) (ids.ID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
+	// uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
+	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
@@ -554,10 +589,15 @@ func (cr *ChainRouter) clearRequest(
 
 // Assumes [cr.lock] is held.
 // Assumes [message.Op] is an alias of byte.
-func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) ids.ID {
+// func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) ids.ID {
+func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) ids.ID {
 	copy(cr.requestIDBytes, nodeID[:])
-	copy(cr.requestIDBytes[hashing.AddrLen:], chainID[:])
+	// copy(cr.requestIDBytes[hashing.AddrLen:], sourceChainID[:])
+	// copy(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], destinationChainID[:])
+	copy(cr.requestIDBytes[hashing.HashLen:], destinationChainID[:])
+	// binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+hashing.HashLen:], requestID)
 	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], requestID)
+	// cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+hashing.HashLen+wrappers.IntLen] = byte(op)
 	cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+wrappers.IntLen] = byte(op)
 	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }

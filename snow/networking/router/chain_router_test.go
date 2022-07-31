@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -340,7 +341,7 @@ func TestRouterTimeout(t *testing.T) {
 	wg.Add(len(msgs))
 
 	for i, msg := range msgs {
-		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, uint32(i), msg)
+		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, ctx.ChainID, uint32(i), msg)
 	}
 
 	wg.Wait()
@@ -430,7 +431,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	vID := ids.GenerateTestNodeID()
 	for i, op := range ops {
-		chainRouter.RegisterRequest(vID, ctx.ChainID, uint32(i), op)
+		chainRouter.RegisterRequest(vID, ctx.ChainID, ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -568,7 +569,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// register a validator request
 	reqID++
-	chainRouter.RegisterRequest(vID, ctx.ChainID, reqID, message.Get)
+	chainRouter.RegisterRequest(vID, ctx.ChainID, ctx.ChainID, reqID, message.Get)
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
 
 	// remove it from validators
@@ -581,4 +582,98 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// shouldn't clear out timed request, as the request should be cleared when
 	// the GetFailed message is sent
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
+}
+
+func TestRouterCrossChainMessages(t *testing.T) {
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     3 * time.Second,
+			MinimumTimeout:     3 * time.Second,
+			MaximumTimeout:     5 * time.Minute,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"timeoutManager",
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go tm.Dispatch()
+
+	mc, err := message.NewCreator(prometheus.NewRegistry(), true, "dummyNamespace", 10*time.Second)
+	assert.NoError(t, err)
+
+	// Create chain router
+	nodeID := ids.GenerateTestNodeID()
+	chainRouter := ChainRouter{}
+	assert.NoError(t, chainRouter.Initialize(nodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry()))
+
+	// Set up validators
+	vdrs := validators.NewSet()
+	assert.NoError(t, vdrs.AddWeight(ids.GenerateTestNodeID(), 1))
+
+	// Create bootstrapper, engine and handler
+	senderCtx := snow.DefaultConsensusContextTest()
+	senderCtx.ChainID = ids.GenerateTestID()
+	senderCtx.Registerer = prometheus.NewRegistry()
+	senderCtx.Metrics = metrics.NewOptionalGatherer()
+	senderCtx.Executing(false)
+
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	assert.NoError(t, err)
+
+	senderHandler, err := handler.New(
+		mc,
+		senderCtx,
+		vdrs,
+		nil,
+		nil,
+		time.Second,
+		resourceTracker,
+	)
+	assert.NoError(t, err)
+
+	receiverCtx := snow.DefaultConsensusContextTest()
+	receiverCtx.ChainID = ids.GenerateTestID()
+	receiverCtx.Registerer = prometheus.NewRegistry()
+	receiverCtx.Metrics = metrics.NewOptionalGatherer()
+	receiverCtx.Executing(false)
+
+	receiverHandler, err := handler.New(
+		mc,
+		receiverCtx,
+		vdrs,
+		nil,
+		nil,
+		time.Second,
+		resourceTracker,
+	)
+	assert.NoError(t, err)
+
+	// assumed bootstrapping is done
+	receiverCtx.SetState(snow.NormalOp)
+	senderCtx.SetState(snow.NormalOp)
+
+	// router tracks two chains - one will send a message to the other
+	chainRouter.AddChain(senderHandler)
+	chainRouter.AddChain(receiverHandler)
+
+	// Each chain should start off with a connected message
+	assert.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
+	assert.Equal(t, 1, chainRouter.chains[receiverCtx.ChainID].Len())
+
+	// register the cross-chain requests so we don't drop them
+	vID := ids.GenerateTestNodeID()
+	chainRouter.RegisterRequest(vID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
+
+	msg := []byte("foobar")
+	chainRouter.HandleInbound(mc.InboundCrossChainAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
+
+	// We should have received the new message in the receiver chain
+	assert.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
+
+	// The sender chain shouldn't have any new messages.
+	assert.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
 }

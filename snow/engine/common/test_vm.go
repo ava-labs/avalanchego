@@ -191,6 +191,26 @@ func (vm *TestVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return errAppGossip
 }
 
+func (vm *TestVM) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (vm *TestVM) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (vm *TestVM) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (vm *TestVM) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (vm *TestVM) Connected(id ids.NodeID, nodeVersion *version.Application) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(id, nodeVersion)

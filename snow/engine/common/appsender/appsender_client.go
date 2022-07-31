@@ -81,3 +81,70 @@ func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error 
 	)
 	return err
 }
+
+func (c *Client) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appRequestBytes []byte) error {
+	nodeIDsBytes := make([][]byte, nodeIDs.Len())
+	i := 0
+	for nodeID := range nodeIDs {
+		nodeID := nodeID // Prevent overwrite in next iteration
+		nodeIDsBytes[i] = nodeID[:]
+		i++
+	}
+	_, err := c.client.SendCrossChainAppRequest(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppRequestMsg{
+			NodeIds:            nodeIDsBytes,
+			SourceChainId:      sourceChainID[:],
+			DestinationChainId: destinationChainID[:],
+			RequestId:          requestID,
+			Request:            appRequestBytes,
+		},
+	)
+	return err
+}
+
+func (c *Client) SendCrossChainAppResponse(nodeID ids.NodeID, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appResponseBytes []byte) error {
+	_, err := c.client.SendCrossChainAppResponse(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppResponseMsg{
+			NodeId:             nodeID[:],
+			SourceChainId:      sourceChainID[:],
+			DestinationChainId: destinationChainID[:],
+			RequestId:          requestID,
+			Response:           appResponseBytes,
+		},
+	)
+	return err
+}
+
+func (c *Client) SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
+	_, err := c.client.SendCrossChainAppGossip(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppGossipMsg{
+			SourceChainId:      sourceChainID[:],
+			DestinationChainId: destinationChainID[:],
+			Msg:                appGossipBytes,
+		},
+	)
+	return err
+}
+
+func (c *Client) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
+	nodeIDsBytes := make([][]byte, nodeIDs.Len())
+	i := 0
+	for nodeID := range nodeIDs {
+		nodeID := nodeID // Prevent overwrite in next iteration
+		nodeIDsBytes[i] = nodeID[:]
+		i++
+	}
+	_, err := c.client.SendCrossChainAppGossipSpecific(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppGossipSpecificMsg{
+			NodeIds:            nodeIDsBytes,
+			SourceChainId:      sourceChainID[:],
+			DestinationChainId: destinationChainID[:],
+			Msg:                appGossipBytes,
+		},
+	)
+	return err
+}

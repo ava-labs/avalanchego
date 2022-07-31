@@ -41,6 +41,10 @@ type VMClient interface {
 	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CrossChainAppRequest(ctx context.Context, in *CrossChainAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CrossChainAppRequestFailed(ctx context.Context, in *CrossChainAppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CrossChainAppResponse(ctx context.Context, in *CrossChainAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CrossChainAppGossip(ctx context.Context, in *CrossChainAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error)
 	// BatchedChainVM
 	GetAncestors(ctx context.Context, in *GetAncestorsRequest, opts ...grpc.CallOption) (*GetAncestorsResponse, error)
@@ -223,6 +227,42 @@ func (c *vMClient) AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc
 	return out, nil
 }
 
+func (c *vMClient) CrossChainAppRequest(ctx context.Context, in *CrossChainAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/CrossChainAppRequest", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) CrossChainAppRequestFailed(ctx context.Context, in *CrossChainAppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/CrossChainAppRequestFailed", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) CrossChainAppResponse(ctx context.Context, in *CrossChainAppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/CrossChainAppResponse", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) CrossChainAppGossip(ctx context.Context, in *CrossChainAppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/CrossChainAppGossip", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error) {
 	out := new(GatherResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/Gather", in, out, opts...)
@@ -371,6 +411,10 @@ type VMServer interface {
 	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error)
 	AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error)
 	AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error)
+	CrossChainAppRequest(context.Context, *CrossChainAppRequestMsg) (*emptypb.Empty, error)
+	CrossChainAppRequestFailed(context.Context, *CrossChainAppRequestFailedMsg) (*emptypb.Empty, error)
+	CrossChainAppResponse(context.Context, *CrossChainAppResponseMsg) (*emptypb.Empty, error)
+	CrossChainAppGossip(context.Context, *CrossChainAppGossipMsg) (*emptypb.Empty, error)
 	Gather(context.Context, *emptypb.Empty) (*GatherResponse, error)
 	// BatchedChainVM
 	GetAncestors(context.Context, *GetAncestorsRequest) (*GetAncestorsResponse, error)
@@ -447,6 +491,18 @@ func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*emp
 }
 func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppGossip not implemented")
+}
+func (UnimplementedVMServer) CrossChainAppRequest(context.Context, *CrossChainAppRequestMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppRequest not implemented")
+}
+func (UnimplementedVMServer) CrossChainAppRequestFailed(context.Context, *CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppRequestFailed not implemented")
+}
+func (UnimplementedVMServer) CrossChainAppResponse(context.Context, *CrossChainAppResponseMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppResponse not implemented")
+}
+func (UnimplementedVMServer) CrossChainAppGossip(context.Context, *CrossChainAppGossipMsg) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CrossChainAppGossip not implemented")
 }
 func (UnimplementedVMServer) Gather(context.Context, *emptypb.Empty) (*GatherResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Gather not implemented")
@@ -809,6 +865,78 @@ func _VM_AppGossip_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_CrossChainAppRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CrossChainAppRequestMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).CrossChainAppRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/CrossChainAppRequest",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).CrossChainAppRequest(ctx, req.(*CrossChainAppRequestMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_CrossChainAppRequestFailed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CrossChainAppRequestFailedMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).CrossChainAppRequestFailed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/CrossChainAppRequestFailed",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).CrossChainAppRequestFailed(ctx, req.(*CrossChainAppRequestFailedMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_CrossChainAppResponse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CrossChainAppResponseMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).CrossChainAppResponse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/CrossChainAppResponse",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).CrossChainAppResponse(ctx, req.(*CrossChainAppResponseMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_CrossChainAppGossip_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CrossChainAppGossipMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).CrossChainAppGossip(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/CrossChainAppGossip",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).CrossChainAppGossip(ctx, req.(*CrossChainAppGossipMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_Gather_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -1135,6 +1263,22 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AppGossip",
 			Handler:    _VM_AppGossip_Handler,
+		},
+		{
+			MethodName: "CrossChainAppRequest",
+			Handler:    _VM_CrossChainAppRequest_Handler,
+		},
+		{
+			MethodName: "CrossChainAppRequestFailed",
+			Handler:    _VM_CrossChainAppRequestFailed_Handler,
+		},
+		{
+			MethodName: "CrossChainAppResponse",
+			Handler:    _VM_CrossChainAppResponse_Handler,
+		},
+		{
+			MethodName: "CrossChainAppGossip",
+			Handler:    _VM_CrossChainAppGossip_Handler,
 		},
 		{
 			MethodName: "Gather",

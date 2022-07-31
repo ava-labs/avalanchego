@@ -35,6 +35,8 @@ const (
 	SummaryHeights                   // Used for state sync
 	SummaryIDs                       // Used for state sync
 	VersionStruct                    // Used internally
+	SourceChainID                    // Used for cross-chain messaging
+	DestinationChainID               // Used for cross-chain messaging
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -48,7 +50,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackLong
 	case IP:
 		return wrappers.TryPackIP
-	case ChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
+	case ChainID, SourceChainID, DestinationChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
 		return wrappers.TryPackHash
 	case ContainerBytes, AppBytes, SigBytes, SummaryBytes:
 		return wrappers.TryPackBytes
@@ -78,7 +80,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackLong
 	case IP:
 		return wrappers.TryUnpackIP
-	case ChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
+	case ChainID, SourceChainID, DestinationChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
 		return wrappers.TryUnpackHash
 	case ContainerBytes, AppBytes, SigBytes, SummaryBytes:
 		return wrappers.TryUnpackBytes
@@ -111,6 +113,10 @@ func (f Field) String() string {
 		return "IP"
 	case ChainID:
 		return "ChainID"
+	case SourceChainID:
+		return "SourceChainID"
+	case DestinationChainID:
+		return "DestinationChainID"
 	case RequestID:
 		return "RequestID"
 	case Deadline:

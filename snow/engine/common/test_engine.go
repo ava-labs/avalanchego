@@ -552,6 +552,26 @@ func (e *EngineTest) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return errAppGossip
 }
 
+func (e *EngineTest) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (e *EngineTest) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (e *EngineTest) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (e *EngineTest) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (e *EngineTest) Chits(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	if e.ChitsF != nil {
 		return e.ChitsF(nodeID, requestID, containerIDs)
