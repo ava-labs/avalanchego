@@ -10,7 +10,6 @@ import (
 
 // Interface introduced for marshalling/unmarshalling
 type Block interface {
-	initialize(bytes []byte) error
 	ID() ids.ID
 	Bytes() []byte
 	Parent() ids.ID
@@ -21,4 +20,6 @@ type Block interface {
 	BlockTxs() []*txs.Tx
 
 	Visit(visitor Visitor) error
+
+	initialize(bytes []byte) error
 }

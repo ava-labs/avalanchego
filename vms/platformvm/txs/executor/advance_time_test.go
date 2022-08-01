@@ -373,7 +373,6 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 			env.state.SetHeight(dummyHeight)
 			assert.NoError(env.state.Commit())
-			assert.NoError(env.state.Load())
 
 			for _, newTime := range test.advanceTimeTo {
 				env.clk.Set(newTime)
@@ -455,7 +454,6 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	env.state.AddTx(tx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
-	assert.NoError(env.state.Load())
 
 	// The above validator is now part of the staking set
 
@@ -480,7 +478,6 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	env.state.AddTx(tx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
-	assert.NoError(env.state.Load())
 
 	// The above validator is now in the pending staker set
 
@@ -548,9 +545,6 @@ func TestWhitelistedSubnet(t *testing.T) {
 			env.state.AddTx(tx, status.Committed)
 			env.state.SetHeight(dummyHeight)
 			if err := env.state.Commit(); err != nil {
-				t.Fatal(err)
-			}
-			if err := env.state.Load(); err != nil {
 				t.Fatal(err)
 			}
 
@@ -641,7 +635,6 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(t, env.state.Commit())
-	assert.NoError(t, env.state.Load())
 
 	// Advance Time
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
@@ -725,7 +718,6 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(t, env.state.Commit())
-	assert.NoError(t, env.state.Load())
 
 	// Advance Time
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
@@ -839,9 +831,6 @@ func addPendingValidator(
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
 	if err := env.state.Commit(); err != nil {
-		return nil, err
-	}
-	if err := env.state.Load(); err != nil {
 		return nil, err
 	}
 	return addPendingValidatorTx, nil

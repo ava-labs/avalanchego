@@ -60,17 +60,22 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	blkTx.EXPECT().Initialize(gomock.Any()).Times(1)
 
+	// We can't serialize [blkTx] because it isn't
+	// regiestered with the stateless.Codec.
+	// Serialize this block with a dummy tx
+	// and replace it after creation with the mock tx.
+	// TODO allow serialization of mock txs.
 	blk, err := stateless.NewProposalBlock(
 		parentID,
 		2,
 		&txs.Tx{
-			Unsigned: blkTx,
+			Unsigned: &txs.AdvanceTimeTx{},
 			Creds:    []verify.Verifiable{},
 		},
 	)
 	assert.NoError(err)
+	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -139,17 +144,22 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	blkTx.EXPECT().Initialize(gomock.Any()).Times(1)
 
+	// We can't serialize [blkTx] because it isn't
+	// regiestered with the stateless.Codec.
+	// Serialize this block with a dummy tx
+	// and replace it after creation with the mock tx.
+	// TODO allow serialization of mock txs.
 	blk, err := stateless.NewAtomicBlock(
 		parentID,
 		2,
 		&txs.Tx{
-			Unsigned: blkTx,
+			Unsigned: &txs.AdvanceTimeTx{},
 			Creds:    []verify.Verifiable{},
 		},
 	)
 	assert.NoError(err)
+	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -232,19 +242,24 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	blkTx.EXPECT().Initialize(gomock.Any()).Times(1)
 
+	// We can't serialize [blkTx] because it isn't
+	// regiestered with the stateless.Codec.
+	// Serialize this block with a dummy tx
+	// and replace it after creation with the mock tx.
+	// TODO allow serialization of mock txs.
 	blk, err := stateless.NewStandardBlock(
 		parentID,
 		2,
 		[]*txs.Tx{
 			{
-				Unsigned: blkTx,
+				Unsigned: &txs.AdvanceTimeTx{},
 				Creds:    []verify.Verifiable{},
 			},
 		},
 	)
 	assert.NoError(err)
+	blk.Txs[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()

@@ -151,17 +151,16 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 
 // BuildBlock builds a block to be added to consensus
 func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
-	var (
-		ctx           = b.txExecutorBackend.Ctx
-		stateVersions = b.txExecutorBackend.StateVersions
-	)
-
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
 		b.resetTimer()
 	}()
 
+	var (
+		ctx           = b.txExecutorBackend.Ctx
+		stateVersions = b.txExecutorBackend.StateVersions
+	)
 	ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
