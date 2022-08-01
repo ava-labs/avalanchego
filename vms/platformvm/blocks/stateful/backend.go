@@ -25,17 +25,16 @@ type backend struct {
 	// child, in which case it's in [blkIDToState].
 	lastAccepted ids.ID
 
-	// TODO ABENEGIA: consider handling these differently following merge conflicts solution
-	// vvvvvvvvvvvvvvvvvvvvvvvv
 	// blkIDToState is a map from a block's ID to the state of the block.
 	// Blocks are put into this map when they are verified.
 	// Proposal blocks are removed from this map when they are rejected
 	// or when a child is accepted.
 	// All other blocks are removed when they are accepted/rejected.
+	// Note that Genesis block is a commit block so no need to update
+	// blkIDToState with it upon backend creation (Genesis is already accepted)
 	blkIDToState  map[ids.ID]*blockState
 	state         state.State
 	stateVersions state.Versions
-	// ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 	ctx          *snow.Context
 	cfg          *config.Config
