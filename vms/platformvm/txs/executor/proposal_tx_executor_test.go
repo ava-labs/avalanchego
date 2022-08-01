@@ -65,9 +65,6 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		if err := target.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		if err := target.state.Load(); err != nil {
-			t.Fatal(err)
-		}
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -99,9 +96,6 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		if err := target.state.Commit(); err != nil {
-			t.Fatal(err)
-		}
-		if err := target.state.Load(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -448,9 +442,6 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := env.state.Load(); err != nil {
-		t.Fatal(err)
-	}
 
 	// Node with ID key.PublicKey().Address() now a pending validator for primary network
 
@@ -596,9 +587,6 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := env.state.Load(); err != nil {
-		t.Fatal(err)
-	}
 
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
@@ -629,9 +617,6 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	env.state.DeleteCurrentValidator(staker)
 	env.state.SetHeight(dummyHeight)
 	if err := env.state.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	if err := env.state.Load(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -755,10 +740,6 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if err := env.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		if err := env.state.Load(); err != nil {
-			t.Fatal(err)
-		}
-
 		executor := ProposalTxExecutor{
 			Backend:  &env.backend,
 			ParentID: lastAcceptedID,
@@ -902,9 +883,6 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		dummyHeight := uint64(1)
 		env.state.SetHeight(dummyHeight)
 		if err := env.state.Commit(); err != nil {
-			t.Fatal(err)
-		}
-		if err := env.state.Load(); err != nil {
 			t.Fatal(err)
 		}
 

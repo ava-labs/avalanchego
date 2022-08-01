@@ -161,8 +161,8 @@ func (vm *VM) Initialize(
 		registerer,
 		&vm.Config,
 		vm.ctx,
-		vm.LocalStake,
-		vm.TotalStake,
+		vm.Metrics.LocalStake,
+		vm.Metrics.TotalStake,
 		vm.rewards,
 	); err != nil {
 		return err

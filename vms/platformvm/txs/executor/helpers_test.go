@@ -250,9 +250,7 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	if err := state.Load(); err != nil {
-		panic(err)
-	}
+
 	return state
 }
 
