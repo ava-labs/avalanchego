@@ -25,28 +25,39 @@ import (
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
+// targetBlockSize is maximum number of transaction bytes to place into a
+// StandardBlock
+const targetBlockSize = 128 * units.KiB
+
 var (
-	_ mempool.BlockTimer = &blockBuilder{}
-	_ BlockBuilder       = &blockBuilder{}
+	_ BlockBuilder = &blockBuilder{}
 
 	errEndOfTime       = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks = errors.New("no pending blocks")
 )
-
-// TargetBlockSize is maximum number of transaction bytes to place into a
-// StandardBlock
-const TargetBlockSize = 128 * units.KiB
 
 type BlockBuilder interface {
 	mempool.Mempool
 	mempool.BlockTimer
 	Network
 
+	// StartTimer starts a timer to periodically check whether a block can be built
 	StartTimer()
+
+	// set preferred block on top of which we'll build next
 	SetPreference(blockID ids.ID) error
+
+	// get preferred block on top of which we'll build next
 	Preferred() (snowman.Block, error)
+
+	// AddUnverifiedTx verifier the tx before adding it to mempool
 	AddUnverifiedTx(tx *txs.Tx) error
+
+	// BuildBlock is called on timer clock to attempt to create
+	// next block
 	BuildBlock() (snowman.Block, error)
+
+	// Shutdown cleanly shuts BlockBuilder down
 	Shutdown()
 }
 
@@ -178,7 +189,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
-		txs := b.Mempool.PopDecisionTxs(TargetBlockSize)
+		txs := b.Mempool.PopDecisionTxs(targetBlockSize)
 		statelessBlk, err := stateless.NewStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			return nil, err

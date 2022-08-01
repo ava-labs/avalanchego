@@ -18,27 +18,27 @@ import (
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	env := newEnvironment(t)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
-	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
+	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 
 	// add a tx to it
-	tx := getValidTx(h.txBuilder, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	h.sender.SendAppGossipF = func(b []byte) error { return nil }
-	err := h.BlockBuilder.AddUnverifiedTx(tx)
+	env.sender.SendAppGossipF = func(b []byte) error { return nil }
+	err := env.BlockBuilder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
-	has := h.mpool.Has(txID)
+	has := env.mpool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
-	blkIntf, err := h.BlockBuilder.BuildBlock()
+	blkIntf, err := env.BlockBuilder.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
 	blk, ok := blkIntf.(*stateful.Block)
@@ -46,53 +46,53 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert.Len(blk.BlockTxs(), 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.BlockTxs()[0].ID(), "standard block does not include expected transaction")
 
-	has = h.mpool.Has(txID)
+	has = env.mpool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	env := newEnvironment(t)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
-	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
+	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 
 	// create candidate tx
-	tx := getValidTx(h.txBuilder, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
-	assert.NoError(h.mpool.Add(tx))
-	assert.True(h.mpool.Has(txID))
-	_, isDropped := h.mpool.GetDropReason(txID)
+	assert.NoError(env.mpool.Add(tx))
+	assert.True(env.mpool.Has(txID))
+	_, isDropped := env.mpool.GetDropReason(txID)
 	assert.False(isDropped)
 
 	// When a tx is marked as dropped, it is still available to allow re-issuance
-	h.mpool.MarkDropped(txID, "dropped for testing")
-	assert.True(h.mpool.Has(txID)) // still available
-	_, isDropped = h.mpool.GetDropReason(txID)
+	env.mpool.MarkDropped(txID, "dropped for testing")
+	assert.True(env.mpool.Has(txID)) // still available
+	_, isDropped = env.mpool.GetDropReason(txID)
 	assert.True(isDropped)
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	switch tx.Unsigned.(type) {
 	case txs.StakerTx:
-		h.mpool.PopProposalTx()
+		env.mpool.PopProposalTx()
 	case *txs.CreateChainTx,
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		h.mpool.PopDecisionTxs(math.MaxInt64)
+		env.mpool.PopDecisionTxs(math.MaxInt64)
 	default:
 		t.Fatal("unknown tx type")
 	}
-	assert.NoError(h.mpool.Add(tx))
+	assert.NoError(env.mpool.Add(tx))
 
-	assert.True(h.mpool.Has(txID))
-	_, isDropped = h.mpool.GetDropReason(txID)
+	assert.True(env.mpool.Has(txID))
+	_, isDropped = env.mpool.GetDropReason(txID)
 	assert.False(isDropped)
 }
