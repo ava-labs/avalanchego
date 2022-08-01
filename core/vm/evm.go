@@ -46,21 +46,14 @@ var (
 	_ precompile.BlockContext              = &BlockContext{}
 )
 
-var prohibitedAddresses = map[common.Address]struct{}{
-	constants.BlackholeAddr: {},
-}
-
-func init() {
-	for _, addr := range precompile.UsedAddresses {
-		prohibitedAddresses[addr] = struct{}{}
-	}
-}
-
 // IsProhibited returns true if [addr] is in the prohibited list of addresses which should
 // not be allowed as an EOA or newly created contract address.
 func IsProhibited(addr common.Address) bool {
-	_, ok := prohibitedAddresses[addr]
-	return ok
+	if addr == constants.BlackholeAddr {
+		return true
+	}
+
+	return precompile.ReservedAddress(addr)
 }
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
