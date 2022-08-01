@@ -29,7 +29,7 @@ type CommonBlock struct {
 	bytes []byte
 }
 
-func (b *CommonBlock) Initialize(version uint16, bytes []byte) error {
+func (b *CommonBlock) initialize(version uint16, bytes []byte) error {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
 	b.version = version

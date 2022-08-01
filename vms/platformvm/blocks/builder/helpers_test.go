@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -49,7 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
-	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
@@ -85,25 +86,25 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-type testHelpersCollection struct {
+type environment struct {
 	BlockBuilder
 	blkManager stateful.Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.AtomicBool
-	cfg            *config.Config
+	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
 	msm            *mutableSharedMemory
 	fx             fx.Fx
-	fullState      state.State
-	atomicUtxosMan avax.AtomicUTXOManager
-	uptimeMan      uptime.Manager
-	utxosMan       utxo.Handler
-	txBuilder      tx_builder.Builder
-	txExecBackend  executor.Backend
+	state          state.State
+	atomicUTXOs    avax.AtomicUTXOManager
+	uptimes        uptime.Manager
+	utxosHandler   utxo.Handler
+	txBuilder      p_tx_builder.Builder
+	backend        executor.Backend
 	stateVersions  state.Versions
 }
 
@@ -120,16 +121,16 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
+func newEnvironment(t *testing.T) *environment {
 	var (
-		res = &testHelpersCollection{}
+		res = &environment{}
 		err error
 	)
 
 	res.isBootstrapped = &utils.AtomicBool{}
 	res.isBootstrapped.SetValue(true)
 
-	res.cfg = defaultCfg()
+	res.config = defaultConfig()
 	res.clk = defaultClock()
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -137,33 +138,33 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	res.ctx, res.msm = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
 
-	rewardsCalc := reward.NewCalculator(res.cfg.RewardConfig)
-	res.fullState = defaultState(res.cfg, res.ctx, res.baseDB, rewardsCalc)
+	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
+	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUtxosMan = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
-	res.uptimeMan = uptime.NewManager(res.fullState)
-	res.utxosMan = utxo.NewHandler(res.ctx, res.clk, res.fullState, res.fx)
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
+	res.uptimes = uptime.NewManager(res.state)
+	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 
-	res.txBuilder = tx_builder.New(
+	res.txBuilder = p_tx_builder.New(
 		res.ctx,
-		*res.cfg,
+		*res.config,
 		res.clk,
 		res.fx,
-		res.fullState,
-		res.atomicUtxosMan,
-		res.utxosMan,
+		res.state,
+		res.atomicUTXOs,
+		res.utxosHandler,
 	)
 
-	genesisID := res.fullState.GetLastAccepted()
-	res.stateVersions = state.NewVersions(genesisID, res.fullState)
-	res.txExecBackend = executor.Backend{
-		Config:        res.cfg,
+	genesisID := res.state.GetLastAccepted()
+	res.stateVersions = state.NewVersions(genesisID, res.state)
+	res.backend = executor.Backend{
+		Config:        res.config,
 		Ctx:           res.ctx,
 		Clk:           res.clk,
 		Bootstrapped:  res.isBootstrapped,
 		Fx:            res.fx,
-		FlowChecker:   res.utxosMan,
-		Uptimes:       res.uptimeMan,
+		FlowChecker:   res.utxosHandler,
+		Uptimes:       res.uptimes,
 		Rewards:       rewardsCalc,
 		StateVersions: res.stateVersions,
 	}
@@ -178,7 +179,7 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := metrics.New("", registerer, res.cfg.WhitelistedSubnets)
+	metrics, err := metrics.New("", registerer, res.config.WhitelistedSubnets)
 	if err != nil {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
@@ -191,15 +192,15 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 	res.blkManager = stateful.NewManager(
 		res.mempool,
 		metrics,
-		res.fullState,
-		res.txExecBackend,
+		res.state,
+		res.backend,
 		window,
 	)
 
 	res.BlockBuilder = NewBlockBuilder(
 		res.mempool,
 		res.txBuilder,
-		res.txExecBackend,
+		res.backend,
 		res.blkManager,
 		nil, // toEngine,
 		res.sender,
@@ -209,14 +210,14 @@ func newTestHelpersCollection(t *testing.T) *testHelpersCollection {
 		panic(fmt.Errorf("failed setting last accepted block: %w", err))
 	}
 
-	addSubnet(res.fullState, res.txBuilder, res.txExecBackend)
+	addSubnet(res.state, res.txBuilder, res.backend)
 
 	return res
 }
 
 func addSubnet(
 	baseState state.State,
-	txBuilder tx_builder.Builder,
+	txBuilder p_tx_builder.Builder,
 	backend executor.Backend,
 ) {
 	// Create a subnet
@@ -260,32 +261,43 @@ func addSubnet(
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
-	baseDB *versiondb.Database,
-	rewardsCalc reward.Calculator,
+	db database.Database,
+	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
-	tState, err := state.New(
-		baseDB,
+	state, err := state.New(
+		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
 		metrics.NewNoopMetrics(),
-		rewardsCalc,
+		rewards,
 	)
 	if err != nil {
 		panic(err)
 	}
-	return tState
+
+	// persist and reload to init a bunch of in-memory stuff
+	state.SetHeight(0)
+	if err := state.Commit(); err != nil {
+		panic(err)
+	}
+	state.SetHeight( /*height*/ 0)
+	if err := state.Commit(); err != nil {
+		panic(err)
+	}
+
+	return state
 }
 
-func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory) {
+func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
 	ctx.AVAXAssetID = avaxAssetID
 
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
 
 	msm := &mutableSharedMemory{
@@ -304,7 +316,7 @@ func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory
 	return ctx, msm
 }
 
-func defaultCfg() *config.Config {
+func defaultConfig() *config.Config {
 	return &config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -429,9 +441,9 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	return genesisBytes
 }
 
-func internalStateShutdown(t *testHelpersCollection) error {
-	if t.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := t.cfg.Validators.GetValidators(constants.PrimaryNetworkID)
+func shutdownEnvironment(env *environment) error {
+	if env.isBootstrapped.GetValue() {
+		primaryValidatorSet, exist := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
 		}
@@ -442,18 +454,18 @@ func internalStateShutdown(t *testHelpersCollection) error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := t.uptimeMan.Shutdown(validatorIDs); err != nil {
+		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := t.fullState.Commit(); err != nil {
+		if err := env.state.Commit(); err != nil {
 			return err
 		}
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		t.fullState.Close(),
-		t.baseDB.Close(),
+		env.state.Close(),
+		env.baseDB.Close(),
 	)
 	return errs.Err
 }

@@ -41,7 +41,7 @@ func NewStandardBlock(
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
 
-		return res, res.Initialize(ApricotVersion, bytes)
+		return res, res.initialize(ApricotVersion, bytes)
 
 	case BlueberryVersion:
 		// Make sure we have the byte representation of
@@ -72,7 +72,7 @@ func NewStandardBlock(
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
-		return res, res.Initialize(BlueberryVersion, bytes)
+		return res, res.initialize(BlueberryVersion, bytes)
 
 	default:
 		return nil, fmt.Errorf("unsopported block version %d", version)
@@ -85,8 +85,8 @@ type ApricotStandardBlock struct {
 	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (asb *ApricotStandardBlock) Initialize(version uint16, bytes []byte) error {
-	if err := asb.CommonBlock.Initialize(version, bytes); err != nil {
+func (asb *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
+	if err := asb.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range asb.Txs {
@@ -111,8 +111,8 @@ type BlueberryStandardBlock struct {
 	Txs []*txs.Tx
 }
 
-func (bsb *BlueberryStandardBlock) Initialize(version uint16, bytes []byte) error {
-	if err := bsb.CommonBlock.Initialize(version, bytes); err != nil {
+func (bsb *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
+	if err := bsb.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 

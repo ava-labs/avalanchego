@@ -46,7 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
@@ -92,7 +92,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      tx_builder.Builder
+	txBuilder      p_tx_builder.Builder
 	backend        Backend
 }
 
@@ -129,7 +129,7 @@ func newEnvironment() *environment {
 	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
-	txBuilder := tx_builder.New(
+	txBuilder := p_tx_builder.New(
 		ctx,
 		config,
 		&clk,
@@ -172,7 +172,7 @@ func newEnvironment() *environment {
 
 func addSubnet(
 	baseState state.State,
-	txBuilder tx_builder.Builder,
+	txBuilder p_tx_builder.Builder,
 	backend Backend,
 ) {
 	// Create a subnet
@@ -238,9 +238,6 @@ func defaultState(
 	}
 	state.SetHeight( /*height*/ 0)
 	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-	if err := state.Load(); err != nil {
 		panic(err)
 	}
 	lastAcceptedID = state.GetLastAccepted()

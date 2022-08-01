@@ -27,8 +27,9 @@ const (
 
 type Network interface {
 	common.AppHandler
+
+	// GossipTx gossips just added to mempool
 	GossipTx(tx *txs.Tx) error
-	SetActivationTime(time.Time)
 }
 
 type network struct {
@@ -48,9 +49,8 @@ func NewNetwork(
 	appSender common.AppSender,
 ) Network {
 	return &network{
-		ctx:        ctx,
-		blkBuilder: blkBuilder,
-
+		ctx:                  ctx,
+		blkBuilder:           blkBuilder,
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
 		recentTxs:            &cache.LRU{Size: recentCacheSize},
@@ -153,5 +153,3 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	}
 	return n.appSender.SendAppGossip(msgBytes)
 }
-
-func (n *network) SetActivationTime(t time.Time) { n.gossipActivationTime = t }

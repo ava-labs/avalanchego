@@ -41,11 +41,11 @@ func NewAtomicBlock(
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(ApricotVersion, bytes)
+	return res, res.initialize(ApricotVersion, bytes)
 }
 
-func (ab *AtomicBlock) Initialize(version uint16, bytes []byte) error {
-	if err := ab.CommonBlock.Initialize(version, bytes); err != nil {
+func (ab *AtomicBlock) initialize(version uint16, bytes []byte) error {
+	if err := ab.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {

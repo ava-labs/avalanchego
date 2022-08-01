@@ -5,7 +5,6 @@ package builder
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -37,15 +36,14 @@ func getValidTx(txBuilder builder.Builder, t *testing.T) *txs.Tx {
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	env := newEnvironment(t)
 	defer func() {
-		assert.NoError(internalStateShutdown(h))
+		assert.NoError(shutdownEnvironment(env))
 	}()
-	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
-	h.ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 
 	var gossipedBytes []byte
-	h.sender.SendAppGossipF = func(b []byte) error {
+	env.sender.SendAppGossipF = func(b []byte) error {
 		gossipedBytes = b
 		return nil
 	}
@@ -53,20 +51,20 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	// create a tx
-	tx := getValidTx(h.txBuilder, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 	// Free lock because [AppGossip] waits for the context lock
-	h.ctx.Lock.Unlock()
+	env.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
-	err = h.AppGossip(nodeID, msgBytes)
+	err = env.AppGossip(nodeID, msgBytes)
 	assert.NoError(err, "error in reception of gossiped tx")
-	assert.True(h.BlockBuilder.Has(txID))
+	assert.True(env.BlockBuilder.Has(txID))
 	// Grab lock back
-	h.ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 
 	// and gossiped if it has just been discovered
 	assert.True(gossipedBytes != nil)
@@ -88,52 +86,50 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	env := newEnvironment(t)
 	defer func() {
-		assert.NoError(internalStateShutdown(h))
+		assert.NoError(shutdownEnvironment(env))
 	}()
-	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
-	h.ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 
 	// create a tx and mark as invalid
-	tx := getValidTx(h.txBuilder, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
-	h.BlockBuilder.MarkDropped(txID, "dropped for testing")
+	env.BlockBuilder.MarkDropped(txID, "dropped for testing")
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
-	h.ctx.Lock.Unlock()
-	err = h.AppGossip(nodeID, msgBytes)
-	h.ctx.Lock.Lock()
+	env.ctx.Lock.Unlock()
+	err = env.AppGossip(nodeID, msgBytes)
+	env.ctx.Lock.Lock()
 	assert.NoError(err, "error in reception of gossiped tx")
-	assert.False(h.BlockBuilder.Has(txID))
+	assert.False(env.BlockBuilder.Has(txID))
 }
 
 // show that locally generated txs are gossiped
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
+	env := newEnvironment(t)
 	defer func() {
-		assert.NoError(internalStateShutdown(h))
+		assert.NoError(shutdownEnvironment(env))
 	}()
-	h.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
-	h.ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 
 	var gossipedBytes []byte
-	h.sender.SendAppGossipF = func(b []byte) error {
+	env.sender.SendAppGossipF = func(b []byte) error {
 		gossipedBytes = b
 		return nil
 	}
 
 	// add a tx to the mempool and show it gets gossiped
-	tx := getValidTx(h.txBuilder, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	err := h.BlockBuilder.AddUnverifiedTx(tx)
+	err := env.BlockBuilder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 	assert.True(gossipedBytes != nil)
 
@@ -151,8 +147,8 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
-	h.BlockBuilder.RemoveDecisionTxs([]*txs.Tx{tx})
-	err = h.BlockBuilder.Add(tx)
+	env.BlockBuilder.RemoveDecisionTxs([]*txs.Tx{tx})
+	err = env.BlockBuilder.Add(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 
 	assert.True(gossipedBytes == nil)

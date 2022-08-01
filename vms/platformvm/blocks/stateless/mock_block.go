@@ -92,20 +92,6 @@ func (mr *MockBlockMockRecorder) ID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockBlock)(nil).ID))
 }
 
-// Initialize mocks base method.
-func (m *MockBlock) Initialize(version uint16, bytes []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", version, bytes)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Initialize indicates an expected call of Initialize.
-func (mr *MockBlockMockRecorder) Initialize(version, bytes interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockBlock)(nil).Initialize), version, bytes)
-}
-
 // Parent mocks base method.
 func (m *MockBlock) Parent() ids.ID {
 	m.ctrl.T.Helper()
@@ -172,4 +158,18 @@ func (m *MockBlock) Visit(visitor Visitor) error {
 func (mr *MockBlockMockRecorder) Visit(visitor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Visit", reflect.TypeOf((*MockBlock)(nil).Visit), visitor)
+}
+
+// initialize mocks base method.
+func (m *MockBlock) initialize(version uint16, bytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "initialize", version, bytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// initialize indicates an expected call of initialize.
+func (mr *MockBlockMockRecorder) initialize(version, bytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initialize", reflect.TypeOf((*MockBlock)(nil).initialize), version, bytes)
 }

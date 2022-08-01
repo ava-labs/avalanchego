@@ -22,7 +22,7 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 	}
 	vm.metrics.SetPercentConnected(primaryPercentConnected)
 	details := map[string]float64{
-		"primary-PercentConnected": primaryPercentConnected,
+		"primary-percentConnected": primaryPercentConnected,
 	}
 
 	// TODO: Use alpha from consensus instead of const

@@ -245,8 +245,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
-	err = env.state.Load()
-	assert.NoError(err)
+
 	// test validator stake
 	set, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 	assert.True(ok)
@@ -370,8 +369,6 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
-	err = env.state.Load()
-	assert.NoError(err)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)

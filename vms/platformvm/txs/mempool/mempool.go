@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	// TargetTxSize is the maximum number of bytes a transaction can use to be
+	// targetTxSize is the maximum number of bytes a transaction can use to be
 	// allowed into the mempool.
-	TargetTxSize = 64 * units.KiB
+	targetTxSize = 64 * units.KiB
 
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 64
@@ -172,8 +172,8 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	}
 
 	txBytes := tx.Bytes()
-	if len(txBytes) > TargetTxSize {
-		return fmt.Errorf("tx %s size (%d) > target size (%d)", txID, len(txBytes), TargetTxSize)
+	if len(txBytes) > targetTxSize {
+		return fmt.Errorf("tx %s size (%d) > target size (%d)", txID, len(txBytes), targetTxSize)
 	}
 	if len(txBytes) > m.bytesAvailable {
 		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",

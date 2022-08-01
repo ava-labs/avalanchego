@@ -297,9 +297,6 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	if err := state.Load(); err != nil {
-		panic(err)
-	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
 }

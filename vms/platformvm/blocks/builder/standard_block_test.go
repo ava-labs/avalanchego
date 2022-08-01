@@ -22,10 +22,10 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	assert := assert.New(t)
 
-	h := newTestHelpersCollection(t)
-	h.ctx.Lock.Lock()
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -37,10 +37,10 @@ func TestAtomicTxImports(t *testing.T) {
 	amount := uint64(70000)
 	recipientKey := preFundedKeys[1]
 
-	m := atomic.NewMemory(prefixdb.New([]byte{5}, h.baseDB))
+	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
-	h.msm.SharedMemory = m.NewSharedMemory(h.ctx.ChainID)
-	peerSharedMemory := m.NewSharedMemory(h.ctx.XChainID)
+	env.msm.SharedMemory = m.NewSharedMemory(env.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: avaxAssetID},
@@ -57,7 +57,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	inputID := utxo.InputID()
 	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
-		h.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		env.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
@@ -67,23 +67,23 @@ func TestAtomicTxImports(t *testing.T) {
 	})
 	assert.NoError(err)
 
-	tx, err := h.txBuilder.NewImportTx(
-		h.ctx.XChainID,
+	tx, err := env.txBuilder.NewImportTx(
+		env.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 		ids.ShortEmpty, // change addr
 	)
 	assert.NoError(err)
 
-	h.fullState.SetTimestamp(h.cfg.ApricotPhase5Time.Add(100 * time.Second))
+	env.state.SetTimestamp(env.config.ApricotPhase5Time.Add(100 * time.Second))
 
-	assert.NoError(h.BlockBuilder.Add(tx))
-	b, err := h.BuildBlock()
+	assert.NoError(env.BlockBuilder.Add(tx))
+	b, err := env.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work
 	assert.NoError(b.Verify())
 	assert.NoError(b.Accept())
-	_, txStatus, err := h.fullState.GetTx(tx.ID())
+	_, txStatus, err := env.state.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state
 	assert.Equal(txStatus, status.Committed)

@@ -1008,20 +1008,6 @@ func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(height, subnetID interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorWeightDiffs), height, subnetID)
 }
 
-// Load mocks base method.
-func (m *MockState) Load() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Load")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Load indicates an expected call of Load.
-func (mr *MockStateMockRecorder) Load() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockState)(nil).Load))
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockState) PutCurrentDelegator(staker *Staker) {
 	m.ctrl.T.Helper()

@@ -219,13 +219,13 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.BlockBuilder.StartTimer)
 
 	if err := vm.updateValidators(); err != nil {
-		return fmt.Errorf("failed to Initialize validator sets: %w", err)
+		return fmt.Errorf("failed to update validator sets: %w", err)
 	}
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {
 		return fmt.Errorf(
-			"failed to Initialize blockchains: %w",
+			"failed to initialize blockchains: %w",
 			err,
 		)
 	}
@@ -567,7 +567,7 @@ func (vm *VM) updateValidators() error {
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
 	vm.metrics.SetLocalStake(float64(weight))
-	vm.metrics.SetLocalStake(float64(primaryValidators.Weight()))
+	vm.metrics.SetTotalStake(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := vm.state.ValidatorSet(subnetID)

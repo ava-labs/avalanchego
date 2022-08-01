@@ -90,7 +90,7 @@ func (service *Service) GetHeight(r *http.Request, args *struct{}, response *Get
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	lastAccepted, err := service.vm.manager.GetBlock(lastAcceptedID)
+	lastAccepted, err := service.vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -1667,7 +1667,7 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
 	state, ok := service.vm.stateVersions.GetState(blockID)
 	if !ok {
-		block, err := service.vm.manager.GetBlock(blockID)
+		block, err := service.vm.GetBlock(blockID)
 		if err != nil {
 			return false, err
 		}
@@ -1956,9 +1956,6 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		// The tx isn't being tracked by the node.
 		response.Status = status.Unknown
 		return nil
-	}
-	if err != nil {
-		return err
 	}
 
 	// The tx was recently dropped because it was invalid.

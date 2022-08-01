@@ -536,7 +536,6 @@ func TestGetStake(t *testing.T) {
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
 	assert.NoError(service.vm.state.Commit())
-	assert.NoError(service.vm.state.Load())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
@@ -583,7 +582,6 @@ func TestGetStake(t *testing.T) {
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
 	assert.NoError(service.vm.state.Commit())
-	assert.NoError(service.vm.state.Load())
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
 	assert.NoError(service.GetStake(nil, &args, &response))
@@ -691,10 +689,6 @@ func TestGetCurrentValidators(t *testing.T) {
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
 	err = service.vm.state.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = service.vm.state.Load()
 	if err != nil {
 		t.Fatal(err)
 	}

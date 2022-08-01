@@ -47,7 +47,7 @@ func NewAbortBlock(
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(blkVersion, bytes)
+	return res, res.initialize(blkVersion, bytes)
 }
 
 type CommitBlock struct {
@@ -83,5 +83,5 @@ func NewCommitBlock(
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.Initialize(blkVersion, bytes)
+	return res, res.initialize(blkVersion, bytes)
 }

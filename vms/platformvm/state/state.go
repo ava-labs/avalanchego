@@ -118,11 +118,6 @@ type State interface {
 	// Return the current validator set of [subnetID].
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 
-	// Load pulls data previously stored on disk that is expected to be in
-	// memory.
-	// TODO remove Load from this interface.
-	Load() error
-
 	SetHeight(height uint64)
 
 	// Discard uncommitted changes to the database.
@@ -897,7 +892,9 @@ func (s *state) syncGenesis(genesisBlk stateless.Block, genesis *genesis.State) 
 	return s.write(0)
 }
 
-func (s *state) Load() error {
+// Load pulls data previously stored on disk that is expected to be in
+// memory.
+func (s *state) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.loadMetadata(),
@@ -1186,7 +1183,7 @@ func (s *state) sync(genesis []byte) error {
 		}
 	}
 
-	if err := s.Load(); err != nil {
+	if err := s.load(); err != nil {
 		return fmt.Errorf(
 			"failed to load the database state: %w",
 			err,
@@ -1256,13 +1253,13 @@ func (s *state) writeBlocks() error {
 		// We use stateless.ApricotVersion for backward compatibility
 		blkBytes, err := stateless.GenesisCodec.Marshal(version.StateVersion, &sblk)
 		if err != nil {
-			return fmt.Errorf("failed to write blocks with: %w", err)
+			return fmt.Errorf("failed to marshal block %s to store with: %w", blkID, err)
 		}
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, stateBlk)
 		if err = s.blockDB.Put(blkID[:], blkBytes); err != nil {
-			return fmt.Errorf("failed to write blocks with: %w", err)
+			return fmt.Errorf("failed to write block %s with: %w", blkID, err)
 		}
 	}
 	return nil

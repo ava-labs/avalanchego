@@ -45,7 +45,7 @@ func (a *apricotStrategy) hasContent() (bool, error) {
 func (a *apricotStrategy) selectBlockContent() error {
 	// try including as many standard txs as possible. No need to advance chain time
 	if a.Mempool.HasDecisionTxs() {
-		a.txes = a.Mempool.PeekDecisionTxs(TargetBlockSize)
+		a.txes = a.Mempool.PeekDecisionTxs(targetBlockSize)
 		return nil
 	}
 

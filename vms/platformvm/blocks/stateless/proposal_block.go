@@ -41,7 +41,7 @@ func NewProposalBlock(
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
-		return res, res.Initialize(ApricotVersion, bytes)
+		return res, res.initialize(ApricotVersion, bytes)
 
 	case BlueberryVersion:
 		// Make sure we have the byte representation of
@@ -67,7 +67,7 @@ func NewProposalBlock(
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
-		return res, res.Initialize(BlueberryVersion, bytes)
+		return res, res.initialize(BlueberryVersion, bytes)
 
 	default:
 		return nil, fmt.Errorf("unsopported block version %d", version)
@@ -81,8 +81,8 @@ type ApricotProposalBlock struct {
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (apb *ApricotProposalBlock) Initialize(version uint16, bytes []byte) error {
-	if err := apb.CommonBlock.Initialize(version, bytes); err != nil {
+func (apb *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
+	if err := apb.CommonBlock.initialize(version, bytes); err != nil {
 		return err
 	}
 	return apb.Tx.Sign(txs.Codec, nil)
@@ -102,8 +102,8 @@ type BlueberryProposalBlock struct {
 	Tx *txs.Tx
 }
 
-func (bpb *BlueberryProposalBlock) Initialize(version uint16, bytes []byte) error {
-	if err := bpb.CommonBlock.Initialize(version, bytes); err != nil {
+func (bpb *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error {
+	if err := bpb.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 

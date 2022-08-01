@@ -57,7 +57,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 
 	// try including as many standard txs as possible. No need to advance chain time
 	if b.Mempool.HasDecisionTxs() {
-		b.txes = b.Mempool.PeekDecisionTxs(TargetBlockSize)
+		b.txes = b.Mempool.PeekDecisionTxs(targetBlockSize)
 		b.blkTime = blkTime
 		return nil
 	}

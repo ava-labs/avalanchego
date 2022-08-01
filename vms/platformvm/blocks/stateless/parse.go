@@ -12,5 +12,5 @@ func Parse(b []byte, c codec.Manager) (Block, error) {
 		return nil, err
 	}
 
-	return blk, blk.Initialize(v, b)
+	return blk, blk.initialize(v, b)
 }

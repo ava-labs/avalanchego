@@ -43,12 +43,12 @@ func (a *acceptor) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error
 func (a *acceptor) commonVisitProposalBlock(b stateless.Block, isApricot bool) error {
 	/* Note that:
 
-	* We don't free the proposal block in this method.
-	  It is freed when its child is accepted.
-	  We need to keep this block's state in memory for its child to use.
+	// * We don't free the proposal block in this method.
+	//   It is freed when its child is accepted.
+	//   We need to keep this block's state in memory for its child to use.
 
-	* We only update the metrics to reflect this block's
-	  acceptance when its child is accepted.
+	// * We only update the metrics to reflect this block's
+	//   acceptance when its child is accepted.
 
 	* We don't write this block to state here.
 	  That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
@@ -86,7 +86,8 @@ func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"accepting Atomic Block",
+		"accepting block",
+		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -139,7 +140,8 @@ func (a *acceptor) standardBlock(b stateless.Block) error {
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
-		"accepting Standard Block",
+		"accepting block",
+		zap.String("blockType", "standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -179,37 +181,37 @@ func (a *acceptor) standardBlock(b stateless.Block) error {
 }
 
 func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
-	return a.acceptOptionBlock(b, true /* isCommit */)
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", "commit"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+	return a.acceptOptionBlock(b)
 }
 
 func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
-	return a.acceptOptionBlock(b, false /* isCommit */)
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", "abort"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+	return a.acceptOptionBlock(b)
 }
 
-func (a *acceptor) acceptOptionBlock(b stateless.Block, isCommit bool) error {
+func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 	blkID := b.ID()
-	defer a.free(blkID)
-
 	parentID := b.Parent()
-	// Note: we assume this block's sibling doesn't
-	// need the parent's state when it's rejected.
-	defer a.free(parentID)
 
-	if isCommit {
-		a.ctx.Log.Verbo(
-			"accepting Commit Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
-	} else {
-		a.ctx.Log.Verbo(
-			"accepting Abort Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
-	}
+	defer func() {
+		a.free(blkID)
+		// Note: we assume this block's sibling doesn't
+		// need the parent's state when it's rejected.
+		a.free(parentID)
+	}()
 
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
