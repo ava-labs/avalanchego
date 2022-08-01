@@ -11,6 +11,9 @@ The `*Block` itself doesn't have any state.
 The state is all held by the `manager`, and the `*Block` acts upon the `manager` to get/set the state.
 Therefore, we don't need to worry about deduplicating `*Block` instances.
 
+The `platformvm` uses the `manager` to create blocks and query block state because 
+the latter returns _stateful_ blocks (`*Block`), whereas `state.State`'s `GetBlock` returns `stateless.Block`s.
+
 ## Visitors
 
 This package contains three implementations of `stateless.Visitor`: `verifier`, `acceptor` and `rejector`.
@@ -18,4 +21,3 @@ These implement the logic for verifying, accepting and rejecting blocks.
 Each implementation has a reference to a shared `*backend`, which maintains state, etc.
 (The `manager` has a reference to the shared `*backend` as well.)
 
-The `platformvm` uses the `manager` to create blocks and query block state. 
