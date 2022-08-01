@@ -38,7 +38,8 @@ type NetworkClient interface {
 }
 
 // client implements NetworkClient interface
-// provides ability to send request / responses through the Network
+// provides ability to send request / responses through the Network and wait for a response
+// so that the caller gets the result synchronously.
 type client struct {
 	network Network
 }
