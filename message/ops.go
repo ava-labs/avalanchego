@@ -43,11 +43,6 @@ const (
 	AppResponse
 	AppGossip
 
-	// Cross-chain messaging:
-	CrossChainAppRequest
-	CrossChainAppResponse
-	CrossChainAppGossip
-
 	// State sync
 	GetStateSummaryFrontier
 	StateSummaryFrontier
@@ -61,7 +56,6 @@ const (
 	GetFailed
 	QueryFailed
 	AppRequestFailed
-	CrossChainAppRequestFailed
 	Timeout
 	Connected
 	Disconnected
@@ -69,6 +63,12 @@ const (
 	GossipRequest
 	GetStateSummaryFrontierFailed
 	GetAcceptedStateSummaryFailed
+
+	// Cross-chain messaging:
+	CrossChainAppRequest
+	CrossChainAppResponse
+	CrossChainAppGossip
+	CrossChainAppRequestFailed
 )
 
 var (
