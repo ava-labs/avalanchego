@@ -12,7 +12,7 @@ The state is all held by the `manager`, and the `*Block` acts upon the `manager`
 Therefore, we don't need to worry about deduplicating `*Block` instances.
 
 The `platformvm` uses the `manager` to create blocks and query block state because 
-the latter returns _stateful_ blocks (`*Block`), whereas `state.State`'s `GetBlock` returns `stateless.Block`s.
+the `manager.GetBlock` returns a _stateful_ block (`*Block`), whereas `state.State`'s `GetStatelessBlock` returns a `stateless.Block`.
 
 ## Visitors
 
