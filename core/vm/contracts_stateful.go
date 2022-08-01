@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/precompile"
+	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
@@ -24,29 +25,24 @@ var (
 	NativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
 )
 
-// StatefulPrecompiledContract is the interface for executing a precompiled contract
-// This wraps the PrecompiledContracts native to Ethereum and allows adding in stateful
-// precompiled contracts to support native Avalanche asset transfers.
-type StatefulPrecompiledContract interface {
-	// Run executes a precompiled contract in the current state
-	// assumes that it has already been verified that [caller] can
-	// transfer [value].
-	Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
-}
-
 // wrappedPrecompiledContract implements StatefulPrecompiledContract by wrapping stateless native precompiled contracts
 // in Ethereum.
 type wrappedPrecompiledContract struct {
 	p PrecompiledContract
 }
 
-func newWrappedPrecompiledContract(p PrecompiledContract) StatefulPrecompiledContract {
+func newWrappedPrecompiledContract(p PrecompiledContract) precompile.StatefulPrecompiledContract {
 	return &wrappedPrecompiledContract{p: p}
 }
 
 // Run implements the StatefulPrecompiledContract interface
-func (w *wrappedPrecompiledContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (w *wrappedPrecompiledContract) Run(accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	return RunPrecompiledContract(w.p, input, suppliedGas)
+}
+
+// RunStatefulPrecompiledContract confirms runs [precompile] with the specified parameters.
+func RunStatefulPrecompiledContract(precompile precompile.StatefulPrecompiledContract, accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return precompile.Run(accessibleState, caller, addr, input, suppliedGas, readOnly)
 }
 
 // nativeAssetBalance is a precompiled contract used to retrieve the native asset balance
@@ -75,21 +71,21 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 }
 
 // Run implements StatefulPrecompiledContract
-func (b *nativeAssetBalance) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (b *nativeAssetBalance) Run(accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// input: encodePacked(address 20 bytes, assetID 32 bytes)
 	if suppliedGas < b.gasCost {
-		return nil, 0, ErrOutOfGas
+		return nil, 0, vmerrs.ErrOutOfGas
 	}
 	remainingGas = suppliedGas - b.gasCost
 
 	address, assetID, err := UnpackNativeAssetBalanceInput(input)
 	if err != nil {
-		return nil, remainingGas, ErrExecutionReverted
+		return nil, remainingGas, vmerrs.ErrExecutionReverted
 	}
 
-	res, overflow := uint256.FromBig(evm.StateDB.GetBalanceMultiCoin(address, assetID))
+	res, overflow := uint256.FromBig(accessibleState.GetStateDB().GetBalanceMultiCoin(address, assetID))
 	if overflow {
-		return nil, remainingGas, ErrExecutionReverted
+		return nil, remainingGas, vmerrs.ErrExecutionReverted
 	}
 	return common.LeftPadBytes(res.Bytes(), 32), remainingGas, nil
 }
@@ -125,63 +121,13 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big
 }
 
 // Run implements StatefulPrecompiledContract
-func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (c *nativeAssetCall) Run(accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// input: encodePacked(address 20 bytes, assetID 32 bytes, assetAmount 32 bytes, callData variable length bytes)
-	if suppliedGas < c.gasCost {
-		return nil, 0, ErrOutOfGas
-	}
-	remainingGas = suppliedGas - c.gasCost
-
-	if readOnly {
-		return nil, remainingGas, ErrExecutionReverted
-	}
-
-	to, assetID, assetAmount, callData, err := UnpackNativeAssetCallInput(input)
-	if err != nil {
-		return nil, remainingGas, ErrExecutionReverted
-	}
-
-	// Note: it is not possible for a negative assetAmount to be passed in here due to the fact that decoding a
-	// byte slice into a *big.Int type will always return a positive value.
-	if assetAmount.Sign() != 0 && !evm.Context.CanTransferMC(evm.StateDB, caller.Address(), to, assetID, assetAmount) {
-		return nil, remainingGas, ErrInsufficientBalance
-	}
-
-	snapshot := evm.StateDB.Snapshot()
-
-	if !evm.StateDB.Exist(to) {
-		if remainingGas < params.CallNewAccountGas {
-			return nil, 0, ErrOutOfGas
-		}
-		remainingGas -= params.CallNewAccountGas
-		evm.StateDB.CreateAccount(to)
-	}
-
-	// Increment the call depth which is restricted to 1024
-	evm.depth++
-	defer func() { evm.depth-- }()
-
-	// Send [assetAmount] of [assetID] to [to] address
-	evm.Context.TransferMultiCoin(evm.StateDB, caller.Address(), to, assetID, assetAmount)
-	ret, remainingGas, err = evm.Call(caller, to, callData, remainingGas, big.NewInt(0))
-
-	// When an error was returned by the EVM or when setting the creation code
-	// above we revert to the snapshot and consume any gas remaining. Additionally
-	// when we're in homestead this also counts for code storage gas errors.
-	if err != nil {
-		evm.StateDB.RevertToSnapshot(snapshot)
-		if err != ErrExecutionReverted {
-			remainingGas = 0
-		}
-		// TODO: consider clearing up unused snapshots:
-		//} else {
-		//	evm.StateDB.DiscardSnapshot(snapshot)
-	}
-	return ret, remainingGas, err
+	return accessibleState.NativeAssetCall(caller, input, suppliedGas, c.gasCost, readOnly)
 }
 
 type deprecatedContract struct{}
 
-func (*deprecatedContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	return nil, suppliedGas, ErrExecutionReverted
+func (*deprecatedContract) Run(accessibleState precompile.PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return nil, suppliedGas, vmerrs.ErrExecutionReverted
 }
