@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	_                       stateless.Visitor = &verifier{}
-	errConflictingBatchTxs                    = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs                   = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	_ stateless.Visitor = &verifier{}
+
+	errConflictingBatchTxs  = errors.New("block contains conflicting transactions")
+	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 )
 
 // verifier handles the logic for verifying a block.
