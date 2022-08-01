@@ -50,9 +50,6 @@ type blockBuilder struct {
 	// the validator set. When it goes off ResetTimer() is called, potentially
 	// triggering creation of a new block.
 	timer *timer.Timer
-
-	// Transactions that have not been put into blocks yet
-	dropIncoming bool
 }
 
 // Initialize this builder.
@@ -105,9 +102,9 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 
 // BuildBlock builds a block to be added to consensus
 func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
-	b.dropIncoming = true
+	b.Mempool.DisableAdding()
 	defer func() {
-		b.dropIncoming = false
+		b.Mempool.EnableAdding()
 		b.resetTimer()
 	}()
 
