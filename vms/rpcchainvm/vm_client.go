@@ -605,45 +605,45 @@ func (vm *VMClient) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return err
 }
 
-func (vm *VMClient) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VMClient) CrossChainAppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	_, err := vm.client.CrossChainAppRequest(context.Background(),
 		&vmpb.CrossChainAppRequestMsg{
-			NodeId:        nodeID[:],
-			SourceChainId: sourceChainID[:],
-			RequestId:     requestID,
-			Deadline:      grpcutils.TimestampFromTime(deadline),
-			Request:       request,
+			NodeId:    nodeID[:],
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Deadline:  grpcutils.TimestampFromTime(deadline),
+			Request:   request,
 		})
 	return err
 }
 
-func (vm *VMClient) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+func (vm *VMClient) CrossChainAppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
 	_, err := vm.client.CrossChainAppRequestFailed(context.Background(),
 		&vmpb.CrossChainAppRequestFailedMsg{
-			NodeId:        nodeID[:],
-			SourceChainId: sourceChainID[:],
-			RequestId:     requestID,
+			NodeId:    nodeID[:],
+			ChainId:   chainID[:],
+			RequestId: requestID,
 		})
 	return err
 }
 
-func (vm *VMClient) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (vm *VMClient) CrossChainAppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
 	_, err := vm.client.CrossChainAppResponse(context.Background(),
 		&vmpb.CrossChainAppResponseMsg{
-			NodeId:        nodeID[:],
-			SourceChainId: sourceChainID[:],
-			RequestId:     requestID,
-			Response:      response,
+			NodeId:    nodeID[:],
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Response:  response,
 		})
 	return err
 }
 
-func (vm *VMClient) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+func (vm *VMClient) CrossChainAppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
 	_, err := vm.client.CrossChainAppGossip(context.Background(),
 		&vmpb.CrossChainAppGossipMsg{
-			NodeId:        nodeID[:],
-			SourceChainId: sourceChainID[:],
-			Msg:           msg,
+			NodeId:  nodeID[:],
+			ChainId: chainID[:],
+			Msg:     msg,
 		})
 	return err
 }

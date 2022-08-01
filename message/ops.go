@@ -49,6 +49,11 @@ const (
 	GetAcceptedStateSummary
 	AcceptedStateSummary
 
+	// Cross-chain messaging:
+	CrossChainAppRequest
+	CrossChainAppResponse
+	CrossChainAppGossip
+
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
 	GetAcceptedFailed
@@ -63,11 +68,6 @@ const (
 	GossipRequest
 	GetStateSummaryFrontierFailed
 	GetAcceptedStateSummaryFailed
-
-	// Cross-chain messaging:
-	CrossChainAppRequest
-	CrossChainAppResponse
-	CrossChainAppGossip
 	CrossChainAppRequestFailed
 )
 

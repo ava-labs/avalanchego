@@ -82,7 +82,7 @@ func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error 
 	return err
 }
 
-func (c *Client) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appRequestBytes []byte) error {
+func (c *Client) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {

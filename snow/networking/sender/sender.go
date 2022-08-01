@@ -826,16 +826,70 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	}
 }
 
+func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	inMsgF := func(deadline time.Duration) message.InboundMessage {
+		return s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
+	}
+	outMsgF := func(deadline time.Duration) (message.OutboundMessage, error) {
+		return s.msgCreator.CrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes)
+	}
+
+	return s.sendAppRequestCommon(
+		nodeIDs,
+		sourceChainID,
+		destinationChainID,
+		requestID,
+		appRequestBytes,
+		message.CrossChainAppRequest,
+		message.CrossChainAppRequestFailed,
+		inMsgF,
+		outMsgF,
+	)
+}
+
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
 func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+	inMsgF := func(deadline time.Duration) message.InboundMessage {
+		return s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
+	}
+	outMsgF := func(deadline time.Duration) (message.OutboundMessage, error) {
+		return s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
+	}
+
+	return s.sendAppRequestCommon(
+		nodeIDs,
+		s.ctx.ChainID,
+		s.ctx.ChainID,
+		requestID,
+		appRequestBytes,
+		message.AppRequest,
+		message.AppRequestFailed,
+		inMsgF,
+		outMsgF,
+	)
+}
+
+// SendAppRequest sends an application-level request to the given nodes.
+// The meaning of this request, and how it should be handled, is defined by the VM.
+func (s *sender) sendAppRequestCommon(
+	nodeIDs ids.NodeIDSet,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	appRequestBytes []byte,
+	op message.Op,
+	failedOp message.Op,
+	inMsgF func(deadline time.Duration) message.InboundMessage,
+	outMsgF func(deadline time.Duration) (message.OutboundMessage, error),
+) error {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AppResponse)
+		s.router.RegisterRequest(nodeID, sourceChainID, destinationChainID, requestID, op)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -855,8 +909,8 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
-			s.failedDueToBench[message.AppRequest].Inc() // update metric
+		if s.timeouts.IsBenched(nodeID, destinationChainID) {
+			s.failedDueToBench[op].Inc() // update metric
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
@@ -877,7 +931,8 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 	} else {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AppRequest),
-			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Stringer("sourceChainID", sourceChainID),
+			zap.Stringer("destinationChainID", destinationChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Binary("payload", appRequestBytes),
 			zap.Error(err),
@@ -889,13 +944,15 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.AppRequest),
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Stringer("sourceChainID", sourceChainID),
+				zap.Stringer("destinationChainID", destinationChainID),
 				zap.Uint32("requestID", requestID),
 			)
 			s.ctx.Log.Verbo("failed to send message",
 				zap.Stringer("messageOp", message.AppRequest),
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Stringer("sourceChainID", sourceChainID),
+				zap.Stringer("destinationChainID", destinationChainID),
 				zap.Uint32("requestID", requestID),
 				zap.Binary("payload", appRequestBytes),
 			)
@@ -907,6 +964,11 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 		}
 	}
 	return nil
+}
+
+func (s *sender) SendCrossChainAppResponse(nodeID ids.NodeID, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appResponseBytes []byte) error {
+	// TODO implement me
+	panic("implement me")
 }
 
 // SendAppResponse sends a response to an application-level request from the
@@ -1025,26 +1087,6 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	return nil
 }
 
-func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appRequestBytes []byte) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (s *sender) SendCrossChainAppResponse(nodeID ids.NodeID, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appResponseBytes []byte) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (s *sender) SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (s *sender) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	// TODO implement me
-	panic("implement me")
-}
-
 // SendGossip gossips the provided container
 func (s *sender) SendGossip(container []byte) {
 	msgCreator := s.getMsgCreator()
@@ -1080,6 +1122,16 @@ func (s *sender) SendGossip(container []byte) {
 			zap.Binary("container", container),
 		)
 	}
+}
+
+func (s *sender) SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (s *sender) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
+	// TODO implement me
+	panic("implement me")
 }
 
 // Accept is called after every consensus decision

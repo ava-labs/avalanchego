@@ -217,7 +217,7 @@ message AppGossipMsg {
 message CrossChainAppRequestMsg {
   // The node that sent us this request
   bytes node_id = 1;
-  bytes source_chain_id = 2;
+  bytes chain_id = 2;
   // The ID of this request
   uint32 request_id = 3;
   // deadline for this request
@@ -229,7 +229,7 @@ message CrossChainAppRequestMsg {
 message CrossChainAppRequestFailedMsg {
   // The node that we failed to get a response from
   bytes node_id = 1;
-  bytes source_chain_id = 2;
+  bytes chain_id = 2;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 3;
 }
@@ -237,7 +237,7 @@ message CrossChainAppRequestFailedMsg {
 message CrossChainAppResponseMsg {
   // The node that we got a response from
   bytes node_id = 1;
-  bytes source_chain_id = 2;
+  bytes chain_id = 2;
   // Request ID of request that this is in response to
   uint32 request_id = 3;
   // The response body
@@ -247,7 +247,7 @@ message CrossChainAppResponseMsg {
 message CrossChainAppGossipMsg {
   // The node that sent us a gossip message
   bytes node_id = 1;
-  bytes source_chain_id = 2;
+  bytes chain_id = 2;
   // The message body
   bytes msg = 3;
 }

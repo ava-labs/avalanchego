@@ -340,7 +340,7 @@ func (s *SenderTest) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes
 	return errSendAppGossipSpecific
 }
 
-func (s *SenderTest) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appRequestBytes []byte) error {
+func (s *SenderTest) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
 	switch {
 	case s.SendCrossChainAppRequestF != nil:
 		return s.SendCrossChainAppRequestF(nodeIDs, requestID, sourceChainID, destinationChainID, appRequestBytes)
