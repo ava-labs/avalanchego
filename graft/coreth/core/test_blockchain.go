@@ -88,7 +88,7 @@ func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
 }
 
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
-// genesis to last acceptd from the original instance yields the same last accepted block and state
+// genesis to last accepted from the original instance yields the same last accepted block and state
 // root.
 // Additionally, create another BlockChain instance from [originalDB] to ensure that BlockChain is
 // persisted correctly through a restart.

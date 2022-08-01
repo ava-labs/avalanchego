@@ -32,6 +32,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
@@ -350,14 +351,14 @@ func opReturnDataCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeConte
 
 	offset64, overflow := dataOffset.Uint64WithOverflow()
 	if overflow {
-		return nil, ErrReturnDataOutOfBounds
+		return nil, vmerrs.ErrReturnDataOutOfBounds
 	}
 	// we can reuse dataOffset now (aliasing it for clarity)
 	var end = dataOffset
 	end.Add(&dataOffset, &length)
 	end64, overflow := end.Uint64WithOverflow()
 	if overflow || uint64(len(interpreter.returnData)) < end64 {
-		return nil, ErrReturnDataOutOfBounds
+		return nil, vmerrs.ErrReturnDataOutOfBounds
 	}
 	scope.Memory.Set(memOffset.Uint64(), length.Uint64(), interpreter.returnData[offset64:end64])
 	return nil, nil
@@ -539,7 +540,7 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 
 func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
-		return nil, ErrWriteProtection
+		return nil, vmerrs.ErrWriteProtection
 	}
 	loc := scope.Stack.pop()
 	val := scope.Stack.pop()
@@ -554,7 +555,7 @@ func opJump(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	}
 	pos := scope.Stack.pop()
 	if !scope.Contract.validJumpdest(&pos) {
-		return nil, ErrInvalidJump
+		return nil, vmerrs.ErrInvalidJump
 	}
 	*pc = pos.Uint64() - 1 // pc will be increased by the interpreter loop
 	return nil, nil
@@ -567,7 +568,7 @@ func opJumpi(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	pos, cond := scope.Stack.pop(), scope.Stack.pop()
 	if !cond.IsZero() {
 		if !scope.Contract.validJumpdest(&pos) {
-			return nil, ErrInvalidJump
+			return nil, vmerrs.ErrInvalidJump
 		}
 		*pc = pos.Uint64() - 1 // pc will be increased by the interpreter loop
 	}
@@ -595,7 +596,7 @@ func opGas(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte
 
 func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
-		return nil, ErrWriteProtection
+		return nil, vmerrs.ErrWriteProtection
 	}
 	var (
 		value        = scope.Stack.pop()
@@ -621,9 +622,9 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
 	// ignore this error and pretend the operation was successful.
-	if interpreter.evm.chainRules.IsHomestead && suberr == ErrCodeStoreOutOfGas {
+	if interpreter.evm.chainRules.IsHomestead && suberr == vmerrs.ErrCodeStoreOutOfGas {
 		stackvalue.Clear()
-	} else if suberr != nil && suberr != ErrCodeStoreOutOfGas {
+	} else if suberr != nil && suberr != vmerrs.ErrCodeStoreOutOfGas {
 		stackvalue.Clear()
 	} else {
 		stackvalue.SetBytes(addr.Bytes())
@@ -631,7 +632,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	scope.Stack.push(&stackvalue)
 	scope.Contract.Gas += returnGas
 
-	if suberr == ErrExecutionReverted {
+	if suberr == vmerrs.ErrExecutionReverted {
 		interpreter.returnData = res // set REVERT data to return data buffer
 		return res, nil
 	}
@@ -641,7 +642,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 
 func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
-		return nil, ErrWriteProtection
+		return nil, vmerrs.ErrWriteProtection
 	}
 	var (
 		endowment    = scope.Stack.pop()
@@ -672,7 +673,7 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	scope.Stack.push(&stackvalue)
 	scope.Contract.Gas += returnGas
 
-	if suberr == ErrExecutionReverted {
+	if suberr == vmerrs.ErrExecutionReverted {
 		interpreter.returnData = res // set REVERT data to return data buffer
 		return res, nil
 	}
@@ -693,7 +694,7 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
 	if interpreter.readOnly && !value.IsZero() {
-		return nil, ErrWriteProtection
+		return nil, vmerrs.ErrWriteProtection
 	}
 	var bigVal = big0
 	//TODO: use uint256.Int instead of converting with toBig()
@@ -712,7 +713,7 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 		temp.SetOne()
 	}
 	stack.push(&temp)
-	if err == nil || err == ErrExecutionReverted {
+	if err == nil || err == vmerrs.ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
 		scope.Memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
@@ -736,7 +737,7 @@ func opCallExpert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
 	if interpreter.readOnly && !value.IsZero() {
-		return nil, ErrWriteProtection
+		return nil, vmerrs.ErrWriteProtection
 	}
 	var bigVal = big0
 	//TODO: use uint256.Int instead of converting with toBig()
@@ -763,7 +764,7 @@ func opCallExpert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 		temp.SetOne()
 	}
 	stack.push(&temp)
-	if err == nil || err == ErrExecutionReverted {
+	if err == nil || err == vmerrs.ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
 		scope.Memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
@@ -798,7 +799,7 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		temp.SetOne()
 	}
 	stack.push(&temp)
-	if err == nil || err == ErrExecutionReverted {
+	if err == nil || err == vmerrs.ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
 		scope.Memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
@@ -827,7 +828,7 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 		temp.SetOne()
 	}
 	stack.push(&temp)
-	if err == nil || err == ErrExecutionReverted {
+	if err == nil || err == vmerrs.ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
 		scope.Memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
@@ -856,7 +857,7 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 		temp.SetOne()
 	}
 	stack.push(&temp)
-	if err == nil || err == ErrExecutionReverted {
+	if err == nil || err == vmerrs.ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
 		scope.Memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
@@ -878,7 +879,7 @@ func opRevert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	ret := scope.Memory.GetPtr(int64(offset.Uint64()), int64(size.Uint64()))
 
 	interpreter.returnData = ret
-	return ret, ErrExecutionReverted
+	return ret, vmerrs.ErrExecutionReverted
 }
 
 func opUndefined(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
@@ -891,7 +892,7 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if interpreter.readOnly {
-		return nil, ErrWriteProtection
+		return nil, vmerrs.ErrWriteProtection
 	}
 	beneficiary := scope.Stack.pop()
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
@@ -910,7 +911,7 @@ func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 func makeLog(size int) executionFunc {
 	return func(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 		if interpreter.readOnly {
-			return nil, ErrWriteProtection
+			return nil, vmerrs.ErrWriteProtection
 		}
 		topics := make([]common.Hash, size)
 		stack := scope.Stack

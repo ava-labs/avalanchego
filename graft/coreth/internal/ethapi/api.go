@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/coreth/eth/tracers/logger"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -1144,7 +1145,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 			return 0, err
 		}
 		if failed {
-			if result != nil && result.Err != vm.ErrOutOfGas {
+			if result != nil && result.Err != vmerrs.ErrOutOfGas {
 				if len(result.Revert()) > 0 {
 					return 0, newRevertError(result)
 				}

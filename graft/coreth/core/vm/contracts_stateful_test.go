@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
@@ -195,7 +196,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: 0,
-			expectedErr:          ErrExecutionReverted,
+			expectedErr:          vmerrs.ErrExecutionReverted,
 			expectedResult:       nil,
 			name:                 "native asset balance: invalid input data reverts",
 		},
@@ -213,7 +214,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big0,
 			gasInput:             params.AssetBalanceApricot - 1,
 			expectedGasRemaining: 0,
-			expectedErr:          ErrOutOfGas,
+			expectedErr:          vmerrs.ErrOutOfGas,
 			expectedResult:       nil,
 			name:                 "native asset balance: insufficient gas errors",
 		},
@@ -231,7 +232,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                bigHundred,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: params.AssetBalanceApricot,
-			expectedErr:          ErrInsufficientBalance,
+			expectedErr:          vmerrs.ErrInsufficientBalance,
 			expectedResult:       nil,
 			name:                 "native asset balance: non-zero value with insufficient funds reverts before running pre-compile",
 		},
@@ -320,7 +321,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot,
 			expectedGasRemaining: 0,
-			expectedErr:          ErrInsufficientBalance,
+			expectedErr:          vmerrs.ErrInsufficientBalance,
 			expectedResult:       nil,
 			name:                 "native asset call: insufficient multicoin funds",
 			stateDBCheck: func(t *testing.T, stateDB StateDB) {
@@ -352,7 +353,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big.NewInt(51),
 			gasInput:             params.AssetCallApricot,
 			expectedGasRemaining: params.AssetCallApricot,
-			expectedErr:          ErrInsufficientBalance,
+			expectedErr:          vmerrs.ErrInsufficientBalance,
 			expectedResult:       nil,
 			name:                 "native asset call: insufficient funds",
 			stateDBCheck: func(t *testing.T, stateDB StateDB) {
@@ -384,7 +385,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot - 1,
 			expectedGasRemaining: 0,
-			expectedErr:          ErrOutOfGas,
+			expectedErr:          vmerrs.ErrOutOfGas,
 			expectedResult:       nil,
 			name:                 "native asset call: insufficient gas for native asset call",
 		},
@@ -405,7 +406,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas - 1,
 			expectedGasRemaining: 0,
-			expectedErr:          ErrOutOfGas,
+			expectedErr:          vmerrs.ErrOutOfGas,
 			expectedResult:       nil,
 			name:                 "native asset call: insufficient gas to create new account",
 			stateDBCheck: func(t *testing.T, stateDB StateDB) {
@@ -437,7 +438,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: params.CallNewAccountGas,
-			expectedErr:          ErrExecutionReverted,
+			expectedErr:          vmerrs.ErrExecutionReverted,
 			expectedResult:       nil,
 			name:                 "native asset call: invalid input",
 		},
@@ -458,7 +459,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			value:                big0,
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: params.AssetCallApricot + params.CallNewAccountGas,
-			expectedErr:          ErrExecutionReverted,
+			expectedErr:          vmerrs.ErrExecutionReverted,
 			expectedResult:       nil,
 			name:                 "deprecated contract",
 		},

@@ -167,6 +167,8 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	if w.chainConfig.DAOForkSupport && w.chainConfig.DAOForkBlock != nil && w.chainConfig.DAOForkBlock.Cmp(header.Number) == 0 {
 		misc.ApplyDAOHardFork(env.state)
 	}
+	// Configure any stateful precompiles that should go into effect during this block.
+	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time()), types.NewBlockWithHeader(header), env.state)
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)

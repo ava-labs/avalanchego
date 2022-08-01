@@ -233,6 +233,24 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if err != nil {
 		panic(err)
 	}
+
+	head := &types.Header{
+		Number:     new(big.Int).SetUint64(g.Number),
+		Nonce:      types.EncodeNonce(g.Nonce),
+		Time:       g.Timestamp,
+		ParentHash: g.ParentHash,
+		Extra:      g.ExtraData,
+		GasLimit:   g.GasLimit,
+		GasUsed:    g.GasUsed,
+		BaseFee:    g.BaseFee,
+		Difficulty: g.Difficulty,
+		MixDigest:  g.Mixhash,
+		Coinbase:   g.Coinbase,
+	}
+
+	// Configure any stateful precompiles that should be enabled in the genesis.
+	g.Config.CheckConfigurePrecompiles(nil, types.NewBlockWithHeader(head), statedb)
+
 	for addr, account := range g.Alloc {
 		statedb.AddBalance(addr, account.Balance)
 		statedb.SetCode(addr, account.Code)
@@ -247,20 +265,8 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	root := statedb.IntermediateRoot(false)
-	head := &types.Header{
-		Number:     new(big.Int).SetUint64(g.Number),
-		Nonce:      types.EncodeNonce(g.Nonce),
-		Time:       g.Timestamp,
-		ParentHash: g.ParentHash,
-		Extra:      g.ExtraData,
-		GasLimit:   g.GasLimit,
-		GasUsed:    g.GasUsed,
-		BaseFee:    g.BaseFee,
-		Difficulty: g.Difficulty,
-		MixDigest:  g.Mixhash,
-		Coinbase:   g.Coinbase,
-		Root:       root,
-	}
+	head.Root = root
+
 	if g.GasLimit == 0 {
 		head.GasLimit = params.GenesisGasLimit
 	}
@@ -275,7 +281,9 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	statedb.Commit(false)
-	statedb.Database().TrieDB().Commit(root, true, nil)
+	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
+		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+	}
 
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil), nil, false)
 }
