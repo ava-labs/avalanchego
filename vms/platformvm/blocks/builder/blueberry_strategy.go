@@ -173,6 +173,6 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		return b.blkManager.NewBlock(statelessBlk), nil
 
 	default:
-		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+		return nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
 	}
 }

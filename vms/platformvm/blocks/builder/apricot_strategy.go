@@ -93,7 +93,7 @@ func (a *apricotStrategy) nextProposalTx() ([]*txs.Tx, error) {
 	// Check the mempool
 	if !a.Mempool.HasProposalTx() {
 		a.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return []*txs.Tx{}, errNoPendingBlocks
+		return nil, errNoPendingBlocks
 	}
 	tx := a.Mempool.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
@@ -157,6 +157,6 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		return a.blkManager.NewBlock(statelessBlk), nil
 
 	default:
-		return nil, fmt.Errorf("unhandled tx type, could not include into a block")
+		return nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
 	}
 }
