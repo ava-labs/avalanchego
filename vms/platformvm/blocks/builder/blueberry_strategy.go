@@ -52,7 +52,7 @@ func (b *blueberryStrategy) hasContent() (bool, error) {
 // if it must
 func (b *blueberryStrategy) selectBlockContent() error {
 	// blkTimestamp is zeroed for Apricot blocks
-	// it is tentatively set to chainTime for Blueberry ones
+	// it is set to the proposed chainTime for Blueberry ones
 	blkTime := b.parentState.GetTimestamp()
 
 	// try including as many standard txs as possible. No need to advance chain time
@@ -84,7 +84,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 		return fmt.Errorf("could not retrieve next chain time %s", err)
 	}
 	if shouldAdvanceTime {
-		b.txes = []*txs.Tx{}
+		b.txes = nil
 		b.blkTime = nextChainTime
 		return nil
 	}
@@ -112,7 +112,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	} else {
 		b.blkTime = blkTime // do not change chain time
 	}
-	return err
+	return nil
 }
 
 func (b *blueberryStrategy) build() (snowman.Block, error) {

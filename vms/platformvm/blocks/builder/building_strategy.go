@@ -13,7 +13,7 @@ import (
 
 // buildingStrategy defines how to create a versioned block.
 // Blocks have different specifications/building instructions as defined by the
-// fork that the block exists in.
+// network upgrades in effect at the time the block is created.
 type buildingStrategy interface {
 	// only check whether next block could be built
 	hasContent() (bool, error)

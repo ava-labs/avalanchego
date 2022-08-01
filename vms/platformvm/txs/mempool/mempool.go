@@ -63,11 +63,11 @@ type Mempool interface {
 	PopProposalTx() *txs.Tx
 
 	// PeekDecisionTxs returns the next decisionTxs
-	// up to maxTxsBytes without removing it from mempool.
+	// up to maxTxsBytes without removing them from the mempool.
 	// It returns nil if !HasDecisionTxs()
 	PeekDecisionTxs(maxTxsBytes int) []*txs.Tx
 
-	// PeekProposalTx returns next proposalTx
+	// PeekProposalTx returns the next proposalTx
 	// without removing it from mempool.
 	// It returns nil if !HasProposalTx()
 	PeekProposalTx() *txs.Tx
