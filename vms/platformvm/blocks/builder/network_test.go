@@ -5,7 +5,6 @@ package builder
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -41,7 +40,6 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
-	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 	env.ctx.Lock.Lock()
 
 	var gossipedBytes []byte
@@ -92,7 +90,6 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
-	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 	env.ctx.Lock.Lock()
 
 	// create a tx and mark as invalid
@@ -120,7 +117,6 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
-	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 	env.ctx.Lock.Lock()
 
 	var gossipedBytes []byte

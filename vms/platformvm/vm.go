@@ -219,13 +219,13 @@ func (vm *VM) Initialize(
 	go vm.ctx.Log.RecoverAndPanic(vm.BlockBuilder.StartTimer)
 
 	if err := vm.updateValidators(); err != nil {
-		return fmt.Errorf("failed to Initialize validator sets: %w", err)
+		return fmt.Errorf("failed to update validator sets: %w", err)
 	}
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {
 		return fmt.Errorf(
-			"failed to Initialize blockchains: %w",
+			"failed to initialize blockchains: %w",
 			err,
 		)
 	}

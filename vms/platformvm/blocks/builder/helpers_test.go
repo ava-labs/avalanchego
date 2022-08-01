@@ -50,7 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
-	tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 var (
@@ -99,7 +99,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      tx_builder.Builder
+	txBuilder      p_tx_builder.Builder
 	backend        executor.Backend
 	stateVersions  state.Versions
 }
@@ -141,7 +141,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.uptimes = uptime.NewManager(res.state)
 	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 
-	res.txBuilder = tx_builder.New(
+	res.txBuilder = p_tx_builder.New(
 		res.ctx,
 		*res.config,
 		res.clk,
@@ -212,7 +212,7 @@ func newEnvironment(t *testing.T) *environment {
 
 func addSubnet(
 	baseState state.State,
-	txBuilder tx_builder.Builder,
+	txBuilder p_tx_builder.Builder,
 	backend executor.Backend,
 ) {
 	// Create a subnet

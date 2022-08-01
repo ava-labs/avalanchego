@@ -23,14 +23,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Max number of items allowed in a page
+const MaxPageSize = 1024
+
 var (
 	_ Builder = &builder{}
 
 	errNoFunds = errors.New("no spendable funds were found")
 )
-
-// Max number of items allowed in a page
-const MaxPageSize = 1024
 
 type Builder interface {
 	AtomicTxBuilder

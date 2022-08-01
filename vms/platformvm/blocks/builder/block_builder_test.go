@@ -6,7 +6,6 @@ package builder
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -24,7 +23,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 
 	// add a tx to it
 	tx := getValidTx(env.txBuilder, t)
@@ -59,7 +57,6 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	env.BlockBuilder.SetActivationTime(time.Unix(0, 0)) // enable mempool gossiping
 
 	// create candidate tx
 	tx := getValidTx(env.txBuilder, t)
