@@ -64,12 +64,10 @@ func (b *blockBuilder) Initialize(
 		b.vm.ctx.Lock.Lock()
 		defer b.vm.ctx.Lock.Unlock()
 
-		b.resetTimer()
+		b.ResetBlockTimer()
 	})
 	go b.vm.ctx.Log.RecoverAndPanic(b.timer.Dispatch)
 }
-
-func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
@@ -101,7 +99,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
-		b.resetTimer()
+		b.ResetBlockTimer()
 	}()
 
 	b.vm.ctx.Log.Debug("starting to attempt to build a block")
@@ -198,9 +196,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	return b.vm.manager.NewBlock(statelessBlk), nil
 }
 
-// ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
-// consensus engine.
-func (b *blockBuilder) resetTimer() {
+func (b *blockBuilder) ResetBlockTimer() {
 	// If there is a pending transaction trigger building of a block with that transaction
 	if b.HasDecisionTxs() {
 		b.notifyBlockReady()
