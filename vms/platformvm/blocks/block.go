@@ -8,15 +8,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// Interface introduced for marshalling/unmarshalling
+// Block defines the common stateless interface for all blocks
 type Block interface {
 	ID() ids.ID
-	Bytes() []byte
 	Parent() ids.ID
+	Bytes() []byte
 	Height() uint64
 
-	// BlockTxs returns list of transactions
-	// contained in the block
+	// BlockTxs returns list of transactions contained in the block
 	BlockTxs() []*txs.Tx
 
 	Visit(visitor Visitor) error
