@@ -14,10 +14,7 @@ import (
 
 type standardBlockState struct {
 	onAcceptFunc func()
-}
-
-type atomicBlockState struct {
-	inputs ids.Set
+	inputs       ids.Set
 }
 
 type proposalBlockState struct {
@@ -31,7 +28,6 @@ type proposalBlockState struct {
 type blockState struct {
 	standardBlockState
 	proposalBlockState
-	atomicBlockState
 	statelessBlock blocks.Block
 	onAcceptState  state.Diff
 

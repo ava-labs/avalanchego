@@ -66,8 +66,8 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 		},
 
-		// It is safe to use [pb.onAbortState] here because the timestamp will never
-		// be modified by an Abort block.
+		// It is safe to use [pb.onAbortState] here because the timestamp will
+		// never be modified by an Abort block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
@@ -150,7 +150,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	blkState := &blockState{
 		statelessBlock: b,
 		onAcceptState:  atomicExecutor.OnAccept,
-		atomicBlockState: atomicBlockState{
+		standardBlockState: standardBlockState{
 			inputs: atomicExecutor.Inputs,
 		},
 		atomicRequests: atomicExecutor.AtomicRequests,
