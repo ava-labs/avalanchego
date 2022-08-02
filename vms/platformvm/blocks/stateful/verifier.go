@@ -24,7 +24,7 @@ var (
 
 	errConflictingBatchTxs                   = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs                  = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
-	errAdvanceTimeTxCannotBeIncluded         = errors.New("advance time tx cannot be included in block")
+	errAdvanceTimeTxCannotBeIncluded         = errors.New("advance time tx cannot be included in BlueberryProposalBlock")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -102,8 +102,7 @@ func (v *verifier) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) e
 		return err
 	}
 
-	tx := b.BlockTxs()[0]
-	if _, ok := tx.Unsigned.(*txs.AdvanceTimeTx); ok {
+	if _, ok := b.Tx.Unsigned.(*txs.AdvanceTimeTx); ok {
 		return errAdvanceTimeTxCannotBeIncluded
 	}
 
@@ -159,11 +158,11 @@ func (v *verifier) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) e
 	txExecutor := executor.ProposalTxExecutor{
 		Backend:          &v.txExecutorBackend,
 		ReferenceBlockID: blkID,
-		Tx:               tx,
+		Tx:               b.Tx,
 	}
 
-	if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-		txID := tx.ID()
+	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
+		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
 	}
@@ -538,7 +537,7 @@ func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
 	}
 	onAcceptState := parentState.onCommitState
 
-	var blkStateTime time.Time
+	var blkTimestamp time.Time
 	switch blkVersion {
 	case version.BlueberryBlockVersion:
 		if err := v.validateBlockTimestamp(
@@ -547,9 +546,9 @@ func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
 		); err != nil {
 			return err
 		}
-		blkStateTime = time.Unix(b.UnixTimestamp(), 0)
+		blkTimestamp = time.Unix(b.UnixTimestamp(), 0)
 	case version.ApricotBlockVersion:
-		blkStateTime = onAcceptState.GetTimestamp()
+		blkTimestamp = onAcceptState.GetTimestamp()
 	default:
 		return fmt.Errorf("invalid block version: %d", blkVersion)
 	}
@@ -557,7 +556,7 @@ func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
 	blkState := &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
-		timestamp:      blkStateTime,
+		timestamp:      blkTimestamp,
 	}
 	v.blkIDToState[blkID] = blkState
 	v.stateVersions.SetState(blkID, blkState.onAcceptState)
@@ -572,34 +571,34 @@ func (v *verifier) AbortBlock(b *stateless.AbortBlock) error {
 		return nil
 	}
 
-	parentID := b.Parent()
 	if err := v.verifyCommonBlock(b); err != nil {
 		return err
 	}
 
+	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 	onAcceptState := parentState.onAbortState
 
-	var blkStateTime time.Time
+	var blkTimestamp time.Time
 	switch b.Version() {
 	case version.BlueberryBlockVersion:
 		if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
 			return err
 		}
-		blkStateTime = time.Unix(b.UnixTimestamp(), 0)
+		blkTimestamp = time.Unix(b.UnixTimestamp(), 0)
 
 	case stateless.ApricotVersion:
-		blkStateTime = onAcceptState.GetTimestamp()
+		blkTimestamp = onAcceptState.GetTimestamp()
 
 	default:
 		return fmt.Errorf("invalid block version: %d", b.Version())
 	}
 	blkState := &blockState{
 		statelessBlock: b,
-		timestamp:      blkStateTime,
+		timestamp:      blkTimestamp,
 		onAcceptState:  onAcceptState,
 	}
 	v.blkIDToState[blkID] = blkState

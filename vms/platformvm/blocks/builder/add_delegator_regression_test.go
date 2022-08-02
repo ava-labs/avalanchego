@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO remove?
+// TODO: possibly better placed in platformvm package?
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert := assert.New(t)

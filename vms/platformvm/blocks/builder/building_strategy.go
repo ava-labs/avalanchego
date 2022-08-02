@@ -15,10 +15,12 @@ import (
 // Blocks have different specifications/building instructions as defined by the
 // network upgrades in effect at the time the block is created.
 type buildingStrategy interface {
-	// only check whether next block could be built
+	// hasContent checks whether next block could be built,
+	// without affecting the mempool. Returns true if a new block
+	// can be built, error if check could not be performed.
 	hasContent() (bool, error)
 
-	// builds a versioned snowman.Block
+	// build builds a versioned snowman.Block
 	build() (snowman.Block, error)
 }
 

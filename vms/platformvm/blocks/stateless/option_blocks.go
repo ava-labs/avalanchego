@@ -19,10 +19,10 @@ type AbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (ab *AbortBlock) BlockTxs() []*txs.Tx { return nil }
+func (*AbortBlock) BlockTxs() []*txs.Tx { return nil }
 
-func (ab *AbortBlock) Visit(v Visitor) error {
-	return v.AbortBlock(ab)
+func (b *AbortBlock) Visit(v Visitor) error {
+	return v.AbortBlock(b)
 }
 
 func NewAbortBlock(
@@ -54,8 +54,8 @@ type CommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (cb *CommitBlock) Visit(v Visitor) error {
-	return v.CommitBlock(cb)
+func (b *CommitBlock) Visit(v Visitor) error {
+	return v.CommitBlock(b)
 }
 
 func (*CommitBlock) BlockTxs() []*txs.Tx { return nil }

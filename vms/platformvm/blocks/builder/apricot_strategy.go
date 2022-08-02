@@ -78,15 +78,15 @@ func (a *apricotStrategy) selectBlockContent() error {
 		return nil
 	}
 
-	a.txes, err = a.nextProposalTx()
+	tx, err := a.nextProposalTx()
+	a.txes = []*txs.Tx{tx}
 	return err
 }
 
 // Try to get/make a proposal tx to put into a block.
 // Returns an error if there's no suitable proposal tx.
 // Doesn't modify [a.Mempool].
-// TODO can this return one tx?
-func (a *apricotStrategy) nextProposalTx() ([]*txs.Tx, error) {
+func (a *apricotStrategy) nextProposalTx() (*txs.Tx, error) {
 	// clean out transactions with an invalid timestamp.
 	a.dropExpiredProposalTxs()
 
@@ -103,7 +103,7 @@ func (a *apricotStrategy) nextProposalTx() ([]*txs.Tx, error) {
 	// If it doesn't, issue an advance time tx.
 	maxChainStartTime := a.parentState.GetTimestamp().Add(executor.MaxFutureStartTime)
 	if !startTime.After(maxChainStartTime) {
-		return []*txs.Tx{tx}, nil
+		return tx, nil
 	}
 
 	// The chain timestamp is too far in the past. Advance it.
@@ -112,7 +112,7 @@ func (a *apricotStrategy) nextProposalTx() ([]*txs.Tx, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not build tx to advance time %s", err)
 	}
-	return []*txs.Tx{advanceTimeTx}, nil
+	return advanceTimeTx, nil
 }
 
 func (a *apricotStrategy) build() (snowman.Block, error) {

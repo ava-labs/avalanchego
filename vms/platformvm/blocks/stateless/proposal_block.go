@@ -70,7 +70,7 @@ func NewProposalBlock(
 		return res, res.initialize(BlueberryVersion, bytes)
 
 	default:
-		return nil, fmt.Errorf("unsopported block version %d", version)
+		return nil, fmt.Errorf("unsupported block version %d", version)
 	}
 }
 
@@ -81,17 +81,17 @@ type ApricotProposalBlock struct {
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (apb *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := apb.CommonBlock.initialize(version, bytes); err != nil {
+func (b *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
+	if err := b.CommonBlock.initialize(version, bytes); err != nil {
 		return err
 	}
-	return apb.Tx.Sign(txs.Codec, nil)
+	return b.Tx.Sign(txs.Codec, nil)
 }
 
-func (apb *ApricotProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{apb.Tx} }
+func (b *ApricotProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
-func (apb *ApricotProposalBlock) Visit(v Visitor) error {
-	return v.ApricotProposalBlock(apb)
+func (b *ApricotProposalBlock) Visit(v Visitor) error {
+	return v.ApricotProposalBlock(b)
 }
 
 type BlueberryProposalBlock struct {
@@ -102,28 +102,28 @@ type BlueberryProposalBlock struct {
 	Tx *txs.Tx
 }
 
-func (bpb *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := bpb.CommonBlock.initialize(version, bytes); err != nil {
+func (b *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error {
+	if err := b.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
 	// [Tx] may be initialized from NewProposalBlock
 	// TODO can we do this a better way?
-	if bpb.Tx == nil {
+	if b.Tx == nil {
 		var tx txs.Tx
-		if _, err := txs.Codec.Unmarshal(bpb.TxBytes, &tx); err != nil {
+		if _, err := txs.Codec.Unmarshal(b.TxBytes, &tx); err != nil {
 			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
 		}
-		bpb.Tx = &tx
-		if err := bpb.Tx.Sign(txs.Codec, nil); err != nil {
+		b.Tx = &tx
+		if err := b.Tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
 }
 
-func (bpb *BlueberryProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{bpb.Tx} }
+func (b *BlueberryProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
-func (bpb *BlueberryProposalBlock) Visit(v Visitor) error {
-	return v.BlueberryProposalBlock(bpb)
+func (b *BlueberryProposalBlock) Visit(v Visitor) error {
+	return v.BlueberryProposalBlock(b)
 }

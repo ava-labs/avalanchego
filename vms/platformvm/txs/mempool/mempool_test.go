@@ -20,11 +20,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var _ BlockTimer = &dummyBlkTimer{}
+var _ BlockTimer = &noopBlkTimer{}
 
-type dummyBlkTimer struct{}
+type noopBlkTimer struct{}
 
-func (bt *dummyBlkTimer) ResetBlockTimer() {}
+func (bt *noopBlkTimer) ResetBlockTimer() {}
 
 var preFundedKeys = crypto.BuildTestKeys()
 
@@ -34,7 +34,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &dummyBlkTimer{})
+	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	assert.NoError(err)
 
 	txes, err := createTestDecisionTxes(1)
@@ -58,7 +58,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	assert := assert.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &dummyBlkTimer{})
+	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	assert.NoError(err)
 
 	txes, err := createTestDecisionTxes(2)
@@ -137,7 +137,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	assert := assert.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mpool, err := NewMempool("mempool", registerer, &dummyBlkTimer{})
+	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	assert.NoError(err)
 
 	// it's key to this test that proposal txs

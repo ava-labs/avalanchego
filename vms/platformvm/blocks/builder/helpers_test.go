@@ -85,9 +85,11 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-type dummyBlkTimer struct{}
+var _ mempool.BlockTimer = &noopBlkTimer{}
 
-func (*dummyBlkTimer) ResetBlockTimer() {}
+type noopBlkTimer struct{}
+
+func (*noopBlkTimer) ResetBlockTimer() {}
 
 type environment struct {
 	BlockBuilder
@@ -188,7 +190,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 	}
 
 	if mockResetBlockTimer {
-		dummy := &dummyBlkTimer{}
+		dummy := &noopBlkTimer{}
 		res.mempool, err = mempool.NewMempool("mempool", registerer, dummy)
 	} else {
 		res.mempool, err = mempool.NewMempool("mempool", registerer, res)

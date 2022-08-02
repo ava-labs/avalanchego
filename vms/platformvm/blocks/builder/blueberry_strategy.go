@@ -107,6 +107,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 
 	b.txes = []*txs.Tx{tx}
 	if startTime.After(maxChainStartTime) {
+		// setting blkTime to now to propose moving chain time ahead
 		now := b.txExecutorBackend.Clk.Time()
 		b.blkTime = now
 	} else {
@@ -116,7 +117,6 @@ func (b *blueberryStrategy) selectBlockContent() error {
 }
 
 func (b *blueberryStrategy) build() (snowman.Block, error) {
-	blkVersion := version.BlueberryBlockVersion
 	if err := b.selectBlockContent(); err != nil {
 		return nil, err
 	}
@@ -124,6 +124,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	// remove selected txs from mempool
 	b.Mempool.Remove(b.txes)
 
+	blkVersion := version.BlueberryBlockVersion
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
 		statelessBlk, err := stateless.NewStandardBlock(

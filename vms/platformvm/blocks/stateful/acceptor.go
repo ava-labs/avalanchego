@@ -23,24 +23,38 @@ type acceptor struct {
 }
 
 func (a *acceptor) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
-	// Update the state of the chain in the database
-	// apply baseOptionState first
-	// TODO by dan for alberto: why do we do this?
+	// Blueberry proposal blocks do modify chain state by (possibly) advancing
+	// chain time. We carry out these state changes before moving to options
 	blkID := b.ID()
+	a.ctx.Log.Verbo(
+		"accepting Aprictor Proposal Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
 	blkState.onAcceptState.Apply(a.state)
 
-	return a.commonVisitProposalBlock(b, false)
+	return a.commonVisitProposalBlock(b)
 }
 
 func (a *acceptor) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
-	return a.commonVisitProposalBlock(b, true)
+	blkID := b.ID()
+	a.ctx.Log.Verbo(
+		"accepting Blueberry Proposal Block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+
+	return a.commonVisitProposalBlock(b)
 }
 
-func (a *acceptor) commonVisitProposalBlock(b stateless.Block, isApricot bool) error {
+func (a *acceptor) commonVisitProposalBlock(b stateless.Block) error {
 	/* Note that:
 
 	// * We don't free the proposal block in this method.
@@ -58,26 +72,9 @@ func (a *acceptor) commonVisitProposalBlock(b stateless.Block, isApricot bool) e
 	  The snowman.Engine requires that the last committed block is a decision block.
 
 	*/
-	blkID := b.ID()
-
-	if isApricot {
-		a.ctx.Log.Verbo(
-			"accepting Aprictor Proposal Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
-	} else {
-		a.ctx.Log.Verbo(
-			"accepting Blueberry Proposal Block",
-			zap.Stringer("blkID", blkID),
-			zap.Uint64("height", b.Height()),
-			zap.Stringer("parent", b.Parent()),
-		)
-	}
 
 	// See comment for [lastAccepted].
-	a.backend.lastAccepted = blkID
+	a.backend.lastAccepted = b.ID()
 	return nil
 }
 

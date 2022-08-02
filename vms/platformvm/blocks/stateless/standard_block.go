@@ -75,7 +75,7 @@ func NewStandardBlock(
 		return res, res.initialize(BlueberryVersion, bytes)
 
 	default:
-		return nil, fmt.Errorf("unsopported block version %d", version)
+		return nil, fmt.Errorf("unsupported block version %d", version)
 	}
 }
 
@@ -85,11 +85,11 @@ type ApricotStandardBlock struct {
 	Txs []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (asb *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := asb.CommonBlock.initialize(version, bytes); err != nil {
+func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
+	if err := b.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	for _, tx := range asb.Txs {
+	for _, tx := range b.Txs {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
@@ -97,10 +97,10 @@ func (asb *ApricotStandardBlock) initialize(version uint16, bytes []byte) error 
 	return nil
 }
 
-func (asb *ApricotStandardBlock) BlockTxs() []*txs.Tx { return asb.Txs }
+func (b *ApricotStandardBlock) BlockTxs() []*txs.Tx { return b.Txs }
 
-func (asb *ApricotStandardBlock) Visit(v Visitor) error {
-	return v.ApricotStandardBlock(asb)
+func (b *ApricotStandardBlock) Visit(v Visitor) error {
+	return v.ApricotStandardBlock(b)
 }
 
 type BlueberryStandardBlock struct {
@@ -111,13 +111,13 @@ type BlueberryStandardBlock struct {
 	Txs []*txs.Tx
 }
 
-func (bsb *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := bsb.CommonBlock.initialize(version, bytes); err != nil {
+func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
+	if err := b.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	bsb.Txs = make([]*txs.Tx, len(bsb.TxsBytes))
-	for i, txBytes := range bsb.TxsBytes {
+	b.Txs = make([]*txs.Tx, len(b.TxsBytes))
+	for i, txBytes := range b.TxsBytes {
 		var tx txs.Tx
 		if _, err := txs.Codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("failed unmarshalling tx in blueberry block: %w", err)
@@ -125,13 +125,13 @@ func (bsb *BlueberryStandardBlock) initialize(version uint16, bytes []byte) erro
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
-		bsb.Txs[i] = &tx
+		b.Txs[i] = &tx
 	}
 	return nil
 }
 
-func (bsb *BlueberryStandardBlock) BlockTxs() []*txs.Tx { return bsb.Txs }
+func (b *BlueberryStandardBlock) BlockTxs() []*txs.Tx { return b.Txs }
 
-func (bsb *BlueberryStandardBlock) Visit(v Visitor) error {
-	return v.BlueberryStandardBlock(bsb)
+func (b *BlueberryStandardBlock) Visit(v Visitor) error {
+	return v.BlueberryStandardBlock(b)
 }

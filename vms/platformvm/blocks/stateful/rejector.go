@@ -63,8 +63,7 @@ func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
 		zap.Stringer("parent", b.Parent()),
 	)
 
-	tx := b.BlockTxs()[0]
-	if err := r.Mempool.Add(tx); err != nil {
+	if err := r.Mempool.Add(b.Tx); err != nil {
 		r.ctx.Log.Debug(
 			"failed to reissue tx",
 			zap.Stringer("txID", b.Tx.ID()),
