@@ -306,18 +306,18 @@ func (nop *noOpAppHandler) AppGossip(nodeID ids.NodeID, _ []byte) error {
 	return nil
 }
 
-func (nop *noOpAppHandler) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (nop *noOpAppHandler) CrossChainAppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
-func (nop *noOpAppHandler) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+func (nop *noOpAppHandler) CrossChainAppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
 	return nil
 }
 
-func (nop *noOpAppHandler) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (nop *noOpAppHandler) CrossChainAppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
 	return nil
 }
 
-func (nop *noOpAppHandler) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+func (nop *noOpAppHandler) CrossChainAppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
 	return nil
 }

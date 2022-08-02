@@ -103,7 +103,7 @@ func (c *Client) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 	return err
 }
 
-func (c *Client) SendCrossChainAppResponse(nodeID ids.NodeID, requestID uint32, sourceChainID ids.ID, destinationChainID ids.ID, appResponseBytes []byte) error {
+func (c *Client) SendCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error {
 	_, err := c.client.SendCrossChainAppResponse(
 		context.Background(),
 		&appsenderpb.SendCrossChainAppResponseMsg{

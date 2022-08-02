@@ -576,7 +576,7 @@ func (b *outMsgBuilder) CrossChainAppGossip(
 			DestinationChainID: destinationChainID[:],
 			AppBytes:           msg,
 		},
-		b.compress && AppGossip.Compressible(), // App messages may be compressed
+		b.compress && CrossChainAppGossip.Compressible(), // App messages may be compressed
 		false,
 	)
 }

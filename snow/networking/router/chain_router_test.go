@@ -341,7 +341,7 @@ func TestRouterTimeout(t *testing.T) {
 	wg.Add(len(msgs))
 
 	for i, msg := range msgs {
-		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, ctx.ChainID, uint32(i), msg)
+		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, uint32(i), msg)
 	}
 
 	wg.Wait()
@@ -431,7 +431,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	vID := ids.GenerateTestNodeID()
 	for i, op := range ops {
-		chainRouter.RegisterRequest(vID, ctx.ChainID, ctx.ChainID, uint32(i), op)
+		chainRouter.RegisterRequest(vID, ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -603,16 +603,16 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	mc, err := message.NewCreator(prometheus.NewRegistry(), true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create chain router
 	nodeID := ids.GenerateTestNodeID()
 	chainRouter := ChainRouter{}
-	assert.NoError(t, chainRouter.Initialize(nodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry()))
+	require.NoError(t, chainRouter.Initialize(nodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry()))
 
 	// Set up validators
 	vdrs := validators.NewSet()
-	assert.NoError(t, vdrs.AddWeight(ids.GenerateTestNodeID(), 1))
+	require.NoError(t, vdrs.AddWeight(ids.GenerateTestNodeID(), 1))
 
 	// Create bootstrapper, engine and handler
 	senderCtx := snow.DefaultConsensusContextTest()
@@ -622,7 +622,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	senderCtx.Executing(false)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	senderHandler, err := handler.New(
 		mc,
@@ -633,7 +633,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	receiverCtx := snow.DefaultConsensusContextTest()
 	receiverCtx.ChainID = ids.GenerateTestID()
@@ -650,7 +650,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// assumed bootstrapping is done
 	receiverCtx.SetState(snow.NormalOp)
@@ -661,19 +661,19 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	chainRouter.AddChain(receiverHandler)
 
 	// Each chain should start off with a connected message
-	assert.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
-	assert.Equal(t, 1, chainRouter.chains[receiverCtx.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	// register the cross-chain requests so we don't drop them
 	vID := ids.GenerateTestNodeID()
-	chainRouter.RegisterRequest(vID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
+	chainRouter.RegisterRequest(vID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
 
 	msg := []byte("foobar")
 	chainRouter.HandleInbound(mc.InboundCrossChainAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
 
 	// We should have received the new message in the receiver chain
-	assert.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
+	require.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	// The sender chain shouldn't have any new messages.
-	assert.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
 }

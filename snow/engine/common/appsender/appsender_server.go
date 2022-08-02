@@ -100,7 +100,7 @@ func (s *Server) SendCrossChainAppResponse(ctx context.Context, req *appsenderpb
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendCrossChainAppResponse(nodeID, req.RequestId, sourceChainID, destinationChainID, req.Response)
+	err = s.appSender.SendCrossChainAppResponse(nodeID, sourceChainID, destinationChainID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 

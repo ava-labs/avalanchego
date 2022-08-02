@@ -137,32 +137,11 @@ func (cr *ChainRouter) Initialize(
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
-	cr.registerRequest(nodeID, sourceChainID, destinationChainID, requestID, op, func(failedOp message.Op) message.InboundMessage {
-		return cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
-	})
+func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) {
+	cr.RegisterCrossChainRequest(nodeID, chainID, chainID, requestID, op)
 }
 
-func (cr *ChainRouter) RegisterCrossChainRequest(
-	nodeID ids.NodeID,
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	op message.Op,
-) {
-	cr.registerRequest(nodeID, sourceChainID, destinationChainID, requestID, op, func(failedOp message.Op) message.InboundMessage {
-		return cr.msgCreator.InternalCrossChainFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
-	})
-}
-
-func (cr *ChainRouter) registerRequest(
-	nodeID ids.NodeID,
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	op message.Op,
-	failedResponseProvider func(failedOp message.Op) message.InboundMessage,
-) {
+func (cr *ChainRouter) RegisterCrossChainRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
@@ -187,7 +166,12 @@ func (cr *ChainRouter) registerRequest(
 
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
-		msg := failedResponseProvider(failedOp)
+		var msg message.InboundMessage
+		if sourceChainID != destinationChainID {
+			msg = cr.msgCreator.InternalCrossChainFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
+		} else {
+			msg = cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
+		}
 		cr.HandleInbound(msg)
 	})
 }
@@ -238,7 +222,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	// Here we assign the requestID already in use for gossiped containers
 	// to allow a uniform handling of all messages
 	var requestID uint32
-	if op == message.AppGossip {
+	if op == message.AppGossip || op == message.CrossChainAppGossip {
 		requestID = constants.GossipMsgRequestID
 	} else {
 		// Invariant: Getting a [RequestID] must never error in the handler. Any

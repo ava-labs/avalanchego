@@ -517,7 +517,7 @@ func (vm *VMServer) CrossChainAppRequest(ctx context.Context, req *vmpb.CrossCha
 	if err != nil {
 		return nil, err
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
+	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return &emptypb.Empty{}, err
 	}
@@ -525,7 +525,7 @@ func (vm *VMServer) CrossChainAppRequest(ctx context.Context, req *vmpb.CrossCha
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(nodeID, sourceChainID, req.RequestId, deadline, req.Request)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(nodeID, chainID, req.RequestId, deadline, req.Request)
 }
 
 func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, req *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
@@ -533,11 +533,11 @@ func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, req *vmpb.Cr
 	if err != nil {
 		return nil, err
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
+	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return &emptypb.Empty{}, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(nodeID, sourceChainID, req.RequestId)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(nodeID, chainID, req.RequestId)
 }
 
 func (vm *VMServer) CrossChainAppResponse(ctx context.Context, req *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
@@ -545,11 +545,11 @@ func (vm *VMServer) CrossChainAppResponse(ctx context.Context, req *vmpb.CrossCh
 	if err != nil {
 		return nil, err
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
+	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return &emptypb.Empty{}, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(nodeID, sourceChainID, req.RequestId, req.Response)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(nodeID, chainID, req.RequestId, req.Response)
 }
 
 func (vm *VMServer) CrossChainAppGossip(ctx context.Context, req *vmpb.CrossChainAppGossipMsg) (*emptypb.Empty, error) {
@@ -557,11 +557,11 @@ func (vm *VMServer) CrossChainAppGossip(ctx context.Context, req *vmpb.CrossChai
 	if err != nil {
 		return nil, err
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
+	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
 		return &emptypb.Empty{}, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppGossip(nodeID, sourceChainID, req.Msg)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppGossip(nodeID, chainID, req.Msg)
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {

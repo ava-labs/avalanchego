@@ -7,6 +7,7 @@ package builder
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.uber.org/zap"
@@ -128,19 +129,26 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VM) CrossChainAppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	vm.log.Info("Received a cross chain app request.",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("chainID", chainID),
+		zap.Strings("requestID", []string{strconv.Itoa(int(requestID))}),
+		zap.Strings("request", []string{string(request)}),
+	)
+
 	return nil
 }
 
-func (vm *VM) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
+func (vm *VM) CrossChainAppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (vm *VM) CrossChainAppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
+func (vm *VM) CrossChainAppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
 	return nil
 }
 

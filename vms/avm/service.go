@@ -183,6 +183,18 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 		zap.Stringer("txID", args.TxID),
 	)
 
+	{
+		nodes := ids.NewNodeIDSet(1)
+		nodes.Add(service.vm.ctx.NodeID)
+		evm, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
+		if err != nil {
+			return err
+		}
+		if err := service.vm.sender.SendCrossChainAppRequest(nodes, service.vm.ctx.ChainID, evm, uint32(12341234), []byte("Hello")); err != nil {
+			return err
+		}
+	}
+
 	if args.TxID == ids.Empty {
 		return errNilTxID
 	}

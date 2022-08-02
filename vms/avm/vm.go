@@ -109,6 +109,7 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 
 	uniqueTxs cache.Deduplicator
+	sender    common.AppSender
 }
 
 func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -138,7 +139,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	_ common.AppSender,
+	sender common.AppSender,
 ) error {
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
@@ -242,6 +243,8 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
+
+	vm.sender = sender
 	return vm.db.Commit()
 }
 
@@ -1065,24 +1068,20 @@ func (vm *VM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	// TODO implement me
-	panic("implement me")
+func (vm *VM) CrossChainAppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return nil
 }
 
-func (vm *VM) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
-	// TODO implement me
-	panic("implement me")
+func (vm *VM) CrossChainAppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
+	return nil
 }
 
-func (vm *VM) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
-	// TODO implement me
-	panic("implement me")
+func (vm *VM) CrossChainAppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
+	return nil
 }
 
-func (vm *VM) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
-	// TODO implement me
-	panic("implement me")
+func (vm *VM) CrossChainAppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+	return nil
 }
 
 // UniqueTx de-duplicates the transaction.
