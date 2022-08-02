@@ -3,6 +3,19 @@
 
 package stateful
 
+import (
+	"testing"
+	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+)
+
 // TODO dan or alberto: implement this (and more) tests
 // type stakerStatus uint
 
@@ -26,225 +39,225 @@ package stateful
 // 	expectedSubnetStakers map[ids.NodeID]stakerStatus
 // }
 
-// func TestApricotStandardBlockTimeVerification(t *testing.T) {
-// 	assert := assert.New(t)
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func TestApricotStandardBlockTimeVerification(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	h := newTestHelpersCollection(t, ctrl)
-// 	defer func() {
-// 		if err := internalStateShutdown(h); err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}()
+	env := newEnvironment(t, ctrl)
+	defer func() {
+		if err := shutdownEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-// 	// setup and store parent block
-// 	// it's a standard block for simplicity
-// 	blksVersion := uint16(stateless.ApricotVersion)
-// 	parentTime := time.Time{}
-// 	parentHeight := uint64(2022)
+	// setup and store parent block
+	// it's a standard block for simplicity
+	blksVersion := uint16(stateless.ApricotVersion)
+	parentTime := time.Time{}
+	parentHeight := uint64(2022)
 
-// 	apricotParentBlk, err := stateless.NewStandardBlock(
-// 		blksVersion,
-// 		uint64(parentTime.Unix()),
-// 		ids.Empty, // does not matter
-// 		parentHeight,
-// 		nil, // txs do not matter in this test
-// 	)
-// 	assert.NoError(err)
+	apricotParentBlk, err := stateless.NewStandardBlock(
+		blksVersion,
+		uint64(parentTime.Unix()),
+		ids.Empty, // does not matter
+		parentHeight,
+		nil, // txs do not matter in this test
+	)
+	assert.NoError(err)
+	parentID := apricotParentBlk.ID()
 
-// 	// Parent state
-// 	chainTime := h.clk.Time().Truncate(time.Second)
-// 	currentSupply := uint64(1000)
-// 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-// 		func(blockID ids.ID) (stateless.Block, choices.Status, error) {
-// 			if blockID == apricotParentBlk.ID() {
-// 				return apricotParentBlk, choices.Accepted, nil
-// 			}
-// 			return nil, choices.Rejected, database.ErrNotFound
-// 		}).AnyTimes()
-// 	h.mockedFullState.EXPECT().GetLastAccepted().Return(apricotParentBlk.ID()).AnyTimes()
-// 	h.mockedFullState.EXPECT().CurrentStakers().AnyTimes()
-// 	h.mockedFullState.EXPECT().PendingStakers().AnyTimes()
-// 	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-// 	h.mockedFullState.EXPECT().GetCurrentSupply().Return(currentSupply).AnyTimes()
+	// store parent block, with relevant quantities
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: apricotParentBlk,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
-// 	// wrong height
-// 	apricotChildBlk, err := stateless.NewStandardBlock(
-// 		blksVersion,
-// 		uint64(parentTime.Unix()),
-// 		apricotParentBlk.ID(),
-// 		apricotParentBlk.Height(),
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block := h.blkManager.NewBlock(apricotChildBlk)
-// 	assert.Error(block.Verify())
+	chainTime := env.clk.Time().Truncate(time.Second)
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
-// 	// valid height
-// 	apricotChildBlk, err = stateless.NewStandardBlock(
-// 		stateless.ApricotVersion,
-// 		uint64(parentTime.Unix()),
-// 		apricotParentBlk.ID(),
-// 		apricotParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(apricotChildBlk)
-// 	assert.NoError(block.Verify())
-// }
+	// wrong height
+	apricotChildBlk, err := stateless.NewStandardBlock(
+		blksVersion,
+		uint64(parentTime.Unix()),
+		apricotParentBlk.ID(),
+		apricotParentBlk.Height(),
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block := env.blkManager.NewBlock(apricotChildBlk)
+	assert.Error(block.Verify())
 
-// func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
-// 	assert := assert.New(t)
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+	// valid height
+	apricotChildBlk, err = stateless.NewStandardBlock(
+		stateless.ApricotVersion,
+		uint64(parentTime.Unix()),
+		apricotParentBlk.ID(),
+		apricotParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(apricotChildBlk)
+	assert.NoError(block.Verify())
+}
 
-// 	h := newTestHelpersCollection(t, ctrl)
-// 	defer func() {
-// 		if err := internalStateShutdown(h); err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}()
-// 	now := h.clk.Time()
-// 	h.clk.Set(now)
-// 	h.cfg.BlueberryTime = time.Time{} // activate Blueberry
+func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	// setup and store parent block
-// 	// it's a standard block for simplicity
-// 	parentVersion := uint16(version.BlueberryBlockVersion)
-// 	parentTime := now
-// 	parentHeight := uint64(2022)
+	env := newEnvironment(t, ctrl)
+	defer func() {
+		if err := shutdownEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	now := env.clk.Time()
+	env.clk.Set(now)
+	env.config.BlueberryTime = time.Time{} // activate Blueberry
 
-// 	blueberryParentBlk, err := stateless.NewStandardBlock(
-// 		parentVersion,
-// 		uint64(parentTime.Unix()),
-// 		ids.Empty, // does not matter
-// 		parentHeight,
-// 		nil, // txs do not matter in this test
-// 	)
-// 	assert.NoError(err)
+	// setup and store parent block
+	// it's a standard block for simplicity
+	parentVersion := version.BlueberryBlockVersion
+	parentTime := now
+	parentHeight := uint64(2022)
 
-// 	// Parent state
-// 	chainTime := h.clk.Time().Truncate(time.Second)
-// 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
-// 	currentSupply := uint64(1000)
-// 	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-// 		func(blockID ids.ID) (stateless.Block, choices.Status, error) {
-// 			if blockID == blueberryParentBlk.ID() {
-// 				return blueberryParentBlk, choices.Accepted, nil
-// 			}
-// 			return nil, choices.Rejected, database.ErrNotFound
-// 		}).AnyTimes()
-// 	h.mockedFullState.EXPECT().GetLastAccepted().Return(blueberryParentBlk.ID()).AnyTimes()
+	blueberryParentBlk, err := stateless.NewStandardBlock(
+		parentVersion,
+		uint64(parentTime.Unix()),
+		ids.Empty, // does not matter
+		parentHeight,
+		nil, // txs do not matter in this test
+	)
+	assert.NoError(err)
+	parentID := blueberryParentBlk.ID()
 
-// 	// currentStaker is set just so UpdateStakerSet goes through doing nothing
-// 	currentStaker := state.NewMockCurrentStakers(ctrl)
-// 	currentStaker.EXPECT().Stakers().AnyTimes()
-// 	currentStaker.EXPECT().UpdateStakers(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-// 	h.mockedFullState.EXPECT().CurrentStakers().
-// 		DoAndReturn(func() state.CurrentStakers { return currentStaker }).AnyTimes()
+	// store parent block, with relevant quantities
+	chainTime := env.clk.Time().Truncate(time.Second)
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: blueberryParentBlk,
+		timestamp:      chainTime,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
-// 	// pendingStaker is set just so UpdateStakerSet goes through doing nothing
-// 	pendingStaker := state.NewMockPendingStakers(ctrl)
-// 	pendingStaker.EXPECT().Stakers().AnyTimes()
-// 	pendingStaker.EXPECT().DeleteStakers(gomock.Any()).AnyTimes()
-// 	h.mockedFullState.EXPECT().PendingStakers().
-// 		DoAndReturn(func() state.PendingStakers { return pendingStaker }).AnyTimes()
+	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 
-// 	h.mockedFullState.EXPECT().GetNextStakerChangeTime().Return(nextStakerTime, nil).AnyTimes()
-// 	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-// 	h.mockedFullState.EXPECT().GetCurrentSupply().Return(currentSupply).AnyTimes()
+	// store just once current staker to mark next staker time.
+	currentStakerIt := state.NewMockStakerIterator(ctrl)
+	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
+	currentStakerIt.EXPECT().Value().Return(
+		&state.Staker{
+			NextTime: nextStakerTime,
+			Priority: state.PrimaryNetworkValidatorCurrentPriority,
+		},
+	).AnyTimes()
+	currentStakerIt.EXPECT().Release().Return().AnyTimes()
+	env.mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
 
-// 	// wrong version
-// 	childTimestamp := uint64(parentTime.Add(time.Second).Unix())
-// 	blueberryChildBlk, err := stateless.NewStandardBlock(
-// 		stateless.ApricotVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block := h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.Error(block.Verify())
+	// no pending stakers
+	pendingIt := state.NewMockStakerIterator(ctrl)
+	pendingIt.EXPECT().Next().Return(false).AnyTimes()
+	pendingIt.EXPECT().Release().Return().AnyTimes()
+	env.mockedState.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
-// 	// wrong height
-// 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		version.BlueberryBlockVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height(),
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.Error(block.Verify())
+	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
-// 	// wrong timestamp, earlier than parent
-// 	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
-// 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		version.BlueberryBlockVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.Error(block.Verify())
+	// wrong version
+	childTimestamp := uint64(parentTime.Add(time.Second).Unix())
+	blueberryChildBlk, err := stateless.NewStandardBlock(
+		stateless.ApricotVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block := env.blkManager.NewBlock(blueberryChildBlk)
+	assert.Error(block.Verify())
 
-// 	// wrong timestamp, violated synchrony bound
-// 	childTimestamp = uint64(parentTime.Add(executor.SyncBound).Add(time.Second).Unix())
-// 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		version.BlueberryBlockVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.Error(block.Verify())
+	// wrong height
+	blueberryChildBlk, err = stateless.NewStandardBlock(
+		version.BlueberryBlockVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height(),
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(blueberryChildBlk)
+	assert.Error(block.Verify())
 
-// 	// wrong timestamp, skipped staker set change event
-// 	childTimestamp = uint64(nextStakerTime.Add(time.Second).Unix())
-// 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		version.BlueberryBlockVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.Error(block.Verify())
+	// wrong timestamp, earlier than parent
+	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
+	blueberryChildBlk, err = stateless.NewStandardBlock(
+		version.BlueberryBlockVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(blueberryChildBlk)
+	assert.Error(block.Verify())
 
-// 	// valid block, same timestamp as parent block
-// 	childTimestamp = uint64(parentTime.Unix())
-// 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		version.BlueberryBlockVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.NoError(block.Verify())
+	// wrong timestamp, violated synchrony bound
+	childTimestamp = uint64(parentTime.Add(executor.SyncBound).Add(time.Second).Unix())
+	blueberryChildBlk, err = stateless.NewStandardBlock(
+		version.BlueberryBlockVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(blueberryChildBlk)
+	assert.Error(block.Verify())
 
-// 	// valid
-// 	childTimestamp = uint64(nextStakerTime.Unix())
-// 	blueberryChildBlk, err = stateless.NewStandardBlock(
-// 		version.BlueberryBlockVersion,
-// 		childTimestamp,
-// 		blueberryParentBlk.ID(),
-// 		blueberryParentBlk.Height()+1,
-// 		nil, // txs nulled to simplify test
-// 	)
-// 	assert.NoError(err)
-// 	block = h.blkManager.NewBlock(blueberryChildBlk)
-// 	assert.NoError(block.Verify())
-// }
+	// wrong timestamp, skipped staker set change event
+	childTimestamp = uint64(nextStakerTime.Add(time.Second).Unix())
+	blueberryChildBlk, err = stateless.NewStandardBlock(
+		version.BlueberryBlockVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(blueberryChildBlk)
+	assert.Error(block.Verify())
+
+	// valid block, same timestamp as parent block
+	childTimestamp = uint64(parentTime.Unix())
+	blueberryChildBlk, err = stateless.NewStandardBlock(
+		version.BlueberryBlockVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(blueberryChildBlk)
+	assert.NoError(block.Verify())
+
+	// valid
+	childTimestamp = uint64(nextStakerTime.Unix())
+	blueberryChildBlk, err = stateless.NewStandardBlock(
+		version.BlueberryBlockVersion,
+		childTimestamp,
+		blueberryParentBlk.ID(),
+		blueberryParentBlk.Height()+1,
+		nil, // txs nulled to simplify test
+	)
+	assert.NoError(err)
+	block = env.blkManager.NewBlock(blueberryChildBlk)
+	assert.NoError(block.Verify())
+}
 
 // func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 // 	assert := assert.New(t)

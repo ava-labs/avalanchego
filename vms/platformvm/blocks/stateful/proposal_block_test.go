@@ -27,9 +27,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	h := newTestHelpersCollection(t, ctrl)
+	env := newEnvironment(t, ctrl)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -49,15 +49,15 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
-	h.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
 	}
-	h.blkManager.(*manager).lastAccepted = parentID
-	h.blkManager.(*manager).stateVersions.SetState(parentID, h.mockedFullState)
-	h.mockedFullState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	// create a proposal transaction to be included into proposal block
-	chainTime := h.clk.Time().Truncate(time.Second)
+	chainTime := env.clk.Time().Truncate(time.Second)
 	utx := &txs.AddValidatorTx{
 		BaseTx:       txs.BaseTx{},
 		Validator:    validator.Validator{End: uint64(chainTime.Unix())},
@@ -74,7 +74,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	// setup state to validate proposal block transaction
-	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
@@ -83,11 +83,11 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		EndTime: chainTime,
 	})
 	currentStakersIt.EXPECT().Release()
-	h.mockedFullState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
-	h.mockedFullState.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
+	env.mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
+	env.mockedState.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 
-	h.mockedFullState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
-	h.mockedFullState.EXPECT().GetUptime(gomock.Any()).Return(
+	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Duration(1000), /*upDuration*/
 		time.Time{},         /*lastUpdated*/
 		nil,                 /*err*/
@@ -101,7 +101,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		parentHeight,
 		blkTx,
 	)
-	block := h.blkManager.NewBlock(statelessProposalBlock)
+	block := env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -113,7 +113,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		parentHeight+1,
 		blkTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 }
@@ -123,14 +123,14 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	h := newTestHelpersCollection(t, ctrl)
+	env := newEnvironment(t, ctrl)
 	defer func() {
-		if err := internalStateShutdown(h); err != nil {
+		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
-	h.clk.Set(defaultGenesisTime)
-	h.cfg.BlueberryTime = time.Time{} // activate Blueberry
+	env.clk.Set(defaultGenesisTime)
+	env.config.BlueberryTime = time.Time{} // activate Blueberry
 
 	// create parentBlock. It's a standard one for simplicity
 	blksVersion := uint16(stateless.ApricotVersion)
@@ -140,7 +140,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	blueberryParentBlk, err := stateless.NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
-		lastAcceptedID, // does not matter
+		genesisBlkID, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
 	)
@@ -149,22 +149,22 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	chainTime := parentTime
-	h.mockedFullState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	h.mockedFullState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
-	onAcceptState, err := state.NewDiff(lastAcceptedID, h.txExecBackend.StateVersions)
+	onAcceptState, err := state.NewDiff(genesisBlkID, env.backend.StateVersions)
 	assert.NoError(err)
 	onAcceptState.SetTimestamp(parentTime)
 
-	h.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: blueberryParentBlk,
 		onAcceptState:  onAcceptState,
 		timestamp:      parentTime,
 	}
-	h.blkManager.(*manager).lastAccepted = parentID
-	h.blkManager.(*manager).stateVersions.SetState(parentID, h.mockedFullState)
-	h.mockedFullState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
-	h.mockedFullState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
+	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
 		func(blockID ids.ID) (stateless.Block, choices.Status, error) {
 			if blockID == parentID {
 				return blueberryParentBlk, choices.Accepted, nil
@@ -185,7 +185,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	}
 	assert.NoError(nextStakerTx.Sign(txs.Codec, nil))
 	nextStakerTxID := nextStakerTx.ID()
-	h.mockedFullState.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
+	env.mockedState.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
@@ -196,14 +196,14 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		Priority: state.PrimaryNetworkValidatorCurrentPriority,
 	}).AnyTimes()
 	currentStakersIt.EXPECT().Release().AnyTimes()
-	h.mockedFullState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
+	env.mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
 
 	pendingStakersIt := state.NewMockStakerIterator(ctrl)
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
 	pendingStakersIt.EXPECT().Release().AnyTimes()
-	h.mockedFullState.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
+	env.mockedState.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
 
-	h.mockedFullState.EXPECT().GetUptime(gomock.Any()).Return(
+	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Duration(1000), /*upDuration*/
 		time.Time{},         /*lastUpdated*/
 		nil,                 /*err*/
@@ -225,7 +225,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height(),
 		blkTx,
 	)
-	block := h.blkManager.NewBlock(statelessProposalBlock)
+	block := env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -237,7 +237,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height()+1,
 		blkTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -249,12 +249,12 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height()+1,
 		blkTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
 	// wrong timestamp, violated synchrony bound
-	beyondSyncBoundTimeStamp := h.clk.Time().Add(executor.SyncBound).Add(time.Second)
+	beyondSyncBoundTimeStamp := env.clk.Time().Add(executor.SyncBound).Add(time.Second)
 	statelessProposalBlock, err = stateless.NewProposalBlock(
 		version.BlueberryBlockVersion,
 		uint64(beyondSyncBoundTimeStamp.Unix()),
@@ -262,7 +262,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height()+1,
 		blkTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -275,7 +275,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height()+1,
 		blkTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -293,7 +293,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height()+1,
 		invalidTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.Error(block.Verify())
 
@@ -305,7 +305,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		blueberryParentBlk.Height()+1,
 		blkTx,
 	)
-	block = h.blkManager.NewBlock(statelessProposalBlock)
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	assert.NoError(err)
 	assert.NoError(block.Verify())
 }
