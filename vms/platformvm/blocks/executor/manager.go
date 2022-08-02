@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -65,18 +65,21 @@ type manager struct {
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	// See if the block is in memory.
 	if blk, ok := m.blkIDToState[blkID]; ok {
-		return newBlock(blk.statelessBlock, m), nil
+		return m.NewBlock(blk.statelessBlock), nil
 	}
 	// The block isn't in memory. Check the database.
 	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
-	return newBlock(statelessBlk, m), nil
+	return m.NewBlock(statelessBlk), nil
 }
 
 func (m *manager) NewBlock(blk blocks.Block) snowman.Block {
-	return newBlock(blk, m)
+	return &Block{
+		manager: m,
+		Block:   blk,
+	}
 }
 
 func (m *manager) LastAccepted() ids.ID {
@@ -86,17 +89,4 @@ func (m *manager) LastAccepted() ids.ID {
 		return m.state.GetLastAccepted()
 	}
 	return m.backend.lastAccepted
-}
-
-func newBlock(blk blocks.Block, manager *manager) snowman.Block {
-	b := &Block{
-		manager: manager,
-		Block:   blk,
-	}
-	if _, ok := blk.(*blocks.ProposalBlock); ok {
-		return &OracleBlock{
-			Block: b,
-		}
-	}
-	return b
 }

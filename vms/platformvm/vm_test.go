@@ -50,18 +50,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
@@ -553,7 +553,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -584,7 +584,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
@@ -612,7 +612,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-executor.SyncBound).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -671,7 +671,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -702,11 +702,11 @@ func TestAddValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -737,7 +737,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -771,7 +771,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -802,11 +802,11 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -844,7 +844,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -875,11 +875,11 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -930,10 +930,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -941,7 +941,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -974,11 +974,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*stateful.Block)
+	commit = options[0].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort = options[1].(*stateful.Block)
+	abort = options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -986,7 +986,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID = blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1028,11 +1028,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -1040,7 +1040,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1069,18 +1069,18 @@ func TestRewardValidatorReject(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*stateful.Block)
+	commit = options[0].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort = options[1].(*stateful.Block)
+	abort = options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 
-	txID = blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(commit.ID())
 		assert.True(ok)
@@ -1123,11 +1123,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -1135,7 +1135,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1165,18 +1165,18 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*stateful.Block)
+	commit = options[0].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort = options[1].(*stateful.Block)
+	abort = options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 
-	txID = blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(commit.ID())
 		assert.True(ok)
@@ -1318,7 +1318,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
@@ -1344,11 +1344,11 @@ func TestCreateSubnet(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -1356,7 +1356,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1390,11 +1390,11 @@ func TestCreateSubnet(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*stateful.Block)
+	commit = options[0].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort = options[1].(*stateful.Block)
+	abort = options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -1402,7 +1402,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID = blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1438,11 +1438,11 @@ func TestCreateSubnet(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*stateful.Block)
+	commit = options[0].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort = options[1].(*stateful.Block)
+	abort = options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -1450,7 +1450,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID = blk.(*stateful.OracleBlock).Block.BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).BlockTxs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -2264,7 +2264,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 	statelessSecondAdvanceTimeBlk, err := blocks.NewProposalBlock(
 		firstOption.ID(),
-		firstOption.(*stateful.Block).Height()+1,
+		firstOption.(*blockexecutor.Block).Height()+1,
 		secondAdvanceTimeTx,
 	)
 	if err != nil {
@@ -2326,10 +2326,10 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			assert := assert.New(t)
-			staker, err := executor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
+			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
 			assert.NoError(err)
 
-			amount, err := executor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
+			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			assert.NoError(err)
 			assert.EqualValues(defaultWeight, amount)
 		})
@@ -2409,11 +2409,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -2422,7 +2422,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(abort.Verify())
 	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	proposalTx := blk.(*stateful.OracleBlock).BlockTxs()[0]
+	proposalTx := blk.(blocks.Block).BlockTxs()[0]
 	{
 		onAccept, ok := secondVM.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -2452,11 +2452,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[1].(*stateful.Block)
+	commit = options[1].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort = options[0].(*stateful.Block)
+	abort = options[0].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -2464,7 +2464,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	proposalTx = blk.(*stateful.OracleBlock).BlockTxs()[0]
+	proposalTx = blk.(blocks.Block).BlockTxs()[0]
 	{
 		onAccept, ok := secondVM.stateVersions.GetState(commit.ID())
 		assert.True(ok)
@@ -2535,11 +2535,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*stateful.Block)
+	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
-	abort := options[1].(*stateful.Block)
+	abort := options[1].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
@@ -2563,11 +2563,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	options, err = block.Options()
 	assert.NoError(err)
 
-	abort = options[0].(*stateful.Block)
+	abort = options[0].(*blockexecutor.Block)
 	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
-	commit = options[1].(*stateful.Block)
+	commit = options[1].(*blockexecutor.Block)
 	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 

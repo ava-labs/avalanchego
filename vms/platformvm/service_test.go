@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -29,15 +30,15 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -262,7 +263,7 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*stateful.Block); !ok {
+	} else if blk, ok := block.(*blockexecutor.Block); !ok {
 		t.Fatalf("should be *stateful.Block but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -309,8 +310,8 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
-					uint64(service.vm.clock.Time().Add(executor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(executor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
@@ -350,43 +351,59 @@ func TestGetTx(t *testing.T) {
 			var response api.GetTxReply
 			if err := service.GetTx(nil, arg, &response); err == nil {
 				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
-			} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+			}
+			if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if block, err := service.vm.BuildBlock(); err != nil {
+			}
+
+			block, err := service.vm.BuildBlock()
+			if err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if err := block.Verify(); err != nil {
+			}
+			if err := block.Verify(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if err := block.Accept(); err != nil {
+			}
+			if err := block.Accept(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
-				if options, err := blk.Options(); err != nil {
-					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if commit, ok := options[0].(*stateful.Block); !ok {
-					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
-				} else if _, ok := options[0].(*stateful.Block).Block.(*blocks.CommitBlock); !ok {
-					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
-				} else if err := commit.Verify(); err != nil {
-					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if err := commit.Accept(); err != nil {
-					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				}
-			} else if err := service.GetTx(nil, arg, &response); err != nil {
-				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else {
-				switch encoding {
-				case formatting.Hex:
-					// we're always guaranteed a string for hex encodings.
-					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+			}
+			if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
+				options, err := blk.Options()
+				if !errors.Is(err, snowman.ErrNotOracle) {
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
-					if !bytes.Equal(responseTxBytes, tx.Bytes()) {
-						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+					commit, ok := options[0].(*blockexecutor.Block)
+					if !ok {
+						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
-				case formatting.JSON:
-					if response.Tx != tx {
-						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+					if _, ok := options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock); !ok {
+						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
+					if err := commit.Verify(); err != nil {
+						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+					}
+					if err := commit.Accept(); err != nil {
+						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+					}
+				}
+			}
+			if err := service.GetTx(nil, arg, &response); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			}
+
+			switch encoding {
+			case formatting.Hex:
+				// we're always guaranteed a string for hex encodings.
+				responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+				if err != nil {
+					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+				}
+				if !bytes.Equal(responseTxBytes, tx.Bytes()) {
+					t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+				}
+			case formatting.JSON:
+				if response.Tx != tx {
+					t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
 				}
 			}
 

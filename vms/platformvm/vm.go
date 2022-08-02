@@ -38,17 +38,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -108,8 +109,8 @@ type VM struct {
 	recentlyAccepted *window.Window
 
 	txBuilder         builder.TxBuilder
-	txExecutorBackend executor.Backend
-	manager           stateful.Manager
+	txExecutorBackend txexecutor.Backend
+	manager           blockexecutor.Manager
 }
 
 // Initialize this blockchain.
@@ -189,7 +190,7 @@ func (vm *VM) Initialize(
 		vm.utxoHandler,
 	)
 
-	vm.txExecutorBackend = executor.Backend{
+	vm.txExecutorBackend = txexecutor.Backend{
 		Config:        &vm.Config,
 		Ctx:           vm.ctx,
 		Clk:           &vm.clock,
@@ -208,7 +209,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
-	vm.manager = stateful.NewManager(
+	vm.manager = blockexecutor.NewManager(
 		mempool,
 		vm.Metrics,
 		vm.state,

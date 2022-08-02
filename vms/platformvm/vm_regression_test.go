@@ -27,13 +27,14 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -45,7 +46,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -79,7 +80,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(assert, vm, firstAdvanceTimeBlock)
 
-	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
@@ -112,7 +113,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
 
-	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
+	vm.clock.Set(secondDelegatorStartTime.Add(-10 * txexecutor.SyncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -155,7 +156,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -474,7 +475,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	newValidatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	key, err := testKeyfactory.NewPrivateKey()
@@ -519,7 +520,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*stateful.Block)
+	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*blockexecutor.Block)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit.Verify()
@@ -657,7 +658,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*stateful.Block)
+	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*blockexecutor.Block)
 	assert.True(ok)
 	_, ok = advanceTimeProposalCommit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
@@ -722,7 +723,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.state.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
@@ -763,7 +764,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*stateful.Block)
+	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*blockexecutor.Block)
 	assert.True(ok)
 	_, ok = addValidatorProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
@@ -810,7 +811,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*stateful.Block)
+	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*blockexecutor.Block)
 	assert.True(ok)
 	_, ok = advanceTimeProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
@@ -926,7 +927,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlkStatus = importBlk.Status()
 	assert.Equal(choices.Processing, importBlkStatus)
 
-	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime1 := newValidatorStartTime0.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
 
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
@@ -965,7 +966,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*stateful.Block)
+	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*blockexecutor.Block)
 	assert.True(ok)
 	_, ok = addValidatorProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
@@ -1012,7 +1013,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*stateful.Block)
+	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*blockexecutor.Block)
 	assert.True(ok)
 	_, ok = advanceTimeProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
@@ -1124,7 +1125,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(expectedValidators1, validators)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID5 := ids.GenerateTestNodeID()
@@ -1226,14 +1227,14 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*stateful.Block)
+	commit, ok := options[0].(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = options[0].(*stateful.Block).Block.(*blocks.CommitBlock)
+	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*stateful.Block)
+	abort, ok := options[1].(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = options[1].(*stateful.Block).Block.(*blocks.AbortBlock)
+	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	// Verify the options

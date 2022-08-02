@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 
 var (
 	_ snowman.Block       = &Block{}
-	_ snowman.OracleBlock = &OracleBlock{}
+	_ snowman.OracleBlock = &Block{}
 )
 
 // Exported for testing in platformvm package.
@@ -72,13 +72,11 @@ func (b *Block) Timestamp() time.Time {
 	return b.manager.state.GetTimestamp()
 }
 
-// Exported for testing in platformvm package.
-type OracleBlock struct {
-	// Invariant: The inner stateless block is a *blocks.ProposalBlock.
-	*Block
-}
+func (b *Block) Options() ([2]snowman.Block, error) {
+	if _, ok := b.Block.(*blocks.ProposalBlock); !ok {
+		return [2]snowman.Block{}, snowman.ErrNotOracle
+	}
 
-func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
