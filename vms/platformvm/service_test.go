@@ -28,8 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -363,7 +363,7 @@ func TestGetTx(t *testing.T) {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 				} else if commit, ok := options[0].(*stateful.Block); !ok {
 					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
-				} else if _, ok := options[0].(*stateful.Block).Block.(*stateless.CommitBlock); !ok {
+				} else if _, ok := options[0].(*stateful.Block).Block.(*blocks.CommitBlock); !ok {
 					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 				} else if err := commit.Verify(); err != nil {
 					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -784,7 +784,7 @@ func TestGetBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			statelessBlock, err := stateless.NewStandardBlock(
+			statelessBlock, err := blocks.NewStandardBlock(
 				service.vm.preferred,
 				preferred.Height()+1,
 				[]*txs.Tx{tx},

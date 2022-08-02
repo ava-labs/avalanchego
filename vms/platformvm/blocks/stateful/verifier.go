@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	_ stateless.Visitor = &verifier{}
+	_ blocks.Visitor = &verifier{}
 
 	errConflictingBatchTxs  = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
@@ -29,7 +29,7 @@ type verifier struct {
 	txExecutorBackend executor.Backend
 }
 
-func (v *verifier) ProposalBlock(b *stateless.ProposalBlock) error {
+func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -81,7 +81,7 @@ func (v *verifier) ProposalBlock(b *stateless.ProposalBlock) error {
 	return nil
 }
 
-func (v *verifier) AtomicBlock(b *stateless.AtomicBlock) error {
+func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -125,7 +125,7 @@ func (v *verifier) AtomicBlock(b *stateless.AtomicBlock) error {
 
 	// Check for conflicts in atomic inputs.
 	if len(atomicExecutor.Inputs) > 0 {
-		var nextBlock stateless.Block = b
+		var nextBlock blocks.Block = b
 		for {
 			parentID := nextBlock.Parent()
 			parentState := v.blkIDToState[parentID]
@@ -162,7 +162,7 @@ func (v *verifier) AtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (v *verifier) StandardBlock(b *stateless.StandardBlock) error {
+func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -225,7 +225,7 @@ func (v *verifier) StandardBlock(b *stateless.StandardBlock) error {
 
 	// Check for conflicts in ancestors.
 	if blkState.inputs.Len() > 0 {
-		var nextBlock stateless.Block = b
+		var nextBlock blocks.Block = b
 		for {
 			parentID := nextBlock.Parent()
 			parentState := v.blkIDToState[parentID]
@@ -237,7 +237,7 @@ func (v *verifier) StandardBlock(b *stateless.StandardBlock) error {
 			if parentState.inputs.Overlaps(blkState.inputs) {
 				return errConflictingParentTxs
 			}
-			var parent stateless.Block
+			var parent blocks.Block
 			if parentState, ok := v.blkIDToState[parentID]; ok {
 				// The parent is in memory.
 				parent = parentState.statelessBlock
@@ -270,7 +270,7 @@ func (v *verifier) StandardBlock(b *stateless.StandardBlock) error {
 	return nil
 }
 
-func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
+func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -298,7 +298,7 @@ func (v *verifier) CommitBlock(b *stateless.CommitBlock) error {
 	return nil
 }
 
-func (v *verifier) AbortBlock(b *stateless.AbortBlock) error {
+func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -328,10 +328,10 @@ func (v *verifier) AbortBlock(b *stateless.AbortBlock) error {
 }
 
 // Assumes [b] isn't nil
-func (v *verifier) verifyCommonBlock(b stateless.CommonBlock) error {
+func (v *verifier) verifyCommonBlock(b blocks.CommonBlock) error {
 	var (
 		parentID           = b.Parent()
-		parentStatelessBlk stateless.Block
+		parentStatelessBlk blocks.Block
 	)
 	// Check if the parent is in memory.
 	if parent, ok := v.blkIDToState[parentID]; ok {

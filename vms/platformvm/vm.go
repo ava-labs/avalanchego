@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -36,8 +37,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -373,9 +374,9 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.BuildBlock() }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	// Note: blocks to be parsed are not verified, so we must used stateless.Codec
-	// rather than stateless.GenesisCodec
-	statelessBlk, err := stateless.Parse(b, stateless.Codec)
+	// Note: blocks to be parsed are not verified, so we must used blocks.Codec
+	// rather than blocks.GenesisCodec
+	statelessBlk, err := blocks.Parse(b, blocks.Codec)
 	if err != nil {
 		return nil, err
 	}

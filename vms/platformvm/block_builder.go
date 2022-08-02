@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -126,7 +126,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
-		statelessBlk, err := stateless.NewStandardBlock(preferredID, nextHeight, txs)
+		statelessBlk, err := blocks.NewStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +143,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, rewardValidatorTx)
+		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, rewardValidatorTx)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +160,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
@@ -188,14 +188,14 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
 		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
-	statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, tx)
+	statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, tx)
 	if err != nil {
 		return nil, err
 	}

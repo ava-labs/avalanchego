@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -160,21 +160,21 @@ func (m *Metrics) MarkVoteLost() {
 }
 
 // TODO: use a visitor here
-func (m *Metrics) MarkAccepted(b stateless.Block) error {
+func (m *Metrics) MarkAccepted(b blocks.Block) error {
 	switch b := b.(type) {
-	case *stateless.MockBlock:
+	case *blocks.MockBlock:
 		// TODO make metrics an interface so we don't need this
-	case *stateless.AbortBlock:
+	case *blocks.AbortBlock:
 		m.numAbortBlocks.Inc()
-	case *stateless.AtomicBlock:
+	case *blocks.AtomicBlock:
 		m.numAtomicBlocks.Inc()
 		return m.AcceptTx(b.Tx)
-	case *stateless.CommitBlock:
+	case *blocks.CommitBlock:
 		m.numCommitBlocks.Inc()
-	case *stateless.ProposalBlock:
+	case *blocks.ProposalBlock:
 		m.numProposalBlocks.Inc()
 		return m.AcceptTx(b.Tx)
-	case *stateless.StandardBlock:
+	case *blocks.StandardBlock:
 		m.numStandardBlocks.Inc()
 		for _, tx := range b.Txs {
 			if err := m.AcceptTx(tx); err != nil {

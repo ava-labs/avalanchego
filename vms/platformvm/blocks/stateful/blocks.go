@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 
 // Exported for testing in platformvm package.
 type Block struct {
-	stateless.Block
+	blocks.Block
 	manager *manager
 }
 
@@ -74,7 +74,7 @@ func (b *Block) Timestamp() time.Time {
 
 // Exported for testing in platformvm package.
 type OracleBlock struct {
-	// Invariant: The inner stateless block is a *stateless.ProposalBlock.
+	// Invariant: The inner stateless block is a *blocks.ProposalBlock.
 	*Block
 }
 
@@ -82,7 +82,7 @@ func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
-	statelessCommitBlk, err := stateless.NewCommitBlock(
+	statelessCommitBlk, err := blocks.NewCommitBlock(
 		blkID,
 		nextHeight,
 	)
@@ -94,7 +94,7 @@ func (b *OracleBlock) Options() ([2]snowman.Block, error) {
 	}
 	commitBlock := b.manager.NewBlock(statelessCommitBlk)
 
-	statelessAbortBlk, err := stateless.NewAbortBlock(
+	statelessAbortBlk, err := blocks.NewAbortBlock(
 		blkID,
 		nextHeight,
 	)

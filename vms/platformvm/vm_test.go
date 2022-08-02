@@ -49,8 +49,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -585,7 +585,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -638,7 +638,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	statelessBlk, err := stateless.NewProposalBlock(preferredID, preferredHeight+1, tx)
+	statelessBlk, err := blocks.NewProposalBlock(preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,11 +703,11 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -803,11 +803,11 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -876,11 +876,11 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -931,10 +931,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -975,11 +975,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1029,11 +1029,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1070,11 +1070,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
@@ -1124,11 +1124,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1166,11 +1166,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
@@ -1345,11 +1345,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1391,11 +1391,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1439,11 +1439,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1601,7 +1601,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := stateless.NewAtomicBlock(
+	statelessBlk, err := blocks.NewAtomicBlock(
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1683,7 +1683,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := stateless.NewProposalBlock(
+	statelessBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1811,7 +1811,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := stateless.NewProposalBlock(
+	statelessBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1945,7 +1945,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessBlk, err := stateless.NewProposalBlock(
+	statelessBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2236,7 +2236,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := stateless.NewProposalBlock(
+	statelessBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2262,7 +2262,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessSecondAdvanceTimeBlk, err := stateless.NewProposalBlock(
+	statelessSecondAdvanceTimeBlk, err := blocks.NewProposalBlock(
 		firstOption.ID(),
 		firstOption.(*stateful.Block).Height()+1,
 		secondAdvanceTimeTx,
@@ -2410,11 +2410,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -2453,11 +2453,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[1].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort = options[0].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
@@ -2536,11 +2536,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*stateful.Block)
-	_, ok := commit.Block.(*stateless.CommitBlock)
+	_, ok := commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -2564,11 +2564,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.NoError(err)
 
 	abort = options[0].(*stateful.Block)
-	_, ok = abort.Block.(*stateless.AbortBlock)
+	_, ok = abort.Block.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	commit = options[1].(*stateful.Block)
-	_, ok = commit.Block.(*stateless.CommitBlock)
+	_, ok = commit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())

@@ -6,34 +6,37 @@ package stateful
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRejectBlock(t *testing.T) {
 	type test struct {
 		name         string
-		newBlockFunc func() (stateless.Block, error)
-		rejectFunc   func(*rejector, stateless.Block) error
+		newBlockFunc func() (blocks.Block, error)
+		rejectFunc   func(*rejector, blocks.Block) error
 	}
 
 	tests := []test{
 		{
 			name: "proposal block",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewProposalBlock(
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewProposalBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
@@ -45,14 +48,14 @@ func TestRejectBlock(t *testing.T) {
 					},
 				)
 			},
-			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.ProposalBlock(b.(*stateless.ProposalBlock))
+			rejectFunc: func(r *rejector, b blocks.Block) error {
+				return r.ProposalBlock(b.(*blocks.ProposalBlock))
 			},
 		},
 		{
 			name: "atomic block",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewAtomicBlock(
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewAtomicBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
@@ -64,14 +67,14 @@ func TestRejectBlock(t *testing.T) {
 					},
 				)
 			},
-			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.AtomicBlock(b.(*stateless.AtomicBlock))
+			rejectFunc: func(r *rejector, b blocks.Block) error {
+				return r.AtomicBlock(b.(*blocks.AtomicBlock))
 			},
 		},
 		{
 			name: "standard block",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewStandardBlock(
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewStandardBlock(
 					ids.GenerateTestID(),
 					1,
 					[]*txs.Tx{
@@ -85,32 +88,32 @@ func TestRejectBlock(t *testing.T) {
 					},
 				)
 			},
-			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.StandardBlock(b.(*stateless.StandardBlock))
+			rejectFunc: func(r *rejector, b blocks.Block) error {
+				return r.StandardBlock(b.(*blocks.StandardBlock))
 			},
 		},
 		{
 			name: "commit",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewCommitBlock(
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewCommitBlock(
 					ids.GenerateTestID(),
 					1,
 				)
 			},
-			rejectFunc: func(r *rejector, blk stateless.Block) error {
-				return r.CommitBlock(blk.(*stateless.CommitBlock))
+			rejectFunc: func(r *rejector, blk blocks.Block) error {
+				return r.CommitBlock(blk.(*blocks.CommitBlock))
 			},
 		},
 		{
 			name: "abort",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewAbortBlock(
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewAbortBlock(
 					ids.GenerateTestID(),
 					1,
 				)
 			},
-			rejectFunc: func(r *rejector, blk stateless.Block) error {
-				return r.AbortBlock(blk.(*stateless.AbortBlock))
+			rejectFunc: func(r *rejector, blk blocks.Block) error {
+				return r.AbortBlock(blk.(*blocks.AbortBlock))
 			},
 		},
 	}

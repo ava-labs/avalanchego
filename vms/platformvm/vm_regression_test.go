@@ -26,8 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -412,7 +412,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := stateless.NewStandardBlock(
+	statelessStandardBlk, err := blocks.NewStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -422,7 +422,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}
 	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = stateless.NewStandardBlock(
+	statelessStandardBlk, err = blocks.NewStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -432,7 +432,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}
 	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = stateless.NewStandardBlock(
+	statelessStandardBlk, err = blocks.NewStandardBlock(
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -502,7 +502,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := stateless.NewProposalBlock(
+	statelessBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -576,7 +576,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	statelessImportBlk, err := stateless.NewStandardBlock(
+	statelessImportBlk, err := blocks.NewStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -639,7 +639,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAdvanceTimeProposalBlk, err := stateless.NewProposalBlock(
+	statelessAdvanceTimeProposalBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -659,7 +659,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
 	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*stateful.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit.Block.(*stateless.CommitBlock)
+	_, ok = advanceTimeProposalCommit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -747,7 +747,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessAddValidatorProposalBlk0, err := stateless.NewProposalBlock(
+	statelessAddValidatorProposalBlk0, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -765,7 +765,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
 	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*stateful.Block)
 	assert.True(ok)
-	_, ok = addValidatorProposalCommit0.Block.(*stateless.CommitBlock)
+	_, ok = addValidatorProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -791,7 +791,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	statelessAdvanceTimeProposalBlk0, err := stateless.NewProposalBlock(
+	statelessAdvanceTimeProposalBlk0, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -812,7 +812,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
 	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*stateful.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit0.Block.(*stateless.CommitBlock)
+	_, ok = advanceTimeProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -875,7 +875,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	statelessImportBlk, err := stateless.NewStandardBlock(
+	statelessImportBlk, err := blocks.NewStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -948,7 +948,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAddValidatorProposalBlk1, err := stateless.NewProposalBlock(
+	statelessAddValidatorProposalBlk1, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -967,7 +967,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
 	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*stateful.Block)
 	assert.True(ok)
-	_, ok = addValidatorProposalCommit1.Block.(*stateless.CommitBlock)
+	_, ok = addValidatorProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -993,7 +993,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	statelessAdvanceTimeProposalBlk1, err := stateless.NewProposalBlock(
+	statelessAdvanceTimeProposalBlk1, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,
@@ -1014,7 +1014,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
 	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*stateful.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit1.Block.(*stateless.CommitBlock)
+	_, ok = advanceTimeProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()
@@ -1149,7 +1149,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessProposalBlk, err := stateless.NewProposalBlock(
+	statelessProposalBlk, err := blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -1183,7 +1183,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	statelessProposalBlk, err = stateless.NewProposalBlock(
+	statelessProposalBlk, err = blocks.NewProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -1228,12 +1228,12 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	// verify the preferences
 	commit, ok := options[0].(*stateful.Block)
 	assert.True(ok)
-	_, ok = options[0].(*stateful.Block).Block.(*stateless.CommitBlock)
+	_, ok = options[0].(*stateful.Block).Block.(*blocks.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
 	abort, ok := options[1].(*stateful.Block)
 	assert.True(ok)
-	_, ok = options[1].(*stateful.Block).Block.(*stateless.AbortBlock)
+	_, ok = options[1].(*stateful.Block).Block.(*blocks.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	// Verify the options

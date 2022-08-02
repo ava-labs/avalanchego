@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -32,7 +32,7 @@ type blockState struct {
 	standardBlockState
 	proposalBlockState
 	atomicBlockState
-	statelessBlock stateless.Block
+	statelessBlock blocks.Block
 	onAcceptState  state.Diff
 
 	timestamp      time.Time

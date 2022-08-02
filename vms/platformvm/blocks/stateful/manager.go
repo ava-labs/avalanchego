@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -20,7 +20,7 @@ type Manager interface {
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
 	GetBlock(id ids.ID) (snowman.Block, error)
-	NewBlock(stateless.Block) snowman.Block
+	NewBlock(blocks.Block) snowman.Block
 }
 
 func NewManager(
@@ -57,9 +57,9 @@ func NewManager(
 
 type manager struct {
 	*backend
-	verifier stateless.Visitor
-	acceptor stateless.Visitor
-	rejector stateless.Visitor
+	verifier blocks.Visitor
+	acceptor blocks.Visitor
+	rejector blocks.Visitor
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
@@ -75,7 +75,7 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	return newBlock(statelessBlk, m), nil
 }
 
-func (m *manager) NewBlock(blk stateless.Block) snowman.Block {
+func (m *manager) NewBlock(blk blocks.Block) snowman.Block {
 	return newBlock(blk, m)
 }
 
@@ -88,12 +88,12 @@ func (m *manager) LastAccepted() ids.ID {
 	return m.backend.lastAccepted
 }
 
-func newBlock(blk stateless.Block, manager *manager) snowman.Block {
+func newBlock(blk blocks.Block, manager *manager) snowman.Block {
 	b := &Block{
 		manager: manager,
 		Block:   blk,
 	}
-	if _, ok := blk.(*stateless.ProposalBlock); ok {
+	if _, ok := blk.(*blocks.ProposalBlock); ok {
 		return &OracleBlock{
 			Block: b,
 		}

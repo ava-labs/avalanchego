@@ -4,19 +4,20 @@
 package stateful
 
 import (
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ stateless.Visitor = &rejector{}
+var _ blocks.Visitor = &rejector{}
 
 // rejector handles the logic for rejecting a block.
 type rejector struct {
 	*backend
 }
 
-func (r *rejector) ProposalBlock(b *stateless.ProposalBlock) error {
+func (r *rejector) ProposalBlock(b *blocks.ProposalBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -42,7 +43,7 @@ func (r *rejector) ProposalBlock(b *stateless.ProposalBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
+func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -68,7 +69,7 @@ func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) StandardBlock(b *stateless.StandardBlock) error {
+func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -96,7 +97,7 @@ func (r *rejector) StandardBlock(b *stateless.StandardBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
+func (r *rejector) CommitBlock(b *blocks.CommitBlock) error {
 	r.ctx.Log.Verbo(
 		"rejecting block",
 		zap.String("blockType", "commit"),
@@ -107,7 +108,7 @@ func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
 	return r.rejectOptionBlock(b)
 }
 
-func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
+func (r *rejector) AbortBlock(b *blocks.AbortBlock) error {
 	r.ctx.Log.Verbo(
 		"rejecting block",
 		zap.String("blockType", "abort"),
@@ -118,7 +119,7 @@ func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
 	return r.rejectOptionBlock(b)
 }
 
-func (r *rejector) rejectOptionBlock(b stateless.Block) error {
+func (r *rejector) rejectOptionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
