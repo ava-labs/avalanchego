@@ -673,11 +673,11 @@ func (v *verifier) validateBlockTimestamp(blk stateless.Block, parentBlkTime tim
 	case *stateless.BlueberryStandardBlock,
 		*stateless.BlueberryProposalBlock:
 		parentID := blk.Parent()
-		parentState, ok := v.blkIDToState[parentID]
+		parentState, ok := v.stateVersions.GetState(parentID)
 		if !ok {
 			return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blk.ID())
 		}
-		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState.onAcceptState)
+		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
 		if err != nil {
 			return fmt.Errorf("could not verify block timestamp: %w", err)
 		}

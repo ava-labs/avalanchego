@@ -17,7 +17,7 @@ import (
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert := assert.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, false /*mockResetBlockTimer*/)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -51,7 +51,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, false /*mockResetBlockTimer*/)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)

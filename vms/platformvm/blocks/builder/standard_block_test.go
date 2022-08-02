@@ -22,7 +22,7 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	assert := assert.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, false /*mockResetBlockTimer*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
