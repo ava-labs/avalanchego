@@ -23,23 +23,17 @@ type acceptor struct {
 	recentlyAccepted *window.Window
 }
 
+// Note that:
+// - We don't free the proposal block in this method. It is freed when its child
+//   is accepted. We need to keep this block's state in memory for its child to
+//   use.
+// - We only update the metrics to reflect this block's acceptance when its
+//   child is accepted.
+// - We don't write this block to state here. That is done when this block's
+//   child (a CommitBlock or AbortBlock) is accepted. We do this so that in the
+//   event that the node shuts down, the proposal block is not written to disk
+//   unless its child is. (The VM's Shutdown method commits the database.)
 func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
-	//  Note that:
-
-	// * We don't free the proposal block in this method.
-	//   It is freed when its child is accepted.
-	//   We need to keep this block's state in memory for its child to use.
-
-	// * We only update the metrics to reflect this block's
-	//   acceptance when its child is accepted.
-
-	// * We don't write this block to state here.
-	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	//   We do this so that in the event that the node shuts down, the proposal block
-	//   is not written to disk unless its child is.
-	//   (The VM's Shutdown method commits the database.)
-	//   The snowman.Engine requires that the last committed block is a decision block.
-
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
 		"accepting block",

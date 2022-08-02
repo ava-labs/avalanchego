@@ -1911,7 +1911,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	// is in the preferred block's db. If so, return that it's processing.
 	onAccept, ok := service.vm.stateVersions.GetState(service.vm.preferred)
 	if !ok {
-		return fmt.Errorf("could not retrieve state for block %s, which should be a decision block", service.vm.preferred)
+		return fmt.Errorf("could not retrieve state for block %s", service.vm.preferred)
 	}
 
 	_, _, err = onAccept.GetTx(args.TxID)

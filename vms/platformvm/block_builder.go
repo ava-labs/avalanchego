@@ -114,7 +114,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	preferredState, ok := b.vm.stateVersions.GetState(preferredID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve state for block %s, which should be a decision block", preferredID)
+		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
 	// Try building a standard block.
@@ -205,7 +205,6 @@ func (b *blockBuilder) ResetBlockTimer() {
 
 	preferredState, ok := b.vm.stateVersions.GetState(b.vm.preferred)
 	if !ok {
-		// The preferred block should always be a decision block
 		b.vm.ctx.Log.Error("couldn't get preferred block state",
 			zap.Stringer("blkID", b.vm.preferred),
 		)
