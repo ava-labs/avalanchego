@@ -121,7 +121,7 @@ func (v *verifier) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) e
 		currentDelegatorsToAdd,
 		pendingDelegatorsToRemove,
 		updatedSupply,
-		err := executor.UpdateStakerSet(parentState, &v.txExecutorBackend, nextChainTime)
+		err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -403,7 +403,7 @@ func (v *verifier) BlueberryStandardBlock(b *stateless.BlueberryStandardBlock) e
 		currentDelegatorsToAdd,
 		pendingDelegatorsToRemove,
 		updatedSupply,
-		err := executor.UpdateStakerSet(parentState, &v.txExecutorBackend, nextChainTime)
+		err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}

@@ -112,7 +112,7 @@ func (b *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error 
 	if b.Tx == nil {
 		var tx txs.Tx
 		if _, err := txs.Codec.Unmarshal(b.TxBytes, &tx); err != nil {
-			return fmt.Errorf("failed unmarshalling tx in post fork block: %w", err)
+			return fmt.Errorf("failed unmarshalling tx in Blueberry block: %w", err)
 		}
 		b.Tx = &tx
 		if err := b.Tx.Sign(txs.Codec, nil); err != nil {

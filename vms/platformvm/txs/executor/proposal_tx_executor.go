@@ -516,7 +516,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		currentDelegatorsToAdd,
 		pendingDelegatorsToRemove,
 		updatedSupply,
-		err := UpdateStakerSet(parentState, e.Backend, proposedChainTime)
+		err := UpdateStakerSet(parentState, proposedChainTime, e.Backend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -558,8 +558,8 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 // TODO return a struct
 func UpdateStakerSet(
 	parentState state.Chain,
-	backend *Backend,
 	proposedChainTime time.Time,
+	rewards reward.Calculator,
 ) (
 	currentValidatorsToAdd []*state.Staker,
 	currentValidatorsToRemove []*state.Staker,
@@ -589,7 +589,7 @@ func UpdateStakerSet(
 
 		switch stakerToRemove.Priority {
 		case state.PrimaryNetworkDelegatorPendingPriority:
-			potentialReward := backend.Rewards.Calculate(
+			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
 				updatedSupply,
@@ -605,7 +605,7 @@ func UpdateStakerSet(
 			currentDelegatorsToAdd = append(currentDelegatorsToAdd, &stakerToAdd)
 			pendingDelegatorsToRemove = append(pendingDelegatorsToRemove, stakerToRemove)
 		case state.PrimaryNetworkValidatorPendingPriority:
-			potentialReward := backend.Rewards.Calculate(
+			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
 				updatedSupply,
