@@ -4,30 +4,21 @@
 package metrics
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 type Metrics struct {
-	txMetrics *txMetrics
+	blockMetrics *blockMetrics
 
 	PercentConnected       prometheus.Gauge
 	SubnetPercentConnected *prometheus.GaugeVec
 	LocalStake             prometheus.Gauge
 	TotalStake             prometheus.Gauge
-
-	numAbortBlocks,
-	numAtomicBlocks,
-	numCommitBlocks,
-	numProposalBlocks,
-	numStandardBlocks prometheus.Counter
 
 	numVotesWon, numVotesLost prometheus.Counter
 
@@ -39,22 +30,15 @@ type Metrics struct {
 	APIRequestMetrics metric.APIInterceptor
 }
 
-func newBlockMetrics(namespace string, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_blks_accepted", name),
-		Help:      fmt.Sprintf("Number of %s blocks accepted", name),
-	})
-}
-
 // Initialize platformvm metrics
 func (m *Metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
 ) error {
-	txMetrics, err := newTxMetrics(namespace, registerer)
-	m.txMetrics = txMetrics
+	blockMetrics, err := newBlockMetrics(namespace, registerer)
+	m.blockMetrics = blockMetrics
+
 	m.PercentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "percent_connected",
@@ -78,12 +62,6 @@ func (m *Metrics) Initialize(
 		Name:      "total_staked",
 		Help:      "Total amount of AVAX staked",
 	})
-
-	m.numAbortBlocks = newBlockMetrics(namespace, "abort")
-	m.numAtomicBlocks = newBlockMetrics(namespace, "atomic")
-	m.numCommitBlocks = newBlockMetrics(namespace, "commit")
-	m.numProposalBlocks = newBlockMetrics(namespace, "proposal")
-	m.numStandardBlocks = newBlockMetrics(namespace, "standard")
 
 	m.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
@@ -128,12 +106,6 @@ func (m *Metrics) Initialize(
 		registerer.Register(m.LocalStake),
 		registerer.Register(m.TotalStake),
 
-		registerer.Register(m.numAbortBlocks),
-		registerer.Register(m.numAtomicBlocks),
-		registerer.Register(m.numCommitBlocks),
-		registerer.Register(m.numProposalBlocks),
-		registerer.Register(m.numStandardBlocks),
-
 		registerer.Register(m.numVotesWon),
 		registerer.Register(m.numVotesLost),
 
@@ -159,34 +131,6 @@ func (m *Metrics) MarkVoteLost() {
 	m.numVotesLost.Inc()
 }
 
-// TODO: use a visitor here
 func (m *Metrics) MarkAccepted(b blocks.Block) error {
-	switch b := b.(type) {
-	case *blocks.MockBlock:
-		// TODO make metrics an interface so we don't need this
-	case *blocks.AbortBlock:
-		m.numAbortBlocks.Inc()
-	case *blocks.AtomicBlock:
-		m.numAtomicBlocks.Inc()
-		return m.AcceptTx(b.Tx)
-	case *blocks.CommitBlock:
-		m.numCommitBlocks.Inc()
-	case *blocks.ProposalBlock:
-		m.numProposalBlocks.Inc()
-		return m.AcceptTx(b.Tx)
-	case *blocks.StandardBlock:
-		m.numStandardBlocks.Inc()
-		for _, tx := range b.Txs {
-			if err := m.AcceptTx(tx); err != nil {
-				return err
-			}
-		}
-	default:
-		return fmt.Errorf("got unexpected block type %T", b)
-	}
-	return nil
-}
-
-func (m *Metrics) AcceptTx(tx *txs.Tx) error {
-	return tx.Unsigned.Visit(m.txMetrics)
+	return b.Visit(m.blockMetrics)
 }
