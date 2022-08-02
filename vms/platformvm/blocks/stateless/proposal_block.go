@@ -15,7 +15,7 @@ var (
 	_ Block = &BlueberryProposalBlock{}
 )
 
-// TODO can we assume [tx] is initialized?
+// NewProposalBlock assumes [tx] is initialized
 func NewProposalBlock(
 	version uint16,
 	timestamp uint64,
@@ -44,12 +44,6 @@ func NewProposalBlock(
 		return res, res.initialize(ApricotVersion, bytes)
 
 	case BlueberryVersion:
-		// Make sure we have the byte representation of
-		// the [tx] so we can use it in the block.
-		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return nil, fmt.Errorf("failed to sign block: %w", err)
-		}
-
 		res := &BlueberryProposalBlock{
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,

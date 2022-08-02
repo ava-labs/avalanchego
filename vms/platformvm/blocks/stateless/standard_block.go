@@ -15,7 +15,7 @@ var (
 	_ Block = &BlueberryStandardBlock{}
 )
 
-// TODO can we assume txs are initialized?
+// NewStandardBlock assumes [txes] are initialized
 func NewStandardBlock(
 	version uint16,
 	timestamp uint64,
@@ -44,13 +44,6 @@ func NewStandardBlock(
 		return res, res.initialize(ApricotVersion, bytes)
 
 	case BlueberryVersion:
-		// Make sure we have the byte representation of
-		// the [txes] so we can use them in the block.
-		for _, tx := range txes {
-			if err := tx.Sign(txs.Codec, nil); err != nil {
-				return nil, fmt.Errorf("failed to sign block: %w", err)
-			}
-		}
 		txsBytes := make([][]byte, len(txes))
 		for i, tx := range txes {
 			txBytes := tx.Bytes()
@@ -116,16 +109,18 @@ func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error 
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	b.Txs = make([]*txs.Tx, len(b.TxsBytes))
-	for i, txBytes := range b.TxsBytes {
-		var tx txs.Tx
-		if _, err := txs.Codec.Unmarshal(txBytes, &tx); err != nil {
-			return fmt.Errorf("failed unmarshalling tx in blueberry block: %w", err)
+	if b.Txs == nil {
+		b.Txs = make([]*txs.Tx, len(b.TxsBytes))
+		for i, txBytes := range b.TxsBytes {
+			var tx txs.Tx
+			if _, err := txs.Codec.Unmarshal(txBytes, &tx); err != nil {
+				return fmt.Errorf("failed unmarshalling tx in blueberry block: %w", err)
+			}
+			if err := tx.Sign(txs.Codec, nil); err != nil {
+				return fmt.Errorf("failed to sign block: %w", err)
+			}
+			b.Txs[i] = &tx
 		}
-		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to sign block: %w", err)
-		}
-		b.Txs[i] = &tx
 	}
 	return nil
 }

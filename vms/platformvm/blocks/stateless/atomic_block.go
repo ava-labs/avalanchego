@@ -20,6 +20,7 @@ type AtomicBlock struct {
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
+// NewAtomicBlock assumes [tx] is initialized
 func NewAtomicBlock(
 	parentID ids.ID,
 	height uint64,

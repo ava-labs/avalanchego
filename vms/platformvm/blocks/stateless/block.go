@@ -26,5 +26,7 @@ type Block interface {
 
 	Visit(visitor Visitor) error
 
+	// note: initialize does not assume that block transactions
+	// are initialized, and initialize them itself if they aren't.
 	initialize(version uint16, bytes []byte) error
 }
