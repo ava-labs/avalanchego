@@ -7,7 +7,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Blockable defines what an object must implement to be able to block on events
+// Blockable defines what an object must implement to be able to block on
+// dependent events being completed.
 type Blockable interface {
 	// IDs that this object is blocking on
 	Dependencies() ids.Set

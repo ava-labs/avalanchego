@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/x509"
-	"encoding/binary"
 	"errors"
 	"io"
 	"math"
@@ -332,14 +331,16 @@ func (p *peer) readMessages() {
 		}
 
 		// Parse the message length
-		msgLen := binary.BigEndian.Uint32(msgLenBytes)
-
-		// Make sure the message length is valid.
-		if msgLen > constants.DefaultMaxMessageSize {
-			p.Log.Verbo("message is too large",
+		msgLen, isProto, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
+		if err != nil {
+			p.Log.Verbo("error reading message length",
 				zap.Stringer("nodeID", p.id),
-				zap.Uint32("messageLen", msgLen),
+				zap.Error(err),
 			)
+			return
+		}
+		if isProto {
+			p.Log.Debug("unexpected isProto=true from 'readMsgLen' (not implemented yet)")
 			return
 		}
 
@@ -479,16 +480,22 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		zap.Binary("message", msgBytes),
 	)
 
-	msgLen := uint32(len(msgBytes))
-	msgLenBytes := [wrappers.IntLen]byte{}
-	binary.BigEndian.PutUint32(msgLenBytes[:], msgLen)
-
 	if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
 		p.Log.Verbo("error setting write deadline",
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
 		msg.DecRef()
+		return
+	}
+
+	msgLen := uint32(len(msgBytes))
+	msgLenBytes, err := writeMsgLen(msgLen, false /* true to use protobufs */, constants.DefaultMaxMessageSize)
+	if err != nil {
+		p.Log.Verbo("error writing message length",
+			zap.Stringer("nodeID", p.id),
+			zap.Error(err),
+		)
 		return
 	}
 
