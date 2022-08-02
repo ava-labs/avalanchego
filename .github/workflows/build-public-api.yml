@@ -12,9 +12,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: "1.17.9" # The Go version to download (if necessary) and use.
+          go-version: '1.18'
+          check-latest: true
       - run: go version
 
       - name: Install aws cli

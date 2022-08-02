@@ -14,7 +14,10 @@ const (
 	minBlockerSize = 16
 )
 
-// Blocker tracks objects that are blocked
+// Blocker tracks Blockable events.
+// Blocker is used to track events that require their dependencies to be
+// fulfilled before them. Once a Blockable event is registered, it will be
+// notified once any of its dependencies are fulfilled or abandoned.
 type Blocker map[ids.ID][]Blockable
 
 func (b *Blocker) init() {
