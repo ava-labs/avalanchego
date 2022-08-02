@@ -119,6 +119,7 @@ var (
 		GetFailed,
 		QueryFailed,
 		AppRequestFailed,
+		CrossChainAppRequestFailed,
 		Timeout,
 		Connected,
 		Disconnected,
@@ -249,9 +250,9 @@ var (
 		AppGossip:   {ChainID, AppBytes},
 
 		// Cross-chain application messaging
-		CrossChainAppRequest:  {SourceChainID, DestinationChainID, RequestID, Deadline, AppBytes},
-		CrossChainAppResponse: {SourceChainID, DestinationChainID, RequestID, AppBytes},
-		CrossChainAppGossip:   {SourceChainID, DestinationChainID, AppBytes},
+		CrossChainAppRequest:  {SourceChainID, ChainID, RequestID, Deadline, AppBytes},
+		CrossChainAppResponse: {SourceChainID, ChainID, RequestID, AppBytes},
+		CrossChainAppGossip:   {SourceChainID, ChainID, AppBytes},
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},

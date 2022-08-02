@@ -406,7 +406,7 @@ type AppHandler interface {
 	// This node should typically send an AppResponse to [nodeID] in response to
 	// a valid message using the same request ID before the deadline. However,
 	// the VM may arbitrarily choose to not send a response to this request.
-	AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
+	AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
 
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
@@ -418,7 +418,7 @@ type AppHandler interface {
 	// * This engine sent a request to [nodeID] with ID [requestID].
 	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error
 
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
@@ -437,7 +437,7 @@ type AppHandler interface {
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another AppRequest, or it may give
 	// up trying to get the requested information.
-	AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error
+	AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error
 
 	// Notify this engine of a gossip message from [nodeID].
 	//
@@ -449,12 +449,7 @@ type AppHandler interface {
 	//
 	// A node may gossip the same message multiple times. That is,
 	// AppGossip([nodeID], [msg]) may be called multiple times.
-	AppGossip(nodeID ids.NodeID, msg []byte) error
-
-	CrossChainAppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
-	CrossChainAppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error
-	CrossChainAppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error
-	CrossChainAppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error
+	AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error
 }
 
 // InternalHandler defines how this consensus engine reacts to messages from

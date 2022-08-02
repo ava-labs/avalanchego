@@ -5,9 +5,8 @@ package syncer
 
 import (
 	"fmt"
-	"time"
-
 	stdmath "math"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -99,7 +98,7 @@ func New(
 		PutHandler:              common.NewNoOpPutHandler(cfg.Ctx.Log),
 		QueryHandler:            common.NewNoOpQueryHandler(cfg.Ctx.Log),
 		ChitsHandler:            common.NewNoOpChitsHandler(cfg.Ctx.Log),
-		AppHandler:              common.NewNoOpAppHandler(cfg.Ctx.Log),
+		AppHandler:              common.NewNoOpAppHandler(cfg.Ctx.Context),
 		stateSyncVM:             ssVM,
 		onDoneStateSyncing:      onDoneStateSyncing,
 	}
@@ -508,16 +507,16 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
 	}
 }
 
-func (ss *stateSyncer) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	return ss.VM.AppRequest(nodeID, requestID, deadline, request)
+func (ss *stateSyncer) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return ss.VM.AppRequest(nodeID, chainID, requestID, deadline, request)
 }
 
-func (ss *stateSyncer) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
-	return ss.VM.AppResponse(nodeID, requestID, response)
+func (ss *stateSyncer) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
+	return ss.VM.AppResponse(nodeID, chainID, requestID, response)
 }
 
-func (ss *stateSyncer) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
-	return ss.VM.AppRequestFailed(nodeID, requestID)
+func (ss *stateSyncer) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
+	return ss.VM.AppRequestFailed(nodeID, chainID, requestID)
 }
 
 func (ss *stateSyncer) Notify(msg common.Message) error {

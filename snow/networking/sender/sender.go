@@ -116,7 +116,7 @@ func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID ui
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -201,7 +201,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID ui
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -291,7 +291,7 @@ func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -370,7 +370,7 @@ func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, contai
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Accepted)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Accepted)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -452,7 +452,7 @@ func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Ancestors)
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Ancestors)
 
 	msgCreator := s.getMsgCreator()
 
@@ -550,7 +550,7 @@ func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [
 func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
+	s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Put)
 
 	msgCreator := s.getMsgCreator()
 
@@ -647,7 +647,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Chits)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -731,7 +731,7 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Chits)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -827,23 +827,22 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
-	return s.SendCrossChainAppRequest(nodeIDs, s.ctx.ChainID, s.ctx.ChainID, requestID, appRequestBytes)
-}
-
-func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
 	crossChain := sourceChainID != destinationChainID
 
 	var (
 		op         message.Op
 		responseOp message.Op
+		failedOp   message.Op
 	)
 	if crossChain {
 		op = message.CrossChainAppRequest
 		responseOp = message.CrossChainAppResponse
+		failedOp = message.CrossChainAppRequestFailed
 	} else {
 		op = message.AppRequest
 		responseOp = message.AppResponse
+		failedOp = message.AppRequestFailed
 	}
 
 	// Tell the router to expect a response message or a message notifying
@@ -852,7 +851,7 @@ func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterCrossChainRequest(nodeID, sourceChainID, destinationChainID, requestID, responseOp)
+		s.router.RegisterRequest(nodeID, sourceChainID, destinationChainID, requestID, responseOp)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -865,12 +864,7 @@ func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		var inMsg message.InboundMessage
-		if crossChain {
-			inMsg = msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
-		} else {
-			inMsg = msgCreator.InboundAppRequest(sourceChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
-		}
+		inMsg := s.msgCreator.InboundAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
@@ -882,28 +876,15 @@ func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
-			var inMsg message.InboundMessage
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			if crossChain {
-				inMsg = msgCreator.InternalCrossChainFailedRequest(message.CrossChainAppRequestFailed, nodeID, sourceChainID, destinationChainID, requestID)
-			} else {
-				inMsg = msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, sourceChainID, requestID)
-			}
+			inMsg := s.msgCreator.InternalFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}
 
 	// Create the outbound message.
 	// [sentTo] are the IDs of nodes who may receive the message.
-	var (
-		outMsg message.OutboundMessage
-		err    error
-	)
-	if crossChain {
-		outMsg, err = msgCreator.CrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes)
-	} else {
-		outMsg, err = msgCreator.AppRequest(sourceChainID, requestID, deadline, appRequestBytes)
-	}
+	outMsg, err := s.msgCreator.AppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes)
 
 	// Send the message over the network.
 	var sentTo ids.NodeIDSet
@@ -911,7 +892,7 @@ func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
 		s.ctx.Log.Error("failed to build message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", op),
 			zap.Stringer("sourceChainID", sourceChainID),
 			zap.Stringer("destinationChainID", destinationChainID),
 			zap.Uint32("requestID", requestID),
@@ -923,14 +904,14 @@ func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", outMsg.Op()),
+				zap.Stringer("messageOp", op),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("sourceChainID", sourceChainID),
 				zap.Stringer("destinationChainID", destinationChainID),
 				zap.Uint32("requestID", requestID),
 			)
 			s.ctx.Log.Verbo("failed to send message",
-				zap.Stringer("messageOp", outMsg.Op()),
+				zap.Stringer("messageOp", op),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("sourceChainID", sourceChainID),
 				zap.Stringer("destinationChainID", destinationChainID),
@@ -941,12 +922,7 @@ func (s *sender) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID i
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
-			var inMsg message.InboundMessage
-			if crossChain {
-				inMsg = msgCreator.InternalCrossChainFailedRequest(message.CrossChainAppRequestFailed, nodeID, sourceChainID, destinationChainID, requestID)
-			} else {
-				inMsg = msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
-			}
+			inMsg := s.msgCreator.InternalFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}
@@ -1034,10 +1010,6 @@ func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []b
 	return nil
 }
 
-func (s *sender) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	return nil
-}
-
 // SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	msgCreator := s.getMsgCreator()
@@ -1047,7 +1019,8 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AppGossip),
-			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Stringer("sourceChainID", sourceChainID),
+			zap.Stringer("chainID", destinationChainID),
 			zap.Binary("payload", appGossipBytes),
 			zap.Error(err),
 		)
@@ -1062,11 +1035,11 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
-			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Stringer("chainID", destinationChainID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
-			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Stringer("chainID", destinationChainID),
 			zap.Binary("payload", appGossipBytes),
 		)
 	}
@@ -1108,11 +1081,6 @@ func (s *sender) SendGossip(container []byte) {
 			zap.Binary("container", container),
 		)
 	}
-}
-
-func (s *sender) SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	// TODO
-	return nil
 }
 
 // Accept is called after every consensus decision

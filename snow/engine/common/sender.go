@@ -132,19 +132,14 @@ type AppSender interface {
 	// * An AppRequestFailed from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
-	SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error
+	SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
 	// A non-nil error should be considered fatal.
-	SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
+	SendAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
-	SendAppGossip(appGossipBytes []byte) error
-	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error
-
-	SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error
-	SendCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error
-	SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
-	SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
+	SendAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
+	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
 }

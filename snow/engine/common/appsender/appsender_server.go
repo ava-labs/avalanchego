@@ -35,7 +35,15 @@ func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppReque
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppRequest(nodeIDs, req.RequestId, req.Request)
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return nil, err
+	}
+	destinationChainID, err := ids.ToID(req.DestinationChainId)
+	if err != nil {
+		return nil, err
+	}
+	err = s.appSender.SendAppRequest(nodeIDs, sourceChainID, destinationChainID, req.RequestId, req.Request)
 	return &emptypb.Empty{}, err
 }
 
@@ -44,12 +52,28 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderpb.SendAppResp
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendAppResponse(nodeID, req.RequestId, req.Response)
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return nil, err
+	}
+	destinationChainID, err := ids.ToID(req.DestinationChainId)
+	if err != nil {
+		return nil, err
+	}
+	err = s.appSender.SendAppResponse(nodeID, sourceChainID, destinationChainID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 
 func (s *Server) SendAppGossip(_ context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	err := s.appSender.SendAppGossip(req.Msg)
+	sourceChainID, err := ids.ToID(req.SourceChainId)
+	if err != nil {
+		return nil, err
+	}
+	destinationChainID, err := ids.ToID(req.DestinationChainId)
+	if err != nil {
+		return nil, err
+	}
+	err = s.appSender.SendAppGossip(sourceChainID, destinationChainID, req.Msg)
 	return &emptypb.Empty{}, err
 }
 
@@ -62,19 +86,6 @@ func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderpb.SendA
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppGossipSpecific(nodeIDs, req.Msg)
-	return &emptypb.Empty{}, err
-}
-
-func (s *Server) SendCrossChainAppRequest(ctx context.Context, req *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
-	for _, nodeIDBytes := range req.NodeIds {
-		nodeID, err := ids.ToNodeID(nodeIDBytes)
-		if err != nil {
-			return nil, err
-		}
-		nodeIDs.Add(nodeID)
-	}
 	sourceChainID, err := ids.ToID(req.SourceChainId)
 	if err != nil {
 		return nil, err
@@ -83,57 +94,6 @@ func (s *Server) SendCrossChainAppRequest(ctx context.Context, req *appsenderpb.
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendCrossChainAppRequest(nodeIDs, sourceChainID, destinationChainID, req.RequestId, req.Request)
-	return &emptypb.Empty{}, err
-}
-
-func (s *Server) SendCrossChainAppResponse(ctx context.Context, req *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendCrossChainAppResponse(nodeID, sourceChainID, destinationChainID, req.RequestId, req.Response)
-	return &emptypb.Empty{}, err
-}
-
-func (s *Server) SendCrossChainAppGossip(ctx context.Context, req *appsenderpb.SendCrossChainAppGossipMsg) (*emptypb.Empty, error) {
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendCrossChainAppGossip(sourceChainID, destinationChainID, req.Msg)
-	return &emptypb.Empty{}, err
-}
-
-func (s *Server) SendCrossChainAppGossipSpecific(ctx context.Context, req *appsenderpb.SendCrossChainAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
-	for _, nodeIDBytes := range req.NodeIds {
-		nodeID, err := ids.ToNodeID(nodeIDBytes)
-		if err != nil {
-			return nil, err
-		}
-		nodeIDs.Add(nodeID)
-	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendCrossChainAppGossipSpecific(nodeIDs, sourceChainID, destinationChainID, req.Msg)
+	err = s.appSender.SendAppGossipSpecific(nodeIDs, sourceChainID, destinationChainID, req.Msg)
 	return &emptypb.Empty{}, err
 }

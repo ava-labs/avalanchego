@@ -14,15 +14,11 @@ import (
 var (
 	_ Sender = &SenderTest{}
 
-	errAccept                          = errors.New("unexpectedly called Accept")
-	errSendAppRequest                  = errors.New("unexpectedly called SendAppRequest")
-	errSendAppResponse                 = errors.New("unexpectedly called SendAppResponse")
-	errSendAppGossip                   = errors.New("unexpectedly called SendAppGossip")
-	errSendAppGossipSpecific           = errors.New("unexpectedly called SendAppGossipSpecific")
-	errSendCrossChainAppRequest        = errors.New("unexpectedly called SendCrossChainAppRequest")
-	errSendCrossChainAppResponse       = errors.New("unexpectedly called SendCrossChainAppResponse")
-	errSendCrossChainAppGossip         = errors.New("unexpectedly called SendCrossChainAppGossip")
-	errSendCrossChainAppGossipSpecific = errors.New("unexpectedly called SendCrossChainAppGossipSpecific")
+	errAccept                = errors.New("unexpectedly called Accept")
+	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")
+	errSendAppResponse       = errors.New("unexpectedly called SendAppResponse")
+	errSendAppGossip         = errors.New("unexpectedly called SendAppGossip")
+	errSendAppGossipSpecific = errors.New("unexpectedly called SendAppGossipSpecific")
 )
 
 // SenderTest is a test sender
@@ -37,8 +33,7 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
-	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific,
-	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse, CantSendCrossChainAppGossip, CantSendCrossChainAppGossipSpecific bool
+	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
 	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
 	SendGetStateSummaryFrontierF func(ids.NodeIDSet, uint32)
@@ -90,10 +85,6 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
 	s.CantSendAppGossipSpecific = cant
-	s.CantSendCrossChainAppRequest = cant
-	s.CantSendCrossChainAppResponse = cant
-	s.CantSendCrossChainAppGossip = cant
-	s.CantSendCrossChainAppGossipSpecific = cant
 }
 
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
@@ -320,7 +311,7 @@ func (s *SenderTest) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRes
 func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 	switch {
 	case s.SendAppGossipF != nil:
-		return s.SendAppGossipF(appGossipBytes)
+		return s.SendAppGossip(appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		s.T.Fatal(errSendAppGossip)
 	}
@@ -338,44 +329,4 @@ func (s *SenderTest) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes
 		s.T.Fatal(errSendAppGossipSpecific)
 	}
 	return errSendAppGossipSpecific
-}
-
-func (s *SenderTest) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	switch {
-	case s.SendCrossChainAppRequestF != nil:
-		return s.SendCrossChainAppRequestF(nodeIDs, requestID, sourceChainID, destinationChainID, appRequestBytes)
-	case s.CantSendCrossChainAppRequest && s.T != nil:
-		s.T.Fatal(errSendCrossChainAppRequest)
-	}
-	return errSendCrossChainAppRequest
-}
-
-func (s *SenderTest) SendCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	switch {
-	case s.SendCrossChainAppRequestF != nil:
-		return s.SendCrossChainAppResponseF(nodeID, requestID, sourceChainID, destinationChainID, appResponseBytes)
-	case s.CantSendCrossChainAppRequest && s.T != nil:
-		s.T.Fatal(errSendCrossChainAppRequest)
-	}
-	return errSendCrossChainAppRequest
-}
-
-func (s *SenderTest) SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	switch {
-	case s.SendCrossChainAppGossipF != nil:
-		return s.SendCrossChainAppGossip(sourceChainID, destinationChainID, appGossipBytes)
-	case s.CantSendCrossChainAppGossip && s.T != nil:
-		s.T.Fatal(errSendCrossChainAppGossip)
-	}
-	return errSendCrossChainAppGossip
-}
-
-func (s *SenderTest) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	switch {
-	case s.SendCrossChainAppGossipSpecificF != nil:
-		return s.SendCrossChainAppGossipSpecificF(nodeIDs, sourceChainID, destinationChainID, appGossipBytes)
-	case s.CantSendCrossChainAppGossipSpecific && s.T != nil:
-		s.T.Fatal(errSendCrossChainAppGossipSpecific)
-	}
-	return errSendCrossChainAppGossipSpecific
 }

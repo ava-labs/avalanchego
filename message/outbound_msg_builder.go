@@ -132,6 +132,7 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 
 	AppRequest(
+		sourceChainID ids.ID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
@@ -139,34 +140,15 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 
 	AppResponse(
+		sourceChainID ids.ID,
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
 	) (OutboundMessage, error)
 
 	AppGossip(
+		sourceChainID ids.ID,
 		chainID ids.ID,
-		msg []byte,
-	) (OutboundMessage, error)
-
-	CrossChainAppRequest(
-		sourceChainID ids.ID,
-		destinationChainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		msg []byte,
-	) (OutboundMessage, error)
-
-	CrossChainAppResponse(
-		sourceChainID ids.ID,
-		destinationChainID ids.ID,
-		requestID uint32,
-		msg []byte,
-	) (OutboundMessage, error)
-
-	CrossChainAppGossip(
-		sourceChainID ids.ID,
-		destinationChainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
 }
@@ -520,63 +502,6 @@ func (b *outMsgBuilderWithPacker) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		b.compress && Chits.Compressible(),
-		false,
-	)
-}
-
-func (b *outMsgBuilder) CrossChainAppRequest(
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	deadline time.Duration,
-	msg []byte,
-) (OutboundMessage, error) {
-	return b.c.Pack(
-		CrossChainAppRequest,
-		map[Field]interface{}{
-			SourceChainID:      sourceChainID[:],
-			DestinationChainID: destinationChainID[:],
-			RequestID:          requestID,
-			Deadline:           uint64(deadline),
-			AppBytes:           msg,
-		},
-		b.compress && AppRequest.Compressible(), // App messages may be compressed
-		false,
-	)
-}
-
-func (b *outMsgBuilder) CrossChainAppResponse(
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	msg []byte,
-) (OutboundMessage, error) {
-	return b.c.Pack(
-		CrossChainAppResponse,
-		map[Field]interface{}{
-			SourceChainID:      sourceChainID[:],
-			DestinationChainID: destinationChainID[:],
-			RequestID:          requestID,
-			AppBytes:           msg,
-		},
-		b.compress && AppResponse.Compressible(), // App messages may be compressed
-		false,
-	)
-}
-
-func (b *outMsgBuilder) CrossChainAppGossip(
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	msg []byte,
-) (OutboundMessage, error) {
-	return b.c.Pack(
-		CrossChainAppGossip,
-		map[Field]interface{}{
-			SourceChainID:      sourceChainID[:],
-			DestinationChainID: destinationChainID[:],
-			AppBytes:           msg,
-		},
-		b.compress && CrossChainAppGossip.Compressible(), // App messages may be compressed
 		false,
 	)
 }

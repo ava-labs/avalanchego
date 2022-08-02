@@ -23,7 +23,7 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
+func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -31,105 +31,49 @@ func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request
 		nodeIDsBytes[i] = nodeID[:]
 		i++
 	}
+
 	_, err := c.client.SendAppRequest(
 		context.Background(),
 		&appsenderpb.SendAppRequestMsg{
-			NodeIds:   nodeIDsBytes,
-			RequestId: requestID,
-			Request:   request,
-		},
-	)
-	return err
-}
-
-func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
-	_, err := c.client.SendAppResponse(
-		context.Background(),
-		&appsenderpb.SendAppResponseMsg{
-			NodeId:    nodeID[:],
-			RequestId: requestID,
-			Response:  response,
-		},
-	)
-	return err
-}
-
-func (c *Client) SendAppGossip(msg []byte) error {
-	_, err := c.client.SendAppGossip(
-		context.Background(),
-		&appsenderpb.SendAppGossipMsg{
-			Msg: msg,
-		},
-	)
-	return err
-}
-
-func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error {
-	nodeIDsBytes := make([][]byte, nodeIDs.Len())
-	i := 0
-	for nodeID := range nodeIDs {
-		nodeID := nodeID // Prevent overwrite in next iteration
-		nodeIDsBytes[i] = nodeID[:]
-		i++
-	}
-	_, err := c.client.SendAppGossipSpecific(
-		context.Background(),
-		&appsenderpb.SendAppGossipSpecificMsg{
-			NodeIds: nodeIDsBytes,
-			Msg:     msg,
-		},
-	)
-	return err
-}
-
-func (c *Client) SendCrossChainAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	nodeIDsBytes := make([][]byte, nodeIDs.Len())
-	i := 0
-	for nodeID := range nodeIDs {
-		nodeID := nodeID // Prevent overwrite in next iteration
-		nodeIDsBytes[i] = nodeID[:]
-		i++
-	}
-	_, err := c.client.SendCrossChainAppRequest(
-		context.Background(),
-		&appsenderpb.SendCrossChainAppRequestMsg{
 			NodeIds:            nodeIDsBytes,
 			SourceChainId:      sourceChainID[:],
 			DestinationChainId: destinationChainID[:],
 			RequestId:          requestID,
-			Request:            appRequestBytes,
+			Request:            request,
 		},
 	)
+
 	return err
 }
 
-func (c *Client) SendCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	_, err := c.client.SendCrossChainAppResponse(
+func (c *Client) SendAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, response []byte) error {
+	_, err := c.client.SendAppResponse(
 		context.Background(),
-		&appsenderpb.SendCrossChainAppResponseMsg{
+		&appsenderpb.SendAppResponseMsg{
 			NodeId:             nodeID[:],
 			SourceChainId:      sourceChainID[:],
 			DestinationChainId: destinationChainID[:],
 			RequestId:          requestID,
-			Response:           appResponseBytes,
+			Response:           response,
 		},
 	)
+
 	return err
 }
 
-func (c *Client) SendCrossChainAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
-	_, err := c.client.SendCrossChainAppGossip(
+func (c *Client) SendAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, msg []byte) error {
+	_, err := c.client.SendAppGossip(
 		context.Background(),
-		&appsenderpb.SendCrossChainAppGossipMsg{
+		&appsenderpb.SendAppGossipMsg{
 			SourceChainId:      sourceChainID[:],
 			DestinationChainId: destinationChainID[:],
-			Msg:                appGossipBytes,
+			Msg:                msg,
 		},
 	)
 	return err
 }
 
-func (c *Client) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error {
+func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, msg []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -137,13 +81,14 @@ func (c *Client) SendCrossChainAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceCh
 		nodeIDsBytes[i] = nodeID[:]
 		i++
 	}
-	_, err := c.client.SendCrossChainAppGossipSpecific(
+
+	_, err := c.client.SendAppGossipSpecific(
 		context.Background(),
-		&appsenderpb.SendCrossChainAppGossipSpecificMsg{
+		&appsenderpb.SendAppGossipSpecificMsg{
 			NodeIds:            nodeIDsBytes,
 			SourceChainId:      sourceChainID[:],
 			DestinationChainId: destinationChainID[:],
-			Msg:                appGossipBytes,
+			Msg:                msg,
 		},
 	)
 	return err

@@ -7,7 +7,6 @@ package builder
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"go.uber.org/zap"
@@ -57,19 +56,19 @@ func NewNetwork(
 	}
 }
 
-func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (n *network) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
+func (n *network) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
+func (n *network) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
@@ -129,29 +128,6 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	vm.log.Info("Received a cross chain app request.",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("chainID", chainID),
-		zap.Strings("requestID", []string{strconv.Itoa(int(requestID))}),
-		zap.Strings("request", []string{string(request)}),
-	)
-
-	return nil
-}
-
-func (vm *VM) CrossChainAppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
-	return nil
-}
-
-func (vm *VM) CrossChainAppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
-	return nil
-}
-
-func (vm *VM) CrossChainAppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
-	return nil
-}
-
 func (n *network) GossipTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
@@ -169,5 +145,5 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
 	}
-	return n.appSender.SendAppGossip(msgBytes)
+	return n.appSender.SendAppGossip(n.ctx.ChainID, n.ctx.ChainID, msgBytes)
 }

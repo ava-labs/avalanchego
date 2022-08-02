@@ -4,6 +4,8 @@
 package metervm
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -145,4 +147,20 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
+}
+
+func (vm *blockVM) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return vm.ChainVM.AppRequest(nodeID, chainID, requestID, deadline, request)
+}
+
+func (vm *blockVM) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
+	return vm.ChainVM.AppResponse(nodeID, chainID, requestID, response)
+}
+
+func (vm *blockVM) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
+	return vm.ChainVM.AppRequestFailed(nodeID, chainID, requestID)
+}
+
+func (vm *blockVM) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+	return vm.ChainVM.AppGossip(nodeID, chainID, msg)
 }

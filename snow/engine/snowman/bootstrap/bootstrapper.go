@@ -87,7 +87,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
+		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Context),
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,

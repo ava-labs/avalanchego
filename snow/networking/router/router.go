@@ -45,6 +45,5 @@ type Router interface {
 type InternalHandler interface {
 	benchlist.Benchable
 
-	RegisterRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op)
-	RegisterCrossChainRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op)
+	RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op)
 }

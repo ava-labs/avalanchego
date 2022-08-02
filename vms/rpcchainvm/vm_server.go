@@ -481,11 +481,15 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emp
 	if err != nil {
 		return nil, err
 	}
+	chainID, err := ids.ToID(req.ChainId)
+	if err != nil {
+		return nil, err
+	}
 	deadline, err := grpcutils.TimestampAsTime(req.Deadline)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestId, deadline, req.Request)
+	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, chainID, req.RequestId, deadline, req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
@@ -493,7 +497,11 @@ func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFail
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequestFailed(nodeID, req.RequestId)
+	chainID, err := ids.ToID(req.ChainId)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.AppRequestFailed(nodeID, chainID, req.RequestId)
 }
 
 func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {
@@ -501,7 +509,11 @@ func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*e
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppResponse(nodeID, req.RequestId, req.Response)
+	chainID, err := ids.ToID(req.ChainId)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.AppResponse(nodeID, chainID, req.RequestId, req.Response)
 }
 
 func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*emptypb.Empty, error) {
@@ -509,59 +521,11 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, req.Msg)
-}
-
-func (vm *VMServer) CrossChainAppRequest(ctx context.Context, req *vmpb.CrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
 	chainID, err := ids.ToID(req.ChainId)
 	if err != nil {
-		return &emptypb.Empty{}, err
-	}
-	deadline, err := grpcutils.TimestampAsTime(req.Deadline)
-	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(nodeID, chainID, req.RequestId, deadline, req.Request)
-}
-
-func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, req *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-	chainID, err := ids.ToID(req.ChainId)
-	if err != nil {
-		return &emptypb.Empty{}, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(nodeID, chainID, req.RequestId)
-}
-
-func (vm *VMServer) CrossChainAppResponse(ctx context.Context, req *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-	chainID, err := ids.ToID(req.ChainId)
-	if err != nil {
-		return &emptypb.Empty{}, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(nodeID, chainID, req.RequestId, req.Response)
-}
-
-func (vm *VMServer) CrossChainAppGossip(ctx context.Context, req *vmpb.CrossChainAppGossipMsg) (*emptypb.Empty, error) {
-	nodeID, err := ids.ToNodeID(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
-	chainID, err := ids.ToID(req.ChainId)
-	if err != nil {
-		return &emptypb.Empty{}, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppGossip(nodeID, chainID, req.Msg)
+	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, chainID, req.Msg)
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {

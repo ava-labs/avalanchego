@@ -279,40 +279,24 @@ func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (t *Transitive) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
-	return t.VM.AppRequest(nodeID, requestID, deadline, request)
+	return t.VM.AppRequest(nodeID, chainID, requestID, deadline, request)
 }
 
-func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
 	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(nodeID, requestID)
+	return t.VM.AppRequestFailed(nodeID, chainID, requestID)
 }
 
-func (t *Transitive) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (t *Transitive) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
-	return t.VM.AppResponse(nodeID, requestID, response)
+	return t.VM.AppResponse(nodeID, chainID, requestID, response)
 }
 
-func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
+func (t *Transitive) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(nodeID, msg)
-}
-
-func (t *Transitive) CrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return t.VM.CrossChainAppRequest(nodeID, sourceChainID, requestID, deadline, request)
-}
-
-func (t *Transitive) CrossChainAppRequestFailed(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32) error {
-	return t.VM.CrossChainAppRequestFailed(nodeID, sourceChainID, requestID)
-}
-
-func (t *Transitive) CrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, requestID uint32, response []byte) error {
-	return t.VM.CrossChainAppResponse(nodeID, sourceChainID, requestID, response)
-}
-
-func (t *Transitive) CrossChainAppGossip(nodeID ids.NodeID, sourceChainID ids.ID, msg []byte) error {
-	return t.VM.CrossChainAppGossip(nodeID, sourceChainID, msg)
+	return t.VM.AppGossip(nodeID, chainID, msg)
 }
 
 func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
