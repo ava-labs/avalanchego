@@ -217,17 +217,8 @@ func (vm *VM) Initialize(
 		vm.recentlyAccepted,
 	)
 
-	if err := vm.blockBuilder.Initialize(
-		mempool,
-		vm,
-		toEngine,
-		registerer,
-	); err != nil {
-		return fmt.Errorf(
-			"failed to initialize the block builder: %w",
-			err,
-		)
-	}
+	vm.blockBuilder.Initialize(mempool, vm, toEngine)
+
 	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 
 	if err := vm.updateValidators(); err != nil {

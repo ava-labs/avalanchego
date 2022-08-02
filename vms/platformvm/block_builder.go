@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -57,11 +55,10 @@ func (b *blockBuilder) Initialize(
 	mempool mempool.Mempool,
 	vm *VM,
 	toEngine chan<- common.Message,
-	registerer prometheus.Registerer,
-) error {
+) {
+	b.Mempool = mempool
 	b.vm = vm
 	b.toEngine = toEngine
-	b.Mempool = mempool
 
 	b.timer = timer.NewTimer(func() {
 		b.vm.ctx.Lock.Lock()
@@ -70,7 +67,6 @@ func (b *blockBuilder) Initialize(
 		b.resetTimer()
 	})
 	go b.vm.ctx.Log.RecoverAndPanic(b.timer.Dispatch)
-	return nil
 }
 
 func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
