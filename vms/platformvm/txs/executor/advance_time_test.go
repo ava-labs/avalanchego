@@ -20,6 +20,63 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+// Ensure semantic verification updates the current and pending staker set
+// for the primary network
+func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
+	assert := assert.New(t)
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
+	defer func() {
+		assert.NoError(shutdownEnvironment(env))
+	}()
+	dummyHeight := uint64(1)
+
+	// Case: Timestamp is after next validator start time
+	// Add a pending validator
+	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
+	nodeID := ids.GenerateTestNodeID()
+	addPendingValidatorTx, err := addPendingValidator(
+		env,
+		pendingValidatorStartTime,
+		pendingValidatorEndTime,
+		nodeID,
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+	)
+	assert.NoError(err)
+
+	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
+	assert.NoError(err)
+
+	executor := ProposalTxExecutor{
+		Backend:          &env.backend,
+		ReferenceBlockID: lastAcceptedID,
+		Tx:               tx,
+	}
+	assert.NoError(tx.Unsigned.Visit(&executor))
+
+	validatorStaker, err := executor.OnCommit.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	assert.NoError(err)
+	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
+	assert.EqualValues(1370, validatorStaker.PotentialReward) // See rewards tests to explain why 1370
+
+	_, err = executor.OnCommit.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	_, err = executor.OnAbort.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	assert.ErrorIs(err, database.ErrNotFound)
+
+	validatorStaker, err = executor.OnAbort.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	assert.NoError(err)
+	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
+
+	// Test VM validators
+	executor.OnCommit.Apply(env.state)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
+	assert.True(env.config.Validators.Contains(constants.PrimaryNetworkID, nodeID))
+}
+
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	env := newEnvironment()
@@ -110,57 +167,6 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	}
 }
 
-// Ensure semantic verification updates the current and pending staker set
-// for the primary network
-func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
-	assert := assert.New(t)
-	env := newEnvironment()
-	env.ctx.Lock.Lock()
-	defer func() {
-		assert.NoError(shutdownEnvironment(env))
-	}()
-	dummyHeight := uint64(1)
-
-	// Case: Timestamp is after next validator start time
-	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
-	nodeID := ids.GenerateTestNodeID()
-	addPendingValidatorTx, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
-	assert.NoError(err)
-
-	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
-	assert.NoError(err)
-
-	executor := ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		Tx:               tx,
-	}
-	assert.NoError(tx.Unsigned.Visit(&executor))
-
-	validatorStaker, err := executor.OnCommit.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	assert.NoError(err)
-	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
-	assert.EqualValues(1370, validatorStaker.PotentialReward) // See rewards tests to explain why 1370
-
-	_, err = executor.OnCommit.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
-
-	_, err = executor.OnAbort.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
-
-	validatorStaker, err = executor.OnAbort.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-	assert.NoError(err)
-	assert.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
-
-	// Test VM validators
-	executor.OnCommit.Apply(env.state)
-	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
-	assert.True(env.config.Validators.Contains(constants.PrimaryNetworkID, nodeID))
-}
-
 // Ensure semantic verification updates the current and pending staker sets correctly.
 // Namely, it should add pending stakers whose start time is at or before the timestamp.
 // It will not remove primary network stakers; that happens in rewardTxs.
@@ -191,7 +197,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	// Staker3:                |------------------------|
 	// Staker3sub:                 |----------------|
 	// Staker4:                |------------------------|
-	// Staker5:            |----------------------------------------|
+	// Staker5:                                     |------------------------|
 	staker1 := staker{
 		nodeID:    ids.GenerateTestNodeID(),
 		startTime: defaultGenesisTime.Add(1 * time.Minute),
@@ -588,7 +594,13 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
+	_, err := addPendingValidator(
+		env,
+		pendingValidatorStartTime,
+		pendingValidatorEndTime,
+		nodeID,
+		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+	)
 	assert.NoError(t, err)
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
@@ -622,7 +634,11 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		uint64(pendingDelegatorEndTime.Unix()),
 		nodeID,
 		preFundedKeys[0].PublicKey().Address(),
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
+		[]*crypto.PrivateKeySECP256K1R{
+			preFundedKeys[0],
+			preFundedKeys[1],
+			preFundedKeys[4],
+		},
 		ids.ShortEmpty,
 	)
 	assert.NoError(t, err)
