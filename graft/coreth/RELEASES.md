@@ -1,5 +1,12 @@
 # Release Notes
 
+## [v0.8.15](https://github.com/ava-labs/coreth/releases/tag/v0.8.15)
+
+- Add optional JSON logging
+- Bump minimum go version to v1.18.1
+- Add interface for suppporting stateful precompiles
+- Remove legacy code format from the database
+
 ## [v0.8.14](https://github.com/ava-labs/coreth/releases/tag/v0.8.14)
 
 - Bump go-ethereum dependency to v1.10.20
