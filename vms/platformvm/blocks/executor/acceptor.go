@@ -1,19 +1,20 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"go.uber.org/zap"
 )
 
-var _ stateless.Visitor = &acceptor{}
+var _ blocks.Visitor = &acceptor{}
 
 // acceptor handles the logic for accepting a block.
 type acceptor struct {
@@ -22,23 +23,17 @@ type acceptor struct {
 	recentlyAccepted *window.Window
 }
 
-func (a *acceptor) ProposalBlock(b *stateless.ProposalBlock) error {
-	//  Note that:
-
-	// * We don't free the proposal block in this method.
-	//   It is freed when its child is accepted.
-	//   We need to keep this block's state in memory for its child to use.
-
-	// * We only update the metrics to reflect this block's
-	//   acceptance when its child is accepted.
-
-	// * We don't write this block to state here.
-	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	//   We do this so that in the event that the node shuts down, the proposal block
-	//   is not written to disk unless its child is.
-	//   (The VM's Shutdown method commits the database.)
-	//   The snowman.Engine requires that the last committed block is a decision block.
-
+// Note that:
+// - We don't free the proposal block in this method. It is freed when its child
+//   is accepted. We need to keep this block's state in memory for its child to
+//   use.
+// - We only update the metrics to reflect this block's acceptance when its
+//   child is accepted.
+// - We don't write this block to state here. That is done when this block's
+//   child (a CommitBlock or AbortBlock) is accepted. We do this so that in the
+//   event that the node shuts down, the proposal block is not written to disk
+//   unless its child is. (The VM's Shutdown method commits the database.)
+func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
 		"accepting block",
@@ -53,7 +48,7 @@ func (a *acceptor) ProposalBlock(b *stateless.ProposalBlock) error {
 	return nil
 }
 
-func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
+func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -99,7 +94,7 @@ func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) StandardBlock(b *stateless.StandardBlock) error {
+func (a *acceptor) StandardBlock(b *blocks.StandardBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -144,7 +139,7 @@ func (a *acceptor) StandardBlock(b *stateless.StandardBlock) error {
 	return nil
 }
 
-func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
+func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
 		zap.String("blockType", "commit"),
@@ -155,7 +150,7 @@ func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
 	return a.acceptOptionBlock(b)
 }
 
-func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
+func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
 		zap.String("blockType", "abort"),
@@ -166,7 +161,7 @@ func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
 	return a.acceptOptionBlock(b)
 }
 
-func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
+func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	parentID := b.Parent()
 
@@ -209,7 +204,7 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 	return a.state.Commit()
 }
 
-func (a *acceptor) commonAccept(b stateless.Block) error {
+func (a *acceptor) commonAccept(b blocks.Block) error {
 	blkID := b.ID()
 	if err := a.metrics.MarkAccepted(b); err != nil {
 		return fmt.Errorf("failed to accept block %s: %w", blkID, err)

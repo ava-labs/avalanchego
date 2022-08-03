@@ -1,23 +1,20 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 type standardBlockState struct {
 	onAcceptFunc func()
-}
-
-type atomicBlockState struct {
-	inputs ids.Set
+	inputs       ids.Set
 }
 
 type proposalBlockState struct {
@@ -31,8 +28,7 @@ type proposalBlockState struct {
 type blockState struct {
 	standardBlockState
 	proposalBlockState
-	atomicBlockState
-	statelessBlock stateless.Block
+	statelessBlock blocks.Block
 	onAcceptState  state.Diff
 
 	timestamp      time.Time

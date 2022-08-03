@@ -1,18 +1,20 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGetBlock(t *testing.T) {
@@ -20,7 +22,7 @@ func TestGetBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	statelessBlk, err := stateless.NewCommitBlock(ids.GenerateTestID(), 2)
+	statelessBlk, err := blocks.NewCommitBlock(ids.GenerateTestID(), 2)
 	assert.NoError(err)
 	state := state.NewMockState(ctrl)
 	manager := &manager{

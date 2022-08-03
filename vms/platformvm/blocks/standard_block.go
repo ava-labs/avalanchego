@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"fmt"
@@ -15,14 +15,14 @@ var _ Block = &StandardBlock{}
 type StandardBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Txs []*txs.Tx `serialize:"true" json:"txs"`
+	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (sb *StandardBlock) initialize(bytes []byte) error {
 	if err := sb.CommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	for _, tx := range sb.Txs {
+	for _, tx := range sb.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
@@ -30,7 +30,7 @@ func (sb *StandardBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (sb *StandardBlock) BlockTxs() []*txs.Tx { return sb.Txs }
+func (sb *StandardBlock) Txs() []*txs.Tx { return sb.Transactions }
 
 func (sb *StandardBlock) Visit(v Visitor) error {
 	return v.StandardBlock(sb)
@@ -46,7 +46,7 @@ func NewStandardBlock(
 			PrntID: parentID,
 			Hght:   height,
 		},
-		Txs: txes,
+		Transactions: txes,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a

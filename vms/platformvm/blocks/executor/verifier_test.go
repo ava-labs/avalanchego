@@ -1,11 +1,15 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,15 +17,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
@@ -32,7 +34,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: executor.Backend{},
 		backend: &backend{
@@ -62,11 +64,11 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the stateless.Codec.
+	// regiestered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := stateless.NewProposalBlock(
+	blk, err := blocks.NewProposalBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -109,7 +111,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	grandparentID := ids.GenerateTestID()
 	stateVersions := state.NewMockVersions(ctrl)
 	parentState := state.NewMockState(ctrl)
@@ -146,11 +148,11 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the stateless.Codec.
+	// regiestered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := stateless.NewAtomicBlock(
+	blk, err := blocks.NewAtomicBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -197,7 +199,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	stateVersions := state.NewMockVersions(ctrl)
 	parentState := state.NewMockState(ctrl)
 	verifier := &verifier{
@@ -244,11 +246,11 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the stateless.Codec.
+	// regiestered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := stateless.NewStandardBlock(
+	blk, err := blocks.NewStandardBlock(
 		parentID,
 		2,
 		[]*txs.Tx{
@@ -259,7 +261,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk.Txs[0].Unsigned = blkTx
+	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -267,7 +269,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs(blk.Txs).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs(blk.Transactions).Times(1)
 	stateVersions.EXPECT().SetState(blk.ID(), gomock.Any()).Times(1)
 
 	err = verifier.StandardBlock(blk)
@@ -294,7 +296,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	stateVersions := state.NewMockVersions(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
@@ -320,7 +322,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := stateless.NewCommitBlock(
+	blk, err := blocks.NewCommitBlock(
 		parentID,
 		2,
 	)
@@ -358,7 +360,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	stateVersions := state.NewMockVersions(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
@@ -384,7 +386,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := stateless.NewAbortBlock(
+	blk, err := blocks.NewAbortBlock(
 		parentID,
 		2,
 	)

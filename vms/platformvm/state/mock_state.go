@@ -13,7 +13,7 @@ import (
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	stateless "github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -501,7 +501,7 @@ func (m *MockBlockState) EXPECT() *MockBlockStateMockRecorder {
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockBlockState) AddStatelessBlock(block stateless.Block, status choices.Status) {
+func (m *MockBlockState) AddStatelessBlock(block blocks.Block, status choices.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddStatelessBlock", block, status)
 }
@@ -513,10 +513,10 @@ func (mr *MockBlockStateMockRecorder) AddStatelessBlock(block, status interface{
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockBlockState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+func (m *MockBlockState) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
-	ret0, _ := ret[0].(stateless.Block)
+	ret0, _ := ret[0].(blocks.Block)
 	ret1, _ := ret[1].(choices.Status)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -588,7 +588,7 @@ func (mr *MockStateMockRecorder) AddRewardUTXO(txID, utxo interface{}) *gomock.C
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockState) AddStatelessBlock(block stateless.Block, status choices.Status) {
+func (m *MockState) AddStatelessBlock(block blocks.Block, status choices.Status) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddStatelessBlock", block, status)
 }
@@ -902,10 +902,10 @@ func (mr *MockStateMockRecorder) GetStartTime(nodeID interface{}) *gomock.Call {
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockState) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+func (m *MockState) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blockID)
-	ret0, _ := ret[0].(stateless.Block)
+	ret0, _ := ret[0].(blocks.Block)
 	ret1, _ := ret[1].(choices.Status)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
