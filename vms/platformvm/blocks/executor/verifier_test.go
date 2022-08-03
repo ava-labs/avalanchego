@@ -261,7 +261,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk.Txs[0].Unsigned = blkTx
+	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -269,7 +269,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs(blk.Txs).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs(blk.Transactions).Times(1)
 	stateVersions.EXPECT().SetState(blk.ID(), gomock.Any()).Times(1)
 
 	err = verifier.StandardBlock(blk)

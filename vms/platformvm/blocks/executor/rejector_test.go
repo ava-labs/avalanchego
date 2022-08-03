@@ -151,7 +151,7 @@ func TestRejectBlock(t *testing.T) {
 			}
 
 			// Set expected calls on dependencies.
-			for _, tx := range blk.BlockTxs() {
+			for _, tx := range blk.Txs() {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
 			gomock.InOrder(

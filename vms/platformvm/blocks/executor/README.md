@@ -1,4 +1,4 @@
-# Package `stateful`
+# Package `executor`
 
 This package deals with state management for P-Chain blocks.
 

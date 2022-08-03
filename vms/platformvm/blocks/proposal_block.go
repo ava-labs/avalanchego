@@ -26,7 +26,7 @@ func (pb *ProposalBlock) initialize(bytes []byte) error {
 	return pb.Tx.Sign(txs.Codec, nil)
 }
 
-func (pb *ProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
+func (pb *ProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
 
 func (pb *ProposalBlock) Visit(v Visitor) error {
 	return v.ProposalBlock(pb)

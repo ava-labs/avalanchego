@@ -186,8 +186,8 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 		return err
 	}
 
-	funcs := make([]func(), 0, len(b.Txs))
-	for _, tx := range b.Txs {
+	funcs := make([]func(), 0, len(b.Transactions))
+	for _, tx := range b.Transactions {
 		txExecutor := &executor.StandardTxExecutor{
 			Backend: &v.txExecutorBackend,
 			State:   onAcceptState,
@@ -266,7 +266,7 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 	blkState.onAcceptState = onAcceptState
 	v.blkIDToState[blkID] = blkState
 	v.stateVersions.SetState(blkID, blkState.onAcceptState)
-	v.Mempool.RemoveDecisionTxs(b.Txs)
+	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 

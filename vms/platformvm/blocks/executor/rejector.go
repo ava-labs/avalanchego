@@ -81,7 +81,7 @@ func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
 		zap.Stringer("parent", b.Parent()),
 	)
 
-	for _, tx := range b.Txs {
+	for _, tx := range b.Transactions {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",

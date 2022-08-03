@@ -47,7 +47,7 @@ func TestStandardBlocks(t *testing.T) {
 
 		parsedStandardBlk, ok := parsed.(*StandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedStandardBlk.Txs)
+		assert.Equal(txs, parsedStandardBlk.Transactions)
 	}
 }
 

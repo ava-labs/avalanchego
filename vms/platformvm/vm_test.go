@@ -941,7 +941,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(blocks.Block).BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -986,7 +986,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID = blk.(blocks.Block).BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1040,7 +1040,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(blocks.Block).BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1080,7 +1080,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 
-	txID = blk.(blocks.Block).BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(commit.ID())
 		assert.True(ok)
@@ -1135,7 +1135,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(blocks.Block).BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1176,7 +1176,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 
-	txID = blk.(blocks.Block).BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(commit.ID())
 		assert.True(ok)
@@ -1356,7 +1356,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID := blk.(blocks.Block).BlockTxs()[0].ID()
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1402,7 +1402,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID = blk.(blocks.Block).BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -1450,7 +1450,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
-	txID = blk.(blocks.Block).BlockTxs()[0].ID()
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -2422,7 +2422,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(abort.Verify())
 	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	proposalTx := blk.(blocks.Block).BlockTxs()[0]
+	proposalTx := blk.(blocks.Block).Txs()[0]
 	{
 		onAccept, ok := secondVM.stateVersions.GetState(abort.ID())
 		assert.True(ok)
@@ -2464,7 +2464,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(commit.Verify())
 	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	proposalTx = blk.(blocks.Block).BlockTxs()[0]
+	proposalTx = blk.(blocks.Block).Txs()[0]
 	{
 		onAccept, ok := secondVM.stateVersions.GetState(commit.ID())
 		assert.True(ok)

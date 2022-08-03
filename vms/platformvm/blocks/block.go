@@ -15,8 +15,8 @@ type Block interface {
 	Bytes() []byte
 	Height() uint64
 
-	// BlockTxs returns list of transactions contained in the block
-	BlockTxs() []*txs.Tx
+	// Txs returns list of transactions contained in the block
+	Txs() []*txs.Tx
 
 	Visit(visitor Visitor) error
 

@@ -68,7 +68,7 @@ func (m *blockMetrics) AtomicBlock(b *blocks.AtomicBlock) error {
 
 func (m *blockMetrics) StandardBlock(b *blocks.StandardBlock) error {
 	m.numStandardBlocks.Inc()
-	for _, tx := range b.Txs {
+	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
 			return err
 		}

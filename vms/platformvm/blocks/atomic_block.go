@@ -29,7 +29,7 @@ func (ab *AtomicBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
+func (ab *AtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
 func (ab *AtomicBlock) Visit(v Visitor) error {
 	return v.AtomicBlock(ab)
