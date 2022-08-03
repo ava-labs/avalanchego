@@ -23,28 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type stakerStatus uint
-
-const (
-	pending stakerStatus = iota
-	current
-)
-
-type staker struct {
-	nodeID             ids.NodeID
-	rewardAddress      ids.ShortID
-	startTime, endTime time.Time
-}
-
-type test struct {
-	description           string
-	stakers               []staker
-	subnetStakers         []staker
-	advanceTimeTo         []time.Time
-	expectedStakers       map[ids.NodeID]stakerStatus
-	expectedSubnetStakers map[ids.NodeID]stakerStatus
-}
-
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
@@ -829,6 +807,30 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)
 	assert.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
+}
+
+// Helpers
+
+type stakerStatus uint
+
+const (
+	pending stakerStatus = iota
+	current
+)
+
+type staker struct {
+	nodeID             ids.NodeID
+	rewardAddress      ids.ShortID
+	startTime, endTime time.Time
+}
+
+type test struct {
+	description           string
+	stakers               []staker
+	subnetStakers         []staker
+	advanceTimeTo         []time.Time
+	expectedStakers       map[ids.NodeID]stakerStatus
+	expectedSubnetStakers map[ids.NodeID]stakerStatus
 }
 
 func addPendingValidator(
