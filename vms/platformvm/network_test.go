@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -49,7 +48,6 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 		return nil
 	}
 
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	nodeID := ids.GenerateTestNodeID()
 
 	// create a tx
@@ -94,8 +92,6 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-
 	// create a tx and mark as invalid
 	tx := getValidTx(vm, t)
 	txID := tx.ID()
@@ -123,7 +119,6 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.blockBuilder
 
 	var gossipedBytes []byte

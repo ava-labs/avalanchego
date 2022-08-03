@@ -164,7 +164,7 @@ func (vm *VM) Initialize(
 			err,
 		)
 	}
-	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
+	vm.network = newNetwork(appSender, vm)
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
 
 	is, err := NewState(vm, vm.dbManager.Current().Database, genesisBytes, registerer)

@@ -325,7 +325,6 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
 			ApricotPhase3Time:      defaultValidateEndTime,
-			ApricotPhase4Time:      defaultValidateEndTime,
 			ApricotPhase5Time:      defaultValidateEndTime,
 		},
 	}}

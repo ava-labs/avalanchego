@@ -6,7 +6,6 @@ package platformvm
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -23,7 +22,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.blockBuilder
 
 	// add a tx to it
@@ -59,7 +57,6 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	blockBuilder := &vm.blockBuilder
 	mempool := blockBuilder.Mempool.(*mempool)
 
@@ -87,7 +84,6 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 		assert.NoError(vm.Shutdown())
 		vm.ctx.Lock.Unlock()
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	blockBuilder := &vm.blockBuilder
 	mempool := blockBuilder.Mempool.(*mempool)
 
