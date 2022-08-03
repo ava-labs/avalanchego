@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -14,14 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var (
-	_ Metrics = &metrics{}
-	_ Metrics = &noopMetrics{}
-)
+var _ Metrics = &metrics{}
 
 type Metrics interface {
 	// Mark that an option vote that we initially preferred was accepted.
@@ -29,7 +24,7 @@ type Metrics interface {
 	// Mark that an option vote that we initially preferred was rejected.
 	MarkOptionVoteLost()
 	// Mark that the given block was accepted.
-	MarkAccepted(stateless.Block) error
+	MarkAccepted(blocks.Block) error
 	// Returns an interceptor function to use for API requests
 	// to track API metrics.
 	InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request
@@ -61,117 +56,103 @@ func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
-) (*metrics, error) {
-	m := &metrics{
-		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "percent_connected",
-			Help:      "Percent of connected stake",
-		}),
-		subnetPercentConnected: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "percent_connected_subnet",
-				Help:      "Percent of connected subnet weight",
-			},
-			[]string{"subnetID"},
-		),
-		localStake: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "local_staked",
-			Help:      "Total amount of AVAX on this node staked",
-		}),
-		totalStake: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "total_staked",
-			Help:      "Total amount of AVAX staked",
-		}),
-		numAbortBlocks:    newBlockMetrics(namespace, "abort"),
-		numAtomicBlocks:   newBlockMetrics(namespace, "atomic"),
-		numCommitBlocks:   newBlockMetrics(namespace, "commit"),
-		numProposalBlocks: newBlockMetrics(namespace, "proposal"),
-		numStandardBlocks: newBlockMetrics(namespace, "standard"),
-		numVotesWon: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "votes_won",
-			Help:      "Total number of votes this node has won",
-		}),
-		numVotesLost: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "votes_lost",
-			Help:      "Total number of votes this node has lost",
-		}),
+) (Metrics, error) {
+	res := &metrics{}
 
-		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
+	blockMetrics, err := newBlockMetrics(namespace, registerer)
+	res.blockMetrics = blockMetrics
+
+	res.percentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "percent_connected",
+		Help:      "Percent of connected stake",
+	})
+	res.subnetPercentConnected = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "validator_sets_cached",
-			Help:      "Total number of validator sets cached",
-		}),
-		validatorSetsCreated: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_created",
-			Help:      "Total number of validator sets created from applying difflayers",
-		}),
-		validatorSetsHeightDiff: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_height_diff_sum",
-			Help:      "Total number of validator sets diffs applied for generating validator sets",
-		}),
-		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "validator_sets_duration_sum",
-			Help:      "Total amount of time generating validator sets in nanoseconds",
-		}),
-	}
-	var err error
-	m.txMetrics, err = newTxMetrics(namespace, registerer)
-	errs := wrappers.Errs{}
-	errs.Add(err)
-	m.apiRequestMetrics, err = metric.NewAPIInterceptor(namespace, registerer)
+			Name:      "percent_connected_subnet",
+			Help:      "Percent of connected subnet weight",
+		},
+		[]string{"subnetID"},
+	)
+	res.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "local_staked",
+		Help:      "Total amount of AVAX on this node staked",
+	})
+	res.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "total_staked",
+		Help:      "Total amount of AVAX staked",
+	})
+
+	res.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "votes_won",
+		Help:      "Total number of votes this node has won",
+	})
+	res.numVotesLost = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "votes_lost",
+		Help:      "Total number of votes this node has lost",
+	})
+
+	res.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_cached",
+		Help:      "Total number of validator sets cached",
+	})
+	res.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_created",
+		Help:      "Total number of validator sets created from applying difflayers",
+	})
+	res.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_height_diff_sum",
+		Help:      "Total number of validator sets diffs applied for generating validator sets",
+	})
+	res.validatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "validator_sets_duration_sum",
+		Help:      "Total amount of time generating validator sets in nanoseconds",
+	})
+
+	errs := wrappers.Errs{Err: err}
+	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
+	res.apiRequestMetrics = apiRequestMetrics
 	errs.Add(
 		err,
 
-		registerer.Register(m.percentConnected),
-		registerer.Register(m.subnetPercentConnected),
-		registerer.Register(m.localStake),
-		registerer.Register(m.totalStake),
+		registerer.Register(res.percentConnected),
+		registerer.Register(res.subnetPercentConnected),
+		registerer.Register(res.localStake),
+		registerer.Register(res.totalStake),
 
-		registerer.Register(m.numAbortBlocks),
-		registerer.Register(m.numAtomicBlocks),
-		registerer.Register(m.numCommitBlocks),
-		registerer.Register(m.numProposalBlocks),
-		registerer.Register(m.numStandardBlocks),
+		registerer.Register(res.numVotesWon),
+		registerer.Register(res.numVotesLost),
 
-		registerer.Register(m.numVotesWon),
-		registerer.Register(m.numVotesLost),
-
-		registerer.Register(m.validatorSetsCreated),
-		registerer.Register(m.validatorSetsCached),
-		registerer.Register(m.validatorSetsHeightDiff),
-		registerer.Register(m.validatorSetsDuration),
+		registerer.Register(res.validatorSetsCreated),
+		registerer.Register(res.validatorSetsCached),
+		registerer.Register(res.validatorSetsHeightDiff),
+		registerer.Register(res.validatorSetsDuration),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets
 	for subnetID := range whitelistedSubnets {
 		// initialize to 0
-		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
+		res.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
 	}
-	return m, errs.Err
+	return res, errs.Err
 }
 
 type metrics struct {
-	txMetrics *txMetrics
+	blockMetrics *blockMetrics
 
 	percentConnected       prometheus.Gauge
 	subnetPercentConnected *prometheus.GaugeVec
 	localStake             prometheus.Gauge
 	totalStake             prometheus.Gauge
-
-	numAbortBlocks,
-	numAtomicBlocks,
-	numCommitBlocks,
-	numProposalBlocks,
-	numStandardBlocks prometheus.Counter
 
 	numVotesWon, numVotesLost prometheus.Counter
 
@@ -183,14 +164,6 @@ type metrics struct {
 	apiRequestMetrics metric.APIInterceptor
 }
 
-func newBlockMetrics(namespace string, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_blks_accepted", name),
-		Help:      fmt.Sprintf("Number of %s blocks accepted", name),
-	})
-}
-
 func (m *metrics) MarkOptionVoteWon() {
 	m.numVotesWon.Inc()
 }
@@ -199,30 +172,8 @@ func (m *metrics) MarkOptionVoteLost() {
 	m.numVotesLost.Inc()
 }
 
-// TODO: use a visitor here
-func (m *metrics) MarkAccepted(b stateless.Block) error {
-	switch b := b.(type) {
-	case *stateless.AbortBlock:
-		m.numAbortBlocks.Inc()
-	case *stateless.AtomicBlock:
-		m.numAtomicBlocks.Inc()
-		return m.AcceptTx(b.Tx)
-	case *stateless.CommitBlock:
-		m.numCommitBlocks.Inc()
-	case *stateless.ProposalBlock:
-		m.numProposalBlocks.Inc()
-		return m.AcceptTx(b.Tx)
-	case *stateless.StandardBlock:
-		m.numStandardBlocks.Inc()
-		for _, tx := range b.Txs {
-			if err := m.AcceptTx(tx); err != nil {
-				return err
-			}
-		}
-	default:
-		return fmt.Errorf("got unexpected block type %T", b)
-	}
-	return nil
+func (m *metrics) MarkAccepted(b blocks.Block) error {
+	return b.Visit(m.blockMetrics)
 }
 
 func (m *metrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
@@ -264,43 +215,3 @@ func (m *metrics) SetSubnetPercentConnected(label string, percent float64) {
 func (m *metrics) SetPercentConnected(percent float64) {
 	m.percentConnected.Set(percent)
 }
-
-func (m *metrics) AcceptTx(tx *txs.Tx) error {
-	return tx.Unsigned.Visit(m.txMetrics)
-}
-
-type noopMetrics struct{}
-
-func NewNoopMetrics() *noopMetrics {
-	return &noopMetrics{}
-}
-
-func (m *noopMetrics) MarkOptionVoteWon() {}
-
-func (m *noopMetrics) MarkOptionVoteLost() {}
-
-func (m *noopMetrics) MarkAccepted(stateless.Block) error { return nil }
-
-func (m *noopMetrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
-	return func(*rpc.RequestInfo) *http.Request { return nil }
-}
-
-func (m *noopMetrics) AfterRequestFunc() func(*rpc.RequestInfo) {
-	return func(ri *rpc.RequestInfo) {}
-}
-
-func (m *noopMetrics) IncValidatorSetsCreated() {}
-
-func (m *noopMetrics) IncValidatorSetsCached() {}
-
-func (m *noopMetrics) AddValidatorSetsDuration(time.Duration) {}
-
-func (m *noopMetrics) AddValidatorSetsHeightDiff(float64) {}
-
-func (m *noopMetrics) SetLocalStake(float64) {}
-
-func (m *noopMetrics) SetTotalStake(float64) {}
-
-func (m *noopMetrics) SetSubnetPercentConnected(label string, percent float64) {}
-
-func (m *noopMetrics) SetPercentConnected(percent float64) {}

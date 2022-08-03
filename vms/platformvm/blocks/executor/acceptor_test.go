@@ -1,11 +1,15 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -17,19 +21,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
 	assert := assert.New(t)
 
-	blk, err := stateless.NewProposalBlock(
+	blk, err := blocks.NewProposalBlock(
 		ids.GenerateTestID(),
 		1,
 		&txs.Tx{
@@ -87,7 +89,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewAtomicBlock(
+	blk, err := blocks.NewAtomicBlock(
 		parentID,
 		1,
 		&txs.Tx{
@@ -171,7 +173,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewStandardBlock(
+	blk, err := blocks.NewStandardBlock(
 		parentID,
 		1,
 		[]*txs.Tx{
@@ -264,7 +266,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewCommitBlock(
+	blk, err := blocks.NewCommitBlock(
 		parentID,
 		1,
 	)
@@ -296,7 +298,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentOnAcceptState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := &blockState{
 		statelessBlock: parentStatelessBlk,
 		onAcceptState:  parentOnAcceptState,
@@ -358,7 +360,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewAbortBlock(
+	blk, err := blocks.NewAbortBlock(
 		parentID,
 		1,
 	)
@@ -390,7 +392,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnAcceptState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := &blockState{
 		statelessBlock: parentStatelessBlk,
 		onAcceptState:  parentOnAcceptState,

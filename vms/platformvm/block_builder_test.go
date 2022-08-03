@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -42,10 +42,10 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blkIntf, err := vm.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
-	blk, ok := blkIntf.(*stateful.Block).Block.(*stateless.StandardBlock)
+	blk, ok := blkIntf.(*executor.Block).Block.(*blocks.StandardBlock)
 	assert.True(ok, "expected standard block")
-	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
-	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
+	assert.Len(blk.Transactions, 1, "standard block should include a single transaction")
+	assert.Equal(txID, blk.Transactions[0].ID(), "standard block does not include expected transaction")
 
 	has = mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")

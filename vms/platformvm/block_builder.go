@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -57,23 +55,19 @@ func (b *blockBuilder) Initialize(
 	mempool mempool.Mempool,
 	vm *VM,
 	toEngine chan<- common.Message,
-	registerer prometheus.Registerer,
-) error {
+) {
+	b.Mempool = mempool
 	b.vm = vm
 	b.toEngine = toEngine
-	b.Mempool = mempool
 
 	b.timer = timer.NewTimer(func() {
 		b.vm.ctx.Lock.Lock()
 		defer b.vm.ctx.Lock.Unlock()
 
-		b.resetTimer()
+		b.ResetBlockTimer()
 	})
 	go b.vm.ctx.Log.RecoverAndPanic(b.timer.Dispatch)
-	return nil
 }
-
-func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
@@ -105,7 +99,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
-		b.resetTimer()
+		b.ResetBlockTimer()
 	}()
 
 	b.vm.ctx.Log.Debug("starting to attempt to build a block")
@@ -120,13 +114,13 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 
 	preferredState, ok := b.vm.stateVersions.GetState(preferredID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve state for block %s, which should be a decision block", preferredID)
+		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
 	// Try building a standard block.
 	if b.HasDecisionTxs() {
 		txs := b.PopDecisionTxs(TargetBlockSize)
-		statelessBlk, err := stateless.NewStandardBlock(preferredID, nextHeight, txs)
+		statelessBlk, err := blocks.NewStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +137,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, rewardValidatorTx)
+		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, rewardValidatorTx)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +154,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
@@ -188,23 +182,21 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
 		return b.vm.manager.NewBlock(statelessBlk), nil
 	}
 
-	statelessBlk, err := stateless.NewProposalBlock(preferredID, nextHeight, tx)
+	statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, tx)
 	if err != nil {
 		return nil, err
 	}
 	return b.vm.manager.NewBlock(statelessBlk), nil
 }
 
-// ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
-// consensus engine.
-func (b *blockBuilder) resetTimer() {
+func (b *blockBuilder) ResetBlockTimer() {
 	// If there is a pending transaction trigger building of a block with that transaction
 	if b.HasDecisionTxs() {
 		b.notifyBlockReady()
@@ -213,7 +205,6 @@ func (b *blockBuilder) resetTimer() {
 
 	preferredState, ok := b.vm.stateVersions.GetState(b.vm.preferred)
 	if !ok {
-		// The preferred block should always be a decision block
 		b.vm.ctx.Log.Error("couldn't get preferred block state",
 			zap.Stringer("blkID", b.vm.preferred),
 		)
