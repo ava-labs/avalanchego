@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ type AbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (*AbortBlock) BlockTxs() []*txs.Tx { return nil }
+func (*AbortBlock) Txs() []*txs.Tx { return nil }
 
 func (b *AbortBlock) Visit(v Visitor) error {
 	return v.AbortBlock(b)
@@ -54,11 +54,11 @@ type CommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
+func (*CommitBlock) Txs() []*txs.Tx { return nil }
+
 func (b *CommitBlock) Visit(v Visitor) error {
 	return v.CommitBlock(b)
 }
-
-func (*CommitBlock) BlockTxs() []*txs.Tx { return nil }
 
 func NewCommitBlock(
 	blkVersion uint16,

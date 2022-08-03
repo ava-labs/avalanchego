@@ -7,14 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/stretchr/testify/assert"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 // TODO: possibly better placed in platformvm package?
@@ -32,7 +34,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	env.ctx.Lock.Lock()
 	env.sender.SendAppGossipF = func(b []byte) error { return nil }
 
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	key, err := testKeyFactory.NewPrivateKey()
@@ -69,7 +71,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(env, assert, firstAdvanceTimeBlock)
 
-	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(env.config.MinStakeDuration)
 
 	// create valid tx
@@ -103,7 +105,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(env.config.MinStakeDuration)
 
-	env.clk.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
+	env.clk.Set(secondDelegatorStartTime.Add(-10 * txexecutor.SyncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
@@ -147,7 +149,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -341,14 +343,14 @@ func verifyAndAcceptProposalCommitment(
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*stateful.Block)
+	commit, ok := options[0].(*blockexecutor.Block)
 	assert.True(ok, "expected commit block to be preferred")
-	_, ok = options[0].(*stateful.Block).Block.(*stateless.CommitBlock)
+	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*stateful.Block)
+	abort, ok := options[1].(*blockexecutor.Block)
 	assert.True(ok, "expected abort block to be issued")
-	_, ok = options[1].(*stateful.Block).Block.(*stateless.AbortBlock)
+	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	err = commit.Verify()

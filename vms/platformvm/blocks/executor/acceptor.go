@@ -1,19 +1,20 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/window"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"go.uber.org/zap"
 )
 
-var _ stateless.Visitor = &acceptor{}
+var _ blocks.Visitor = &acceptor{}
 
 // acceptor handles the logic for accepting a block.
 type acceptor struct {
@@ -22,7 +23,7 @@ type acceptor struct {
 	recentlyAccepted *window.Window
 }
 
-func (a *acceptor) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
 	// Blueberry proposal blocks do modify chain state by (possibly) advancing
 	// chain time. We carry out these state changes before moving to options
 	blkID := b.ID()
@@ -42,7 +43,7 @@ func (a *acceptor) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) e
 	return a.commonVisitProposalBlock(b)
 }
 
-func (a *acceptor) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
 		"accepting Blueberry Proposal Block",
@@ -54,7 +55,7 @@ func (a *acceptor) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error
 	return a.commonVisitProposalBlock(b)
 }
 
-func (a *acceptor) commonVisitProposalBlock(b stateless.Block) error {
+func (a *acceptor) commonVisitProposalBlock(b blocks.Block) error {
 	/* Note that:
 
 	// * We don't free the proposal block in this method.
@@ -78,7 +79,7 @@ func (a *acceptor) commonVisitProposalBlock(b stateless.Block) error {
 	return nil
 }
 
-func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
+func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -124,15 +125,15 @@ func (a *acceptor) AtomicBlock(b *stateless.AtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) BlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
+func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
 	return a.standardBlock(b)
 }
 
-func (a *acceptor) ApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
+func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return a.standardBlock(b)
 }
 
-func (a *acceptor) standardBlock(b stateless.Block) error {
+func (a *acceptor) standardBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -177,7 +178,7 @@ func (a *acceptor) standardBlock(b stateless.Block) error {
 	return nil
 }
 
-func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
+func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
 		zap.String("blockType", "commit"),
@@ -188,7 +189,7 @@ func (a *acceptor) CommitBlock(b *stateless.CommitBlock) error {
 	return a.acceptOptionBlock(b)
 }
 
-func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
+func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
 		zap.String("blockType", "abort"),
@@ -199,7 +200,7 @@ func (a *acceptor) AbortBlock(b *stateless.AbortBlock) error {
 	return a.acceptOptionBlock(b)
 }
 
-func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
+func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	parentID := b.Parent()
 
@@ -242,7 +243,7 @@ func (a *acceptor) acceptOptionBlock(b stateless.Block) error {
 	return a.state.Commit()
 }
 
-func (a *acceptor) commonAccept(b stateless.Block) error {
+func (a *acceptor) commonAccept(b blocks.Block) error {
 	blkID := b.ID()
 
 	if err := a.metrics.MarkAccepted(b); err != nil {

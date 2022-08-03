@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"fmt"
@@ -82,7 +82,7 @@ func (b *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
 	return b.Tx.Sign(txs.Codec, nil)
 }
 
-func (b *ApricotProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{b.Tx} }
+func (b *ApricotProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
 func (b *ApricotProposalBlock) Visit(v Visitor) error {
 	return v.ApricotProposalBlock(b)
@@ -116,7 +116,7 @@ func (b *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error 
 	return nil
 }
 
-func (b *BlueberryProposalBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{b.Tx} }
+func (b *BlueberryProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
 func (b *BlueberryProposalBlock) Visit(v Visitor) error {
 	return v.BlueberryProposalBlock(b)

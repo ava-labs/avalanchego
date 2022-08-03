@@ -39,6 +39,9 @@ var (
 )
 
 type BlockTimer interface {
+	// ResetBlockTimer schedules a timer to notify the consensus engine once
+	// there is a block ready to be built. If a block is ready to be built when
+	// this function is called, the engine will be notified directly.
 	ResetBlockTimer()
 }
 

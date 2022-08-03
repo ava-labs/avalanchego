@@ -1,11 +1,15 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -17,20 +21,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
 	assert := assert.New(t)
 
-	blk, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		ids.GenerateTestID(),
 		1,
@@ -43,7 +45,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	proposalBlk, ok := blk.(*stateless.ApricotProposalBlock)
+	proposalBlk, ok := blk.(*blocks.ApricotProposalBlock)
 	assert.True(ok)
 
 	metrics := metrics.NewNoopMetrics()
@@ -91,7 +93,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewAtomicBlock(
+	blk, err := blocks.NewAtomicBlock(
 		parentID,
 		1,
 		&txs.Tx{
@@ -175,8 +177,8 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewStandardBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewStandardBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		1,
@@ -191,7 +193,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	apricotStandardBlk, ok := blk.(*stateless.ApricotStandardBlock)
+	apricotStandardBlk, ok := blk.(*blocks.ApricotStandardBlock)
 	assert.True(ok)
 
 	// Set expected calls on the state.
@@ -272,14 +274,14 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewCommitBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewCommitBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		1,
 	)
 	assert.NoError(err)
-	commitBlk, ok := blk.(*stateless.CommitBlock)
+	commitBlk, ok := blk.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	blkID := blk.ID()
@@ -308,7 +310,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentOnAcceptState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := &blockState{
 		statelessBlock: parentStatelessBlk,
 		onAcceptState:  parentOnAcceptState,
@@ -370,14 +372,14 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := stateless.NewAbortBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewAbortBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		1,
 	)
 	assert.NoError(err)
-	abortBlk, ok := blk.(*stateless.AbortBlock)
+	abortBlk, ok := blk.(*blocks.AbortBlock)
 	assert.True(ok)
 
 	blkID := blk.ID()
@@ -406,7 +408,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnAcceptState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := &blockState{
 		statelessBlock: parentStatelessBlk,
 		onAcceptState:  parentOnAcceptState,

@@ -8,20 +8,21 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"go.uber.org/zap"
 
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -66,8 +67,8 @@ type blockBuilder struct {
 	Network
 
 	txBuilder         p_tx_builder.Builder
-	txExecutorBackend executor.Backend
-	blkManager        stateful.Manager
+	txExecutorBackend txexecutor.Backend
+	blkManager        blockexecutor.Manager
 
 	// ID of the preferred block to build on top of
 	preferredBlockID ids.ID
@@ -85,12 +86,12 @@ type blockBuilder struct {
 func NewBlockBuilder(
 	mempool mempool.Mempool,
 	txBuilder p_tx_builder.Builder,
-	txExecutorBackend executor.Backend,
-	blkManager stateful.Manager,
+	txExecutorBackend txexecutor.Backend,
+	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
 ) BlockBuilder {
-	blkBuilder := &blockBuilder{
+	builder := &blockBuilder{
 		Mempool:           mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
@@ -98,22 +99,23 @@ func NewBlockBuilder(
 		toEngine:          toEngine,
 	}
 
-	blkBuilder.timer = timer.NewTimer(
+	builder.timer = timer.NewTimer(
 		func() {
 			txExecutorBackend.Ctx.Lock.Lock()
 			defer txExecutorBackend.Ctx.Lock.Unlock()
 
-			blkBuilder.resetTimer()
-		},
-	)
+			builder.ResetBlockTimer()
+		})
 
-	blkBuilder.Network = NewNetwork(
+	builder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
-		blkBuilder,
+		builder,
 		txExecutorBackend.Config.ApricotPhase4Time,
 		appSender,
 	)
-	return blkBuilder
+
+	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
+	return builder
 }
 
 func (b *blockBuilder) StartTimer() { b.timer.Dispatch() }
@@ -124,15 +126,13 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) error {
 		return nil
 	}
 	b.preferredBlockID = blockID
-	b.resetTimer()
+	b.ResetBlockTimer()
 	return nil
 }
 
 func (b *blockBuilder) Preferred() (snowman.Block, error) {
 	return b.blkManager.GetBlock(b.preferredBlockID)
 }
-
-func (b *blockBuilder) ResetBlockTimer() { b.resetTimer() }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
@@ -143,7 +143,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 		return nil
 	}
 
-	verifier := executor.MempoolTxVerifier{
+	verifier := txexecutor.MempoolTxVerifier{
 		Backend:  &b.txExecutorBackend,
 		ParentID: b.preferredBlockID, // We want to build off of the preferred block
 		Tx:       tx,
@@ -164,7 +164,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
-		b.resetTimer()
+		b.ResetBlockTimer()
 	}()
 
 	ctx := b.txExecutorBackend.Ctx
@@ -192,7 +192,7 @@ func (b *blockBuilder) Shutdown() {
 
 // resetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
-func (b *blockBuilder) resetTimer() {
+func (b *blockBuilder) ResetBlockTimer() {
 	blkBuildStrategy, err := b.getBuildingStrategy()
 	if err != nil {
 		return
@@ -224,7 +224,7 @@ func (b *blockBuilder) resetTimer() {
 		)
 		return
 	}
-	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
 			zap.Error(err),
@@ -276,7 +276,7 @@ func (b *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
 func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
-	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(preferredState)
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
 	}
@@ -295,7 +295,7 @@ func (b *blockBuilder) dropExpiredProposalTxs() {
 	var (
 		ctx      = b.txExecutorBackend.Ctx
 		now      = b.txExecutorBackend.Clk.Time()
-		syncTime = now.Add(executor.SyncBound)
+		syncTime = now.Add(txexecutor.SyncBound)
 	)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PeekProposalTx()

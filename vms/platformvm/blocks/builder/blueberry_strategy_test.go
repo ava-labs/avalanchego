@@ -7,12 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/stretchr/testify/assert"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestBlueberryPickingOrder(t *testing.T) {
@@ -39,7 +41,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	assert.NoError(err)
 
 	// accept validator as pending
-	txExecutor := executor.ProposalTxExecutor{
+	txExecutor := txexecutor.ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: env.state.GetLastAccepted(),
 		Tx:               validatorTx,
@@ -71,7 +73,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	}
 
 	// start time is beyond maximal distance from chain time
-	starkerTxStartTime := nextChainTime.Add(executor.MaxFutureStartTime).Add(time.Second)
+	starkerTxStartTime := nextChainTime.Add(txexecutor.MaxFutureStartTime).Add(time.Second)
 	stakerTx, err := createTestValidatorTx(env, starkerTxStartTime, starkerTxStartTime.Add(time.Hour))
 	assert.NoError(err)
 	assert.NoError(env.mempool.Add(stakerTx))
@@ -80,12 +82,12 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err := env.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(nextChainTime))
-	stdBlk, ok := blk.(*stateful.Block)
+	stdBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = stdBlk.Block.(*stateless.BlueberryStandardBlock)
+	_, ok = stdBlk.Block.(*blocks.BlueberryStandardBlock)
 	assert.True(ok)
-	assert.True(len(decisionTxs) == len(stdBlk.BlockTxs()))
-	for i, tx := range stdBlk.BlockTxs() {
+	assert.True(len(decisionTxs) == len(stdBlk.Txs()))
+	for i, tx := range stdBlk.Txs() {
 		assert.Equal(decisionTxs[i].ID(), tx.ID())
 	}
 
@@ -95,11 +97,11 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err = env.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(nextChainTime))
-	rewardBlk, ok := blk.(*stateful.OracleBlock)
+	rewardBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = rewardBlk.Block.Block.(*stateless.BlueberryProposalBlock)
+	_, ok = rewardBlk.Block.(*blocks.BlueberryProposalBlock)
 	assert.True(ok)
-	rewardTx, ok := rewardBlk.BlockTxs()[0].Unsigned.(*txs.RewardValidatorTx)
+	rewardTx, ok := rewardBlk.Txs()[0].Unsigned.(*txs.RewardValidatorTx)
 	assert.True(ok)
 	assert.Equal(validatorTx.ID(), rewardTx.TxID)
 
@@ -116,20 +118,20 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	// mempool proposal tx is too far in the future. A
 	// proposal block including mempool proposalTx
 	// will be issued to advance time and
-	now = nextChainTime.Add(executor.MaxFutureStartTime / 2)
+	now = nextChainTime.Add(txexecutor.MaxFutureStartTime / 2)
 	env.clk.Set(now)
 	blk, err = env.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(now))
-	proposalBlk, ok := blk.(*stateful.OracleBlock)
+	proposalBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = proposalBlk.Block.Block.(*stateless.BlueberryProposalBlock)
+	_, ok = proposalBlk.Block.(*blocks.BlueberryProposalBlock)
 	assert.True(ok)
-	assert.Equal(stakerTx.ID(), proposalBlk.BlockTxs()[0].ID())
+	assert.Equal(stakerTx.ID(), proposalBlk.Txs()[0].ID())
 
 	// Finally an empty standard block can be issued to advance time
 	// if no mempool txs are available
-	now, err = executor.GetNextStakerChangeTime(env.state)
+	now, err = txexecutor.GetNextStakerChangeTime(env.state)
 	assert.NoError(err)
 	env.clk.Set(now)
 
@@ -137,9 +139,9 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	blk, err = env.BlockBuilder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(now))
-	emptyStdBlk, ok := blk.(*stateful.Block)
+	emptyStdBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = emptyStdBlk.Block.(*stateless.BlueberryStandardBlock)
+	_, ok = emptyStdBlk.Block.(*blocks.BlueberryStandardBlock)
 	assert.True(ok)
-	assert.True(len(emptyStdBlk.BlockTxs()) == 0)
+	assert.True(len(emptyStdBlk.Txs()) == 0)
 }

@@ -1,26 +1,28 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
+
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -37,11 +39,11 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	// setup and store parent block
 	// it's a standard block for simplicity
-	blksVersion := uint16(stateless.ApricotVersion)
+	blksVersion := uint16(blocks.ApricotVersion)
 	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
-	apricotParentBlk, err := stateless.NewStandardBlock(
+	apricotParentBlk, err := blocks.NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
@@ -64,7 +66,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
 	// wrong height
-	apricotChildBlk, err := stateless.NewStandardBlock(
+	apricotChildBlk, err := blocks.NewStandardBlock(
 		blksVersion,
 		uint64(parentTime.Unix()),
 		apricotParentBlk.ID(),
@@ -76,8 +78,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// valid height
-	apricotChildBlk, err = stateless.NewStandardBlock(
-		stateless.ApricotVersion,
+	apricotChildBlk, err = blocks.NewStandardBlock(
+		blocks.ApricotVersion,
 		uint64(parentTime.Unix()),
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height()+1,
@@ -109,7 +111,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	parentTime := now
 	parentHeight := uint64(2022)
 
-	blueberryParentBlk, err := stateless.NewStandardBlock(
+	blueberryParentBlk, err := blocks.NewStandardBlock(
 		parentVersion,
 		uint64(parentTime.Unix()),
 		ids.Empty, // does not matter
@@ -129,7 +131,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
-	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
+	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
 
 	// store just once current staker to mark next staker time.
 	currentStakerIt := state.NewMockStakerIterator(ctrl)
@@ -154,8 +156,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 
 	// wrong version
 	childTimestamp := uint64(parentTime.Add(time.Second).Unix())
-	blueberryChildBlk, err := stateless.NewStandardBlock(
-		stateless.ApricotVersion,
+	blueberryChildBlk, err := blocks.NewStandardBlock(
+		blocks.ApricotVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,
@@ -166,7 +168,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// wrong height
-	blueberryChildBlk, err = stateless.NewStandardBlock(
+	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
@@ -179,7 +181,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 
 	// wrong timestamp, earlier than parent
 	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
-	blueberryChildBlk, err = stateless.NewStandardBlock(
+	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
@@ -191,8 +193,8 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// wrong timestamp, violated synchrony bound
-	childTimestamp = uint64(parentTime.Add(executor.SyncBound).Add(time.Second).Unix())
-	blueberryChildBlk, err = stateless.NewStandardBlock(
+	childTimestamp = uint64(parentTime.Add(txexecutor.SyncBound).Add(time.Second).Unix())
+	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
@@ -205,7 +207,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 
 	// wrong timestamp, skipped staker set change event
 	childTimestamp = uint64(nextStakerTime.Add(time.Second).Unix())
-	blueberryChildBlk, err = stateless.NewStandardBlock(
+	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
@@ -218,7 +220,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 
 	// valid block, same timestamp as parent block
 	childTimestamp = uint64(parentTime.Unix())
-	blueberryChildBlk, err = stateless.NewStandardBlock(
+	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
@@ -231,7 +233,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 
 	// valid
 	childTimestamp = uint64(nextStakerTime.Unix())
-	blueberryChildBlk, err = stateless.NewStandardBlock(
+	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
@@ -272,7 +274,7 @@ func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	statelessStandardBlock, err := stateless.NewStandardBlock(
+	statelessStandardBlock, err := blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		uint64(pendingValidatorStartTime.Unix()),
 		parentBlk.ID(),
@@ -510,7 +512,7 @@ func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 				preferredID := env.state.GetLastAccepted()
 				parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 				assert.NoError(err)
-				statelessStandardBlock, err := stateless.NewStandardBlock(
+				statelessStandardBlock, err := blocks.NewStandardBlock(
 					version.BlueberryBlockVersion,
 					uint64(newTime.Unix()),
 					parentBlk.ID(),
@@ -621,7 +623,7 @@ func TestBlueberryStandardBlockRemoveSubnetValidator(t *testing.T) {
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	statelessStandardBlock, err := stateless.NewStandardBlock(
+	statelessStandardBlock, err := blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		uint64(subnetVdr1EndTime.Unix()),
 		parentBlk.ID(),
@@ -692,7 +694,7 @@ func TestBlueberryStandardBlockWhitelistedSubnet(t *testing.T) {
 			preferredID := env.state.GetLastAccepted()
 			parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 			assert.NoError(err)
-			statelessStandardBlock, err := stateless.NewStandardBlock(
+			statelessStandardBlock, err := blocks.NewStandardBlock(
 				version.BlueberryBlockVersion,
 				uint64(subnetVdr1StartTime.Unix()),
 				parentBlk.ID(),
@@ -740,7 +742,7 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	statelessStandardBlock, err := stateless.NewStandardBlock(
+	statelessStandardBlock, err := blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		uint64(pendingValidatorStartTime.Unix()),
 		parentBlk.ID(),
@@ -791,7 +793,7 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	preferredID = env.state.GetLastAccepted()
 	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
 	assert.NoError(err)
-	statelessStandardBlock, err = stateless.NewStandardBlock(
+	statelessStandardBlock, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		uint64(pendingDelegatorStartTime.Unix()),
 		parentBlk.ID(),

@@ -11,24 +11,33 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -40,7 +49,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -74,7 +83,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(assert, vm, firstAdvanceTimeBlock)
 
-	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
@@ -107,7 +116,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
 
-	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
+	vm.clock.Set(secondDelegatorStartTime.Add(-10 * txexecutor.SyncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -150,7 +159,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -328,6 +337,142 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 	}
 }
 
+// Test that calling Verify on a block with an unverified parent doesn't cause a
+// panic.
+func TestUnverifiedParentPanicRegression(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+
+	vm := &VM{Factory: Factory{
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime, // Blueberry not yet active
+		},
+	}}
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	msgChan := make(chan common.Message, 1)
+	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	m := atomic.NewMemory(atomicDB)
+	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
+	key0 := keys[0]
+	key1 := keys[1]
+	addr0 := key0.PublicKey().Address()
+	addr1 := key1.PublicKey().Address()
+
+	addSubnetTx0, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{addr0},
+		[]*crypto.PrivateKeySECP256K1R{key0},
+		addr0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addSubnetTx1, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{addr1},
+		[]*crypto.PrivateKeySECP256K1R{key1},
+		addr1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addSubnetTx2, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{addr1},
+		[]*crypto.PrivateKeySECP256K1R{key1},
+		addr0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preferred, err := vm.Preferred()
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferredID := preferred.ID()
+	preferredHeight := preferred.Height()
+
+	statelessStandardBlk, err := blocks.NewStandardBlock(
+		blocks.ApricotVersion,
+		0, // timestamp
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{addSubnetTx0},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
+
+	statelessStandardBlk, err = blocks.NewStandardBlock(
+		blocks.ApricotVersion,
+		0, // timestamp
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{addSubnetTx1},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
+
+	statelessStandardBlk, err = blocks.NewStandardBlock(
+		blocks.ApricotVersion,
+		0, // timestamp
+		addSubnetBlk1.ID(),
+		preferredHeight+2,
+		[]*txs.Tx{addSubnetTx2},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSubnetBlk2 := vm.manager.NewBlock(statelessStandardBlk)
+
+	if _, err := vm.ParseBlock(addSubnetBlk0.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.ParseBlock(addSubnetBlk1.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.ParseBlock(addSubnetBlk2.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := addSubnetBlk0.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := addSubnetBlk0.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	// Doesn't matter what verify returns as long as it's not panicking.
+	_ = addSubnetBlk2.Verify()
+}
+
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
@@ -340,7 +485,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	newValidatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	key, err := testKeyFactory.NewPrivateKey()
@@ -368,8 +513,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessBlk, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -387,7 +532,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*stateful.Block)
+	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*blockexecutor.Block)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit.Verify()
@@ -444,8 +589,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	statelessImportBlk, err := stateless.NewStandardBlock(
-		stateless.ApricotVersion,
+	statelessImportBlk, err := blocks.NewStandardBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -509,8 +654,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAdvanceTimeProposalBlk, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessAdvanceTimeProposalBlk, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -529,9 +674,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*stateful.Block)
+	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit.Block.(*stateless.CommitBlock)
+	_, ok = advanceTimeProposalCommit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -593,7 +738,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.state.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
@@ -618,8 +763,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessAddValidatorProposalBlk0, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessAddValidatorProposalBlk0, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -636,9 +781,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*stateful.Block)
+	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = addValidatorProposalCommit0.Block.(*stateless.CommitBlock)
+	_, ok = addValidatorProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -664,8 +809,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	statelessAdvanceTimeProposalBlk0, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessAdvanceTimeProposalBlk0, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -685,9 +830,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*stateful.Block)
+	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit0.Block.(*stateless.CommitBlock)
+	_, ok = advanceTimeProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -750,8 +895,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	statelessImportBlk, err := stateless.NewStandardBlock(
-		stateless.ApricotVersion,
+	statelessImportBlk, err := blocks.NewStandardBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -803,7 +948,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlkStatus = importBlk.Status()
 	assert.Equal(choices.Processing, importBlkStatus)
 
-	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime1 := newValidatorStartTime0.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
 
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
@@ -825,8 +970,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAddValidatorProposalBlk1, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessAddValidatorProposalBlk1, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -844,9 +989,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*stateful.Block)
+	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = addValidatorProposalCommit1.Block.(*stateless.CommitBlock)
+	_, ok = addValidatorProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -872,8 +1017,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	statelessAdvanceTimeProposalBlk1, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessAdvanceTimeProposalBlk1, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -893,9 +1038,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*stateful.Block)
+	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit1.Block.(*stateless.CommitBlock)
+	_, ok = advanceTimeProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()
@@ -1004,7 +1149,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(expectedValidators1, validators)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID5 := ids.GenerateTestNodeID()
@@ -1029,8 +1174,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessProposalBlk, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessProposalBlk, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -1065,8 +1210,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	statelessProposalBlk, err = stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	statelessProposalBlk, err = blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		preferredID,
 		preferredHeight+1,
@@ -1110,14 +1255,14 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	assert.NoError(err)
 
 	// verify the preferences
-	commit, ok := options[0].(*stateful.Block)
+	commit, ok := options[0].(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = options[0].(*stateful.Block).Block.(*stateless.CommitBlock)
+	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
-	abort, ok := options[1].(*stateful.Block)
+	abort, ok := options[1].(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = options[1].(*stateful.Block).Block.(*stateless.AbortBlock)
+	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.AbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	// Verify the options

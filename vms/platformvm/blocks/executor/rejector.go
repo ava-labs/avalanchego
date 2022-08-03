@@ -1,30 +1,31 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ stateless.Visitor = &rejector{}
+var _ blocks.Visitor = &rejector{}
 
 // rejector handles the logic for rejecting a block.
 type rejector struct {
 	*backend
 }
 
-func (r *rejector) BlueberryProposalBlock(b *stateless.BlueberryProposalBlock) error {
+func (r *rejector) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
 	return r.visitProposalBlock(b)
 }
 
-func (r *rejector) ApricotProposalBlock(b *stateless.ApricotProposalBlock) error {
+func (r *rejector) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	return r.visitProposalBlock(b)
 }
 
-func (r *rejector) visitProposalBlock(b stateless.Block) error {
+func (r *rejector) visitProposalBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -36,7 +37,7 @@ func (r *rejector) visitProposalBlock(b stateless.Block) error {
 		zap.Stringer("parent", b.Parent()),
 	)
 
-	tx := b.BlockTxs()[0]
+	tx := b.Txs()[0]
 	if err := r.Mempool.Add(tx); err != nil {
 		r.ctx.Log.Verbo(
 			"failed to reissue tx",
@@ -51,7 +52,7 @@ func (r *rejector) visitProposalBlock(b stateless.Block) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
+func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -77,15 +78,15 @@ func (r *rejector) AtomicBlock(b *stateless.AtomicBlock) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) BlueberryStandardBlock(b *stateless.BlueberryStandardBlock) error {
+func (r *rejector) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
 	return r.visitStandardBlock(b)
 }
 
-func (r *rejector) ApricotStandardBlock(b *stateless.ApricotStandardBlock) error {
+func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return r.visitStandardBlock(b)
 }
 
-func (r *rejector) visitStandardBlock(b stateless.Block) error {
+func (r *rejector) visitStandardBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
@@ -97,8 +98,8 @@ func (r *rejector) visitStandardBlock(b stateless.Block) error {
 		zap.Stringer("parent", b.Parent()),
 	)
 
-	txes := b.BlockTxs()
-	for _, tx := range txes {
+	txs := b.Txs()
+	for _, tx := range txs {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",
@@ -114,7 +115,7 @@ func (r *rejector) visitStandardBlock(b stateless.Block) error {
 	return r.state.Commit()
 }
 
-func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
+func (r *rejector) CommitBlock(b *blocks.CommitBlock) error {
 	r.ctx.Log.Verbo(
 		"rejecting block",
 		zap.String("blockType", "commit"),
@@ -125,7 +126,7 @@ func (r *rejector) CommitBlock(b *stateless.CommitBlock) error {
 	return r.rejectOptionBlock(b)
 }
 
-func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
+func (r *rejector) AbortBlock(b *blocks.AbortBlock) error {
 	r.ctx.Log.Verbo(
 		"rejecting block",
 		zap.String("blockType", "abort"),
@@ -136,7 +137,7 @@ func (r *rejector) AbortBlock(b *stateless.AbortBlock) error {
 	return r.rejectOptionBlock(b)
 }
 
-func (r *rejector) rejectOptionBlock(b stateless.Block) error {
+func (r *rejector) rejectOptionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"fmt"
@@ -55,7 +55,7 @@ func (ab *AtomicBlock) initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (ab *AtomicBlock) BlockTxs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
+func (ab *AtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
 
 func (ab *AtomicBlock) Visit(v Visitor) error {
 	return v.AtomicBlock(ab)

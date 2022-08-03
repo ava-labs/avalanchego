@@ -1,11 +1,15 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -15,16 +19,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
@@ -35,7 +37,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: executor.Backend{},
 		backend: &backend{
@@ -66,12 +68,12 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the stateless.Codec.
+	// regiestered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := stateless.NewProposalBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewProposalBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		2,
@@ -81,11 +83,11 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk.(*stateless.ApricotProposalBlock).Tx.Unsigned = blkTx
+	blk.(*blocks.ApricotProposalBlock).Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	tx := blk.BlockTxs()[0]
+	tx := blk.Txs()[0]
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
 	onCommitState.EXPECT().AddTx(tx, status.Committed).Times(1)
@@ -93,7 +95,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	onAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	// Visit the block
-	err = verifier.ApricotProposalBlock(blk.(*stateless.ApricotProposalBlock))
+	err = verifier.ApricotProposalBlock(blk.(*blocks.ApricotProposalBlock))
 	assert.NoError(err)
 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
@@ -103,7 +105,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotProposalBlock(blk.(*stateless.ApricotProposalBlock))
+	err = verifier.ApricotProposalBlock(blk.(*blocks.ApricotProposalBlock))
 	assert.NoError(err)
 }
 
@@ -116,7 +118,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	grandparentID := ids.GenerateTestID()
 	stateVersions := state.NewMockVersions(ctrl)
 	parentState := state.NewMockState(ctrl)
@@ -154,11 +156,11 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the stateless.Codec.
+	// regiestered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := stateless.NewAtomicBlock(
+	blk, err := blocks.NewAtomicBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -205,7 +207,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	stateVersions := state.NewMockVersions(ctrl)
 	parentState := state.NewMockState(ctrl)
 	verifier := &verifier{
@@ -253,12 +255,12 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the stateless.Codec.
+	// regiestered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := stateless.NewStandardBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewStandardBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		2,
@@ -270,7 +272,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk.(*stateless.ApricotStandardBlock).Txs[0].Unsigned = blkTx
+	blk.(*blocks.ApricotStandardBlock).Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -278,10 +280,10 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs(blk.BlockTxs()).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs(blk.Txs()).Times(1)
 	stateVersions.EXPECT().SetState(blk.ID(), gomock.Any()).Times(1)
 
-	err = verifier.ApricotStandardBlock(blk.(*stateless.ApricotStandardBlock))
+	err = verifier.ApricotStandardBlock(blk.(*blocks.ApricotStandardBlock))
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -292,7 +294,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotStandardBlock(blk.(*stateless.ApricotStandardBlock))
+	err = verifier.ApricotStandardBlock(blk.(*blocks.ApricotStandardBlock))
 	assert.NoError(err)
 }
 
@@ -305,7 +307,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	stateVersions := state.NewMockVersions(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
@@ -332,8 +334,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := stateless.NewCommitBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewCommitBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		2,
@@ -349,7 +351,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.CommitBlock(blk.(*stateless.CommitBlock))
+	err = verifier.CommitBlock(blk.(*blocks.CommitBlock))
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -359,7 +361,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.CommitBlock(blk.(*stateless.CommitBlock))
+	err = verifier.CommitBlock(blk.(*blocks.CommitBlock))
 	assert.NoError(err)
 }
 
@@ -372,7 +374,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
-	parentStatelessBlk := stateless.NewMockBlock(ctrl)
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	stateVersions := state.NewMockVersions(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
@@ -399,8 +401,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := stateless.NewAbortBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewAbortBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		parentID,
 		2,
@@ -416,7 +418,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.AbortBlock(blk.(*stateless.AbortBlock))
+	err = verifier.AbortBlock(blk.(*blocks.AbortBlock))
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -426,7 +428,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.AbortBlock(blk.(*stateless.AbortBlock))
+	err = verifier.AbortBlock(blk.(*blocks.AbortBlock))
 	assert.NoError(err)
 }
 
@@ -455,8 +457,8 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 		},
 	}
 
-	blk, err := stateless.NewAbortBlock(
-		stateless.ApricotVersion,
+	blk, err := blocks.NewAbortBlock(
+		blocks.ApricotVersion,
 		0,        // timestamp
 		parentID, // not in memory or persisted state
 		2,
@@ -513,7 +515,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			mempool := mempool.NewMockMempool(ctrl)
 			parentID := ids.GenerateTestID()
 			stateVersions := state.NewMockVersions(ctrl)
-			parentStatelessBlk := stateless.NewMockBlock(ctrl)
+			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
 			verifier := &verifier{
 				txExecutorBackend: executor.Backend{},
@@ -538,7 +540,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			// build and verify child block
 			childVersion := blkVersion
 			childHeight := parentHeight + 1
-			statelessAbortBlk, err := stateless.NewAbortBlock(
+			statelessAbortBlk, err := blocks.NewAbortBlock(
 				childVersion,
 				uint64(test.childTime.Unix()),
 				parentID,
@@ -597,7 +599,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			mempool := mempool.NewMockMempool(ctrl)
 			parentID := ids.GenerateTestID()
 			stateVersions := state.NewMockVersions(ctrl)
-			parentStatelessBlk := stateless.NewMockBlock(ctrl)
+			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
 			verifier := &verifier{
 				txExecutorBackend: executor.Backend{},
@@ -622,7 +624,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			// build and verify child block
 			childVersion := blkVersion
 			childHeight := parentHeight + 1
-			statelessCommitBlk, err := stateless.NewCommitBlock(
+			statelessCommitBlk, err := blocks.NewCommitBlock(
 				childVersion,
 				uint64(test.childTime.Unix()),
 				parentID,

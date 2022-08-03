@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -44,13 +43,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
 
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -93,7 +93,7 @@ func (*noopBlkTimer) ResetBlockTimer() {}
 
 type environment struct {
 	BlockBuilder
-	blkManager stateful.Manager
+	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
@@ -109,7 +109,7 @@ type environment struct {
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
 	txBuilder      p_tx_builder.Builder
-	backend        executor.Backend
+	backend        txexecutor.Backend
 	stateVersions  state.Versions
 }
 
@@ -162,7 +162,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 
 	genesisID := res.state.GetLastAccepted()
 	res.stateVersions = state.NewVersions(genesisID, res.state)
-	res.backend = executor.Backend{
+	res.backend = txexecutor.Backend{
 		Config:        res.config,
 		Ctx:           res.ctx,
 		Clk:           res.clk,
@@ -199,7 +199,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
-	res.blkManager = stateful.NewManager(
+	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
 		metrics,
 		res.state,
@@ -228,7 +228,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 func addSubnet(
 	baseState state.State,
 	txBuilder p_tx_builder.Builder,
-	backend executor.Backend,
+	backend txexecutor.Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -253,7 +253,7 @@ func addSubnet(
 		panic(err)
 	}
 
-	executor := executor.StandardTxExecutor{
+	executor := txexecutor.StandardTxExecutor{
 		Backend: &backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,

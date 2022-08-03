@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -116,7 +116,7 @@ func (a *apricotStrategy) nextProposalTx() (*txs.Tx, error) {
 }
 
 func (a *apricotStrategy) build() (snowman.Block, error) {
-	blkVersion := uint16(stateless.ApricotVersion)
+	blkVersion := uint16(blocks.ApricotVersion)
 	if err := a.selectBlockContent(); err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		statelessBlk, err := stateless.NewProposalBlock(
+		statelessBlk, err := blocks.NewProposalBlock(
 			blkVersion,
 			uint64(0),
 			a.parentBlkID,
@@ -144,7 +144,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		statelessBlk, err := stateless.NewStandardBlock(
+		statelessBlk, err := blocks.NewStandardBlock(
 			blkVersion,
 			uint64(0),
 			a.parentBlkID,

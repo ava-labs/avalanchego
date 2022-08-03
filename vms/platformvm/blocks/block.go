@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"time"
@@ -10,19 +10,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// Interface introduced for marshalling/unmarshalling
+// Block defines the common stateless interface for all blocks
 type Block interface {
 	ID() ids.ID
-	Bytes() []byte
 	Parent() ids.ID
+	Bytes() []byte
 	Height() uint64
 	Version() uint16
 	UnixTimestamp() int64
 	SetTimestamp(time.Time)
 
-	// BlockTxs returns list of transactions
-	// contained in the block
-	BlockTxs() []*txs.Tx
+	// Txs returns list of transactions contained in the block
+	Txs() []*txs.Tx
 
 	Visit(visitor Visitor) error
 

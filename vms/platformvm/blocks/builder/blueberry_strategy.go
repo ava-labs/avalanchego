@@ -9,8 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -127,7 +127,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	blkVersion := version.BlueberryBlockVersion
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
-		statelessBlk, err := stateless.NewStandardBlock(
+		statelessBlk, err := blocks.NewStandardBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
 			b.parentBlkID,
@@ -145,7 +145,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		statelessBlk, err := stateless.NewProposalBlock(
+		statelessBlk, err := blocks.NewProposalBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
 			b.parentBlkID,
@@ -161,7 +161,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		statelessBlk, err := stateless.NewStandardBlock(
+		statelessBlk, err := blocks.NewStandardBlock(
 			blkVersion,
 			uint64(b.blkTime.Unix()),
 			b.parentBlkID,

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"math"
@@ -65,9 +65,8 @@ func init() {
 
 // RegisterApricotBlockTypes allows registering relevant type of blocks package
 // in the right sequence. Following repackaging of platformvm package, a few
-// subpackage-level codecs were introduced, each handling serialization of specific types.
-// RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
-// are coherent with components one.
+// subpackage-level codecs were introduced, each handling serialization of
+// specific types.
 func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(

@@ -7,8 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 )
 
 // buildingStrategy defines how to create a versioned block.
@@ -44,7 +43,7 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 
 	// select transactions to include and finally build the block
 	switch blkVersion {
-	case stateless.ApricotVersion:
+	case version.ApricotBlockVersion:
 		return &apricotStrategy{
 			blockBuilder: b,
 			parentBlkID:  prefBlkID,

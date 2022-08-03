@@ -28,8 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -102,8 +102,8 @@ type LastAccepteder interface {
 }
 
 type BlockState interface {
-	GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error)
-	AddStatelessBlock(block stateless.Block, status choices.Status)
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	AddStatelessBlock(block blocks.Block, status choices.Status)
 }
 
 type State interface {
@@ -237,7 +237,7 @@ type txBytesAndStatus struct {
 }
 
 type stateBlk struct {
-	Blk    stateless.Block
+	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
 }
@@ -724,7 +724,7 @@ func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAcce
 
 func (s *state) SetHeight(height uint64) { s.currentHeight = height }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Status, error) {
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk.Blk, blk.Status, nil
 	}
@@ -747,11 +747,11 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Stat
 
 	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
 	blkState := stateBlk{}
-	if _, err := stateless.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	blkState.Blk, err = stateless.Parse(blkState.Bytes, stateless.GenesisCodec)
+	blkState.Blk, err = blocks.Parse(blkState.Bytes, blocks.GenesisCodec)
 	if err != nil {
 		return nil, choices.Processing, err
 	}
@@ -760,7 +760,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (stateless.Block, choices.Stat
 	return blkState.Blk, blkState.Status, nil
 }
 
-func (s *state) AddStatelessBlock(block stateless.Block, status choices.Status) {
+func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
 	s.addedBlocks[block.ID()] = stateBlk{
 		Blk:    block,
 		Bytes:  block.Bytes(),
@@ -831,7 +831,7 @@ func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	return vdrs, nil
 }
 
-func (s *state) syncGenesis(genesisBlk stateless.Block, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1197,8 +1197,8 @@ func (s *state) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := stateless.NewCommitBlock(
-		stateless.ApricotVersion,
+	genesisBlock, err := blocks.NewCommitBlock(
+		blocks.ApricotVersion,
 		0, // timestamp
 		genesisID,
 		0, // height
@@ -1251,14 +1251,14 @@ func (s *state) writeBlocks() error {
 
 		// Note that here we are marshalling a stateBlk, not stateless.Block.
 		// We use stateless.ApricotVersion for backward compatibility
-		blkBytes, err := stateless.GenesisCodec.Marshal(version.StateVersion, &sblk)
+		blockBytes, err := blocks.GenesisCodec.Marshal(version.StateVersion, &sblk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal block %s to store with: %w", blkID, err)
 		}
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, stateBlk)
-		if err = s.blockDB.Put(blkID[:], blkBytes); err != nil {
+		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s with: %w", blkID, err)
 		}
 	}

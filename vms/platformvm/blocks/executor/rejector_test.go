@@ -1,38 +1,40 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"testing"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRejectBlock(t *testing.T) {
 	type test struct {
 		name         string
-		newBlockFunc func() (stateless.Block, error)
-		rejectFunc   func(*rejector, stateless.Block) error
+		newBlockFunc func() (blocks.Block, error)
+		rejectFunc   func(*rejector, blocks.Block) error
 	}
 
 	tests := []test{
 		{
 			name: "proposal block",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewProposalBlock(
-					stateless.ApricotVersion,
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewProposalBlock(
+					blocks.ApricotVersion,
 					0, // timestamp
 					ids.GenerateTestID(),
 					1,
@@ -45,14 +47,14 @@ func TestRejectBlock(t *testing.T) {
 					},
 				)
 			},
-			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.ApricotProposalBlock(b.(*stateless.ApricotProposalBlock))
+			rejectFunc: func(r *rejector, b blocks.Block) error {
+				return r.ApricotProposalBlock(b.(*blocks.ApricotProposalBlock))
 			},
 		},
 		{
 			name: "atomic block",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewAtomicBlock(
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewAtomicBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
@@ -64,15 +66,15 @@ func TestRejectBlock(t *testing.T) {
 					},
 				)
 			},
-			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.AtomicBlock(b.(*stateless.AtomicBlock))
+			rejectFunc: func(r *rejector, b blocks.Block) error {
+				return r.AtomicBlock(b.(*blocks.AtomicBlock))
 			},
 		},
 		{
 			name: "standard block",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewStandardBlock(
-					stateless.ApricotVersion,
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewStandardBlock(
+					blocks.ApricotVersion,
 					0, // timestamp
 					ids.GenerateTestID(),
 					1,
@@ -87,36 +89,36 @@ func TestRejectBlock(t *testing.T) {
 					},
 				)
 			},
-			rejectFunc: func(r *rejector, b stateless.Block) error {
-				return r.ApricotStandardBlock(b.(*stateless.ApricotStandardBlock))
+			rejectFunc: func(r *rejector, b blocks.Block) error {
+				return r.ApricotStandardBlock(b.(*blocks.ApricotStandardBlock))
 			},
 		},
 		{
 			name: "commit",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewCommitBlock(
-					stateless.ApricotVersion,
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewCommitBlock(
+					blocks.ApricotVersion,
 					0, // timestamp
 					ids.GenerateTestID(),
 					1,
 				)
 			},
-			rejectFunc: func(r *rejector, blk stateless.Block) error {
-				return r.CommitBlock(blk.(*stateless.CommitBlock))
+			rejectFunc: func(r *rejector, blk blocks.Block) error {
+				return r.CommitBlock(blk.(*blocks.CommitBlock))
 			},
 		},
 		{
 			name: "abort",
-			newBlockFunc: func() (stateless.Block, error) {
-				return stateless.NewAbortBlock(
-					stateless.ApricotVersion,
+			newBlockFunc: func() (blocks.Block, error) {
+				return blocks.NewAbortBlock(
+					blocks.ApricotVersion,
 					0, // timestamp
 					ids.GenerateTestID(),
 					1,
 				)
 			},
-			rejectFunc: func(r *rejector, blk stateless.Block) error {
-				return r.AbortBlock(blk.(*stateless.AbortBlock))
+			rejectFunc: func(r *rejector, blk blocks.Block) error {
+				return r.AbortBlock(blk.(*blocks.AbortBlock))
 			},
 		},
 	}
@@ -150,7 +152,7 @@ func TestRejectBlock(t *testing.T) {
 			}
 
 			// Set expected calls on dependencies.
-			for _, tx := range blk.BlockTxs() {
+			for _, tx := range blk.Txs() {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
 			gomock.InOrder(

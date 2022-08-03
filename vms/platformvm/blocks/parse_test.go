@@ -1,11 +1,13 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 var preFundedKeys = crypto.BuildTestKeys()
@@ -55,7 +56,7 @@ func TestStandardBlocks(t *testing.T) {
 
 		parsedApricotStandardBlk, ok := parsed.(*ApricotStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedApricotStandardBlk.BlockTxs())
+		assert.Equal(txs, parsedApricotStandardBlk.Txs())
 
 		// check that blueberry standard block can be built and parsed
 		blueberryStandardBlk, err := NewStandardBlock(
@@ -80,10 +81,10 @@ func TestStandardBlocks(t *testing.T) {
 		assert.Equal(blueberryStandardBlk.UnixTimestamp(), parsed.UnixTimestamp())
 		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedBlueberryStandardBlk.BlockTxs())
+		assert.Equal(txs, parsedBlueberryStandardBlk.Txs())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotStandardBlk.BlockTxs(), parsedBlueberryStandardBlk.BlockTxs())
+		assert.Equal(parsedApricotStandardBlk.Txs(), parsedBlueberryStandardBlk.Txs())
 	}
 }
 
@@ -124,7 +125,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		assert.True(ok)
-		assert.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.BlockTxs())
+		assert.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
 
 		// check that blueberry proposal block can be built and parsed
 		blueberryProposalBlk, err := NewProposalBlock(
@@ -149,10 +150,10 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal(blueberryProposalBlk.UnixTimestamp(), parsed.UnixTimestamp())
 		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
 		assert.True(ok)
-		assert.Equal([]*txs.Tx{tx}, parsedBlueberryProposalBlk.BlockTxs())
+		assert.Equal([]*txs.Tx{tx}, parsedBlueberryProposalBlk.Txs())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotProposalBlk.BlockTxs(), parsedBlueberryProposalBlk.BlockTxs())
+		assert.Equal(parsedApricotProposalBlk.Txs(), parsedBlueberryProposalBlk.Txs())
 	}
 }
 
@@ -297,7 +298,7 @@ func TestAtomicBlocks(t *testing.T) {
 
 		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
 		assert.True(ok)
-		assert.Equal([]*txs.Tx{tx}, parsedAtomicBlk.BlockTxs())
+		assert.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
 	}
 }
 

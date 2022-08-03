@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateless
+package blocks
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ func NewStandardBlock(
 				Hght:         height,
 				BlkTimestamp: timestamp,
 			},
-			Txs: txes,
+			Transactions: txes,
 		}
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
@@ -55,8 +55,8 @@ func NewStandardBlock(
 				Hght:         height,
 				BlkTimestamp: timestamp,
 			},
-			TxsBytes: txsBytes,
-			Txs:      txes,
+			TxsBytes:     txsBytes,
+			Transactions: txes,
 		}
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
@@ -75,14 +75,14 @@ func NewStandardBlock(
 type ApricotStandardBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Txs []*txs.Tx `serialize:"true" json:"txs"`
+	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
 	if err := b.CommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	for _, tx := range b.Txs {
+	for _, tx := range b.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
@@ -90,7 +90,7 @@ func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
 	return nil
 }
 
-func (b *ApricotStandardBlock) BlockTxs() []*txs.Tx { return b.Txs }
+func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
 
 func (b *ApricotStandardBlock) Visit(v Visitor) error {
 	return v.ApricotStandardBlock(b)
@@ -101,7 +101,7 @@ type BlueberryStandardBlock struct {
 
 	TxsBytes [][]byte `serialize:"false" blueberry:"true" json:"txs"`
 
-	Txs []*txs.Tx
+	Transactions []*txs.Tx
 }
 
 func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
@@ -109,8 +109,8 @@ func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error 
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	if b.Txs == nil {
-		b.Txs = make([]*txs.Tx, len(b.TxsBytes))
+	if b.Transactions == nil {
+		b.Transactions = make([]*txs.Tx, len(b.TxsBytes))
 		for i, txBytes := range b.TxsBytes {
 			var tx txs.Tx
 			if _, err := txs.Codec.Unmarshal(txBytes, &tx); err != nil {
@@ -119,13 +119,13 @@ func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error 
 			if err := tx.Sign(txs.Codec, nil); err != nil {
 				return fmt.Errorf("failed to sign block: %w", err)
 			}
-			b.Txs[i] = &tx
+			b.Transactions[i] = &tx
 		}
 	}
 	return nil
 }
 
-func (b *BlueberryStandardBlock) BlockTxs() []*txs.Tx { return b.Txs }
+func (b *BlueberryStandardBlock) Txs() []*txs.Tx { return b.Transactions }
 
 func (b *BlueberryStandardBlock) Visit(v Visitor) error {
 	return v.BlueberryStandardBlock(b)

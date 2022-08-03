@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -36,20 +37,20 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p_blk_builder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -101,8 +102,8 @@ type VM struct {
 	recentlyAccepted *window.Window
 
 	txBuilder         p_tx_builder.Builder
-	txExecutorBackend executor.Backend
-	manager           stateful.Manager
+	txExecutorBackend txexecutor.Backend
+	manager           blockexecutor.Manager
 }
 
 // Initialize this blockchain.
@@ -181,7 +182,7 @@ func (vm *VM) Initialize(
 		utxoHandler,
 	)
 
-	vm.txExecutorBackend = executor.Backend{
+	vm.txExecutorBackend = txexecutor.Backend{
 		Config:        &vm.Config,
 		Ctx:           vm.ctx,
 		Clk:           &vm.clock,
@@ -200,7 +201,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
-	vm.manager = stateful.NewManager(
+	vm.manager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
 		vm.state,
@@ -215,8 +216,6 @@ func (vm *VM) Initialize(
 		toEngine,
 		appSender,
 	)
-
-	go vm.ctx.Log.RecoverAndPanic(vm.BlockBuilder.StartTimer)
 
 	if err := vm.updateValidators(); err != nil {
 		return fmt.Errorf("failed to update validator sets: %w", err)
@@ -357,9 +356,9 @@ func (vm *VM) Shutdown() error {
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	// Note: blocks to be parsed are not verified, so we must used stateless.Codec
-	// rather than stateless.GenesisCodec
-	statelessBlk, err := stateless.Parse(b, stateless.Codec)
+	// Note: blocks to be parsed are not verified, so we must used blocks.Codec
+	// rather than blocks.GenesisCodec
+	statelessBlk, err := blocks.Parse(b, blocks.Codec)
 	if err != nil {
 		return nil, err
 	}

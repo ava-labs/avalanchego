@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package stateful
+package executor
 
 import (
 	"time"
@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateful/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/stateless"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -48,7 +48,7 @@ func (b *backend) ExpectedChildVersion(blk snowman.Block) uint16 {
 func (b *backend) expectedChildVersion(blkTime time.Time) uint16 {
 	forkTime := b.cfg.BlueberryTime
 	if blkTime.Before(forkTime) {
-		return stateless.ApricotVersion
+		return blocks.ApricotVersion
 	}
 	return version.BlueberryBlockVersion
 }
@@ -60,7 +60,7 @@ func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
 }
 
-func (b *backend) getStatelessBlock(blkID ids.ID) (stateless.Block, error) {
+func (b *backend) getStatelessBlock(blkID ids.ID) (blocks.Block, error) {
 	// See if the block is in memory.
 	if blk, ok := b.blkIDToState[blkID]; ok {
 		return blk.statelessBlock, nil
