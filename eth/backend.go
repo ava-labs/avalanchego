@@ -64,9 +64,7 @@ import (
 // Deprecated: use ethconfig.Config instead.
 type Config = ethconfig.Config
 
-var (
-	DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
-)
+var DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
 
 type Settings struct {
 	MaxBlocksPerRequest int64 // Maximum number of blocks to serve per getLogs request
@@ -189,7 +187,7 @@ func New(
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
-	var dbVer = "<nil>"
+	dbVer := "<nil>"
 	if bcVersion != nil {
 		dbVer = fmt.Sprintf("%d", *bcVersion)
 	}

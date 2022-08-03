@@ -59,11 +59,9 @@ type SetLogLevelArgs struct {
 
 func (p *Admin) SetLogLevel(_ *http.Request, args *SetLogLevelArgs, reply *api.EmptyReply) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
-	logLevel, err := log.LvlFromString(args.Level)
-	if err != nil {
+	if err := p.vm.logger.SetLogLevel(args.Level); err != nil {
 		return fmt.Errorf("failed to parse log level: %w ", err)
 	}
-	p.vm.setLogLevel(logLevel)
 	return nil
 }
 
