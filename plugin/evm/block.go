@@ -114,6 +114,22 @@ type Block struct {
 	atomicTxs []*Tx
 }
 
+// newBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
+func (vm *VM) newBlock(ethBlock *types.Block) (*Block, error) {
+	isApricotPhase5 := vm.chainConfig.IsApricotPhase5(new(big.Int).SetUint64(ethBlock.Time()))
+	atomicTxs, err := ExtractAtomicTxs(ethBlock.ExtData(), isApricotPhase5, vm.codec)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Block{
+		id:        ids.ID(ethBlock.Hash()),
+		ethBlock:  ethBlock,
+		vm:        vm,
+		atomicTxs: atomicTxs,
+	}, nil
+}
+
 // ID implements the snowman.Block interface
 func (b *Block) ID() ids.ID { return b.id }
 
