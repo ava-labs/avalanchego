@@ -69,8 +69,11 @@ const (
 
 var (
 	DefaultDialOptions = []grpc.DialOption{
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(math.MaxInt),
+			grpc.MaxCallSendMsgSize(math.MaxInt),
+			grpc.WaitForReady(true),
+		),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                defaultClientKeepAliveTime,
 			Timeout:             defaultClientKeepAliveTimeOut,
