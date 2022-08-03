@@ -27,6 +27,9 @@ type Element struct {
 type SharedMemory interface {
 	// Get fetches the values corresponding to [keys] that have been sent from
 	// [peerChainID]
+	//
+	// Invariant: Get guarantees that the resulting values array is the same
+	//            length as keys.
 	Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error)
 	// Indexed returns a paginated result of values that possess any of the
 	// given traits and were sent from [peerChainID].
