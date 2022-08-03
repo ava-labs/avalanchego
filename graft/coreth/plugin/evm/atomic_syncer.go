@@ -82,7 +82,7 @@ func (s *atomicSyncer) onLeafs(keys [][]byte, values [][]byte) error {
 		height := binary.BigEndian.Uint64(key[:wrappers.LongLen])
 
 		// Commit the trie and update [nextCommit] if we are crossing a commit interval
-		if height > s.nextCommit {
+		for height > s.nextCommit {
 			if err := s.atomicTrie.commit(s.nextCommit); err != nil {
 				return err
 			}
