@@ -46,9 +46,10 @@ const (
 	// mitigate retry storms.
 	defaultServerMaxConnectionAge = 10 * time.Minute
 	// Grace period after max defaultServerMaxConnectionAge after
-	// which the http2 connection is closed. 1 second is the minimum possible
-	// value. Anything less will be internally overridden to 1s by grpc.
-	defaultServerMaxConnectionAgeGrace = math.MaxInt
+	// which the http2 connection is forcefully closed. 1 second is the minimum
+	// possible value. Anything less will be internally overridden to 1s by grpc.
+	// We never want an RPC to live longer than this value.
+	defaultServerMaxConnectionAgeGrace = math.MaxInt64
 
 	// Client:
 
@@ -69,8 +70,11 @@ const (
 
 var (
 	DefaultDialOptions = []grpc.DialOption{
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(math.MaxInt),
+			grpc.MaxCallSendMsgSize(math.MaxInt),
+			grpc.WaitForReady(true),
+		),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                defaultClientKeepAliveTime,
 			Timeout:             defaultClientKeepAliveTimeOut,
@@ -79,6 +83,7 @@ var (
 	}
 
 	DefaultServerOptions = []grpc.ServerOption{
+
 		grpc.MaxRecvMsgSize(math.MaxInt),
 		grpc.MaxSendMsgSize(math.MaxInt),
 		grpc.MaxConcurrentStreams(math.MaxUint32),
