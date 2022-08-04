@@ -277,7 +277,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 
 	// ... and check returned values are as expected
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.Len(res, 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
+	assert.Len(res, 3)
 	assert.EqualValues(res[0], builtBlk3.Bytes())
 	assert.EqualValues(res[1], builtBlk2.Bytes())
 	assert.EqualValues(res[2], builtBlk1.Bytes())

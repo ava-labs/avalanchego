@@ -78,9 +78,6 @@ type Config struct {
 	// Time of the AP3 network upgrade
 	ApricotPhase3Time time.Time
 
-	// Time of the AP4 network upgrade
-	ApricotPhase4Time time.Time
-
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
 

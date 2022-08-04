@@ -346,7 +346,6 @@ func defaultConfig() *config.Config {
 			SupplyCap:          720 * units.MegaAvax,
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase4Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BlueberryTime:     mockable.MaxTime,
 	}

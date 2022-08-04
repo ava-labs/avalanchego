@@ -31,16 +31,6 @@ var (
 		Minor: 6,
 		Patch: 0,
 	}
-	MinimumUnmaskedVersion = &Application{
-		Major: 1,
-		Minor: 1,
-		Patch: 0,
-	}
-	PrevMinimumUnmaskedVersion = &Application{
-		Major: 1,
-		Minor: 0,
-		Patch: 0,
-	}
 
 	CurrentDatabase = DatabaseVersion1_4_5
 	PrevDatabase    = DatabaseVersion1_0_0
@@ -55,24 +45,6 @@ var (
 		Minor: 0,
 		Patch: 0,
 	}
-
-	ApricotPhase0Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2020, time.December, 8, 3, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase0DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-
-	ApricotPhase1Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase1DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-
-	ApricotPhase2Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase2DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	ApricotPhase3Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
@@ -111,27 +83,6 @@ var (
 	}
 	XChainMigrationDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
-
-func GetApricotPhase0Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase0Times[networkID]; exists {
-		return upgradeTime
-	}
-	return ApricotPhase0DefaultTime
-}
-
-func GetApricotPhase1Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase1Times[networkID]; exists {
-		return upgradeTime
-	}
-	return ApricotPhase1DefaultTime
-}
-
-func GetApricotPhase2Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase2Times[networkID]; exists {
-		return upgradeTime
-	}
-	return ApricotPhase2DefaultTime
-}
 
 func GetApricotPhase3Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase3Times[networkID]; exists {
@@ -181,8 +132,5 @@ func GetCompatibility(networkID uint32) Compatibility {
 		MinimumCompatibleVersion,
 		GetApricotPhase5Time(networkID),
 		PrevMinimumCompatibleVersion,
-		MinimumUnmaskedVersion,
-		GetApricotPhase0Time(networkID),
-		PrevMinimumUnmaskedVersion,
 	)
 }

@@ -328,7 +328,6 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
 			ApricotPhase3Time:      defaultValidateEndTime,
-			ApricotPhase4Time:      defaultValidateEndTime,
 			ApricotPhase5Time:      defaultValidateEndTime,
 			BlueberryTime:          mockable.MaxTime,
 		},

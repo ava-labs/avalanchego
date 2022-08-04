@@ -37,23 +37,20 @@ type network struct {
 	blkBuilder BlockBuilder
 
 	// gossip related attributes
-	gossipActivationTime time.Time
-	appSender            common.AppSender
-	recentTxs            *cache.LRU
+	appSender common.AppSender
+	recentTxs *cache.LRU
 }
 
 func NewNetwork(
 	ctx *snow.Context,
 	blkBuilder *blockBuilder,
-	activationTime time.Time,
 	appSender common.AppSender,
 ) Network {
 	return &network{
-		ctx:                  ctx,
-		blkBuilder:           blkBuilder,
-		gossipActivationTime: activationTime,
-		appSender:            appSender,
-		recentTxs:            &cache.LRU{Size: recentCacheSize},
+		ctx:        ctx,
+		blkBuilder: blkBuilder,
+		appSender:  appSender,
+		recentTxs:  &cache.LRU{Size: recentCacheSize},
 	}
 }
 
@@ -80,11 +77,6 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
-
-	if time.Now().Before(n.gossipActivationTime) {
-		n.ctx.Log.Debug("AppGossip message called before activation time")
-		return nil
-	}
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
