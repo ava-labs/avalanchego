@@ -10,8 +10,4 @@ const (
 	// This codec version marshals/unmarshals Blueberry blocks
 	// and Apricot Blocks.
 	BlueberryBlockVersion uint16 = 1
-
-	// This codec version marshals/unmarshals
-	// anything that isn't a block (UTXOS, output owners, etc.)
-	StateVersion = ApricotBlockVersion
 )

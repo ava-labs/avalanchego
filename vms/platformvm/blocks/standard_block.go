@@ -19,11 +19,6 @@ var (
 
 // NewBlueberryStandardBlock assumes [txes] are initialized
 func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txes []*txs.Tx) (Block, error) {
-	txsBytes := make([][]byte, len(txes))
-	for i, tx := range txes {
-		txBytes := tx.Bytes()
-		txsBytes[i] = txBytes
-	}
 	res := &BlueberryStandardBlock{
 		BlueberryCommonBlock: BlueberryCommonBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
@@ -32,7 +27,6 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 			},
 			BlkTimestamp: uint64(timestamp.Unix()),
 		},
-		TxsBytes:     txsBytes,
 		Transactions: txes,
 	}
 	// We serialize this block as a Block so that it can be deserialized into a
@@ -48,27 +42,16 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 type BlueberryStandardBlock struct {
 	BlueberryCommonBlock `serialize:"true"`
 
-	TxsBytes [][]byte `serialize:"true" json:"txs"`
-
-	Transactions []*txs.Tx
+	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
+	if err := b.BlueberryCommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-
-	if b.Transactions == nil {
-		b.Transactions = make([]*txs.Tx, len(b.TxsBytes))
-		for i, txBytes := range b.TxsBytes {
-			var tx txs.Tx
-			if _, err := txs.Codec.Unmarshal(txBytes, &tx); err != nil {
-				return fmt.Errorf("failed unmarshalling tx in blueberry block: %w", err)
-			}
-			if err := tx.Sign(txs.Codec, nil); err != nil {
-				return fmt.Errorf("failed to sign block: %w", err)
-			}
-			b.Transactions[i] = &tx
+	for _, tx := range b.Transactions {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
+			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
