@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 )
 
 var (
@@ -58,7 +59,7 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
-	if b.Block.Version() == blocks.BlueberryVersion {
+	if b.Block.Version() == version.BlueberryBlockVersion {
 		return b.BlockTimestamp()
 	}
 

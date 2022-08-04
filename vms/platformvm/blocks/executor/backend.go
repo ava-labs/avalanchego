@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -48,7 +48,7 @@ func (b *backend) ExpectedChildVersion(blk snowman.Block) uint16 {
 func (b *backend) expectedChildVersion(blkTime time.Time) uint16 {
 	forkTime := b.cfg.BlueberryTime
 	if blkTime.Before(forkTime) {
-		return blocks.ApricotVersion
+		return version.ApricotBlockVersion
 	}
 	return version.BlueberryBlockVersion
 }

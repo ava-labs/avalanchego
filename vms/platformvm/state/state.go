@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -1198,7 +1198,7 @@ func (s *state) init(genesisBytes []byte) error {
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
 	genesisBlock, err := blocks.NewCommitBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		genesisID,
 		0, // height

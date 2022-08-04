@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -32,7 +33,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	assert := assert.New(t)
 
 	blk, err := blocks.NewProposalBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		ids.GenerateTestID(),
 		1,
@@ -178,7 +179,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewStandardBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		1,
@@ -275,7 +276,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewCommitBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		1,
@@ -373,7 +374,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewAbortBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		1,

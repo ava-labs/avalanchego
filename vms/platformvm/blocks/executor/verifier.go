@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -602,7 +603,7 @@ func (v *verifier) verifyCommonBlock(b blocks.Block) error {
 }
 
 func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.Time) error {
-	if blk.Version() == blocks.ApricotVersion {
+	if blk.Version() == version.ApricotBlockVersion {
 		return nil
 	}
 

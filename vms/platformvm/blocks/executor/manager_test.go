@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -24,7 +25,7 @@ func TestGetBlock(t *testing.T) {
 	defer ctrl.Finish()
 
 	statelessBlk, err := blocks.NewCommitBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		ids.GenerateTestID(),
 		2,

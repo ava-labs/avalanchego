@@ -62,6 +62,7 @@ import (
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	blkversion "github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -607,7 +608,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _, _ := defaultVM()
-	blkVersion := uint16(blocks.ApricotVersion)
+	blkVersion := blkversion.ApricotBlockVersion
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1655,7 +1656,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(blocks.ApricotVersion)
+	blkVersion := blkversion.ApricotBlockVersion
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1792,7 +1793,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(blocks.ApricotVersion)
+	blkVersion := blkversion.ApricotBlockVersion
 
 	db := manager.NewMemDB(version.Semantic1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1922,7 +1923,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(blocks.ApricotVersion)
+	blkVersion := blkversion.ApricotBlockVersion
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
@@ -2220,7 +2221,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := uint16(blocks.ApricotVersion)
+	blkVersion := blkversion.ApricotBlockVersion
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Factory: Factory{

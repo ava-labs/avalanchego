@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -37,13 +38,13 @@ func (b *BlueberryAbortBlock) Visit(v Visitor) error {
 }
 
 func NewAbortBlock(
-	version uint16,
+	blkVersion uint16,
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 ) (Block, error) {
-	switch version {
-	case ApricotVersion:
+	switch blkVersion {
+	case version.ApricotBlockVersion:
 		res := &ApricotAbortBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
@@ -54,14 +55,14 @@ func NewAbortBlock(
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
 		blk := Block(res)
-		bytes, err := Codec.Marshal(version, &blk)
+		bytes, err := Codec.Marshal(blkVersion, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
 
-		return res, res.initialize(version, bytes)
+		return res, res.initialize(blkVersion, bytes)
 
-	case BlueberryVersion:
+	case version.BlueberryBlockVersion:
 		res := &BlueberryAbortBlock{
 			BlueberryCommonBlock: BlueberryCommonBlock{
 				ApricotCommonBlock: ApricotCommonBlock{
@@ -75,14 +76,14 @@ func NewAbortBlock(
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
 		blk := Block(res)
-		bytes, err := Codec.Marshal(version, &blk)
+		bytes, err := Codec.Marshal(blkVersion, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
 
-		return res, res.initialize(version, bytes)
+		return res, res.initialize(blkVersion, bytes)
 
 	default:
-		return nil, fmt.Errorf("unsupported block version %d", version)
+		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
 	}
 }

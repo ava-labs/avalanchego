@@ -10,16 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	// ApricotVersion is the current default codec version
-	ApricotVersion   = 0
-	BlueberryVersion = 1
-
-	blueberryTag = "blueberry"
-)
+const blueberryTag = "blueberry"
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -53,10 +48,10 @@ func init() {
 	}
 
 	errs.Add(
-		Codec.RegisterCodec(ApricotVersion, apricotCdc),
-		Codec.RegisterCodec(BlueberryVersion, blueberryCdc),
-		GenesisCodec.RegisterCodec(ApricotVersion, preGc),
-		GenesisCodec.RegisterCodec(BlueberryVersion, postGc),
+		Codec.RegisterCodec(version.ApricotBlockVersion, apricotCdc),
+		Codec.RegisterCodec(version.BlueberryBlockVersion, blueberryCdc),
+		GenesisCodec.RegisterCodec(version.ApricotBlockVersion, preGc),
+		GenesisCodec.RegisterCodec(version.BlueberryBlockVersion, postGc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

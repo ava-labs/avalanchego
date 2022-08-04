@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -44,7 +44,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentHeight := uint64(2022)
 
 	apricotParentBlk, err := blocks.NewStandardBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		parentTime,
 		ids.Empty, // does not matter
 		parentHeight,
@@ -100,7 +100,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// wrong height
 	statelessProposalBlock, err := blocks.NewProposalBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		parentTime,
 		parentID,
 		parentHeight,
@@ -112,7 +112,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// valid
 	statelessProposalBlock, err = blocks.NewProposalBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		parentTime,
 		parentID,
 		parentHeight+1,
@@ -138,7 +138,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	env.config.BlueberryTime = time.Time{} // activate Blueberry
 
 	// create parentBlock. It's a standard one for simplicity
-	blksVersion := uint16(blocks.ApricotVersion)
+	blksVersion := version.ApricotBlockVersion
 	parentTime := defaultGenesisTime
 	parentHeight := uint64(2022)
 
@@ -236,7 +236,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	// wrong version
 	statelessProposalBlock, err = blocks.NewProposalBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		parentTime.Add(time.Second),
 		parentID,
 		blueberryParentBlk.Height()+1,

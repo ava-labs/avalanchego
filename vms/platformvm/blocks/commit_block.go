@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -43,7 +44,7 @@ func NewCommitBlock(
 	height uint64,
 ) (Block, error) {
 	switch blkVersion {
-	case ApricotVersion:
+	case version.ApricotBlockVersion:
 		res := &ApricotCommitBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
@@ -61,7 +62,7 @@ func NewCommitBlock(
 
 		return res, res.initialize(blkVersion, bytes)
 
-	case BlueberryVersion:
+	case version.BlueberryBlockVersion:
 		res := &BlueberryCommitBlock{
 			BlueberryCommonBlock: BlueberryCommonBlock{
 				ApricotCommonBlock: ApricotCommonBlock{

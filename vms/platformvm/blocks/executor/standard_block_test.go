@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -39,7 +39,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	// setup and store parent block
 	// it's a standard block for simplicity
-	blksVersion := uint16(blocks.ApricotVersion)
+	blksVersion := version.ApricotBlockVersion
 	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
@@ -79,7 +79,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	// valid height
 	apricotChildBlk, err = blocks.NewStandardBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		parentTime,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height()+1,
@@ -157,7 +157,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	// wrong version
 	childTimestamp := parentTime.Add(time.Second)
 	blueberryChildBlk, err := blocks.NewStandardBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		childTimestamp,
 		blueberryParentBlk.ID(),
 		blueberryParentBlk.Height()+1,

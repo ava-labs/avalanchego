@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -35,7 +36,7 @@ func TestRejectBlock(t *testing.T) {
 			name: "proposal block",
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewProposalBlock(
-					blocks.ApricotVersion,
+					version.ApricotBlockVersion,
 					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
@@ -75,7 +76,7 @@ func TestRejectBlock(t *testing.T) {
 			name: "standard block",
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewStandardBlock(
-					blocks.ApricotVersion,
+					version.ApricotBlockVersion,
 					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
@@ -98,7 +99,7 @@ func TestRejectBlock(t *testing.T) {
 			name: "commit",
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewCommitBlock(
-					blocks.ApricotVersion,
+					version.ApricotBlockVersion,
 					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
@@ -112,7 +113,7 @@ func TestRejectBlock(t *testing.T) {
 			name: "abort",
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewAbortBlock(
-					blocks.ApricotVersion,
+					version.ApricotBlockVersion,
 					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,

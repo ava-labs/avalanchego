@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -31,7 +32,7 @@ func TestStandardBlocks(t *testing.T) {
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
 		apricotStandardBlk, err := NewStandardBlock(
-			uint16(ApricotVersion),
+			version.ApricotBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -60,7 +61,7 @@ func TestStandardBlocks(t *testing.T) {
 
 		// check that blueberry standard block can be built and parsed
 		blueberryStandardBlk, err := NewStandardBlock(
-			uint16(BlueberryVersion),
+			version.BlueberryBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -100,7 +101,7 @@ func TestProposalBlocks(t *testing.T) {
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
 		apricotProposalBlk, err := NewProposalBlock(
-			uint16(ApricotVersion),
+			version.ApricotBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -129,7 +130,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		// check that blueberry proposal block can be built and parsed
 		blueberryProposalBlk, err := NewProposalBlock(
-			uint16(BlueberryVersion),
+			version.BlueberryBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -167,7 +168,7 @@ func TestCommitBlock(t *testing.T) {
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
 		apricotCommitBlk, err := NewCommitBlock(
-			uint16(ApricotVersion),
+			version.ApricotBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -191,7 +192,7 @@ func TestCommitBlock(t *testing.T) {
 
 		// check that blueberry commit block can be built and parsed
 		blueberryCommitBlk, err := NewCommitBlock(
-			uint16(BlueberryVersion),
+			version.BlueberryBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -222,7 +223,7 @@ func TestAbortBlock(t *testing.T) {
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
 		apricotAbortBlk, err := NewAbortBlock(
-			uint16(ApricotVersion),
+			version.ApricotBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,
@@ -246,7 +247,7 @@ func TestAbortBlock(t *testing.T) {
 
 		// check that blueberry abort block can be built and parsed
 		blueberryAbortBlk, err := NewAbortBlock(
-			uint16(BlueberryVersion),
+			version.BlueberryBlockVersion,
 			blkTimestamp,
 			parentID,
 			height,

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -37,12 +38,12 @@ func NewAtomicBlock(
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(res)
-	bytes, err := Codec.Marshal(ApricotVersion, &blk)
+	bytes, err := Codec.Marshal(version.ApricotBlockVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.initialize(ApricotVersion, bytes)
+	return res, res.initialize(version.ApricotBlockVersion, bytes)
 }
 
 func (ab *AtomicBlock) initialize(version uint16, bytes []byte) error {

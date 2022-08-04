@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -73,7 +73,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
 	blk, err := blocks.NewProposalBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		2,
@@ -260,7 +260,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
 	blk, err := blocks.NewStandardBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		2,
@@ -335,7 +335,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewCommitBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		2,
@@ -402,7 +402,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewAbortBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,
 		2,
@@ -458,7 +458,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	}
 
 	blk, err := blocks.NewAbortBlock(
-		blocks.ApricotVersion,
+		version.ApricotBlockVersion,
 		time.Time{}, // timestamp
 		parentID,    // not in memory or persisted state
 		2,
