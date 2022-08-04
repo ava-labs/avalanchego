@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -45,6 +44,9 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	if err := v.verifyCommonBlock(b); err != nil {
 		return err
 	}
+	if err := v.validateBlockTimestamp(b); err != nil {
+		return err
+	}
 
 	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
@@ -52,10 +54,6 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 	onAcceptState := parentState.onAbortState
-
-	if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
-		return err
-	}
 
 	blkState := &blockState{
 		statelessBlock: b,
@@ -78,6 +76,9 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	if err := v.verifyCommonBlock(b); err != nil {
 		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
 	}
+	if err := v.validateBlockTimestamp(b); err != nil {
+		return err
+	}
 
 	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
@@ -85,10 +86,6 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 	onAcceptState := parentState.onCommitState
-
-	if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
-		return err
-	}
 
 	blkState := &blockState{
 		statelessBlock: b,
@@ -107,16 +104,20 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		// This block has already been verified.
 		return nil
 	}
-	blkState := &blockState{
-		statelessBlock: b,
-	}
 
 	if err := v.verifyCommonBlock(b); err != nil {
+		return err
+	}
+	if err := v.validateBlockTimestamp(b); err != nil {
 		return err
 	}
 
 	if _, ok := b.Tx.Unsigned.(*txs.AdvanceTimeTx); ok {
 		return errAdvanceTimeTxCannotBeIncluded
+	}
+
+	blkState := &blockState{
+		statelessBlock: b,
 	}
 
 	parentID := b.Parent()
@@ -203,13 +204,17 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		// This block has already been verified.
 		return nil
 	}
-	blkState := &blockState{
-		statelessBlock: b,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
 
 	if err := v.verifyCommonBlock(b); err != nil {
 		return err
+	}
+	if err := v.validateBlockTimestamp(b); err != nil {
+		return err
+	}
+
+	blkState := &blockState{
+		statelessBlock: b,
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
 	parentID := b.Parent()
@@ -599,17 +604,19 @@ func (v *verifier) verifyCommonBlock(b blocks.Block) error {
 		)
 	}
 
-	return v.validateBlockTimestamp(b, parentTimestamp)
+	return nil
 }
 
-func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.Time) error {
-	if blk.Version() == version.ApricotBlockVersion {
-		return nil
+func (v *verifier) validateBlockTimestamp(b blocks.Block) error {
+	parentID := b.Parent()
+	parentBlk, err := v.getStatelessBlock(parentID)
+	if err != nil {
+		return err
 	}
+	parentBlkTime := parentBlk.BlockTimestamp()
+	blkTime := b.BlockTimestamp()
 
-	blkTime := blk.BlockTimestamp()
-
-	switch blk.(type) {
+	switch b.(type) {
 	case *blocks.BlueberryAbortBlock,
 		*blocks.BlueberryCommitBlock:
 		if !blkTime.Equal(parentBlkTime) {
@@ -624,10 +631,10 @@ func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.T
 
 	case *blocks.BlueberryStandardBlock,
 		*blocks.BlueberryProposalBlock:
-		parentID := blk.Parent()
+		parentID := b.Parent()
 		parentState, ok := v.stateVersions.GetState(parentID)
 		if !ok {
-			return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blk.ID())
+			return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, b.ID())
 		}
 		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
 		if err != nil {
@@ -644,10 +651,7 @@ func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.T
 		)
 
 	default:
-		return fmt.Errorf(
-			"cannot not validate block timestamp for block type %T",
-			blk,
-		)
+		return fmt.Errorf("cannot not validate block timestamp for block type %T", b)
 	}
 }
 

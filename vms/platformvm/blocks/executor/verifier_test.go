@@ -521,9 +521,9 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			statelessAbortBlk, err := blocks.NewBlueberryAbortBlock(test.childTime, parentID, childHeight)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().Height().Return(parentHeight).Times(1)
+			parentStatelessBlk.EXPECT().BlockTimestamp().Return(test.parentTime).Times(1)
 			assert.NoError(err)
-			err = verifier.verifyCommonBlock(statelessAbortBlk)
+			err = verifier.validateBlockTimestamp(statelessAbortBlk)
 			assert.ErrorIs(err, test.result)
 		})
 	}
@@ -598,9 +598,9 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().Height().Return(parentHeight).Times(1)
+			parentStatelessBlk.EXPECT().BlockTimestamp().Return(test.parentTime).Times(1)
 			assert.NoError(err)
-			err = verifier.verifyCommonBlock(statelessCommitBlk)
+			err = verifier.validateBlockTimestamp(statelessCommitBlk)
 			assert.ErrorIs(err, test.result)
 		})
 	}
