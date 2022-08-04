@@ -83,7 +83,6 @@ var (
 	}
 
 	DefaultServerOptions = []grpc.ServerOption{
-
 		grpc.MaxRecvMsgSize(math.MaxInt),
 		grpc.MaxSendMsgSize(math.MaxInt),
 		grpc.MaxConcurrentStreams(math.MaxUint32),
