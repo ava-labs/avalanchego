@@ -4,15 +4,33 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 )
 
 func Parse(b []byte, c codec.Manager) (Block, error) {
 	var blk Block
-	v, err := c.Unmarshal(b, &blk)
-	if err != nil {
+	if _, err := c.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
 
-	return blk, blk.initialize(v, b)
+	switch blk.(type) {
+	case *BlueberryAbortBlock,
+		*BlueberryCommitBlock,
+		*BlueberryProposalBlock,
+		*BlueberryStandardBlock:
+		return blk, blk.initialize(version.BlueberryBlockVersion, b)
+
+	case *ApricotAbortBlock,
+		*ApricotCommitBlock,
+		*ApricotProposalBlock,
+		*ApricotStandardBlock,
+		*AtomicBlock:
+		return blk, blk.initialize(version.ApricotBlockVersion, b)
+
+	default:
+		return nil, fmt.Errorf("unhandled block type %T", blk)
+	}
 }
