@@ -62,7 +62,6 @@ import (
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	blkversion "github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -608,7 +607,6 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _, _ := defaultVM()
-	blkVersion := blkversion.ApricotBlockVersion
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -643,9 +641,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	statelessBlk, err := blocks.NewProposalBlock(
-		blkVersion,
-		time.Time{}, // apricot timestamp is not serialized
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1656,7 +1652,6 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := blkversion.ApricotBlockVersion
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1697,9 +1692,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
-		blkVersion,
-		time.Time{}, // apricot timestamp is not serialized
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1793,7 +1786,6 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := blkversion.ApricotBlockVersion
 
 	db := manager.NewMemDB(version.Semantic1_0_0)
 	firstDB := db.NewPrefixDBManager([]byte{})
@@ -1830,9 +1822,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
-		blkVersion,
-		time.Time{}, // apricot timestamp is not serialized
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1923,7 +1913,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := blkversion.ApricotBlockVersion
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
@@ -1969,9 +1958,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessBlk, err := blocks.NewProposalBlock(
-		blkVersion,
-		time.Time{}, // apricot timestamp is not serialized
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2221,7 +2208,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	blkVersion := blkversion.ApricotBlockVersion
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Factory: Factory{
@@ -2263,9 +2249,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
-		blkVersion,
-		time.Time{}, // apricot timestamp is not serialized
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2291,9 +2275,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessSecondAdvanceTimeBlk, err := blocks.NewProposalBlock(
-		blkVersion,
-		time.Time{}, // apricot timestamp is not serialized
+	statelessSecondAdvanceTimeBlk, err := blocks.NewApricotProposalBlock(
 		firstOption.ID(),
 		firstOption.(*blockexecutor.Block).Height()+1,
 		secondAdvanceTimeTx,

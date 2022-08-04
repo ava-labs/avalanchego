@@ -5,12 +5,10 @@ package builder
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -118,7 +116,6 @@ func (a *apricotStrategy) nextProposalTx() (*txs.Tx, error) {
 }
 
 func (a *apricotStrategy) build() (snowman.Block, error) {
-	blkVersion := version.ApricotBlockVersion
 	if err := a.selectBlockContent(); err != nil {
 		return nil, err
 	}
@@ -130,9 +127,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		statelessBlk, err := blocks.NewProposalBlock(
-			blkVersion,
-			time.Time{},
+		statelessBlk, err := blocks.NewApricotProposalBlock(
 			a.parentBlkID,
 			a.nextHeight,
 			tx,

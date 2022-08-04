@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -32,9 +31,7 @@ import (
 func TestAcceptorVisitProposalBlock(t *testing.T) {
 	assert := assert.New(t)
 
-	blk, err := blocks.NewProposalBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	blk, err := blocks.NewApricotProposalBlock(
 		ids.GenerateTestID(),
 		1,
 		&txs.Tx{

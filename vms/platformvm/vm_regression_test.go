@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	blkversion "github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -508,9 +507,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -647,9 +644,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAdvanceTimeProposalBlk, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessAdvanceTimeProposalBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -756,9 +751,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessAddValidatorProposalBlk0, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessAddValidatorProposalBlk0, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -802,9 +795,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	statelessAdvanceTimeProposalBlk0, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessAdvanceTimeProposalBlk0, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -961,9 +952,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAddValidatorProposalBlk1, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessAddValidatorProposalBlk1, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -1008,9 +997,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	statelessAdvanceTimeProposalBlk1, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessAdvanceTimeProposalBlk1, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,
@@ -1165,9 +1152,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessProposalBlk, err := blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessProposalBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -1201,9 +1186,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	statelessProposalBlk, err = blocks.NewProposalBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessProposalBlk, err = blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,

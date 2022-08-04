@@ -5,7 +5,6 @@ package executor
 
 import (
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -35,9 +33,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "proposal block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewProposalBlock(
-					version.ApricotBlockVersion,
-					time.Time{}, // timestamp
+				return blocks.NewApricotProposalBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{

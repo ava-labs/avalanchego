@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -88,9 +87,7 @@ func TestProposalBlocks(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		apricotProposalBlk, err := NewProposalBlock(
-			version.ApricotBlockVersion,
-			blkTimestamp,
+		apricotProposalBlk, err := NewApricotProposalBlock(
 			parentID,
 			height,
 			tx,
@@ -117,8 +114,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
 
 		// check that blueberry proposal block can be built and parsed
-		blueberryProposalBlk, err := NewProposalBlock(
-			version.BlueberryBlockVersion,
+		blueberryProposalBlk, err := NewBlueberryProposalBlock(
 			blkTimestamp,
 			parentID,
 			height,

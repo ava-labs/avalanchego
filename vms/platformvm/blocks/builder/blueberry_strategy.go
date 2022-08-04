@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -124,7 +123,6 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	// remove selected txs from mempool
 	b.Mempool.Remove(b.txes)
 
-	blkVersion := version.BlueberryBlockVersion
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
 		statelessBlk, err := blocks.NewBlueberryStandardBlock(
@@ -144,8 +142,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		statelessBlk, err := blocks.NewProposalBlock(
-			blkVersion,
+		statelessBlk, err := blocks.NewBlueberryProposalBlock(
 			b.blkTime,
 			b.parentBlkID,
 			b.height,

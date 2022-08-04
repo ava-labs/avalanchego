@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -72,9 +71,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewProposalBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	blk, err := blocks.NewApricotProposalBlock(
 		parentID,
 		2,
 		&txs.Tx{

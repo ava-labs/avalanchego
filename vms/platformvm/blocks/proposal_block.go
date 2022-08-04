@@ -13,82 +13,37 @@ import (
 )
 
 var (
-	_ Block = &ApricotProposalBlock{}
 	_ Block = &BlueberryProposalBlock{}
+	_ Block = &ApricotProposalBlock{}
 )
 
-// NewProposalBlock assumes [tx] is initialized
-func NewProposalBlock(
-	blkVersion uint16,
+// NewBlueberryProposalBlock assumes [tx] is initialized
+func NewBlueberryProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
 ) (Block, error) {
-	switch blkVersion {
-	case version.ApricotBlockVersion:
-		res := &ApricotProposalBlock{
+	res := &BlueberryProposalBlock{
+		BlueberryCommonBlock: BlueberryCommonBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
-			Tx: tx,
-		}
-
-		// We serialize this block as a Block so that it can be deserialized into a
-		// Block
-		blk := Block(res)
-		bytes, err := Codec.Marshal(Version, &blk)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-		}
-		return res, res.initialize(version.ApricotBlockVersion, bytes)
-
-	case version.BlueberryBlockVersion:
-		res := &BlueberryProposalBlock{
-			BlueberryCommonBlock: BlueberryCommonBlock{
-				ApricotCommonBlock: ApricotCommonBlock{
-					PrntID: parentID,
-					Hght:   height,
-				},
-				BlkTimestamp: uint64(timestamp.Unix()),
-			},
-			TxBytes: tx.Bytes(),
-			Tx:      tx,
-		}
-
-		// We serialize this block as a Block so that it can be deserialized into a
-		// Block
-		blk := Block(res)
-		bytes, err := Codec.Marshal(Version, &blk)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-		}
-		return res, res.initialize(version.BlueberryBlockVersion, bytes)
-
-	default:
-		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
+			BlkTimestamp: uint64(timestamp.Unix()),
+		},
+		TxBytes: tx.Bytes(),
+		Tx:      tx,
 	}
-}
 
-// As is, this is duplication of atomic block. But let's tolerate some code duplication for now
-type ApricotProposalBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-
-	Tx *txs.Tx `serialize:"true" json:"tx"`
-}
-
-func (b *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
-		return err
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := Block(res)
+	bytes, err := Codec.Marshal(Version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-	return b.Tx.Sign(txs.Codec, nil)
-}
-
-func (b *ApricotProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
-
-func (b *ApricotProposalBlock) Visit(v Visitor) error {
-	return v.ApricotProposalBlock(b)
+	return res, res.initialize(version.BlueberryBlockVersion, bytes)
 }
 
 type BlueberryProposalBlock struct {
@@ -123,4 +78,44 @@ func (b *BlueberryProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
 func (b *BlueberryProposalBlock) Visit(v Visitor) error {
 	return v.BlueberryProposalBlock(b)
+}
+
+// NewApricotProposalBlock assumes [tx] is initialized
+func NewApricotProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (Block, error) {
+	res := &ApricotProposalBlock{
+		ApricotCommonBlock: ApricotCommonBlock{
+			PrntID: parentID,
+			Hght:   height,
+		},
+		Tx: tx,
+	}
+
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := Block(res)
+	bytes, err := Codec.Marshal(Version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+	}
+	return res, res.initialize(version.ApricotBlockVersion, bytes)
+}
+
+// As is, this is duplication of atomic block. But let's tolerate some code duplication for now
+type ApricotProposalBlock struct {
+	ApricotCommonBlock `serialize:"true"`
+
+	Tx *txs.Tx `serialize:"true" json:"tx"`
+}
+
+func (b *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
+	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
+		return err
+	}
+	return b.Tx.Sign(txs.Codec, nil)
+}
+
+func (b *ApricotProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
+
+func (b *ApricotProposalBlock) Visit(v Visitor) error {
+	return v.ApricotProposalBlock(b)
 }
