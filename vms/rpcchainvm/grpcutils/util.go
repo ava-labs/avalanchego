@@ -45,10 +45,16 @@ const (
 	// before sending GOAWAY. Internally in gRPC a +-10% jitter is added to
 	// mitigate retry storms.
 	defaultServerMaxConnectionAge = 10 * time.Minute
-	// Grace period after max defaultServerMaxConnectionAge after
-	// which the http2 connection is forcefully closed. 1 second is the minimum
-	// possible value. Anything less will be internally overridden to 1s by grpc.
-	// We never want an RPC to live longer than this value.
+	// After MaxConnectionAge, MaxConnectionAgeGrace specifies the amount of time
+	// between when the server sends a GOAWAY to the client to initiate graceful
+	// shutdown, and when the server closes the connection.
+	//
+	// The server expects that this grace period will allow the client to complete
+	// any ongoing requests, after which it will forcefully terminate the connection.
+	// If a request takes longer than this grace period, it will *fail*.
+	// We *never* want an RPC to live longer than this value.
+	//
+	// invariant: Any value < 1 second will be internally overridden by gRPC.
 	defaultServerMaxConnectionAgeGrace = math.MaxInt64
 
 	// Client:
