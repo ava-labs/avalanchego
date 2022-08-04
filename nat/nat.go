@@ -96,7 +96,7 @@ func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc str
 		}
 
 		// log a message, sleep a second and retry.
-		m.log.Error("renewing port mapping failed",
+		m.log.Warn("renewing port mapping failed",
 			zap.Int("attempt", retryCnt+1),
 			zap.Uint16("externalPort", extPort),
 			zap.Uint16("internalPort", intPort),

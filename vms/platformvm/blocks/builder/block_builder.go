@@ -111,7 +111,6 @@ func NewBlockBuilder(
 	builder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
 		builder,
-		txExecutorBackend.Config.ApricotPhase4Time,
 		appSender,
 	)
 
