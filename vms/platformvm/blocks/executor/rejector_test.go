@@ -98,12 +98,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "commit",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewCommitBlock(
-					version.ApricotBlockVersion,
-					time.Time{}, // timestamp
-					ids.GenerateTestID(),
-					1,
-				)
+				return blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
 				return r.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))

@@ -334,12 +334,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewCommitBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		parentID,
-		2,
-	)
+	blk, err := blocks.NewApricotCommitBlock(parentID, 2 /*height*/)
 	assert.NoError(err)
 
 	// Set expectations for dependencies.
@@ -545,7 +540,6 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 	defer ctrl.Finish()
 
 	now := defaultGenesisTime.Add(time.Hour)
-	blkVersion := version.BlueberryBlockVersion
 
 	tests := []struct {
 		description string
@@ -605,14 +599,8 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			}
 
 			// build and verify child block
-			childVersion := blkVersion
 			childHeight := parentHeight + 1
-			statelessCommitBlk, err := blocks.NewCommitBlock(
-				childVersion,
-				test.childTime,
-				parentID,
-				childHeight,
-			)
+			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
 
 			// Set expectations for dependencies.
 			parentStatelessBlk.EXPECT().Height().Return(parentHeight).Times(1)

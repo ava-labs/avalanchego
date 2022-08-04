@@ -1197,12 +1197,7 @@ func (s *state) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := blocks.NewCommitBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		genesisID,
-		0, // height
-	)
+	genesisBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}

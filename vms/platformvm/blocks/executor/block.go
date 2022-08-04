@@ -93,15 +93,20 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
-	blkID := b.ID()
-	nextHeight := b.Height() + 1
+	var (
+		statelessCommitBlk blocks.Block
+		err                error
 
-	statelessCommitBlk, err := blocks.NewCommitBlock(
-		b.Version(),
-		b.BlockTimestamp(),
-		blkID,
-		nextHeight,
+		blkID      = b.ID()
+		nextHeight = b.Height() + 1
 	)
+
+	switch b.Block.(type) {
+	case *blocks.ApricotProposalBlock:
+		statelessCommitBlk, err = blocks.NewApricotCommitBlock(blkID, nextHeight)
+	default: // must be *blocks.BlueberryProposalBlock
+		statelessCommitBlk, err = blocks.NewBlueberryCommitBlock(b.BlockTimestamp(), blkID, nextHeight)
+	}
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create commit block: %w",

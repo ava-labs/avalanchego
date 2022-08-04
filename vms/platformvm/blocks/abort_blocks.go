@@ -17,11 +17,7 @@ var (
 	_ Block = &ApricotAbortBlock{}
 )
 
-func NewBlueberryAbortBlock(
-	timestamp time.Time,
-	parentID ids.ID,
-	height uint64,
-) (Block, error) {
+func NewBlueberryAbortBlock(timestamp time.Time, parentID ids.ID, height uint64) (Block, error) {
 	res := &BlueberryAbortBlock{
 		BlueberryCommonBlock: BlueberryCommonBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
@@ -53,10 +49,7 @@ func (b *BlueberryAbortBlock) Visit(v Visitor) error {
 	return v.BlueberryAbortBlock(b)
 }
 
-func NewApricotAbortBlock(
-	parentID ids.ID,
-	height uint64,
-) (Block, error) {
+func NewApricotAbortBlock(parentID ids.ID, height uint64) (Block, error) {
 	res := &ApricotAbortBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,

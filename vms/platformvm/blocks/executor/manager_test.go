@@ -5,7 +5,6 @@ package executor
 
 import (
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -24,12 +22,7 @@ func TestGetBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	statelessBlk, err := blocks.NewCommitBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		ids.GenerateTestID(),
-		2,
-	)
+	statelessBlk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
 	assert.NoError(err)
 	state := state.NewMockState(ctrl)
 	manager := &manager{

@@ -275,12 +275,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewCommitBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		parentID,
-		1,
-	)
+	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
 	assert.NoError(err)
 	commitBlk, ok := blk.(*blocks.ApricotCommitBlock)
 	assert.True(ok)

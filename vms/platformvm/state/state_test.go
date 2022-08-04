@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -311,12 +310,7 @@ func newInitializedState(assert *assert.Assertions) (State, database.Database) {
 		InitialSupply: units.Schmeckle + units.Avax,
 	}
 
-	genesisBlk, err := blocks.NewCommitBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		genesisBlkID,
-		0,
-	)
+	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
 	assert.NoError(err)
 	assert.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
 

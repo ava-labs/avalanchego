@@ -167,12 +167,7 @@ func TestCommitBlock(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		apricotCommitBlk, err := NewCommitBlock(
-			version.ApricotBlockVersion,
-			blkTimestamp,
-			parentID,
-			height,
-		)
+		apricotCommitBlk, err := NewApricotCommitBlock(parentID, height)
 		assert.NoError(err)
 
 		// parse block
@@ -191,12 +186,7 @@ func TestCommitBlock(t *testing.T) {
 		assert.Equal(time.Unix(0, 0), parsed.BlockTimestamp())
 
 		// check that blueberry commit block can be built and parsed
-		blueberryCommitBlk, err := NewCommitBlock(
-			version.BlueberryBlockVersion,
-			blkTimestamp,
-			parentID,
-			height,
-		)
+		blueberryCommitBlk, err := NewBlueberryCommitBlock(blkTimestamp, parentID, height)
 		assert.NoError(err)
 
 		// parse block
