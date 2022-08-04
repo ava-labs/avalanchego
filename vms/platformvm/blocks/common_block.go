@@ -15,7 +15,7 @@ type BlueberryCommonBlock struct {
 
 	// Time this block was proposed at. Note that this
 	// is serialized for blueberry blocks only
-	BlkTimestamp uint64 `blueberry:"true" json:"time"`
+	BlkTimestamp uint64 `serialize:"true" json:"time"`
 }
 
 func (b *BlueberryCommonBlock) BlockTimestamp() time.Time {

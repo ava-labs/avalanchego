@@ -37,7 +37,7 @@ func NewStandardBlock(
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
 		blk := Block(res)
-		bytes, err := Codec.Marshal(version.ApricotBlockVersion, &blk)
+		bytes, err := Codec.Marshal(Version, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
@@ -64,7 +64,7 @@ func NewStandardBlock(
 		// We serialize this block as a Block so that it can be deserialized into a
 		// Block
 		blk := Block(res)
-		bytes, err := Codec.Marshal(version.BlueberryBlockVersion, &blk)
+		bytes, err := Codec.Marshal(Version, &blk)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 		}
@@ -102,7 +102,7 @@ func (b *ApricotStandardBlock) Visit(v Visitor) error {
 type BlueberryStandardBlock struct {
 	BlueberryCommonBlock `serialize:"true"`
 
-	TxsBytes [][]byte `serialize:"false" blueberry:"true" json:"txs"`
+	TxsBytes [][]byte `serialize:"true" json:"txs"`
 
 	Transactions []*txs.Tx
 }

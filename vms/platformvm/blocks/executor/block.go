@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 )
 
 var (
@@ -59,24 +58,31 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
-	if b.Block.Version() == version.BlueberryBlockVersion {
+	switch b.Block.(type) {
+	case *blocks.ApricotAbortBlock,
+		*blocks.ApricotCommitBlock,
+		*blocks.ApricotProposalBlock,
+		*blocks.ApricotStandardBlock,
+		*blocks.AtomicBlock:
+		// If this is the last accepted block and the block was loaded from disk
+		// since it was accepted, then the timestamp wouldn't be set correctly. So,
+		// we explicitly return the chain time.
+		// Check if the block is processing.
+		if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
+			return blkState.timestamp
+		}
+
+		// The block isn't processing.
+		// According to the snowman.Block interface, the last accepted
+		// block is the only accepted block that must return a correct timestamp,
+		// so we just return the chain time.
+		return b.manager.state.GetTimestamp()
+
+	default:
+		// from blueberry on, timestamps are serialized in blocks
 		return b.BlockTimestamp()
-	}
 
-	// Here blocks have ApricotVersion
-	// If this is the last accepted block and the block was loaded from disk
-	// since it was accepted, then the timestamp wouldn't be set correctly. So,
-	// we explicitly return the chain time.
-	// Check if the block is processing.
-	if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
-		return blkState.timestamp
 	}
-
-	// The block isn't processing.
-	// According to the snowman.Block interface, the last accepted
-	// block is the only accepted block that must return a correct timestamp,
-	// so we just return the chain time.
-	return b.manager.state.GetTimestamp()
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {

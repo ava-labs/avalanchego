@@ -8,13 +8,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const blueberryTag = "blueberry"
+// Version is the current default codec version
+const Version = 0
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -26,32 +25,22 @@ var (
 )
 
 func init() {
-	blueberryTags := []string{reflectcodec.DefaultTagName, blueberryTag}
-
-	apricotCdc := linearcodec.NewDefault()
-	blueberryCdc := linearcodec.NewWithTags(blueberryTags)
+	c := linearcodec.NewDefault()
 	Codec = codec.NewDefaultManager()
-
-	preGc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	postGc := linearcodec.New(blueberryTags, math.MaxInt32)
+	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{apricotCdc, blueberryCdc, preGc, postGc} {
+	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
+			RegisterBlueberryBlockTypes(c),
 		)
 	}
-	for _, c := range []codec.Registry{blueberryCdc, postGc} {
-		errs.Add(RegisterBlueberryBlockTypes(c))
-	}
-
 	errs.Add(
-		Codec.RegisterCodec(version.ApricotBlockVersion, apricotCdc),
-		Codec.RegisterCodec(version.BlueberryBlockVersion, blueberryCdc),
-		GenesisCodec.RegisterCodec(version.ApricotBlockVersion, preGc),
-		GenesisCodec.RegisterCodec(version.BlueberryBlockVersion, postGc),
+		Codec.RegisterCodec(txs.Version, c),
+		GenesisCodec.RegisterCodec(txs.Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
