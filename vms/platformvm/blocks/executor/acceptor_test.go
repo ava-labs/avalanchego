@@ -373,12 +373,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewAbortBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		parentID,
-		1,
-	)
+	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
 	assert.NoError(err)
 	abortBlk, ok := blk.(*blocks.ApricotAbortBlock)
 	assert.True(ok)

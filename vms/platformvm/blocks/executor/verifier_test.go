@@ -401,12 +401,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewAbortBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		parentID,
-		2,
-	)
+	blk, err := blocks.NewApricotAbortBlock(parentID, 2 /*height*/)
 	assert.NoError(err)
 
 	// Set expectations for dependencies.
@@ -457,12 +452,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewAbortBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
-		parentID,    // not in memory or persisted state
-		2,
-	)
+	blk, err := blocks.NewApricotAbortBlock(parentID /*not in memory or persisted state*/, 2 /*height*/)
 	assert.NoError(err)
 
 	// Set expectations for dependencies.
@@ -478,7 +468,6 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 	defer ctrl.Finish()
 
 	now := defaultGenesisTime.Add(time.Hour)
-	blkVersion := version.BlueberryBlockVersion
 
 	tests := []struct {
 		description string
@@ -538,14 +527,8 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			}
 
 			// build and verify child block
-			childVersion := blkVersion
 			childHeight := parentHeight + 1
-			statelessAbortBlk, err := blocks.NewAbortBlock(
-				childVersion,
-				test.childTime,
-				parentID,
-				childHeight,
-			)
+			statelessAbortBlk, err := blocks.NewBlueberryAbortBlock(test.childTime, parentID, childHeight)
 
 			// Set expectations for dependencies.
 			parentStatelessBlk.EXPECT().Height().Return(parentHeight).Times(1)

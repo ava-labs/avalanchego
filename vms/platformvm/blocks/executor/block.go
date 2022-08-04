@@ -81,7 +81,6 @@ func (b *Block) Timestamp() time.Time {
 	default:
 		// from blueberry on, timestamps are serialized in blocks
 		return b.BlockTimestamp()
-
 	}
 }
 
@@ -111,12 +110,13 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 	}
 	commitBlock := b.manager.NewBlock(statelessCommitBlk)
 
-	statelessAbortBlk, err := blocks.NewAbortBlock(
-		b.Version(),
-		b.BlockTimestamp(),
-		blkID,
-		nextHeight,
-	)
+	var statelessAbortBlk blocks.Block
+	switch b.Block.(type) {
+	case *blocks.ApricotProposalBlock:
+		statelessAbortBlk, err = blocks.NewApricotAbortBlock(blkID, nextHeight)
+	default: // must be *blocks.BlueberryProposalBlock
+		statelessAbortBlk, err = blocks.NewBlueberryAbortBlock(b.BlockTimestamp(), blkID, nextHeight)
+	}
 	if err != nil {
 		return [2]snowman.Block{}, fmt.Errorf(
 			"failed to create abort block: %w",

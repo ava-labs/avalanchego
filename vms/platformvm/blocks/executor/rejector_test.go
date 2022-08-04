@@ -112,12 +112,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "abort",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewAbortBlock(
-					version.ApricotBlockVersion,
-					time.Time{}, // timestamp
-					ids.GenerateTestID(),
-					1,
-				)
+				return blocks.NewApricotAbortBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
 				return r.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))

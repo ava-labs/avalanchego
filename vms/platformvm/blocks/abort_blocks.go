@@ -13,18 +13,34 @@ import (
 )
 
 var (
-	_ Block = &ApricotAbortBlock{}
 	_ Block = &BlueberryAbortBlock{}
+	_ Block = &ApricotAbortBlock{}
 )
 
-type ApricotAbortBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-}
+func NewBlueberryAbortBlock(
+	timestamp time.Time,
+	parentID ids.ID,
+	height uint64,
+) (Block, error) {
+	res := &BlueberryAbortBlock{
+		BlueberryCommonBlock: BlueberryCommonBlock{
+			ApricotCommonBlock: ApricotCommonBlock{
+				PrntID: parentID,
+				Hght:   height,
+			},
+			BlkTimestamp: uint64(timestamp.Unix()),
+		},
+	}
 
-func (*ApricotAbortBlock) Txs() []*txs.Tx { return nil }
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := Block(res)
+	bytes, err := Codec.Marshal(Version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+	}
 
-func (b *ApricotAbortBlock) Visit(v Visitor) error {
-	return v.ApricotAbortBlock(b)
+	return res, res.initialize(version.BlueberryBlockVersion, bytes)
 }
 
 type BlueberryAbortBlock struct {
@@ -37,53 +53,34 @@ func (b *BlueberryAbortBlock) Visit(v Visitor) error {
 	return v.BlueberryAbortBlock(b)
 }
 
-func NewAbortBlock(
-	blkVersion uint16,
-	timestamp time.Time,
+func NewApricotAbortBlock(
 	parentID ids.ID,
 	height uint64,
 ) (Block, error) {
-	switch blkVersion {
-	case version.ApricotBlockVersion:
-		res := &ApricotAbortBlock{
-			ApricotCommonBlock: ApricotCommonBlock{
-				PrntID: parentID,
-				Hght:   height,
-			},
-		}
-
-		// We serialize this block as a Block so that it can be deserialized into a
-		// Block
-		blk := Block(res)
-		bytes, err := Codec.Marshal(Version, &blk)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-		}
-
-		return res, res.initialize(blkVersion, bytes)
-
-	case version.BlueberryBlockVersion:
-		res := &BlueberryAbortBlock{
-			BlueberryCommonBlock: BlueberryCommonBlock{
-				ApricotCommonBlock: ApricotCommonBlock{
-					PrntID: parentID,
-					Hght:   height,
-				},
-				BlkTimestamp: uint64(timestamp.Unix()),
-			},
-		}
-
-		// We serialize this block as a Block so that it can be deserialized into a
-		// Block
-		blk := Block(res)
-		bytes, err := Codec.Marshal(Version, &blk)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-		}
-
-		return res, res.initialize(blkVersion, bytes)
-
-	default:
-		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
+	res := &ApricotAbortBlock{
+		ApricotCommonBlock: ApricotCommonBlock{
+			PrntID: parentID,
+			Hght:   height,
+		},
 	}
+
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := Block(res)
+	bytes, err := Codec.Marshal(Version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+	}
+
+	return res, res.initialize(version.ApricotBlockVersion, bytes)
+}
+
+type ApricotAbortBlock struct {
+	ApricotCommonBlock `serialize:"true"`
+}
+
+func (*ApricotAbortBlock) Txs() []*txs.Tx { return nil }
+
+func (b *ApricotAbortBlock) Visit(v Visitor) error {
+	return v.ApricotAbortBlock(b)
 }

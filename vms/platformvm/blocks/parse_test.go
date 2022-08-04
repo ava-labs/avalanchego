@@ -222,12 +222,7 @@ func TestAbortBlock(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		apricotAbortBlk, err := NewAbortBlock(
-			version.ApricotBlockVersion,
-			blkTimestamp,
-			parentID,
-			height,
-		)
+		apricotAbortBlk, err := NewApricotAbortBlock(parentID, height)
 		assert.NoError(err)
 
 		// parse block
@@ -246,12 +241,7 @@ func TestAbortBlock(t *testing.T) {
 		assert.Equal(time.Unix(0, 0), parsed.BlockTimestamp())
 
 		// check that blueberry abort block can be built and parsed
-		blueberryAbortBlk, err := NewAbortBlock(
-			version.BlueberryBlockVersion,
-			blkTimestamp,
-			parentID,
-			height,
-		)
+		blueberryAbortBlk, err := NewBlueberryAbortBlock(blkTimestamp, parentID, height)
 		assert.NoError(err)
 
 		// parse block
