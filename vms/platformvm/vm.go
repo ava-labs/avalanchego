@@ -218,7 +218,7 @@ func (vm *VM) Initialize(
 
 	vm.blockBuilder.Initialize(mempool, vm, toEngine)
 
-	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
+	vm.network = newNetwork(appSender, vm)
 
 	if err := vm.updateValidators(); err != nil {
 		return fmt.Errorf(
