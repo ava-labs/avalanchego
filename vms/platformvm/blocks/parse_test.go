@@ -40,23 +40,23 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(apricotStandardBlk.Bytes(), cdc)
+		parsedBlueberry, err := Parse(apricotStandardBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
-		assert.Equal(apricotStandardBlk.ID(), parsed.ID())
-		assert.Equal(apricotStandardBlk.Bytes(), parsed.Bytes())
-		assert.Equal(apricotStandardBlk.Parent(), parsed.Parent())
-		assert.Equal(apricotStandardBlk.Height(), parsed.Height())
-		assert.Equal(apricotStandardBlk.Version(), parsed.Version())
+		assert.Equal(apricotStandardBlk.ID(), parsedBlueberry.ID())
+		assert.Equal(apricotStandardBlk.Bytes(), parsedBlueberry.Bytes())
+		assert.Equal(apricotStandardBlk.Parent(), parsedBlueberry.Parent())
+		assert.Equal(apricotStandardBlk.Height(), parsedBlueberry.Height())
+		assert.Equal(apricotStandardBlk.Version(), parsedBlueberry.Version())
 
 		// timestamp is not serialized in apricot blocks
 		// no matter if block is built with a non-zero timestamp
-		assert.Equal(time.Unix(0, 0), parsed.BlockTimestamp())
+		assert.Equal(time.Unix(0, 0), parsedBlueberry.BlockTimestamp())
 
-		parsedApricotStandardBlk, ok := parsed.(*ApricotStandardBlock)
+		parsedApricot, ok := parsedBlueberry.(*ApricotStandardBlock)
 		assert.True(ok)
-		assert.Equal(txs, parsedApricotStandardBlk.Txs())
+		assert.Equal(txs, parsedApricot.Txs())
 
 		// check that blueberry standard block can be built and parsed
 		blueberryStandardBlk, err := NewStandardBlock(
@@ -69,22 +69,22 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = Parse(blueberryStandardBlk.Bytes(), cdc)
+		parsedBlueberry, err = Parse(blueberryStandardBlk.Bytes(), cdc)
 		assert.NoError(err)
 
 		// compare content
-		assert.Equal(blueberryStandardBlk.ID(), parsed.ID())
-		assert.Equal(blueberryStandardBlk.Bytes(), parsed.Bytes())
+		assert.Equal(blueberryStandardBlk.ID(), parsedBlueberry.ID())
+		assert.Equal(blueberryStandardBlk.Bytes(), parsedBlueberry.Bytes())
 		assert.Equal(blueberryStandardBlk.Parent(), blueberryStandardBlk.Parent())
-		assert.Equal(blueberryStandardBlk.Height(), parsed.Height())
-		assert.Equal(blueberryStandardBlk.Version(), parsed.Version())
-		assert.Equal(blueberryStandardBlk.BlockTimestamp(), parsed.BlockTimestamp())
-		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
+		assert.Equal(blueberryStandardBlk.Height(), parsedBlueberry.Height())
+		assert.Equal(blueberryStandardBlk.Version(), parsedBlueberry.Version())
+		assert.Equal(blueberryStandardBlk.BlockTimestamp(), parsedBlueberry.BlockTimestamp())
+		parsedBlueberryStandardBlk, ok := parsedBlueberry.(*BlueberryStandardBlock)
 		assert.True(ok)
 		assert.Equal(txs, parsedBlueberryStandardBlk.Txs())
 
 		// backward compatibility check
-		assert.Equal(parsedApricotStandardBlk.Txs(), parsedBlueberryStandardBlk.Txs())
+		assert.Equal(parsedApricot.Txs(), parsedBlueberryStandardBlk.Txs())
 	}
 }
 

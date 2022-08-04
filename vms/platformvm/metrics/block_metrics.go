@@ -56,9 +56,14 @@ func newBlockMetric(
 	return blockMetric
 }
 
-func (m *blockMetrics) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	m.numProposalBlocks.Inc()
-	return b.Tx.Unsigned.Visit(m.txMetrics)
+func (m *blockMetrics) BlueberryAbortBlock(*blocks.BlueberryAbortBlock) error {
+	m.numAbortBlocks.Inc()
+	return nil
+}
+
+func (m *blockMetrics) BlueberryCommitBlock(*blocks.BlueberryCommitBlock) error {
+	m.numCommitBlocks.Inc()
+	return nil
 }
 
 func (m *blockMetrics) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
@@ -66,8 +71,28 @@ func (m *blockMetrics) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) 
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) AtomicBlock(b *blocks.AtomicBlock) error {
-	m.numAtomicBlocks.Inc()
+func (m *blockMetrics) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+	m.numStandardBlocks.Inc()
+	for _, tx := range b.Transactions {
+		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *blockMetrics) ApricotAbortBlock(*blocks.ApricotAbortBlock) error {
+	m.numAbortBlocks.Inc()
+	return nil
+}
+
+func (m *blockMetrics) ApricotCommitBlock(*blocks.ApricotCommitBlock) error {
+	m.numCommitBlocks.Inc()
+	return nil
+}
+
+func (m *blockMetrics) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+	m.numProposalBlocks.Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
@@ -81,22 +106,7 @@ func (m *blockMetrics) ApricotStandardBlock(b *blocks.ApricotStandardBlock) erro
 	return nil
 }
 
-func (m *blockMetrics) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
-	m.numStandardBlocks.Inc()
-	for _, tx := range b.Transactions {
-		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *blockMetrics) CommitBlock(*blocks.CommitBlock) error {
-	m.numCommitBlocks.Inc()
-	return nil
-}
-
-func (m *blockMetrics) AbortBlock(*blocks.AbortBlock) error {
-	m.numAbortBlocks.Inc()
-	return nil
+func (m *blockMetrics) AtomicBlock(b *blocks.AtomicBlock) error {
+	m.numAtomicBlocks.Inc()
+	return b.Tx.Unsigned.Visit(m.txMetrics)
 }

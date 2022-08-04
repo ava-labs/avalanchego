@@ -281,11 +281,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		1,
 	)
 	assert.NoError(err)
-	commitBlk, ok := blk.(*blocks.CommitBlock)
+	commitBlk, ok := blk.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	blkID := blk.ID()
-	err = acceptor.CommitBlock(commitBlk)
+	err = acceptor.ApricotCommitBlock(commitBlk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -339,7 +339,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.CommitBlock(commitBlk)
+	err = acceptor.ApricotCommitBlock(commitBlk)
 	assert.NoError(err)
 	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
@@ -379,11 +379,11 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		1,
 	)
 	assert.NoError(err)
-	abortBlk, ok := blk.(*blocks.AbortBlock)
+	abortBlk, ok := blk.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	blkID := blk.ID()
-	err = acceptor.AbortBlock(abortBlk)
+	err = acceptor.ApricotAbortBlock(abortBlk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -437,7 +437,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.AbortBlock(abortBlk)
+	err = acceptor.ApricotAbortBlock(abortBlk)
 	assert.NoError(err)
 	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

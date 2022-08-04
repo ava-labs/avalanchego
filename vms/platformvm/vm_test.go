@@ -588,7 +588,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -714,11 +714,11 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -814,11 +814,11 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -887,11 +887,11 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -942,10 +942,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -986,11 +986,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1040,11 +1040,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1081,11 +1081,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
@@ -1135,11 +1135,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1177,11 +1177,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
@@ -1356,11 +1356,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1402,11 +1402,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -1450,11 +1450,11 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -2442,11 +2442,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -2485,11 +2485,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(err)
 
 	commit = options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort = options[0].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())
@@ -2569,11 +2569,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	assert.NoError(block.Accept())
@@ -2597,11 +2597,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.NoError(err)
 
 	abort = options[0].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok)
 
 	commit = options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	assert.NoError(blk.Accept())

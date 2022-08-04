@@ -676,7 +676,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
 	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit.Block.(*blocks.CommitBlock)
+	_, ok = advanceTimeProposalCommit.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -783,7 +783,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
 	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = addValidatorProposalCommit0.Block.(*blocks.CommitBlock)
+	_, ok = addValidatorProposalCommit0.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -832,7 +832,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
 	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit0.Block.(*blocks.CommitBlock)
+	_, ok = advanceTimeProposalCommit0.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -991,7 +991,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
 	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = addValidatorProposalCommit1.Block.(*blocks.CommitBlock)
+	_, ok = addValidatorProposalCommit1.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -1040,7 +1040,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
 	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = advanceTimeProposalCommit1.Block.(*blocks.CommitBlock)
+	_, ok = advanceTimeProposalCommit1.Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()
@@ -1257,12 +1257,12 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	// verify the preferences
 	commit, ok := options[0].(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock)
+	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
 	abort, ok := options[1].(*blockexecutor.Block)
 	assert.True(ok)
-	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.AbortBlock)
+	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	// Verify the options

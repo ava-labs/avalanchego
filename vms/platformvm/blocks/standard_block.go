@@ -27,10 +27,9 @@ func NewStandardBlock(
 	switch version {
 	case ApricotVersion:
 		res := &ApricotStandardBlock{
-			CommonBlock: CommonBlock{
-				PrntID:       parentID,
-				Hght:         height,
-				BlkTimestamp: uint64(timestamp.Unix()),
+			ApricotCommonBlock: ApricotCommonBlock{
+				PrntID: parentID,
+				Hght:   height,
 			},
 			Transactions: txes,
 		}
@@ -51,9 +50,11 @@ func NewStandardBlock(
 			txsBytes[i] = txBytes
 		}
 		res := &BlueberryStandardBlock{
-			CommonBlock: CommonBlock{
-				PrntID:       parentID,
-				Hght:         height,
+			BlueberryCommonBlock: BlueberryCommonBlock{
+				ApricotCommonBlock: ApricotCommonBlock{
+					PrntID: parentID,
+					Hght:   height,
+				},
 				BlkTimestamp: uint64(timestamp.Unix()),
 			},
 			TxsBytes:     txsBytes,
@@ -74,13 +75,13 @@ func NewStandardBlock(
 }
 
 type ApricotStandardBlock struct {
-	CommonBlock `serialize:"true"`
+	ApricotCommonBlock `serialize:"true"`
 
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.CommonBlock.initialize(version, bytes); err != nil {
+	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range b.Transactions {
@@ -98,7 +99,7 @@ func (b *ApricotStandardBlock) Visit(v Visitor) error {
 }
 
 type BlueberryStandardBlock struct {
-	CommonBlock `serialize:"true"`
+	BlueberryCommonBlock `serialize:"true"`
 
 	TxsBytes [][]byte `serialize:"false" blueberry:"true" json:"txs"`
 
@@ -106,7 +107,7 @@ type BlueberryStandardBlock struct {
 }
 
 func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.CommonBlock.initialize(version, bytes); err != nil {
+	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 

@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -34,7 +33,7 @@ type verifier struct {
 	txExecutorBackend executor.Backend
 }
 
-func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -46,43 +45,57 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return err
 	}
 
-	txExecutor := &executor.ProposalTxExecutor{
-		Backend:          &v.txExecutorBackend,
-		ReferenceBlockID: b.Parent(),
-		Tx:               b.Tx,
+	parentID := b.Parent()
+	parentState, ok := v.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
-		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+	onAcceptState := parentState.onAbortState
+
+	if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
 		return err
 	}
 
-	onCommitState := txExecutor.OnCommit
-	onCommitState.AddTx(b.Tx, status.Committed)
+	blkState := &blockState{
+		statelessBlock: b,
+		timestamp:      b.BlockTimestamp(),
+		onAcceptState:  onAcceptState,
+	}
+	v.blkIDToState[blkID] = blkState
+	v.stateVersions.SetState(blkID, blkState.onAcceptState)
+	return nil
+}
 
-	onAbortState := txExecutor.OnAbort
-	onAbortState.AddTx(b.Tx, status.Aborted)
+func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
+	blkID := b.ID()
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+
+	if err := v.verifyCommonBlock(b); err != nil {
+		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
+	}
+
+	parentID := b.Parent()
+	parentState, ok := v.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+	}
+	onAcceptState := parentState.onCommitState
+
+	if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
+		return err
+	}
 
 	blkState := &blockState{
 		statelessBlock: b,
-		proposalBlockState: proposalBlockState{
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-			initiallyPreferCommit: txExecutor.PrefersCommit,
-		},
-
-		// It is safe to use [pb.onAbortState] here because the timestamp will
-		// never be modified by an Abort block.
-		timestamp: onAbortState.GetTimestamp(),
+		onAcceptState:  onAcceptState,
+		timestamp:      b.BlockTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
-
-	// Notice that we do not add an entry to the state versions here for this
-	// block. This block must be followed by either a Commit or an Abort block.
-	// These blocks will get their parent state by referencing [onCommitState]
-	// or [onAbortState] directly.
-
-	v.Mempool.RemoveProposalTx(b.Tx)
+	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 
@@ -179,195 +192,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveProposalTx(b.Tx)
-	return nil
-}
-
-func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
-	if err := v.verifyCommonBlock(b); err != nil {
-		return err
-	}
-
-	parentID := b.Parent()
-	parentState, ok := v.stateVersions.GetState(parentID)
-	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
-	}
-
-	cfg := v.txExecutorBackend.Config
-	currentTimestamp := parentState.GetTimestamp()
-	if enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time); enbledAP5 {
-		return fmt.Errorf(
-			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
-			currentTimestamp.Unix(),
-			cfg.ApricotPhase5Time.Unix(),
-		)
-	}
-
-	atomicExecutor := &executor.AtomicTxExecutor{
-		Backend:  &v.txExecutorBackend,
-		ParentID: parentID,
-		Tx:       b.Tx,
-	}
-
-	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
-		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
-		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
-	}
-
-	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
-
-	// Check for conflicts in atomic inputs.
-	if len(atomicExecutor.Inputs) > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
-				return errConflictingParentTxs
-			}
-			parent, _, err := v.state.GetStatelessBlock(parentID)
-			if err != nil {
-				// The parent isn't in memory, so it should be on disk,
-				// but it isn't.
-				return err
-			}
-			nextBlock = parent
-		}
-	}
-
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  atomicExecutor.OnAccept,
-		standardBlockState: standardBlockState{
-			inputs: atomicExecutor.Inputs,
-		},
-		atomicRequests: atomicExecutor.AtomicRequests,
-		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-	}
-	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
-	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
-	return nil
-}
-
-func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-	blkState := &blockState{
-		statelessBlock: b,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
-
-	if err := v.verifyCommonBlock(b); err != nil {
-		return err
-	}
-
-	onAcceptState, err := state.NewDiff(
-		b.Parent(),
-		v.stateVersions,
-	)
-	if err != nil {
-		return err
-	}
-
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
-		txExecutor := &executor.StandardTxExecutor{
-			Backend: &v.txExecutorBackend,
-			State:   onAcceptState,
-			Tx:      tx,
-		}
-		if err := tx.Unsigned.Visit(txExecutor); err != nil {
-			txID := tx.ID()
-			v.MarkDropped(txID, err.Error()) // cache tx as dropped
-			return err
-		}
-		// ensure it doesn't overlap with current input batch
-		if blkState.inputs.Overlaps(txExecutor.Inputs) {
-			return errConflictingBatchTxs
-		}
-		// Add UTXOs to batch
-		blkState.inputs.Union(txExecutor.Inputs)
-
-		onAcceptState.AddTx(tx, status.Committed)
-		if txExecutor.OnAccept != nil {
-			funcs = append(funcs, txExecutor.OnAccept)
-		}
-
-		for chainID, txRequests := range txExecutor.AtomicRequests {
-			// Add/merge in the atomic requests represented by [tx]
-			chainRequests, exists := blkState.atomicRequests[chainID]
-			if !exists {
-				blkState.atomicRequests[chainID] = txRequests
-				continue
-			}
-
-			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
-			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
-		}
-	}
-
-	// Check for conflicts in ancestors.
-	if blkState.inputs.Len() > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(blkState.inputs) {
-				return errConflictingParentTxs
-			}
-			var parent blocks.Block
-			if parentState, ok := v.blkIDToState[parentID]; ok {
-				// The parent is in memory.
-				parent = parentState.statelessBlock
-			} else {
-				var err error
-				parent, _, err = v.state.GetStatelessBlock(parentID)
-				if err != nil {
-					return err
-				}
-			}
-			nextBlock = parent
-		}
-	}
-
-	if numFuncs := len(funcs); numFuncs == 1 {
-		blkState.onAcceptFunc = funcs[0]
-	} else if numFuncs > 1 {
-		blkState.onAcceptFunc = func() {
-			for _, f := range funcs {
-				f()
-			}
-		}
-	}
-	blkState.timestamp = onAcceptState.GetTimestamp()
-	blkState.onAcceptState = onAcceptState
-
-	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
-	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 
@@ -516,53 +340,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	return nil
 }
 
-func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
-	if err := v.verifyCommonBlock(b); err != nil {
-		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
-	}
-
-	blkVersion := b.Version()
-	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
-	}
-	onAcceptState := parentState.onCommitState
-
-	var blkTimestamp time.Time
-	switch blkVersion {
-	case version.BlueberryBlockVersion:
-		if err := v.validateBlockTimestamp(
-			b,
-			parentState.timestamp,
-		); err != nil {
-			return err
-		}
-		blkTimestamp = b.BlockTimestamp()
-	case version.ApricotBlockVersion:
-		blkTimestamp = onAcceptState.GetTimestamp()
-	default:
-		return fmt.Errorf("invalid block version: %d", blkVersion)
-	}
-
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      blkTimestamp,
-	}
-	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
-	return nil
-}
-
-func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
+func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -581,27 +359,202 @@ func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 	}
 	onAcceptState := parentState.onAbortState
 
-	var blkTimestamp time.Time
-	switch b.Version() {
-	case version.BlueberryBlockVersion:
-		if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
-			return err
-		}
-		blkTimestamp = b.BlockTimestamp()
-
-	case blocks.ApricotVersion:
-		blkTimestamp = onAcceptState.GetTimestamp()
-
-	default:
-		return fmt.Errorf("invalid block version: %d", b.Version())
-	}
 	blkState := &blockState{
 		statelessBlock: b,
-		timestamp:      blkTimestamp,
+		timestamp:      onAcceptState.GetTimestamp(),
 		onAcceptState:  onAcceptState,
 	}
 	v.blkIDToState[blkID] = blkState
 	v.stateVersions.SetState(blkID, blkState.onAcceptState)
+	return nil
+}
+
+func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
+	blkID := b.ID()
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+
+	if err := v.verifyCommonBlock(b); err != nil {
+		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
+	}
+
+	parentID := b.Parent()
+	parentState, ok := v.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+	}
+	onAcceptState := parentState.onCommitState
+
+	blkState := &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+	}
+	v.blkIDToState[blkID] = blkState
+	v.stateVersions.SetState(blkID, blkState.onAcceptState)
+	return nil
+}
+
+func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+	blkID := b.ID()
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+
+	if err := v.verifyCommonBlock(b); err != nil {
+		return err
+	}
+
+	txExecutor := &executor.ProposalTxExecutor{
+		Backend:          &v.txExecutorBackend,
+		ReferenceBlockID: b.Parent(),
+		Tx:               b.Tx,
+	}
+	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
+		txID := b.Tx.ID()
+		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+		return err
+	}
+
+	onCommitState := txExecutor.OnCommit
+	onCommitState.AddTx(b.Tx, status.Committed)
+
+	onAbortState := txExecutor.OnAbort
+	onAbortState.AddTx(b.Tx, status.Aborted)
+
+	blkState := &blockState{
+		statelessBlock: b,
+		proposalBlockState: proposalBlockState{
+			onCommitState:         onCommitState,
+			onAbortState:          onAbortState,
+			initiallyPreferCommit: txExecutor.PrefersCommit,
+		},
+
+		// It is safe to use [pb.onAbortState] here because the timestamp will
+		// never be modified by an Abort block.
+		timestamp: onAbortState.GetTimestamp(),
+	}
+	v.blkIDToState[blkID] = blkState
+
+	// Notice that we do not add an entry to the state versions here for this
+	// block. This block must be followed by either a Commit or an Abort block.
+	// These blocks will get their parent state by referencing [onCommitState]
+	// or [onAbortState] directly.
+
+	v.Mempool.RemoveProposalTx(b.Tx)
+	return nil
+}
+
+func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
+	blkID := b.ID()
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+	blkState := &blockState{
+		statelessBlock: b,
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
+	}
+
+	if err := v.verifyCommonBlock(b); err != nil {
+		return err
+	}
+
+	onAcceptState, err := state.NewDiff(
+		b.Parent(),
+		v.stateVersions,
+	)
+	if err != nil {
+		return err
+	}
+
+	funcs := make([]func(), 0, len(b.Transactions))
+	for _, tx := range b.Transactions {
+		txExecutor := &executor.StandardTxExecutor{
+			Backend: &v.txExecutorBackend,
+			State:   onAcceptState,
+			Tx:      tx,
+		}
+		if err := tx.Unsigned.Visit(txExecutor); err != nil {
+			txID := tx.ID()
+			v.MarkDropped(txID, err.Error()) // cache tx as dropped
+			return err
+		}
+		// ensure it doesn't overlap with current input batch
+		if blkState.inputs.Overlaps(txExecutor.Inputs) {
+			return errConflictingBatchTxs
+		}
+		// Add UTXOs to batch
+		blkState.inputs.Union(txExecutor.Inputs)
+
+		onAcceptState.AddTx(tx, status.Committed)
+		if txExecutor.OnAccept != nil {
+			funcs = append(funcs, txExecutor.OnAccept)
+		}
+
+		for chainID, txRequests := range txExecutor.AtomicRequests {
+			// Add/merge in the atomic requests represented by [tx]
+			chainRequests, exists := blkState.atomicRequests[chainID]
+			if !exists {
+				blkState.atomicRequests[chainID] = txRequests
+				continue
+			}
+
+			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
+			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
+		}
+	}
+
+	// Check for conflicts in ancestors.
+	if blkState.inputs.Len() > 0 {
+		var nextBlock blocks.Block = b
+		for {
+			parentID := nextBlock.Parent()
+			parentState := v.blkIDToState[parentID]
+			if parentState == nil {
+				// The parent state isn't pinned in memory.
+				// This means the parent must be accepted already.
+				break
+			}
+			if parentState.inputs.Overlaps(blkState.inputs) {
+				return errConflictingParentTxs
+			}
+			var parent blocks.Block
+			if parentState, ok := v.blkIDToState[parentID]; ok {
+				// The parent is in memory.
+				parent = parentState.statelessBlock
+			} else {
+				var err error
+				parent, _, err = v.state.GetStatelessBlock(parentID)
+				if err != nil {
+					return err
+				}
+			}
+			nextBlock = parent
+		}
+	}
+
+	if numFuncs := len(funcs); numFuncs == 1 {
+		blkState.onAcceptFunc = funcs[0]
+	} else if numFuncs > 1 {
+		blkState.onAcceptFunc = func() {
+			for _, f := range funcs {
+				f()
+			}
+		}
+	}
+	blkState.timestamp = onAcceptState.GetTimestamp()
+	blkState.onAcceptState = onAcceptState
+
+	v.blkIDToState[blkID] = blkState
+	v.stateVersions.SetState(blkID, blkState.onAcceptState)
+	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 
@@ -656,8 +609,8 @@ func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.T
 	blkTime := blk.BlockTimestamp()
 
 	switch blk.(type) {
-	case *blocks.AbortBlock,
-		*blocks.CommitBlock:
+	case *blocks.BlueberryAbortBlock,
+		*blocks.BlueberryCommitBlock:
 		if !blkTime.Equal(parentBlkTime) {
 			return fmt.Errorf(
 				"%w parent block timestamp (%s) option block timestamp (%s)",
@@ -695,4 +648,85 @@ func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.T
 			blk,
 		)
 	}
+}
+
+func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
+	blkID := b.ID()
+
+	if _, ok := v.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+
+	if err := v.verifyCommonBlock(b); err != nil {
+		return err
+	}
+
+	parentID := b.Parent()
+	parentState, ok := v.stateVersions.GetState(parentID)
+	if !ok {
+		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+	}
+
+	cfg := v.txExecutorBackend.Config
+	currentTimestamp := parentState.GetTimestamp()
+	if enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time); enbledAP5 {
+		return fmt.Errorf(
+			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
+			currentTimestamp.Unix(),
+			cfg.ApricotPhase5Time.Unix(),
+		)
+	}
+
+	atomicExecutor := &executor.AtomicTxExecutor{
+		Backend:  &v.txExecutorBackend,
+		ParentID: parentID,
+		Tx:       b.Tx,
+	}
+
+	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
+		txID := b.Tx.ID()
+		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
+	}
+
+	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
+
+	// Check for conflicts in atomic inputs.
+	if len(atomicExecutor.Inputs) > 0 {
+		var nextBlock blocks.Block = b
+		for {
+			parentID := nextBlock.Parent()
+			parentState := v.blkIDToState[parentID]
+			if parentState == nil {
+				// The parent state isn't pinned in memory.
+				// This means the parent must be accepted already.
+				break
+			}
+			if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
+				return errConflictingParentTxs
+			}
+			parent, _, err := v.state.GetStatelessBlock(parentID)
+			if err != nil {
+				// The parent isn't in memory, so it should be on disk,
+				// but it isn't.
+				return err
+			}
+			nextBlock = parent
+		}
+	}
+
+	blkState := &blockState{
+		statelessBlock: b,
+		onAcceptState:  atomicExecutor.OnAccept,
+		standardBlockState: standardBlockState{
+			inputs: atomicExecutor.Inputs,
+		},
+		atomicRequests: atomicExecutor.AtomicRequests,
+		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
+	}
+	v.blkIDToState[blkID] = blkState
+	v.stateVersions.SetState(blkID, blkState.onAcceptState)
+	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
+	return nil
 }

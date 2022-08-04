@@ -345,12 +345,12 @@ func verifyAndAcceptProposalCommitment(
 	// verify the preferences
 	commit, ok := options[0].(*blockexecutor.Block)
 	assert.True(ok, "expected commit block to be preferred")
-	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock)
+	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.ApricotCommitBlock)
 	assert.True(ok, "expected commit block to be preferred")
 
 	abort, ok := options[1].(*blockexecutor.Block)
 	assert.True(ok, "expected abort block to be issued")
-	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.AbortBlock)
+	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.ApricotAbortBlock)
 	assert.True(ok, "expected abort block to be issued")
 
 	err = commit.Verify()

@@ -71,8 +71,8 @@ func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		targetCodec.RegisterType(&ApricotProposalBlock{}),
-		targetCodec.RegisterType(&AbortBlock{}),
-		targetCodec.RegisterType(&CommitBlock{}),
+		targetCodec.RegisterType(&ApricotAbortBlock{}),
+		targetCodec.RegisterType(&ApricotCommitBlock{}),
 		targetCodec.RegisterType(&ApricotStandardBlock{}),
 		targetCodec.RegisterType(&AtomicBlock{}),
 	)
@@ -83,6 +83,8 @@ func RegisterBlueberryBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		targetCodec.RegisterType(&BlueberryProposalBlock{}),
+		targetCodec.RegisterType(&BlueberryAbortBlock{}),
+		targetCodec.RegisterType(&BlueberryCommitBlock{}),
 		targetCodec.RegisterType(&BlueberryStandardBlock{}),
 	)
 	return errs.Err

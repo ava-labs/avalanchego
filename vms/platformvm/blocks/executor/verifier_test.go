@@ -351,7 +351,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.CommitBlock(blk.(*blocks.CommitBlock))
+	err = verifier.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -361,7 +361,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.CommitBlock(blk.(*blocks.CommitBlock))
+	err = verifier.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
 	assert.NoError(err)
 }
 
@@ -418,7 +418,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.AbortBlock(blk.(*blocks.AbortBlock))
+	err = verifier.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -428,7 +428,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.AbortBlock(blk.(*blocks.AbortBlock))
+	err = verifier.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
 	assert.NoError(err)
 }
 

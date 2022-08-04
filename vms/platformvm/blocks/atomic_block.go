@@ -15,7 +15,7 @@ var _ Block = &AtomicBlock{}
 // AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	CommonBlock `serialize:"true"`
+	ApricotCommonBlock `serialize:"true"`
 
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
@@ -27,7 +27,7 @@ func NewAtomicBlock(
 	tx *txs.Tx,
 ) (*AtomicBlock, error) {
 	res := &AtomicBlock{
-		CommonBlock: CommonBlock{
+		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
@@ -46,7 +46,7 @@ func NewAtomicBlock(
 }
 
 func (ab *AtomicBlock) initialize(version uint16, bytes []byte) error {
-	if err := ab.CommonBlock.initialize(version, bytes); err != nil {
+	if err := ab.ApricotCommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {

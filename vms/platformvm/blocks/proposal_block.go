@@ -27,10 +27,9 @@ func NewProposalBlock(
 	switch version {
 	case ApricotVersion:
 		res := &ApricotProposalBlock{
-			CommonBlock: CommonBlock{
-				PrntID:       parentID,
-				Hght:         height,
-				BlkTimestamp: uint64(timestamp.Unix()),
+			ApricotCommonBlock: ApricotCommonBlock{
+				PrntID: parentID,
+				Hght:   height,
 			},
 			Tx: tx,
 		}
@@ -46,9 +45,11 @@ func NewProposalBlock(
 
 	case BlueberryVersion:
 		res := &BlueberryProposalBlock{
-			CommonBlock: CommonBlock{
-				PrntID:       parentID,
-				Hght:         height,
+			BlueberryCommonBlock: BlueberryCommonBlock{
+				ApricotCommonBlock: ApricotCommonBlock{
+					PrntID: parentID,
+					Hght:   height,
+				},
 				BlkTimestamp: uint64(timestamp.Unix()),
 			},
 			TxBytes: tx.Bytes(),
@@ -71,13 +72,13 @@ func NewProposalBlock(
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now
 type ApricotProposalBlock struct {
-	CommonBlock `serialize:"true"`
+	ApricotCommonBlock `serialize:"true"`
 
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (b *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.CommonBlock.initialize(version, bytes); err != nil {
+	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
 		return err
 	}
 	return b.Tx.Sign(txs.Codec, nil)
@@ -90,7 +91,7 @@ func (b *ApricotProposalBlock) Visit(v Visitor) error {
 }
 
 type BlueberryProposalBlock struct {
-	CommonBlock `serialize:"true"`
+	BlueberryCommonBlock `serialize:"true"`
 
 	TxBytes []byte `serialize:"false" blueberry:"true" json:"txs"`
 
@@ -98,7 +99,7 @@ type BlueberryProposalBlock struct {
 }
 
 func (b *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.CommonBlock.initialize(version, bytes); err != nil {
+	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 

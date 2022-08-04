@@ -379,7 +379,7 @@ func TestGetTx(t *testing.T) {
 					if !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
-					if _, ok := options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock); !ok {
+					if _, ok := options[0].(*blockexecutor.Block).Block.(*blocks.ApricotCommitBlock); !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
 					if err := commit.Verify(); err != nil {

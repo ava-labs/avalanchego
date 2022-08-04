@@ -4,11 +4,15 @@
 package blocks
 
 type Visitor interface {
-	AtomicBlock(blk *AtomicBlock) error
-	ApricotProposalBlock(blk *ApricotProposalBlock) error
+	BlueberryAbortBlock(blk *BlueberryAbortBlock) error
+	BlueberryCommitBlock(blk *BlueberryCommitBlock) error
 	BlueberryProposalBlock(blk *BlueberryProposalBlock) error
-	ApricotStandardBlock(blk *ApricotStandardBlock) error
 	BlueberryStandardBlock(blk *BlueberryStandardBlock) error
-	AbortBlock(blk *AbortBlock) error
-	CommitBlock(blk *CommitBlock) error
+
+	ApricotAbortBlock(blk *ApricotAbortBlock) error
+	ApricotCommitBlock(blk *ApricotCommitBlock) error
+	ApricotProposalBlock(blk *ApricotProposalBlock) error
+	ApricotStandardBlock(blk *ApricotStandardBlock) error
+
+	AtomicBlock(blk *AtomicBlock) error
 }

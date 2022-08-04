@@ -105,7 +105,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.CommitBlock(blk.(*blocks.CommitBlock))
+				return r.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.AbortBlock(blk.(*blocks.AbortBlock))
+				return r.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
 			},
 		},
 	}
