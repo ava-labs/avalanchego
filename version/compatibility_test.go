@@ -28,37 +28,19 @@ func TestCompatibility(t *testing.T) {
 		Minor: 3,
 		Patch: 0,
 	}
-	minUnmaskable := &Application{
-		Major: 1,
-		Minor: 2,
-		Patch: 0,
-	}
-	minUnmaskableTime := time.Unix(7000, 0)
-	prevMinUnmaskable := &Application{
-		Major: 1,
-		Minor: 1,
-		Patch: 0,
-	}
 
 	compatibility := NewCompatibility(
 		v,
 		minCompatable,
 		minCompatableTime,
 		prevMinCompatable,
-		minUnmaskable,
-		minUnmaskableTime,
-		prevMinUnmaskable,
 	).(*compatibility)
 	assert.Equal(t, v, compatibility.Version())
-	assert.Equal(t, minUnmaskableTime, compatibility.MaskTime())
 
 	tests := []struct {
-		peer        *Application
-		time        time.Time
-		connectable bool
-		compatible  bool
-		unmaskable  bool
-		wontMask    bool
+		peer       *Application
+		time       time.Time
+		compatible bool
 	}{
 		{
 			peer: &Application{
@@ -66,11 +48,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 5,
 				Patch: 0,
 			},
-			time:        minCompatableTime,
-			connectable: true,
-			compatible:  true,
-			unmaskable:  true,
-			wontMask:    true,
+			time:       minCompatableTime,
+			compatible: true,
 		},
 		{
 			peer: &Application{
@@ -78,11 +57,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 3,
 				Patch: 5,
 			},
-			time:        time.Unix(8500, 0),
-			connectable: true,
-			compatible:  true,
-			unmaskable:  true,
-			wontMask:    true,
+			time:       time.Unix(8500, 0),
+			compatible: true,
 		},
 		{
 			peer: &Application{
@@ -90,11 +66,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 1,
 				Patch: 0,
 			},
-			time:        minCompatableTime,
-			connectable: false,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
+			time:       minCompatableTime,
+			compatible: false,
 		},
 		{
 			peer: &Application{
@@ -102,11 +75,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 3,
 				Patch: 5,
 			},
-			time:        minCompatableTime,
-			connectable: true,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
+			time:       minCompatableTime,
+			compatible: false,
 		},
 		{
 			peer: &Application{
@@ -114,11 +84,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 2,
 				Patch: 5,
 			},
-			time:        time.Unix(8500, 0),
-			connectable: true,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
+			time:       time.Unix(8500, 0),
+			compatible: false,
 		},
 		{
 			peer: &Application{
@@ -126,23 +93,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 1,
 				Patch: 5,
 			},
-			time:        time.Unix(7500, 0),
-			connectable: true,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
-		},
-		{
-			peer: &Application{
-				Major: 1,
-				Minor: 1,
-				Patch: 5,
-			},
-			time:        time.Unix(6500, 0),
-			connectable: true,
-			compatible:  false,
-			unmaskable:  false,
-			wontMask:    false,
+			time:       time.Unix(7500, 0),
+			compatible: false,
 		},
 	}
 	for _, test := range tests {
@@ -153,16 +105,6 @@ func TestCompatibility(t *testing.T) {
 				t.Fatalf("incorrectly marked %s as incompatible with %s", peer, err)
 			} else if !test.compatible && err == nil {
 				t.Fatalf("incorrectly marked %s as compatible", peer)
-			}
-			if err := compatibility.Unmaskable(peer); test.unmaskable && err != nil {
-				t.Fatalf("incorrectly marked %s as un-maskable with %s", peer, err)
-			} else if !test.unmaskable && err == nil {
-				t.Fatalf("incorrectly marked %s as maskable", peer)
-			}
-			if err := compatibility.WontMask(peer); test.wontMask && err != nil {
-				t.Fatalf("incorrectly marked %s as unmaskable with %s", peer, err)
-			} else if !test.wontMask && err == nil {
-				t.Fatalf("incorrectly marked %s as maskable", peer)
 			}
 		})
 	}

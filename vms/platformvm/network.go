@@ -26,21 +26,19 @@ const (
 type network struct {
 	log logging.Logger
 	// gossip related attributes
-	gossipActivationTime time.Time
-	appSender            common.AppSender
-	mempool              *blockBuilder
-	vm                   *VM
-	recentTxs            *cache.LRU
+	appSender common.AppSender
+	mempool   *blockBuilder
+	vm        *VM
+	recentTxs *cache.LRU
 }
 
-func newNetwork(activationTime time.Time, appSender common.AppSender, vm *VM) *network {
+func newNetwork(appSender common.AppSender, vm *VM) *network {
 	n := &network{
-		log:                  vm.ctx.Log,
-		gossipActivationTime: activationTime,
-		appSender:            appSender,
-		mempool:              &vm.blockBuilder,
-		vm:                   vm,
-		recentTxs:            &cache.LRU{Size: recentCacheSize},
+		log:       vm.ctx.Log,
+		appSender: appSender,
+		mempool:   &vm.blockBuilder,
+		vm:        vm,
+		recentTxs: &cache.LRU{Size: recentCacheSize},
 	}
 
 	return n
@@ -69,11 +67,6 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
-
-	if time.Now().Before(n.gossipActivationTime) {
-		n.log.Debug("AppGossip message called before activation time")
-		return nil
-	}
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {

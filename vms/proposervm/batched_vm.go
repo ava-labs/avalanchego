@@ -30,7 +30,7 @@ func (vm *VM) GetAncestors(
 
 	res := make([][]byte, 0, maxBlocksNum)
 	currentByteLength := 0
-	startTime := time.Now()
+	startTime := vm.Clock.Time()
 
 	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
 	// fork is hit
@@ -47,7 +47,8 @@ func (vm *VM) GetAncestors(
 		// the size of the message is included with each container, and the size
 		// is repr. by an int.
 		currentByteLength += wrappers.IntLen + len(blkBytes)
-		if len(res) > 0 && (currentByteLength >= maxBlocksSize || maxBlocksRetrivalTime <= time.Since(startTime)) {
+		elapsedTime := vm.Clock.Time().Sub(startTime)
+		if len(res) > 0 && (currentByteLength >= maxBlocksSize || maxBlocksRetrivalTime <= elapsedTime) {
 			return res, nil // reached maximum size or ran out of time
 		}
 
