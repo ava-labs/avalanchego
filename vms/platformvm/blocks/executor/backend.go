@@ -53,9 +53,6 @@ func (b *backend) expectedChildVersion(blkTime time.Time) uint16 {
 	return version.BlueberryBlockVersion
 }
 
-// Note: free may be invoked multiple time on the same block
-// (e.g. twice on any option's parent). Hence it's important
-// to make sure free stays idempotent.
 func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
 }
