@@ -48,7 +48,7 @@ const (
 	// Grace period after max defaultServerMaxConnectionAge after
 	// which the http2 connection is closed. 1 second is the minimum possible
 	// value. Anything less will be internally overridden to 1s by grpc.
-	defaultServerMaxConnectionAgeGrace = 1 * time.Second
+	defaultServerMaxConnectionAgeGrace = math.MaxInt
 
 	// Client:
 
