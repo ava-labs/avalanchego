@@ -56,13 +56,18 @@ func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
 		a.free(parentID)
 	}()
 
+	// Note that the parent must be accepted first.
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
 	}
-	// Note that the parent must be accepted first.
 	if err := a.commonAccept(parentState.statelessBlock); err != nil {
 		return err
+	}
+
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
 	if err := a.commonAccept(b); err != nil {
 		return err
@@ -78,12 +83,10 @@ func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
 		}
 	}
 
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
-	}
-
 	// Update the state to reflect the changes made in [onAcceptState].
+	if parentState.onAcceptState != nil { // not nil for blueberry blocks
+		parentState.onAcceptState.Apply(a.state)
+	}
 	blkState.onAcceptState.Apply(a.state)
 	return a.state.Commit()
 }
@@ -98,12 +101,6 @@ func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
 	)
-
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
-	}
-	blkState.onAcceptState.Apply(a.state)
 
 	return a.commonVisitProposalBlock(b)
 }
