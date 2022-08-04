@@ -4,8 +4,6 @@
 package blocks
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -18,7 +16,6 @@ type Block interface {
 	Height() uint64
 	Version() uint16
 	UnixTimestamp() int64
-	SetTimestamp(time.Time)
 
 	// Txs returns list of transactions contained in the block
 	Txs() []*txs.Tx

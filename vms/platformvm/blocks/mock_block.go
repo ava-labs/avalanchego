@@ -6,7 +6,6 @@ package blocks
 
 import (
 	reflect "reflect"
-	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -90,18 +89,6 @@ func (m *MockBlock) Parent() ids.ID {
 func (mr *MockBlockMockRecorder) Parent() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parent", reflect.TypeOf((*MockBlock)(nil).Parent))
-}
-
-// SetTimestamp mocks base method.
-func (m *MockBlock) SetTimestamp(arg0 time.Time) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetTimestamp", arg0)
-}
-
-// SetTimestamp indicates an expected call of SetTimestamp.
-func (mr *MockBlockMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockBlock)(nil).SetTimestamp), arg0)
 }
 
 // Txs mocks base method.
