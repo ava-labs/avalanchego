@@ -6,6 +6,7 @@ package blocks
 
 import (
 	reflect "reflect"
+	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -33,6 +34,20 @@ func NewMockBlock(ctrl *gomock.Controller) *MockBlock {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockBlock) EXPECT() *MockBlockMockRecorder {
 	return m.recorder
+}
+
+// BlockTimestamp mocks base method.
+func (m *MockBlock) BlockTimestamp() time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BlockTimestamp")
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// BlockTimestamp indicates an expected call of BlockTimestamp.
+func (mr *MockBlockMockRecorder) BlockTimestamp() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockTimestamp", reflect.TypeOf((*MockBlock)(nil).BlockTimestamp))
 }
 
 // Bytes mocks base method.
@@ -103,20 +118,6 @@ func (m *MockBlock) Txs() []*txs.Tx {
 func (mr *MockBlockMockRecorder) Txs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Txs", reflect.TypeOf((*MockBlock)(nil).Txs))
-}
-
-// UnixTimestamp mocks base method.
-func (m *MockBlock) UnixTimestamp() int64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnixTimestamp")
-	ret0, _ := ret[0].(int64)
-	return ret0
-}
-
-// UnixTimestamp indicates an expected call of UnixTimestamp.
-func (mr *MockBlockMockRecorder) UnixTimestamp() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnixTimestamp", reflect.TypeOf((*MockBlock)(nil).UnixTimestamp))
 }
 
 // Version mocks base method.

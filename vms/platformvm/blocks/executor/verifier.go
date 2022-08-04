@@ -110,7 +110,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	nextChainTime := time.Unix(b.UnixTimestamp(), 0)
+	nextChainTime := b.BlockTimestamp()
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction
@@ -174,7 +174,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	onAbortState.AddTx(b.Tx, status.Aborted)
 	blkState.onAbortState = onAbortState
 
-	blkState.timestamp = time.Unix(b.UnixTimestamp(), 0)
+	blkState.timestamp = b.BlockTimestamp()
 	blkState.initiallyPreferCommit = txExecutor.PrefersCommit
 
 	v.blkIDToState[blkID] = blkState
@@ -392,7 +392,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	nextChainTime := time.Unix(b.UnixTimestamp(), 0)
+	nextChainTime := b.BlockTimestamp()
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction
@@ -545,7 +545,7 @@ func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
 		); err != nil {
 			return err
 		}
-		blkTimestamp = time.Unix(b.UnixTimestamp(), 0)
+		blkTimestamp = b.BlockTimestamp()
 	case version.ApricotBlockVersion:
 		blkTimestamp = onAcceptState.GetTimestamp()
 	default:
@@ -587,7 +587,7 @@ func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 		if err := v.validateBlockTimestamp(b, parentState.timestamp); err != nil {
 			return err
 		}
-		blkTimestamp = time.Unix(b.UnixTimestamp(), 0)
+		blkTimestamp = b.BlockTimestamp()
 
 	case blocks.ApricotVersion:
 		blkTimestamp = onAcceptState.GetTimestamp()
@@ -653,7 +653,7 @@ func (v *verifier) validateBlockTimestamp(blk blocks.Block, parentBlkTime time.T
 		return nil
 	}
 
-	blkTime := time.Unix(blk.UnixTimestamp(), 0)
+	blkTime := blk.BlockTimestamp()
 
 	switch blk.(type) {
 	case *blocks.AbortBlock,

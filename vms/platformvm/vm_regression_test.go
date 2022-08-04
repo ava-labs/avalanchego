@@ -419,7 +419,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	statelessStandardBlk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -431,7 +431,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	statelessStandardBlk, err = blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -443,7 +443,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 
 	statelessStandardBlk, err = blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -515,7 +515,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	statelessBlk, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -591,7 +591,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	statelessImportBlk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -656,7 +656,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	statelessAdvanceTimeProposalBlk, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -765,7 +765,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	statelessAddValidatorProposalBlk0, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -811,7 +811,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	statelessAdvanceTimeProposalBlk0, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -897,7 +897,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	statelessImportBlk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -972,7 +972,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	statelessAddValidatorProposalBlk1, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -1019,7 +1019,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	statelessAdvanceTimeProposalBlk1, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,
@@ -1176,7 +1176,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	statelessProposalBlk, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -1212,7 +1212,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	statelessProposalBlk, err = blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,

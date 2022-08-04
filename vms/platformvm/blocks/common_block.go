@@ -4,6 +4,8 @@
 package blocks
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -41,6 +43,6 @@ func (b *CommonBlock) Height() uint64 { return b.Hght }
 
 func (b *CommonBlock) Version() uint16 { return b.version }
 
-func (b *CommonBlock) UnixTimestamp() int64 {
-	return int64(b.BlkTimestamp)
+func (b *CommonBlock) BlockTimestamp() time.Time {
+	return time.Unix(int64(b.BlkTimestamp), 0)
 }

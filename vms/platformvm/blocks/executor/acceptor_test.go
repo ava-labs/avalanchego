@@ -33,7 +33,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	blk, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		ids.GenerateTestID(),
 		1,
 		&txs.Tx{
@@ -179,7 +179,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 
 	blk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		1,
 		[]*txs.Tx{
@@ -276,7 +276,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 	blk, err := blocks.NewCommitBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		1,
 	)
@@ -374,7 +374,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	blk, err := blocks.NewAbortBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		1,
 	)

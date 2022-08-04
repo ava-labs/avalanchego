@@ -644,7 +644,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredHeight := preferred.Height()
 	statelessBlk, err := blocks.NewProposalBlock(
 		blkVersion,
-		0, // apricot timestamp is not serialized
+		time.Time{}, // apricot timestamp is not serialized
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1698,7 +1698,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	statelessBlk, err := blocks.NewProposalBlock(
 		blkVersion,
-		0, // apricot timestamp is not serialized
+		time.Time{}, // apricot timestamp is not serialized
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1831,7 +1831,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	statelessBlk, err := blocks.NewProposalBlock(
 		blkVersion,
-		0, // apricot timestamp is not serialized
+		time.Time{}, // apricot timestamp is not serialized
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1970,7 +1970,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	statelessBlk, err := blocks.NewProposalBlock(
 		blkVersion,
-		0, // apricot timestamp is not serialized
+		time.Time{}, // apricot timestamp is not serialized
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2264,7 +2264,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	statelessBlk, err := blocks.NewProposalBlock(
 		blkVersion,
-		0, // apricot timestamp is not serialized
+		time.Time{}, // apricot timestamp is not serialized
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2292,7 +2292,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}
 	statelessSecondAdvanceTimeBlk, err := blocks.NewProposalBlock(
 		blkVersion,
-		0, // apricot timestamp is not serialized
+		time.Time{}, // apricot timestamp is not serialized
 		firstOption.ID(),
 		firstOption.(*blockexecutor.Block).Height()+1,
 		secondAdvanceTimeTx,

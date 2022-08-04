@@ -5,6 +5,7 @@ package builder
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -130,7 +131,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		*txs.AdvanceTimeTx:
 		statelessBlk, err := blocks.NewProposalBlock(
 			blkVersion,
-			uint64(0),
+			time.Time{},
 			a.parentBlkID,
 			a.nextHeight,
 			tx,
@@ -146,7 +147,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		*txs.ExportTx:
 		statelessBlk, err := blocks.NewStandardBlock(
 			blkVersion,
-			uint64(0),
+			time.Time{},
 			a.parentBlkID,
 			a.nextHeight,
 			a.txes,

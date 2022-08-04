@@ -74,7 +74,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// TODO allow serialization of mock txs.
 	blk, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		2,
 		&txs.Tx{
@@ -261,7 +261,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// TODO allow serialization of mock txs.
 	blk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		2,
 		[]*txs.Tx{
@@ -336,7 +336,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	blk, err := blocks.NewCommitBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		2,
 	)
@@ -403,7 +403,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	blk, err := blocks.NewAbortBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		parentID,
 		2,
 	)
@@ -459,8 +459,8 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	blk, err := blocks.NewAbortBlock(
 		blocks.ApricotVersion,
-		0,        // timestamp
-		parentID, // not in memory or persisted state
+		time.Time{}, // timestamp
+		parentID,    // not in memory or persisted state
 		2,
 	)
 	assert.NoError(err)
@@ -542,7 +542,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			childHeight := parentHeight + 1
 			statelessAbortBlk, err := blocks.NewAbortBlock(
 				childVersion,
-				uint64(test.childTime.Unix()),
+				test.childTime,
 				parentID,
 				childHeight,
 			)
@@ -626,7 +626,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			childHeight := parentHeight + 1
 			statelessCommitBlk, err := blocks.NewCommitBlock(
 				childVersion,
-				uint64(test.childTime.Unix()),
+				test.childTime,
 				parentID,
 				childHeight,
 			)

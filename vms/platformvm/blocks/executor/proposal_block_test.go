@@ -40,12 +40,12 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}()
 
 	// create apricotParentBlk. It's a standard one for simplicity
-	parentUnixTime := uint64(0)
+	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
 	apricotParentBlk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		parentUnixTime,
+		parentTime,
 		ids.Empty, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -101,7 +101,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	// wrong height
 	statelessProposalBlock, err := blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		parentUnixTime,
+		parentTime,
 		parentID,
 		parentHeight,
 		blkTx,
@@ -113,7 +113,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	// valid
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		parentUnixTime,
+		parentTime,
 		parentID,
 		parentHeight+1,
 		blkTx,
@@ -144,7 +144,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	blueberryParentBlk, err := blocks.NewStandardBlock(
 		blksVersion,
-		uint64(parentTime.Unix()),
+		parentTime,
 		genesisBlkID, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -225,7 +225,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	// wrong height
 	statelessProposalBlock, err := blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(parentTime.Add(time.Second).Unix()),
+		parentTime.Add(time.Second),
 		parentID,
 		blueberryParentBlk.Height(),
 		blkTx,
@@ -237,7 +237,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	// wrong version
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		blocks.ApricotVersion,
-		uint64(parentTime.Add(time.Second).Unix()),
+		parentTime.Add(time.Second),
 		parentID,
 		blueberryParentBlk.Height()+1,
 		blkTx,
@@ -249,7 +249,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	// wrong timestamp, earlier than parent
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(parentTime.Add(-1*time.Second).Unix()),
+		parentTime.Add(-1*time.Second),
 		parentID,
 		blueberryParentBlk.Height()+1,
 		blkTx,
@@ -262,7 +262,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	beyondSyncBoundTimeStamp := env.clk.Time().Add(executor.SyncBound).Add(time.Second)
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(beyondSyncBoundTimeStamp.Unix()),
+		beyondSyncBoundTimeStamp,
 		parentID,
 		blueberryParentBlk.Height()+1,
 		blkTx,
@@ -275,7 +275,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(skippedStakerEventTimeStamp.Unix()),
+		skippedStakerEventTimeStamp,
 		parentID,
 		blueberryParentBlk.Height()+1,
 		blkTx,
@@ -293,7 +293,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	assert.NoError(invalidTx.Sign(txs.Codec, nil))
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(parentTime.Add(time.Second).Unix()),
+		parentTime.Add(time.Second),
 		parentID,
 		blueberryParentBlk.Height()+1,
 		invalidTx,
@@ -305,7 +305,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	// valid
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(nextStakerTime.Unix()),
+		nextStakerTime,
 		parentID,
 		blueberryParentBlk.Height()+1,
 		blkTx,
@@ -587,7 +587,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 				assert.NoError(err)
 				statelessProposalBlock, err := blocks.NewProposalBlock(
 					version.BlueberryBlockVersion,
-					uint64(newTime.Unix()),
+					newTime,
 					parentBlk.ID(),
 					parentBlk.Height()+1,
 					s0RewardTx,
@@ -733,7 +733,7 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	assert.NoError(err)
 	statelessProposalBlock, err := blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(subnetVdr1EndTime.Unix()),
+		subnetVdr1EndTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
@@ -840,7 +840,7 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 			assert.NoError(err)
 			statelessProposalBlock, err := blocks.NewProposalBlock(
 				version.BlueberryBlockVersion,
-				uint64(subnetVdr1StartTime.Unix()),
+				subnetVdr1StartTime,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
 				s0RewardTx,
@@ -924,7 +924,7 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(err)
 	statelessProposalBlock, err := blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingValidatorStartTime.Unix()),
+		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
@@ -1012,7 +1012,7 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(err)
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingDelegatorStartTime.Unix()),
+		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
@@ -1101,7 +1101,7 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(err)
 	statelessProposalBlock, err := blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingValidatorStartTime.Unix()),
+		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
@@ -1188,7 +1188,7 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	assert.NoError(err)
 	statelessProposalBlock, err = blocks.NewProposalBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingDelegatorStartTime.Unix()),
+		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,

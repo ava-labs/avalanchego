@@ -58,6 +58,11 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
+	if b.Block.Version() == blocks.BlueberryVersion {
+		return b.BlockTimestamp()
+	}
+
+	// Here blocks have ApricotVersion
 	// If this is the last accepted block and the block was loaded from disk
 	// since it was accepted, then the timestamp wouldn't be set correctly. So,
 	// we explicitly return the chain time.
@@ -66,14 +71,11 @@ func (b *Block) Timestamp() time.Time {
 		return blkState.timestamp
 	}
 
-	if b.Version() == blocks.ApricotVersion {
-		// The block isn't processing.
-		// According to the snowman.Block interface, the last accepted
-		// block is the only accepted block that must return a correct timestamp,
-		// so we just return the chain time.
-		return b.manager.state.GetTimestamp()
-	}
-	return time.Unix(b.UnixTimestamp(), 0)
+	// The block isn't processing.
+	// According to the snowman.Block interface, the last accepted
+	// block is the only accepted block that must return a correct timestamp,
+	// so we just return the chain time.
+	return b.manager.state.GetTimestamp()
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {
@@ -90,7 +92,7 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 
 	statelessCommitBlk, err := blocks.NewCommitBlock(
 		b.Version(),
-		uint64(b.UnixTimestamp()),
+		b.BlockTimestamp(),
 		blkID,
 		nextHeight,
 	)
@@ -104,7 +106,7 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 
 	statelessAbortBlk, err := blocks.NewAbortBlock(
 		b.Version(),
-		uint64(b.UnixTimestamp()),
+		b.BlockTimestamp(),
 		blkID,
 		nextHeight,
 	)

@@ -129,7 +129,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		// empty standard block are allowed to move chain time head
 		statelessBlk, err := blocks.NewStandardBlock(
 			blkVersion,
-			uint64(b.blkTime.Unix()),
+			b.blkTime,
 			b.parentBlkID,
 			b.height,
 			nil,
@@ -147,7 +147,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		*txs.AdvanceTimeTx:
 		statelessBlk, err := blocks.NewProposalBlock(
 			blkVersion,
-			uint64(b.blkTime.Unix()),
+			b.blkTime,
 			b.parentBlkID,
 			b.height,
 			tx,
@@ -163,7 +163,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		*txs.ExportTx:
 		statelessBlk, err := blocks.NewStandardBlock(
 			blkVersion,
-			uint64(b.blkTime.Unix()),
+			b.blkTime,
 			b.parentBlkID,
 			b.height,
 			b.txes,

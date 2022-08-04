@@ -312,7 +312,7 @@ func newInitializedState(assert *assert.Assertions) (State, database.Database) {
 
 	genesisBlk, err := blocks.NewCommitBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		genesisBlkID,
 		0,
 	)

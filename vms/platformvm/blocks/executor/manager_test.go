@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -24,7 +25,7 @@ func TestGetBlock(t *testing.T) {
 
 	statelessBlk, err := blocks.NewCommitBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		ids.GenerateTestID(),
 		2,
 	)

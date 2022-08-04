@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -35,7 +36,7 @@ func TestRejectBlock(t *testing.T) {
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewProposalBlock(
 					blocks.ApricotVersion,
-					0, // timestamp
+					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
@@ -75,7 +76,7 @@ func TestRejectBlock(t *testing.T) {
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewStandardBlock(
 					blocks.ApricotVersion,
-					0, // timestamp
+					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
 					[]*txs.Tx{
@@ -98,7 +99,7 @@ func TestRejectBlock(t *testing.T) {
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewCommitBlock(
 					blocks.ApricotVersion,
-					0, // timestamp
+					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
 				)
@@ -112,7 +113,7 @@ func TestRejectBlock(t *testing.T) {
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewAbortBlock(
 					blocks.ApricotVersion,
-					0, // timestamp
+					time.Time{}, // timestamp
 					ids.GenerateTestID(),
 					1,
 				)

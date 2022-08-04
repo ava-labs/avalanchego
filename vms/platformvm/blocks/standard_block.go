@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -18,7 +19,7 @@ var (
 // NewStandardBlock assumes [txes] are initialized
 func NewStandardBlock(
 	version uint16,
-	timestamp uint64,
+	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 	txes []*txs.Tx,
@@ -29,7 +30,7 @@ func NewStandardBlock(
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
-				BlkTimestamp: timestamp,
+				BlkTimestamp: uint64(timestamp.Unix()),
 			},
 			Transactions: txes,
 		}
@@ -53,7 +54,7 @@ func NewStandardBlock(
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
-				BlkTimestamp: timestamp,
+				BlkTimestamp: uint64(timestamp.Unix()),
 			},
 			TxsBytes:     txsBytes,
 			Transactions: txes,

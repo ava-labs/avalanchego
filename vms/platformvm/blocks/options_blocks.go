@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -27,7 +28,7 @@ func (b *AbortBlock) Visit(v Visitor) error {
 
 func NewAbortBlock(
 	blkVersion uint16,
-	timestamp uint64,
+	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 ) (Block, error) {
@@ -35,7 +36,7 @@ func NewAbortBlock(
 		CommonBlock: CommonBlock{
 			PrntID:       parentID,
 			Hght:         height,
-			BlkTimestamp: timestamp,
+			BlkTimestamp: uint64(timestamp.Unix()),
 		},
 	}
 
@@ -62,7 +63,7 @@ func (b *CommitBlock) Visit(v Visitor) error {
 
 func NewCommitBlock(
 	blkVersion uint16,
-	timestamp uint64,
+	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 ) (Block, error) {
@@ -70,7 +71,7 @@ func NewCommitBlock(
 		CommonBlock: CommonBlock{
 			PrntID:       parentID,
 			Hght:         height,
-			BlkTimestamp: timestamp,
+			BlkTimestamp: uint64(timestamp.Unix()),
 		},
 	}
 

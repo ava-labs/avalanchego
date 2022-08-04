@@ -45,7 +45,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	apricotParentBlk, err := blocks.NewStandardBlock(
 		blksVersion,
-		uint64(parentTime.Unix()),
+		parentTime,
 		ids.Empty, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -68,7 +68,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	// wrong height
 	apricotChildBlk, err := blocks.NewStandardBlock(
 		blksVersion,
-		uint64(parentTime.Unix()),
+		parentTime,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height(),
 		nil, // txs nulled to simplify test
@@ -80,7 +80,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	// valid height
 	apricotChildBlk, err = blocks.NewStandardBlock(
 		blocks.ApricotVersion,
-		uint64(parentTime.Unix()),
+		parentTime,
 		apricotParentBlk.ID(),
 		apricotParentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -113,7 +113,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 
 	blueberryParentBlk, err := blocks.NewStandardBlock(
 		parentVersion,
-		uint64(parentTime.Unix()),
+		parentTime,
 		ids.Empty, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -155,7 +155,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	// wrong version
-	childTimestamp := uint64(parentTime.Add(time.Second).Unix())
+	childTimestamp := parentTime.Add(time.Second)
 	blueberryChildBlk, err := blocks.NewStandardBlock(
 		blocks.ApricotVersion,
 		childTimestamp,
@@ -180,7 +180,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// wrong timestamp, earlier than parent
-	childTimestamp = uint64(parentTime.Add(-1 * time.Second).Unix())
+	childTimestamp = parentTime.Add(-1 * time.Second)
 	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
@@ -193,7 +193,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// wrong timestamp, violated synchrony bound
-	childTimestamp = uint64(parentTime.Add(txexecutor.SyncBound).Add(time.Second).Unix())
+	childTimestamp = parentTime.Add(txexecutor.SyncBound).Add(time.Second)
 	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
@@ -206,7 +206,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// wrong timestamp, skipped staker set change event
-	childTimestamp = uint64(nextStakerTime.Add(time.Second).Unix())
+	childTimestamp = nextStakerTime.Add(time.Second)
 	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
@@ -219,7 +219,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.Error(block.Verify())
 
 	// valid block, same timestamp as parent block
-	childTimestamp = uint64(parentTime.Unix())
+	childTimestamp = parentTime
 	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
@@ -232,7 +232,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	assert.NoError(block.Verify())
 
 	// valid
-	childTimestamp = uint64(nextStakerTime.Unix())
+	childTimestamp = nextStakerTime
 	blueberryChildBlk, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
 		childTimestamp,
@@ -276,7 +276,7 @@ func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	assert.NoError(err)
 	statelessStandardBlock, err := blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingValidatorStartTime.Unix()),
+		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -514,7 +514,7 @@ func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 				assert.NoError(err)
 				statelessStandardBlock, err := blocks.NewStandardBlock(
 					version.BlueberryBlockVersion,
-					uint64(newTime.Unix()),
+					newTime,
 					parentBlk.ID(),
 					parentBlk.Height()+1,
 					nil, // txs nulled to simplify test
@@ -625,7 +625,7 @@ func TestBlueberryStandardBlockRemoveSubnetValidator(t *testing.T) {
 	assert.NoError(err)
 	statelessStandardBlock, err := blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
-		uint64(subnetVdr1EndTime.Unix()),
+		subnetVdr1EndTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -696,7 +696,7 @@ func TestBlueberryStandardBlockWhitelistedSubnet(t *testing.T) {
 			assert.NoError(err)
 			statelessStandardBlock, err := blocks.NewStandardBlock(
 				version.BlueberryBlockVersion,
-				uint64(subnetVdr1StartTime.Unix()),
+				subnetVdr1StartTime,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
 				nil, // txs nulled to simplify test
@@ -744,7 +744,7 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(err)
 	statelessStandardBlock, err := blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingValidatorStartTime.Unix()),
+		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test
@@ -795,7 +795,7 @@ func TestBlueberryStandardBlockDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(err)
 	statelessStandardBlock, err = blocks.NewStandardBlock(
 		version.BlueberryBlockVersion,
-		uint64(pendingDelegatorStartTime.Unix()),
+		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		nil, // txs nulled to simplify test

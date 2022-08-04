@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -18,7 +19,7 @@ var (
 // NewProposalBlock assumes [tx] is initialized
 func NewProposalBlock(
 	version uint16,
-	timestamp uint64,
+	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
@@ -29,7 +30,7 @@ func NewProposalBlock(
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
-				BlkTimestamp: timestamp,
+				BlkTimestamp: uint64(timestamp.Unix()),
 			},
 			Tx: tx,
 		}
@@ -48,7 +49,7 @@ func NewProposalBlock(
 			CommonBlock: CommonBlock{
 				PrntID:       parentID,
 				Hght:         height,
-				BlkTimestamp: timestamp,
+				BlkTimestamp: uint64(timestamp.Unix()),
 			},
 			TxBytes: tx.Bytes(),
 			Tx:      tx,

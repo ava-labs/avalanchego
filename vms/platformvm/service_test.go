@@ -807,7 +807,7 @@ func TestGetBlock(t *testing.T) {
 			}
 			statelessBlock, err := blocks.NewStandardBlock(
 				blkVersion,
-				0, // apricot timestamp is not serialized
+				time.Time{}, // apricot timestamp is not serialized
 				preferred.ID(),
 				preferred.Height()+1,
 				[]*txs.Tx{tx},

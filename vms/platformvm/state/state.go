@@ -1199,7 +1199,7 @@ func (s *state) init(genesisBytes []byte) error {
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
 	genesisBlock, err := blocks.NewCommitBlock(
 		blocks.ApricotVersion,
-		0, // timestamp
+		time.Time{}, // timestamp
 		genesisID,
 		0, // height
 	)
