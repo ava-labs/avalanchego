@@ -127,8 +127,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 	blkVersion := version.BlueberryBlockVersion
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
-		statelessBlk, err := blocks.NewStandardBlock(
-			blkVersion,
+		statelessBlk, err := blocks.NewBlueberryStandardBlock(
 			b.blkTime,
 			b.parentBlkID,
 			b.height,
@@ -161,8 +160,7 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		statelessBlk, err := blocks.NewStandardBlock(
-			blkVersion,
+		statelessBlk, err := blocks.NewBlueberryStandardBlock(
 			b.blkTime,
 			b.parentBlkID,
 			b.height,

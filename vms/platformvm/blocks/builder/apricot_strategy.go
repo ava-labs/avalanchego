@@ -146,9 +146,7 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		statelessBlk, err := blocks.NewStandardBlock(
-			blkVersion,
-			time.Time{},
+		statelessBlk, err := blocks.NewApricotStandardBlock(
 			a.parentBlkID,
 			a.nextHeight,
 			a.txes,

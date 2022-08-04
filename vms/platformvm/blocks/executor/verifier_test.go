@@ -259,11 +259,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewStandardBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
-		2,
+		2, /*height*/
 		[]*txs.Tx{
 			{
 				Unsigned: &txs.AdvanceTimeTx{},

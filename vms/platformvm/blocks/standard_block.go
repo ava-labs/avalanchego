@@ -13,90 +13,36 @@ import (
 )
 
 var (
-	_ Block = &ApricotStandardBlock{}
 	_ Block = &BlueberryStandardBlock{}
+	_ Block = &ApricotStandardBlock{}
 )
 
-// NewStandardBlock assumes [txes] are initialized
-func NewStandardBlock(
-	blkVersion uint16,
-	timestamp time.Time,
-	parentID ids.ID,
-	height uint64,
-	txes []*txs.Tx,
-) (Block, error) {
-	switch blkVersion {
-	case version.ApricotBlockVersion:
-		res := &ApricotStandardBlock{
+// NewBlueberryStandardBlock assumes [txes] are initialized
+func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txes []*txs.Tx) (Block, error) {
+	txsBytes := make([][]byte, len(txes))
+	for i, tx := range txes {
+		txBytes := tx.Bytes()
+		txsBytes[i] = txBytes
+	}
+	res := &BlueberryStandardBlock{
+		BlueberryCommonBlock: BlueberryCommonBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
-			Transactions: txes,
-		}
-		// We serialize this block as a Block so that it can be deserialized into a
-		// Block
-		blk := Block(res)
-		bytes, err := Codec.Marshal(Version, &blk)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-		}
-
-		return res, res.initialize(version.ApricotBlockVersion, bytes)
-
-	case version.BlueberryBlockVersion:
-		txsBytes := make([][]byte, len(txes))
-		for i, tx := range txes {
-			txBytes := tx.Bytes()
-			txsBytes[i] = txBytes
-		}
-		res := &BlueberryStandardBlock{
-			BlueberryCommonBlock: BlueberryCommonBlock{
-				ApricotCommonBlock: ApricotCommonBlock{
-					PrntID: parentID,
-					Hght:   height,
-				},
-				BlkTimestamp: uint64(timestamp.Unix()),
-			},
-			TxsBytes:     txsBytes,
-			Transactions: txes,
-		}
-		// We serialize this block as a Block so that it can be deserialized into a
-		// Block
-		blk := Block(res)
-		bytes, err := Codec.Marshal(Version, &blk)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-		}
-		return res, res.initialize(version.BlueberryBlockVersion, bytes)
-
-	default:
-		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
+			BlkTimestamp: uint64(timestamp.Unix()),
+		},
+		TxsBytes:     txsBytes,
+		Transactions: txes,
 	}
-}
-
-type ApricotStandardBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-
-	Transactions []*txs.Tx `serialize:"true" json:"txs"`
-}
-
-func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
-		return fmt.Errorf("failed to initialize: %w", err)
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := Block(res)
+	bytes, err := Codec.Marshal(Version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-	for _, tx := range b.Transactions {
-		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to sign block: %w", err)
-		}
-	}
-	return nil
-}
-
-func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
-
-func (b *ApricotStandardBlock) Visit(v Visitor) error {
-	return v.ApricotStandardBlock(b)
+	return res, res.initialize(version.BlueberryBlockVersion, bytes)
 }
 
 type BlueberryStandardBlock struct {
@@ -132,4 +78,48 @@ func (b *BlueberryStandardBlock) Txs() []*txs.Tx { return b.Transactions }
 
 func (b *BlueberryStandardBlock) Visit(v Visitor) error {
 	return v.BlueberryStandardBlock(b)
+}
+
+// NewApricotStandardBlock assumes [txes] are initialized
+func NewApricotStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (Block, error) {
+	res := &ApricotStandardBlock{
+		ApricotCommonBlock: ApricotCommonBlock{
+			PrntID: parentID,
+			Hght:   height,
+		},
+		Transactions: txes,
+	}
+	// We serialize this block as a Block so that it can be deserialized into a
+	// Block
+	blk := Block(res)
+	bytes, err := Codec.Marshal(Version, &blk)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
+	}
+
+	return res, res.initialize(version.ApricotBlockVersion, bytes)
+}
+
+type ApricotStandardBlock struct {
+	ApricotCommonBlock `serialize:"true"`
+
+	Transactions []*txs.Tx `serialize:"true" json:"txs"`
+}
+
+func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
+	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	for _, tx := range b.Transactions {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
+			return fmt.Errorf("failed to sign block: %w", err)
+		}
+	}
+	return nil
+}
+
+func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
+
+func (b *ApricotStandardBlock) Visit(v Visitor) error {
+	return v.ApricotStandardBlock(b)
 }

@@ -43,9 +43,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentTime := time.Time{}
 	parentHeight := uint64(2022)
 
-	apricotParentBlk, err := blocks.NewStandardBlock(
-		version.ApricotBlockVersion,
-		parentTime,
+	apricotParentBlk, err := blocks.NewApricotStandardBlock(
 		ids.Empty, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -138,13 +136,10 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	env.config.BlueberryTime = time.Time{} // activate Blueberry
 
 	// create parentBlock. It's a standard one for simplicity
-	blksVersion := version.ApricotBlockVersion
 	parentTime := defaultGenesisTime
 	parentHeight := uint64(2022)
 
-	blueberryParentBlk, err := blocks.NewStandardBlock(
-		blksVersion,
-		parentTime,
+	blueberryParentBlk, err := blocks.NewApricotStandardBlock(
 		genesisBlkID, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test

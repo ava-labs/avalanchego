@@ -418,9 +418,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := blocks.NewStandardBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessStandardBlk, err := blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -430,9 +428,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}
 	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = blocks.NewStandardBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessStandardBlk, err = blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -442,9 +438,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}
 	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = blocks.NewStandardBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessStandardBlk, err = blocks.NewApricotStandardBlock(
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -590,9 +584,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	statelessImportBlk, err := blocks.NewStandardBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessImportBlk, err := blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -896,9 +888,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	statelessImportBlk, err := blocks.NewStandardBlock(
-		blkversion.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	statelessImportBlk, err := blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},

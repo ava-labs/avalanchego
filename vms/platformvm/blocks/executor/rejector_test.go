@@ -75,9 +75,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "standard block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewStandardBlock(
-					version.ApricotBlockVersion,
-					time.Time{}, // timestamp
+				return blocks.NewApricotStandardBlock(
 					ids.GenerateTestID(),
 					1,
 					[]*txs.Tx{

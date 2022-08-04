@@ -31,13 +31,7 @@ func TestStandardBlocks(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		apricotStandardBlk, err := NewStandardBlock(
-			version.ApricotBlockVersion,
-			blkTimestamp,
-			parentID,
-			height,
-			txs,
-		)
+		apricotStandardBlk, err := NewApricotStandardBlock(parentID, height, txs)
 		assert.NoError(err)
 
 		// parse block
@@ -60,13 +54,7 @@ func TestStandardBlocks(t *testing.T) {
 		assert.Equal(txs, parsedApricot.Txs())
 
 		// check that blueberry standard block can be built and parsed
-		blueberryStandardBlk, err := NewStandardBlock(
-			version.BlueberryBlockVersion,
-			blkTimestamp,
-			parentID,
-			height,
-			txs,
-		)
+		blueberryStandardBlk, err := NewBlueberryStandardBlock(blkTimestamp, parentID, height, txs)
 		assert.NoError(err)
 
 		// parse block

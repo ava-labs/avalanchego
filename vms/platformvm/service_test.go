@@ -38,7 +38,6 @@ import (
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	blkversion "github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -787,7 +786,6 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			service, _ := defaultService(t)
-			blkVersion := blkversion.ApricotBlockVersion
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
@@ -806,9 +804,7 @@ func TestGetBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			statelessBlock, err := blocks.NewStandardBlock(
-				blkVersion,
-				time.Time{}, // apricot timestamp is not serialized
+			statelessBlock, err := blocks.NewApricotStandardBlock(
 				preferred.ID(),
 				preferred.Height()+1,
 				[]*txs.Tx{tx},

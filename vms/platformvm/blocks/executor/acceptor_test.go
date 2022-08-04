@@ -178,9 +178,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewStandardBlock(
-		version.ApricotBlockVersion,
-		time.Time{}, // timestamp
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		1,
 		[]*txs.Tx{
