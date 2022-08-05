@@ -8,10 +8,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -41,16 +40,25 @@ type backend struct {
 	bootstrapped *utils.AtomicBool
 }
 
-func (b *backend) ExpectedChildVersion(blk snowman.Block) uint16 {
-	return b.expectedChildVersion(blk.Timestamp())
-}
-
-func (b *backend) expectedChildVersion(blkTime time.Time) uint16 {
-	forkTime := b.cfg.BlueberryTime
-	if blkTime.Before(forkTime) {
-		return version.ApricotBlockVersion
+func (b *backend) GetFork(blkID ids.ID) (forks.Fork, error) {
+	// We need the parent's timestamp.
+	// Verify was already called on the parent (guaranteed by consensus engine).
+	// The parent hasn't been rejected (guaranteed by consensus engine).
+	// If the parent is accepted, the parent is the most recently
+	// accepted block.
+	// If the parent hasn't been accepted, the parent is in memory.
+	var parentTimestamp time.Time
+	if parentState, ok := b.blkIDToState[blkID]; ok {
+		parentTimestamp = parentState.timestamp
+	} else {
+		parentTimestamp = b.state.GetTimestamp()
 	}
-	return version.BlueberryBlockVersion
+
+	forkTime := b.cfg.BlueberryTime
+	if parentTimestamp.Before(forkTime) {
+		return forks.Apricot, nil
+	}
+	return forks.Blueberry, nil
 }
 
 func (b *backend) free(blkID ids.ID) {

@@ -30,17 +30,13 @@ type ApricotCommonBlock struct {
 	// This block's height. The genesis block is at height 0.
 	Hght uint64 `serialize:"true" json:"height"`
 
-	// Codec version used to serialized/deserialize the block
-	version uint16
-
 	id    ids.ID
 	bytes []byte
 }
 
-func (b *ApricotCommonBlock) initialize(version uint16, bytes []byte) error {
+func (b *ApricotCommonBlock) initialize(bytes []byte) error {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
-	b.version = version
 	return nil
 }
 
@@ -48,8 +44,6 @@ func (b *ApricotCommonBlock) ID() ids.ID     { return b.id }
 func (b *ApricotCommonBlock) Parent() ids.ID { return b.PrntID }
 func (b *ApricotCommonBlock) Bytes() []byte  { return b.bytes }
 func (b *ApricotCommonBlock) Height() uint64 { return b.Hght }
-
-func (b *ApricotCommonBlock) Version() uint16 { return b.version }
 
 func (b *ApricotCommonBlock) BlockTimestamp() time.Time {
 	return time.Unix(0, 0)

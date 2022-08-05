@@ -16,7 +16,6 @@ type Block interface {
 	Parent() ids.ID
 	Bytes() []byte
 	Height() uint64
-	Version() uint16
 	BlockTimestamp() time.Time
 
 	// Txs returns list of transactions contained in the block
@@ -25,6 +24,6 @@ type Block interface {
 	Visit(visitor Visitor) error
 
 	// note: initialize does not assume that block transactions
-	// are initialized, and initialize them itself if they aren't.
-	initialize(version uint16, bytes []byte) error
+	// are initialized, and initializes them itself if they aren't.
+	initialize(bytes []byte) error
 }

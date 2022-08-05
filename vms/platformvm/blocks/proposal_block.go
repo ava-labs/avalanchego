@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -43,7 +42,7 @@ func NewBlueberryProposalBlock(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-	return res, res.initialize(version.BlueberryBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
 type BlueberryProposalBlock struct {
@@ -54,8 +53,8 @@ type BlueberryProposalBlock struct {
 	Tx *txs.Tx
 }
 
-func (b *BlueberryProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
+func (b *BlueberryProposalBlock) initialize(bytes []byte) error {
+	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
@@ -97,7 +96,7 @@ func NewApricotProposalBlock(parentID ids.ID, height uint64, tx *txs.Tx) (Block,
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-	return res, res.initialize(version.ApricotBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now
@@ -107,8 +106,8 @@ type ApricotProposalBlock struct {
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (b *ApricotProposalBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
+func (b *ApricotProposalBlock) initialize(bytes []byte) error {
+	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
 		return err
 	}
 	return b.Tx.Sign(txs.Codec, nil)

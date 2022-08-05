@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -43,11 +42,11 @@ func NewAtomicBlock(
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.initialize(version.ApricotBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
-func (ab *AtomicBlock) initialize(version uint16, bytes []byte) error {
-	if err := ab.ApricotCommonBlock.initialize(version, bytes); err != nil {
+func (ab *AtomicBlock) initialize(bytes []byte) error {
+	if err := ab.ApricotCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {

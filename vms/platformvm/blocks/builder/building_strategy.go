@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 )
 
 // buildingStrategy defines how to create a versioned block.
@@ -33,7 +33,10 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 	}
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	blkVersion := b.blkManager.ExpectedChildVersion(preferred)
+	currentFork, err := b.blkManager.GetFork(prefBlkID)
+	if err != nil {
+		return nil, fmt.Errorf("could not fork for block %s: %w", prefBlkID, err)
+	}
 
 	stateVersions := b.txExecutorBackend.StateVersions
 	preferredState, ok := stateVersions.GetState(prefBlkID)
@@ -42,15 +45,15 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 	}
 
 	// select transactions to include and finally build the block
-	switch blkVersion {
-	case version.ApricotBlockVersion:
+	switch currentFork {
+	case forks.Apricot:
 		return &apricotStrategy{
 			blockBuilder: b,
 			parentBlkID:  prefBlkID,
 			parentState:  preferredState,
 			nextHeight:   nextHeight,
 		}, nil
-	case version.BlueberryBlockVersion:
+	case forks.Blueberry:
 		return &blueberryStrategy{
 			blockBuilder: b,
 			parentBlkID:  prefBlkID,
@@ -58,6 +61,6 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 			height:       nextHeight,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported block version %d", blkVersion)
+		return nil, fmt.Errorf("unsupported fork %s", currentFork)
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -36,7 +35,7 @@ func NewBlueberryAbortBlock(timestamp time.Time, parentID ids.ID, height uint64)
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.initialize(version.BlueberryBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
 type BlueberryAbortBlock struct {
@@ -65,7 +64,7 @@ func NewApricotAbortBlock(parentID ids.ID, height uint64) (Block, error) {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.initialize(version.ApricotBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
 type ApricotAbortBlock struct {

@@ -4,10 +4,7 @@
 package blocks
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 )
 
 func Parse(b []byte, c codec.Manager) (Block, error) {
@@ -16,21 +13,5 @@ func Parse(b []byte, c codec.Manager) (Block, error) {
 		return nil, err
 	}
 
-	switch blk.(type) {
-	case *BlueberryAbortBlock,
-		*BlueberryCommitBlock,
-		*BlueberryProposalBlock,
-		*BlueberryStandardBlock:
-		return blk, blk.initialize(version.BlueberryBlockVersion, b)
-
-	case *ApricotAbortBlock,
-		*ApricotCommitBlock,
-		*ApricotProposalBlock,
-		*ApricotStandardBlock,
-		*AtomicBlock:
-		return blk, blk.initialize(version.ApricotBlockVersion, b)
-
-	default:
-		return nil, fmt.Errorf("unhandled block type %T", blk)
-	}
+	return blk, blk.initialize(b)
 }

@@ -6,11 +6,11 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -581,27 +581,32 @@ func (v *verifier) verifyCommonBlock(b blocks.Block) error {
 		)
 	}
 
-	// verify block version
-	blkVersion := b.Version()
-	// We need the parent's timestamp.
-	// Verify was already called on the parent (guaranteed by consensus engine).
-	// The parent hasn't been rejected (guaranteed by consensus engine).
-	// If the parent is accepted, the parent is the most recently
-	// accepted block.
-	// If the parent hasn't been accepted, the parent is in memory.
-	var parentTimestamp time.Time
-	if parentState, ok := v.blkIDToState[parentID]; ok {
-		parentTimestamp = parentState.timestamp
-	} else {
-		parentTimestamp = v.state.GetTimestamp()
+	// check whether block type is allowed in current fork
+	currentFork, err := v.GetFork(b.Parent())
+	if err != nil {
+		return fmt.Errorf("could not check block type against fork, %w", err)
 	}
-	expectedVersion := v.expectedChildVersion(parentTimestamp)
-	if expectedVersion != blkVersion {
-		return fmt.Errorf(
-			"expected block to have version %d, but found %d",
-			expectedVersion,
-			blkVersion,
-		)
+
+	switch b.(type) {
+	case *blocks.BlueberryAbortBlock,
+		*blocks.BlueberryCommitBlock,
+		*blocks.BlueberryProposalBlock,
+		*blocks.BlueberryStandardBlock:
+		if currentFork != forks.Blueberry {
+			return fmt.Errorf("block type %t not accepted on fork %s", b, currentFork)
+		}
+
+	case *blocks.ApricotAbortBlock,
+		*blocks.ApricotCommitBlock,
+		*blocks.ApricotProposalBlock,
+		*blocks.ApricotStandardBlock,
+		*blocks.AtomicBlock:
+		if currentFork != forks.Apricot {
+			return fmt.Errorf("block type %t not accepted on fork %s", b, currentFork)
+		}
+
+	default:
+		return fmt.Errorf("cannot tell whether block type %t is accepted on fork %s", b, currentFork)
 	}
 
 	return nil

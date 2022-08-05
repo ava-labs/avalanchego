@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -22,7 +23,8 @@ type Manager interface {
 	GetBlock(id ids.ID) (snowman.Block, error)
 	NewBlock(blocks.Block) snowman.Block
 
-	ExpectedChildVersion(blk snowman.Block) uint16
+	// GetFork returns fork active on blkID
+	GetFork(blkID ids.ID) (forks.Fork, error)
 }
 
 func NewManager(

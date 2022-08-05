@@ -42,7 +42,6 @@ func TestStandardBlocks(t *testing.T) {
 		assert.Equal(apricotStandardBlk.Bytes(), parsedBlueberry.Bytes())
 		assert.Equal(apricotStandardBlk.Parent(), parsedBlueberry.Parent())
 		assert.Equal(apricotStandardBlk.Height(), parsedBlueberry.Height())
-		assert.Equal(apricotStandardBlk.Version(), parsedBlueberry.Version())
 
 		// timestamp is not serialized in apricot blocks
 		// no matter if block is built with a non-zero timestamp
@@ -65,7 +64,6 @@ func TestStandardBlocks(t *testing.T) {
 		assert.Equal(blueberryStandardBlk.Bytes(), parsedBlueberry.Bytes())
 		assert.Equal(blueberryStandardBlk.Parent(), blueberryStandardBlk.Parent())
 		assert.Equal(blueberryStandardBlk.Height(), parsedBlueberry.Height())
-		assert.Equal(blueberryStandardBlk.Version(), parsedBlueberry.Version())
 		assert.Equal(blueberryStandardBlk.BlockTimestamp(), parsedBlueberry.BlockTimestamp())
 		parsedBlueberryStandardBlk, ok := parsedBlueberry.(*BlueberryStandardBlock)
 		assert.True(ok)
@@ -103,7 +101,6 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal(apricotProposalBlk.Bytes(), parsed.Bytes())
 		assert.Equal(apricotProposalBlk.Parent(), parsed.Parent())
 		assert.Equal(apricotProposalBlk.Height(), parsed.Height())
-		assert.Equal(apricotProposalBlk.Version(), parsed.Version())
 
 		// timestamp is not serialized in apricot blocks
 		// no matter if block is built with a non-zero timestamp
@@ -131,7 +128,6 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal(blueberryProposalBlk.Bytes(), parsed.Bytes())
 		assert.Equal(blueberryProposalBlk.Parent(), blueberryProposalBlk.Parent())
 		assert.Equal(blueberryProposalBlk.Height(), parsed.Height())
-		assert.Equal(blueberryProposalBlk.Version(), parsed.Version())
 		assert.Equal(blueberryProposalBlk.BlockTimestamp(), parsed.BlockTimestamp())
 		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
 		assert.True(ok)
@@ -163,7 +159,6 @@ func TestCommitBlock(t *testing.T) {
 		assert.Equal(apricotCommitBlk.Bytes(), parsed.Bytes())
 		assert.Equal(apricotCommitBlk.Parent(), parsed.Parent())
 		assert.Equal(apricotCommitBlk.Height(), parsed.Height())
-		assert.Equal(apricotCommitBlk.Version(), parsed.Version())
 
 		// timestamp is not serialized in apricot blocks
 		// no matter if block is built with a non-zero timestamp
@@ -182,7 +177,6 @@ func TestCommitBlock(t *testing.T) {
 		assert.Equal(blueberryCommitBlk.Bytes(), parsed.Bytes())
 		assert.Equal(blueberryCommitBlk.Parent(), blueberryCommitBlk.Parent())
 		assert.Equal(blueberryCommitBlk.Height(), parsed.Height())
-		assert.Equal(blueberryCommitBlk.Version(), parsed.Version())
 		assert.Equal(blueberryCommitBlk.BlockTimestamp(), parsed.BlockTimestamp())
 	}
 }
@@ -208,7 +202,6 @@ func TestAbortBlock(t *testing.T) {
 		assert.Equal(apricotAbortBlk.Bytes(), parsed.Bytes())
 		assert.Equal(apricotAbortBlk.Parent(), parsed.Parent())
 		assert.Equal(apricotAbortBlk.Height(), parsed.Height())
-		assert.Equal(apricotAbortBlk.Version(), parsed.Version())
 
 		// timestamp is not serialized in apricot blocks
 		// no matter if block is built with a non-zero timestamp
@@ -227,7 +220,6 @@ func TestAbortBlock(t *testing.T) {
 		assert.Equal(blueberryAbortBlk.Bytes(), parsed.Bytes())
 		assert.Equal(blueberryAbortBlk.Parent(), blueberryAbortBlk.Parent())
 		assert.Equal(blueberryAbortBlk.Height(), parsed.Height())
-		assert.Equal(blueberryAbortBlk.Version(), parsed.Version())
 		assert.Equal(blueberryAbortBlk.BlockTimestamp(), parsed.BlockTimestamp())
 	}
 }
@@ -258,7 +250,6 @@ func TestAtomicBlocks(t *testing.T) {
 		assert.Equal(atomicBlk.Bytes(), parsed.Bytes())
 		assert.Equal(atomicBlk.Parent(), parsed.Parent())
 		assert.Equal(atomicBlk.Height(), parsed.Height())
-		assert.Equal(atomicBlk.Version(), parsed.Version())
 		assert.Equal(time.Unix(0, 0), parsed.BlockTimestamp())
 
 		parsedAtomicBlk, ok := parsed.(*AtomicBlock)

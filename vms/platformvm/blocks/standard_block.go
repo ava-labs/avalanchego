@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -36,7 +35,7 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-	return res, res.initialize(version.BlueberryBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
 type BlueberryStandardBlock struct {
@@ -45,8 +44,8 @@ type BlueberryStandardBlock struct {
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (b *BlueberryStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.BlueberryCommonBlock.initialize(version, bytes); err != nil {
+func (b *BlueberryStandardBlock) initialize(bytes []byte) error {
+	if err := b.BlueberryCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range b.Transactions {
@@ -80,7 +79,7 @@ func NewApricotStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (Bl
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
-	return res, res.initialize(version.ApricotBlockVersion, bytes)
+	return res, res.initialize(bytes)
 }
 
 type ApricotStandardBlock struct {
@@ -89,8 +88,8 @@ type ApricotStandardBlock struct {
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (b *ApricotStandardBlock) initialize(version uint16, bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(version, bytes); err != nil {
+func (b *ApricotStandardBlock) initialize(bytes []byte) error {
+	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range b.Transactions {
