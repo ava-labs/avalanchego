@@ -26,17 +26,33 @@ type backend struct {
 	// All other blocks are removed when they are accepted/rejected.
 	// Note that Genesis block is a commit block so no need to update
 	// blkIDToState with it upon backend creation (Genesis is already accepted)
-	blkIDToState  map[ids.ID]*blockState
-	state         state.State
-	stateVersions state.Versions
+	blkIDToState map[ids.ID]*blockState
+	state        state.State
 
 	ctx          *snow.Context
 	bootstrapped *utils.AtomicBool
 }
 
-// Note: free may be invoked multiple time on the same block
-// (e.g. twice on any option's parent). Hence it's important
-// to make sure free stays idempotent.
+func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
+	if blkID == b.lastAccepted {
+		return b.state, true
+	}
+
+	state, ok := b.blkIDToState[blkID]
+	if !ok {
+		return nil, false
+	}
+
+	if state.onAcceptState != nil {
+		return state.onAcceptState, true
+	}
+	return nil, false
+}
+
+func (b *backend) LastAccepted() ids.ID {
+	return b.lastAccepted
+}
+
 func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
 }

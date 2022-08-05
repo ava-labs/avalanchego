@@ -42,9 +42,10 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 	}
 
 	txExecutor := &executor.ProposalTxExecutor{
-		Backend:  &v.txExecutorBackend,
-		ParentID: b.Parent(),
-		Tx:       b.Tx,
+		Backend:       &v.txExecutorBackend,
+		ParentID:      b.Parent(),
+		StateVersions: v,
+		Tx:            b.Tx,
 	}
 	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
 		txID := b.Tx.ID()
@@ -94,7 +95,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.stateVersions.GetState(parentID)
+	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
@@ -110,9 +111,10 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	}
 
 	atomicExecutor := &executor.AtomicTxExecutor{
-		Backend:  &v.txExecutorBackend,
-		ParentID: parentID,
-		Tx:       b.Tx,
+		Backend:       &v.txExecutorBackend,
+		ParentID:      parentID,
+		StateVersions: v,
+		Tx:            b.Tx,
 	}
 
 	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
@@ -157,7 +159,6 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	return nil
 }
@@ -178,10 +179,7 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 		return err
 	}
 
-	onAcceptState, err := state.NewDiff(
-		b.Parent(),
-		v.stateVersions,
-	)
+	onAcceptState, err := state.NewDiff(b.Parent(), v)
 	if err != nil {
 		return err
 	}
@@ -265,7 +263,6 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 	blkState.timestamp = onAcceptState.GetTimestamp()
 	blkState.onAcceptState = onAcceptState
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
@@ -294,7 +291,6 @@ func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
 		onAcceptState:  onAcceptState,
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 
@@ -323,7 +319,6 @@ func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 		onAcceptState:  onAcceptState,
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 

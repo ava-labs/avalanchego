@@ -1652,13 +1652,13 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	state, ok := service.vm.stateVersions.GetState(blockID)
+	state, ok := service.vm.manager.GetState(blockID)
 	if !ok {
 		block, err := service.vm.manager.GetBlock(blockID)
 		if err != nil {
 			return false, err
 		}
-		state, ok = service.vm.stateVersions.GetState(block.Parent())
+		state, ok = service.vm.manager.GetState(block.Parent())
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
@@ -1909,7 +1909,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	onAccept, ok := service.vm.stateVersions.GetState(service.vm.preferred)
+	onAccept, ok := service.vm.manager.GetState(service.vm.preferred)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for block %s", service.vm.preferred)
 	}

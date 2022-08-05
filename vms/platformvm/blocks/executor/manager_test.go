@@ -66,26 +66,13 @@ func TestGetBlock(t *testing.T) {
 
 func TestManagerLastAccepted(t *testing.T) {
 	assert := assert.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	state := state.NewMockState(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
 	manager := &manager{
 		backend: &backend{
-			state: state,
+			lastAccepted: lastAcceptedID,
 		},
 	}
 
-	{
-		// Case: lastAccepted isn't set in memory.
-		lastAccepted := ids.GenerateTestID()
-		state.EXPECT().GetLastAccepted().Return(lastAccepted).Times(1)
-		assert.Equal(lastAccepted, manager.LastAccepted())
-	}
-	{
-		// Case: lastAccepted is set in memory.
-		lastAccepted := ids.GenerateTestID()
-		manager.lastAccepted = lastAccepted
-		assert.Equal(lastAccepted, manager.LastAccepted())
-	}
+	assert.Equal(lastAcceptedID, manager.LastAccepted())
 }

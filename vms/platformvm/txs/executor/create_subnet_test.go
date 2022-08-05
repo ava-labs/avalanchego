@@ -71,7 +71,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			tx := &txs.Tx{Unsigned: utx}
 			assert.NoError(tx.Sign(txs.Codec, signers))
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			assert.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)

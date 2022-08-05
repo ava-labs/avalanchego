@@ -38,7 +38,6 @@ func (r *rejector) ProposalBlock(b *blocks.ProposalBlock) error {
 		)
 	}
 
-	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -64,7 +63,6 @@ func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
 		)
 	}
 
-	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -92,7 +90,6 @@ func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
 		}
 	}
 
-	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -123,7 +120,6 @@ func (r *rejector) rejectOptionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
-	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }

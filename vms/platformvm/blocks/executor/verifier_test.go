@@ -38,14 +38,14 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: executor.Backend{},
 		backend: &backend{
+			lastAccepted: parentID,
 			blkIDToState: map[ids.ID]*blockState{
 				parentID: {
 					statelessBlock: parentStatelessBlk,
 				},
 			},
-			Mempool:       mempool,
-			state:         s,
-			stateVersions: state.NewVersions(parentID, s),
+			Mempool: mempool,
+			state:   s,
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
@@ -113,8 +113,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	grandparentID := ids.GenerateTestID()
-	stateVersions := state.NewMockVersions(ctrl)
-	parentState := state.NewMockState(ctrl)
+	parentState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: executor.Backend{
 			Config: &config.Config{
@@ -125,11 +124,11 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			blkIDToState: map[ids.ID]*blockState{
 				parentID: {
 					statelessBlock: parentStatelessBlk,
+					onAcceptState:  parentState,
 				},
 			},
-			Mempool:       mempool,
-			state:         s,
-			stateVersions: stateVersions,
+			Mempool: mempool,
+			state:   s,
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
@@ -147,10 +146,9 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		},
 	).Times(1)
 
-	// We can't serialize [blkTx] because it isn't
-	// regiestered with the blocks.Codec.
-	// Serialize this block with a dummy tx
-	// and replace it after creation with the mock tx.
+	// We can't serialize [blkTx] because it isn't registered with blocks.Codec.
+	// Serialize this block with a dummy tx and replace it after creation with
+	// the mock tx.
 	// TODO allow serialization of mock txs.
 	blk, err := blocks.NewAtomicBlock(
 		parentID,
@@ -166,14 +164,12 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
 	s.EXPECT().GetStatelessBlock(parentID).Return(parentStatelessBlk, choices.Accepted, nil).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
 	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	stateVersions.EXPECT().SetState(blk.ID(), onAccept).Times(1)
 
 	err = verifier.AtomicBlock(blk)
 	assert.NoError(err)
@@ -200,8 +196,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
-	stateVersions := state.NewMockVersions(ctrl)
-	parentState := state.NewMockState(ctrl)
+	parentState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: executor.Backend{
 			Config: &config.Config{
@@ -212,11 +207,11 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			blkIDToState: map[ids.ID]*blockState{
 				parentID: {
 					statelessBlock: parentStatelessBlk,
+					onAcceptState:  parentState,
 				},
 			},
-			Mempool:       mempool,
-			state:         s,
-			stateVersions: stateVersions,
+			Mempool: mempool,
+			state:   s,
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
@@ -267,10 +262,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
-	stateVersions.EXPECT().GetState(blk.Parent()).Return(parentState, true).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs(blk.Transactions).Times(1)
-	stateVersions.EXPECT().SetState(blk.ID(), gomock.Any()).Times(1)
 
 	err = verifier.StandardBlock(blk)
 	assert.NoError(err)
@@ -297,7 +290,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
-	stateVersions := state.NewMockVersions(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
@@ -313,9 +305,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 					standardBlockState: standardBlockState{},
 				},
 			},
-			Mempool:       mempool,
-			state:         s,
-			stateVersions: stateVersions,
+			Mempool: mempool,
+			state:   s,
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
@@ -333,7 +324,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
-		stateVersions.EXPECT().SetState(blk.ID(), parentOnCommitState).Times(1),
 	)
 
 	// Verify the block.
@@ -361,7 +351,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
-	stateVersions := state.NewMockVersions(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
@@ -377,9 +366,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 					standardBlockState: standardBlockState{},
 				},
 			},
-			Mempool:       mempool,
-			state:         s,
-			stateVersions: stateVersions,
+			Mempool: mempool,
+			state:   s,
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
 			},
@@ -397,7 +385,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
-		stateVersions.EXPECT().SetState(blk.ID(), parentOnCommitState).Times(1),
 	)
 
 	// Verify the block.
