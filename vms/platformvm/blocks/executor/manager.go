@@ -41,7 +41,7 @@ func NewManager(
 		blkIDToState: map[ids.ID]*blockState{},
 	}
 
-	manager := &manager{
+	return &manager{
 		backend: backend,
 		verifier: &verifier{
 			backend:           backend,
@@ -54,7 +54,6 @@ func NewManager(
 		},
 		rejector: &rejector{backend: backend},
 	}
-	return manager
 }
 
 type manager struct {
