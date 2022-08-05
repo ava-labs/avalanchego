@@ -26,7 +26,7 @@ func (r *rejector) ProposalBlock(b *blocks.ProposalBlock) error {
 		zap.String("blockType", "proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
@@ -51,7 +51,7 @@ func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
 		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
@@ -76,7 +76,7 @@ func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
 		zap.String("blockType", "standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	for _, tx := range b.Transactions {
@@ -100,7 +100,7 @@ func (r *rejector) CommitBlock(b *blocks.CommitBlock) error {
 		zap.String("blockType", "commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 	return r.rejectOptionBlock(b)
 }
@@ -111,7 +111,7 @@ func (r *rejector) AbortBlock(b *blocks.AbortBlock) error {
 		zap.String("blockType", "abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 	return r.rejectOptionBlock(b)
 }

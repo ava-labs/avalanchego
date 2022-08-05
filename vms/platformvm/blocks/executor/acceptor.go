@@ -40,7 +40,7 @@ func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
 		zap.String("blockType", "proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	// See comment for [lastAccepted].
@@ -57,7 +57,7 @@ func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
 		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -103,7 +103,7 @@ func (a *acceptor) StandardBlock(b *blocks.StandardBlock) error {
 		zap.String("blockType", "standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -145,7 +145,7 @@ func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
 		zap.String("blockType", "commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 	return a.acceptOptionBlock(b)
 }
@@ -156,7 +156,7 @@ func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
 		zap.String("blockType", "abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 	return a.acceptOptionBlock(b)
 }
