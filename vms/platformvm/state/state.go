@@ -894,8 +894,7 @@ func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.Sta
 	return s.write(0)
 }
 
-// Load pulls data previously stored on disk that is expected to be in
-// memory.
+// Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
