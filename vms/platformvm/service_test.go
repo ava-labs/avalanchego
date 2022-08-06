@@ -264,7 +264,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if blk, ok := block.(*blockexecutor.Block); !ok {
-		t.Fatalf("should be *stateful.Block but is %T", block)
+		t.Fatalf("should be *blockexecutor.Block but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
