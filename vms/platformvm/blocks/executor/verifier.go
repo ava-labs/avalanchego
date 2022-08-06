@@ -73,11 +73,6 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 	}
 	v.blkIDToState[blkID] = blkState
 
-	// Notice that we do not add an entry to the state versions here for this
-	// block. This block must be followed by either a Commit or an Abort block.
-	// These blocks will get their parent state by referencing [onCommitState]
-	// or [onAbortState] directly.
-
 	v.Mempool.RemoveProposalTx(b.Tx)
 	return nil
 }
