@@ -423,7 +423,7 @@ func new(
 		return nil, err
 	}
 
-	s := &state{
+	return &state{
 		cfg:        cfg,
 		ctx:        ctx,
 		localStake: localStake,
@@ -480,9 +480,7 @@ func new(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}
-
-	return s, nil
+	}, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
