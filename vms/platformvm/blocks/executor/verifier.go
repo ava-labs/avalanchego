@@ -59,7 +59,7 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 	onAbortState := txExecutor.OnAbort
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		proposalBlockState: proposalBlockState{
 			onCommitState:         onCommitState,
@@ -71,7 +71,6 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 		// never be modified by an Abort block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	return nil
@@ -144,7 +143,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 		}
 	}
 
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  atomicExecutor.OnAccept,
 		standardBlockState: standardBlockState{
@@ -153,7 +152,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 		atomicRequests: atomicExecutor.AtomicRequests,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
+
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	return nil
 }
@@ -279,13 +278,13 @@ func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
+
 	onAcceptState := parentState.onCommitState
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		timestamp:      onAcceptState.GetTimestamp(),
 		onAcceptState:  onAcceptState,
 	}
-	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
@@ -306,14 +305,13 @@ func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	onAcceptState := parentState.onAbortState
 
-	blkState := &blockState{
+	onAcceptState := parentState.onAbortState
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		timestamp:      onAcceptState.GetTimestamp(),
 		onAcceptState:  onAcceptState,
 	}
-	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
