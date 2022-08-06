@@ -4,8 +4,6 @@
 package blocks
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -29,22 +27,13 @@ func NewAbortBlock(
 	parentID ids.ID,
 	height uint64,
 ) (*AbortBlock, error) {
-	res := &AbortBlock{
+	blk := &AbortBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 	}
-
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(txs.Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	return res, res.initialize(bytes)
+	return blk, initialize(blk)
 }
 
 type CommitBlock struct {
@@ -61,20 +50,11 @@ func NewCommitBlock(
 	parentID ids.ID,
 	height uint64,
 ) (*CommitBlock, error) {
-	res := &CommitBlock{
+	blk := &CommitBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 	}
-
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(txs.Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	return res, res.initialize(bytes)
+	return blk, initialize(blk)
 }
