@@ -124,7 +124,6 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	var err error
 	ctx.Log.Verbo("initializing platform chain")
 
 	registerer := prometheus.NewRegistry()
@@ -156,7 +155,9 @@ func (vm *VM) Initialize(
 	)
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-	if vm.state, err = state.New(
+
+	var err error
+	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
 		registerer,
@@ -165,7 +166,8 @@ func (vm *VM) Initialize(
 		vm.Metrics.LocalStake,
 		vm.Metrics.TotalStake,
 		vm.rewards,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
