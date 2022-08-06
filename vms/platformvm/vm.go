@@ -365,7 +365,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.Build
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	// Note: blocks to be parsed are not verified, so we must used blocks.Codec
 	// rather than blocks.GenesisCodec
-	statelessBlk, err := blocks.Parse(b, blocks.Codec)
+	statelessBlk, err := blocks.Parse(blocks.Codec, b)
 	if err != nil {
 		return nil, err
 	}

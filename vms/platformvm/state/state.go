@@ -1280,7 +1280,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	blkState.Blk, err = blocks.Parse(blkState.Bytes, blocks.GenesisCodec)
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
 		return nil, choices.Processing, err
 	}

@@ -36,7 +36,7 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(standardBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, standardBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -69,7 +69,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(proposalBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, proposalBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -96,7 +96,7 @@ func TestCommitBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(commitBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, commitBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -119,7 +119,7 @@ func TestAbortBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(abortBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, abortBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -148,7 +148,7 @@ func TestAtomicBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(atomicBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, atomicBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
