@@ -52,6 +52,12 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+const (
+	validatorSetsCacheSize        = 64
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
+)
+
 var (
 	_ block.ChainVM    = &VM{}
 	_ secp256k1fx.VM   = &VM{}
@@ -59,12 +65,6 @@ var (
 
 	errWrongCacheType      = errors.New("unexpectedly cached type")
 	errMissingValidatorSet = errors.New("missing validator set")
-)
-
-const (
-	validatorSetsCacheSize        = 64
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 type VM struct {
