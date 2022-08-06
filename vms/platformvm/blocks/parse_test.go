@@ -18,7 +18,7 @@ import (
 
 var preFundedKeys = crypto.BuildTestKeys()
 
-func TestStandardBlocks(t *testing.T) {
+func TestStandardBlock(t *testing.T) {
 	// check standard block can be built and parsed
 	assert := assert.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
@@ -51,7 +51,7 @@ func TestStandardBlocks(t *testing.T) {
 	}
 }
 
-func TestProposalBlocks(t *testing.T) {
+func TestProposalBlock(t *testing.T) {
 	// check proposal block can be built and parsed
 	assert := assert.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
@@ -130,7 +130,7 @@ func TestAbortBlock(t *testing.T) {
 	}
 }
 
-func TestAtomicBlocks(t *testing.T) {
+func TestAtomicBlock(t *testing.T) {
 	// check atomic block can be built and parsed
 	assert := assert.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
