@@ -37,7 +37,7 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
+	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
 		return err
 	}
 
@@ -84,7 +84,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
+	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
 		return err
 	}
 
@@ -169,7 +169,7 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
+	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
 		return err
 	}
 
@@ -269,7 +269,7 @@ func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
+	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
 		return err
 	}
 
@@ -296,7 +296,7 @@ func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b.CommonBlock); err != nil {
+	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
 		return err
 	}
 
@@ -315,8 +315,7 @@ func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
 	return nil
 }
 
-// Assumes [b] isn't nil
-func (v *verifier) verifyCommonBlock(b blocks.CommonBlock) error {
+func (v *verifier) verifyCommonBlock(b *blocks.CommonBlock) error {
 	var (
 		parentID           = b.Parent()
 		parentStatelessBlk blocks.Block
