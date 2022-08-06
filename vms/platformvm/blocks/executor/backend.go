@@ -34,19 +34,18 @@ type backend struct {
 }
 
 func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
-	if blkID == b.lastAccepted {
-		return b.state, true
-	}
-
-	state, ok := b.blkIDToState[blkID]
-	if !ok {
+	// If the block is in the map, it is either processing or a proposal block
+	// that was accepted without an accepted child.
+	if state, ok := b.blkIDToState[blkID]; ok {
+		if state.onAcceptState != nil {
+			return state.onAcceptState, true
+		}
 		return nil, false
 	}
 
-	if state.onAcceptState != nil {
-		return state.onAcceptState, true
-	}
-	return nil, false
+	// Note: If the last accepted block is a proposal block, we will have
+	//       returned in the above if statement.
+	return b.state, blkID == b.lastAccepted
 }
 
 func (b *backend) LastAccepted() ids.ID {

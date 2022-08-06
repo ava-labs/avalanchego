@@ -50,10 +50,14 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
 	assert.NoError(err)
 
+	blkID := blk.ID()
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
+			},
+			blkIDToState: map[ids.ID]*blockState{
+				blkID: {},
 			},
 		},
 		metrics:          metrics,
@@ -63,7 +67,10 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	err = acceptor.ProposalBlock(blk)
 	assert.NoError(err)
 
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	assert.Equal(blkID, acceptor.backend.lastAccepted)
+
+	_, exists := acceptor.GetState(blkID)
+	assert.False(exists)
 }
 
 func TestAcceptorVisitAtomicBlock(t *testing.T) {
