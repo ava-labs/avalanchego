@@ -47,6 +47,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const (
+	testNetworkID = 10 // To be used in tests
+	defaultWeight = 10000
+)
+
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -67,11 +72,6 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory crypto.FactorySECP256K1R
-)
-
-const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
 )
 
 type mutableSharedMemory struct {
