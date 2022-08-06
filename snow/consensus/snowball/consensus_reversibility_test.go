@@ -24,7 +24,7 @@ func TestSnowballGovernance(t *testing.T) {
 
 	sampler.Seed(seed)
 	for i := 0; i < numRed; i++ {
-		nBitwise.AddNodeSpecificColor(&Tree{}, []int{0, 1})
+		nBitwise.AddNodeSpecificColor(&Tree{}, 0, []int{1})
 	}
 
 	for _, node := range nBitwise.nodes {
@@ -34,11 +34,11 @@ func TestSnowballGovernance(t *testing.T) {
 	}
 
 	for i := 0; i < numNodes-numByzantine-numRed; i++ {
-		nBitwise.AddNodeSpecificColor(&Tree{}, []int{1, 0})
+		nBitwise.AddNodeSpecificColor(&Tree{}, 1, []int{0})
 	}
 
 	for i := 0; i < numByzantine; i++ {
-		nBitwise.AddNodeSpecificColor(&Byzantine{}, []int{1, 0})
+		nBitwise.AddNodeSpecificColor(&Byzantine{}, 1, []int{0})
 	}
 
 	for !nBitwise.Finalized() {
