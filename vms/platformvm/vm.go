@@ -107,7 +107,7 @@ type VM struct {
 	recentlyAccepted *window.Window
 
 	txBuilder         builder.TxBuilder
-	txExecutorBackend txexecutor.Backend
+	txExecutorBackend *txexecutor.Backend
 	manager           blockexecutor.Manager
 }
 
@@ -184,7 +184,7 @@ func (vm *VM) Initialize(
 		vm.utxoHandler,
 	)
 
-	vm.txExecutorBackend = txexecutor.Backend{
+	vm.txExecutorBackend = &txexecutor.Backend{
 		Config:       &vm.Config,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,

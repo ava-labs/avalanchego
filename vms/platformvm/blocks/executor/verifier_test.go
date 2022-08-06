@@ -36,7 +36,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	verifier := &verifier{
-		txExecutorBackend: executor.Backend{},
+		txExecutorBackend: &executor.Backend{},
 		backend: &backend{
 			lastAccepted: parentID,
 			blkIDToState: map[ids.ID]*blockState{
@@ -115,7 +115,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	grandparentID := ids.GenerateTestID()
 	parentState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
-		txExecutorBackend: executor.Backend{
+		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 			},
@@ -198,7 +198,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
-		txExecutorBackend: executor.Backend{
+		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 			},
@@ -293,7 +293,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
-		txExecutorBackend: executor.Backend{},
+		txExecutorBackend: &executor.Backend{},
 		backend: &backend{
 			blkIDToState: map[ids.ID]*blockState{
 				parentID: {
@@ -354,7 +354,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 	verifier := &verifier{
-		txExecutorBackend: executor.Backend{},
+		txExecutorBackend: &executor.Backend{},
 		backend: &backend{
 			blkIDToState: map[ids.ID]*blockState{
 				parentID: {

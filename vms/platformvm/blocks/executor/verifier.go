@@ -26,7 +26,7 @@ var (
 // verifier handles the logic for verifying a block.
 type verifier struct {
 	*backend
-	txExecutorBackend executor.Backend
+	txExecutorBackend *executor.Backend
 }
 
 func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
@@ -42,7 +42,7 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 	}
 
 	txExecutor := &executor.ProposalTxExecutor{
-		Backend:       &v.txExecutorBackend,
+		Backend:       v.txExecutorBackend,
 		ParentID:      b.Parent(),
 		StateVersions: v,
 		Tx:            b.Tx,
@@ -111,7 +111,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	}
 
 	atomicExecutor := &executor.AtomicTxExecutor{
-		Backend:       &v.txExecutorBackend,
+		Backend:       v.txExecutorBackend,
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,
@@ -187,7 +187,7 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 	funcs := make([]func(), 0, len(b.Transactions))
 	for _, tx := range b.Transactions {
 		txExecutor := &executor.StandardTxExecutor{
-			Backend: &v.txExecutorBackend,
+			Backend: v.txExecutorBackend,
 			State:   onAcceptState,
 			Tx:      tx,
 		}

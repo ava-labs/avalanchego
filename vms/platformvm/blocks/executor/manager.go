@@ -29,7 +29,7 @@ func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
 	s state.State,
-	txExecutorBackend executor.Backend,
+	txExecutorBackend *executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
 	backend := &backend{

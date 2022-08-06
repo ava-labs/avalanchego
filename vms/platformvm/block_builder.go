@@ -79,7 +79,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	}
 
 	verifier := executor.MempoolTxVerifier{
-		Backend:       &b.vm.txExecutorBackend,
+		Backend:       b.vm.txExecutorBackend,
 		ParentID:      b.vm.preferred, // We want to build off of the preferred block
 		StateVersions: b.vm.manager,
 		Tx:            tx,
