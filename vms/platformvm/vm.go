@@ -583,7 +583,7 @@ func (vm *VM) updateValidators() error {
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
 	vm.LocalStake.Set(float64(weight))
-	vm.LocalStake.Set(float64(primaryValidators.Weight()))
+	vm.TotalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := vm.state.ValidatorSet(subnetID)
