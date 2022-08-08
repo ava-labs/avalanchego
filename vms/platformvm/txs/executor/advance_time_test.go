@@ -35,9 +35,10 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -48,6 +49,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -64,9 +66,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -80,6 +83,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 
 	// Case: Timestamp is after next validator end time
 	env = newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -97,9 +101,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -113,6 +118,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	assert := assert.New(t)
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
@@ -130,9 +136,10 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	assert.NoError(err)
 
 	executor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
 
@@ -153,7 +160,8 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// Test VM validators
 	executor.OnCommit.Apply(env.state)
-	assert.NoError(env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 	assert.True(env.config.Validators.Contains(constants.PrimaryNetworkID, nodeID))
 }
 
@@ -329,6 +337,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 		t.Run(test.description, func(ts *testing.T) {
 			assert := assert.New(ts)
 			env := newEnvironment()
+			env.ctx.Lock.Lock()
 			defer func() {
 				assert.NoError(shutdownEnvironment(env))
 			}()
@@ -365,8 +374,8 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				env.state.PutPendingValidator(staker)
 				env.state.AddTx(tx, status.Committed)
 			}
-			assert.NoError(env.state.Write(dummyHeight))
-			assert.NoError(env.state.Load())
+			env.state.SetHeight(dummyHeight)
+			assert.NoError(env.state.Commit())
 
 			for _, newTime := range test.advanceTimeTo {
 				env.clk.Set(newTime)
@@ -374,15 +383,17 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				assert.NoError(err)
 
 				executor := ProposalTxExecutor{
-					Backend:  &env.backend,
-					ParentID: lastAcceptedID,
-					Tx:       tx,
+					Backend:       &env.backend,
+					ParentID:      lastAcceptedID,
+					StateVersions: env,
+					Tx:            tx,
 				}
 				assert.NoError(tx.Unsigned.Visit(&executor))
 
 				executor.OnCommit.Apply(env.state)
 			}
-			assert.NoError(env.state.Write(dummyHeight))
+			env.state.SetHeight(dummyHeight)
+			assert.NoError(env.state.Commit())
 
 			for stakerNodeID, status := range test.expectedStakers {
 				switch status {
@@ -416,6 +427,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	assert := assert.New(t)
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
@@ -443,8 +455,8 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(tx, status.Committed)
-	assert.NoError(env.state.Write(dummyHeight))
-	assert.NoError(env.state.Load())
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	// The above validator is now part of the staking set
 
@@ -467,8 +479,8 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(tx, status.Committed)
-	assert.NoError(env.state.Write(dummyHeight))
-	assert.NoError(env.state.Load())
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	// The above validator is now in the pending staker set
 
@@ -478,9 +490,10 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	assert.NoError(err)
 
 	executor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
 
@@ -489,7 +502,8 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	// Check VM Validators are removed successfully
 	executor.OnCommit.Apply(env.state)
-	assert.NoError(env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 	assert.False(env.config.Validators.Contains(testSubnet1.ID(), subnetVdr2NodeID))
 	assert.False(env.config.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 }
@@ -498,6 +512,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 	for _, whitelist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(t *testing.T) {
 			env := newEnvironment()
+			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownEnvironment(env); err != nil {
 					t.Fatal(err)
@@ -531,10 +546,8 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)
-			if err := env.state.Write(dummyHeight); err != nil {
-				t.Fatal(err)
-			}
-			if err := env.state.Load(); err != nil {
+			env.state.SetHeight(dummyHeight)
+			if err := env.state.Commit(); err != nil {
 				t.Fatal(err)
 			}
 
@@ -546,9 +559,10 @@ func TestWhitelistedSubnet(t *testing.T) {
 			}
 
 			executor := ProposalTxExecutor{
-				Backend:  &env.backend,
-				ParentID: lastAcceptedID,
-				Tx:       tx,
+				Backend:       &env.backend,
+				ParentID:      lastAcceptedID,
+				StateVersions: env,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil {
@@ -556,7 +570,8 @@ func TestWhitelistedSubnet(t *testing.T) {
 			}
 
 			executor.OnCommit.Apply(env.state)
-			assert.NoError(t, env.state.Write(dummyHeight))
+			env.state.SetHeight(dummyHeight)
+			assert.NoError(t, env.state.Commit())
 			assert.Equal(t, whitelist, env.config.Validators.Contains(testSubnet1.ID(), ids.NodeID(subnetValidatorNodeID)))
 		})
 	}
@@ -564,6 +579,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -583,15 +599,17 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(env.state)
-	assert.NoError(t, env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(t, env.state.Commit())
 
 	// Test validator weight before delegation
 	primarySet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -620,23 +638,25 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
-	assert.NoError(t, env.state.Write(dummyHeight))
-	assert.NoError(t, env.state.Load())
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(t, env.state.Commit())
 
 	// Advance Time
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
 	executor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(env.state)
-	assert.NoError(t, env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(t, env.state.Commit())
 
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)
@@ -645,6 +665,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -664,15 +685,17 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	assert.NoError(t, err)
 
 	executor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(env.state)
-	assert.NoError(t, env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(t, env.state.Commit())
 
 	// Test validator weight before delegation
 	primarySet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -700,23 +723,25 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
-	assert.NoError(t, env.state.Write(dummyHeight))
-	assert.NoError(t, env.state.Load())
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(t, env.state.Commit())
 
 	// Advance Time
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
 	executor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
 
 	executor.OnCommit.Apply(env.state)
-	assert.NoError(t, env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(t, env.state.Commit())
 
 	// Test validator weight after delegation
 	vdrWeight, _ = primarySet.GetWeight(nodeID)
@@ -726,6 +751,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -740,9 +766,10 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -755,6 +782,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -810,10 +838,8 @@ func addPendingValidator(
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(addPendingValidatorTx, status.Committed)
 	dummyHeight := uint64(1)
-	if err := env.state.Write(dummyHeight); err != nil {
-		return nil, err
-	}
-	if err := env.state.Load(); err != nil {
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
 		return nil, err
 	}
 	return addPendingValidatorTx, nil

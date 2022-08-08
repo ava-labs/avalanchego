@@ -61,10 +61,8 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
-		if err := target.state.Write(dummyHeight); err != nil {
-			t.Fatal(err)
-		}
-		if err := target.state.Load(); err != nil {
+		target.state.SetHeight(dummyHeight)
+		if err := target.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -96,10 +94,8 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
-		if err := target.state.Write(dummyHeight); err != nil {
-			t.Fatal(err)
-		}
-		if err := target.state.Load(); err != nil {
+		target.state.SetHeight(dummyHeight)
+		if err := target.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -236,7 +232,8 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				for _, utxoID := range utxoIDs {
 					target.state.DeleteUTXO(utxoID)
 				}
-				if err := target.state.Write(dummyHeight); err != nil {
+				target.state.SetHeight(dummyHeight)
+				if err := target.state.Commit(); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -297,9 +294,10 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			}
 
 			executor := ProposalTxExecutor{
-				Backend:  &freshTH.backend,
-				ParentID: lastAcceptedID,
-				Tx:       tx,
+				Backend:       &freshTH.backend,
+				ParentID:      lastAcceptedID,
+				StateVersions: freshTH,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
@@ -313,6 +311,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 
 func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -339,9 +338,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -368,9 +368,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -419,9 +420,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -440,10 +442,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
-	if err := env.state.Write(dummyHeight); err != nil {
-		t.Fatal(err)
-	}
-	if err := env.state.Load(); err != nil {
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -466,9 +466,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -493,9 +494,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -520,9 +522,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -550,9 +553,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -587,10 +591,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
-	if err := env.state.Write(dummyHeight); err != nil {
-		t.Fatal(err)
-	}
-	if err := env.state.Load(); err != nil {
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -610,9 +612,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       duplicateSubnetTx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -621,10 +624,8 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 
 	env.state.DeleteCurrentValidator(staker)
-	if err := env.state.Write(dummyHeight); err != nil {
-		t.Fatal(err)
-	}
-	if err := env.state.Load(); err != nil {
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -644,9 +645,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -677,9 +679,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -709,9 +712,10 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -744,17 +748,15 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
-		if err := env.state.Write(dummyHeight); err != nil {
+		env.state.SetHeight(dummyHeight)
+		if err := env.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		if err := env.state.Load(); err != nil {
-			t.Fatal(err)
-		}
-
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -765,6 +767,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 
 func TestAddValidatorTxExecute(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -795,9 +798,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -822,9 +826,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -849,9 +854,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -891,17 +897,16 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
 		dummyHeight := uint64(1)
-		if err := env.state.Write(dummyHeight); err != nil {
-			t.Fatal(err)
-		}
-		if err := env.state.Load(); err != nil {
+		env.state.SetHeight(dummyHeight)
+		if err := env.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -935,9 +940,10 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 
 		executor := ProposalTxExecutor{
-			Backend:  &env.backend,
-			ParentID: lastAcceptedID,
-			Tx:       tx,
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

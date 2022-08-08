@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +18,7 @@ import (
 
 func TestNewExportTx(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -56,6 +59,9 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			assert := assert.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
 			tx, err := env.txBuilder.NewExportTx(
 				defaultBalance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
@@ -69,18 +75,19 @@ func TestNewExportTx(t *testing.T) {
 			}
 			assert.NoError(err)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+			fakedState, err := state.NewDiff(lastAcceptedID, env)
 			assert.NoError(err)
 
 			fakedState.SetTimestamp(tt.timestamp)
 
 			fakedParent := ids.GenerateTestID()
-			env.backend.StateVersions.SetState(fakedParent, fakedState)
+			env.SetState(fakedParent, fakedState)
 
 			verifier := MempoolTxVerifier{
-				Backend:  &env.backend,
-				ParentID: fakedParent,
-				Tx:       tx,
+				Backend:       &env.backend,
+				ParentID:      fakedParent,
+				StateVersions: env,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

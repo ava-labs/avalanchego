@@ -5,47 +5,36 @@
 package state
 
 import (
+	reflect "reflect"
+
 	ids "github.com/ava-labs/avalanchego/ids"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
-// MockVersions is a mock of Versions interface
+// MockVersions is a mock of Versions interface.
 type MockVersions struct {
 	ctrl     *gomock.Controller
 	recorder *MockVersionsMockRecorder
 }
 
-// MockVersionsMockRecorder is the mock recorder for MockVersions
+// MockVersionsMockRecorder is the mock recorder for MockVersions.
 type MockVersionsMockRecorder struct {
 	mock *MockVersions
 }
 
-// NewMockVersions creates a new mock instance
+// NewMockVersions creates a new mock instance.
 func NewMockVersions(ctrl *gomock.Controller) *MockVersions {
 	mock := &MockVersions{ctrl: ctrl}
 	mock.recorder = &MockVersionsMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockVersions) EXPECT() *MockVersionsMockRecorder {
 	return m.recorder
 }
 
-// DeleteState mocks base method
-func (m *MockVersions) DeleteState(arg0 ids.ID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteState", arg0)
-}
-
-// DeleteState indicates an expected call of DeleteState
-func (mr *MockVersionsMockRecorder) DeleteState(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteState", reflect.TypeOf((*MockVersions)(nil).DeleteState), arg0)
-}
-
-// GetState mocks base method
+// GetState mocks base method.
 func (m *MockVersions) GetState(arg0 ids.ID) (Chain, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetState", arg0)
@@ -54,20 +43,8 @@ func (m *MockVersions) GetState(arg0 ids.ID) (Chain, bool) {
 	return ret0, ret1
 }
 
-// GetState indicates an expected call of GetState
+// GetState indicates an expected call of GetState.
 func (mr *MockVersionsMockRecorder) GetState(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetState", reflect.TypeOf((*MockVersions)(nil).GetState), arg0)
-}
-
-// SetState mocks base method
-func (m *MockVersions) SetState(arg0 ids.ID, arg1 Chain) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetState", arg0, arg1)
-}
-
-// SetState indicates an expected call of SetState
-func (mr *MockVersionsMockRecorder) SetState(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*MockVersions)(nil).SetState), arg0, arg1)
 }

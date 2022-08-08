@@ -17,14 +17,18 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -34,6 +38,7 @@ import (
 
 const (
 	validatorDiffsCacheSize = 2048
+	blockCacheSize          = 2048
 	txCacheSize             = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
@@ -45,6 +50,7 @@ var (
 
 	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 
+	blockPrefix           = []byte("block")
 	validatorsPrefix      = []byte("validators")
 	currentPrefix         = []byte("current")
 	pendingPrefix         = []byte("pending")
@@ -88,37 +94,99 @@ type Chain interface {
 	AddTx(tx *txs.Tx, status status.Status)
 }
 
+type LastAccepteder interface {
+	GetLastAccepted() ids.ID
+	SetLastAccepted(blkID ids.ID)
+}
+
+type BlockState interface {
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	AddStatelessBlock(block blocks.Block, status choices.Status)
+}
+
 type State interface {
+	LastAccepteder
 	Chain
+	BlockState
 	uptime.State
 	avax.UTXOReader
-
-	// TODO: remove ShouldInit and DoneInit and perform them in New
-	ShouldInit() (bool, error)
-	DoneInit() error
-
-	GetLastAccepted() ids.ID
-	SetLastAccepted(ids.ID)
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
 	// Return the current validator set of [subnetID].
 	ValidatorSet(subnetID ids.ID) (validators.Set, error)
 
-	// TODO: remove SyncGenesis and Load from the interface and perform them
-	//       once upon creation
+	SetHeight(height uint64)
 
-	// SyncGenesis initializes the state with the genesis state.
-	SyncGenesis(genesisBlkID ids.ID, genesisState *genesis.State) error
+	// Discard uncommitted changes to the database.
+	Abort()
 
-	// Load pulls data previously stored on disk that is expected to be in
-	// memory.
-	Load() error
+	// Commit changes to the base database.
+	Commit() error
 
-	Write(height uint64) error
+	// Returns a batch of unwritten changes that, when written, will be commit
+	// all pending changes to the base database.
+	CommitBatch() (database.Batch, error)
+
 	Close() error
 }
 
+type stateBlk struct {
+	Blk    blocks.Block
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
+}
+
+/*
+ * VMDB
+ * |-. validators
+ * | |-. current
+ * | | |-. validator
+ * | | | '-. list
+ * | | |   '-- txID -> uptime + potential reward
+ * | | |-. delegator
+ * | | | '-. list
+ * | | |   '-- txID -> potential reward
+ * | | '-. subnetValidator
+ * | |   '-. list
+ * | |     '-- txID -> nil
+ * | |-. pending
+ * | | |-. validator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | |-. delegator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | '-. subnetValidator
+ * | |   '-. list
+ * | |     '-- txID -> nil
+ * | '-. diffs
+ * |   '-. height+subnet
+ * |     '-. list
+ * |       '-- nodeID -> weightChange
+ * |-. blocks
+ * | '-- blockID -> block bytes
+ * |-. txs
+ * | '-- txID -> tx bytes + tx status
+ * |- rewardUTXOs
+ * | '-. txID
+ * |   '-. list
+ * |     '-- utxoID -> utxo bytes
+ * |- utxos
+ * | '-- utxoDB
+ * |-. subnets
+ * | '-. list
+ * |   '-- txID -> nil
+ * |-. chains
+ * | '-. subnetID
+ * |   '-. list
+ * |     '-- txID -> nil
+ * '-. singletons
+ *   |-- initializedKey -> nil
+ *   |-- timestampKey -> timestamp
+ *   |-- currentSupplyKey -> currentSupply
+ *   '-- lastAcceptedKey -> lastAccepted
+ */
 type state struct {
 	cfg        *config.Config
 	ctx        *snow.Context
@@ -126,10 +194,16 @@ type state struct {
 	totalStake prometheus.Gauge
 	rewards    reward.Calculator
 
-	baseDB database.Database
+	baseDB *versiondb.Database
 
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
+
+	currentHeight uint64
+
+	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
+	blockCache  cache.Cacher        // cache of blockID -> Block, if the entry is nil, it is not in the database
+	blockDB     database.Database
 
 	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
 	updatedUptimes map[ids.NodeID]struct{}         // nodeID -> nil
@@ -175,10 +249,12 @@ type state struct {
 	chainDBCache cache.Cacher         // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
-	originalTimestamp, timestamp         time.Time
-	originalCurrentSupply, currentSupply uint64
-	originalLastAccepted, lastAccepted   ids.ID
-	singletonDB                          database.Database
+	// The persisted fields represent the current database value
+	timestamp, persistedTimestamp         time.Time
+	currentSupply, persistedCurrentSupply uint64
+	// [lastAccepted] is the most recently accepted block.
+	lastAccepted, persistedLastAccepted ids.ID
+	singletonDB                         database.Database
 }
 
 type ValidatorWeightDiff struct {
@@ -227,7 +303,8 @@ type uptimeAndReward struct {
 }
 
 func New(
-	baseDB database.Database,
+	db database.Database,
+	genesisBytes []byte,
 	metrics prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,
@@ -235,6 +312,49 @@ func New(
 	totalStake prometheus.Gauge,
 	rewards reward.Calculator,
 ) (State, error) {
+	s, err := new(
+		db,
+		metrics,
+		cfg,
+		ctx,
+		localStake,
+		totalStake,
+		rewards,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = s.Close()
+
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func new(
+	db database.Database,
+	metrics prometheus.Registerer,
+	cfg *config.Config,
+	ctx *snow.Context,
+	localStake prometheus.Gauge,
+	totalStake prometheus.Gauge,
+	rewards reward.Calculator,
+) (*state, error) {
+	blockCache, err := metercacher.New(
+		"block_cache",
+		metrics,
+		&cache.LRU{Size: blockCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	baseDB := versiondb.New(db)
+
 	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
 
 	currentValidatorsDB := prefixdb.New(currentPrefix, validatorsDB)
@@ -299,6 +419,9 @@ func New(
 		metrics,
 		&cache.LRU{Size: chainDBCacheSize},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &state{
 		cfg:        cfg,
@@ -306,8 +429,11 @@ func New(
 		localStake: localStake,
 		totalStake: totalStake,
 		rewards:    rewards,
+		baseDB:     baseDB,
 
-		baseDB: baseDB,
+		addedBlocks: make(map[ids.ID]stateBlk),
+		blockCache:  blockCache,
+		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -354,7 +480,7 @@ func New(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}, err
+	}, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -413,12 +539,12 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
-func (s *state) ShouldInit() (bool, error) {
+func (s *state) shouldInit() (bool, error) {
 	has, err := s.singletonDB.Has(initializedKey)
 	return !has, err
 }
 
-func (s *state) DoneInit() error {
+func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
 }
 
@@ -707,10 +833,12 @@ func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	return vdrs, nil
 }
 
-func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.State) error {
+	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(genesis.InitialSupply)
+	s.AddStatelessBlock(genesisBlk, choices.Accepted)
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
@@ -763,10 +891,11 @@ func (s *state) SyncGenesis(genesisBlkID ids.ID, genesis *genesis.State) error {
 		s.AddChain(chain)
 		s.AddTx(chain, status.Committed)
 	}
-	return s.Write(0)
+	return s.write(0)
 }
 
-func (s *state) Load() error {
+// Load pulls data previously stored on disk that is expected to be in memory.
+func (s *state) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.loadMetadata(),
@@ -781,21 +910,21 @@ func (s *state) loadMetadata() error {
 	if err != nil {
 		return err
 	}
-	s.originalTimestamp = timestamp
+	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, currentSupplyKey)
 	if err != nil {
 		return err
 	}
-	s.originalCurrentSupply = currentSupply
+	s.persistedCurrentSupply = currentSupply
 	s.SetCurrentSupply(currentSupply)
 
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
 	if err != nil {
 		return err
 	}
-	s.originalLastAccepted = lastAccepted
+	s.persistedLastAccepted = lastAccepted
 	s.lastAccepted = lastAccepted
 	return nil
 }
@@ -1016,9 +1145,10 @@ func (s *state) loadPendingValidators() error {
 	return subnetValidatorIt.Error()
 }
 
-func (s *state) Write(height uint64) error {
+func (s *state) write(height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
+		s.writeBlocks(),
 		s.writeCurrentPrimaryNetworkStakers(height),
 		s.writeCurrentSubnetStakers(height),
 		s.writePendingPrimaryNetworkStakers(),
@@ -1054,6 +1184,153 @@ func (s *state) Close() error {
 		s.singletonDB.Close(),
 	)
 	return errs.Err
+}
+
+func (s *state) sync(genesis []byte) error {
+	shouldInit, err := s.shouldInit()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database is initialized: %w",
+			err,
+		)
+	}
+
+	// If the database is empty, create the platform chain anew using the
+	// provided genesis state
+	if shouldInit {
+		if err := s.init(genesis); err != nil {
+			return fmt.Errorf(
+				"failed to initialize the database: %w",
+				err,
+			)
+		}
+	}
+
+	if err := s.load(); err != nil {
+		return fmt.Errorf(
+			"failed to load the database state: %w",
+			err,
+		)
+	}
+	return nil
+}
+
+func (s *state) init(genesisBytes []byte) error {
+	// Create the genesis block and save it as being accepted (We don't do
+	// genesisBlock.Accept() because then it'd look for genesisBlock's
+	// non-existent parent)
+	genesisID := hashing.ComputeHash256Array(genesisBytes)
+	genesisBlock, err := blocks.NewCommitBlock(
+		genesisID,
+		0,
+	)
+	if err != nil {
+		return err
+	}
+
+	genesisState, err := genesis.ParseState(genesisBytes)
+	if err != nil {
+		return err
+	}
+	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
+		return err
+	}
+
+	if err := s.doneInit(); err != nil {
+		return err
+	}
+
+	return s.Commit()
+}
+
+func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
+	s.addedBlocks[block.ID()] = stateBlk{
+		Blk:    block,
+		Bytes:  block.Bytes(),
+		Status: status,
+	}
+}
+
+func (s *state) SetHeight(height uint64) {
+	s.currentHeight = height
+}
+
+func (s *state) Commit() error {
+	defer s.Abort()
+	batch, err := s.CommitBatch()
+	if err != nil {
+		return err
+	}
+	return batch.Write()
+}
+
+func (s *state) Abort() {
+	s.baseDB.Abort()
+}
+
+func (s *state) CommitBatch() (database.Batch, error) {
+	if err := s.write(s.currentHeight); err != nil {
+		return nil, err
+	}
+	return s.baseDB.CommitBatch()
+}
+
+func (s *state) writeBlocks() error {
+	for blkID, stateBlk := range s.addedBlocks {
+		var (
+			blkID = blkID
+			stBlk = stateBlk
+		)
+
+		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
+		blockBytes, err := blocks.GenesisCodec.Marshal(txs.Version, &stBlk)
+		if err != nil {
+			return fmt.Errorf("failed to marshal block %s: %w", blkID, err)
+		}
+
+		delete(s.addedBlocks, blkID)
+		s.blockCache.Put(blkID, stateBlk)
+		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
+			return fmt.Errorf("failed to write block %s: %w", blkID, err)
+		}
+	}
+	return nil
+}
+
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk.Blk, blk.Status, nil
+	}
+	if blkIntf, cached := s.blockCache.Get(blockID); cached {
+		if blkIntf == nil {
+			return nil, choices.Processing, database.ErrNotFound // status does not matter here
+		}
+
+		blkState := blkIntf.(stateBlk)
+		return blkState.Blk, blkState.Status, nil
+	}
+
+	blkBytes, err := s.blockDB.Get(blockID[:])
+	if err == database.ErrNotFound {
+		s.blockCache.Put(blockID, nil)
+		return nil, choices.Processing, database.ErrNotFound // status does not matter here
+	} else if err != nil {
+		return nil, choices.Processing, err // status does not matter here
+	}
+
+	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, err // status does not matter here
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, err
+	}
+
+	s.blockCache.Put(blockID, blkState)
+	return blkState.Blk, blkState.Status, nil
 }
 
 func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
@@ -1432,23 +1709,23 @@ func (s *state) writeChains() error {
 }
 
 func (s *state) writeMetadata() error {
-	if !s.originalTimestamp.Equal(s.timestamp) {
+	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, timestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
-		s.originalTimestamp = s.timestamp
+		s.persistedTimestamp = s.timestamp
 	}
-	if s.originalCurrentSupply != s.currentSupply {
+	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, currentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)
 		}
-		s.originalCurrentSupply = s.currentSupply
+		s.persistedCurrentSupply = s.currentSupply
 	}
-	if s.originalLastAccepted != s.lastAccepted {
+	if s.persistedLastAccepted != s.lastAccepted {
 		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
-		s.originalLastAccepted = s.lastAccepted
+		s.persistedLastAccepted = s.lastAccepted
 	}
 	return nil
 }

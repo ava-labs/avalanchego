@@ -53,8 +53,9 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	ParentID ids.ID
-	Tx       *txs.Tx
+	ParentID      ids.ID
+	StateVersions state.Versions
+	Tx            *txs.Tx
 
 	// outputs of visitor execution
 	OnCommit      state.Diff
