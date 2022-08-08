@@ -49,17 +49,19 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
@@ -368,25 +370,15 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	)
 	if err != nil {
 		panic(err)
-	}
-	if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	}
-
-	blk, err := vm.BuildBlock()
-	if err != nil {
+	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
-	}
-	if err := blk.Verify(); err != nil {
+	} else if err := blk.Verify(); err != nil {
 		panic(err)
-	}
-	if err := vm.SetPreference(blk.ID()); err != nil {
+	} else if err := blk.Accept(); err != nil {
 		panic(err)
-	}
-	if err := blk.Accept(); err != nil {
-		panic(err)
-	}
-	if err := vm.SetPreference(vm.lastAcceptedID); err != nil {
+	} else if err := vm.SetPreference(vm.manager.LastAccepted()); err != nil {
 		panic(err)
 	}
 
@@ -481,7 +473,7 @@ func TestGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if genesisBlock, err := vm.getBlock(genesisBlockID); err != nil {
+	if genesisBlock, err := vm.GetBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
 	} else if genesisBlock.Status() != choices.Accepted {
 		t.Fatal("genesis block should be accepted")
@@ -500,7 +492,7 @@ func TestGenesis(t *testing.T) {
 		}
 		addrs := ids.ShortSet{}
 		addrs.Add(addr)
-		utxos, err := avax.GetAllUTXOs(vm.internalState, addrs)
+		utxos, err := avax.GetAllUTXOs(vm.state, addrs)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -540,12 +532,12 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure genesis timestamp is correct
-	if timestamp := vm.internalState.GetTimestamp(); timestamp.Unix() != int64(genesisState.Time) {
+	if timestamp := vm.state.GetTimestamp(); timestamp.Unix() != int64(genesisState.Time) {
 		t.Fatalf("vm's time is incorrect. Expected %v got %v", genesisState.Time, timestamp)
 	}
 
 	// Ensure the new subnet we created exists
-	if _, _, err := vm.internalState.GetTx(testSubnet1.ID()); err != nil {
+	if _, _, err := vm.state.GetTx(testSubnet1.ID()); err != nil {
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
 	}
 }
@@ -560,7 +552,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -587,22 +579,24 @@ func TestAddValidatorCommit(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(commit.Accept()) // commit the proposal
 
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in pending validator set
-	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	assert.NoError(err)
 }
 
@@ -617,7 +611,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(-executor.SyncBound).Add(-1 * time.Second)
+	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyfactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -643,7 +637,11 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, tx)
+	statelessBlk, err := blocks.NewProposalBlock(preferredID, preferredHeight+1, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blk := vm.manager.NewBlock(statelessBlk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +655,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, dropped := vm.blockBuilder.GetDropReason(blk.Tx.ID()); !dropped {
+	if _, dropped := vm.blockBuilder.GetDropReason(statelessBlk.Tx.ID()); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }
@@ -672,7 +670,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -699,23 +697,28 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 	assert.NoError(abort.Accept()) // reject the proposal
 
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -733,7 +736,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	startTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -767,7 +770,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -794,19 +797,24 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(tx.ID())
@@ -816,12 +824,12 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	assert.NoError(commit.Accept())
 
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in pending validator set
-	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
 	assert.NoError(err)
 }
 
@@ -835,7 +843,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -862,18 +870,23 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 
 	{
-		onAccept, ok := vm.stateVersions.GetState(commit.ID())
+		onAccept, ok := vm.manager.GetState(commit.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(tx.ID())
@@ -884,12 +897,12 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(abort.Verify())
 	assert.NoError(abort.Accept())
 
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
 	// Verify that new validator NOT in pending validator set
-	_, err = vm.internalState.GetPendingValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -912,35 +925,42 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // advance the timestamp
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	lastAcceptedID, err := vm.LastAccepted()
+	assert.NoError(err)
+	assert.NoError(vm.SetPreference(lastAcceptedID))
 
-	_, txStatus, err := vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err := vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
 	// Verify that chain's timestamp has advanced
-	timestamp := vm.internalState.GetTimestamp()
+	timestamp := vm.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
@@ -949,33 +969,39 @@ func TestRewardValidatorAccept(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*CommitBlock)
-	abort = options[1].(*AbortBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // reward the genesis validator
 
-	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -994,38 +1020,43 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
-
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // advance the timestamp
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
-	_, txStatus, err := vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err := vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	timestamp := vm.internalState.GetTimestamp()
+	timestamp := vm.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
@@ -1033,21 +1064,27 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	assert.NoError(blk.Verify())
 
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*CommitBlock)
-	abort = options[1].(*AbortBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(commit.ID())
+		onAccept, ok := vm.manager.GetState(commit.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Committed, txStatus)
 	}
@@ -1055,11 +1092,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	assert.NoError(abort.Verify())
 	assert.NoError(abort.Accept()) // do not reward the genesis validator
 
-	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1078,38 +1115,43 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
-
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // advance the timestamp
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
-	_, txStatus, err := vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err := vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	timestamp := vm.internalState.GetTimestamp()
+	timestamp := vm.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
@@ -1118,21 +1160,27 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 	assert.NoError(blk.Verify())
 
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*CommitBlock)
-	abort = options[1].(*AbortBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(commit.ID())
+		onAccept, ok := vm.manager.GetState(commit.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Committed, txStatus)
 	}
@@ -1140,11 +1188,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.NoError(abort.Verify())
 	assert.NoError(abort.Accept()) // do not reward the genesis validator
 
-	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	_, err = vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1193,14 +1241,14 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
 	}
 
 	// Verify chain was created
-	chains, err := vm.internalState.GetChains(testSubnet1.ID())
+	chains, err := vm.state.GetChains(testSubnet1.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1250,13 +1298,13 @@ func TestCreateSubnet(t *testing.T) {
 
 	assert.NoError(blk.Verify())
 	assert.NoError(blk.Accept())
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
-	_, txStatus, err := vm.internalState.GetTx(createSubnetTx.ID())
+	_, txStatus, err := vm.state.GetTx(createSubnetTx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	subnets, err := vm.internalState.GetSubnets()
+	subnets, err := vm.state.GetSubnets()
 	assert.NoError(err)
 
 	found := false
@@ -1269,7 +1317,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
@@ -1291,34 +1339,40 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct and accept the proposal/commit
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // add the validator to pending validator set
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
-	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	assert.NoError(err)
 
 	// Advance time to when new validator should start validating
@@ -1331,37 +1385,43 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct and accept the proposal/commit
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*CommitBlock)
-	abort = options[1].(*AbortBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // move validator addValidatorTx from pending to current
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
-	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.internalState.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	assert.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1373,36 +1433,42 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[0].(*CommitBlock)
-	abort = options[1].(*AbortBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 
+	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(txID)
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // remove validator from current validator set
 
-	_, txStatus, err = vm.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = vm.state.GetTx(txID)
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
-	_, err = vm.internalState.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.internalState.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	assert.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1451,7 +1517,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1484,7 +1550,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
-	} else if _, txStatus, err := vm.internalState.GetTx(tx.ID()); err != nil {
+	} else if _, txStatus, err := vm.state.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if txStatus != status.Committed {
 		t.Fatalf("status should be Committed but is %s", txStatus)
@@ -1523,7 +1589,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+	if err := tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1534,10 +1600,15 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	blk, err := vm.newAtomicBlock(preferredID, preferredHeight+1, tx)
+	statelessBlk, err := blocks.NewAtomicBlock(
+		preferredID,
+		preferredHeight+1,
+		tx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	blk := vm.manager.NewBlock(statelessBlk)
 
 	if err := blk.Verify(); err == nil {
 		t.Fatalf("Block should have failed verification due to missing UTXOs")
@@ -1559,7 +1630,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1611,17 +1682,23 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, firstAdvanceTimeTx)
+	statelessBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	firstAdvanceTimeBlk := firstVM.manager.NewBlock(statelessBlk)
 
 	firstVM.clock.Set(defaultGenesisTime.Add(3 * time.Second))
 	if err := firstAdvanceTimeBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
 
-	options, err := firstAdvanceTimeBlk.Options()
+	options, err := firstAdvanceTimeBlk.(smcon.OracleBlock).Options()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1733,16 +1810,21 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(preferredID, preferredHeight+1, firstAdvanceTimeTx)
+	statelessBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	firstAdvanceTimeBlk := firstVM.manager.NewBlock(statelessBlk)
 	firstVM.clock.Set(defaultGenesisTime.Add(3 * time.Second))
 	if err := firstAdvanceTimeBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
 
-	options, err := firstAdvanceTimeBlk.Options()
+	options, err := firstAdvanceTimeBlk.(smcon.OracleBlock).Options()
 	if err != nil {
 		t.Fatal(err)
 	} else if err := options[0].Verify(); err != nil {
@@ -1862,21 +1944,20 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
+	statelessBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		advanceTimeTx,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceTimeBlk := vm.manager.NewBlock(statelessBlk)
 	if err != nil {
 		t.Fatal(err)
 	}
 	advanceTimeBlkID := advanceTimeBlk.ID()
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
-
-	options, err := advanceTimeBlk.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Because the block needs to have been verified for it's preference to be
-	// set correctly, we manually select the correct preference here.
-	advanceTimePreference := options[1]
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
 	vdrs := validators.NewSet()
@@ -2091,6 +2172,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	options, err := advanceTimeBlk.(smcon.OracleBlock).Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Because the block needs to have been verified for it's preference to be
+	// set correctly, we manually select the correct preference here.
+	advanceTimePreference := options[0]
+
 	if preferred.ID() != advanceTimePreference.ID() {
 		t.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
 			preferred.ID(),
@@ -2145,17 +2235,22 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, firstAdvanceTimeTx)
+	statelessBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		firstAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	firstAdvanceTimeBlk := vm.manager.NewBlock(statelessBlk)
 
 	vm.clock.Set(defaultGenesisTime.Add(2 * time.Second))
 	if err := firstAdvanceTimeBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
 
-	options, err := firstAdvanceTimeBlk.Options()
+	options, err := firstAdvanceTimeBlk.(smcon.OracleBlock).Options()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2166,10 +2261,16 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, secondAdvanceTimeTx)
+	statelessSecondAdvanceTimeBlk, err := blocks.NewProposalBlock(
+		firstOption.ID(),
+		firstOption.(*blockexecutor.Block).Height()+1,
+		secondAdvanceTimeTx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	secondAdvanceTimeBlk := vm.manager.NewBlock(statelessSecondAdvanceTimeBlk)
 
 	if parentBlkID := secondAdvanceTimeBlk.Parent(); parentBlkID != firstOption.ID() {
 		t.Fatalf("Wrong parent block ID returned")
@@ -2224,10 +2325,10 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			assert := assert.New(t)
-			staker, err := executor.GetValidator(vm.internalState, constants.PrimaryNetworkID, nodeID)
+			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
 			assert.NoError(err)
 
-			amount, err := executor.GetMaxWeight(vm.internalState, staker, test.startTime, test.endTime)
+			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			assert.NoError(err)
 			assert.EqualValues(defaultWeight, amount)
 		})
@@ -2303,36 +2404,42 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
-	assert.NoError(secondVM.SetPreference(secondVM.lastAcceptedID))
+	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
+	proposalTx := blk.(blocks.Block).Txs()[0]
 	{
-		onAccept, ok := secondVM.stateVersions.GetState(abort.ID())
+		onAccept, ok := secondVM.manager.GetState(abort.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(proposalTx.ID())
 		assert.NoError(err)
 		assert.Equal(status.Aborted, txStatus)
 	}
 
 	assert.NoError(commit.Accept()) // advance the timestamp
-	assert.NoError(secondVM.SetPreference(secondVM.lastAcceptedID))
+	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	_, txStatus, err := secondVM.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err := secondVM.state.GetTx(proposalTx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Committed, txStatus)
 
 	// Verify that chain's timestamp has advanced
-	timestamp := secondVM.internalState.GetTimestamp()
+	timestamp := secondVM.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	blk, err = secondVM.BuildBlock() // should contain proposal to reward genesis validator
@@ -2340,35 +2447,41 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	assert.NoError(blk.Verify())
 
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	commit = options[1].(*CommitBlock)
-	abort = options[0].(*AbortBlock)
+	commit = options[1].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort = options[0].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
-	assert.NoError(secondVM.SetPreference(secondVM.lastAcceptedID))
+	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
+	proposalTx = blk.(blocks.Block).Txs()[0]
 	{
-		onAccept, ok := secondVM.stateVersions.GetState(commit.ID())
+		onAccept, ok := secondVM.manager.GetState(commit.ID())
 		assert.True(ok)
 
-		_, txStatus, err := onAccept.GetTx(block.Tx.ID())
+		_, txStatus, err := onAccept.GetTx(proposalTx.ID())
 		assert.NoError(err)
 		assert.Equal(status.Committed, txStatus)
 	}
 
 	assert.NoError(abort.Verify())
 	assert.NoError(abort.Accept()) // do not reward the genesis validator
-	assert.NoError(secondVM.SetPreference(secondVM.lastAcceptedID))
+	assert.NoError(secondVM.SetPreference(secondVM.manager.LastAccepted()))
 
-	_, txStatus, err = secondVM.internalState.GetTx(block.Tx.ID())
+	_, txStatus, err = secondVM.state.GetTx(proposalTx.ID())
 	assert.NoError(err)
 	assert.Equal(status.Aborted, txStatus)
 
-	_, err = secondVM.internalState.GetCurrentValidator(
+	_, err = secondVM.state.GetCurrentValidator(
 		constants.PrimaryNetworkID,
 		ids.NodeID(keys[1].PublicKey().Address()),
 	)
@@ -2417,21 +2530,26 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.NoError(blk.Verify())
 
 	// first the time will be advanced.
-	block := blk.(*ProposalBlock)
+	block := blk.(smcon.OracleBlock)
 	options, err := block.Options()
 	assert.NoError(err)
 
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
 
 	assert.NoError(block.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 	assert.NoError(commit.Accept()) // advance the timestamp
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
 	// Verify that chain's timestamp has advanced
-	timestamp := vm.internalState.GetTimestamp()
+	timestamp := vm.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
@@ -2440,20 +2558,25 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	assert.NoError(blk.Verify())
 
-	block = blk.(*ProposalBlock)
+	block = blk.(smcon.OracleBlock)
 	options, err = block.Options()
 	assert.NoError(err)
 
-	abort = options[0].(*AbortBlock)
-	commit = options[1].(*CommitBlock)
+	abort = options[0].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok)
+
+	commit = options[1].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.CommitBlock)
+	assert.True(ok)
 
 	assert.NoError(blk.Accept())
 	assert.NoError(commit.Verify())
 	assert.NoError(abort.Verify())
 	assert.NoError(abort.Accept()) // do not reward the genesis validator
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
-	_, err = vm.internalState.GetCurrentValidator(
+	_, err = vm.state.GetCurrentValidator(
 		constants.PrimaryNetworkID,
 		ids.NodeID(keys[1].PublicKey().Address()),
 	)

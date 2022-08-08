@@ -84,7 +84,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 		return nil
 	}
 
-	tx, err := txs.Parse(Codec, msg.Tx)
+	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
 		n.log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),

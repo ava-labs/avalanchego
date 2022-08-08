@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -38,17 +39,18 @@ var (
 
 func TestStateInitialization(t *testing.T) {
 	assert := assert.New(t)
-	state, db := newUninitializedState(assert)
+	s, db := newUninitializedState(assert)
 
-	shouldInit, err := state.ShouldInit()
+	shouldInit, err := s.(*state).shouldInit()
 	assert.NoError(err)
 	assert.True(shouldInit)
 
-	assert.NoError(state.DoneInit())
+	assert.NoError(s.(*state).doneInit())
+	assert.NoError(s.Commit())
 
-	state = newStateFromDB(assert, db)
+	s = newStateFromDB(assert, db)
 
-	shouldInit, err = state.ShouldInit()
+	shouldInit, err = s.(*state).shouldInit()
 	assert.NoError(err)
 	assert.False(shouldInit)
 }
@@ -231,10 +233,12 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 		for _, delegator := range stakerDiff.delegatorsToRemove {
 			state.DeleteCurrentDelegator(delegator)
 		}
-		assert.NoError(state.Write(uint64(i + 1)))
+		state.SetHeight(uint64(i + 1))
+		assert.NoError(state.Commit())
 
 		// Calling write again should not change the state.
-		assert.NoError(state.Write(uint64(i + 1)))
+		state.SetHeight(uint64(i + 1))
+		assert.NoError(state.Commit())
 
 		for j, stakerDiff := range stakerDiffs[:i+1] {
 			for subnetID, expectedValidatorWeightDiffs := range stakerDiff.expectedValidatorWeightDiffs {
@@ -249,7 +253,7 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 }
 
 func newInitializedState(assert *assert.Assertions) (State, database.Database) {
-	state, db := newUninitializedState(assert)
+	s, db := newUninitializedState(assert)
 
 	initialValidator := &txs.AddValidatorTx{
 		Validator: validator.Validator{
@@ -304,9 +308,12 @@ func newInitializedState(assert *assert.Assertions) (State, database.Database) {
 		Timestamp:     uint64(initialTime.Unix()),
 		InitialSupply: units.Schmeckle + units.Avax,
 	}
-	assert.NoError(state.SyncGenesis(genesisBlkID, genesisState))
 
-	return state, db
+	genesisBlk, err := blocks.NewCommitBlock(genesisBlkID, 0)
+	assert.NoError(err)
+	assert.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
+
+	return s, db
 }
 
 func newUninitializedState(assert *assert.Assertions) (State, database.Database) {
@@ -318,7 +325,7 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	assert.NoError(vdrs.Set(constants.PrimaryNetworkID, validators.NewSet()))
 
-	state, err := New(
+	state, err := new(
 		db,
 		prometheus.NewRegistry(),
 		&config.Config{

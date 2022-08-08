@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package mempool
 
 import (
 	"errors"
@@ -17,6 +17,10 @@ import (
 )
 
 const (
+	// targetTxSize is the maximum number of bytes a transaction can use to be
+	// allowed into the mempool.
+	targetTxSize = 64 * units.KiB
+
 	// droppedTxIDsCacheSize is the maximum number of dropped txIDs to cache
 	droppedTxIDsCacheSize = 64
 
@@ -30,13 +34,24 @@ var (
 	_ Mempool     = &mempool{}
 	_ txs.Visitor = &mempoolIssuer{}
 
-	errUnknownTxType = errors.New("unknown transaction type")
-	errDuplicatedTx  = errors.New("duplicated transaction")
-	errConflictingTx = errors.New("conflicting transaction")
-	errMempoolFull   = errors.New("mempool is full")
+	errMempoolFull                = errors.New("mempool is full")
+	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
+	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
+type BlockTimer interface {
+	// ResetBlockTimer schedules a timer to notify the consensus engine once
+	// there is a block ready to be built. If a block is ready to be built when
+	// this function is called, the engine will be notified directly.
+	ResetBlockTimer()
+}
+
 type Mempool interface {
+	// we may want to be able to stop valid transactions
+	// from entering the mempool, e.g. during blocks creation
+	EnableAdding()
+	DisableAdding()
+
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
@@ -64,6 +79,9 @@ type Mempool interface {
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempool struct {
+	// If true, drop transactions added to the mempool via Add.
+	dropIncoming bool
+
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
@@ -76,9 +94,15 @@ type mempool struct {
 	droppedTxIDs *cache.LRU
 
 	consumedUTXOs ids.Set
+
+	blkTimer BlockTimer
 }
 
-func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, error) {
+func NewMempool(
+	namespace string,
+	registerer prometheus.Registerer,
+	blkTimer BlockTimer,
+) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "bytes_available",
@@ -124,29 +148,47 @@ func NewMempool(namespace string, registerer prometheus.Registerer) (Mempool, er
 		unknownTxs:           unknownTxs,
 		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
+		dropIncoming:         false, // enable tx adding by default
+		blkTimer:             blkTimer,
 	}, nil
 }
 
+func (m *mempool) EnableAdding()  { m.dropIncoming = false }
+func (m *mempool) DisableAdding() { m.dropIncoming = true }
+
 func (m *mempool) Add(tx *txs.Tx) error {
+	if m.dropIncoming {
+		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
+	}
+
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
-		return errDuplicatedTx
+		return fmt.Errorf("duplicate tx %s", txID)
 	}
-	if txBytes := tx.Bytes(); len(txBytes) > m.bytesAvailable {
-		return errMempoolFull
+
+	txBytes := tx.Bytes()
+	if len(txBytes) > targetTxSize {
+		return fmt.Errorf("tx %s size (%d) > target size (%d)", txID, len(txBytes), targetTxSize)
+	}
+	if len(txBytes) > m.bytesAvailable {
+		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",
+			errMempoolFull,
+			txID,
+			len(txBytes),
+			m.bytesAvailable,
+		)
 	}
 
 	inputs := tx.Unsigned.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
-		return errConflictingTx
+		return fmt.Errorf("tx %s conflicts with a transaction in the mempool", txID)
 	}
 
-	err := tx.Unsigned.Visit(&mempoolIssuer{
+	if err := tx.Unsigned.Visit(&mempoolIssuer{
 		m:  m,
 		tx: tx,
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -155,6 +197,8 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
+
+	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 
@@ -254,8 +298,13 @@ type mempoolIssuer struct {
 	tx *txs.Tx
 }
 
-func (i *mempoolIssuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errUnknownTxType }
-func (i *mempoolIssuer) RewardValidatorTx(*txs.RewardValidatorTx) error { return errUnknownTxType }
+func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+	return errCantIssueAdvanceTimeTx
+}
+
+func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+	return errCantIssueRewardValidatorTx
+}
 
 func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
 	i.m.AddProposalTx(i.tx)

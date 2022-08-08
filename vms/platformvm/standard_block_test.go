@@ -50,7 +50,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 	inputID := utxo.InputID()
 	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
@@ -70,7 +70,7 @@ func TestAtomicTxImports(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	vm.internalState.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
+	vm.state.SetTimestamp(vm.ApricotPhase5Time.Add(100 * time.Second))
 
 	vm.mempool.AddDecisionTx(tx)
 	b, err := vm.BuildBlock()
@@ -78,10 +78,8 @@ func TestAtomicTxImports(t *testing.T) {
 	// Test multiple verify calls work
 	assert.NoError(b.Verify())
 	assert.NoError(b.Accept())
-	_, txStatus, err := vm.internalState.GetTx(tx.ID())
+	_, txStatus, err := vm.state.GetTx(tx.ID())
 	assert.NoError(err)
 	// Ensure transaction is in the committed state
 	assert.Equal(txStatus, status.Committed)
-	// Ensure standard block contains one atomic transaction
-	assert.Equal(b.(*StandardBlock).inputs.Len(), 1)
 }

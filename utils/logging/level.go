@@ -22,9 +22,7 @@ const (
 	Error
 	Fatal
 	Off
-)
 
-const (
 	fatalStr   = "FATAL"
 	errorStr   = "ERROR"
 	warnStr    = "WARN"

@@ -41,6 +41,7 @@ type UnsignedTx interface {
 		creationTxFee uint64,
 		numFxs int,
 	) error
+	// Visit calls [visitor] with this transaction's concrete type
 	Visit(visitor Visitor) error
 }
 

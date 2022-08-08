@@ -59,6 +59,13 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
+const (
+	decidedCacheSize    = 2048
+	missingCacheSize    = 2048
+	unverifiedCacheSize = 2048
+	bytesToIDCacheSize  = 2048
+)
+
 var (
 	errUnsupportedFXs                       = errors.New("unsupported feature extensions")
 	errBatchedParseBlockWrongNumberOfBlocks = errors.New("BatchedParseBlock returned different number of blocks than expected")
@@ -72,13 +79,6 @@ var (
 	_ snowman.Block = &blockClient{}
 
 	_ block.StateSummary = &summaryClient{}
-)
-
-const (
-	decidedCacheSize    = 2048
-	missingCacheSize    = 2048
-	unverifiedCacheSize = 2048
-	bytesToIDCacheSize  = 2048
 )
 
 // VMClient is an implementation of a VM that talks over RPC.

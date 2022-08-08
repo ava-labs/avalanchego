@@ -15,8 +15,9 @@ var _ txs.Visitor = &MempoolTxVerifier{}
 
 type MempoolTxVerifier struct {
 	*Backend
-	ParentID ids.ID
-	Tx       *txs.Tx
+	ParentID      ids.ID
+	StateVersions state.Versions
+	Tx            *txs.Tx
 }
 
 func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
@@ -58,9 +59,10 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	}
 
 	executor := ProposalTxExecutor{
-		Backend:  v.Backend,
-		ParentID: v.ParentID,
-		Tx:       v.Tx,
+		Backend:       v.Backend,
+		ParentID:      v.ParentID,
+		StateVersions: v.StateVersions,
+		Tx:            v.Tx,
 	}
 	err := tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be

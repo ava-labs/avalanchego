@@ -45,9 +45,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -59,9 +60,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -70,9 +72,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -92,7 +95,8 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor.OnCommit.Apply(env.state)
-	assert.NoError(env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	assert.NoError(err)
@@ -123,9 +127,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -137,9 +142,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -148,9 +154,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -170,7 +177,8 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor.OnAbort.Apply(env.state)
-	assert.NoError(env.state.Write(dummyHeight))
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	onAbortBalance, err := avax.GetBalance(env.state, stakeOwners)
 	assert.NoError(err)
@@ -241,10 +249,9 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	err = env.state.Write(dummyHeight)
-	assert.NoError(err)
-	err = env.state.Load()
-	assert.NoError(err)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
+
 	// test validator stake
 	set, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
 	assert.True(ok)
@@ -256,9 +263,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
@@ -276,8 +284,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor.OnCommit.Apply(env.state)
-	err = env.state.Write(dummyHeight)
-	assert.NoError(err)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
@@ -366,18 +374,17 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env.state.PutCurrentDelegator(delStaker)
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	err = env.state.Write(dummyHeight)
-	assert.NoError(err)
-	err = env.state.Load()
-	assert.NoError(err)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
@@ -395,8 +402,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor.OnAbort.Apply(env.state)
-	err = env.state.Write(dummyHeight)
-	assert.NoError(err)
+	env.state.SetHeight(dummyHeight)
+	assert.NoError(env.state.Commit())
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
 	newVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)

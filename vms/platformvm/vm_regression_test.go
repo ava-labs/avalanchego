@@ -26,11 +26,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -42,7 +46,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -76,7 +80,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	verifyAndAcceptProposalCommitment(assert, vm, firstAdvanceTimeBlock)
 
-	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
+	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
@@ -109,7 +113,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
 
-	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
+	vm.clock.Set(secondDelegatorStartTime.Add(-10 * txexecutor.SyncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -147,22 +151,12 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.Error(
-		vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx),
-		"should have marked the delegator as being over delegated",
-	)
+	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+	assert.Error(err, "should have marked the delegator as being over delegated")
 }
 
-func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
-	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
-	defer func() {
-		assert.NoError(vm.Shutdown())
-		vm.ctx.Lock.Unlock()
-	}()
-
-	validatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+func TestAddDelegatorTxHeapCorruption(t *testing.T) {
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -182,119 +176,162 @@ func TestAddDelegatorTxHeapCorruptionRegression(t *testing.T) {
 	delegator4EndTime := delegator1StartTime.Add(7 * defaultMinStakingDuration)
 	delegator4Stake := defaultMaxValidatorStake - validatorStake - defaultMinValidatorStake
 
-	nodeID := ids.GenerateTestNodeID()
-	changeAddr := keys[0].PublicKey().Address()
+	tests := []struct {
+		name       string
+		ap3Time    time.Time
+		shouldFail bool
+	}{
+		{
+			name:       "pre-upgrade is no longer restrictive",
+			ap3Time:    validatorEndTime,
+			shouldFail: false,
+		},
+		{
+			name:       "post-upgrade calculate max stake correctly",
+			ap3Time:    defaultGenesisTime,
+			shouldFail: false,
+		},
+	}
 
-	// create valid tx
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		validatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		nodeID,
-		changeAddr,
-		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
-		changeAddr,
-	)
-	assert.NoError(err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert := assert.New(t)
 
-	// issue the add validator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
-	assert.NoError(err)
+			vm, _, _, _ := defaultVM()
+			vm.ApricotPhase3Time = test.ap3Time
 
-	// trigger block creation for the validator tx
-	addValidatorBlock, err := vm.BuildBlock()
-	assert.NoError(err)
+			vm.ctx.Lock.Lock()
+			defer func() {
+				err := vm.Shutdown()
+				assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
+				vm.ctx.Lock.Unlock()
+			}()
 
-	// create valid tx
-	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		delegator1Stake,
-		uint64(delegator1StartTime.Unix()),
-		uint64(delegator1EndTime.Unix()),
-		nodeID,
-		changeAddr,
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
-		changeAddr,
-	)
-	assert.NoError(err)
+			key, err := testKeyfactory.NewPrivateKey()
+			assert.NoError(err)
 
-	// issue the first add delegator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
-	assert.NoError(err)
+			id := key.PublicKey().Address()
+			changeAddr := keys[0].PublicKey().Address()
 
-	// trigger block creation for the first add delegator tx
-	addFirstDelegatorBlock, err := vm.BuildBlock()
-	assert.NoError(err)
+			// create valid tx
+			addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+				validatorStake,
+				uint64(validatorStartTime.Unix()),
+				uint64(validatorEndTime.Unix()),
+				ids.NodeID(id),
+				id,
+				reward.PercentDenominator,
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
+			// issue the add validator tx
+			err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+			assert.NoError(err)
 
-	// create valid tx
-	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		delegator2Stake,
-		uint64(delegator2StartTime.Unix()),
-		uint64(delegator2EndTime.Unix()),
-		nodeID,
-		changeAddr,
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
-		changeAddr,
-	)
-	assert.NoError(err)
+			// trigger block creation for the validator tx
+			addValidatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
 
-	// issue the second add delegator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
-	assert.NoError(err)
+			verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
 
-	// trigger block creation for the second add delegator tx
-	addSecondDelegatorBlock, err := vm.BuildBlock()
-	assert.NoError(err)
+			// create valid tx
+			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				delegator1Stake,
+				uint64(delegator1StartTime.Unix()),
+				uint64(delegator1EndTime.Unix()),
+				ids.NodeID(id),
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
+			// issue the first add delegator tx
+			err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+			assert.NoError(err)
 
-	// create valid tx
-	addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		delegator3Stake,
-		uint64(delegator3StartTime.Unix()),
-		uint64(delegator3EndTime.Unix()),
-		nodeID,
-		changeAddr,
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
-		changeAddr,
-	)
-	assert.NoError(err)
+			// trigger block creation for the first add delegator tx
+			addFirstDelegatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
 
-	// issue the third add delegator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
-	assert.NoError(err)
+			verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
 
-	// trigger block creation for the third add delegator tx
-	addThirdDelegatorBlock, err := vm.BuildBlock()
-	assert.NoError(err)
+			// create valid tx
+			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				delegator2Stake,
+				uint64(delegator2StartTime.Unix()),
+				uint64(delegator2EndTime.Unix()),
+				ids.NodeID(id),
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, vm, addThirdDelegatorBlock)
+			// issue the second add delegator tx
+			err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
+			assert.NoError(err)
 
-	// create valid tx
-	addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		delegator4Stake,
-		uint64(delegator4StartTime.Unix()),
-		uint64(delegator4EndTime.Unix()),
-		nodeID,
-		changeAddr,
-		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
-		changeAddr,
-	)
-	assert.NoError(err)
+			// trigger block creation for the second add delegator tx
+			addSecondDelegatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
 
-	// issue the fourth add delegator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
-	assert.NoError(err)
+			verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
 
-	// trigger block creation for the fourth add delegator tx
-	addFourthDelegatorBlock, err := vm.BuildBlock()
-	assert.NoError(err)
+			// create valid tx
+			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				delegator3Stake,
+				uint64(delegator3StartTime.Unix()),
+				uint64(delegator3EndTime.Unix()),
+				ids.NodeID(id),
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
 
-	verifyAndAcceptProposalCommitment(assert, vm, addFourthDelegatorBlock)
+			// issue the third add delegator tx
+			err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the third add delegator tx
+			addThirdDelegatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, vm, addThirdDelegatorBlock)
+
+			// create valid tx
+			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				delegator4Stake,
+				uint64(delegator4StartTime.Unix()),
+				uint64(delegator4EndTime.Unix()),
+				ids.NodeID(id),
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
+
+			// issue the fourth add delegator tx
+			err = vm.blockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the fourth add delegator tx
+			addFourthDelegatorBlock, err := vm.BuildBlock()
+
+			if test.shouldFail {
+				assert.Error(err, "should have failed to allow new delegator")
+				return
+			}
+
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, vm, addFourthDelegatorBlock)
+		})
+	}
 }
 
 // Test that calling Verify on a block with an unverified parent doesn't cause a
@@ -376,18 +413,35 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{addSubnetTx0})
+	statelessStandardBlk, err := blocks.NewStandardBlock(
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{addSubnetTx0},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{addSubnetTx1})
+	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
+
+	statelessStandardBlk, err = blocks.NewStandardBlock(
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{addSubnetTx1},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*txs.Tx{addSubnetTx2})
+	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
+
+	statelessStandardBlk, err = blocks.NewStandardBlock(
+		addSubnetBlk1.ID(),
+		preferredHeight+2,
+		[]*txs.Tx{addSubnetTx2},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	addSubnetBlk2 := vm.manager.NewBlock(statelessStandardBlk)
 
 	if _, err := vm.ParseBlock(addSubnetBlk0.Bytes()); err != nil {
 		t.Fatal(err)
@@ -421,7 +475,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	newValidatorStartTime := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	key, err := testKeyfactory.NewPrivateKey()
@@ -449,18 +503,24 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx)
+	statelessBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		addValidatorTx,
+	)
 	assert.NoError(err)
+
+	addValidatorProposalBlk := vm.manager.NewBlock(statelessBlk)
 
 	err = addValidatorProposalBlk.Verify()
 	assert.NoError(err)
 
 	// Get the commit block to add the new validator
-	addValidatorProposalOptions, err := addValidatorProposalBlk.Options()
+	addValidatorProposalOptions, err := addValidatorProposalBlk.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf := addValidatorProposalOptions[0]
-	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*CommitBlock)
+	addValidatorProposalCommit, ok := addValidatorProposalCommitIntf.(*blockexecutor.Block)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit.Verify()
@@ -468,8 +528,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that the new validator now in pending validator set
 	{
-		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit.ID())
-		assert.True(ok)
+		onAccept, found := vm.manager.GetState(addValidatorProposalCommit.ID())
+		assert.True(found)
 
 		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 		assert.NoError(err)
@@ -507,7 +567,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
+	err = signedImportTx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
 	assert.NoError(err)
@@ -517,8 +577,14 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{signedImportTx})
+	statelessImportBlk, err := blocks.NewStandardBlock(
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{signedImportTx},
+	)
 	assert.NoError(err)
+
+	importBlk := vm.manager.NewBlock(statelessImportBlk)
 
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
@@ -536,7 +602,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
@@ -574,20 +640,27 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	advanceTimeProposalBlk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
+	statelessAdvanceTimeProposalBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		advanceTimeTx,
+	)
 	assert.NoError(err)
 
+	advanceTimeProposalBlk := vm.manager.NewBlock(statelessAdvanceTimeProposalBlk)
 	err = advanceTimeProposalBlk.Verify()
 	assert.NoError(err)
 
 	// Get the commit block that advances the timestamp to the point that the
 	// validator should be moved from the pending validator set into the current
 	// validator set.
-	advanceTimeProposalOptions, err := advanceTimeProposalBlk.Options()
+	advanceTimeProposalOptions, err := advanceTimeProposalBlk.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
-	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*CommitBlock)
+	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*blockexecutor.Block)
+	assert.True(ok)
+	_, ok = advanceTimeProposalCommit.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -610,24 +683,28 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := NewState(
-		vm,
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
+		&vm.Config,
+		vm.ctx,
+		vm.LocalStake,
+		vm.TotalStake,
+		vm.rewards,
 	)
 	assert.NoError(err)
-	vm.internalState = is
+	vm.state = is
 
 	// Verify that new validator is now in the current validator set.
 	{
-		_, err := vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+		_, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 		assert.NoError(err)
 
-		_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 		assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.internalState.GetTimestamp()
+		currentTimestamp := vm.state.GetTimestamp()
 		assert.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
 	}
 }
@@ -644,9 +721,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.internalState.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
+	vm.state.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
@@ -671,18 +748,25 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx0)
+	statelessAddValidatorProposalBlk0, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		addValidatorTx0,
+	)
 	assert.NoError(err)
 
+	addValidatorProposalBlk0 := vm.manager.NewBlock(statelessAddValidatorProposalBlk0)
 	err = addValidatorProposalBlk0.Verify()
 	assert.NoError(err)
 
 	// Get the commit block to add the first new validator
-	addValidatorProposalOptions0, err := addValidatorProposalBlk0.Options()
+	addValidatorProposalOptions0, err := addValidatorProposalBlk0.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
-	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*CommitBlock)
+	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*blockexecutor.Block)
+	assert.True(ok)
+	_, ok = addValidatorProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -690,7 +774,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that first new validator now in pending validator set
 	{
-		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit0.ID())
+		onAccept, ok := vm.manager.GetState(addValidatorProposalCommit0.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
@@ -708,8 +792,14 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx0)
+	statelessAdvanceTimeProposalBlk0, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		advanceTimeTx0,
+	)
 	assert.NoError(err)
+
+	advanceTimeProposalBlk0 := vm.manager.NewBlock(statelessAdvanceTimeProposalBlk0)
 
 	err = advanceTimeProposalBlk0.Verify()
 	assert.NoError(err)
@@ -717,11 +807,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Get the commit block that advances the timestamp to the point that the
 	// first new validator should be moved from the pending validator set into
 	// the current validator set.
-	advanceTimeProposalOptions0, err := advanceTimeProposalBlk0.Options()
+	advanceTimeProposalOptions0, err := advanceTimeProposalBlk0.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
-	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*CommitBlock)
+	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*blockexecutor.Block)
+	assert.True(ok)
+	_, ok = advanceTimeProposalCommit0.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -729,7 +821,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the first new validator is now in the current validator set.
 	{
-		onAccept, ok := vm.stateVersions.GetState(advanceTimeProposalCommit0.ID())
+		onAccept, ok := vm.manager.GetState(advanceTimeProposalCommit0.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
@@ -774,7 +866,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{
+	err = signedImportTx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
 		{}, // There is one input, with no required signers
 	})
 	assert.NoError(err)
@@ -784,9 +876,14 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	importBlk, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*txs.Tx{signedImportTx})
+	statelessImportBlk, err := blocks.NewStandardBlock(
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{signedImportTx},
+	)
 	assert.NoError(err)
 
+	importBlk := vm.manager.NewBlock(statelessImportBlk)
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
 	err = importBlk.Verify()
@@ -803,7 +900,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
@@ -830,7 +927,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlkStatus = importBlk.Status()
 	assert.Equal(choices.Processing, importBlkStatus)
 
-	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime1 := newValidatorStartTime0.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
 
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
@@ -852,18 +949,26 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	addValidatorProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx1)
+	statelessAddValidatorProposalBlk1, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		addValidatorTx1,
+	)
 	assert.NoError(err)
+
+	addValidatorProposalBlk1 := vm.manager.NewBlock(statelessAddValidatorProposalBlk1)
 
 	err = addValidatorProposalBlk1.Verify()
 	assert.NoError(err)
 
 	// Get the commit block to add the second new validator
-	addValidatorProposalOptions1, err := addValidatorProposalBlk1.Options()
+	addValidatorProposalOptions1, err := addValidatorProposalBlk1.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
-	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*CommitBlock)
+	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*blockexecutor.Block)
+	assert.True(ok)
+	_, ok = addValidatorProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -871,7 +976,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator now in pending validator set
 	{
-		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit1.ID())
+		onAccept, ok := vm.manager.GetState(addValidatorProposalCommit1.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
@@ -889,8 +994,14 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	advanceTimeProposalBlk1, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx1)
+	statelessAdvanceTimeProposalBlk1, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		advanceTimeTx1,
+	)
 	assert.NoError(err)
+
+	advanceTimeProposalBlk1 := vm.manager.NewBlock(statelessAdvanceTimeProposalBlk1)
 
 	err = advanceTimeProposalBlk1.Verify()
 	assert.NoError(err)
@@ -898,11 +1009,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Get the commit block that advances the timestamp to the point that the
 	// second new validator should be moved from the pending validator set into
 	// the current validator set.
-	advanceTimeProposalOptions1, err := advanceTimeProposalBlk1.Options()
+	advanceTimeProposalOptions1, err := advanceTimeProposalBlk1.(snowman.OracleBlock).Options()
 	assert.NoError(err)
 
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
-	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*CommitBlock)
+	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*blockexecutor.Block)
+	assert.True(ok)
+	_, ok = advanceTimeProposalCommit1.Block.(*blocks.CommitBlock)
 	assert.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()
@@ -910,7 +1023,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator is now in the current validator set.
 	{
-		onAccept, ok := vm.stateVersions.GetState(advanceTimeProposalCommit1.ID())
+		onAccept, ok := vm.manager.GetState(advanceTimeProposalCommit1.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
@@ -944,33 +1057,37 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	is, err := NewState(
-		vm,
+	is, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
+		&vm.Config,
+		vm.ctx,
+		vm.LocalStake,
+		vm.TotalStake,
+		vm.rewards,
 	)
 	assert.NoError(err)
-	vm.internalState = is
+	vm.state = is
 
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
 	{
-		staker0, err := vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+		staker0, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
 		assert.NoError(err)
 		assert.EqualValues(60000000, staker0.PotentialReward)
 
-		staker1, err := vm.internalState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+		staker1, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
 		assert.NoError(err)
 		assert.EqualValues(59999999, staker1.PotentialReward)
 
-		_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
 		assert.ErrorIs(err, database.ErrNotFound)
 
-		_, err = vm.internalState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
 		assert.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.internalState.GetTimestamp()
+		currentTimestamp := vm.state.GetTimestamp()
 		assert.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
 	}
 }
@@ -1008,7 +1125,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(expectedValidators1, validators)
 
-	newValidatorStartTime0 := defaultGenesisTime.Add(executor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID5 := ids.GenerateTestNodeID()
@@ -1033,8 +1150,13 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addValidatorProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, addValidatorTx0)
+	statelessProposalBlk, err := blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		addValidatorTx0,
+	)
 	assert.NoError(err)
+	addValidatorProposalBlk0 := vm.manager.NewBlock(statelessProposalBlk)
 
 	verifyAndAcceptProposalCommitment(assert, vm, addValidatorProposalBlk0)
 
@@ -1062,8 +1184,13 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	advanceTimeProposalBlk0, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx0)
+	statelessProposalBlk, err = blocks.NewProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		advanceTimeTx0,
+	)
 	assert.NoError(err)
+	advanceTimeProposalBlk0 := vm.manager.NewBlock(statelessProposalBlk)
 
 	verifyAndAcceptProposalCommitment(assert, vm, advanceTimeProposalBlk0)
 
@@ -1095,11 +1222,18 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	assert.NoError(blk.Verify())
 
 	// Assert preferences are correct
-	proposalBlk := blk.(*ProposalBlock)
+	proposalBlk := blk.(snowman.OracleBlock)
 	options, err := proposalBlk.Options()
 	assert.NoError(err)
-	commit := options[0].(*CommitBlock)
-	abort := options[1].(*AbortBlock)
+
+	// verify the preferences
+	commit := options[0].(*blockexecutor.Block)
+	_, ok := commit.Block.(*blocks.CommitBlock)
+	assert.True(ok, "expected commit block to be preferred")
+
+	abort := options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.AbortBlock)
+	assert.True(ok, "expected abort block to be issued")
 
 	// Verify the options
 	assert.NoError(commit.Verify())
@@ -1109,5 +1243,5 @@ func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk sn
 	assert.NoError(proposalBlk.Accept())
 	assert.NoError(commit.Accept())
 	assert.NoError(abort.Reject())
-	assert.NoError(vm.SetPreference(vm.lastAcceptedID))
+	assert.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -37,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -87,11 +87,24 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
+	states         map[ids.ID]state.Chain
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
 	txBuilder      builder.TxBuilder
 	backend        Backend
+}
+
+func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
+	if blkID == lastAcceptedID {
+		return e.state, true
+	}
+	chainState, ok := e.states[blkID]
+	return chainState, ok
+}
+
+func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
+	e.states[blkID] = chainState
 }
 
 // TODO: snLookup currently duplicated in vm_test.go. Remove duplication
@@ -138,20 +151,17 @@ func newEnvironment() *environment {
 	)
 
 	backend := Backend{
-		Config:        &config,
-		Ctx:           ctx,
-		Clk:           &clk,
-		Bootstrapped:  &isBootstrapped,
-		Fx:            fx,
-		FlowChecker:   utxoHandler,
-		Uptimes:       uptimes,
-		Rewards:       rewards,
-		StateVersions: state.NewVersions(lastAcceptedID, baseState),
+		Config:       &config,
+		Ctx:          ctx,
+		Clk:          &clk,
+		Bootstrapped: &isBootstrapped,
+		Fx:           fx,
+		FlowChecker:  utxoHandler,
+		Uptimes:      uptimes,
+		Rewards:      rewards,
 	}
 
-	addSubnet(baseState, txBuilder, backend)
-
-	return &environment{
+	env := &environment{
 		isBootstrapped: &isBootstrapped,
 		config:         &config,
 		clk:            &clk,
@@ -160,16 +170,21 @@ func newEnvironment() *environment {
 		msm:            msm,
 		fx:             fx,
 		state:          baseState,
+		states:         make(map[ids.ID]state.Chain),
 		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
 		utxosHandler:   utxoHandler,
 		txBuilder:      txBuilder,
 		backend:        backend,
 	}
+
+	addSubnet(env, txBuilder, backend)
+
+	return env
 }
 
 func addSubnet(
-	baseState state.State,
+	env *environment,
 	txBuilder builder.TxBuilder,
 	backend Backend,
 ) {
@@ -190,7 +205,7 @@ func addSubnet(
 	}
 
 	// store it
-	stateDiff, err := state.NewDiff(lastAcceptedID, backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		panic(err)
 	}
@@ -206,13 +221,13 @@ func addSubnet(
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(baseState)
+	stateDiff.Apply(env.state)
 }
 
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
-	baseDB *versiondb.Database,
+	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
 	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -226,8 +241,10 @@ func defaultState(
 		Help:      "Total amount of AVAX staked",
 	})
 
+	genesisBytes := buildGenesisTest(ctx)
 	state, err := state.New(
-		baseDB,
+		db,
+		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
@@ -239,26 +256,26 @@ func defaultState(
 		panic(err)
 	}
 
-	// setup initial data as if we are storing genesis
-	initializeState(state, ctx)
-
 	// persist and reload to init a bunch of in-memory stuff
-	if err := state.Write( /*height*/ 0); err != nil {
+	state.SetHeight(0)
+	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	if err := state.Load(); err != nil {
+	state.SetHeight( /*height*/ 0)
+	if err := state.Commit(); err != nil {
 		panic(err)
 	}
+
 	return state
 }
 
-func defaultCtx(baseDB *versiondb.Database) (*snow.Context, *mutableSharedMemory) {
+func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
 	ctx.AVAXAssetID = avaxAssetID
 
-	atomicDB := prefixdb.New([]byte{1}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
 
 	msm := &mutableSharedMemory{
@@ -335,22 +352,7 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	return res
 }
 
-func initializeState(tState state.State, ctx *snow.Context) {
-	genesisBytes := buildGenesis(ctx)
-	genesisState, err := genesis.ParseState(genesisBytes)
-	if err != nil {
-		panic(err)
-	}
-	dummyGenID := ids.ID{'g', 'e', 'n', 'I', 'D'}
-	if err := tState.SyncGenesis(
-		dummyGenID,
-		genesisState,
-	); err != nil {
-		panic(err)
-	}
-}
-
-func buildGenesis(ctx *snow.Context) []byte {
+func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range preFundedKeys {
@@ -431,7 +433,8 @@ func shutdownEnvironment(env *environment) error {
 		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := env.state.Write( /*height*/ math.MaxUint64); err != nil {
+		env.state.SetHeight( /*height*/ math.MaxUint64)
+		if err := env.state.Commit(); err != nil {
 			return err
 		}
 	}

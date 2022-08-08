@@ -76,7 +76,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	reply, ok := replyIntf.(*message.Tx)
 	assert.True(ok, "unknown message type")
 
-	retrivedTx, err := txs.Parse(Codec, reply.Tx)
+	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
 	assert.NoError(err, "failed parsing tx")
 
 	assert.Equal(txID, retrivedTx.ID())
@@ -142,7 +142,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	reply, ok := replyIntf.(*message.Tx)
 	assert.True(ok, "unknown message type")
 
-	retrivedTx, err := txs.Parse(Codec, reply.Tx)
+	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
 	assert.NoError(err, "failed parsing tx")
 
 	assert.Equal(txID, retrivedTx.ID())
@@ -150,7 +150,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	vm.mempool.RemoveDecisionTxs([]*txs.Tx{tx})
-	err = vm.mempool.AddVerifiedTx(tx)
+	err = vm.mempool.Add(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 
 	assert.True(gossipedBytes == nil)

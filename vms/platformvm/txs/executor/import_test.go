@@ -202,18 +202,19 @@ func TestNewImportTx(t *testing.T) {
 
 			assert.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+			fakedState, err := state.NewDiff(lastAcceptedID, env)
 			assert.NoError(err)
 
 			fakedState.SetTimestamp(tt.timestamp)
 
 			fakedParent := ids.GenerateTestID()
-			env.backend.StateVersions.SetState(fakedParent, fakedState)
+			env.SetState(fakedParent, fakedState)
 
 			verifier := MempoolTxVerifier{
-				Backend:  &env.backend,
-				ParentID: fakedParent,
-				Tx:       tx,
+				Backend:       &env.backend,
+				ParentID:      fakedParent,
+				StateVersions: env,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {

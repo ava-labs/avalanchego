@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -86,7 +87,7 @@ func (service *Service) GetHeight(r *http.Request, args *struct{}, response *Get
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	lastAccepted, err := service.vm.getBlock(lastAcceptedID)
+	lastAccepted, err := service.vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -201,7 +202,7 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 		return err
 	}
 
-	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
@@ -384,7 +385,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 	}
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
-			service.vm.internalState,
+			service.vm.state,
 			addrSet,
 			startAddr,
 			startUTXO,
@@ -405,7 +406,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := Codec.Marshal(txs.Version, utxo)
+		bytes, err := txs.Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -466,7 +467,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 	getAll := len(args.IDs) == 0
 	if getAll {
-		subnets, err := service.vm.internalState.GetSubnets() // all subnets
+		subnets, err := service.vm.state.GetSubnets() // all subnets
 		if err != nil {
 			return fmt.Errorf("error getting subnets from database: %w", err)
 		}
@@ -516,7 +517,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			continue
 		}
 
-		subnetTx, _, err := service.vm.internalState.GetTx(subnetID)
+		subnetTx, _, err := service.vm.state.GetTx(subnetID)
 		if err == database.ErrNotFound {
 			continue
 		}
@@ -614,7 +615,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentStakerIterator, err := service.vm.internalState.GetCurrentStakerIterator()
+	currentStakerIterator, err := service.vm.state.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -630,7 +631,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			continue
 		}
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -773,7 +774,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingStakerIterator, err := service.vm.internalState.GetPendingStakerIterator()
+	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -788,7 +789,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			continue
 		}
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -852,7 +853,7 @@ type GetCurrentSupplyReply struct {
 func (service *Service) GetCurrentSupply(_ *http.Request, _ *struct{}, reply *GetCurrentSupplyReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetCurrentSupply called")
 
-	reply.Supply = json.Uint64(service.vm.internalState.GetCurrentSupply())
+	reply.Supply = json.Uint64(service.vm.state.GetCurrentSupply())
 	return nil
 }
 
@@ -1632,7 +1633,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 }
 
 func (service *Service) nodeValidates(blockchainID ids.ID) bool {
-	chainTx, _, err := service.vm.internalState.GetTx(blockchainID)
+	chainTx, _, err := service.vm.state.GetTx(blockchainID)
 	if err != nil {
 		return false
 	}
@@ -1651,13 +1652,13 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	state, ok := service.vm.stateVersions.GetState(blockID)
+	state, ok := service.vm.manager.GetState(blockID)
 	if !ok {
-		block, err := service.vm.getBlock(blockID)
+		block, err := service.vm.manager.GetBlock(blockID)
 		if err != nil {
 			return false, err
 		}
-		state, ok = service.vm.stateVersions.GetState(block.Parent())
+		state, ok = service.vm.manager.GetState(block.Parent())
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
@@ -1690,7 +1691,7 @@ type ValidatedByResponse struct {
 func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	service.vm.ctx.Log.Debug("Platform: ValidatedBy called")
 
-	chainTx, _, err := service.vm.internalState.GetTx(args.BlockchainID)
+	chainTx, _, err := service.vm.state.GetTx(args.BlockchainID)
 	if err != nil {
 		return fmt.Errorf(
 			"problem retrieving blockchain %q: %w",
@@ -1721,7 +1722,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.ctx.Log.Debug("Platform: Validates called")
 
 	if args.SubnetID != constants.PrimaryNetworkID {
-		subnetTx, _, err := service.vm.internalState.GetTx(args.SubnetID)
+		subnetTx, _, err := service.vm.state.GetTx(args.SubnetID)
 		if err != nil {
 			return fmt.Errorf(
 				"problem retrieving subnet %q: %w",
@@ -1736,7 +1737,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 
 	// Get the chains that exist
-	chains, err := service.vm.internalState.GetChains(args.SubnetID)
+	chains, err := service.vm.state.GetChains(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("problem retrieving chains for subnet %q: %w", args.SubnetID, err)
 	}
@@ -1773,7 +1774,7 @@ type GetBlockchainsResponse struct {
 func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetBlockchains called")
 
-	subnets, err := service.vm.internalState.GetSubnets()
+	subnets, err := service.vm.state.GetSubnets()
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -1781,7 +1782,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	response.Blockchains = []APIBlockchain{}
 	for _, subnet := range subnets {
 		subnetID := subnet.ID()
-		chains, err := service.vm.internalState.GetChains(subnetID)
+		chains, err := service.vm.state.GetChains(subnetID)
 		if err != nil {
 			return fmt.Errorf(
 				"couldn't retrieve chains for subnet %q: %w",
@@ -1805,7 +1806,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		}
 	}
 
-	chains, err := service.vm.internalState.GetChains(constants.PrimaryNetworkID)
+	chains, err := service.vm.state.GetChains(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -1834,7 +1835,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx, err := txs.Parse(Codec, txBytes)
+	tx, err := txs.Parse(txs.Codec, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
@@ -1850,7 +1851,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetTxReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTx called")
 
-	tx, _, err := service.vm.internalState.GetTx(args.TxID)
+	tx, _, err := service.vm.state.GetTx(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
@@ -1897,7 +1898,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		zap.Stringer("txID", args.TxID),
 	)
 
-	_, txStatus, err := service.vm.internalState.GetTx(args.TxID)
+	_, txStatus, err := service.vm.state.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = txStatus
 		return nil
@@ -1908,9 +1909,9 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	onAccept, ok := service.vm.stateVersions.GetState(service.vm.preferred)
+	onAccept, ok := service.vm.manager.GetState(service.vm.preferred)
 	if !ok {
-		return errInvalidBlockType
+		return fmt.Errorf("could not retrieve state for block %s", service.vm.preferred)
 	}
 
 	_, _, err = onAccept.GetTx(args.TxID)
@@ -2044,7 +2045,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return err
 	}
 
-	currentStakerIterator, err := service.vm.internalState.GetCurrentStakerIterator()
+	currentStakerIterator, err := service.vm.state.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -2057,7 +2058,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	for currentStakerIterator.Next() { // Iterates over current stakers
 		staker := currentStakerIterator.Value()
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -2073,7 +2074,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts = append(stakedOuts, outs...)
 	}
 
-	pendingStakerIterator, err := service.vm.internalState.GetPendingStakerIterator()
+	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -2082,7 +2083,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	for pendingStakerIterator.Next() { // Iterates over pending stakers
 		staker := pendingStakerIterator.Value()
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -2101,7 +2102,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := Codec.Marshal(txs.Version, output)
+		bytes, err := txs.Codec.Marshal(txs.Version, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -2180,12 +2181,12 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	if startTime.After(endTime) {
 		return errStartAfterEndTime
 	}
-	currentChainTime := service.vm.internalState.GetTimestamp()
-	if startTime.Before(currentChainTime) {
+	now := service.vm.state.GetTimestamp()
+	if startTime.Before(now) {
 		return errStartTimeInThePast
 	}
 
-	staker, err := executor.GetValidator(service.vm.internalState, args.SubnetID, args.NodeID)
+	staker, err := executor.GetValidator(service.vm.state, args.SubnetID, args.NodeID)
 	if err == database.ErrNotFound {
 		return nil
 	}
@@ -2200,7 +2201,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 		return nil
 	}
 
-	maxStakeAmount, err := executor.GetMaxWeight(service.vm.internalState, staker, startTime, endTime)
+	maxStakeAmount, err := executor.GetMaxWeight(service.vm.state, staker, startTime, endTime)
 	reply.Amount = json.Uint64(maxStakeAmount)
 	return err
 }
@@ -2220,7 +2221,7 @@ type GetRewardUTXOsReply struct {
 func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *GetRewardUTXOsReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetRewardUTXOs called")
 
-	utxos, err := service.vm.internalState.GetRewardUTXOs(args.TxID)
+	utxos, err := service.vm.state.GetRewardUTXOs(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get reward UTXOs: %w", err)
 	}
@@ -2228,7 +2229,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := GenesisCodec.Marshal(txs.Version, utxo)
+		utxoBytes, err := blocks.GenesisCodec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}
@@ -2253,7 +2254,7 @@ type GetTimestampReply struct {
 func (service *Service) GetTimestamp(_ *http.Request, args *struct{}, reply *GetTimestampReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTimestamp called")
 
-	reply.Timestamp = service.vm.internalState.GetTimestamp()
+	reply.Timestamp = service.vm.state.GetTimestamp()
 	return nil
 }
 

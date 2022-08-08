@@ -254,10 +254,10 @@ type diffValidator struct {
 // nodeID.
 //
 // Returns:
-// 1. If the validator was added in this diff, [staker, true] will be returned.
-// 2. If the validator was removed in this diff, [nil, true] will be returned.
-// 3. If the validator was not modified by this diff, [nil, false] will be
-//    returned.
+//  1. If the validator was added in this diff, [staker, true] will be returned.
+//  2. If the validator was removed in this diff, [nil, true] will be returned.
+//  3. If the validator was not modified by this diff, [nil, false] will be
+//     returned.
 func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
