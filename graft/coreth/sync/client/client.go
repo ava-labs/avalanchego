@@ -361,7 +361,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
 			c.networkClient.TrackBandwidth(nodeID, bandwidth)
 			metric.IncSucceeded()
-			metric.UpdateReceived(int64(numElements))
+			metric.IncReceived(int64(numElements))
 			return responseIntf, nil
 		}
 	}

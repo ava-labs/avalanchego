@@ -25,7 +25,7 @@ type MessageMetric interface {
 	IncSucceeded()
 	IncFailed()
 	IncInvalidResponse()
-	UpdateReceived(int64)
+	IncReceived(int64)
 	UpdateRequestLatency(time.Duration)
 }
 
@@ -34,9 +34,9 @@ type messageMetric struct {
 	succeeded       metrics.Counter // Number of times a request has succeeded
 	failed          metrics.Counter // Number of times a request failed (does not include invalid responses)
 	invalidResponse metrics.Counter // Number of times a request failed due to an invalid response
+	received        metrics.Counter // Number of items that have been received
 
-	received       metrics.Histogram // Histogram of the amount of this metric that has been received
-	requestLatency metrics.Timer     // Latency for this request
+	requestLatency metrics.Timer // Latency for this request
 }
 
 func NewMessageMetric(name string) MessageMetric {
@@ -45,7 +45,7 @@ func NewMessageMetric(name string) MessageMetric {
 		succeeded:       metrics.GetOrRegisterCounter(fmt.Sprintf("%s_succeeded", name), nil),
 		failed:          metrics.GetOrRegisterCounter(fmt.Sprintf("%s_failed", name), nil),
 		invalidResponse: metrics.GetOrRegisterCounter(fmt.Sprintf("%s_invalid_response", name), nil),
-		received:        metrics.GetOrRegisterHistogram(fmt.Sprintf("%s_received", name), nil, metrics.NewExpDecaySample(1028, 0.015)),
+		received:        metrics.GetOrRegisterCounter(fmt.Sprintf("%s_received", name), nil),
 		requestLatency:  metrics.GetOrRegisterTimer(fmt.Sprintf("%s_request_latency", name), nil),
 	}
 }
@@ -66,8 +66,8 @@ func (m *messageMetric) IncInvalidResponse() {
 	m.invalidResponse.Inc(1)
 }
 
-func (m *messageMetric) UpdateReceived(size int64) {
-	m.received.Update(size)
+func (m *messageMetric) IncReceived(size int64) {
+	m.received.Inc(size)
 }
 
 func (m *messageMetric) UpdateRequestLatency(duration time.Duration) {
@@ -123,7 +123,7 @@ func (noopMsgMetric) IncRequested()                      {}
 func (noopMsgMetric) IncSucceeded()                      {}
 func (noopMsgMetric) IncFailed()                         {}
 func (noopMsgMetric) IncInvalidResponse()                {}
-func (noopMsgMetric) UpdateReceived(int64)               {}
+func (noopMsgMetric) IncReceived(int64)                  {}
 func (noopMsgMetric) UpdateRequestLatency(time.Duration) {}
 
 func NewNoOpStats() ClientSyncerStats {
@@ -133,11 +133,6 @@ func NewNoOpStats() ClientSyncerStats {
 func (n noopStats) GetMetric(_ message.Request) (MessageMetric, error) {
 	return n.noop, nil
 }
-
-// all operations are no-ops
-func (n *noopStats) IncLeavesRequested()                    {}
-func (n *noopStats) UpdateLeavesReceived(int64)             {}
-func (n *noopStats) UpdateLeafRequestLatency(time.Duration) {}
 
 // NewStats returns syncer stats if enabled or a no-op version if disabled.
 func NewStats(enabled bool) ClientSyncerStats {
