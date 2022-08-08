@@ -31,6 +31,8 @@ type Jobs struct {
 	db *versiondb.Database
 	// state writes the job queue to [db].
 	state *state
+	// Measures the ETA until bootstrapping finishes in nanoseconds.
+	etaMetric prometheus.Gauge
 }
 
 // New attempts to create a new job queue from the provided database.
@@ -45,10 +47,17 @@ func New(
 		return nil, fmt.Errorf("couldn't create new jobs state: %w", err)
 	}
 
+	etaMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Name:      "eta_execution_complete",
+		Help:      "ETA in nanoseconds until execution phase of bootstrapping finishes",
+	})
+
 	return &Jobs{
-		db:    vdb,
-		state: state,
-	}, nil
+		db:        vdb,
+		state:     state,
+		etaMetric: etaMetric,
+	}, metricsRegisterer.Register(etaMetric)
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
@@ -175,6 +184,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 				uint64(numExecuted),
 				numToExecute,
 			)
+			j.etaMetric.Set(float64(eta))
 
 			if !restarted {
 				ctx.Log.Info("executing operations",
@@ -190,6 +200,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 				)
 			}
 		}
+		j.etaMetric.Set(0)
 	}
 
 	if !restarted {
