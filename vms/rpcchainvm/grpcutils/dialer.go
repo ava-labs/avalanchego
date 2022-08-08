@@ -57,7 +57,11 @@ func (c *conn) DecRef() {
 		c.redialer.closer.Go(c.conn.Close)
 		delete(c.redialer.oldConns, c)
 
-		logger.Infof("closing rotated connection after %d operations", c.ops)
+		logger.Infof(
+			"closing rotated connection %s after %d operations",
+			c.conn.Target(),
+			c.ops,
+		)
 	}
 }
 
@@ -78,7 +82,11 @@ type redialer struct {
 // redialer is not closed
 func (r *redialer) getConn() (*conn, error) {
 	if r.currentConn.ops >= maxOps {
-		logger.Infof("rotating connection after %d operations", r.currentConn.ops)
+		logger.Infof(
+			"rotating connection %s after %d operations",
+			r.currentConn.conn.Target(),
+			r.currentConn.ops,
+		)
 
 		newConn, err := createClientConn(r.addr, r.opts...)
 		if err != nil {
