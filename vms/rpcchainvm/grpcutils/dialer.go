@@ -71,8 +71,9 @@ type redialer struct {
 }
 
 // Lock is held
+// redialer is not closed
 func (r *redialer) getConn() (*conn, error) {
-	if !r.closed && r.currentConn.ops >= maxOps {
+	if r.currentConn.ops >= maxOps {
 		logger.Infof("rotating connection after %d operations", r.currentConn.ops)
 
 		newConn, err := createClientConn(r.addr, r.opts...)
