@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/grpclog"
 )
 
 const (
@@ -20,6 +21,8 @@ const (
 
 var (
 	_ Conn = &redialer{}
+
+	logger = grpclog.Component("external-dialer")
 
 	errUnimplemented = errors.New("unimplemented")
 )
@@ -49,23 +52,29 @@ func (c *conn) DecRef() {
 	if !c.redialer.closed && c.refs == 0 {
 		c.redialer.closer.Go(c.conn.Close)
 		delete(c.redialer.oldConns, c)
+
+		logger.Infof("closing rotated connection after %d operations", c.ops)
 	}
 }
 
+// redialer is a wrapper around a grpc.ClientConn that periodically rotates the
+// connection. This avoids overflowing the underlying streamId.
 type redialer struct {
 	addr string
 	opts []grpc.DialOption
 
 	lock        sync.Mutex
 	closed      bool
-	currentConn *conn
+	currentConn *conn // never nil
 	oldConns    map[*conn]struct{}
 	closer      errgroup.Group
 }
 
 // Lock is held
 func (r *redialer) getConn() (*conn, error) {
-	if r.currentConn.ops >= maxOps {
+	if !r.closed && r.currentConn.ops >= maxOps {
+		logger.Infof("rotating connection after %d operations", r.currentConn.ops)
+
 		newConn, err := createClientConn(r.addr, r.opts...)
 		if err != nil {
 			return nil, err
