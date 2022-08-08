@@ -134,8 +134,9 @@ func Dial(addr string, opts ...grpc.DialOption) (Conn, error) {
 	}
 
 	r := &redialer{
-		addr: addr,
-		opts: opts,
+		addr:     addr,
+		opts:     opts,
+		oldConns: make(map[*conn]struct{}),
 	}
 	r.currentConn = &conn{
 		redialer: r,
