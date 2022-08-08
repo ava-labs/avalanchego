@@ -127,21 +127,21 @@ func (vm *VM) Initialize(
 	ctx.Log.Verbo("initializing platform chain")
 
 	registerer := prometheus.NewRegistry()
-	vm.ctx = ctx
 	if err := ctx.Metrics.Register(registerer); err != nil {
-		return err
-	}
-
-	vm.dbManager = dbManager
-
-	vm.codecRegistry = linearcodec.NewDefault()
-	vm.fx = &secp256k1fx.Fx{}
-	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
 
 	// Initialize metrics as soon as possible
 	if err := vm.Metrics.Initialize("", registerer, vm.WhitelistedSubnets); err != nil {
+		return err
+	}
+
+	vm.ctx = ctx
+	vm.dbManager = dbManager
+
+	vm.codecRegistry = linearcodec.NewDefault()
+	vm.fx = &secp256k1fx.Fx{}
+	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
 
