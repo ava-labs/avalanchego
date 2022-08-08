@@ -35,6 +35,10 @@ type Conn interface {
 type conn struct {
 	redialer *redialer
 
+	// When this connection is created, the redialer will hold a reference.
+	// Whenever the connection is used, the call will grab a reference and then
+	// remove the reference when the call is done.
+	// When this connection is rotated, the redialer will remove the reference.
 	refs int // number of references to this connection
 	ops  int // number of operations performed on this connection
 	conn *grpc.ClientConn
