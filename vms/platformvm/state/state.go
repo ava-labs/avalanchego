@@ -193,15 +193,12 @@ type state struct {
 	chainDBCache cache.Cacher         // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
-	originalTimestamp, timestamp         time.Time
-	originalCurrentSupply, currentSupply uint64
+	// The persisted fields represent the current database value
+	timestamp, persistedTimestamp         time.Time
+	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
-	// Returned by GetLastAccepted().
-	lastAccepted ids.ID
-	// [persistedLastAccepted] is the most recently accepted block
-	// that was written to the database.
-	persistedLastAccepted ids.ID
-	singletonDB           database.Database
+	lastAccepted, persistedLastAccepted ids.ID
+	singletonDB                         database.Database
 }
 
 type ValidatorWeightDiff struct {
@@ -373,7 +370,7 @@ func new(
 		return nil, err
 	}
 
-	s := &state{
+	return &state{
 		cfg:     cfg,
 		ctx:     ctx,
 		metrics: metrics,
@@ -429,9 +426,7 @@ func new(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}
-
-	return s, nil
+	}, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -750,7 +745,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return nil, choices.Processing, err // status does not matter here
 	}
 
-	blkState.Blk, err = blocks.Parse(blkState.Bytes, blocks.GenesisCodec)
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
 		return nil, choices.Processing, err
 	}
@@ -891,8 +886,7 @@ func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.Sta
 	return s.write(0)
 }
 
-// Load pulls data previously stored on disk that is expected to be in
-// memory.
+// Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -908,14 +902,14 @@ func (s *state) loadMetadata() error {
 	if err != nil {
 		return err
 	}
-	s.originalTimestamp = timestamp
+	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, currentSupplyKey)
 	if err != nil {
 		return err
 	}
-	s.originalCurrentSupply = currentSupply
+	s.persistedCurrentSupply = currentSupply
 	s.SetCurrentSupply(currentSupply)
 
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
@@ -1637,17 +1631,17 @@ func (s *state) writeChains() error {
 }
 
 func (s *state) writeMetadata() error {
-	if !s.originalTimestamp.Equal(s.timestamp) {
+	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, timestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
-		s.originalTimestamp = s.timestamp
+		s.persistedTimestamp = s.timestamp
 	}
-	if s.originalCurrentSupply != s.currentSupply {
+	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, currentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)
 		}
-		s.originalCurrentSupply = s.currentSupply
+		s.persistedCurrentSupply = s.currentSupply
 	}
 	if s.persistedLastAccepted != s.lastAccepted {
 		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {

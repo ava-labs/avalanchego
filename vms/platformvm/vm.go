@@ -52,6 +52,12 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+const (
+	validatorSetsCacheSize        = 64
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
+)
+
 var (
 	_ block.ChainVM    = &VM{}
 	_ secp256k1fx.VM   = &VM{}
@@ -59,12 +65,6 @@ var (
 
 	errWrongCacheType      = errors.New("unexpectedly cached type")
 	errMissingValidatorSet = errors.New("missing validator set")
-)
-
-const (
-	validatorSetsCacheSize        = 64
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 type VM struct {
@@ -87,9 +87,8 @@ type VM struct {
 	ctx       *snow.Context
 	dbManager manager.Manager
 
-	state         state.State
-	utxoHandler   utxo.Handler
-	stateVersions state.Versions
+	state       state.State
+	utxoHandler utxo.Handler
 
 	// ID of the preferred block
 	preferred ids.ID
@@ -109,7 +108,7 @@ type VM struct {
 	recentlyAccepted *window.Window
 
 	txBuilder         builder.TxBuilder
-	txExecutorBackend txexecutor.Backend
+	txExecutorBackend *txexecutor.Backend
 	manager           blockexecutor.Manager
 }
 
@@ -125,26 +124,27 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	var err error
 	ctx.Log.Verbo("initializing platform chain")
 
 	registerer := prometheus.NewRegistry()
-	vm.ctx = ctx
 	if err := ctx.Metrics.Register(registerer); err != nil {
 		return err
 	}
 
+	// Initialize metrics as soon as possible
+	var err error
+	vm.Metrics, err = metrics.New("", registerer, vm.WhitelistedSubnets)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	vm.ctx = ctx
 	vm.dbManager = dbManager
 
 	vm.codecRegistry = linearcodec.NewDefault()
 	vm.fx = &secp256k1fx.Fx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
-	}
-
-	vm.Metrics, err = metrics.New("", registerer, vm.WhitelistedSubnets)
-	if err != nil {
-		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
@@ -157,7 +157,8 @@ func (vm *VM) Initialize(
 	)
 
 	vm.rewards = reward.NewCalculator(vm.RewardConfig)
-	if vm.state, err = state.New(
+
+	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
 		registerer,
@@ -165,13 +166,10 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.Metrics,
 		vm.rewards,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
-
-	lastAcceptedID := vm.state.GetLastAccepted()
-	ctx.Log.Info("initializing last accepted %s", zap.Stringer("blkID", lastAcceptedID))
-	vm.stateVersions = state.NewVersions(lastAcceptedID, vm.state)
 
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
@@ -189,20 +187,19 @@ func (vm *VM) Initialize(
 		vm.utxoHandler,
 	)
 
-	vm.txExecutorBackend = txexecutor.Backend{
-		Config:        &vm.Config,
-		Ctx:           vm.ctx,
-		Clk:           &vm.clock,
-		Fx:            vm.fx,
-		FlowChecker:   vm.utxoHandler,
-		Uptimes:       vm.uptimeManager,
-		Rewards:       vm.rewards,
-		Bootstrapped:  &vm.bootstrapped,
-		StateVersions: vm.stateVersions,
+	vm.txExecutorBackend = &txexecutor.Backend{
+		Config:       &vm.Config,
+		Ctx:          vm.ctx,
+		Clk:          &vm.clock,
+		Fx:           vm.fx,
+		FlowChecker:  vm.utxoHandler,
+		Uptimes:      vm.uptimeManager,
+		Rewards:      vm.rewards,
+		Bootstrapped: &vm.bootstrapped,
 	}
 
-	// Note: there is a circular dependency among mempool and blkBuilder
-	// which is broken by mean of vm
+	// Note: There is a circular dependency between the mempool and block
+	//       builder which is broken by passing in the vm.
 	mempool, err := mempool.NewMempool("mempool", registerer, vm)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
@@ -235,6 +232,10 @@ func (vm *VM) Initialize(
 		)
 	}
 
+	lastAcceptedID := vm.state.GetLastAccepted()
+	ctx.Log.Info("initializing last accepted",
+		zap.Stringer("blkID", lastAcceptedID),
+	)
 	return vm.SetPreference(lastAcceptedID)
 }
 
@@ -367,7 +368,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.Build
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	// Note: blocks to be parsed are not verified, so we must used blocks.Codec
 	// rather than blocks.GenesisCodec
-	statelessBlk, err := blocks.Parse(b, blocks.Codec)
+	statelessBlk, err := blocks.Parse(blocks.Codec, b)
 	if err != nil {
 		return nil, err
 	}

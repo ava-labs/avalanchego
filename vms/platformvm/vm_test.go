@@ -814,7 +814,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(abort.Verify())
 
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(tx.ID())
@@ -886,7 +886,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(commit.Verify())
 
 	{
-		onAccept, ok := vm.stateVersions.GetState(commit.ID())
+		onAccept, ok := vm.manager.GetState(commit.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(tx.ID())
@@ -942,7 +942,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -987,7 +987,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1041,7 +1041,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1081,7 +1081,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(commit.ID())
+		onAccept, ok := vm.manager.GetState(commit.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1136,7 +1136,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1177,7 +1177,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(commit.ID())
+		onAccept, ok := vm.manager.GetState(commit.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1357,7 +1357,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	txID := blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1403,7 +1403,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -1451,7 +1451,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	txID = blk.(blocks.Block).Txs()[0].ID()
 	{
-		onAccept, ok := vm.stateVersions.GetState(abort.ID())
+		onAccept, ok := vm.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(txID)
@@ -2423,7 +2423,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	proposalTx := blk.(blocks.Block).Txs()[0]
 	{
-		onAccept, ok := secondVM.stateVersions.GetState(abort.ID())
+		onAccept, ok := secondVM.manager.GetState(abort.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(proposalTx.ID())
@@ -2465,7 +2465,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	proposalTx = blk.(blocks.Block).Txs()[0]
 	{
-		onAccept, ok := secondVM.stateVersions.GetState(commit.ID())
+		onAccept, ok := secondVM.manager.GetState(commit.ID())
 		assert.True(ok)
 
 		_, txStatus, err := onAccept.GetTx(proposalTx.ID())

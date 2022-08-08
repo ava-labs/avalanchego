@@ -46,10 +46,14 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	metrics := metrics.NewNoopMetrics()
 
+	blkID := blk.ID()
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
 				Log: logging.NoLog{},
+			},
+			blkIDToState: map[ids.ID]*blockState{
+				blkID: {},
 			},
 		},
 		metrics:          metrics,
@@ -59,7 +63,10 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	err = acceptor.ProposalBlock(blk)
 	assert.NoError(err)
 
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	assert.Equal(blkID, acceptor.backend.lastAccepted)
+
+	_, exists := acceptor.GetState(blkID)
+	assert.False(exists)
 }
 
 func TestAcceptorVisitAtomicBlock(t *testing.T) {
@@ -73,9 +80,9 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState:  make(map[ids.ID]*blockState),
-			state:         s,
-			stateVersions: state.NewVersions(parentID, s),
+			lastAccepted: parentID,
+			blkIDToState: make(map[ids.ID]*blockState),
+			state:        s,
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -157,9 +164,9 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState:  make(map[ids.ID]*blockState),
-			state:         s,
-			stateVersions: state.NewVersions(parentID, s),
+			lastAccepted: parentID,
+			blkIDToState: make(map[ids.ID]*blockState),
+			state:        s,
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -249,9 +256,9 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState:  make(map[ids.ID]*blockState),
-			state:         s,
-			stateVersions: state.NewVersions(parentID, s),
+			lastAccepted: parentID,
+			blkIDToState: make(map[ids.ID]*blockState),
+			state:        s,
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -317,7 +324,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
 		s.EXPECT().AddStatelessBlock(parentState.statelessBlock, choices.Accepted).Times(1),
-		parentStatelessBlk.EXPECT().Parent().Return(ids.Empty).Times(1),
 
 		s.EXPECT().SetLastAccepted(blkID).Times(1),
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
@@ -343,9 +349,9 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
 		backend: &backend{
-			blkIDToState:  make(map[ids.ID]*blockState),
-			state:         s,
-			stateVersions: state.NewVersions(parentID, s),
+			lastAccepted: parentID,
+			blkIDToState: make(map[ids.ID]*blockState),
+			state:        s,
 			ctx: &snow.Context{
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
@@ -411,7 +417,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
 		s.EXPECT().AddStatelessBlock(parentState.statelessBlock, choices.Accepted).Times(1),
-		parentStatelessBlk.EXPECT().Parent().Return(ids.Empty).Times(1),
 
 		s.EXPECT().SetLastAccepted(blkID).Times(1),
 		s.EXPECT().SetHeight(blk.Height()).Times(1),

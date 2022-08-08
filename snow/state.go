@@ -5,16 +5,16 @@ package snow
 
 import "errors"
 
-type State uint8
-
-var ErrUnknownState = errors.New("unknown state")
-
 const (
 	Initializing = iota
 	StateSyncing
 	Bootstrapping
 	NormalOp
 )
+
+var ErrUnknownState = errors.New("unknown state")
+
+type State uint8
 
 func (st State) String() string {
 	switch st {

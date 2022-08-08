@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -17,7 +18,7 @@ var (
 	_ SignedBlock = &statelessBlock{}
 
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
-	errMissingProposer    = errors.New("expected proposer but one was provided")
+	errMissingProposer    = errors.New("expected proposer but none was provided")
 )
 
 type Block interface {
@@ -82,6 +83,11 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	if err != nil {
 		return err
 	}
+
+	if err := staking.VerifyCertificate(cert); err != nil {
+		return err
+	}
+
 	b.cert = cert
 	b.proposer = ids.NodeIDFromCert(cert)
 	return nil

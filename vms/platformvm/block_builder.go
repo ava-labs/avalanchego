@@ -79,9 +79,10 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	}
 
 	verifier := executor.MempoolTxVerifier{
-		Backend:  &b.vm.txExecutorBackend,
-		ParentID: b.vm.preferred, // We want to build off of the preferred block
-		Tx:       tx,
+		Backend:       b.vm.txExecutorBackend,
+		ParentID:      b.vm.preferred, // We want to build off of the preferred block
+		StateVersions: b.vm.manager,
+		Tx:            tx,
 	}
 	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		b.MarkDropped(txID, err.Error())
@@ -112,7 +113,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
-	preferredState, ok := b.vm.stateVersions.GetState(preferredID)
+	preferredState, ok := b.vm.manager.GetState(preferredID)
 	if !ok {
 		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
@@ -203,7 +204,7 @@ func (b *blockBuilder) ResetBlockTimer() {
 		return
 	}
 
-	preferredState, ok := b.vm.stateVersions.GetState(b.vm.preferred)
+	preferredState, ok := b.vm.manager.GetState(b.vm.preferred)
 	if !ok {
 		b.vm.ctx.Log.Error("couldn't get preferred block state",
 			zap.Stringer("blkID", b.vm.preferred),
