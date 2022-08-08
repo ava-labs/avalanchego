@@ -1,6 +1,6 @@
 module github.com/ava-labs/subnet-evm/cmd/simulator
 
-go 1.17
+go 1.18
 
 require (
 	github.com/ava-labs/subnet-evm v0.2.6

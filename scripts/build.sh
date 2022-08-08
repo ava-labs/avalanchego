@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-go_version_minimum="1.17.9"
+go_version_minimum="1.18.1"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'
