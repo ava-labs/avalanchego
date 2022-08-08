@@ -44,6 +44,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	txExecutor := txexecutor.ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: env.state.GetLastAccepted(),
+		StateVersions:    env.blkManager,
 		Tx:               validatorTx,
 	}
 	assert.NoError(validatorTx.Unsigned.Visit(&txExecutor))

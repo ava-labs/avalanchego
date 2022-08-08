@@ -38,8 +38,7 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 		return nil, fmt.Errorf("could not fork for block %s: %w", prefBlkID, err)
 	}
 
-	stateVersions := b.txExecutorBackend.StateVersions
-	preferredState, ok := stateVersions.GetState(prefBlkID)
+	preferredState, ok := b.blkManager.GetState(prefBlkID)
 	if !ok {
 		return nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
 	}

@@ -67,7 +67,7 @@ type blockBuilder struct {
 	Network
 
 	txBuilder         p_tx_builder.Builder
-	txExecutorBackend txexecutor.Backend
+	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
 	// ID of the preferred block to build on top of
@@ -86,7 +86,7 @@ type blockBuilder struct {
 func NewBlockBuilder(
 	mempool mempool.Mempool,
 	txBuilder p_tx_builder.Builder,
-	txExecutorBackend txexecutor.Backend,
+	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
@@ -143,9 +143,10 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	}
 
 	verifier := txexecutor.MempoolTxVerifier{
-		Backend:  &b.txExecutorBackend,
-		ParentID: b.preferredBlockID, // We want to build off of the preferred block
-		Tx:       tx,
+		Backend:       b.txExecutorBackend,
+		ParentID:      b.preferredBlockID, // We want to build off of the preferred block
+		StateVersions: b.blkManager,
+		Tx:            tx,
 	}
 	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		b.MarkDropped(txID, err.Error())
@@ -210,12 +211,11 @@ func (b *blockBuilder) ResetBlockTimer() {
 
 	// Wake up when it's time to add/remove the next validator
 	var (
-		ctx           = b.txExecutorBackend.Ctx
-		now           = b.txExecutorBackend.Clk.Time()
-		stateVersions = b.txExecutorBackend.StateVersions
+		ctx = b.txExecutorBackend.Ctx
+		now = b.txExecutorBackend.Clk.Time()
 	)
 
-	preferredState, ok := stateVersions.GetState(b.preferredBlockID)
+	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
 	if !ok {
 		// The preferred block should always be a decision block
 		ctx.Log.Error("couldn't get preferred block state",

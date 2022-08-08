@@ -27,7 +27,7 @@ const (
 	// SyncBound is the synchrony bound used for safe decision making
 	SyncBound = 10 * time.Second
 
-	MaxValidatorWeightFactor = uint64(5)
+	MaxValidatorWeightFactor = 5
 )
 
 var (
@@ -58,6 +58,8 @@ type ProposalTxExecutor struct {
 	// On the contrary, Blueberry proposalTxs are validated again the current
 	// block state, which is generated processing block timestamp
 	ReferenceBlockID ids.ID
+
+	StateVersions state.Versions
 
 	Tx *txs.Tx
 

@@ -36,13 +36,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	addPendingValidatorTx, err := addPendingValidator(
-		env,
-		pendingValidatorStartTime,
-		pendingValidatorEndTime,
-		nodeID,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
-	)
+	addPendingValidatorTx, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
 	assert.NoError(err)
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
@@ -51,6 +45,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	executor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
@@ -94,6 +89,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	executor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
@@ -124,6 +120,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -158,6 +155,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -388,6 +386,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				executor := ProposalTxExecutor{
 					Backend:          &env.backend,
 					ReferenceBlockID: lastAcceptedID,
+					StateVersions:    env,
 					Tx:               tx,
 				}
 				assert.NoError(tx.Unsigned.Visit(&executor))
@@ -495,6 +494,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	executor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
@@ -564,6 +564,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			executor := ProposalTxExecutor{
 				Backend:          &env.backend,
 				ReferenceBlockID: lastAcceptedID,
+				StateVersions:    env,
 				Tx:               tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
@@ -609,6 +610,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	executor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
@@ -659,6 +661,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	executor = ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
@@ -697,6 +700,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	executor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
@@ -742,6 +746,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	executor = ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
@@ -776,6 +781,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	executor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&executor)

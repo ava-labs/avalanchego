@@ -49,16 +49,17 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
+	onParentAccept := state.NewMockDiff(ctrl)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
+		onAcceptState:  onParentAccept,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
-	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	chainTime := env.clk.Time().Truncate(time.Second)
-	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := blocks.NewApricotStandardBlock(
@@ -111,13 +112,14 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	parentID := blueberryParentBlk.ID()
 
 	// store parent block, with relevant quantities
+	onParentAccept := state.NewMockDiff(ctrl)
 	chainTime := env.clk.Time().Truncate(time.Second)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: blueberryParentBlk,
+		onAcceptState:  onParentAccept,
 		timestamp:      chainTime,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
-	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
@@ -132,16 +134,16 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 		},
 	).AnyTimes()
 	currentStakerIt.EXPECT().Release().Return().AnyTimes()
-	env.mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
 
 	// no pending stakers
 	pendingIt := state.NewMockStakerIterator(ctrl)
 	pendingIt.EXPECT().Next().Return(false).AnyTimes()
 	pendingIt.EXPECT().Release().Return().AnyTimes()
-	env.mockedState.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
-	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
-	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	// wrong version
 	childTimestamp := parentTime.Add(time.Second)

@@ -50,11 +50,12 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
+	onParentAccept := state.NewMockDiff(ctrl)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
+		onAcceptState:  onParentAccept,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
-	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	// create a proposal transaction to be included into proposal block
@@ -75,7 +76,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	// setup state to validate proposal block transaction
-	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
@@ -84,10 +85,10 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		EndTime: chainTime,
 	})
 	currentStakersIt.EXPECT().Release()
-	env.mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
-	env.mockedState.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
+	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
+	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
-	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Duration(1000), /*upDuration*/
 		time.Time{},         /*lastUpdated*/
@@ -144,19 +145,17 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	// store parent block, with relevant quantities
 	chainTime := parentTime
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	env.mockedState.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
-	onAcceptState, err := state.NewDiff(genesisBlkID, env.backend.StateVersions)
-	assert.NoError(err)
-	onAcceptState.SetTimestamp(parentTime)
+	onParentAccept := state.NewMockDiff(ctrl)
+	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: blueberryParentBlk,
-		onAcceptState:  onAcceptState,
+		onAcceptState:  onParentAccept,
 		timestamp:      parentTime,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
-	env.blkManager.(*manager).stateVersions.SetState(parentID, env.mockedState)
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
 		func(blockID ids.ID) (blocks.Block, choices.Status, error) {
@@ -179,7 +178,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	}
 	assert.NoError(nextStakerTx.Sign(txs.Codec, nil))
 	nextStakerTxID := nextStakerTx.ID()
-	env.mockedState.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
+	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
@@ -190,12 +189,12 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		Priority: state.PrimaryNetworkValidatorCurrentPriority,
 	}).AnyTimes()
 	currentStakersIt.EXPECT().Release().AnyTimes()
-	env.mockedState.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
 
 	pendingStakersIt := state.NewMockStakerIterator(ctrl)
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
 	pendingStakersIt.EXPECT().Release().AnyTimes()
-	env.mockedState.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Duration(1000), /*upDuration*/

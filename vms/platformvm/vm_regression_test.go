@@ -532,7 +532,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Verify that the new validator now in pending validator set
 	{
-		onAccept, found := vm.stateVersions.GetState(addValidatorProposalCommit.ID())
+		onAccept, found := vm.manager.GetState(addValidatorProposalCommit.ID())
 		assert.True(found)
 
 		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
@@ -777,7 +777,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that first new validator now in pending validator set
 	{
-		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit0.ID())
+		onAccept, ok := vm.manager.GetState(addValidatorProposalCommit0.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
@@ -824,7 +824,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the first new validator is now in the current validator set.
 	{
-		onAccept, ok := vm.stateVersions.GetState(advanceTimeProposalCommit0.ID())
+		onAccept, ok := vm.manager.GetState(advanceTimeProposalCommit0.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
@@ -979,7 +979,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator now in pending validator set
 	{
-		onAccept, ok := vm.stateVersions.GetState(addValidatorProposalCommit1.ID())
+		onAccept, ok := vm.manager.GetState(addValidatorProposalCommit1.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
@@ -1026,7 +1026,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Verify that the second new validator is now in the current validator set.
 	{
-		onAccept, ok := vm.stateVersions.GetState(advanceTimeProposalCommit1.ID())
+		onAccept, ok := vm.manager.GetState(advanceTimeProposalCommit1.ID())
 		assert.True(ok)
 
 		_, err := onAccept.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)

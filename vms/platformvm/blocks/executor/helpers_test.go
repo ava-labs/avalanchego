@@ -98,8 +98,7 @@ type environment struct {
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
 	txBuilder      p_tx_builder.Builder
-	backend        executor.Backend
-	stateVersions  state.Versions
+	backend        *executor.Backend
 }
 
 func (t *environment) ResetBlockTimer() {
@@ -152,7 +151,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			res.atomicUTXOs,
 			res.utxosHandler,
 		)
-		res.stateVersions = state.NewVersions(genesisBlkID, res.state)
 	} else {
 		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
@@ -167,20 +165,20 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			res.atomicUTXOs,
 			res.utxosHandler,
 		)
-		res.stateVersions = state.NewVersions(genesisBlkID, res.mockedState)
-		// Note: no loaded expectation for res.mockedFullState.GetLastAccepted() here
+
+		// setup expectations strictly needed for environment creation
+		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
 	}
 
-	res.backend = executor.Backend{
-		Config:        res.config,
-		Ctx:           res.ctx,
-		Clk:           res.clk,
-		Bootstrapped:  res.isBootstrapped,
-		Fx:            res.fx,
-		FlowChecker:   res.utxosHandler,
-		Uptimes:       res.uptimes,
-		Rewards:       rewardsCalc,
-		StateVersions: res.stateVersions,
+	res.backend = &executor.Backend{
+		Config:       res.config,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		FlowChecker:  res.utxosHandler,
+		Uptimes:      res.uptimes,
+		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -207,7 +205,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			res.backend,
 			window,
 		)
-		addSubnet(res.state, res.txBuilder, res.backend)
+		addSubnet(res)
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
@@ -223,14 +221,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	return res
 }
 
-func addSubnet(
-	baseState state.State,
-	txBuilder p_tx_builder.Builder,
-	backend executor.Backend,
-) {
+func addSubnet(env *environment) {
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
 			preFundedKeys[0].PublicKey().Address(),
@@ -245,14 +239,14 @@ func addSubnet(
 	}
 
 	// store it
-	genesisID := baseState.GetLastAccepted()
-	stateDiff, err := state.NewDiff(genesisID, backend.StateVersions)
+	genesisID := env.state.GetLastAccepted()
+	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	if err != nil {
 		panic(err)
 	}
 
 	executor := executor.StandardTxExecutor{
-		Backend: &backend,
+		Backend: env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
@@ -262,7 +256,7 @@ func addSubnet(
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(baseState)
+	stateDiff.Apply(env.state)
 }
 
 func defaultState(

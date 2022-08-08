@@ -49,6 +49,11 @@ import (
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
+const (
+	testNetworkID = 10 // To be used in tests
+	defaultWeight = 10000
+)
+
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -71,11 +76,6 @@ var (
 	testKeyfactory crypto.FactorySECP256K1R
 )
 
-const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
-)
-
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
@@ -89,11 +89,24 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
+	states         map[ids.ID]state.Chain
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
 	txBuilder      p_tx_builder.Builder
 	backend        Backend
+}
+
+func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
+	if blkID == lastAcceptedID {
+		return e.state, true
+	}
+	chainState, ok := e.states[blkID]
+	return chainState, ok
+}
+
+func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
+	e.states[blkID] = chainState
 }
 
 // TODO: snLookup currently duplicated in vm_test.go. Remove duplication
@@ -140,20 +153,17 @@ func newEnvironment() *environment {
 	)
 
 	backend := Backend{
-		Config:        &config,
-		Ctx:           ctx,
-		Clk:           &clk,
-		Bootstrapped:  &isBootstrapped,
-		Fx:            fx,
-		FlowChecker:   utxoHandler,
-		Uptimes:       uptimes,
-		Rewards:       rewards,
-		StateVersions: state.NewVersions(lastAcceptedID, baseState),
+		Config:       &config,
+		Ctx:          ctx,
+		Clk:          &clk,
+		Bootstrapped: &isBootstrapped,
+		Fx:           fx,
+		FlowChecker:  utxoHandler,
+		Uptimes:      uptimes,
+		Rewards:      rewards,
 	}
 
-	addSubnet(baseState, txBuilder, backend)
-
-	return &environment{
+	env := &environment{
 		isBootstrapped: &isBootstrapped,
 		config:         &config,
 		clk:            &clk,
@@ -162,18 +172,22 @@ func newEnvironment() *environment {
 		msm:            msm,
 		fx:             fx,
 		state:          baseState,
+		states:         make(map[ids.ID]state.Chain),
 		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
 		utxosHandler:   utxoHandler,
 		txBuilder:      txBuilder,
 		backend:        backend,
 	}
+
+	addSubnet(env, txBuilder)
+
+	return env
 }
 
 func addSubnet(
-	baseState state.State,
+	env *environment,
 	txBuilder p_tx_builder.Builder,
-	backend Backend,
 ) {
 	// Create a subnet
 	var err error
@@ -192,13 +206,13 @@ func addSubnet(
 	}
 
 	// store it
-	stateDiff, err := state.NewDiff(lastAcceptedID, backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		panic(err)
 	}
 
 	executor := StandardTxExecutor{
-		Backend: &backend,
+		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
@@ -208,7 +222,7 @@ func addSubnet(
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(baseState)
+	stateDiff.Apply(env.state)
 }
 
 func defaultState(

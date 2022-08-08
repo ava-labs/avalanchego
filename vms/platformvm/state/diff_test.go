@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
 
@@ -21,31 +21,44 @@ import (
 
 func TestDiffMissingState(t *testing.T) {
 	assert := assert.New(t)
-	state, _ := newInitializedState(assert)
-	states := NewVersions(ids.GenerateTestID(), state)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	_, err := NewDiff(ids.GenerateTestID(), states)
+	versions := NewMockVersions(ctrl)
+
+	parentID := ids.GenerateTestID()
+	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
+
+	_, err := NewDiff(parentID, versions)
 	assert.ErrorIs(err, errMissingParentState)
 }
 
 func TestDiffCreation(t *testing.T) {
 	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(assert)
-	states := NewVersions(lastAcceptedID, state)
+	versions := NewMockVersions(ctrl)
+	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
-	d, err := NewDiff(lastAcceptedID, states)
+	d, err := NewDiff(lastAcceptedID, versions)
 	assert.NoError(err)
 	assertChainsEqual(t, state, d)
 }
 
 func TestDiffCurrentSupply(t *testing.T) {
 	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(assert)
-	states := NewVersions(lastAcceptedID, state)
+	versions := NewMockVersions(ctrl)
+	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
-	d, err := NewDiff(lastAcceptedID, states)
+	d, err := NewDiff(lastAcceptedID, versions)
 	assert.NoError(err)
 
 	initialCurrentSupply := d.GetCurrentSupply()

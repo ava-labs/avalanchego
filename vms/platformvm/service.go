@@ -1665,13 +1665,13 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	state, ok := service.vm.stateVersions.GetState(blockID)
+	state, ok := service.vm.manager.GetState(blockID)
 	if !ok {
 		block, err := service.vm.GetBlock(blockID)
 		if err != nil {
 			return false, err
 		}
-		state, ok = service.vm.stateVersions.GetState(block.Parent())
+		state, ok = service.vm.manager.GetState(block.Parent())
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
@@ -1928,7 +1928,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 
 	preferredID := prefBlk.ID()
-	onAccept, ok := service.vm.stateVersions.GetState(preferredID)
+	onAccept, ok := service.vm.manager.GetState(preferredID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}

@@ -29,8 +29,7 @@ var (
 // verifier handles the logic for verifying a block.
 type verifier struct {
 	*backend
-	man               *manager
-	txExecutorBackend executor.Backend
+	txExecutorBackend *executor.Backend
 }
 
 func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
@@ -61,7 +60,6 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		onAcceptState:  onAcceptState,
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 
@@ -93,7 +91,6 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		timestamp:      b.BlockTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 
@@ -121,7 +118,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.stateVersions.GetState(parentID)
+	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
@@ -140,7 +137,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return err
 	}
 
-	onAcceptState, err := state.NewDiff(parentID, v.stateVersions)
+	onAcceptState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
@@ -167,11 +164,12 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	// Finally we process block transaction
 	// Unlike ApricotProposalBlock,we register an entry for BlueberryProposalBlock in stateVersions.
 	// We do it before processing the proposal block tx, since it needs the state for correct verification.
-	v.stateVersions.SetState(blkID, onAcceptState)
+	v.blkIDToState[blkID] = blkState
 
 	txExecutor := executor.ProposalTxExecutor{
-		Backend:          &v.txExecutorBackend,
+		Backend:          v.txExecutorBackend,
 		ReferenceBlockID: blkID,
+		StateVersions:    v.backend,
 		Tx:               b.Tx,
 	}
 
@@ -218,7 +216,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.stateVersions.GetState(parentID)
+	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
@@ -237,7 +235,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return err
 	}
 
-	onAcceptState, err := state.NewDiff(parentID, v.stateVersions)
+	onAcceptState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
@@ -264,7 +262,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	funcs := make([]func(), 0, len(b.Transactions))
 	for _, tx := range b.Transactions {
 		txExecutor := executor.StandardTxExecutor{
-			Backend: &v.txExecutorBackend,
+			Backend: v.txExecutorBackend,
 			State:   onAcceptState,
 			Tx:      tx,
 		}
@@ -341,7 +339,6 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	blkState.onAcceptState = onAcceptState
 
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
@@ -371,7 +368,6 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		onAcceptState:  onAcceptState,
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 
@@ -400,7 +396,6 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		timestamp:      onAcceptState.GetTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	return nil
 }
 
@@ -417,8 +412,9 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	}
 
 	txExecutor := &executor.ProposalTxExecutor{
-		Backend:          &v.txExecutorBackend,
+		Backend:          v.txExecutorBackend,
 		ReferenceBlockID: b.Parent(),
+		StateVersions:    v.backend,
 		Tx:               b.Tx,
 	}
 	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
@@ -433,7 +429,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	onAbortState := txExecutor.OnAbort
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		proposalBlockState: proposalBlockState{
 			onCommitState:         onCommitState,
@@ -445,12 +441,6 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		// never be modified by an Abort block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
-
-	// Notice that we do not add an entry to the state versions here for this
-	// block. This block must be followed by either a Commit or an Abort block.
-	// These blocks will get their parent state by referencing [onCommitState]
-	// or [onAbortState] directly.
 
 	v.Mempool.RemoveProposalTx(b.Tx)
 	return nil
@@ -472,10 +462,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		return err
 	}
 
-	onAcceptState, err := state.NewDiff(
-		b.Parent(),
-		v.stateVersions,
-	)
+	onAcceptState, err := state.NewDiff(b.Parent(), v)
 	if err != nil {
 		return err
 	}
@@ -483,7 +470,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	funcs := make([]func(), 0, len(b.Transactions))
 	for _, tx := range b.Transactions {
 		txExecutor := &executor.StandardTxExecutor{
-			Backend: &v.txExecutorBackend,
+			Backend: v.txExecutorBackend,
 			State:   onAcceptState,
 			Tx:      tx,
 		}
@@ -517,33 +504,8 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		}
 	}
 
-	// Check for conflicts in ancestors.
-	if blkState.inputs.Len() > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(blkState.inputs) {
-				return errConflictingParentTxs
-			}
-			var parent blocks.Block
-			if parentState, ok := v.blkIDToState[parentID]; ok {
-				// The parent is in memory.
-				parent = parentState.statelessBlock
-			} else {
-				var err error
-				parent, _, err = v.state.GetStatelessBlock(parentID)
-				if err != nil {
-					return err
-				}
-			}
-			nextBlock = parent
-		}
+	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
+		return err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -559,21 +521,28 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	blkState.onAcceptState = onAcceptState
 
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 
 func (v *verifier) verifyCommonBlock(b blocks.Block) error {
-	// retrieve parent block first
-	parentID := b.Parent()
-	parentBlk, err := v.getStatelessBlock(parentID)
-	if err != nil {
-		return err
+	var (
+		parentID           = b.Parent()
+		parentStatelessBlk blocks.Block
+	)
+	// Check if the parent is in memory.
+	if parent, ok := v.blkIDToState[parentID]; ok {
+		parentStatelessBlk = parent.statelessBlock
+	} else {
+		// The parent isn't in memory.
+		var err error
+		parentStatelessBlk, _, err = v.state.GetStatelessBlock(parentID)
+		if err != nil {
+			return err
+		}
 	}
 
-	// verify block height
-	if expectedHeight := parentBlk.Height() + 1; expectedHeight != b.Height() {
+	if expectedHeight := parentStatelessBlk.Height() + 1; expectedHeight != b.Height() {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
 			expectedHeight,
@@ -637,7 +606,7 @@ func (v *verifier) validateBlockTimestamp(b blocks.Block) error {
 	case *blocks.BlueberryStandardBlock,
 		*blocks.BlueberryProposalBlock:
 		parentID := b.Parent()
-		parentState, ok := v.stateVersions.GetState(parentID)
+		parentState, ok := v.GetState(parentID)
 		if !ok {
 			return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, b.ID())
 		}
@@ -673,7 +642,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.stateVersions.GetState(parentID)
+	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
@@ -689,9 +658,10 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	}
 
 	atomicExecutor := &executor.AtomicTxExecutor{
-		Backend:  &v.txExecutorBackend,
-		ParentID: parentID,
-		Tx:       b.Tx,
+		Backend:       v.txExecutorBackend,
+		ParentID:      parentID,
+		StateVersions: v.backend,
+		Tx:            b.Tx,
 	}
 
 	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
@@ -736,7 +706,31 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
-	v.stateVersions.SetState(blkID, blkState.onAcceptState)
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	return nil
+}
+
+// verifyUniqueInputs verifies that the inputs of the given block are not
+// duplicated in any of the parent blocks pinned in memory.
+func (v *verifier) verifyUniqueInputs(block blocks.Block, inputs ids.Set) error {
+	if inputs.Len() == 0 {
+		return nil
+	}
+
+	// Check for conflicts in ancestors.
+	for {
+		parentID := block.Parent()
+		parentState, ok := v.blkIDToState[parentID]
+		if !ok {
+			// The parent state isn't pinned in memory.
+			// This means the parent must be accepted already.
+			return nil
+		}
+
+		if parentState.inputs.Overlaps(inputs) {
+			return errConflictingParentTxs
+		}
+
+		block = parentState.statelessBlock
+	}
 }

@@ -43,7 +43,7 @@ func (r *rejector) rejectOptionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
-	r.stateVersions.DeleteState(blkID)
+	// r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -61,7 +61,7 @@ func (r *rejector) visitProposalBlock(b blocks.Block) error {
 		zap.String("blockType", "proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	tx := b.Txs()[0]
@@ -74,7 +74,6 @@ func (r *rejector) visitProposalBlock(b blocks.Block) error {
 		)
 	}
 
-	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -107,7 +106,7 @@ func (r *rejector) visitStandardBlock(b blocks.Block) error {
 		}
 	}
 
-	r.stateVersions.DeleteState(blkID)
+	// r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }
@@ -151,7 +150,7 @@ func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
 		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := r.Mempool.Add(b.Tx); err != nil {
@@ -163,7 +162,6 @@ func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
 		)
 	}
 
-	r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
 	return r.state.Commit()
 }

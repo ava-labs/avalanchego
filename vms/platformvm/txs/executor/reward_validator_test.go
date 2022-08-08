@@ -47,6 +47,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	txExecutor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
@@ -61,6 +62,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	txExecutor = ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
@@ -72,6 +74,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	txExecutor = ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
@@ -126,6 +129,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	txExecutor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
@@ -140,6 +144,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	txExecutor = ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
@@ -151,6 +156,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	txExecutor = ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
@@ -259,6 +265,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	txExecutor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -376,6 +383,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	txExecutor := ProposalTxExecutor{
 		Backend:          &env.backend,
 		ReferenceBlockID: lastAcceptedID,
+		StateVersions:    env,
 		Tx:               tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)

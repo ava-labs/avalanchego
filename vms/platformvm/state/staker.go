@@ -57,11 +57,11 @@ type Staker struct {
 }
 
 // A *Staker is considered to be less than another *Staker when:
-// 1. If its NextTime is before the other's.
-// 2. If the NextTimes are the same, the *Staker with the lesser priority is the
-//    lesser one.
-// 3. If the priorities are also the same, the one with the lesser txID is
-//    lesser.
+//  1. If its NextTime is before the other's.
+//  2. If the NextTimes are the same, the *Staker with the lesser priority is the
+//     lesser one.
+//  3. If the priorities are also the same, the one with the lesser txID is
+//     lesser.
 //
 // Invariant: [thanIntf] is a *Staker.
 func (s *Staker) Less(thanIntf btree.Item) bool {

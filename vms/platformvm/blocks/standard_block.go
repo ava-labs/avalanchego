@@ -28,14 +28,8 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 		},
 		Transactions: txes,
 	}
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-	return res, res.initialize(bytes)
+
+	return res, initialize(Block(res))
 }
 
 type BlueberryStandardBlock struct {
@@ -71,15 +65,8 @@ func NewApricotStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (Bl
 		},
 		Transactions: txes,
 	}
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
 
-	return res, res.initialize(bytes)
+	return res, initialize(Block(res))
 }
 
 type ApricotStandardBlock struct {

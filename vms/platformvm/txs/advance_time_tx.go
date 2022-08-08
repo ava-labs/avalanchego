@@ -17,8 +17,8 @@ var _ UnsignedTx = &AdvanceTimeTx{}
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
 // followed by a commit block) the staker set is also updated accordingly.
 // It must be that:
-//   * proposed timestamp > [current chain time]
-//   * proposed timestamp <= [time for next staker set change]
+// - proposed timestamp > [current chain time]
+// - proposed timestamp <= [time for next staker set change]
 type AdvanceTimeTx struct {
 	// Unix time this block proposes increasing the timestamp to
 	Time uint64 `serialize:"true" json:"time"`

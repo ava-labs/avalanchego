@@ -295,6 +295,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			executor := ProposalTxExecutor{
 				Backend:          &freshTH.backend,
 				ReferenceBlockID: lastAcceptedID,
+				StateVersions:    freshTH,
 				Tx:               tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
@@ -338,6 +339,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -367,6 +369,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -418,6 +421,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -463,6 +467,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -490,6 +495,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -517,6 +523,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -547,6 +554,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -605,6 +613,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
@@ -637,6 +646,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -670,6 +680,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -702,6 +713,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -742,6 +754,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -786,6 +799,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -813,6 +827,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -840,6 +855,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -888,6 +904,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
@@ -924,6 +941,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		executor := ProposalTxExecutor{
 			Backend:          &env.backend,
 			ReferenceBlockID: lastAcceptedID,
+			StateVersions:    env,
 			Tx:               tx,
 		}
 		err = tx.Unsigned.Visit(&executor)

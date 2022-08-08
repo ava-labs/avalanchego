@@ -34,7 +34,7 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsedBlueberry, err := Parse(apricotStandardBlk.Bytes(), cdc)
+		parsedBlueberry, err := Parse(cdc, apricotStandardBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -56,7 +56,7 @@ func TestStandardBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsedBlueberry, err = Parse(blueberryStandardBlk.Bytes(), cdc)
+		parsedBlueberry, err = Parse(cdc, blueberryStandardBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -93,7 +93,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(apricotProposalBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, apricotProposalBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -120,7 +120,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = Parse(blueberryProposalBlk.Bytes(), cdc)
+		parsed, err = Parse(cdc, blueberryProposalBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -151,7 +151,7 @@ func TestCommitBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(apricotCommitBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, apricotCommitBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -169,7 +169,7 @@ func TestCommitBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = Parse(blueberryCommitBlk.Bytes(), cdc)
+		parsed, err = Parse(cdc, blueberryCommitBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -194,7 +194,7 @@ func TestAbortBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(apricotAbortBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, apricotAbortBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -212,7 +212,7 @@ func TestAbortBlock(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err = Parse(blueberryAbortBlk.Bytes(), cdc)
+		parsed, err = Parse(cdc, blueberryAbortBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content
@@ -224,7 +224,7 @@ func TestAbortBlock(t *testing.T) {
 	}
 }
 
-func TestAtomicBlocks(t *testing.T) {
+func TestAtomicBlock(t *testing.T) {
 	// check atomic block can be built and parsed
 	assert := assert.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
@@ -242,7 +242,7 @@ func TestAtomicBlocks(t *testing.T) {
 		assert.NoError(err)
 
 		// parse block
-		parsed, err := Parse(atomicBlk.Bytes(), cdc)
+		parsed, err := Parse(cdc, atomicBlk.Bytes())
 		assert.NoError(err)
 
 		// compare content

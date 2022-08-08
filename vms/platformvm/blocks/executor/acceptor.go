@@ -99,7 +99,7 @@ func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		"accepting Aprictor Proposal Block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	return a.commonVisitProposalBlock(b)
@@ -225,7 +225,7 @@ func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
 		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -273,8 +273,6 @@ func (a *acceptor) commonAccept(b blocks.Block) error {
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.state.AddStatelessBlock(b, choices.Accepted)
-	a.stateVersions.DeleteState(b.Parent())
-	a.stateVersions.SetState(blkID, a.state)
 	a.recentlyAccepted.Add(blkID)
 	return nil
 }

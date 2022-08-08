@@ -4,6 +4,7 @@
 package blocks
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,4 +27,14 @@ type Block interface {
 	// note: initialize does not assume that block transactions
 	// are initialized, and initializes them itself if they aren't.
 	initialize(bytes []byte) error
+}
+
+func initialize(blk Block) error {
+	// We serialize this block as a pointer so that it can be deserialized into
+	// a Block
+	bytes, err := Codec.Marshal(txs.Version, &blk)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal block: %w", err)
+	}
+	return blk.initialize(bytes)
 }

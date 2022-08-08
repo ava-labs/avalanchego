@@ -34,15 +34,7 @@ func NewAtomicBlock(
 		Tx: tx,
 	}
 
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	return res, res.initialize(bytes)
+	return res, initialize(Block(res))
 }
 
 func (ab *AtomicBlock) initialize(bytes []byte) error {
