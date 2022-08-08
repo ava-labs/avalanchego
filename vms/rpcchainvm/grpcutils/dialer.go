@@ -5,12 +5,13 @@ package grpcutils
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -18,60 +19,14 @@ const (
 )
 
 var (
-	_ Conn              = &redialer{}
-	_ grpc.ClientStream = &stream{}
+	_ Conn = &redialer{}
+
+	errUnimplemented = errors.New("unimplemented")
 )
 
 type Conn interface {
 	io.Closer
 	grpc.ClientConnInterface
-}
-
-//  1. Call Close on the ClientConn.
-//  2. Cancel the context provided.
-//  3. Call RecvMsg until a non-nil error is returned. A protobuf-generated
-//     client-streaming RPC, for instance, might use the helper function
-//     CloseAndRecv (note that CloseSend does not Recv, therefore is not
-//     guaranteed to release all resources).
-//  4. Receive a non-nil, non-io.EOF error from Header or SendMsg.
-type stream struct {
-	grpc.ClientStream
-
-	// TODO: decRef when the context provided by [NewStream] is canceled.
-	decRef sync.Once
-	conn   *conn
-}
-
-func (s *stream) Header() (metadata.MD, error) {
-	md, err := s.ClientStream.Header()
-	if err != nil && err != io.EOF {
-		s.close()
-	}
-	return md, err
-}
-
-func (s *stream) SendMsg(m interface{}) error {
-	err := s.ClientStream.SendMsg(m)
-	if err != nil && err != io.EOF {
-		s.close()
-	}
-	return err
-}
-
-func (s *stream) RecvMsg(m interface{}) error {
-	err := s.ClientStream.RecvMsg(m)
-	if err != nil {
-		s.close()
-	}
-	return err
-}
-
-func (s *stream) close() {
-	s.decRef.Do(func() {
-		s.conn.redialer.lock.Lock()
-		s.conn.DecRef()
-		s.conn.redialer.lock.Unlock()
-	})
 }
 
 type conn struct {
@@ -150,31 +105,9 @@ func (r *redialer) Invoke(ctx context.Context, method string, args interface{}, 
 	return err
 }
 
-// We don't currently use any Streams... So this really is just for completeness
+// We don't currently use any Streams
 func (r *redialer) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	r.lock.Lock()
-	if r.closed {
-		r.lock.Unlock()
-		return r.currentConn.conn.NewStream(ctx, desc, method, opts...)
-	}
-	c, err := r.getConn()
-	r.lock.Unlock()
-	if err != nil {
-		return nil, err
-	}
-
-	s, err := c.conn.NewStream(ctx, desc, method, opts...)
-	if err != nil {
-		r.lock.Lock()
-		c.DecRef()
-		r.lock.Unlock()
-		return nil, err
-	}
-
-	return &stream{
-		ClientStream: s,
-		conn:         c,
-	}, nil
+	return nil, errUnimplemented
 }
 
 func (r *redialer) Close() error {
