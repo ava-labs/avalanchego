@@ -399,3 +399,99 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	err = verifier.AbortBlock(blk)
 	assert.NoError(err)
 }
+
+func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	grandParentID := ids.GenerateTestID()
+	grandParentStatelessBlk := blocks.NewMockBlock(ctrl)
+	grandParentState := state.NewMockDiff(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	parentState := state.NewMockDiff(ctrl)
+	atomicInputs := ids.Set{
+		ids.GenerateTestID(): struct{}{},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				ApricotPhase5Time: time.Now().Add(time.Hour),
+			},
+		},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				grandParentID: {
+					standardBlockState: standardBlockState{
+						inputs: atomicInputs,
+					},
+					statelessBlock: grandParentStatelessBlk,
+					onAcceptState:  grandParentState,
+				},
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+					onAcceptState:  parentState,
+				},
+			},
+			Mempool: mempool,
+			state:   s,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blkTx := txs.NewMockUnsignedTx(ctrl)
+	atomicRequests := map[ids.ID]*atomic.Requests{
+		ids.GenerateTestID(): {
+			RemoveRequests: [][]byte{{1}, {2}},
+			PutRequests: []*atomic.Element{
+				{
+					Key:    []byte{3},
+					Value:  []byte{4},
+					Traits: [][]byte{{5}, {6}},
+				},
+			},
+		},
+	}
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
+		func(e *executor.StandardTxExecutor) error {
+			e.OnAccept = func() {}
+			e.Inputs = atomicInputs
+			e.AtomicRequests = atomicRequests
+			return nil
+		},
+	).Times(1)
+
+	// We can't serialize [blkTx] because it isn't
+	// regiestered with the blocks.Codec.
+	// Serialize this block with a dummy tx
+	// and replace it after creation with the mock tx.
+	// TODO allow serialization of mock txs.
+	blk, err := blocks.NewStandardBlock(
+		parentID,
+		2,
+		[]*txs.Tx{
+			{
+				Unsigned: &txs.AdvanceTimeTx{},
+				Creds:    []verify.Verifiable{},
+			},
+		},
+	)
+	assert.NoError(err)
+	blk.Transactions[0].Unsigned = blkTx
+
+	// Set expectations for dependencies.
+	timestamp := time.Now()
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
+	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
+
+	err = verifier.StandardBlock(blk)
+	assert.ErrorIs(err, errConflictingParentTxs)
+}
