@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -166,7 +165,6 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
-	s.EXPECT().GetStatelessBlock(parentID).Return(parentStatelessBlk, choices.Accepted, nil).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
 	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)

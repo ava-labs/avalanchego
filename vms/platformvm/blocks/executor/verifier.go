@@ -119,28 +119,8 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	// Check for conflicts in atomic inputs.
-	if len(atomicExecutor.Inputs) > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
-				return errConflictingParentTxs
-			}
-			parent, _, err := v.state.GetStatelessBlock(parentID)
-			if err != nil {
-				// The parent isn't in memory, so it should be on disk,
-				// but it isn't.
-				return err
-			}
-			nextBlock = parent
-		}
+	if err := v.verifyUniqueInputs(b, atomicExecutor.Inputs); err != nil {
+		return err
 	}
 
 	v.blkIDToState[blkID] = &blockState{
@@ -215,33 +195,8 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 		}
 	}
 
-	// Check for conflicts in ancestors.
-	if blkState.inputs.Len() > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(blkState.inputs) {
-				return errConflictingParentTxs
-			}
-			var parent blocks.Block
-			if parentState, ok := v.blkIDToState[parentID]; ok {
-				// The parent is in memory.
-				parent = parentState.statelessBlock
-			} else {
-				var err error
-				parent, _, err = v.state.GetStatelessBlock(parentID)
-				if err != nil {
-					return err
-				}
-			}
-			nextBlock = parent
-		}
+	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
+		return err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -339,4 +294,29 @@ func (v *verifier) verifyCommonBlock(b *blocks.CommonBlock) error {
 		)
 	}
 	return nil
+}
+
+// verifyUniqueInputs verifies that the inputs of the given block are not
+// duplicated in any of the parent blocks pinned in memory.
+func (v *verifier) verifyUniqueInputs(block blocks.Block, inputs ids.Set) error {
+	if inputs.Len() == 0 {
+		return nil
+	}
+
+	// Check for conflicts in ancestors.
+	for {
+		parentID := block.Parent()
+		parentState, ok := v.blkIDToState[parentID]
+		if !ok {
+			// The parent state isn't pinned in memory.
+			// This means the parent must be accepted already.
+			return nil
+		}
+
+		if parentState.inputs.Overlaps(inputs) {
+			return errConflictingParentTxs
+		}
+
+		block = parentState.statelessBlock
+	}
 }
