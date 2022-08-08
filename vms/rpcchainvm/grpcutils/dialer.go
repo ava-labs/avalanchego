@@ -9,9 +9,9 @@ import (
 	"io"
 	"sync"
 
-	"google.golang.org/grpc"
+	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -47,7 +47,7 @@ func (c *conn) IncRef() {
 func (c *conn) DecRef() {
 	c.refs--
 	if !c.redialer.closed && c.refs == 0 {
-		c.redialer.closeErrs.Add(c.conn.Close())
+		c.redialer.closer.Go(c.conn.Close)
 		delete(c.redialer.oldConns, c)
 	}
 }
@@ -60,7 +60,7 @@ type redialer struct {
 	closed      bool
 	currentConn *conn
 	oldConns    map[*conn]struct{}
-	closeErrs   wrappers.Errs
+	closer      errgroup.Group
 }
 
 // Lock is held
@@ -115,12 +115,12 @@ func (r *redialer) Close() error {
 	defer r.lock.Unlock()
 	r.closed = true
 
-	r.closeErrs.Add(r.currentConn.conn.Close())
+	r.closer.Go(r.currentConn.conn.Close)
 	for conn := range r.oldConns {
-		r.closeErrs.Add(conn.conn.Close())
+		r.closer.Go(conn.conn.Close)
 		delete(r.oldConns, conn)
 	}
-	return r.closeErrs.Err
+	return r.closer.Wait()
 }
 
 func Dial(addr string, opts ...grpc.DialOption) (Conn, error) {
