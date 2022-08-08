@@ -43,7 +43,7 @@ type bootstrapper struct {
 
 	common.Bootstrapper
 	common.Fetcher
-	metrics
+	*metrics
 
 	started bool
 
@@ -74,9 +74,14 @@ type bootstrapper struct {
 }
 
 func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
-	b := &bootstrapper{
-		Config: config,
+	metrics, err := newMetrics("bs", config.Ctx.Registerer)
+	if err != nil {
+		return nil, err
+	}
 
+	b := &bootstrapper{
+		Config:                      config,
+		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
 		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
@@ -88,10 +93,6 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 			OnFinished: onFinished,
 		},
 		executedStateTransitions: math.MaxInt32,
-	}
-
-	if err := b.metrics.Initialize("bs", config.Ctx.Registerer); err != nil {
-		return nil, err
 	}
 
 	b.parser = &parser{
@@ -271,6 +272,7 @@ func (b *bootstrapper) Timeout() error {
 	if !b.Config.Subnet.IsBootstrapped() {
 		return b.Restart(true)
 	}
+	b.fetchETA.Set(0)
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 
@@ -385,11 +387,11 @@ func (b *bootstrapper) Clear() error {
 
 // process a series of consecutive blocks starting at [blk].
 //
-// - blk is a block that is assumed to have been marked as acceptable by the
-//   bootstrapping engine.
-// - processingBlocks is a set of blocks that can be used to lookup blocks. This
-//   enables the engine to process multiple blocks without relying on the VM to
-//   have stored blocks during `ParseBlock`.
+//   - blk is a block that is assumed to have been marked as acceptable by the
+//     bootstrapping engine.
+//   - processingBlocks is a set of blocks that can be used to lookup blocks.
+//     This enables the engine to process multiple blocks without relying on the
+//     VM to have stored blocks during `ParseBlock`.
 //
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
@@ -399,7 +401,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		if b.Halted() {
 			// We must add in [blkID] to the set of missing IDs so that we are
 			// guaranteed to continue processing from this state when the
-			// bootstapper is restarted.
+			// bootstrapper is restarted.
 			b.Blocked.AddMissingID(blkID)
 			return b.Blocked.Commit()
 		}
@@ -461,6 +463,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 				blocksFetchedSoFar-b.initiallyFetched, // Number of blocks we have fetched during this run
 				totalBlocksToFetch-b.initiallyFetched, // Number of blocks we expect to fetch during this run
 			)
+			b.fetchETA.Set(float64(eta))
 
 			if !b.Config.SharedCfg.Restarted {
 				b.Ctx.Log.Info("fetching blocks",
@@ -575,6 +578,6 @@ func (b *bootstrapper) checkFinish() error {
 		b.awaitingTimeout = true
 		return nil
 	}
-
+	b.fetchETA.Set(0)
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
