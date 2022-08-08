@@ -89,6 +89,8 @@ func (r *redialer) Invoke(ctx context.Context, method string, args interface{}, 
 	r.lock.Lock()
 	if r.closed {
 		r.lock.Unlock()
+		// Calling Invoke on the closed connection is an easy way to ensure we
+		// act similarly to the underlying grpc implementation.
 		return r.currentConn.conn.Invoke(ctx, method, args, reply, opts...)
 	}
 	c, err := r.getConn()
@@ -106,7 +108,7 @@ func (r *redialer) Invoke(ctx context.Context, method string, args interface{}, 
 }
 
 // We don't currently use any Streams
-func (r *redialer) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+func (r *redialer) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error) {
 	return nil, errUnimplemented
 }
 
