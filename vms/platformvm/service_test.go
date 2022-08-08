@@ -267,7 +267,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if blk, ok := block.(*blockexecutor.Block); !ok {
-		t.Fatalf("should be *stateful.Block but is %T", block)
+		t.Fatalf("should be *blockexecutor.Block but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
@@ -375,11 +375,8 @@ func TestGetTx(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
-					commit, ok := options[0].(*blockexecutor.Block)
-					if !ok {
-						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
-					}
-					if _, ok := options[0].(*blockexecutor.Block).Block.(*blocks.CommitBlock); !ok {
+					commit := options[0].(*blockexecutor.Block)
+					if _, ok := commit.Block.(*blocks.CommitBlock); !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
 					if err := commit.Verify(); err != nil {

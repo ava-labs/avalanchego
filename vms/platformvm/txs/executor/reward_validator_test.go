@@ -45,9 +45,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -59,9 +60,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -70,9 +72,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -124,9 +127,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -138,9 +142,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -149,9 +154,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -257,9 +263,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
@@ -374,9 +381,10 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
-		Backend:  &env.backend,
-		ParentID: lastAcceptedID,
-		Tx:       tx,
+		Backend:       &env.backend,
+		ParentID:      lastAcceptedID,
+		StateVersions: env,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)

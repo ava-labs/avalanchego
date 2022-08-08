@@ -4,6 +4,8 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -21,4 +23,14 @@ type Block interface {
 	Visit(visitor Visitor) error
 
 	initialize(bytes []byte) error
+}
+
+func initialize(blk Block) error {
+	// We serialize this block as a pointer so that it can be deserialized into
+	// a Block
+	bytes, err := Codec.Marshal(txs.Version, &blk)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal block: %w", err)
+	}
+	return blk.initialize(bytes)
 }

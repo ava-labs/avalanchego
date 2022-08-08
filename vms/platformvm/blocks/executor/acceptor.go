@@ -24,15 +24,15 @@ type acceptor struct {
 }
 
 // Note that:
-// - We don't free the proposal block in this method. It is freed when its child
-//   is accepted. We need to keep this block's state in memory for its child to
-//   use.
-// - We only update the metrics to reflect this block's acceptance when its
-//   child is accepted.
-// - We don't write this block to state here. That is done when this block's
-//   child (a CommitBlock or AbortBlock) is accepted. We do this so that in the
-//   event that the node shuts down, the proposal block is not written to disk
-//   unless its child is. (The VM's Shutdown method commits the database.)
+//   - We don't free the proposal block in this method. It is freed when its child
+//     is accepted. We need to keep this block's state in memory for its child to
+//     use.
+//   - We only update the metrics to reflect this block's acceptance when its
+//     child is accepted.
+//   - We don't write this block to state here. That is done when this block's
+//     child (a CommitBlock or AbortBlock) is accepted. We do this so that in the
+//     event that the node shuts down, the proposal block is not written to disk
+//     unless its child is. (The VM's Shutdown method commits the database.)
 func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
@@ -40,7 +40,7 @@ func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
 		zap.String("blockType", "proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	// See comment for [lastAccepted].
@@ -57,7 +57,7 @@ func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
 		zap.String("blockType", "atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -103,7 +103,7 @@ func (a *acceptor) StandardBlock(b *blocks.StandardBlock) error {
 		zap.String("blockType", "standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	if err := a.commonAccept(b); err != nil {
@@ -145,7 +145,7 @@ func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
 		zap.String("blockType", "commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 	return a.acceptOptionBlock(b)
 }
@@ -156,7 +156,7 @@ func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
 		zap.String("blockType", "abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 	return a.acceptOptionBlock(b)
 }
@@ -214,8 +214,6 @@ func (a *acceptor) commonAccept(b blocks.Block) error {
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.state.AddStatelessBlock(b, choices.Accepted)
-	a.stateVersions.DeleteState(b.Parent())
-	a.stateVersions.SetState(blkID, a.state)
 
 	a.recentlyAccepted.Add(blkID)
 	return nil

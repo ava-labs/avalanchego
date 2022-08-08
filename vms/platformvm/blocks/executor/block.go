@@ -37,9 +37,8 @@ func (b *Block) Reject() error {
 
 func (b *Block) Status() choices.Status {
 	blkID := b.ID()
-	// If this block is an accepted Proposal block with
-	// no accepted children, it will be in [blkIDToState],
-	// but we should return accepted, not processing,
+	// If this block is an accepted Proposal block with no accepted children, it
+	// will be in [blkIDToState], but we should return accepted, not processing,
 	// so we do this check.
 	if b.manager.backend.lastAccepted == blkID {
 		return choices.Accepted

@@ -46,7 +46,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			err = tx.Sign(txs.Codec, signers)
 			assert.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			assert.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)

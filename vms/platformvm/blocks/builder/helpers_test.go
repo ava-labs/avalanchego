@@ -101,7 +101,6 @@ type environment struct {
 	utxosHandler   utxo.Handler
 	txBuilder      p_tx_builder.Builder
 	backend        txexecutor.Backend
-	stateVersions  state.Versions
 }
 
 // TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
@@ -152,17 +151,15 @@ func newEnvironment(t *testing.T) *environment {
 	)
 
 	genesisID := res.state.GetLastAccepted()
-	res.stateVersions = state.NewVersions(genesisID, res.state)
 	res.backend = txexecutor.Backend{
-		Config:        res.config,
-		Ctx:           res.ctx,
-		Clk:           res.clk,
-		Bootstrapped:  res.isBootstrapped,
-		Fx:            res.fx,
-		FlowChecker:   res.utxosHandler,
-		Uptimes:       res.uptimes,
-		Rewards:       rewardsCalc,
-		StateVersions: res.stateVersions,
+		Config:       res.config,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		FlowChecker:  res.utxosHandler,
+		Uptimes:      res.uptimes,
+		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -188,14 +185,14 @@ func newEnvironment(t *testing.T) *environment {
 		res.mpool,
 		metrics,
 		res.state,
-		res.backend,
+		&res.backend,
 		window,
 	)
 
 	res.BlockBuilder = NewBlockBuilder(
 		res.mpool,
 		res.txBuilder,
-		res.backend,
+		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
 		res.sender,
@@ -205,19 +202,17 @@ func newEnvironment(t *testing.T) *environment {
 		panic(fmt.Errorf("failed setting last accepted block: %w", err))
 	}
 
-	addSubnet(res.state, res.txBuilder, res.backend)
+	addSubnet(res)
 
 	return res
 }
 
 func addSubnet(
-	baseState state.State,
-	txBuilder p_tx_builder.Builder,
-	backend txexecutor.Backend,
+	env *environment,
 ) {
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
 			preFundedKeys[0].PublicKey().Address(),
@@ -232,14 +227,14 @@ func addSubnet(
 	}
 
 	// store it
-	genesisID := baseState.GetLastAccepted()
-	stateDiff, err := state.NewDiff(genesisID, backend.StateVersions)
+	genesisID := env.state.GetLastAccepted()
+	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	if err != nil {
 		panic(err)
 	}
 
 	executor := txexecutor.StandardTxExecutor{
-		Backend: &backend,
+		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
@@ -249,8 +244,7 @@ func addSubnet(
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(baseState)
-	backend.StateVersions.SetState(genesisID, baseState)
+	stateDiff.Apply(env.state)
 }
 
 func defaultState(

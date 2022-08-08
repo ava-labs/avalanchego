@@ -68,7 +68,7 @@ type blockBuilder struct {
 	Network
 
 	txBuilder         p_tx_builder.Builder
-	txExecutorBackend txexecutor.Backend
+	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
 	// ID of the preferred block to build on top of
@@ -87,7 +87,7 @@ type blockBuilder struct {
 func NewBlockBuilder(
 	mempool mempool.Mempool,
 	txBuilder p_tx_builder.Builder,
-	txExecutorBackend txexecutor.Backend,
+	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
@@ -144,9 +144,10 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 	}
 
 	verifier := txexecutor.MempoolTxVerifier{
-		Backend:  &b.txExecutorBackend,
-		ParentID: b.preferredBlockID, // We want to build off of the preferred block
-		Tx:       tx,
+		Backend:       b.txExecutorBackend,
+		ParentID:      b.preferredBlockID, // We want to build off of the preferred block
+		StateVersions: b.blkManager,
+		Tx:            tx,
 	}
 	if err := tx.Unsigned.Visit(&verifier); err != nil {
 		b.MarkDropped(txID, err.Error())
@@ -167,10 +168,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		b.ResetBlockTimer()
 	}()
 
-	var (
-		ctx           = b.txExecutorBackend.Ctx
-		stateVersions = b.txExecutorBackend.StateVersions
-	)
+	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
@@ -181,7 +179,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
 
-	preferredState, ok := stateVersions.GetState(preferredID)
+	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
 		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
@@ -295,12 +293,8 @@ func (b *blockBuilder) ResetBlockTimer() {
 		return
 	}
 
-	var (
-		ctx           = b.txExecutorBackend.Ctx
-		stateVersions = b.txExecutorBackend.StateVersions
-	)
-
-	preferredState, ok := stateVersions.GetState(b.preferredBlockID)
+	ctx := b.txExecutorBackend.Ctx
+	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
 	if !ok {
 		// The preferred block should always be a decision block
 		ctx.Log.Error("couldn't get preferred block state",

@@ -27,7 +27,7 @@ const (
 	// SyncBound is the synchrony bound used for safe decision making
 	SyncBound = 10 * time.Second
 
-	MaxValidatorWeightFactor = uint64(5)
+	MaxValidatorWeightFactor = 5
 )
 
 var (
@@ -53,8 +53,9 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	ParentID ids.ID
-	Tx       *txs.Tx
+	ParentID      ids.ID
+	StateVersions state.Versions
+	Tx            *txs.Tx
 
 	// outputs of visitor execution
 	OnCommit      state.Diff

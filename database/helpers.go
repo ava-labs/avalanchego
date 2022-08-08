@@ -12,12 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var errWrongSize = errors.New("value has unexpected size")
-
 const (
 	// kvPairOverhead is an estimated overhead for a kv pair in a database.
 	kvPairOverhead = 8 // bytes
 )
+
+var errWrongSize = errors.New("value has unexpected size")
 
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])

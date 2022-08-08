@@ -125,7 +125,6 @@ func TestRejectBlock(t *testing.T) {
 			assert.NoError(err)
 
 			mempool := mempool.NewMockMempool(ctrl)
-			stateVersions := state.NewMockVersions(ctrl)
 			state := state.NewMockState(ctrl)
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
@@ -136,10 +135,9 @@ func TestRejectBlock(t *testing.T) {
 					ctx: &snow.Context{
 						Log: logging.NoLog{},
 					},
-					blkIDToState:  blkIDToState,
-					Mempool:       mempool,
-					stateVersions: stateVersions,
-					state:         state,
+					blkIDToState: blkIDToState,
+					Mempool:      mempool,
+					state:        state,
 				},
 			}
 
@@ -148,7 +146,6 @@ func TestRejectBlock(t *testing.T) {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
 			gomock.InOrder(
-				stateVersions.EXPECT().DeleteState(blk.ID()).Times(1),
 				state.EXPECT().AddStatelessBlock(blk, choices.Rejected).Times(1),
 				state.EXPECT().Commit().Return(nil).Times(1),
 			)

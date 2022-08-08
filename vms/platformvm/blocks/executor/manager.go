@@ -17,9 +17,11 @@ import (
 var _ Manager = &manager{}
 
 type Manager interface {
+	state.Versions
+
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
-	GetBlock(id ids.ID) (snowman.Block, error)
+	GetBlock(blkID ids.ID) (snowman.Block, error)
 	NewBlock(blocks.Block) snowman.Block
 }
 
@@ -27,19 +29,19 @@ func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
 	s state.State,
-	txExecutorBackend executor.Backend,
+	txExecutorBackend *executor.Backend,
 	recentlyAccepted *window.Window,
 ) Manager {
 	backend := &backend{
-		Mempool:       mempool,
-		state:         s,
-		bootstrapped:  txExecutorBackend.Bootstrapped,
-		ctx:           txExecutorBackend.Ctx,
-		blkIDToState:  map[ids.ID]*blockState{},
-		stateVersions: txExecutorBackend.StateVersions,
+		Mempool:      mempool,
+		lastAccepted: s.GetLastAccepted(),
+		state:        s,
+		bootstrapped: txExecutorBackend.Bootstrapped,
+		ctx:          txExecutorBackend.Ctx,
+		blkIDToState: map[ids.ID]*blockState{},
 	}
 
-	manager := &manager{
+	return &manager{
 		backend: backend,
 		verifier: &verifier{
 			backend:           backend,
@@ -52,7 +54,6 @@ func NewManager(
 		},
 		rejector: &rejector{backend: backend},
 	}
-	return manager
 }
 
 type manager struct {
@@ -80,13 +81,4 @@ func (m *manager) NewBlock(blk blocks.Block) snowman.Block {
 		manager: m,
 		Block:   blk,
 	}
-}
-
-func (m *manager) LastAccepted() ids.ID {
-	if m.backend.lastAccepted == ids.Empty {
-		// No blocks have been accepted since startup.
-		// Return the last accepted block from state.
-		return m.state.GetLastAccepted()
-	}
-	return m.backend.lastAccepted
 }
