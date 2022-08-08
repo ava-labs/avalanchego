@@ -97,7 +97,7 @@ type VMClient struct {
 	appSender    *appsender.Server
 
 	serverCloser grpcutils.ServerCloser
-	conns        []*grpc.ClientConn
+	conns        []grpcutils.Conn
 
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
 
