@@ -111,94 +111,96 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	assert.NoError(err)
 }
 
-// TODO: unlock
-// func TestVerifierVisitAtomicBlock(t *testing.T) {
-// 	assert := assert.New(t)
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func TestVerifierVisitAtomicBlock(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	// Create mocked dependencies.
-// 	s := state.NewMockState(ctrl)
-// 	mempool := mempool.NewMockMempool(ctrl)
-// 	parentID := ids.GenerateTestID()
-// 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
-// 	grandparentID := ids.GenerateTestID()
-// 	parentState := state.NewMockDiff(ctrl)
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	grandparentID := ids.GenerateTestID()
+	parentState := state.NewMockDiff(ctrl)
 
-// 	config := &config.Config{
-// 		ApricotPhase5Time: time.Now().Add(time.Hour),
-// 		BlueberryTime:     mockable.MaxTime, // blueberry is not activated
-// 	}
+	config := &config.Config{
+		ApricotPhase5Time: time.Now().Add(time.Hour),
+		BlueberryTime:     mockable.MaxTime, // blueberry is not activated
+	}
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentState,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: config,
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: config,
+		},
+		backend: backend,
+		forkChecker: &forkChecker{
+			backend: backend,
+		},
+	}
 
-// 	verifier := &verifier{
-// 		txExecutorBackend: &executor.Backend{
-// 			Config: config,
-// 		},
-// 		backend: &backend{
-// 			blkIDToState: map[ids.ID]*blockState{
-// 				parentID: {
-// 					statelessBlock: parentStatelessBlk,
-// 					onAcceptState:  parentState,
-// 				},
-// 			},
-// 			Mempool: mempool,
-// 			state:   s,
-// 			ctx: &snow.Context{
-// 				Log: logging.NoLog{},
-// 			},
-// 			cfg: config,
-// 		},
-// 	}
+	onAccept := state.NewMockDiff(ctrl)
+	blkTx := txs.NewMockUnsignedTx(ctrl)
+	inputs := ids.Set{ids.GenerateTestID(): struct{}{}}
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
+		func(e *executor.AtomicTxExecutor) error {
+			e.OnAccept = onAccept
+			e.Inputs = inputs
+			return nil
+		},
+	).Times(1)
 
-// 	onAccept := state.NewMockDiff(ctrl)
-// 	blkTx := txs.NewMockUnsignedTx(ctrl)
-// 	inputs := ids.Set{ids.GenerateTestID(): struct{}{}}
-// 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
-// 		func(e *executor.AtomicTxExecutor) error {
-// 			e.OnAccept = onAccept
-// 			e.Inputs = inputs
-// 			return nil
-// 		},
-// 	).Times(1)
+	// We can't serialize [blkTx] because it isn't registered with blocks.Codec.
+	// Serialize this block with a dummy tx and replace it after creation with
+	// the mock tx.
+	// TODO allow serialization of mock txs.
+	blk, err := blocks.NewApricotAtomicBlock(
+		parentID,
+		2,
+		&txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{},
+			Creds:    []verify.Verifiable{},
+		},
+	)
+	assert.NoError(err)
+	blk.Tx.Unsigned = blkTx
 
-// 	// We can't serialize [blkTx] because it isn't registered with blocks.Codec.
-// 	// Serialize this block with a dummy tx and replace it after creation with
-// 	// the mock tx.
-// 	// TODO allow serialization of mock txs.
-// 	blk, err := blocks.NewAtomicBlock(
-// 		parentID,
-// 		2,
-// 		&txs.Tx{
-// 			Unsigned: &txs.AdvanceTimeTx{},
-// 			Creds:    []verify.Verifiable{},
-// 		},
-// 	)
-// 	assert.NoError(err)
-// 	blk.Tx.Unsigned = blkTx
+	// Set expectations for dependencies.
+	timestamp := time.Now()
+	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
+	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
+	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
-// 	// Set expectations for dependencies.
-// 	timestamp := time.Now()
-// 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-// 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-// 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
-// 	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
-// 	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
-// 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	err = verifier.ApricotAtomicBlock(blk)
+	assert.NoError(err)
 
-// 	err = verifier.AtomicBlock(blk)
-// 	assert.NoError(err)
+	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	assert.Equal(blk, gotBlkState.statelessBlock)
+	assert.Equal(onAccept, gotBlkState.onAcceptState)
+	assert.Equal(inputs, gotBlkState.inputs)
+	assert.Equal(timestamp, gotBlkState.timestamp)
 
-// 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
-// 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-// 	assert.Equal(blk, gotBlkState.statelessBlock)
-// 	assert.Equal(onAccept, gotBlkState.onAcceptState)
-// 	assert.Equal(inputs, gotBlkState.inputs)
-// 	assert.Equal(timestamp, gotBlkState.timestamp)
-
-// 	// Visiting again should return nil without using dependencies.
-// 	err = verifier.AtomicBlock(blk)
-// 	assert.NoError(err)
-// }
+	// Visiting again should return nil without using dependencies.
+	err = verifier.ApricotAtomicBlock(blk)
+	assert.NoError(err)
+}
 
 func TestVerifierVisitStandardBlock(t *testing.T) {
 	assert := assert.New(t)
