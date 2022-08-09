@@ -50,93 +50,93 @@ func New(
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
 ) (Metrics, error) {
-	res := &metrics{}
-
 	blockMetrics, err := newBlockMetrics(namespace, registerer)
-	res.blockMetrics = blockMetrics
+	m := &metrics{
+		blockMetrics: blockMetrics,
 
-	res.percentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "percent_connected",
-		Help:      "Percent of connected stake",
-	})
-	res.subnetPercentConnected = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "percent_connected_subnet",
-			Help:      "Percent of connected subnet weight",
-		},
-		[]string{"subnetID"},
-	)
-	res.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	res.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
+			Name:      "percent_connected",
+			Help:      "Percent of connected stake",
+		}),
+		subnetPercentConnected: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "percent_connected_subnet",
+				Help:      "Percent of connected subnet weight",
+			},
+			[]string{"subnetID"},
+		),
+		localStake: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "local_staked",
+			Help:      "Total amount of AVAX on this node staked",
+		}),
+		totalStake: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "total_staked",
+			Help:      "Total amount of AVAX staked",
+		}),
 
-	res.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "votes_won",
-		Help:      "Total number of votes this node has won",
-	})
-	res.numVotesLost = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "votes_lost",
-		Help:      "Total number of votes this node has lost",
-	})
+		numVotesWon: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "votes_won",
+			Help:      "Total number of votes this node has won",
+		}),
+		numVotesLost: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "votes_lost",
+			Help:      "Total number of votes this node has lost",
+		}),
 
-	res.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_cached",
-		Help:      "Total number of validator sets cached",
-	})
-	res.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_created",
-		Help:      "Total number of validator sets created from applying difflayers",
-	})
-	res.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_height_diff_sum",
-		Help:      "Total number of validator sets diffs applied for generating validator sets",
-	})
-	res.validatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_duration_sum",
-		Help:      "Total amount of time generating validator sets in nanoseconds",
-	})
+		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_cached",
+			Help:      "Total number of validator sets cached",
+		}),
+		validatorSetsCreated: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_created",
+			Help:      "Total number of validator sets created from applying difflayers",
+		}),
+		validatorSetsHeightDiff: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_height_diff_sum",
+			Help:      "Total number of validator sets diffs applied for generating validator sets",
+		}),
+		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_duration_sum",
+			Help:      "Total amount of time generating validator sets in nanoseconds",
+		}),
+	}
 
 	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
-	res.APIInterceptor = apiRequestMetrics
+	m.APIInterceptor = apiRequestMetrics
 	errs.Add(
 		err,
 
-		registerer.Register(res.percentConnected),
-		registerer.Register(res.subnetPercentConnected),
-		registerer.Register(res.localStake),
-		registerer.Register(res.totalStake),
+		registerer.Register(m.percentConnected),
+		registerer.Register(m.subnetPercentConnected),
+		registerer.Register(m.localStake),
+		registerer.Register(m.totalStake),
 
-		registerer.Register(res.numVotesWon),
-		registerer.Register(res.numVotesLost),
+		registerer.Register(m.numVotesWon),
+		registerer.Register(m.numVotesLost),
 
-		registerer.Register(res.validatorSetsCreated),
-		registerer.Register(res.validatorSetsCached),
-		registerer.Register(res.validatorSetsHeightDiff),
-		registerer.Register(res.validatorSetsDuration),
+		registerer.Register(m.validatorSetsCreated),
+		registerer.Register(m.validatorSetsCached),
+		registerer.Register(m.validatorSetsHeightDiff),
+		registerer.Register(m.validatorSetsDuration),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets
 	for subnetID := range whitelistedSubnets {
 		// initialize to 0
-		res.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
+		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
 	}
-	return res, errs.Err
+	return m, errs.Err
 }
 
 type metrics struct {
