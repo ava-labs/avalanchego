@@ -216,7 +216,10 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			test.assertState(t, statedb)
+
+			if test.assertState != nil {
+				test.assertState(t, statedb)
+			}
 		})
 	}
 }

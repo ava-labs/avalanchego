@@ -286,7 +286,9 @@ func TestContractDeployerAllowListRun(t *testing.T) {
 			assert.Equal(t, uint64(0), remainingGas)
 			assert.Equal(t, test.expectedRes, ret)
 
-			test.assertState(t, state)
+			if test.assertState != nil {
+				test.assertState(t, state)
+			}
 		})
 	}
 }
@@ -519,7 +521,9 @@ func TestTxAllowListRun(t *testing.T) {
 			assert.Equal(t, uint64(0), remainingGas)
 			assert.Equal(t, test.expectedRes, ret)
 
-			test.assertState(t, state)
+			if test.assertState != nil {
+				test.assertState(t, state)
+			}
 		})
 	}
 }
@@ -769,7 +773,9 @@ func TestContractNativeMinterRun(t *testing.T) {
 			assert.Equal(t, uint64(0), remainingGas)
 			assert.Equal(t, test.expectedRes, ret)
 
-			test.assertState(t, state)
+			if test.assertState != nil {
+				test.assertState(t, state)
+			}
 		})
 	}
 }
@@ -1049,7 +1055,9 @@ func TestFeeConfigManagerRun(t *testing.T) {
 			assert.Equal(t, uint64(0), remainingGas)
 			assert.Equal(t, test.expectedRes, ret)
 
-			test.assertState(t, state)
+			if test.assertState != nil {
+				test.assertState(t, state)
+			}
 		})
 	}
 }
