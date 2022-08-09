@@ -38,11 +38,10 @@ type Metrics interface {
 	SetLocalStake(uint64)
 	// Mark that this much stake is staked in the network.
 	SetTotalStake(uint64)
-	// Mark that this node is connected to this
-	// percent of the subnet's stake.
+	// Mark that this node is connected to this percent of a subnet's stake.
 	SetSubnetPercentConnected(subnetID ids.ID, percent float64)
-	// Mark that this node is connected to this percent
-	// of the Primary network's stake.
+	// Mark that this node is connected to this percent of the Primary Network's
+	// stake.
 	SetPercentConnected(percent float64)
 }
 
