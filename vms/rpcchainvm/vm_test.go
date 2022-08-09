@@ -286,7 +286,7 @@ func (vm *TestVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*vmpb.C
 
 type TestVMClient struct {
 	client vmpb.VMClient
-	conns  []grpcutils.Conn
+	conns  []*grpc.ClientConn
 }
 
 func NewTestClient(client vmpb.VMClient) *TestVMClient {
