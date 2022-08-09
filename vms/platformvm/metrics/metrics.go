@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/rpc/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -46,7 +47,7 @@ type Metrics interface {
 	SetTotalStake(float64)
 	// Mark that this node is connected to this
 	// percent of the subnet's stake.
-	SetSubnetPercentConnected(subnetIDStr string, percent float64)
+	SetSubnetPercentConnected(subnetID ids.ID, percent float64)
 	// Mark that this node is connected to this percent
 	// of the Primary network's stake.
 	SetPercentConnected(percent float64)
@@ -208,8 +209,8 @@ func (m *metrics) SetTotalStake(s float64) {
 	m.totalStake.Set(s)
 }
 
-func (m *metrics) SetSubnetPercentConnected(label string, percent float64) {
-	m.subnetPercentConnected.WithLabelValues(label).Set(percent)
+func (m *metrics) SetSubnetPercentConnected(subnetID ids.ID, percent float64) {
+	m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(percent)
 }
 
 func (m *metrics) SetPercentConnected(percent float64) {

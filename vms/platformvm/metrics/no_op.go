@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/gorilla/rpc/v2"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
 var _ Metrics = &noopMetrics{}
@@ -45,6 +47,6 @@ func (m *noopMetrics) SetLocalStake(float64) {}
 
 func (m *noopMetrics) SetTotalStake(float64) {}
 
-func (m *noopMetrics) SetSubnetPercentConnected(label string, percent float64) {}
+func (m *noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
-func (m *noopMetrics) SetPercentConnected(percent float64) {}
+func (m *noopMetrics) SetPercentConnected(float64) {}
