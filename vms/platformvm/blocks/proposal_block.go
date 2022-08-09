@@ -44,10 +44,11 @@ type BlueberryProposalBlock struct {
 }
 
 func (b *BlueberryProposalBlock) initialize(bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
-		return fmt.Errorf("failed to initialize: %w", err)
+	b.BlueberryCommonBlock.initialize(bytes)
+	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
-	return b.Tx.Sign(txs.Codec, nil)
+	return nil
 }
 
 func (b *BlueberryProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
@@ -81,10 +82,11 @@ type ApricotProposalBlock struct {
 }
 
 func (b *ApricotProposalBlock) initialize(bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
-		return err
+	b.ApricotCommonBlock.initialize(bytes)
+	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
-	return b.Tx.Sign(txs.Codec, nil)
+	return nil
 }
 
 func (b *ApricotProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }

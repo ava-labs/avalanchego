@@ -125,8 +125,8 @@ type State interface {
 	// Commit changes to the base database.
 	Commit() error
 
-	// Returns a batch of unwritten changes that,
-	// when written, will be commit to the base database.
+	// Returns a batch of unwritten changes that, when written, will be commit
+	// all pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
 	Close() error

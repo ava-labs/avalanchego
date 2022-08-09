@@ -13,91 +13,59 @@ import (
 var _ blocks.Visitor = &rejector{}
 
 // rejector handles the logic for rejecting a block.
+// All errors returned by this struct are fatal and should result in the chain
+// being shutdown.
 type rejector struct {
 	*backend
 }
 
 func (r *rejector) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "abort"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
-	)
-	return r.rejectOptionBlock(b)
+	return r.rejectBlock(b, "blueberry abort")
 }
 
 func (r *rejector) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "commit"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
-	)
-	return r.rejectOptionBlock(b)
-}
-
-func (r *rejector) rejectOptionBlock(b blocks.Block) error {
-	blkID := b.ID()
-	defer r.free(blkID)
-
-	// r.stateVersions.DeleteState(blkID)
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	return r.rejectBlock(b, "blueberry commit")
 }
 
 func (r *rejector) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
-	return r.visitProposalBlock(b)
+	return r.rejectBlock(b, "blueberry proposal")
 }
 
-func (r *rejector) visitProposalBlock(b blocks.Block) error {
-	blkID := b.ID()
-	defer r.free(blkID)
+func (r *rejector) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+	return r.rejectBlock(b, "blueberry standard")
+}
 
+func (r *rejector) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
+	return r.rejectBlock(b, "apricot abort")
+}
+
+func (r *rejector) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
+	return r.rejectBlock(b, "apricot commit")
+}
+
+func (r *rejector) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+	return r.rejectBlock(b, "apricot proposal")
+}
+
+func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
+	return r.rejectBlock(b, "apricot standard")
+}
+
+func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
+	return r.rejectBlock(b, "apricot atomic")
+}
+
+func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
+	blkID := b.ID()
 	r.ctx.Log.Verbo(
 		"rejecting block",
-		zap.String("blockType", "proposal"),
+		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	txs := b.Txs()
-	for _, tx := range txs {
-		if err := r.Mempool.Add(tx); err != nil {
-			r.ctx.Log.Verbo(
-				"failed to reissue tx",
-				zap.Stringer("txID", tx.ID()),
-				zap.Stringer("blkID", blkID),
-				zap.Error(err),
-			)
-		}
-	}
-
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
-}
-
-func (r *rejector) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
-	return r.visitStandardBlock(b)
-}
-
-func (r *rejector) visitStandardBlock(b blocks.Block) error {
-	blkID := b.ID()
-	defer r.free(blkID)
-
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "standard"),
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
-	)
-
-	txs := b.Txs()
-	for _, tx := range txs {
+	for _, tx := range b.Txs() {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",
@@ -108,62 +76,8 @@ func (r *rejector) visitStandardBlock(b blocks.Block) error {
 		}
 	}
 
-	// r.stateVersions.DeleteState(blkID)
 	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
-}
-
-func (r *rejector) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "abort"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
-	)
-	return r.rejectOptionBlock(b)
-}
-
-func (r *rejector) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "commit"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
-	)
-	return r.rejectOptionBlock(b)
-}
-
-func (r *rejector) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	return r.visitProposalBlock(b)
-}
-
-func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	return r.visitStandardBlock(b)
-}
-
-func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
-	blkID := b.ID()
-	defer r.free(blkID)
-
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "apricot atomic"),
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
-	)
-
-	if err := r.Mempool.Add(b.Tx); err != nil {
-		r.ctx.Log.Debug(
-			"failed to reissue tx",
-			zap.Stringer("txID", b.Tx.ID()),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
-	}
-
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	err := r.state.Commit()
+	r.free(blkID)
+	return err
 }

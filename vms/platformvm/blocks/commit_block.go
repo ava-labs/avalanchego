@@ -33,6 +33,11 @@ type BlueberryCommitBlock struct {
 	BlueberryCommonBlock `serialize:"true"`
 }
 
+func (b *BlueberryCommitBlock) initialize(bytes []byte) error {
+	b.BlueberryCommonBlock.initialize(bytes)
+	return nil
+}
+
 func (*BlueberryCommitBlock) Txs() []*txs.Tx { return nil }
 
 func (b *BlueberryCommitBlock) Visit(v Visitor) error {
@@ -52,6 +57,11 @@ func NewApricotCommitBlock(parentID ids.ID, height uint64) (Block, error) {
 
 type ApricotCommitBlock struct {
 	ApricotCommonBlock `serialize:"true"`
+}
+
+func (b *ApricotCommitBlock) initialize(bytes []byte) error {
+	b.ApricotCommonBlock.initialize(bytes)
+	return nil
 }
 
 func (*ApricotCommitBlock) Txs() []*txs.Tx { return nil }

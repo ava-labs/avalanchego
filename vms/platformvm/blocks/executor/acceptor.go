@@ -17,6 +17,8 @@ import (
 var _ blocks.Visitor = &acceptor{}
 
 // acceptor handles the logic for accepting a block.
+// All errors returned by this struct are fatal and should result in the chain
+// being shutdown.
 type acceptor struct {
 	*backend
 	metrics          metrics.Metrics

@@ -33,6 +33,11 @@ type BlueberryAbortBlock struct {
 	BlueberryCommonBlock `serialize:"true"`
 }
 
+func (b *BlueberryAbortBlock) initialize(bytes []byte) error {
+	b.BlueberryCommonBlock.initialize(bytes)
+	return nil
+}
+
 func (*BlueberryAbortBlock) Txs() []*txs.Tx { return nil }
 
 func (b *BlueberryAbortBlock) Visit(v Visitor) error {
@@ -52,6 +57,11 @@ func NewApricotAbortBlock(parentID ids.ID, height uint64) (Block, error) {
 
 type ApricotAbortBlock struct {
 	ApricotCommonBlock `serialize:"true"`
+}
+
+func (b *ApricotAbortBlock) initialize(bytes []byte) error {
+	b.ApricotCommonBlock.initialize(bytes)
+	return nil
 }
 
 func (*ApricotAbortBlock) Txs() []*txs.Tx { return nil }

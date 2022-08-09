@@ -34,10 +34,9 @@ type ApricotCommonBlock struct {
 	bytes []byte
 }
 
-func (b *ApricotCommonBlock) initialize(bytes []byte) error {
+func (b *ApricotCommonBlock) initialize(bytes []byte) {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
-	return nil
 }
 
 func (b *ApricotCommonBlock) ID() ids.ID     { return b.id }

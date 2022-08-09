@@ -77,11 +77,11 @@ type manager struct {
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	statelessBlk, err := m.getStatelessBlock(blkID)
+	blk, err := m.backend.GetBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
-	return m.NewBlock(statelessBlk), nil
+	return m.NewBlock(blk), nil
 }
 
 func (m *manager) NewBlock(blk blocks.Block) snowman.Block {

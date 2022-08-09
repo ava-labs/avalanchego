@@ -39,12 +39,10 @@ type BlueberryStandardBlock struct {
 }
 
 func (b *BlueberryStandardBlock) initialize(bytes []byte) error {
-	if err := b.BlueberryCommonBlock.initialize(bytes); err != nil {
-		return fmt.Errorf("failed to initialize: %w", err)
-	}
+	b.BlueberryCommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to sign block: %w", err)
+			return fmt.Errorf("failed to initialize tx: %w", err)
 		}
 	}
 	return nil
@@ -76,9 +74,7 @@ type ApricotStandardBlock struct {
 }
 
 func (b *ApricotStandardBlock) initialize(bytes []byte) error {
-	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
-		return fmt.Errorf("failed to initialize: %w", err)
-	}
+	b.ApricotCommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)

@@ -54,6 +54,16 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 	return b.state, blkID == b.lastAccepted
 }
 
+func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
+	// See if the block is in memory.
+	if blk, ok := b.blkIDToState[blkID]; ok {
+		return blk.statelessBlock, nil
+	}
+	// The block isn't in memory. Check the database.
+	statelessBlk, _, err := b.state.GetStatelessBlock(blkID)
+	return statelessBlk, err
+}
+
 func (b *backend) LastAccepted() ids.ID {
 	return b.lastAccepted
 }

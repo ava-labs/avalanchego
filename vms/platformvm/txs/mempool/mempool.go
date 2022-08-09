@@ -34,8 +34,9 @@ var (
 	_ Mempool     = &mempool{}
 	_ txs.Visitor = &mempoolIssuer{}
 
-	errUnknownTxType = errors.New("unknown transaction type")
-	errMempoolFull   = errors.New("mempool is full")
+	errMempoolFull                = errors.New("mempool is full")
+	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
+	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
 type BlockTimer interface {
@@ -343,11 +344,11 @@ type mempoolIssuer struct {
 }
 
 func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
-	return fmt.Errorf("%w: %T", errUnknownTxType, tx)
+	return errCantIssueAdvanceTimeTx
 }
 
 func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
-	return fmt.Errorf("%w: %T", errUnknownTxType, tx)
+	return errCantIssueRewardValidatorTx
 }
 
 func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {

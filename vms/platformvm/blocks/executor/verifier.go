@@ -526,23 +526,13 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 }
 
 func (v *verifier) verifyCommonBlock(b blocks.Block) error {
-	var (
-		parentID           = b.Parent()
-		parentStatelessBlk blocks.Block
-	)
-	// Check if the parent is in memory.
-	if parent, ok := v.blkIDToState[parentID]; ok {
-		parentStatelessBlk = parent.statelessBlock
-	} else {
-		// The parent isn't in memory.
-		var err error
-		parentStatelessBlk, _, err = v.state.GetStatelessBlock(parentID)
-		if err != nil {
-			return err
-		}
+	parentID := b.Parent()
+	parent, err := v.GetBlock(parentID)
+	if err != nil {
+		return err
 	}
 
-	if expectedHeight := parentStatelessBlk.Height() + 1; expectedHeight != b.Height() {
+	if expectedHeight := parent.Height() + 1; expectedHeight != b.Height() {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
 			expectedHeight,
