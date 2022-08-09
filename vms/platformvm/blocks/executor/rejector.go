@@ -13,73 +13,43 @@ import (
 var _ blocks.Visitor = &rejector{}
 
 // rejector handles the logic for rejecting a block.
+// All errors returned by this struct are fatal and should result in the chain
+// being shutdown.
 type rejector struct {
 	*backend
 }
 
 func (r *rejector) ProposalBlock(b *blocks.ProposalBlock) error {
-	blkID := b.ID()
-	defer r.free(blkID)
-
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "proposal"),
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
-	)
-
-	if err := r.Mempool.Add(b.Tx); err != nil {
-		r.ctx.Log.Verbo(
-			"failed to reissue tx",
-			zap.Stringer("txID", b.Tx.ID()),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
-	}
-
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	return r.rejectBlock(b, "proposal")
 }
 
 func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
-	blkID := b.ID()
-	defer r.free(blkID)
-
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "atomic"),
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
-	)
-
-	if err := r.Mempool.Add(b.Tx); err != nil {
-		r.ctx.Log.Debug(
-			"failed to reissue tx",
-			zap.Stringer("txID", b.Tx.ID()),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
-	}
-
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	return r.rejectBlock(b, "atomic")
 }
 
 func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
-	blkID := b.ID()
-	defer r.free(blkID)
+	return r.rejectBlock(b, "standard")
+}
 
+func (r *rejector) CommitBlock(b *blocks.CommitBlock) error {
+	return r.rejectBlock(b, "commit")
+}
+
+func (r *rejector) AbortBlock(b *blocks.AbortBlock) error {
+	return r.rejectBlock(b, "abort")
+}
+
+func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
+	blkID := b.ID()
 	r.ctx.Log.Verbo(
 		"rejecting block",
-		zap.String("blockType", "standard"),
+		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	for _, tx := range b.Transactions {
+	for _, tx := range b.Txs() {
 		if err := r.Mempool.Add(tx); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",
@@ -91,35 +61,7 @@ func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
 	}
 
 	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
-}
-
-func (r *rejector) CommitBlock(b *blocks.CommitBlock) error {
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "commit"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
-	)
-	return r.rejectOptionBlock(b)
-}
-
-func (r *rejector) AbortBlock(b *blocks.AbortBlock) error {
-	r.ctx.Log.Verbo(
-		"rejecting block",
-		zap.String("blockType", "abort"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
-	)
-	return r.rejectOptionBlock(b)
-}
-
-func (r *rejector) rejectOptionBlock(b blocks.Block) error {
-	blkID := b.ID()
-	defer r.free(blkID)
-
-	r.state.AddStatelessBlock(b, choices.Rejected)
-	return r.state.Commit()
+	err := r.state.Commit()
+	r.free(blkID)
+	return err
 }
