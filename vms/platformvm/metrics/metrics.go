@@ -33,11 +33,11 @@ type Metrics interface {
 	AddValidatorSetsDuration(time.Duration)
 	// Mark that we computed a validator diff at a height with the given
 	// difference from the top.
-	AddValidatorSetsHeightDiff(float64)
+	AddValidatorSetsHeightDiff(uint64)
 	// Mark that this much stake is staked on the node.
-	SetLocalStake(float64)
+	SetLocalStake(uint64)
 	// Mark that this much stake is staked in the network.
-	SetTotalStake(float64)
+	SetTotalStake(uint64)
 	// Mark that this node is connected to this
 	// percent of the subnet's stake.
 	SetSubnetPercentConnected(subnetID ids.ID, percent float64)
@@ -182,16 +182,16 @@ func (m *metrics) AddValidatorSetsDuration(d time.Duration) {
 	m.validatorSetsDuration.Add(float64(d))
 }
 
-func (m *metrics) AddValidatorSetsHeightDiff(d float64) {
-	m.validatorSetsHeightDiff.Add(d)
+func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
+	m.validatorSetsHeightDiff.Add(float64(d))
 }
 
-func (m *metrics) SetLocalStake(s float64) {
-	m.localStake.Set(s)
+func (m *metrics) SetLocalStake(s uint64) {
+	m.localStake.Set(float64(s))
 }
 
-func (m *metrics) SetTotalStake(s float64) {
-	m.totalStake.Set(s)
+func (m *metrics) SetTotalStake(s uint64) {
+	m.totalStake.Set(float64(s))
 }
 
 func (m *metrics) SetSubnetPercentConnected(subnetID ids.ID, percent float64) {

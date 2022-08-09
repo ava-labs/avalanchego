@@ -532,7 +532,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 	endTime := vm.Clock().Time()
 	vm.Metrics.IncValidatorSetsCreated()
 	vm.AddValidatorSetsDuration(endTime.Sub(startTime))
-	vm.AddValidatorSetsHeightDiff(float64(lastAcceptedHeight - height))
+	vm.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
 	return vdrSet, nil
 }
 
@@ -582,8 +582,8 @@ func (vm *VM) updateValidators() error {
 	}
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.Metrics.SetLocalStake(float64(weight))
-	vm.Metrics.SetTotalStake(float64(primaryValidators.Weight()))
+	vm.Metrics.SetLocalStake(weight)
+	vm.Metrics.SetTotalStake(primaryValidators.Weight())
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := vm.state.ValidatorSet(subnetID)

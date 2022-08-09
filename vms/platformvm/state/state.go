@@ -1375,8 +1375,8 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		return nil
 	}
 	weight, _ := primaryValidators.GetWeight(s.ctx.NodeID)
-	s.metrics.SetLocalStake(float64(weight))
-	s.metrics.SetTotalStake(float64(primaryValidators.Weight()))
+	s.metrics.SetLocalStake(weight)
+	s.metrics.SetTotalStake(primaryValidators.Weight())
 	return nil
 }
 
