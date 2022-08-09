@@ -409,7 +409,6 @@ func TestNewImportTx(t *testing.T) {
 		if actualBalance := sdb.GetBalance(addr); actualBalance.Cmp(expectedRemainingBalance) != 0 {
 			t.Fatalf("address remaining balance %s equal %s not %s", addr.String(), actualBalance, expectedRemainingBalance)
 		}
-
 	}
 	tests2 := map[string]atomicTxTest{
 		"apricot phase 0": {

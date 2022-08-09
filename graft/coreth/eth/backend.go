@@ -287,27 +287,22 @@ func (s *Ethereum) APIs() []rpc.API {
 	return append(apis, []rpc.API{
 		{
 			Namespace: "eth",
-			Version:   "1.0",
 			Service:   NewEthereumAPI(s),
 			Name:      "eth",
 		}, {
 			Namespace: "eth",
-			Version:   "1.0",
 			Service:   filters.NewFilterAPI(s.APIBackend, false, 5*time.Minute),
 			Name:      "eth-filter",
 		}, {
 			Namespace: "admin",
-			Version:   "1.0",
 			Service:   NewAdminAPI(s),
 			Name:      "admin",
 		}, {
 			Namespace: "debug",
-			Version:   "1.0",
 			Service:   NewDebugAPI(s),
 			Name:      "debug",
 		}, {
 			Namespace: "net",
-			Version:   "1.0",
 			Service:   s.netRPCService,
 			Name:      "net",
 		},

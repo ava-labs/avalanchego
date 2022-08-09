@@ -616,7 +616,6 @@ func (pool *TxPool) PendingSize() int {
 		count += len(txs)
 	}
 	return count
-
 }
 
 // Locals retrieves the accounts currently considered local by the pool.

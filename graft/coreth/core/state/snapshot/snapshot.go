@@ -752,7 +752,6 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 				if stats := layer.genStats; stats != nil {
 					wiper = stats.wiping
 				}
-
 			}
 			// Layer should be inactive now, mark it as stale
 			layer.lock.Lock()
