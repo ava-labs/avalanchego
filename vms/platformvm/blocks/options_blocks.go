@@ -17,6 +17,11 @@ type AbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
+func (ab *AbortBlock) initialize(bytes []byte) error {
+	ab.CommonBlock.initialize(bytes)
+	return nil
+}
+
 func (ab *AbortBlock) Txs() []*txs.Tx { return nil }
 
 func (ab *AbortBlock) Visit(v Visitor) error {
@@ -38,6 +43,11 @@ func NewAbortBlock(
 
 type CommitBlock struct {
 	CommonBlock `serialize:"true"`
+}
+
+func (cb *CommitBlock) initialize(bytes []byte) error {
+	cb.CommonBlock.initialize(bytes)
+	return nil
 }
 
 func (cb *CommitBlock) Txs() []*txs.Tx { return nil }

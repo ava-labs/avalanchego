@@ -19,12 +19,10 @@ type StandardBlock struct {
 }
 
 func (sb *StandardBlock) initialize(bytes []byte) error {
-	if err := sb.CommonBlock.initialize(bytes); err != nil {
-		return fmt.Errorf("failed to initialize: %w", err)
-	}
+	sb.CommonBlock.initialize(bytes)
 	for _, tx := range sb.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to sign block: %w", err)
+			return fmt.Errorf("failed to initialize tx: %w", err)
 		}
 	}
 	return nil

@@ -17,10 +17,9 @@ type CommonBlock struct {
 	bytes []byte
 }
 
-func (b *CommonBlock) initialize(bytes []byte) error {
+func (b *CommonBlock) initialize(bytes []byte) {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
-	return nil
 }
 
 func (b *CommonBlock) ID() ids.ID     { return b.id }

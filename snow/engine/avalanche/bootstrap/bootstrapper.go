@@ -580,6 +580,5 @@ func (b *bootstrapper) checkFinish() error {
 		b.awaitingTimeout = true
 		return nil
 	}
-
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }

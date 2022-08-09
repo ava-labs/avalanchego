@@ -4,6 +4,8 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -18,10 +20,11 @@ type ProposalBlock struct {
 }
 
 func (pb *ProposalBlock) initialize(bytes []byte) error {
-	if err := pb.CommonBlock.initialize(bytes); err != nil {
-		return err
+	pb.CommonBlock.initialize(bytes)
+	if err := pb.Tx.Sign(txs.Codec, nil); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
-	return pb.Tx.Sign(txs.Codec, nil)
+	return nil
 }
 
 func (pb *ProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{pb.Tx} }

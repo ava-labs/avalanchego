@@ -64,16 +64,11 @@ type manager struct {
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	// See if the block is in memory.
-	if blk, ok := m.blkIDToState[blkID]; ok {
-		return m.NewBlock(blk.statelessBlock), nil
-	}
-	// The block isn't in memory. Check the database.
-	statelessBlk, _, err := m.backend.state.GetStatelessBlock(blkID)
+	blk, err := m.backend.GetBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
-	return m.NewBlock(statelessBlk), nil
+	return m.NewBlock(blk), nil
 }
 
 func (m *manager) NewBlock(blk blocks.Block) snowman.Block {

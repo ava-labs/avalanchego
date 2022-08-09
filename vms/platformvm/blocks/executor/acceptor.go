@@ -17,6 +17,8 @@ import (
 var _ blocks.Visitor = &acceptor{}
 
 // acceptor handles the logic for accepting a block.
+// All errors returned by this struct are fatal and should result in the chain
+// being shutdown.
 type acceptor struct {
 	*backend
 	metrics          metrics.Metrics
@@ -140,58 +142,78 @@ func (a *acceptor) StandardBlock(b *blocks.StandardBlock) error {
 }
 
 func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
+	blkID := b.ID()
+	parentID := b.Parent()
 	a.ctx.Log.Verbo(
 		"accepting block",
 		zap.String("blockType", "commit"),
-		zap.Stringer("blkID", b.ID()),
+		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
+		zap.Stringer("parentID", parentID),
 	)
-	return a.acceptOptionBlock(b)
-}
-
-func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
-	a.ctx.Log.Verbo(
-		"accepting block",
-		zap.String("blockType", "abort"),
-		zap.Stringer("blkID", b.ID()),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
-	)
-	return a.acceptOptionBlock(b)
-}
-
-func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
-	blkID := b.ID()
-	parentID := b.Parent()
-
-	defer func() {
-		a.free(blkID)
-		// Note: we assume this block's sibling doesn't
-		// need the parent's state when it's rejected.
-		a.free(parentID)
-	}()
 
 	parentState, ok := a.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
 	}
-	// Note that the parent must be accepted first.
-	if err := a.commonAccept(parentState.statelessBlock); err != nil {
-		return err
-	}
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
 
 	// Update metrics
 	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if wasPreferred {
+		if parentState.initiallyPreferCommit {
 			a.metrics.MarkOptionVoteWon()
 		} else {
 			a.metrics.MarkOptionVoteLost()
 		}
+	}
+
+	return a.acceptOptionBlock(b, parentState.statelessBlock)
+}
+
+func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
+	blkID := b.ID()
+	parentID := b.Parent()
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", "abort"),
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parentID", parentID),
+	)
+
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
+	}
+
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		if parentState.initiallyPreferCommit {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.acceptOptionBlock(b, parentState.statelessBlock)
+}
+
+func (a *acceptor) acceptOptionBlock(b blocks.Block, parent blocks.Block) error {
+	blkID := b.ID()
+	parentID := b.Parent()
+
+	defer func() {
+		// Note: we assume this block's sibling doesn't
+		// need the parent's state when it's rejected.
+		a.free(parentID)
+		a.free(blkID)
+	}()
+
+	// Note that the parent must be accepted first.
+	if err := a.commonAccept(parent); err != nil {
+		return err
+	}
+	if err := a.commonAccept(b); err != nil {
+		return err
 	}
 
 	blkState, ok := a.blkIDToState[blkID]

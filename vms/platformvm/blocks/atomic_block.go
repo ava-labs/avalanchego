@@ -20,9 +20,7 @@ type AtomicBlock struct {
 }
 
 func (ab *AtomicBlock) initialize(bytes []byte) error {
-	if err := ab.CommonBlock.initialize(bytes); err != nil {
-		return fmt.Errorf("failed to initialize: %w", err)
-	}
+	ab.CommonBlock.initialize(bytes)
 	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {
 		return fmt.Errorf("failed to initialize tx: %w", err)
 	}

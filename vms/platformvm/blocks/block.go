@@ -20,6 +20,7 @@ type Block interface {
 	// Txs returns list of transactions contained in the block
 	Txs() []*txs.Tx
 
+	// Visit calls [visitor] with this block's concrete type
 	Visit(visitor Visitor) error
 
 	initialize(bytes []byte) error
