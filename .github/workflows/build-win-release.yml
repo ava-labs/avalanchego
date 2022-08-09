@@ -18,10 +18,9 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v2
         with:
-          go-version: '1.18'
-          check-latest: true
+          go-version: "1.17.9" # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Get the version

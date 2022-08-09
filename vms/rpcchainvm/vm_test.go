@@ -203,7 +203,7 @@ func testHTTPPingRequest(target, endpoint string, payload []byte) error {
 
 func testWebsocketEchoRequest(target, endpoint string, expectedMsgCount int, payload []byte) error {
 	dialTarget := fmt.Sprintf("ws://%s%s", target, endpoint)
-	cli, _, err := websocket.DefaultDialer.Dial(dialTarget, nil)
+	cli, _, err := websocket.DefaultDialer.Dial(dialTarget, nil) //nolint
 	if err != nil {
 		return err
 	}
