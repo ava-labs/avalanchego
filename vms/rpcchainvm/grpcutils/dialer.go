@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	maxOps = 1_000_000
+	maxOps = 10_000_000
 )
 
 var (
