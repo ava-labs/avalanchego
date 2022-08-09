@@ -341,7 +341,7 @@ func TestRouterTimeout(t *testing.T) {
 	wg.Add(len(msgs))
 
 	for i, msg := range msgs {
-		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, uint32(i), msg)
+		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, ctx.ChainID, uint32(i), msg)
 	}
 
 	wg.Wait()
@@ -431,7 +431,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	vID := ids.GenerateTestNodeID()
 	for i, op := range ops {
-		chainRouter.RegisterRequest(vID, ctx.ChainID, uint32(i), op)
+		chainRouter.RegisterRequest(vID, ctx.ChainID, ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -666,10 +666,10 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 	// register the cross-chain requests so we don't drop them
 	vID := ids.GenerateTestNodeID()
-	chainRouter.RegisterRequest(vID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
+	chainRouter.RegisterRequest(vID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
 
 	msg := []byte("foobar")
-	chainRouter.HandleInbound(mc.InboundCrossChainAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
+	chainRouter.HandleInbound(mc.InboundAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
 
 	// We should have received the new message in the receiver chain
 	require.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())

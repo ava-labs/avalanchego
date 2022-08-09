@@ -353,7 +353,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	_, genesisBytes := defaultGenesis()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func([]byte) error { return nil }
+	appSender.SendAppGossipF = func(ids.ID, ids.ID, []byte) error { return nil }
 
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
@@ -429,7 +429,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func([]byte) error { return nil }
+	appSender.SendAppGossipF = func(ids.ID, ids.ID, []byte) error { return nil }
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
