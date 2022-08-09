@@ -659,13 +659,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 			if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
 				return errConflictingParentTxs
 			}
-			parent, _, err := v.state.GetStatelessBlock(parentID)
-			if err != nil {
-				// The parent isn't in memory, so it should be on disk,
-				// but it isn't.
-				return err
-			}
-			nextBlock = parent
+			nextBlock = parentState.statelessBlock
 		}
 	}
 
