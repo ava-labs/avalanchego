@@ -6,7 +6,7 @@ The activation of Blueberry fork slightly changes the way the P-chain selects tr
 
 Transactions to be included into an Apricot block can originate from the mempool or can be created just in time to duly update the stakers set. Block formation logic in the Apricot fork can be broken up into two high-level logical steps:
 
-* First, we try selecting any candidate standard or proposal transactions which could be included in a block *without advancing the current chain time*;
+* First, we try selecting any candidate decision or proposal transactions which could be included in a block *without advancing the current chain time*;
 * If no such transactions are found, we evaluate candidate transactions which *may require advancing chain time*. If a chain time advancement is required to include these transactions in a block, a proposal block with an advance time transaction is built first; selected transactions may be included in a subsequent block.
 
 In more details, blocks which do not change chain time are build as follows:
@@ -31,7 +31,7 @@ The activation of the Blueberry fork only makes minor changes to the way the P-c
 
 We carry out operations in the following order:
 
-* We try to fill a Standard block with mempool standard transactions
+* We try to fill a Standard block with mempool decision transactions
 * We check if any staker needs to be rewarded, issuing as many Proposal blocks as needed, as above
 * We try to move chain time ahead to the earliest staker set change event. Unlike Apricot, here we issue a Standard block with no transactions whose timestamp is the proposed chain time. A Standard block does not require any voting, and will be either accepted or rejected. Hence this solution is marginally faster.
 * We try to build a Proposal block with one mempool proposal transaction, if any. No changes to chain time are proposed here.

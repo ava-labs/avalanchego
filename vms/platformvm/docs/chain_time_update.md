@@ -36,9 +36,23 @@ Validation rules for block timestamps varies slightly depending on block types:
 
 ## Serialization changes
 
-Other than forbidding `AdvanceTimeTx`s to be included in a block, the Blueberry fork activation does not require any transactions format change. This means that transactions byte representation is fully backward compatible.
+However upon Blueberry activation some transactions and blocks type will be forbidden, while some new block types will be allowed. Specifically:
 
-Blueberry fork activation does however change block formatting, which is why an explicit hard fork is necessary to activate these changes. Technically blocks change in two ways:
+* The following block types will be forbidden [^1]:
+  * `blocks.ApricotAbortBlock`
+  * `blocks.ApricotCommitBlock`
+  * `blocks.ApricotProposalBlock`
+  * `blocks.ApricotStandardtBlock`
+* The following tx types will be forbidden:
+  * `AdvanceTimeTx`
+* The following block types will be allowed:
+  * `blocks.BlueberryAbortBlock`
+  * `blocks.BlueberryCommitBlock`
+  * `blocks.BlueberryProposalBlock`
+  * `blocks.BlueberryStandardtBlock`
 
-1. A new codec version is used for blocks, which is explicitly serialized in blocks byte representation.
-2. Transactions included in both `ProposalBlock`s and `StandardBlock`s are serialized as byte slices rather than directly as `txs.SignedTx`s. This measure is required to guarantee transactions backward compatibility face the blocks version change.
+Note that unlike `blocks.Apricot*` blocks, `blocks.Blueberry*` blocks will serialize block timestamp.
+
+Note Bluberry fork won't change any transactions format, so transactions byte representation is fully backward compatible. Also Blueberry won't change any codec version
+
+[^1]: note that avalanchego codebase includes `blocks.ApricotAtomicBlock`, which has been forbidden on Apricot Phase 5 fork. This type is kept just to allow boostrapping from genesis and it is forbidden on Blueberry as well as subsequent Apricot forks.
