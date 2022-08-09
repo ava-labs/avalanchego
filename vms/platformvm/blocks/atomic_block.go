@@ -37,18 +37,15 @@ func NewAtomicBlock(
 	return res, initialize(Block(res))
 }
 
-func (ab *AtomicBlock) initialize(bytes []byte) error {
-	if err := ab.ApricotCommonBlock.initialize(bytes); err != nil {
+func (b *AtomicBlock) initialize(bytes []byte) error {
+	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	if err := ab.Tx.Sign(txs.Codec, nil); err != nil {
-		return fmt.Errorf("failed to initialize tx: %w", err)
-	}
-	return nil
+	return b.Tx.Sign(txs.Codec, nil)
 }
 
-func (ab *AtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{ab.Tx} }
+func (b *AtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
-func (ab *AtomicBlock) Visit(v Visitor) error {
-	return v.AtomicBlock(ab)
+func (b *AtomicBlock) Visit(v Visitor) error {
+	return v.AtomicBlock(b)
 }

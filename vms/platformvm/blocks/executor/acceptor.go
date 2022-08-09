@@ -26,7 +26,7 @@ type acceptor struct {
 func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "abort"),
+		zap.String("blockType", "blueberry abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -37,7 +37,7 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "commit"),
+		zap.String("blockType", "blueberry commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -93,19 +93,21 @@ func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
 
 func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
 	// Blueberry proposal blocks do modify chain state by (possibly) advancing
-	// chain time. We carry out these state changes before moving to options
-	blkID := b.ID()
+	// chain time. We carry out these state changes when accepting the selected child
+	// option, before moving to options.
 	a.ctx.Log.Verbo(
-		"accepting Aprictor Proposal Block",
-		zap.Stringer("blkID", blkID),
+		"accepting block",
+		zap.String("blockType", "blueberry proposal"),
+		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parentID", b.Parent()),
+		zap.Stringer("parent", b.Parent()),
 	)
 
-	return a.commonVisitProposalBlock(b)
+	a.commonVisitProposalBlock(b)
+	return nil
 }
 
-func (a *acceptor) commonVisitProposalBlock(b blocks.Block) error {
+func (a *acceptor) commonVisitProposalBlock(b blocks.Block) {
 	/* Note that:
 
 	// * We don't free the proposal block in this method.
@@ -126,24 +128,23 @@ func (a *acceptor) commonVisitProposalBlock(b blocks.Block) error {
 
 	// See comment for [lastAccepted].
 	a.backend.lastAccepted = b.ID()
-	return nil
 }
 
 func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", "blueberry standard"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+
 	return a.standardBlock(b)
 }
 
 func (a *acceptor) standardBlock(b blocks.Block) error {
 	blkID := b.ID()
 	defer a.free(blkID)
-
-	a.ctx.Log.Verbo(
-		"accepting block",
-		zap.String("blockType", "standard"),
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
-	)
 
 	if err := a.commonAccept(b); err != nil {
 		return err
@@ -181,7 +182,7 @@ func (a *acceptor) standardBlock(b blocks.Block) error {
 func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "abort"),
+		zap.String("blockType", "apricot abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -192,7 +193,7 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "commit"),
+		zap.String("blockType", "apricot commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
@@ -201,18 +202,27 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 }
 
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	blkID := b.ID()
 	a.ctx.Log.Verbo(
-		"accepting Blueberry Proposal Block",
-		zap.Stringer("blkID", blkID),
+		"accepting block",
+		zap.String("blockType", "apricot proposal"),
+		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parent", b.Parent()),
 	)
 
-	return a.commonVisitProposalBlock(b)
+	a.commonVisitProposalBlock(b)
+	return nil
 }
 
 func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
+	a.ctx.Log.Verbo(
+		"accepting block",
+		zap.String("blockType", "apricot standard"),
+		zap.Stringer("blkID", b.ID()),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parent", b.Parent()),
+	)
+
 	return a.standardBlock(b)
 }
 

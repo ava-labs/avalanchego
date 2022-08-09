@@ -31,8 +31,7 @@ func NewBlueberryProposalBlock(
 			},
 			BlkTimestamp: uint64(timestamp.Unix()),
 		},
-		TxBytes: tx.Bytes(),
-		Tx:      tx,
+		Tx: tx,
 	}
 
 	return res, initialize(Block(res))
@@ -41,29 +40,14 @@ func NewBlueberryProposalBlock(
 type BlueberryProposalBlock struct {
 	BlueberryCommonBlock `serialize:"true"`
 
-	TxBytes []byte `serialize:"true" json:"txs"`
-
-	Tx *txs.Tx
+	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
 func (b *BlueberryProposalBlock) initialize(bytes []byte) error {
 	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-
-	// [Tx] may be initialized from NewProposalBlock
-	// TODO can we do this a better way?
-	if b.Tx == nil {
-		var tx txs.Tx
-		if _, err := txs.Codec.Unmarshal(b.TxBytes, &tx); err != nil {
-			return fmt.Errorf("failed unmarshalling tx in Blueberry block: %w", err)
-		}
-		b.Tx = &tx
-		if err := b.Tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to sign block: %w", err)
-		}
-	}
-	return nil
+	return b.Tx.Sign(txs.Codec, nil)
 }
 
 func (b *BlueberryProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }

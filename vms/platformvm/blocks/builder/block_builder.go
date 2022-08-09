@@ -174,7 +174,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	return blkBuildingStrategy.build()
+	return blkBuildingStrategy.buildBlock()
 }
 
 func (b *blockBuilder) Shutdown() {

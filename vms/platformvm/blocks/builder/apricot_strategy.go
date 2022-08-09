@@ -79,8 +79,11 @@ func (a *apricotStrategy) selectBlockContent() error {
 	}
 
 	tx, err := a.nextProposalTx()
+	if err != nil {
+		return err
+	}
 	a.txes = []*txs.Tx{tx}
-	return err
+	return nil
 }
 
 // Try to get/make a proposal tx to put into a block.
@@ -115,13 +118,11 @@ func (a *apricotStrategy) nextProposalTx() (*txs.Tx, error) {
 	return advanceTimeTx, nil
 }
 
-func (a *apricotStrategy) build() (snowman.Block, error) {
+func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 	if err := a.selectBlockContent(); err != nil {
 		return nil, err
 	}
 
-	// remove selected txs from mempool
-	a.Mempool.Remove(a.txes)
 	tx := a.txes[0]
 	switch tx.Unsigned.(type) {
 	case txs.StakerTx,
@@ -135,6 +136,10 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// remove selected txs from mempool only when we are sure
+		// a valid block containing it has been generated
+		a.Mempool.Remove(a.txes)
 		return a.blkManager.NewBlock(statelessBlk), nil
 
 	case *txs.CreateChainTx,
@@ -149,6 +154,10 @@ func (a *apricotStrategy) build() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// remove selected txs from mempool only when we are sure
+		// a valid block containing it has been generated
+		a.Mempool.Remove(a.txes)
 		return a.blkManager.NewBlock(statelessBlk), nil
 
 	default:

@@ -4,7 +4,6 @@
 package blocks
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,15 +26,7 @@ func NewBlueberryAbortBlock(timestamp time.Time, parentID ids.ID, height uint64)
 		},
 	}
 
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	return res, res.initialize(bytes)
+	return res, initialize(Block(res))
 }
 
 type BlueberryAbortBlock struct {
@@ -56,15 +47,7 @@ func NewApricotAbortBlock(parentID ids.ID, height uint64) (Block, error) {
 		},
 	}
 
-	// We serialize this block as a Block so that it can be deserialized into a
-	// Block
-	blk := Block(res)
-	bytes, err := Codec.Marshal(Version, &blk)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
-	}
-
-	return res, res.initialize(bytes)
+	return res, initialize(Block(res))
 }
 
 type ApricotAbortBlock struct {

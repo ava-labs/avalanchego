@@ -84,16 +84,9 @@ func (b *Block) Timestamp() time.Time {
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {
-	switch b.Block.(type) {
-	case *blocks.ApricotProposalBlock,
-		*blocks.BlueberryProposalBlock:
-		// go ahead creating options
-	default:
-		return [2]snowman.Block{}, snowman.ErrNotOracle
-	}
-
 	var (
 		statelessCommitBlk blocks.Block
+		statelessAbortBlk  blocks.Block
 		err                error
 
 		blkID      = b.ID()
@@ -103,36 +96,50 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 	switch b.Block.(type) {
 	case *blocks.ApricotProposalBlock:
 		statelessCommitBlk, err = blocks.NewApricotCommitBlock(blkID, nextHeight)
-	default: // must be *blocks.BlueberryProposalBlock
-		statelessCommitBlk, err = blocks.NewBlueberryCommitBlock(b.BlockTimestamp(), blkID, nextHeight)
-	}
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create commit block: %w",
-			err,
-		)
-	}
-	commitBlock := b.manager.NewBlock(statelessCommitBlk)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create commit block: %w",
+				err,
+			)
+		}
 
-	var statelessAbortBlk blocks.Block
-	switch b.Block.(type) {
-	case *blocks.ApricotProposalBlock:
 		statelessAbortBlk, err = blocks.NewApricotAbortBlock(blkID, nextHeight)
-	default: // must be *blocks.BlueberryProposalBlock
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create abort block: %w",
+				err,
+			)
+		}
+
+	case *blocks.BlueberryProposalBlock:
+		statelessCommitBlk, err = blocks.NewBlueberryCommitBlock(b.BlockTimestamp(), blkID, nextHeight)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create commit block: %w",
+				err,
+			)
+		}
+
 		statelessAbortBlk, err = blocks.NewBlueberryAbortBlock(b.BlockTimestamp(), blkID, nextHeight)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create abort block: %w",
+				err,
+			)
+		}
+
+	default:
+		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create abort block: %w",
-			err,
-		)
-	}
+
+	commitBlock := b.manager.NewBlock(statelessCommitBlk)
 	abortBlock := b.manager.NewBlock(statelessAbortBlk)
 
 	blkState, ok := b.manager.backend.blkIDToState[blkID]
 	if !ok {
 		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
 	}
+
 	if blkState.initiallyPreferCommit {
 		return [2]snowman.Block{commitBlock, abortBlock}, nil
 	}

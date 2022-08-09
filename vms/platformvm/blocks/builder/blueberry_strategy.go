@@ -115,13 +115,10 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	return nil
 }
 
-func (b *blueberryStrategy) build() (snowman.Block, error) {
+func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 	if err := b.selectBlockContent(); err != nil {
 		return nil, err
 	}
-
-	// remove selected txs from mempool
-	b.Mempool.Remove(b.txes)
 
 	if len(b.txes) == 0 {
 		// empty standard block are allowed to move chain time head
@@ -151,6 +148,10 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// remove selected txs from mempool only when we are sure
+		// a valid block containing it has been generated
+		b.Mempool.Remove(b.txes)
 		return b.blkManager.NewBlock(statelessBlk), nil
 
 	case *txs.CreateChainTx,
@@ -166,6 +167,10 @@ func (b *blueberryStrategy) build() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// remove selected txs from mempool only when we are sure
+		// a valid block containing it has been generated
+		b.Mempool.Remove(b.txes)
 		return b.blkManager.NewBlock(statelessBlk), nil
 
 	default:

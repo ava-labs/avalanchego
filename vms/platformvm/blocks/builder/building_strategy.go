@@ -19,8 +19,8 @@ type buildingStrategy interface {
 	// can be built, error if check could not be performed.
 	hasContent() (bool, error)
 
-	// build builds a versioned snowman.Block
-	build() (snowman.Block, error)
+	// buildBlock builds a versioned snowman.Block
+	buildBlock() (snowman.Block, error)
 }
 
 // Factory method that returns the correct building strategy for the

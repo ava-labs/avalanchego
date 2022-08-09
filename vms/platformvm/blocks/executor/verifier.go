@@ -575,7 +575,7 @@ func (v *verifier) verifyCommonBlock(b blocks.Block) error {
 		}
 
 	default:
-		return fmt.Errorf("cannot tell whether block type %t is accepted on fork %s", b, currentFork)
+		return fmt.Errorf("cannot tell whether block type %T is accepted on fork %s", b, currentFork)
 	}
 
 	return nil
