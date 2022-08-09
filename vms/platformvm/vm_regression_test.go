@@ -690,7 +690,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		metrics.NewNoopMetrics(),
+		metrics.Noop,
 		vm.rewards,
 	)
 	assert.NoError(err)
@@ -1063,7 +1063,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		metrics.NewNoopMetrics(),
+		metrics.Noop,
 		vm.rewards,
 	)
 	assert.NoError(err)

@@ -44,8 +44,6 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	metrics := metrics.NewNoopMetrics()
-
 	blkID := blk.ID()
 	acceptor := &acceptor{
 		backend: &backend{
@@ -56,7 +54,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 				blkID: {},
 			},
 		},
-		metrics:          metrics,
+		metrics:          metrics.Noop,
 		recentlyAccepted: nil,
 	}
 
@@ -88,7 +86,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics.NewNoopMetrics(),
+		metrics: metrics.Noop,
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
@@ -172,7 +170,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics.NewNoopMetrics(),
+		metrics: metrics.Noop,
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
@@ -265,7 +263,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 			bootstrapped: &utils.AtomicBool{},
 		},
-		metrics: metrics.NewNoopMetrics(),
+		metrics: metrics.Noop,
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
@@ -358,7 +356,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 			bootstrapped: &utils.AtomicBool{},
 		},
-		metrics: metrics.NewNoopMetrics(),
+		metrics: metrics.Noop,
 		recentlyAccepted: window.New(window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,

@@ -13,40 +13,36 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ Metrics = &noopMetrics{}
+var Noop Metrics = noopMetrics{}
 
 type noopMetrics struct{}
 
-func NewNoopMetrics() *noopMetrics {
-	return &noopMetrics{}
-}
+func (noopMetrics) MarkOptionVoteWon() {}
 
-func (m *noopMetrics) MarkOptionVoteWon() {}
+func (noopMetrics) MarkOptionVoteLost() {}
 
-func (m *noopMetrics) MarkOptionVoteLost() {}
+func (noopMetrics) MarkAccepted(blocks.Block) error { return nil }
 
-func (m *noopMetrics) MarkAccepted(blocks.Block) error { return nil }
-
-func (m *noopMetrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
+func (noopMetrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
 	return func(*rpc.RequestInfo) *http.Request { return nil }
 }
 
-func (m *noopMetrics) AfterRequestFunc() func(*rpc.RequestInfo) {
+func (noopMetrics) AfterRequestFunc() func(*rpc.RequestInfo) {
 	return func(ri *rpc.RequestInfo) {}
 }
 
-func (m *noopMetrics) IncValidatorSetsCreated() {}
+func (noopMetrics) IncValidatorSetsCreated() {}
 
-func (m *noopMetrics) IncValidatorSetsCached() {}
+func (noopMetrics) IncValidatorSetsCached() {}
 
-func (m *noopMetrics) AddValidatorSetsDuration(time.Duration) {}
+func (noopMetrics) AddValidatorSetsDuration(time.Duration) {}
 
-func (m *noopMetrics) AddValidatorSetsHeightDiff(float64) {}
+func (noopMetrics) AddValidatorSetsHeightDiff(float64) {}
 
-func (m *noopMetrics) SetLocalStake(float64) {}
+func (noopMetrics) SetLocalStake(float64) {}
 
-func (m *noopMetrics) SetTotalStake(float64) {}
+func (noopMetrics) SetTotalStake(float64) {}
 
-func (m *noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
+func (noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
-func (m *noopMetrics) SetPercentConnected(float64) {}
+func (noopMetrics) SetPercentConnected(float64) {}
