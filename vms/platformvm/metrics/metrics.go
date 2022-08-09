@@ -4,10 +4,7 @@
 package metrics
 
 import (
-	"net/http"
 	"time"
-
-	"github.com/gorilla/rpc/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -20,18 +17,14 @@ import (
 var _ Metrics = &metrics{}
 
 type Metrics interface {
+	metric.APIInterceptor
+
 	// Mark that an option vote that we initially preferred was accepted.
 	MarkOptionVoteWon()
 	// Mark that an option vote that we initially preferred was rejected.
 	MarkOptionVoteLost()
 	// Mark that the given block was accepted.
 	MarkAccepted(blocks.Block) error
-	// Returns an interceptor function to use for API requests
-	// to track API metrics.
-	InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request
-	// Returns an AfterRequest function to use for API requests
-	// to track API metrics.
-	AfterRequestFunc() func(*rpc.RequestInfo)
 	// Mark that a validator set was created.
 	IncValidatorSetsCreated()
 	// Mark that a validator set was cached.
@@ -121,7 +114,7 @@ func New(
 
 	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
-	res.apiRequestMetrics = apiRequestMetrics
+	res.APIInterceptor = apiRequestMetrics
 	errs.Add(
 		err,
 
@@ -148,6 +141,8 @@ func New(
 }
 
 type metrics struct {
+	metric.APIInterceptor
+
 	blockMetrics *blockMetrics
 
 	percentConnected       prometheus.Gauge
@@ -161,8 +156,6 @@ type metrics struct {
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
-
-	apiRequestMetrics metric.APIInterceptor
 }
 
 func (m *metrics) MarkOptionVoteWon() {
@@ -175,14 +168,6 @@ func (m *metrics) MarkOptionVoteLost() {
 
 func (m *metrics) MarkAccepted(b blocks.Block) error {
 	return b.Visit(m.blockMetrics)
-}
-
-func (m *metrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
-	return m.apiRequestMetrics.InterceptRequest
-}
-
-func (m *metrics) AfterRequestFunc() func(*rpc.RequestInfo) {
-	return m.apiRequestMetrics.AfterRequest
 }
 
 func (m *metrics) IncValidatorSetsCreated() {

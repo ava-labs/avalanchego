@@ -23,13 +23,11 @@ func (noopMetrics) MarkOptionVoteLost() {}
 
 func (noopMetrics) MarkAccepted(blocks.Block) error { return nil }
 
-func (noopMetrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
-	return func(*rpc.RequestInfo) *http.Request { return nil }
+func (noopMetrics) InterceptRequest(i *rpc.RequestInfo) *http.Request {
+	return i.Request
 }
 
-func (noopMetrics) AfterRequestFunc() func(*rpc.RequestInfo) {
-	return func(ri *rpc.RequestInfo) {}
-}
+func (noopMetrics) AfterRequest(*rpc.RequestInfo) {}
 
 func (noopMetrics) IncValidatorSetsCreated() {}
 

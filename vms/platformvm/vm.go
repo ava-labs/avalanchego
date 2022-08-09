@@ -410,8 +410,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.Metrics.InterceptRequestFunc())
-	server.RegisterAfterFunc(vm.Metrics.AfterRequestFunc())
+	server.RegisterInterceptFunc(vm.Metrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.Metrics.AfterRequest)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}
