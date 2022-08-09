@@ -44,7 +44,7 @@ const (
 	// Duration for the maximum amount of time a http2 connection can exist
 	// before sending GOAWAY. Internally in gRPC a +-10% jitter is added to
 	// mitigate retry storms.
-	defaultServerMaxConnectionAge = math.MaxInt64
+	defaultServerMaxConnectionAge = 10 * time.Minute
 	// After MaxConnectionAge, MaxConnectionAgeGrace specifies the amount of time
 	// between when the server sends a GOAWAY to the client to initiate graceful
 	// shutdown, and when the server closes the connection.
