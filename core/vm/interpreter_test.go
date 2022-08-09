@@ -83,5 +83,4 @@ func TestLoopInterrupt(t *testing.T) {
 			}
 		}
 	}
-
 }

@@ -126,7 +126,6 @@ func (mc *mockAcceptedCaller) AcceptedCallContract(ctx context.Context, call int
 	return mc.acceptedCallContractBytes, mc.acceptedCallContractErr
 }
 func TestPassingBlockNumber(t *testing.T) {
-
 	mc := &mockAcceptedCaller{
 		mockCaller: &mockCaller{
 			codeAtBytes: []byte{1, 2, 3},

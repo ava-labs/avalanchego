@@ -21,6 +21,7 @@ linters:
     - misspell
     - unconvert
     - varcheck
+    - whitespace
 
 linters-settings:
   gofmt:

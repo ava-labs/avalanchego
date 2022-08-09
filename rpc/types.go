@@ -41,7 +41,7 @@ import (
 // API describes the set of methods offered over the RPC interface
 type API struct {
 	Namespace string      // namespace under which the rpc methods of Service are exposed
-	Version   string      // api version for DApp's
+	Version   string      // deprecated - this field is no longer used, but retained for compatibility
 	Service   interface{} // receiver instance which holds the methods
 	Name      string      // Name of the API
 }
@@ -99,7 +99,9 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-	case "accepted", "finalized": // Include "finalized" as an option for compatibility with FinalizedBlockNumber from geth.
+	// Include "finalized" and "safe" as an option for compatibility with
+	// FinalizedBlockNumber and SafeBlockNumber from geth.
+	case "accepted", "finalized", "safe":
 		*bn = AcceptedBlockNumber
 		return nil
 	}
@@ -179,7 +181,9 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
-	case "accepted":
+	// Include "finalized" and "safe" as an option for compatibility with
+	// FinalizedBlockNumber and SafeBlockNumber from geth.
+	case "accepted", "finalized", "safe":
 		bn := AcceptedBlockNumber
 		bnh.BlockNumber = &bn
 		return nil

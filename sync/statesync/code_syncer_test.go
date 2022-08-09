@@ -103,7 +103,6 @@ func TestCodeSyncerManyCodeHashes(t *testing.T) {
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		codeHashes = append(codeHashes, codeHash)
 		codeByteSlices = append(codeByteSlices, codeBytes)
-
 	}
 
 	testCodeSyncer(t, codeSyncerTest{
@@ -150,7 +149,6 @@ func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		codeHashes = append(codeHashes, codeHash)
 		codeByteSlices = append(codeByteSlices, codeBytes)
-
 	}
 
 	testCodeSyncer(t, codeSyncerTest{

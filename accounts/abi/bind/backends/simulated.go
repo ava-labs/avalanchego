@@ -138,7 +138,7 @@ func (b *SimulatedBackend) Close() error {
 
 // Commit imports all the pending transactions as a single block and starts a
 // fresh new state.
-func (b *SimulatedBackend) Commit(accept bool) {
+func (b *SimulatedBackend) Commit(accept bool) common.Hash {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -151,9 +151,13 @@ func (b *SimulatedBackend) Commit(accept bool) {
 		}
 		b.blockchain.DrainAcceptorQueue()
 	}
+	blockHash := b.acceptedBlock.Hash()
+
 	// Using the last inserted block here makes it possible to build on a side
 	// chain after a fork.
 	b.rollback(b.acceptedBlock)
+
+	return blockHash
 }
 
 // Rollback aborts all pending transactions, reverting to the last committed state.

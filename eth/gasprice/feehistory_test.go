@@ -81,7 +81,6 @@ func TestFeeHistory(t *testing.T) {
 		}
 		tip := big.NewInt(1 * params.GWei)
 		backend := newTestBackendFakerEngine(t, params.TestChainConfig, 32, common.Big0, func(i int, b *core.BlockGen) {
-
 			signer := types.LatestSigner(params.TestChainConfig)
 
 			b.SetCoinbase(common.Address{1})
