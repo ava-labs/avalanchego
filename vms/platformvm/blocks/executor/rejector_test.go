@@ -52,7 +52,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "atomic block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewAtomicBlock(
+				return blocks.NewApricotAtomicBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
@@ -65,7 +65,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.AtomicBlock(b.(*blocks.AtomicBlock))
+				return r.ApricotAtomicBlock(b.(*blocks.ApricotAtomicBlock))
 			},
 		},
 		{

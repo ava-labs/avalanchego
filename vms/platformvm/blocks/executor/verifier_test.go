@@ -37,21 +37,26 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+
+	backend := &backend{
+		lastAccepted: parentID,
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			lastAccepted: parentID,
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+		backend:           backend,
+		forkChecker: &forkChecker{
+			backend: backend,
 		},
 	}
 
@@ -206,25 +211,30 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentState,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
 			},
 		},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					onAcceptState:  parentState,
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+		backend: backend,
+		forkChecker: &forkChecker{
+			backend: backend,
 		},
 	}
 
@@ -302,25 +312,30 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
+				},
+				standardBlockState: standardBlockState{},
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					proposalBlockState: proposalBlockState{
-						onCommitState: parentOnCommitState,
-						onAbortState:  parentOnAbortState,
-					},
-					standardBlockState: standardBlockState{},
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+		backend:           backend,
+		forkChecker: &forkChecker{
+			backend: backend,
 		},
 	}
 
@@ -361,25 +376,30 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
+				},
+				standardBlockState: standardBlockState{},
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					proposalBlockState: proposalBlockState{
-						onCommitState: parentOnCommitState,
-						onAbortState:  parentOnAbortState,
-					},
-					standardBlockState: standardBlockState{},
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+		backend:           backend,
+		forkChecker: &forkChecker{
+			backend: backend,
 		},
 	}
 
@@ -418,16 +438,21 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{},
+		Mempool:      mempool,
+		state:        s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{},
-			Mempool:      mempool,
-			state:        s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			cfg: &config.Config{BlueberryTime: mockable.MaxTime}, // blueberry is not activated
+		backend:           backend,
+		forkChecker: &forkChecker{
+			backend: backend,
 		},
 	}
 
@@ -484,22 +509,27 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
+
+			backend := &backend{
+				blkIDToState: map[ids.ID]*blockState{
+					parentID: {
+						timestamp:      test.parentTime,
+						statelessBlock: parentStatelessBlk,
+					},
+				},
+				Mempool: mempool,
+				state:   s,
+				ctx: &snow.Context{
+					Log: logging.NoLog{},
+				},
+				// Blueberry is activated
+				cfg: &config.Config{BlueberryTime: time.Time{}},
+			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{},
-				backend: &backend{
-					blkIDToState: map[ids.ID]*blockState{
-						parentID: {
-							timestamp:      test.parentTime,
-							statelessBlock: parentStatelessBlk,
-						},
-					},
-					Mempool: mempool,
-					state:   s,
-					ctx: &snow.Context{
-						Log: logging.NoLog{},
-					},
-					// Blueberry is activated
-					cfg: &config.Config{BlueberryTime: time.Time{}},
+				backend:           backend,
+				forkChecker: &forkChecker{
+					backend: backend,
 				},
 			}
 
@@ -559,22 +589,27 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
+
+			backend := &backend{
+				blkIDToState: map[ids.ID]*blockState{
+					parentID: {
+						timestamp:      test.parentTime,
+						statelessBlock: parentStatelessBlk,
+					},
+				},
+				Mempool: mempool,
+				state:   s,
+				ctx: &snow.Context{
+					Log: logging.NoLog{},
+				},
+				// Blueberry is activated
+				cfg: &config.Config{BlueberryTime: time.Time{}},
+			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{},
-				backend: &backend{
-					blkIDToState: map[ids.ID]*blockState{
-						parentID: {
-							timestamp:      test.parentTime,
-							statelessBlock: parentStatelessBlk,
-						},
-					},
-					Mempool: mempool,
-					state:   s,
-					ctx: &snow.Context{
-						Log: logging.NoLog{},
-					},
-					// Blueberry is activated
-					cfg: &config.Config{BlueberryTime: time.Time{}},
+				backend:           backend,
+				forkChecker: &forkChecker{
+					backend: backend,
 				},
 			}
 
@@ -614,30 +649,35 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 		ApricotPhase5Time: time.Now().Add(time.Hour),
 		BlueberryTime:     mockable.MaxTime,
 	}
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			grandParentID: {
+				standardBlockState: standardBlockState{
+					inputs: atomicInputs,
+				},
+				statelessBlock: grandParentStatelessBlk,
+				onAcceptState:  grandParentState,
+			},
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentState,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: config,
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: config,
 		},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				grandParentID: {
-					standardBlockState: standardBlockState{
-						inputs: atomicInputs,
-					},
-					statelessBlock: grandParentStatelessBlk,
-					onAcceptState:  grandParentState,
-				},
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					onAcceptState:  parentState,
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-			cfg: config,
+		backend: backend,
+		forkChecker: &forkChecker{
+			backend: backend,
 		},
 	}
 

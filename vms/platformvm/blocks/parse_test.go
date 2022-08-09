@@ -234,7 +234,7 @@ func TestAtomicBlock(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		atomicBlk, err := NewAtomicBlock(
+		atomicBlk, err := NewApricotAtomicBlock(
 			parentID,
 			height,
 			tx,
@@ -252,7 +252,7 @@ func TestAtomicBlock(t *testing.T) {
 		assert.Equal(atomicBlk.Height(), parsed.Height())
 		assert.Equal(time.Unix(0, 0), parsed.BlockTimestamp())
 
-		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
+		parsedAtomicBlk, ok := parsed.(*ApricotAtomicBlock)
 		assert.True(ok)
 		assert.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
 	}

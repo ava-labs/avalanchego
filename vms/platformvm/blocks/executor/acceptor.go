@@ -226,13 +226,13 @@ func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return a.standardBlock(b)
 }
 
-func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
+func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "atomic"),
+		zap.String("blockType", "apricot atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),

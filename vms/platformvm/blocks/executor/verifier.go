@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -30,6 +29,7 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
+	forkChecker       *forkChecker
 }
 
 func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
@@ -551,34 +551,7 @@ func (v *verifier) verifyCommonBlock(b blocks.Block) error {
 	}
 
 	// check whether block type is allowed in current fork
-	currentFork, err := v.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type against fork, %w", err)
-	}
-
-	switch b.(type) {
-	case *blocks.BlueberryAbortBlock,
-		*blocks.BlueberryCommitBlock,
-		*blocks.BlueberryProposalBlock,
-		*blocks.BlueberryStandardBlock:
-		if currentFork != forks.Blueberry {
-			return fmt.Errorf("block type %t not accepted on fork %s", b, currentFork)
-		}
-
-	case *blocks.ApricotAbortBlock,
-		*blocks.ApricotCommitBlock,
-		*blocks.ApricotProposalBlock,
-		*blocks.ApricotStandardBlock,
-		*blocks.AtomicBlock:
-		if currentFork != forks.Apricot {
-			return fmt.Errorf("block type %t not accepted on fork %s", b, currentFork)
-		}
-
-	default:
-		return fmt.Errorf("cannot tell whether block type %T is accepted on fork %s", b, currentFork)
-	}
-
-	return nil
+	return b.Visit(v.forkChecker)
 }
 
 func (v *verifier) validateBlockTimestamp(b blocks.Block) error {
@@ -629,7 +602,7 @@ func (v *verifier) validateBlockTimestamp(b blocks.Block) error {
 	}
 }
 
-func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
+func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {

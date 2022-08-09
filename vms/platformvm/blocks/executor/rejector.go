@@ -64,14 +64,16 @@ func (r *rejector) visitProposalBlock(b blocks.Block) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	tx := b.Txs()[0]
-	if err := r.Mempool.Add(tx); err != nil {
-		r.ctx.Log.Verbo(
-			"failed to reissue tx",
-			zap.Stringer("txID", tx.ID()),
-			zap.Stringer("blkID", blkID),
-			zap.Error(err),
-		)
+	txs := b.Txs()
+	for _, tx := range txs {
+		if err := r.Mempool.Add(tx); err != nil {
+			r.ctx.Log.Verbo(
+				"failed to reissue tx",
+				zap.Stringer("txID", tx.ID()),
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
+		}
 	}
 
 	r.state.AddStatelessBlock(b, choices.Rejected)
@@ -141,13 +143,13 @@ func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return r.visitStandardBlock(b)
 }
 
-func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
+func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 
 	r.ctx.Log.Verbo(
 		"rejecting block",
-		zap.String("blockType", "atomic"),
+		zap.String("blockType", "apricot atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),

@@ -98,7 +98,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewAtomicBlock(
+	blk, err := blocks.NewApricotAtomicBlock(
 		parentID,
 		1,
 		&txs.Tx{
@@ -117,7 +117,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.AtomicBlock(blk)
+	err = acceptor.ApricotAtomicBlock(blk)
 	assert.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -151,7 +151,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.AtomicBlock(blk)
+	err = acceptor.ApricotAtomicBlock(blk)
 	assert.NoError(err)
 }
 

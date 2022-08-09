@@ -1608,7 +1608,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewAtomicBlock(
+	statelessBlk, err := blocks.NewApricotAtomicBlock(
 		preferredID,
 		preferredHeight+1,
 		tx,

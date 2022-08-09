@@ -10,23 +10,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &AtomicBlock{}
+var _ Block = &ApricotAtomicBlock{}
 
-// AtomicBlock being accepted results in the atomic transaction contained in the
+// ApricotAtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
-type AtomicBlock struct {
+type ApricotAtomicBlock struct {
 	ApricotCommonBlock `serialize:"true"`
 
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-// NewAtomicBlock assumes [tx] is initialized
-func NewAtomicBlock(
+// NewApricotAtomicBlock assumes [tx] is initialized
+func NewApricotAtomicBlock(
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
-) (*AtomicBlock, error) {
-	res := &AtomicBlock{
+) (*ApricotAtomicBlock, error) {
+	res := &ApricotAtomicBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
@@ -37,15 +37,15 @@ func NewAtomicBlock(
 	return res, initialize(Block(res))
 }
 
-func (b *AtomicBlock) initialize(bytes []byte) error {
+func (b *ApricotAtomicBlock) initialize(bytes []byte) error {
 	if err := b.ApricotCommonBlock.initialize(bytes); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	return b.Tx.Sign(txs.Codec, nil)
 }
 
-func (b *AtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
+func (b *ApricotAtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
-func (b *AtomicBlock) Visit(v Visitor) error {
-	return v.AtomicBlock(b)
+func (b *ApricotAtomicBlock) Visit(v Visitor) error {
+	return v.ApricotAtomicBlock(b)
 }

@@ -106,7 +106,7 @@ func (m *blockMetrics) ApricotStandardBlock(b *blocks.ApricotStandardBlock) erro
 	return nil
 }
 
-func (m *blockMetrics) AtomicBlock(b *blocks.AtomicBlock) error {
+func (m *blockMetrics) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	m.numAtomicBlocks.Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }

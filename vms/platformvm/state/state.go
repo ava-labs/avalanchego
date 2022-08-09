@@ -1237,8 +1237,6 @@ func (s *state) writeBlocks() error {
 			sblk  = stateBlk
 		)
 
-		// Note that here we are marshalling a stateBlk, not stateless.Block.
-		// We use stateless.ApricotVersion for backward compatibility
 		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &sblk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal block %s to store with: %w", blkID, err)

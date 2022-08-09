@@ -49,6 +49,9 @@ func NewManager(
 	verifier := &verifier{
 		backend:           backend,
 		txExecutorBackend: txExecutorBackend,
+		forkChecker: &forkChecker{
+			backend: backend,
+		},
 	}
 	manager := &manager{
 		backend:  backend,
@@ -68,9 +71,9 @@ func NewManager(
 
 type manager struct {
 	*backend
-	verifier blocks.Visitor
-	acceptor blocks.Visitor
-	rejector blocks.Visitor
+	verifier *verifier
+	acceptor *acceptor
+	rejector *rejector
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {

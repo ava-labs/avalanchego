@@ -62,7 +62,7 @@ func (b *Block) Timestamp() time.Time {
 		*blocks.ApricotCommitBlock,
 		*blocks.ApricotProposalBlock,
 		*blocks.ApricotStandardBlock,
-		*blocks.AtomicBlock:
+		*blocks.ApricotAtomicBlock:
 		// If this is the last accepted block and the block was loaded from disk
 		// since it was accepted, then the timestamp wouldn't be set correctly. So,
 		// we explicitly return the chain time.

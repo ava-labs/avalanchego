@@ -58,7 +58,7 @@ func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&ApricotAbortBlock{}),
 		targetCodec.RegisterType(&ApricotCommitBlock{}),
 		targetCodec.RegisterType(&ApricotStandardBlock{}),
-		targetCodec.RegisterType(&AtomicBlock{}),
+		targetCodec.RegisterType(&ApricotAtomicBlock{}),
 	)
 	return errs.Err
 }
