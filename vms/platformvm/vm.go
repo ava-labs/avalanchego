@@ -72,17 +72,17 @@ type VM struct {
 	Factory
 	p_blk_builder.BlockBuilder
 
-	metrics p_metrics.Metrics
+	metrics            p_metrics.Metrics
+	atomicUtxosManager avax.AtomicUTXOManager
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
 
+	uptimeManager uptime.Manager
+
 	// The context of this vm
 	ctx       *snow.Context
 	dbManager manager.Manager
-
-	atomicUtxosManager avax.AtomicUTXOManager
-	uptimeManager      uptime.Manager
 
 	state state.State
 

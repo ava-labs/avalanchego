@@ -32,7 +32,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	err := env.BlockBuilder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
-	has := env.mpool.Has(txID)
+	has := env.mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
@@ -44,7 +44,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert.Len(blk.Txs(), 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs()[0].ID(), "standard block does not include expected transaction")
 
-	has = env.mpool.Has(txID)
+	has = env.mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
@@ -63,33 +63,33 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
-	assert.NoError(env.mpool.Add(tx))
-	assert.True(env.mpool.Has(txID))
-	_, isDropped := env.mpool.GetDropReason(txID)
+	assert.NoError(env.mempool.Add(tx))
+	assert.True(env.mempool.Has(txID))
+	_, isDropped := env.mempool.GetDropReason(txID)
 	assert.False(isDropped)
 
 	// When a tx is marked as dropped, it is still available to allow re-issuance
-	env.mpool.MarkDropped(txID, "dropped for testing")
-	assert.True(env.mpool.Has(txID)) // still available
-	_, isDropped = env.mpool.GetDropReason(txID)
+	env.mempool.MarkDropped(txID, "dropped for testing")
+	assert.True(env.mempool.Has(txID)) // still available
+	_, isDropped = env.mempool.GetDropReason(txID)
 	assert.True(isDropped)
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	switch tx.Unsigned.(type) {
 	case txs.StakerTx:
-		env.mpool.PopProposalTx()
+		env.mempool.PopProposalTx()
 	case *txs.CreateChainTx,
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		env.mpool.PopDecisionTxs(math.MaxInt64)
+		env.mempool.PopDecisionTxs(math.MaxInt64)
 	default:
 		t.Fatal("unknown tx type")
 	}
-	assert.NoError(env.mpool.Add(tx))
+	assert.NoError(env.mempool.Add(tx))
 
-	assert.True(env.mpool.Has(txID))
-	_, isDropped = env.mpool.GetDropReason(txID)
+	assert.True(env.mempool.Has(txID))
+	_, isDropped = env.mempool.GetDropReason(txID)
 	assert.False(isDropped)
 }

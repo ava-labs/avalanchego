@@ -85,7 +85,7 @@ type mutableSharedMemory struct {
 type environment struct {
 	BlockBuilder
 	blkManager blockexecutor.Manager
-	mpool      mempool.Mempool
+	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
 	isBootstrapped *utils.AtomicBool
@@ -177,12 +177,12 @@ func newEnvironment(t *testing.T) *environment {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
 
-	res.mpool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
 	res.blkManager = blockexecutor.NewManager(
-		res.mpool,
+		res.mempool,
 		metrics,
 		res.state,
 		&res.backend,
@@ -190,7 +190,7 @@ func newEnvironment(t *testing.T) *environment {
 	)
 
 	res.BlockBuilder = NewBlockBuilder(
-		res.mpool,
+		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
