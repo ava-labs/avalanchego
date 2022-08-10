@@ -38,7 +38,7 @@ jobs:
           then
             echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
            else
-            echo ::set-output name=VERSION::${{inputs.tag}}
+            echo ::set-output name=VERSION::${{ inputs.tag }}
           fi
         shell: bash
 
